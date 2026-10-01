@@ -16,6 +16,8 @@ import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageInclusionsOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
+import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
+import {createRequire} from 'node:module';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -237,6 +239,10 @@ export function resolveConfig(options={},env=process.env){
     declaredTokenRef:project?.tokenRef??null,
     disabled:decl?.mode==='disabled'?(decl.reason??'the stack declaration disables Sonar'):null,
     declaration:decl?{file:decl.file,provider:decl.provider,mode:decl.mode,projects:decl.projects.map(p=>p.key),ci:decl.ci?.wiring??null,ownerAction:decl.ownerAction}:(declarationError?{error:declarationError}:null),
+    // specs: the owner's product-test switches ({unit}); null reads config.yaml `specs` per scan. coverageRunner: the
+    // function that writes the slice's lcov (runSliceCoverage); a spec passes its own.
+    specs:options.specs??null,
+    coverageRunner:options.coverageRunner??null,
     timeoutMs:Number(options.timeoutMs??8000),
     pollMs:Number(options.pollMs??3000),
     fetch:options.fetch??globalThis.fetch,
@@ -816,6 +822,48 @@ export function duplicatedLinesOf(doc,fileKey){
   return lines;
 }
 
+/**
+ * The be unit run over the slice's services alone, writing the lcov Sonar imports: jest from the directory two levels above
+ * the lcov report (`be/coverage/lcov.info` -> be/, the preset's coverageDirectory under its rootDir), the unit project, the
+ * specs related to `files` and coverage collected from `files` only, so the per-file threshold and the report name exactly
+ * the services the slice touched. Returns {exitCode, error}.
+ */
+export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
+  let bin;
+  try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
+  catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
+  const collect=files.flatMap(file=>['--collectCoverageFrom',file]);
+  const run=spawnSync(process.execPath,[bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:64*1024*1024});
+  return {exitCode:run.status,error:run.error?String(run.error.message):null};
+}
+
+/**
+ * Before a slice scan: the services the slice touched (changed files inside sonar.coverage.inclusions) get a fresh lcov at
+ * sonar.javascript.lcov.reportPaths, written by the be unit run over their related specs (cfg.coverageRunner, default
+ * runSliceCoverage), so Sonar imports this slice's coverage and never a stale report. With the owner's specs.unit off
+ * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
+ * runs and the slice's coverage is not judged (`judged` false). Returns {judged, targets, lcov, exitCode?, written?, error?, note?}.
+ */
+export function prepareSliceCoverage(cfg,{cwd,props,slice}){
+  const inclusions=coverageInclusionsOf(props);
+  if(!inclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.inclusions'};
+  const specs=cfg.specs??specsSettings(inspectOwnerConfig().config);
+  if(specs.unit===false)return {judged:false,targets:[],note:'specs.unit=false (owner config.yaml specs): the slice writes no unit test and its coverage is not judged'};
+  const isTarget=coverageTargetOf(inclusions);
+  const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
+  if(!targets.length)return {judged:true,targets};
+  const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).filter(Boolean)[0];
+  if(!lcov)return {judged:true,targets,error:'sonar-project.properties names no sonar.javascript.lcov.reportPaths: the coverage of the slice\'s services cannot be imported'};
+  const jestCwd=path.resolve(cwd,path.dirname(path.dirname(lcov)));
+  const lcovFile=path.resolve(cwd,lcov);
+  fs.rmSync(lcovFile,{force:true});
+  const relative=targets.map(file=>posixPath(path.relative(jestCwd,path.join(cwd,file))));
+  const ran=(cfg.coverageRunner??runSliceCoverage)({jestCwd,files:relative});
+  const written=fs.existsSync(lcovFile);
+  return {judged:true,targets,lcov,exitCode:ran.exitCode??null,written,
+    ...(ran.error||!written?{error:ran.error??`the unit run (exit ${ran.exitCode}) wrote no ${lcov}`}:{})};
+}
+
 /** The Sonar `coverage` measure of one file, a number or null when Sonar holds none; {error} when the server cannot answer. */
 async function fileCoverage(cfg,tokens,fileKey){
   const got=await read(cfg,tokens,`/api/measures/component?component=${encodeURIComponent(fileKey)}&metricKeys=coverage`);
@@ -831,7 +879,7 @@ async function fileCoverage(cfg,tokens,fileKey){
  * (a changed file inside sonar.coverage.inclusions of `props`; any other file is not a coverage target).
  * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate())}){
+export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate()),coverageRun=null}){
   const qualifierOf=fileQualifier(props,pkg);
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
@@ -899,14 +947,17 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
   const inclusions=coverageInclusionsOf(props);
   const isTarget=coverageTargetOf(inclusions);
   const measured=[];
-  for(const fileKey of keys){
+  for(const fileKey of coverageRun?.judged===false?[]:keys){
     const file=analyzed.get(fileKey);
     if(qualifierOf(file.path)!=='FIL'||!isTarget(file.path))continue;
     const got=await fileCoverage(cfg,tokens,fileKey);
     if(got.error)return {error:`coverage of ${file.path} could not be read: ${got.error}`};
     measured.push({path:file.path,coverage:got.coverage});
   }
-  const coverage=judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+  const coverage=coverageRun?.judged===false
+    ?{applied:false,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
+    :judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+  if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
   failures.push(...coverage.failures);
   return {error:null,result:{
     analyzedFiles:keys.length,notAnalyzed,
@@ -1043,6 +1094,10 @@ export async function scan(cfg,options={}){
       }
     }
   }
+  // The slice's services get their own fresh lcov before the scanner reads it (a project-gate scan imports the report the
+  // last `npm test` wrote).
+  const coverageRun=slice?prepareSliceCoverage(cfg,{cwd,props,slice}):null;
+  if(coverageRun)summary.coverageRun=coverageRun;
   const analysisToken=token.value;
   const childEnv={...process.env,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
 
@@ -1106,7 +1161,7 @@ export async function scan(cfg,options={}){
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate,coverageRun});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});

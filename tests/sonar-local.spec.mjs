@@ -195,7 +195,8 @@ const CHILD_TIMEOUT_MS=allocationMs('landGate.perSpecMs');
 
 function configFor(host,custody,extra={}){
   // record: a re-mint event of a spec never reaches the supervisor ledger.
-  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},...extra};
+  // specs: the owner switches are fixed (unit on), never the developer's config.yaml.
+  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},specs:{unit:true,e2e:false},...extra};
 }
 
 const assertNoSecret=(value,label)=>{
@@ -417,6 +418,12 @@ fs.writeFileSync(path.join(d['sonar.working.directory'],'report-task.txt'),'proj
 
 /** The slice files of a services repository: two services and a resolver (not a coverage target). */
 const SERVICE_SLICE=['src/orders/order.service.js','src/orders/payment.service.js','src/orders/order.resolver.js'];
+/** A unit run stand-in: records what it was asked and writes the lcov where jest would (coverage/ under its cwd). */
+const lcovRunner=(calls=[],{write=true,exitCode=0}={})=>Object.assign(({jestCwd,files})=>{
+  calls.push({jestCwd,files});
+  if(write){fs.mkdirSync(path.join(jestCwd,'coverage'),{recursive:true});fs.writeFileSync(path.join(jestCwd,'coverage','lcov.info'),files.map(f=>`SF:${f}\nend_of_record`).join('\n'));}
+  return {exitCode,error:null};
+},{calls});
 const serviceSources=()=>knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,...Object.fromEntries(SERVICE_SLICE.map(file=>[file,4]))}});
 
 test('--blob stores both the sanitized scanner log and the Sonar report', async t => {
@@ -920,7 +927,8 @@ test('the slice holds every service it touched at 100 coverage: one service belo
   const custody=fakeCustody(temporary(t,'cov-custody'));
   // One service at 87.5 fails although the other is at 100 and the resolver beside it sits at 10.
   const red=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':87.5,'src/orders/order.resolver.js':10}});
-  const failed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-red'),{services:true}),'--wait'],{config:configFor(red.host,custody)});
+  const runner=lcovRunner();
+  const failed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-red'),{services:true}),'--wait'],{config:configFor(red.host,custody,{coverageRunner:runner})});
   assert.equal(failed.exitCode,1,JSON.stringify(failed.report.slice));
   assert.equal(failed.report.outcome,'fail');
   assert.deepEqual(failed.report.slice.coverage.files,[
@@ -928,19 +936,32 @@ test('the slice holds every service it touched at 100 coverage: one service belo
     {path:'src/orders/payment.service.js',coverage:87.5,ok:false},
   ],'only the services are coverage targets');
   assert.deepEqual(failed.report.slice.coverage.failures,['coverage of src/orders/payment.service.js 87.5% < 100%']);
+  // The unit run before the scanner measured the slice's two services only, into the lcov the properties import.
+  assert.deepEqual(runner.calls.map(c=>c.files.sort()),[['src/orders/order.service.js','src/orders/payment.service.js']]);
+  assert.deepEqual([failed.report.coverageRun.lcov,failed.report.coverageRun.written,failed.report.coverageRun.judged],['coverage/lcov.info',true,true]);
   assert.match(failed.report.reason,/coverage of src\/orders\/payment\.service\.js 87\.5% < 100%/);
   assert.doesNotMatch(failed.report.reason,/resolver/,'the resolver is not judged');
   assert.ok(!red.state.requests.some(r=>r.path==='/api/measures/component'&&String(r.query.component).endsWith('order.resolver.js')),'a non-service file\'s coverage is never read');
   // Every service at 100 passes, whatever the resolver's coverage.
   const green=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100,'src/orders/order.resolver.js':0}});
-  const passed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-green'),{services:true}),'--wait'],{config:configFor(green.host,custody)});
+  const passed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-green'),{services:true}),'--wait'],{config:configFor(green.host,custody,{coverageRunner:lcovRunner()})});
   assert.equal(passed.exitCode,0,JSON.stringify(passed.report.slice));
   assert.deepEqual(passed.report.slice.coverage.failures,[]);
   // A service the lcov does not name has no measure: never a pass.
   const missing=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100}});
-  const absent=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-missing'),{services:true}),'--wait'],{config:configFor(missing.host,custody)});
+  const absent=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-missing'),{services:true}),'--wait'],{config:configFor(missing.host,custody,{coverageRunner:lcovRunner()})});
   assert.equal(absent.exitCode,1);
   assert.match(absent.report.reason,/src\/orders\/payment\.service\.js has no coverage measure/);
+  // A unit run that writes no lcov is a failure of its own, never a stale or absent report read as a pass.
+  const broken=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-broken'),{services:true}),'--wait'],{config:configFor(green.host,custody,{coverageRunner:lcovRunner([],{write:false,exitCode:1})})});
+  assert.equal(broken.exitCode,1);
+  assert.match(broken.report.reason,/the slice's services could not be measured: the unit run \(exit 1\) wrote no coverage\/lcov\.info/);
+  // With the owner's specs.unit off the slice writes no unit test: nothing runs and coverage is not judged.
+  const offRunner=lcovRunner();
+  const off=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-off'),{services:true}),'--wait'],{config:configFor(red.host,custody,{coverageRunner:offRunner,specs:{unit:false,e2e:false}})});
+  assert.equal(off.exitCode,0,JSON.stringify(off.report.slice));
+  assert.deepEqual([off.report.slice.coverage.applied,offRunner.calls.length],[false,0]);
+  assert.match(off.report.slice.coverage.note,/specs\.unit=false/);
 });
 
 test('dashboard prints the project numbers and fails unless bugs, smells and vulnerabilities are 0, hotspots reviewed and every service at 100', async t => {

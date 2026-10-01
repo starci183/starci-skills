@@ -587,14 +587,14 @@ sections:
     blocks:
       - "Owner rule 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root
         `specs: {unit, e2e}` switches product testing per class; unit is on unless set false, e2e is off unless set true (defaults 2026-09-29).
-        unit covers the back end's unit tests (*.service.spec.ts; jest and its per-file coverage threshold; the front end
-        has no tests and Sonar takes no coverage); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
+        unit covers the back end's unit tests (*.service.spec.ts; jest and its per-file coverage threshold, and the
+        services' coverage Sonar judges; the front end has no tests); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the
         legs behind it proceed. skip - the op runs without writing or running that class of test and demands
-        no coverage of it; Sonar still runs, so bugs, smells and security findings still
-        gate. not-counted - a review or handover gate does not count an absent test or coverage of that class
+        no coverage of it; Sonar still runs (sonar-local reads specs.unit and judges no coverage while it is off), so
+        bugs, smells and security findings still gate. not-counted - a review or handover gate does not count an absent test or coverage of that class
         (api coverage drops that requiresProof kind from must-haves). The dispatch prompt prints a `specs:`
         line naming the classes that are off; it overrides every test, coverage and e2e step, proof and
         blocker of the brief, and a skipped gate is recorded as a check named specs.unit or specs.e2e with

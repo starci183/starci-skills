@@ -32,10 +32,12 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
   real source. The unit project overlays `isolatedModules: false` and `importHelpers: true` on the repository tsconfig (ts-jest merges an
   inline `tsconfig` object over the `tsconfig.json` it finds): with `isolatedModules` on, TypeScript emits an unreachable
   `typeof Dep !== "undefined" ? Dep : Object` guard per class-typed constructor parameter, and inlined decorator helpers carry branches
-  of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary` and
-  `text`; there is no `lcov`.
-- **Sonar does not read coverage.** `sonarCoverageExclusions()` and the lcov report are removed. `sonarExclusions()` still renders
-  `sonar.exclusions` (`**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**`); the quality gate fails on imported issues only.
+  of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary`,
+  `text` and `lcov`: the run writes `coverage/lcov.info` under the repository (be/) root.
+- **Sonar and Codecov import that lcov, scoped to the services.** `hfs sync` renders `sonar.coverage.inclusions` and the `codecov.yml`
+  status paths from `COVERAGE_SOURCES` on the be side (`be/src/**/*.service.ts`), so jest, Sonar and Codecov measure the same files;
+  the Sonar gate holds coverage at 100 overall, on new code and per file. `sonarExclusions()` still renders `sonar.exclusions`
+  (`**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**`). There is no coverage exclusion list.
 
 ## The unit standard in one page
 

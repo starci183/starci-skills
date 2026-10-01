@@ -554,23 +554,30 @@ rules:
         - Confirm a new service ships its spec in the same change and the unit project stays at 100.
     relatedExamples: []
   - id: BE-TEST-14
-    title: Sonar does not depend on coverage
+    title: Sonar and Codecov judge the services' coverage, from the one scope
     kind: mandatory
     hfsRules: [R11]
     requirement: |-
-      Sonar analysis takes no coverage: `sonar-project.properties` has no lcov report path and no coverage exclusions, the quality
-      gate has no coverage condition, and CI uploads no coverage report (Codecov is removed unless a convention separately requires
-      it). The gate keeps failing on any imported issue (eslint, stylelint, hfs, architecture). Coverage is enforced by the unit
-      project's own threshold (BE-TEST-13), in the `test` script, not by an external service.
+      The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
+      it with ONE scope, the services: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
+      `sonar.coverage.inclusions=be/src/**/*.service.ts` and no other coverage key; the managed `codecov.yml` holds the same paths at
+      100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. hfs sync
+      renders the scope into both files from the jest preset's `COVERAGE_SOURCES`, so it can never drift. The Sonar gate
+      (`knowledge/sonar-gate.yaml`) holds coverage at 100 overall and on new code, and the runtime judges it per file: one service
+      below 100 fails. Handlers, resolvers, controllers, modules, config and tests are not coverage targets; fe/ has no tests.
     rationale: |-
-      One authority for the coverage bar avoids two denominators that disagree, and Sonar stays a gate on code issues.
+      One denominator everywhere: the unit project's per-file 100 on services (BE-TEST-13), the Sonar dashboard and Codecov show
+      the same number for the same files, so a gap in any one service is visible and blocking wherever it is read.
     cases:
       - id: case-1
         when: sonar-project.properties
-        write: 'no sonar.javascript.lcov.reportPaths and no sonar.coverage.exclusions; hfs sync renders the file'
+        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.inclusions=be/src/**/*.service.ts, no coverage exclusion; hfs sync renders the file'
       - id: case-2
         when: CI
-        write: 'the workflow runs `npm test` (which enforces per-file 100) and uploads no coverage'
+        write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action and the CODECOV_TOKEN secret'
+      - id: case-3
+        when: codecov.yml
+        write: 'project and patch status target 100% on paths be/src/**/*.service.ts, fe/** ignored; hfs sync renders the file from the same scope as Sonar'
     verification:
       automated:
         - HFS_SONAR_CONFIG

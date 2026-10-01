@@ -1,0 +1,47 @@
+id: sonar-services-coverage
+effectiveAt: '2026-10-01T22:00:00+07:00'
+summary: >-
+  Lane C0 SONAR (owner 2026-10-01, reverses "Sonar has no coverage" of ut-unit-standard and "Codecov stays removed"): Sonar and
+  Codecov judge coverage, scoped to the back end's services only, from ONE scope. (1) @starci/jest-preset 2.2.2 adds the lcov
+  reporter: the unit run writes coverage/lcov.info (be/coverage/lcov.info from the app root); coverage is still collected from
+  src/**/*.service.ts only at per-file 100. (2) hfs sync renders the scope once, coverageScope(presets) = the installed preset's
+  COVERAGE_SOURCES under be/: the managed sonar-project.properties adds sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and
+  sonar.coverage.inclusions=be/src/**/*.service.ts (no other coverage key); a new managed codecov.yml (slot app.quality-config,
+  now {sonar-project.properties,codecov.yml}) holds the same paths at 100 on the project and the patch and ignores fe/**; the
+  managed CI workflow uploads the lcov with codecov/codecov-action@v5 and the CODECOV_TOKEN secret after the unit run. fe/ is
+  outside coverage; handlers, resolvers, controllers, modules, config and tests are not coverage targets. (3)
+  knowledge/sonar-gate.yaml holds coverage 100 on new code (new_coverage) and overall (coverage, perFile), and every hotspot
+  reviewed overall (security_hotspots_reviewed); serverConditions carries them. (4) The runtime judges per file
+  (scripts/checks/sonar-gate.mjs judgeCoverage, judgeDashboard): one service below 100, or a service with no coverage measure,
+  fails; a file outside the inclusions is never read. sonar-local scan first runs the unit specs related to every service the
+  slice touched with coverage into the imported lcov (prepareSliceCoverage), so an op's slice is judged on fresh numbers, and
+  judges no coverage while the owner's specs.unit is off; the failure reaches settle as sonar-gate-red. sonar-local dashboard
+  prints a project's bugs, code smells, vulnerabilities, hotspots reviewed, coverage and per-service coverage and fails unless
+  all are at the gate. (5) R11 law and HFS_SONAR_CONFIG text, BE-TEST-14 and the docs state the import. Apps and examples
+  re-render with `hfs sync --write`. A leg admitted earlier settles on its old contract.
+reach: new-legs
+ops: [backend.implement, interface.implement, code.refactor]
+paths:
+  - modules/kernel/contract-changes/sonar-services-coverage.yaml
+  - packages/jest-preset/index.cjs
+  - packages/jest-preset/package.json
+  - packages/jest-preset/README.md
+  - packages/jest-preset/CHANGELOG.md
+  - packages/hfs/sync/index.mjs
+  - packages/hfs/sync/managed.mjs
+  - packages/hfs/templates
+  - packages/hfs/README.md
+  - packages/hfs/CHANGELOG.md
+  - knowledge/sonar-gate.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/test.yaml
+  - knowledge/index.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/_common.yaml
+  - scripts/checks/sonar-gate.mjs
+  - scripts/checks/sonar-local.mjs
+  - docs/config-format.md
+  - ext/sonar/README.md

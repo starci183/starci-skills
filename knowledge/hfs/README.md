@@ -428,7 +428,7 @@ no contract copy under `fe/`.
   `{ fakedBy, reason }`; a stateful service (database, cache, identity, storage, mail, queue, search, or one with a persistent volume)
   never is (R47 `test-world-files`).
 - Backend specs never skip themselves (R48 `spec-no-skip`: no `skip`, `skipIf`, `runIf`, `todo`, `only`, `xit`, and no conditional runner); the one skip is the test-world library's `useSandbox(...)`, which skips a contract spec when its sandbox config is absent; no app file, world helpers included, writes a skip. An integration or e2e spec passes `useTestWorld` one object literal (R47 `test-world-shape`). Every `fakes/<provider>/` with `payloads/*.json` needs a `contract/<provider>/*.contract-spec.ts` asserting `shapeOf(real)` equals `shapeOf(fixture)` (R47 `contract-fixture-guard`, helper named by `ruleParams.be.contractShape`).
-- Integration, e2e and contract run by hand: no husky, lint-staged, default typecheck, coverage, Codecov or automatic
+- Integration, e2e and contract run by hand: no husky, lint-staged, default typecheck, coverage, Codecov upload or automatic
   CI; the e2e workflow is `workflow_dispatch` only (R12). `test:contract` is never part of `test` or `test:e2e`.
 - Backend: one `be/jest.config.js` (preset `@starci/jest-preset`) with exactly the projects `unit`, `integration`, `e2e`
   and `contract`; ts-jest `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs
@@ -499,7 +499,7 @@ no contract copy under `fe/`.
 | OS op settle | the op gate `scripts/checks/gate.mjs` over the op's changed files, forced every round of the op loop: the merge guard, `hfs lint --changed`, `codegen` and package builds, `tsc` per owning tsconfig, the slice's specs; only findings new against the base block; `api settle` re-reads the attached gate JSON and READ digest and refuses a red `done` | per op | every file-level and owner-level rule in scope |
 | LG land | the Kernel's landing of a green op: the op branch rebased onto main, `gate.mjs` re-run over the rebased tree against main (merge guard included), then main fast-forwarded and pushed | per op | as OS, against the newest main |
 | CI GitHub | `npm ci`, `npm run lint -- --sonar reports/lint.sonar.json` (the pinned `hfs lint`), `format:check`, `typecheck`, `npm test` (unit with the per-file coverage threshold), `build:be`, `build:fe`, the Sonar scan and gate | | every rule |
-| SQ Sonar | the imported lint findings, duplication, cognitive complexity; no coverage condition (coverage is the unit project's per-file 100 on `be/src/**/*.service.ts`) | | R20, R21 (second gate) |
+| SQ Sonar | the imported lint findings, duplication, cognitive complexity and coverage 100 on `be/src/**/*.service.ts` (overall, new code and per file; the be unit run's lcov, the same per-file 100 the unit project enforces) | | R20, R21 (second gate) |
 
 A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manifest, not an app.
 
@@ -531,7 +531,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R08 | `HFS_WORK_NODE_RETIRED` | Only flat family records, never `work/node`. |
 | R09 | `HFS_IDENTITY_CUSTODY` | An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role. |
 | R10 | `HFS_STACKS_SHAPE` | `.starcistacks` has the standard shape and the host Sonar owner. |
-| R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and no coverage import. |
+| R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL, importing the be lcov with the services as the only coverage scope. |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. |
 | R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. |
 | R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, a root `overrides` pin included, and npm is the only package manager. |
