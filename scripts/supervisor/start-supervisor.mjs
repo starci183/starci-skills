@@ -23,8 +23,8 @@
 //   2. the seat (machine.sqlite seats row 'supervisor', scripts/supervisor/home.mjs seatOf/writeSeat): a 'starting'
 //      reservation with an expiry, then the attested worker (its Dispatch and terminal). A seat whose Dispatch
 //      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
-//   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
-//      tab or a terminal an open worker job owns never is): bare shells and extra sessions are quit and closed.
+//   3. dedupe by OWNERSHIP (seat-sessions.mjs): a terminal sup_events records as a seat session that is not the
+//      current seat is a duplicate: quit and closed. A terminal merely titled "[Supervisor]" is never touched.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,10 +35,11 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine, pidAlive } from '../../engine/machine-db.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
+  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, STARTUP_RESERVATION_MS,
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
+import { recordedSeatTerminals, seatSessions, entryTerminalOf } from './seat-sessions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const EXIT_HOST_UNAVAILABLE = 75;
@@ -147,22 +148,7 @@ export function seatHealth(seat, deps) {
 }
 
 /**
- * Every Orca terminal carrying the [Supervisor] marker (tab or pane title): [{handle, tabTitle, paneTitle, agent, connected}].
- * A [Worker] is never one: its tab title says [Worker], and a terminal an open job owns (`owned`, workers.mjs
- * openWorkerHandles) is excluded whatever its agent wrote into the pane title. Workers sit in the same Orca
- * project as the seat, and a pane title that mentions the Supervisor must not get a live worker closed.
- */
-export function supervisorTerminals(listing, tabTitlesOf = () => new Map(), { owned = new Set() } = {}) {
-  const terminals = listing?.terminals ?? [];
-  const tabs = tabTitlesOf(listing?.visualLayouts ?? [], terminals);
-  return terminals.filter((t) => t?.handle && t.connected !== false)
-    .map((t) => ({ handle: t.handle, tabTitle: tabs.get(t.handle) ?? null, paneTitle: t.title ?? null, agent: t.agentIdentity ?? null, worktreePath: t.worktreePath ?? null }))
-    .filter((t) => !owned.has(t.handle) && !WORKER_MARKER.test(t.tabTitle ?? ''))
-    .filter((t) => SUPERVISOR_MARKER.test(`${t.tabTitle ?? ''} ${t.paneTitle ?? ''}`));
-}
-
-/**
- * The dedupe plan: the seat terminal is kept; every other marked terminal is closed - a terminal is never adopted
+ * The dedupe plan: the seat terminal is kept; every other recorded seat session is closed - a terminal is never adopted
  * as the seat (every seat is a worker-start worker). `screenOf(handle)` reads a frame (null = unreadable: kept).
  * Returns {close: [entry], keep: [entry]}.
  */
@@ -235,7 +221,8 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     let listing = null;
     try { listing = d.list(); } catch (e) { listing = { ok: false, error: String(e?.message ?? e) }; }
     if (listing?.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: listing.error ?? 'terminal list did not answer' };
-    const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles, { owned: openWorkerHandles(m) }) : [];
+    const recorded = recordedSeatTerminals(m);
+    const marked = listing?.ok ? seatSessions(listing, recorded, d.tabTitles) : [];
     const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, screenOf: d.screen, exitedRow: d.exitedRow });
 
     if (planOnly) return { ok: true, exit: 0, action: 'plan', enabled, seat: seat?.value ?? null, health, dedupe,
@@ -274,7 +261,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     });
     const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
       specFile: path.join(SKILL_ROOT, 'runtime', 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
-      entry: env.ORCA_TERMINAL_HANDLE || null, priorRunId: seat?.value?.runId ?? null });
+      entry: entryTerminalOf({ env, listing, recorded, owned: openWorkerHandles(m) }), priorRunId: seat?.value?.runId ?? null });
     if (!spawned?.ok) {
       m.transaction(() => {
         clearSeat(m, { token });
