@@ -1,7 +1,7 @@
 /**
  * Twin tests for the naming rules.
  *
- *   node --test naming.test.mjs
+ *   node --test naming.spec.mjs
  *
  * The cases that matter here are the NEGATIVE ones. Both rules are narrow on purpose, and a rule
  * that widens quietly is worse than one that misses: the day `handlerOnPrefix` starts firing on a

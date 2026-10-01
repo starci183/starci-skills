@@ -1,7 +1,7 @@
 /**
  * Twin tests for the connection rules (R84, R88 `em-injection-slots`).
  *
- *   node --test connections.test.mjs
+ *   node --test connections.spec.mjs
  *
  * The fixture repository declares one connection, `primary` (env prefix `PRIMARY_DB`). Files are virtual paths under the
  * typed fixture root, so the HFS slot of each case comes from its path and the types from the stubs beside it.

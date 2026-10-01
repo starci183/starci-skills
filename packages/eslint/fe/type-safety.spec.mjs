@@ -1,7 +1,7 @@
 /**
  * Twin tests for the type-safety rule.
  *
- *   node --test type-safety.test.mjs
+ *   node --test type-safety.spec.mjs
  *
  * The single cast is the case that matters. `x as T` is a narrowing the compiler can still partly
  * check, and forbidding it would make the rule an argument rather than a boundary - so the valid

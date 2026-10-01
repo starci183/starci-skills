@@ -4,7 +4,7 @@
  * findings of its codes on the file ESLint visits. The trees below are the violating and the passing trees of
  * tests/architecture-*.spec.mjs, written to a hermetic repository (hfs.json, tsconfig, the files listed).
  *
- *   node --test project-graph.owners.test.mjs
+ *   node --test project-graph.owners.spec.mjs
  */
 import test from "node:test"
 import { projectFixture } from "../be/fixtures/project/tester.mjs"

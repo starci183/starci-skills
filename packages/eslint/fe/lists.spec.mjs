@@ -1,7 +1,7 @@
 /**
  * Twin tests for the list rules (`FE_LIST_KEY`, under R65).
  *
- *   node --test lists.test.mjs
+ *   node --test lists.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

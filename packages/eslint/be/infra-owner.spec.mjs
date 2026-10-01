@@ -1,7 +1,7 @@
 /**
  * Twin tests for the infrastructure-owner law (R90 `BE_INFRA_OWNER`).
  *
- *   node --test infra-owner.test.mjs
+ *   node --test infra-owner.spec.mjs
  *
  * The table under test is the one the slot manifest ships (`ruleParams.be.infraOwners`); a case's path decides which
  * capability owns the file.

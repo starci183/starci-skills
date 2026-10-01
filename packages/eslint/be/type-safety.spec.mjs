@@ -1,10 +1,10 @@
 /**
  * Twin tests for the type-safety rules.
  *
- *   node --test type-safety.test.mjs
+ *   node --test type-safety.spec.mjs
  *
  * The assertion rules (`as`, `x!`, `any`) are the factory's borrowed typescript-eslint rules and are held by
- * `config.test.mjs`; a spec is judged by every rule here exactly like product code.
+ * `config.spec.mjs`; a spec is judged by every rule here exactly like product code.
  */
 import assert from "node:assert/strict"
 import test from "node:test"

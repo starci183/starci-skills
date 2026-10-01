@@ -1,7 +1,7 @@
 /**
  * Twin tests for the `starciFeConfig` factory and the Vietnamese why map.
  *
- *   node --test config.test.mjs
+ *   node --test config.spec.mjs
  *
  * The failure this file exists to catch is the silent one: a factory that returns a block with a
  * rule missing, or at `warn`, or `off`, lints clean and is indistinguishable from adoption.

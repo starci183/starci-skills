@@ -1,7 +1,7 @@
 /**
  * Twin tests for the file-layout rules.
  *
- *   node --test file-layout.test.mjs
+ *   node --test file-layout.spec.mjs
  *
  * These rules ask the HFS slot view, so the cases that matter are the ones where a path looks governed and
  * is not (a folder named like a layer that no slot owns) and where it is governed at an unusual place.

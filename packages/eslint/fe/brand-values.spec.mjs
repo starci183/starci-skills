@@ -1,7 +1,7 @@
 /**
  * Twin tests for the raw brand value rule (HFS R61, TypeScript half).
  *
- *   node --test brand-values.test.mjs
+ *   node --test brand-values.spec.mjs
  *
  * The cases that earn their place are the near misses: a fragment link that reads like a hex colour,
  * a component's `color="primary"` prop that reads like a paint, and a `data:` URI full of `#` and `px`.

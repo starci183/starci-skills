@@ -3,7 +3,7 @@
  * findings are judged by the architecture machine over the repository graph and served through ESLint (project-graph.mjs); each
  * block below ports the violating and the passing file trees of the machine specs (tests/architecture-*.spec.mjs).
  *
- *   node --test project-graph.routes.test.mjs
+ *   node --test project-graph.routes.spec.mjs
  */
 import test from "node:test"
 import { projectFixture } from "../be/fixtures/project/tester.mjs"

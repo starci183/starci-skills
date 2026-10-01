@@ -1,7 +1,7 @@
 /**
  * Twin tests for the icon rules.
  *
- *   node --test icon.test.mjs
+ *   node --test icon.spec.mjs
  *
  * The case that matters most is the SUBPATH one. The original escape imported a vendor subpath,
  * and a check comparing a package name for equality does not see it - so that case is asserted

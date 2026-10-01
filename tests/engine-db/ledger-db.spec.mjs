@@ -100,8 +100,8 @@ function preMetaLedgerFile(){
 test('the ledger schema carries every contract table, the meta identity, the drift trigger, and version 1',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,5);
-  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),5);
+  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,1);
+  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),LEDGER_VERSION);
   assert.equal(ledger.db.prepare('PRAGMA auto_vacuum').get().auto_vacuum,2);
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
@@ -281,7 +281,7 @@ test('inspectLedger refuses a missing file, and reflects the identity and versio
   assert.throws(()=>inspectLedger({file:path.join(dir,'missing.sqlite')}),/existing file/);
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});const id=ledger.ledgerId;ledger.close();
   const inspect=inspectLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(inspect.version,5);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
+  assert.equal(inspect.version,LEDGER_VERSION);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
   assert.equal(inspect.ledgerId,id);assert.equal(inspect.ledgerId,ledgerIdOf(inspect));
   inspect.close();
 });
@@ -328,55 +328,18 @@ test('inspectLedger exposes the same job and event read surface as openLedger',t
   inspect.close();
 });
 
-/**
- * jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`). A fresh ledger carries it
- * in 0001-init.sql; a ledger created before it is upgraded in place on the writer's first open (writable_schema CHECK
- * relax + trigger recreate + job_transitions/ui_state_map rows + schema_migrations version 2), and stays valid.
- */
-test('a ledger created before awaiting_owner is upgraded in place on the writer open',t=>{
-  const dir=temporary(),file=path.join(dir,'runtime.sqlite');
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const seeded=openLedger({file});
-  // An ask an older runtime settled `failed` (verdict awaiting-owner) and a real failure beside it.
-  seedWorkflow(seeded,{id:'wf-old',jobs:[
-    {jobId:'job-ask',opId:'brand.decide',status:'failed',result:{verdict:'awaiting-owner',askDispatchId:'ctx_old'}},
-    {jobId:'job-red',opId:'code.write',status:'failed',result:{verdict:'fail'}}]});
-  seeded.close();
-  const {DatabaseSync}=require('node:sqlite');
-  // Rewind it to the pre-awaiting_owner schema exactly as an older runtime wrote it.
-  let raw=new DatabaseSync(file);
-  raw.enableDefensive(false);
-  const ddl=raw.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql;
-  const cookie=raw.prepare('PRAGMA schema_version').get().schema_version;
-  raw.exec('PRAGMA writable_schema=ON');
-  raw.prepare("UPDATE sqlite_master SET sql=? WHERE type='table' AND name='jobs'").run(ddl.replace("'awaiting_owner',",''));
-  raw.exec(`PRAGMA schema_version=${cookie+1}`);
-  raw.exec('PRAGMA writable_schema=OFF');
-  raw.exec("DELETE FROM job_transitions WHERE to_status='awaiting_owner'");
-  raw.exec("DELETE FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'");
-  raw.exec('DELETE FROM schema_migrations WHERE version=2');
-  raw.close();
-  raw=new DatabaseSync(file);
-  assert.ok(!raw.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes('awaiting_owner'),'the rewound ledger refuses the status');
-  raw.close();
-
-  const ledger=openLedger({file});
+/** jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`); 0001-init.sql carries it. */
+test('a fresh ledger carries awaiting_owner: the status, its transitions, its ui state and the job triggers',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   try{
     const db=ledger.db;
     assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
-    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner'],[3,'0003-usage-unavailable'],[4,'0004-attempt-why'],[5,'0005-ended-workflow-views']]);
+    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init']]);
     assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
     assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
-    assert.deepEqual(db.prepare("SELECT job_id,status FROM jobs ORDER BY job_id").all().map(r=>[r.job_id,r.status]),[['job-ask','awaiting_owner'],['job-red','failed']],'only the ask moves to the new status');
-    assert.deepEqual(db.prepare("SELECT unit_id,state FROM work_units ORDER BY unit_id").all().map(r=>[r.unit_id,r.state]),[['job-ask','deciding'],['job-red','failed']]);
-    assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
     assert.deepEqual(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'jobs_%' ORDER BY name").all().map(r=>r.name),['jobs_enqueue_guard','jobs_release_leases','jobs_status_guard']);
   }finally{ledger.close();}
-  // A second open changes nothing (idempotent); a fresh ledger already carries the status and is not migrated.
-  const again=openLedger({file});
-  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,5);}finally{again.close();}
-  const fresh=openLedger({file:path.join(dir,'fresh.sqlite')});
-  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1,3,4,5]);}finally{fresh.close();}
 });
 
 test('awaiting_owner is a settled status reached only from reported|deciding; a retry follows it and it spends no try',t=>{
@@ -431,24 +394,13 @@ test('recordAttemptUsage writes llm_usage rows and the attempt summary once; rec
   ledger.close();
 });
 
-test('an older (user_version 1) ledger is migrated forward on the first writer open: backup, wider usage_source CHECK, usage_reason, recorded migration',t=>{
+test('a fresh ledger carries the widened usage_source CHECK and usage_reason from 0001-init',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const file=path.join(dir,'runtime.sqlite');
-  const seed=openLedger({file});
-  // Put the file back to what 0001-init alone produced.
-  seed.db.enableDefensive(false);
-  seed.db.exec("PRAGMA writable_schema=ON;UPDATE sqlite_master SET sql=replace(sql,',''unavailable'')',')') WHERE name='op_attempts';PRAGMA writable_schema=OFF");
-  seed.db.exec('DROP VIEW v_op_history;DROP VIEW v_attempt_state;ALTER TABLE op_attempts DROP COLUMN why_json;ALTER TABLE op_attempts DROP COLUMN usage_reason;DELETE FROM schema_migrations WHERE version IN (3,4,5);PRAGMA user_version=1');
-  seed.close();
-  const old=inspectLedger({file});assert.equal(old.version,1);assert.equal(old.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),false);old.close();
-  const ledger=openLedger({file});
-  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),5);
-  assert.equal(ledger.db.prepare('SELECT status FROM schema_migrations WHERE version=3').get().status,'done');
-  assert.equal(fs.existsSync(`${file}.pre-0003-usage-unavailable.bak`),true,'a VACUUM INTO backup precedes the migration');
-  assert.equal(ledger.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),true);
-  assert.ok(ledger.db.prepare('PRAGMA table_info(op_attempts)').all().some(c=>c.name==='usage_reason'));
-  ledger.close();
-  assert.doesNotThrow(()=>openLedger({file}).close(),'a second open migrates nothing');
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  try{
+    assert.equal(ledger.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),true);
+    assert.ok(ledger.db.prepare('PRAGMA table_info(op_attempts)').all().some(c=>c.name==='usage_reason'));
+  }finally{ledger.close();}
 });
 
 test('markAttemptUsageUnavailable stores usage_source unavailable with its reason, never over a measured attempt, and a later measurement replaces it',t=>{

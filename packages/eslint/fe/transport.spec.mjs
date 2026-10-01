@@ -1,7 +1,7 @@
 /**
  * Twin tests for the transport rules (HFS R50, R51, R52).
  *
- *   node --test transport.test.mjs
+ *   node --test transport.spec.mjs
  *
  * The cases that earn their place are the collapse shapes: `null`, an empty array and a bare throw
  * all say "something failed" and nothing else, and each looks like defensive code when read alone.

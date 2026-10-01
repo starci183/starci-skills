@@ -1,7 +1,7 @@
 /**
  * Twin tests for the comment rules.
  *
- *   node --test comments.test.mjs
+ *   node --test comments.spec.mjs
  *
  * The export documentation rule, the emoji rule and the Vietnamese rule, which walk every place prose hides. Vietnamese
  * letters in these cases are written as \u escapes, so this file itself stays English-only ASCII.

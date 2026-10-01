@@ -1,7 +1,7 @@
 /**
  * Twin tests for the shape-slot law.
  *
- *   node --test shape-slot.test.mjs
+ *   node --test shape-slot.spec.mjs
  *
  * The scope is the pure half of a split tier. The cases that matter sit just outside it: the
  * connected half and the recipe composite are SUPPOSED to read status flags, and a layout alone

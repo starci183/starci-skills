@@ -1,7 +1,7 @@
 /**
  * Twin tests for the e2e-flow rules.
  *
- *   node --test e2e-flow.test.mjs
+ *   node --test e2e-flow.spec.mjs
  *
  * The valid cases carry most of the weight. Every rule fires only inside `*.e2e-spec.ts`, and a version that widened
  * to every spec would refuse the ordinary unit test, where a sleep is sometimes the thing under test and a

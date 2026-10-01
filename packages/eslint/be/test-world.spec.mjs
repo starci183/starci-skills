@@ -1,7 +1,7 @@
 /**
  * Twin tests for the `test-world` law (R47, owner test layout 2026-09-30).
  *
- *   node --test test-world.test.mjs
+ *   node --test test-world.spec.mjs
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"

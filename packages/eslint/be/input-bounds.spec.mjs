@@ -1,7 +1,7 @@
 /**
  * Twin tests for the input-bounds rules (R42).
  *
- *   node --test input-bounds.test.mjs
+ *   node --test input-bounds.spec.mjs
  *
  * The bound a property owes comes from its TYPE (string, enum, array, nested object), so the cases rename fields freely.
  */

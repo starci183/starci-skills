@@ -1,7 +1,7 @@
 /**
  * Twin tests for the formatting rule (`FE_I18N_FORMATTER`, under R59).
  *
- *   node --test formatting.test.mjs
+ *   node --test formatting.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

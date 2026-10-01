@@ -1,7 +1,7 @@
 /**
  * Twin tests for the size and state budget rules (HFS R65).
  *
- *   node --test size-and-state-budget.test.mjs
+ *   node --test size-and-state-budget.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

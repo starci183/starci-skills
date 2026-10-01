@@ -1,7 +1,7 @@
 /**
  * Twin tests for `spec-typed-entity-manager` (R48, unit-test standard 2026-09-30).
  *
- *   node --test spec-typed-entity-manager.test.mjs
+ *   node --test spec-typed-entity-manager.spec.mjs
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"

@@ -92,8 +92,8 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
      stays `requeued`, `effect-unknown` stays as is); `v_op_history.ui = 'rejected'` (neutral, a Vietnamese "rejected on delivery" label). The why `state` is `dispatch-rejected` (`requeued` for an
      unknown effect); `next` says it is not counted.
    The two ui values are computed by the view: `v_op_history.ui` is `awaiting-owner` / `rejected` for those two natives and
-   `ui_state_map` for every other one (`ui_states` is unchanged). Migration 0004 (`0004-attempt-why`, user_version 4, run by
-   `migrateLedger`) adds `op_attempts.why_json` and recreates `v_attempt_state` and `v_op_history`.
+   `ui_state_map` for every other one (`ui_states` is unchanged). `0001-init.sql` carries `op_attempts.why_json` and the
+   `v_attempt_state` and `v_op_history` views that compute them.
 4. **Kernel notes.** Source: table `events`, kinds `kernel-decision` (entity_type `decision`, payload `{hypothesis, actionKey,
    metric, command, baseline}`), `kernel-decision-result` (same entity_id, payload `{result: keep|revert, observed}`) and
    `kernel-proposal` (entity_type `kernel-proposal`, payload `{id, title, evidence, files, tier, status}`). Reader:
@@ -109,9 +109,6 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
 - `api status`: `legs[].why` (latest attempt of each non-green leg), `legs[].attempts[]` (each with its `why`),
   `frontier.why`, `kernelNotes[]`; the text form prints `why:` lines.
 - `scripts/reconciler/core-watch.mjs`: a bad leg's alert text is `<op> <state> - <why.headline>`.
-- Dry-run backfill: `node scripts/supervisor/why-backfill.mjs [--ledger <name>] [--workflow <id>] [--op <op>] [--json]`
-  computes the why of every attempt of a registered ledger that needs one and prints it; it opens the ledger read-only and has
-  no apply mode.
 
 ## Where the why is written
 

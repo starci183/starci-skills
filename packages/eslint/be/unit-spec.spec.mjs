@@ -1,7 +1,7 @@
 /**
  * Twin tests for the unit-spec form rules (R48 `BE_SPEC_QUALITY`).
  *
- *   node --test unit-spec.test.mjs
+ *   node --test unit-spec.spec.mjs
  *
  * A case's file path decides its slot (`at(...)` under the typed fixture repository); the types come from the stubs of
  * `@nestjs/testing`, `@starci/jest-preset` and `typeorm` in `fixtures/typed/node_modules`.

@@ -1,7 +1,7 @@
 /**
  * Twin tests for the Next conventions rules (`FE_NEXT_CONVENTIONS`).
  *
- *   node --test next-conventions.test.mjs
+ *   node --test next-conventions.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

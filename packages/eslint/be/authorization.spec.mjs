@@ -1,7 +1,7 @@
 /**
  * Twin tests for the authorization rule (R41 `no-auth-use-guards`).
  *
- *   node --test authorization.test.mjs
+ *   node --test authorization.spec.mjs
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"

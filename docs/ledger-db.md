@@ -1,9 +1,9 @@
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
-The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql` plus its forward migrations
-(`0003-usage-unavailable.sql`; `meta.schema = 'starci/runtime@1'`, `user_version = 3`; an older ledger is migrated on the first writer open after a
-`VACUUM INTO` backup and integrity check, `schema_migrations` records each step) and `engine/db/migrations/machine/0001-init.sql`
-(`machine_meta.schema = 'starci/machine@1'`, `user_version = 1`). This page explains the
+The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql`
+(`meta.schema = 'starci/runtime@1'`, `user_version = 1`) and `engine/db/migrations/machine/0001-init.sql`
+(`machine_meta.schema = 'starci/machine@1'`, `user_version = 1`). Each database is one schema file with no migration chain: a file at any
+other schema or `user_version` is refused, and a fresh one is created on first open (move the refused file aside). `schema_migrations` holds the one `0001-init` row. This page explains the
 decisions and the invariants; when it disagrees with the SQL files, the SQL wins.
 
 ## 1. The layout

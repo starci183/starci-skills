@@ -1,5 +1,5 @@
-// worktree-kinds.mjs — the kinds of worktree the runtime registers (machine.sqlite worktrees.kind CHECK,
-// 0003-worktrees-workflow-orca), split by the home that makes each: Orca (an agent's workspace) or git (a runtime-internal
+// worktree-kinds.mjs — the kinds of worktree the runtime registers (machine.sqlite worktrees.kind CHECK in
+// engine/db/migrations/machine/0001-init.sql), split by the home that makes each: Orca (an agent's workspace) or git (a runtime-internal
 // scratch tree). The registry (scripts/machine/worktree-registry.mjs), both homes (scripts/machine/worktree-git.mjs,
 // scripts/machine/worktree-orca.mjs), the Orca orphan scan (orca-orphans.mjs) and check-worktree-add read them here.
 

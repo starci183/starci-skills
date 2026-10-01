@@ -1,7 +1,7 @@
 /**
  * Twin tests for the typography rule.
  *
- *   node --test typography.test.mjs
+ *   node --test typography.spec.mjs
  *
  * Two exemptions decide whether this rule is honest: the component that OWNS the tag has to be
  * allowed to write it, and a twin test has to be allowed to build heading markup to assert

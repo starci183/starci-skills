@@ -4,7 +4,7 @@
  * fixture (the tester git-inits and adds every file) and each rule reports the findings of its codes on the TypeScript file ESLint visits.
  * A finding on a file that is not TypeScript stays in `hfs check` and is not on the lint surface (see the last test).
  *
- *   node --test project-graph.paths.test.mjs
+ *   node --test project-graph.paths.spec.mjs
  */
 import test from "node:test"
 import { projectFixture } from "./fixtures/project/tester.mjs"

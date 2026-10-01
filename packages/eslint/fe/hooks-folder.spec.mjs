@@ -1,7 +1,7 @@
 /**
  * Twin tests for the hooks-folder rule (HFS R56, lint half).
  *
- *   node --test hooks-folder.test.mjs
+ *   node --test hooks-folder.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

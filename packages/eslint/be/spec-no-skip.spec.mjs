@@ -1,7 +1,7 @@
 /**
  * Twin tests for `spec-no-skip` (R48, owner test policy 2026-09-30).
  *
- *   node --test spec-no-skip.test.mjs
+ *   node --test spec-no-skip.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

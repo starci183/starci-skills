@@ -1,7 +1,7 @@
 /**
  * Twin tests for the injection rules (R85).
  *
- *   node --test injection.test.mjs
+ *   node --test injection.spec.mjs
  *
  * Every case is typed: the filename decides the slot, and the imports resolve to the fixture repository under
  * `fixtures/typed` (the injector builder in `platform/composition`, the `Clock` port in `platform/clock`, a domain
