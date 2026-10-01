@@ -104,8 +104,9 @@ and only `api report` plus recorded `api check` rows support a verdict.
 worktree, the Task carrying the packet, the effective agent and model attested
 with `worker-show` ([host contract](host-contract.md)). The packet is a bounded
 grant: one op, its brief (`modules/ops/ops/<op>.yaml`), a closed read set, a
-closed write set (`owned_paths`, relative to the side the job targets: `be/` or
-`fe/` of the bound app, resolved by `scripts/kernel/target-repo.mjs`), one model,
+closed write set (`owned_paths`, app-relative: `be/...`, `fe/...`,
+`.starciwork/...` or an app-root path of the bound app; any other form is
+refused `path-not-app-relative`), one model,
 one budget, one lease token. Without `--spawn` it is a dry-run — the packet
 prints and nothing is reserved. A spawn that does not land is
 `dispatch-rejected`: the reservation is settled, never left leasing a ghost.
@@ -154,9 +155,8 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
    attached. Still red after the last round is `blocked` with the exact
    findings.
 
-`gate.mjs` and `read-digest.mjs` take app-relative paths (`be/src/...`,
-`fe/apps/...`) at `--root <app>`; owned paths in the packet are relative to
-the job's side.
+`gate.mjs`, `read-digest.mjs`, the packet's owned paths and every finding use
+the same app-relative paths (`be/src/...`, `fe/apps/...`) at the app root.
 
 **Settle enforcement.** `api settle` re-reads both attached documents itself
 (`scripts/kernel/gate-settle.mjs`, recorded as the runtime check `op-gate`) and
