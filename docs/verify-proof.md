@@ -81,11 +81,10 @@ to prove? It walks record -> sibling `evidence.yaml` -> the source bytes that ev
 prints one finding per line as `CODE  <record id>  <detail>`.
 
 ```sh
-node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--repo <id>=<git root>]... [--json]
+node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--json]
 ```
 
-`--repo` re-points one repository name at an explicit root, for a workspace whose repositories do not sit
-where `workspace.yaml` places them. `--json` emits `{findings:[{code,node,path,detail}]}` instead of lines.
+Every path a proof hashes is app-relative (`be/...`, `fe/...`) and resolves under the app root. `--json` emits `{findings:[{code,node,path,detail}]}` instead of lines.
 
 | code | what it refuses |
 | --- | --- |

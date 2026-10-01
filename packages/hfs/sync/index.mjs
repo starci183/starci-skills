@@ -150,7 +150,8 @@ export function variables(app, scope, presets, sonarKey) {
     header: HEADER(scope),
     appScripts: appScripts(app),
     buildFe: ['npm run codegen --silent', ...(packages ? ['npm run build --workspaces --if-present'] : []), `cd fe && ${fe.apps.map(entry => `next build apps/${entry.name}`).join(' && ')}`].join(' && '),
-    typecheck: ['npm run codegen --silent', 'tsc -p be/tsconfig.json', ...feTsconfigs.filter(file => !file.includes('*')).map(file => `tsc -p ${file} --noEmit`), ...(packages ? ['npm run typecheck --workspaces --if-present'] : [])].join(' && '),
+    // The fe apps import the workspace packages from their dist/, so the packages are built before the apps are type-checked.
+    typecheck: ['npm run codegen --silent', 'tsc -p be/tsconfig.json', ...(packages ? ['npm run build --workspaces --if-present'] : []), ...feTsconfigs.filter(file => !file.includes('*')).map(file => `tsc -p ${file} --noEmit`), ...(packages ? ['npm run typecheck --workspaces --if-present'] : [])].join(' && '),
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**'].filter(Boolean).join(','),

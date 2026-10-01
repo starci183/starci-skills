@@ -5,7 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
-import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
+import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:
@@ -149,7 +149,12 @@ const eventClassOf = id => id.replace(/^event\./, '').split('.').map(s => s.repl
 function checkTree(workRoot, out, baseline) {
   const records = loadRecords(workRoot, walk);
   const workspaceDoc = readWorkspace(workRoot);
-  const backendRoot = path.dirname(workRoot);
+  // The app root holds the one package.json, the Work tree and the sides; the be side's src/ is where the shipped surfaces are.
+  const appRoot = appRootOf(workRoot);
+  const beRoot = path.join(appRoot, 'be');
+  const sideRoots = APP_SIDES.map(side => path.join(appRoot, side));
+  let appScripts = null;
+  try { appScripts = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'))?.scripts ?? {}; } catch { appScripts = {}; }
   const rel = f => path.relative(root, f).replaceAll('\\', '/');
   const refuse = (file, code, msg) => out.refuse.push(`${rel(file)}: ${msg} [${code}]`);
   const suspect = (file, code, msg) => out.suspect.push(`${rel(file)}: ${msg} [${code}]`);
@@ -233,39 +238,22 @@ function checkTree(workRoot, out, baseline) {
       }
     }
 
-    // PROOF_COMMAND_DEAD: requiresProof + evidence assertion commands must name real specs/scripts.
-    // Commands resolve against the record's OWN repository (a fe impl's `npm run uat:typecheck` lives in
-    // the frontend package.json), and a bare spec basename is a jest pattern, not a path - searched
-    // repo-wide, not resolved literally.
-    // this tree owns records for every bound repo (the backend's .starciwork describes the frontend too),
-    // so a spec path may live in ANY bound repository - resolve candidates across all of them
-    const repoRoots = [backendRoot, ...(workspaceDoc?.repositories ?? [])
-      .filter(r => r?.name && r.role !== 'be')
-      .map(r => repoRootFor(workRoot, r.name, workspaceDoc))];
-    const recordRepoRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
+    // PROOF_COMMAND_DEAD: requiresProof + evidence assertion commands must name real specs/scripts. A proof command runs
+    // from the app root: its npm script is the app root package.json's, a spec path is app-relative (be/src/tests/...), and
+    // a bare spec basename is a jest pattern, not a path - searched over the sides, not resolved literally.
     const specExists = p => p.includes('/')
-      ? repoRoots.some(r => fs.existsSync(path.join(r, p)))
-      : repoRoots.some(r => srcFiles(r, '.ts').some(f => path.basename(f) === p));
+      ? fs.existsSync(path.join(appRoot, p))
+      : sideRoots.some(r => srcFiles(r, '.ts').some(f => path.basename(f) === p));
     const checkCommand = (command, file, label) => {
       if (typeof command !== 'string') return;
       const npmRun = /npm run ([\w:-]+)/.exec(command);
-      if (npmRun) {
-        const scriptIn = r => {
-          const pkgFile = path.join(r, 'package.json');
-          if (!fs.existsSync(pkgFile)) return null;
-          const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
-          return pkg?.scripts?.[npmRun[1]] != null ? path.basename(r) : null;
-        };
-        if (!scriptIn(recordRepoRoot)) {
-          const elsewhere = repoRoots.map(scriptIn).filter(Boolean);
-          if (elsewhere.length) suspect(file, 'PROOF_COMMAND_AMBIGUOUS', `${label}: npm script "${npmRun[1]}" exists only in ${elsewhere.join('/')}, not the record's own repository - evidence does not record which cwd it ran in`);
-          else refuse(file, 'PROOF_COMMAND_DEAD', `${label}: npm script "${npmRun[1]}" does not exist in any bound repository's package.json`);
-        }
+      if (npmRun && appScripts?.[npmRun[1]] == null) {
+        refuse(file, 'PROOF_COMMAND_DEAD', `${label}: npm script "${npmRun[1]}" does not exist in the app root package.json`);
       }
       for (const token of command.match(/[\w./-]+\.(?:spec|e2e-spec|test)\.ts/g) ?? []) {
         const p = token.replace(/^--\S+\s+/, '');
         if (!specExists(p)) {
-          refuse(file, 'PROOF_COMMAND_DEAD', `${label}: spec "${p}" matches no file in any bound repository`);
+          refuse(file, 'PROOF_COMMAND_DEAD', `${label}: spec "${p}" matches no file of the app`);
         }
       }
       // jest-style filter args like `-- tasks/complete` should match a real spec dir/file prefix;
@@ -273,13 +261,13 @@ function checkTree(workRoot, out, baseline) {
       // word sequences before comparing - still heuristic, which is why it is SUSPECT not REFUSE
       const filter = /--\s+([\w/-]+)$/.exec(command)?.[1];
       if (filter && !filter.includes('*')) {
-        const testsRoot = path.join(recordRepoRoot, 'src', 'tests');
+        const testsRoot = path.join(beRoot, 'src', 'tests');
         const words = filter.toLowerCase().split(/[\s/.\\_-]+/).filter(Boolean);
         const hit = fs.existsSync(testsRoot) && walk(testsRoot).some(f => {
           const fwords = f.toLowerCase().replaceAll('\\', '/').split(/[\s/.\\_-]+/).filter(Boolean);
           return words.every(w => fwords.includes(w));
         });
-        if (!hit) suspect(indexFile, 'PROOF_FILTER_EMPTY', `${label}: filter "-- ${filter}" matches no spec under src/tests`);
+        if (!hit) suspect(indexFile, 'PROOF_FILTER_EMPTY', `${label}: filter "-- ${filter}" matches no spec under be/src/tests`);
       }
     };
     checkCommand(data.requiresProof?.e2e?.command, indexFile, 'requiresProof.e2e');
@@ -288,12 +276,11 @@ function checkTree(workRoot, out, baseline) {
       checkCommand(a?.command, evEntry.file, `assertion ${a?.id ?? '(unnamed)'}`);
     }
 
-    // REPO_UNBOUND: a repository field that resolves to a dir that isn't there = evidence that will false-stale
+    // REPO_UNBOUND: a repository that is not a side workspace.yaml declares, or whose side folder is not there = evidence that will false-stale
     if (data.repository) {
       const repoRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
-      if (!fs.existsSync(repoRoot)) {
-        refuse(indexFile, 'REPO_UNBOUND', `${id} names repository "${data.repository}" which resolves to ${rel(repoRoot)} - nothing there; evidence under it will report (no files found), not the truth`);
-      }
+      if (!repoRoot) refuse(indexFile, 'REPO_UNBOUND', `${id} names repository "${data.repository}", which is not a side (be, fe) workspace.yaml declares - evidence under it will report (no files found), not the truth`);
+      else if (!fs.existsSync(repoRoot)) refuse(indexFile, 'REPO_UNBOUND', `${id} names repository "${data.repository}" which resolves to ${rel(repoRoot)} - nothing there; evidence under it will report (no files found), not the truth`);
     }
 
     // EVENT_PRODUCER_KIND + EVENT_UNPRODUCED
@@ -302,7 +289,7 @@ function checkTree(workRoot, out, baseline) {
       if (producer?.schema === 'work/business-rule@1') {
         suspect(indexFile, 'EVENT_PRODUCER_IS_RULE', `${id} producer is ${data.producer}, a business-rule - rules do not emit events; the real producer (handler/impl) has no record`);
       }
-      const emitted = emittedEvents ??= eventClasses(backendRoot);
+      const emitted = emittedEvents ??= eventClasses(beRoot);
       // the codebase names classes inconsistently (TaskDeletedEvent keeps the feature segment,
       // SignedInEvent drops it) - try the id's full class name and the feature-stripped one
       const withFeature = eventClassOf(id);
@@ -318,7 +305,7 @@ function checkTree(workRoot, out, baseline) {
       if (fs.existsSync(runDir)) {
         const runMtime = Math.max(...walk(runDir).map(f => fs.statSync(f).mtimeMs));
         const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot);
-        const newer = dirs.flatMap(d => fs.existsSync(d.abs) ? walk(d.abs).filter(f => fs.statSync(f).mtimeMs > runMtime).map(f => path.relative(backendRoot, f)) : []);
+        const newer = dirs.flatMap(d => fs.existsSync(d.abs) ? walk(d.abs).filter(f => fs.statSync(f).mtimeMs > runMtime).map(f => path.relative(appRoot, f)) : []);
         if (newer.length) suspect(indexFile, 'UAT_RUN_AGING', `${id}'s settled run predates ${newer.length} code file(s) that changed since (e.g. ${newer[0]}) - the pass may no longer describe the code`);
       }
     }
@@ -354,8 +341,8 @@ function checkTree(workRoot, out, baseline) {
   }
   const ownerOf = file => ownedDirs.find(d => file.startsWith(d.abs))?.id ?? null;
 
-  const routes = httpRoutes(backendRoot);
-  const ops = gqlOps(backendRoot);
+  const routes = httpRoutes(beRoot);
+  const ops = gqlOps(beRoot);
   for (const r of routes) {
     if (!ownerOf(r.file)) suspect(r.file, 'UNCLAIMED_SURFACE', `${r.method} ${r.path} served by ${path.basename(r.file)} sits under no record's owners - a shipped surface with no claimant`);
   }
@@ -414,7 +401,7 @@ function checkTree(workRoot, out, baseline) {
       const [method, p] = s.split(' ');
       const norm = `${method} ${p.replace(/\/:[^/]+/g, '/:_').replace(/\/$/, '') || '/'}`;
       if (servedPaths.size && ![...servedPaths].some(sp => sp === norm)) {
-        suspect(path.join(rec.dir, 'index.yaml'), 'GHOST_SURFACE', `${id} declares "${s}" but no controller under ${path.basename(backendRoot)}/src serves it - contract describes a wire that does not exist`);
+        suspect(path.join(rec.dir, 'index.yaml'), 'GHOST_SURFACE', `${id} declares "${s}" but no controller under be/src serves it - contract describes a wire that does not exist`);
       }
     }
   }

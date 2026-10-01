@@ -28,15 +28,15 @@ function buildTree(t, mutate = () => {}) {
   const base = mkdtemp(t, 'evidence-binding-');
   const repo = path.join(base, 'demo-app');
   const workRoot = path.join(repo, '.starciwork');
-  const moduleDir = path.join(repo, 'src', 'task');
-  const recordDir = path.join(workRoot, 'features', 'task', 'impl', 'demo-app', 'ownership');
+  const moduleDir = path.join(repo, 'be', 'src', 'task');
+  const recordDir = path.join(workRoot, 'features', 'task', 'impl', 'be', 'ownership');
   fs.mkdirSync(moduleDir, {recursive: true});
   fs.mkdirSync(recordDir, {recursive: true});
   for (const [name, body] of Object.entries(SOURCE)) fs.writeFileSync(path.join(moduleDir, name), body);
 
   const write = (file, body) => fs.writeFileSync(path.join(workRoot, file), body);
   write('index.yaml', 'schema: work/catalog@1\nid: catalog\nfeatures:\n  - task\n');
-  write('workspace.yaml', 'schema: work/workspace@1\nid: workspace\nrepositories:\n  - {role: be, name: demo-app}\n');
+  write('workspace.yaml', 'schema: work/workspace@1\nid: workspace\nrepositories:\n  - {role: be, name: be}\n  - {role: fe, name: fe}\n');
 
   const tree = {
     base,
@@ -45,24 +45,24 @@ function buildTree(t, mutate = () => {}) {
     moduleDir,
     record: {
       schema: 'work/implementation@1',
-      id: 'impl.task.demo-app.ownership',
+      id: 'impl.task.be.ownership',
       title: 'The ownership module',
       state: 'done',
-      repository: 'demo-app',
-      owners: [{role: 'module', path: 'src/task'}],
+      repository: 'be',
+      owners: [{role: 'module', path: 'be/src/task'}],
       proves: ['br.task.ownership'],
     },
     evidence: {
       schema: 'work/evidence@1',
-      record: 'impl.task.demo-app.ownership',
+      record: 'impl.task.be.ownership',
       recordDigest: 'f'.repeat(64),
       codeDigest: {
         algorithm: 'sha256',
-        files: Object.entries(SOURCE).map(([name, body]) => ({path: `src/task/${name}`, sha256: sha256(body)})),
+        files: Object.entries(SOURCE).map(([name, body]) => ({path: `be/src/task/${name}`, sha256: sha256(body)})),
         digest: '0'.repeat(64),
       },
       outcome: 'pass',
-      assertions: [{id: 'br.task.ownership', outcome: 'pass', observation: 'npx jest src/task exited 0'}],
+      assertions: [{id: 'br.task.ownership', outcome: 'pass', observation: 'npx jest be/src/task exited 0'}],
       provenance: {actor: 'example-evidence', tool: 'harness', environment: 'local', capturedAt: '2099-01-01T00:00:00.000Z'},
     },
   };
@@ -85,7 +85,7 @@ test('a tree whose proof still binds to its source is clean', (t) => {
 
 test('EVIDENCE_PATH_MISSING: the proof hashes source that is not there', (t) => {
   const tree = buildTree(t, t => {
-    t.evidence.codeDigest.files.push({path: 'src/task/deleted.ts', sha256: sha256('gone\n')});
+    t.evidence.codeDigest.files.push({path: 'be/src/task/deleted.ts', sha256: sha256('gone\n')});
   });
   const result = run('--work', tree.workRoot);
   assert.equal(result.status, 1, result.stderr);
@@ -95,7 +95,7 @@ test('EVIDENCE_PATH_MISSING: the proof hashes source that is not there', (t) => 
   const json = JSON.parse(run('--work', tree.workRoot, '--json').stdout);
   assert.equal(json.findings.length, 1);
   assert.deepEqual(Object.keys(json.findings[0]).sort(), ['code', 'detail', 'node', 'path']);
-  assert.equal(json.findings[0].node, 'impl.task.demo-app.ownership');
+  assert.equal(json.findings[0].node, 'impl.task.be.ownership');
 });
 
 test('EVIDENCE_DIGEST_MISMATCH: the source moved under a recorded digest', (t) => {
@@ -199,15 +199,15 @@ test('usage and IO failures exit 2 without printing findings', (t) => {
   assert.match(notAWorkRoot.stderr, /not a \.starciwork root/);
 
   const tree = buildTree(t);
-  const badRepo = run('--work', tree.workRoot, '--repo', 'demo-app');
-  assert.equal(badRepo.status, 2);
-  assert.match(badRepo.stderr, /--repo must be <id>=<git root>/);
+  const repoFlag = run('--work', tree.workRoot, '--repo', 'be=elsewhere');
+  assert.equal(repoFlag.status, 2, 'the sides of an app sit under its root; no flag re-points them');
+  assert.match(repoFlag.stderr, /Unknown argument --repo/);
 });
 
 test('--help names the CLI surface and exits 0', () => {
   const help = run('--help');
   assert.equal(help.status, 0, help.stderr);
-  for (const flag of ['--work', '--repo', '--json']) assert.ok(help.stdout.includes(flag), flag);
+  for (const flag of ['--work', '--json']) assert.ok(help.stdout.includes(flag), flag);
   for (const code of ['EVIDENCE_PATH_MISSING', 'EVIDENCE_DIGEST_MISMATCH', 'EVIDENCE_OLDER_THAN_SOURCE', 'EVIDENCE_ASSERTED_NOT_OBSERVED']) {
     assert.ok(help.stdout.includes(code), code);
   }
@@ -230,25 +230,10 @@ test('EVIDENCE_OLDER_THAN_SOURCE reads the commit clock against the record\'s ow
   // Without the revision the capture is in 2099, so no clock can call the source newer.
   assert.equal(run('--work', tree.workRoot).status, 0);
 
-  const record = JSON.parse(fs.readFileSync(path.join(tree.workRoot, 'features/task/impl/demo-app/ownership/index.yaml'), 'utf8'));
-  fs.writeFileSync(path.join(tree.workRoot, 'features/task/impl/demo-app/ownership/index.yaml'), JSON.stringify({...record, revision}, null, 2));
+  const record = JSON.parse(fs.readFileSync(path.join(tree.workRoot, 'features/task/impl/be/ownership/index.yaml'), 'utf8'));
+  fs.writeFileSync(path.join(tree.workRoot, 'features/task/impl/be/ownership/index.yaml'), JSON.stringify({...record, revision}, null, 2));
   const result = run('--work', tree.workRoot);
   assert.equal(result.status, 1, result.stderr);
   assert.deepEqual(codes(result.stdout), ['EVIDENCE_OLDER_THAN_SOURCE']);
   assert.match(result.stdout, new RegExp(`git commit time, after the record's own revision ${revision.slice(0, 12)}`));
-});
-
-test('--repo points a repository name at an explicit root', (t) => {
-  const tree = buildTree(t);
-  const moved = mkdtemp(t, 'evidence-binding-repo-');
-  fs.mkdirSync(path.join(moved, 'src', 'task'), {recursive: true});
-  for (const [name, body] of Object.entries(SOURCE)) fs.writeFileSync(path.join(moved, 'src', 'task', name), body);
-  fs.rmSync(path.join(tree.repo, 'src'), {recursive: true, force: true});
-
-  const unmapped = run('--work', tree.workRoot);
-  assert.equal(unmapped.status, 1, unmapped.stderr);
-  assert.deepEqual(new Set(codes(unmapped.stdout)), new Set(['EVIDENCE_PATH_MISSING']));
-
-  const mapped = run('--work', tree.workRoot, '--repo', `demo-app=${moved}`);
-  assert.equal(mapped.status, 0, mapped.stdout + mapped.stderr);
 });

@@ -63,6 +63,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_REPO_LOCAL_CHECK` | error | a `check-*` file in `scripts/` or `tools/`, an `eslint-local-rules*` file or local eslint plugin, or a script that runs a local check (R103) |
 | `HFS_LINT_SUPPRESSION_FILE` | error | an `eslint.suppressions*` file, a `lint:suppressions` script, an eslint suppress flag or a suppressions config (R104) |
 | `HFS_PROOF_COMMAND_FILE_MISSING` | error | a `.starciwork` `requiresProof.<kind>.command` that runs a file the repository does not hold (R105) |
+| `HFS_PEER_INTEGRATION_MISSING` | error | the app root `package.json` depends on a driver integration (a pair of `knowledge/hfs/peer-integrations.yaml`) without its runtime peer, e.g. `@nestjs/apollo` on `@nestjs/platform-express` 11 without `@as-integrations/express5` (R111) |
 | `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
 | `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |

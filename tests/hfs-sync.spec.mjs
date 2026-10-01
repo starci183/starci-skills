@@ -23,6 +23,8 @@ import { hygieneFindings, runWorkHygiene } from '../packages/hfs/sync/hygiene.mj
 const ROOT = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
 const jestPreset = require('../packages/jest-preset/index.cjs');
+const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
+const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
 const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();
@@ -381,6 +383,14 @@ describe('the package.json scripts of the app', () => {
     assert.match(scripts['build:fe'], /^npm run codegen --silent && cd fe && next build apps\/app && next build apps\/admin$/);
     assert.doesNotMatch(Object.values(scripts).join('\n'), /--rule|--no-inline-config|--no-eslintrc|--ignore-pattern|vitest|playwright|scripts\/check-/);
   });
+  it('typecheck builds the fe workspace packages before it type-checks the fe apps that import them from dist/', () => {
+    const withPackages = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck.split(' && ');
+    const build = withPackages.indexOf('npm run build --workspaces --if-present');
+    assert.ok(build > 0, `the typecheck of an app with fe packages builds them: ${withPackages.join(' && ')}`);
+    assert.ok(build < withPackages.indexOf('tsc -p fe/apps/app/tsconfig.json --noEmit'), 'the packages are built before the fe app is type-checked');
+    const without = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck;
+    assert.equal(without, 'npm run codegen --silent && tsc -p be/tsconfig.json && tsc -p fe/apps/app/tsconfig.json --noEmit', 'an app without fe packages builds nothing');
+  });
   it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
     assert.equal(one['dev:fe'], 'npm run codegen --silent && cd fe && next dev apps/web');
@@ -490,6 +500,11 @@ describe('hfs scaffold app: the first tree', () => {
       'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package(-lock)?\.json$/.test(file)), 'no side and no app holds a package.json or lockfile');
     assert.equal(JSON.parse(read(root, 'hfs.json')).kind, 'app');
+    // The Work tree names the two sides of the app as its repositories, the form of the examples and the work-layout contract.
+    const workspace = parseYaml(read(root, '.starciwork/workspace.yaml'));
+    assert.deepEqual(workspace.repositories, [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }]);
+    assert.equal(validateWorkspace(workspace), true, JSON.stringify(validateWorkspace.errors));
+    assert.equal(validateWorkspace({ ...workspace, repositories: [{ role: 'be', name: 'be', apps: [{ name: 'api' }] }] }), false, 'the schema refuses apps: on a repository (hfs.json declares the apps)');
     assert.equal((await run(['--check'], root)).code, 0, 'a fresh app is in sync by construction');
     assert.throws(() => scaffoldApp({ name: 'nivo', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_EXISTS' });
     assert.throws(() => scaffoldApp({ name: 'Nivo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });

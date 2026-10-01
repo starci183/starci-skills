@@ -3697,17 +3697,6 @@ PROMPT_MISSING:
   owner: other-op:interface.asset
   kind: check-finding
 
-PROOF_COMMAND_AMBIGUOUS:
-  title: "Proof npm script in another repo"
-  title_vi: "Lệnh chứng minh chỉ có ở kho khác"
-  meaning_vi: "Lệnh npm chứng minh chỉ tồn tại ở kho khác, không phải kho của bản ghi, nên không rõ chạy ở đâu."
-  causes_vi:
-    - "Kho ghi trong bản ghi sai"
-    - "Script nằm ở kho khác"
-  nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả bản ghi phải ghi đúng kho hoặc script."
-  owner: other-op:work.author
-  kind: check-finding
-
 PROOF_COMMAND_DEAD:
   title: "Proof npm script does not exist"
   title_vi: "Lệnh chứng minh trỏ tới script không tồn tại"
@@ -12206,6 +12195,16 @@ HFS_LINT_SUPPRESSION_FILE:
   causes_vi:
     - "Vi phạm luật R104: lỗi lint được sửa trong mã (hoặc luật được đổi trong canon); không ghi nhận để lỗi nằm lại trong tệp suppressions."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp, script hoặc cờ, và sửa các lỗi lint trong mã."
+  owner: op-retry
+  kind: check-finding
+
+HFS_PEER_INTEGRATION_MISSING:
+  title: "An app declares the runtime peer its driver integration needs"
+  title_vi: "Thiếu gói peer mà tích hợp driver cần khi chạy"
+  meaning_vi: "`package.json` ở gốc app phụ thuộc vào các gói của một cặp trong `knowledge/hfs/peer-integrations.yaml` (ví dụ `@nestjs/apollo` trên `@nestjs/platform-express` 11, tức Express 5) nhưng không khai báo gói `<requires>` trong dependencies, nên api không khởi động được."
+  causes_vi:
+    - "Vi phạm luật R111: npm không tự cài gói peer này, type-check và unit spec không nạp nó, nên lỗi chỉ lộ ra khi api khởi động (hai backend cũ thiếu `@as-integrations/express5` và api GraphQL không chạy được trên Express 5)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói `<requires>` vào dependencies của `package.json` ở gốc app; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 

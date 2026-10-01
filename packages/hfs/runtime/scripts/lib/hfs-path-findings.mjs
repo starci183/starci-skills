@@ -46,8 +46,10 @@ function sourceFormFindings({ files, resolver }) {
     // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
     const slot = resolver.slot(c.slot);
     if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
-    // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
+    // So is an allows entry below the slot root whose last segment is that literal name (be.tests.world fakes/<provider>/server.ts).
     const admitted = allowsFile(resolver, file);
+    if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) continue;
+    // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
     if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) continue;
     if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
     const parts = base.slice(0, -'.ts'.length).split('.');

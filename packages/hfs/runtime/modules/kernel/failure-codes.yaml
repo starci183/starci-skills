@@ -1219,6 +1219,16 @@ HFS_PACKAGE_MANAGER_MIXED:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_PEER_INTEGRATION_MISSING:
+  title: "An app declares the runtime peer its driver integration needs"
+  title_vi: "Thiếu gói peer mà tích hợp driver cần khi chạy"
+  meaning_vi: "`package.json` ở gốc app phụ thuộc vào các gói của một cặp trong `knowledge/hfs/peer-integrations.yaml` (ví dụ `@nestjs/apollo` trên `@nestjs/platform-express` 11, tức Express 5) nhưng không khai báo gói `<requires>` trong dependencies, nên api không khởi động được."
+  causes_vi:
+    - "Vi phạm luật R111: npm không tự cài gói peer này, type-check và unit spec không nạp nó, nên lỗi chỉ lộ ra khi api khởi động (hai backend cũ thiếu `@as-integrations/express5` và api GraphQL không chạy được trên Express 5)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói `<requires>` vào dependencies của `package.json` ở gốc app; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 HFS_PLAINTEXT_SECRET:
   title: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`"
   title_vi: "Bí mật dạng rõ trong kho"

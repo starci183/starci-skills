@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
+import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * The audits' sharpest surface complaint was the `/buyers` vs `/internal/buyers` class: a done contract
@@ -375,7 +375,6 @@ const eventClassNamesOf = id => {
 export function checkWorkSurfaces(workRoot, out) {
   const records = loadRecords(workRoot, walk);
   const workspaceDoc = readWorkspace(workRoot);
-  const backendRoot = path.dirname(workRoot);
   const rel = f => path.relative(root, f).replaceAll('\\', '/');
   const refuse = (file, code, msg) => out.refuse.push(`${rel(file)}: ${msg} [${code}]`);
   const suspect = (file, code, msg) => out.suspect.push(`${rel(file)}: ${msg} [${code}]`);
@@ -387,12 +386,15 @@ export function checkWorkSurfaces(workRoot, out) {
   const inline = indexInlineCriteria(records);
   const canon = ref => resolveRecordRef(records, ref, inline) ?? ref;
 
-  const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
-  const repoRoots = [...new Map([backendRoot, ...repos.map(r => repoRootFor(workRoot, r?.name, workspaceDoc))]
-    .map(r => [r, r])).values()];
-  const beRoots = repoRoots.filter(r => fs.existsSync(path.join(r, 'src')));
-  const feRoots = [...new Set(repos.filter(r => r?.role === 'fe')
-    .map(r => repoRootFor(workRoot, r.name, workspaceDoc)))].filter(r => fs.existsSync(r));
+  // The sides workspace.yaml declares (be, fe), each its folder under the app root: the be side serves the routes, ops and
+  // events, the fe side the pages.
+  const sideRoot = side => {
+    const root = repoRootFor(workRoot, side, workspaceDoc);
+    return root && fs.existsSync(root) ? root : null;
+  };
+  const repoRoots = APP_SIDES.map(sideRoot).filter(Boolean);
+  const beRoots = [sideRoot('be')].filter(r => r && fs.existsSync(path.join(r, 'src')));
+  const feRoots = [sideRoot('fe')].filter(Boolean);
 
   // owned dirs once, for "the tree explains this file" tests
   const ownedDirs = [];
