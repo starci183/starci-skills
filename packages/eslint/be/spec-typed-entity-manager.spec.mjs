@@ -28,6 +28,9 @@ test("R48: a unit spec's database double is the kit's mockEntityManager from @st
             // a fixture file is no longer a source of the double, and neither is a same-named lookalike
             { filename: SPEC, code: 'import { mockEntityManager } from "../../../tests/fixtures/database"\nexport const m = mockEntityManager()', errors: [{ messageId: "adhoc" }] },
             { filename: SPEC, code: 'import type { EntityManager } from "typeorm"\nexport const mockEntityManager = (): EntityManager => { throw new Error("x") }\nexport const m = mockEntityManager()', errors: [{ messageId: "adhoc" }] },
+            // an intersection and a union that carry the manager are expanded
+            { filename: SPEC, code: 'import type { EntityManager } from "typeorm"\ndeclare function make(): EntityManager & { extra: number }\nexport const m = make()', errors: [{ messageId: "adhoc" }] },
+            { filename: SPEC, code: 'import type { EntityManager } from "typeorm"\ndeclare function make(): EntityManager | undefined\nexport const m = make()', errors: [{ messageId: "adhoc" }] },
             // stubbing a member of the manager by hand
             { filename: SPEC, code: `${KIT}declare const jest: { fn(): () => Promise<Array<object>> }\nconst manager = mockEntityManager()\nmanager.find = jest.fn()`, errors: [{ messageId: "adhoc" }] },
         ],
