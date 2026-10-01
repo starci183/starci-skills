@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { linkedNodeModulesOf, classifyNpm } from '../scripts/guards/deps-guard.mjs';
+import { linkedNodeModulesOf, classifyInstall } from '../scripts/guards/deps-guard.mjs';
 import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'nm-link-'));
@@ -18,13 +18,13 @@ test('an install in a checkout whose node_modules is a link is detected, a real 
     const scratch = path.join(base, 'scratch'); fs.mkdirSync(path.join(scratch, 'sub'), { recursive: true });
     fs.writeFileSync(path.join(scratch, 'package.json'), '{}');
     link(live, path.join(scratch, 'node_modules'));
-    const hit = linkedNodeModulesOf(['ci'], path.join(scratch, 'sub'));
+    const hit = linkedNodeModulesOf('npm', ['ci'], path.join(scratch, 'sub'));
     assert.ok(hit, 'the nearest package root holds a linked node_modules');
     assert.equal(path.resolve(hit.target).toLowerCase(), fs.realpathSync.native(live).toLowerCase());
-    assert.ok(linkedNodeModulesOf(['install', '--prefix', scratch], base));
+    assert.ok(linkedNodeModulesOf('npm', ['install', '--prefix', scratch], base));
     const own = path.join(base, 'own'); fs.mkdirSync(path.join(own, 'node_modules'), { recursive: true }); fs.writeFileSync(path.join(own, 'package.json'), '{}');
-    assert.equal(linkedNodeModulesOf(['ci'], own), null);
-    assert.equal(classifyNpm(['ci']).kind, 'clean-install');
+    assert.equal(linkedNodeModulesOf('npm', ['ci'], own), null);
+    assert.equal(classifyInstall('npm', ['ci']).kind, 'clean-install');
     fs.unlinkSync(path.join(scratch, 'node_modules'));
   } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });

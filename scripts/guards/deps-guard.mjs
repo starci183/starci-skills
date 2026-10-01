@@ -8,61 +8,120 @@
 //  - a command that deletes node_modules (npm ci and its aliases) is refused
 //    while a job of ANOTHER workflow of the same ledger is leased, because that
 //    job's checks read node_modules right now;
-//  - an install-family command through a linked node_modules is always refused:
-//    it empties the live tree the link points to (node-modules-link-wipe).
-// scripts/guards/command-guard.mjs (a PreToolUse hook) applies it to an op or
-// [Worker] agent's npm command before it runs.
+//  - an install-family command of npm, pnpm or yarn through a linked node_modules is always refused, with or without
+//    a guard file: it empties the live tree the link points to (node-modules-link-wipe, contract change
+//    install-through-link).
+// scripts/guards/command-guard.mjs (a PreToolUse hook) applies it to an agent's shell command before it runs.
 import fs from 'node:fs';
 import path from 'node:path';
 
-const INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
+/** The package managers whose install family rewrites node_modules. */
+export const PACKAGE_MANAGERS = Object.freeze(['npm', 'pnpm', 'yarn']);
+const NPM_INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
   'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln',
   'it', 'install-test']);
-const CLEAN_INSTALL = new Set(['ci', 'clean-install', 'ic', 'install-clean', 'isntall-clean', 'cit', 'install-ci-test', 'clean-install-test', 'sit']);
-// npm options that consume the next word.
-const NPM_VALUE_OPTIONS = new Set(['--prefix', '-C', '--workspace', '-w', '--userconfig', '--cache', '--registry', '--loglevel', '--tag', '--omit', '--include', '--install-strategy']);
+const NPM_CLEAN_INSTALL = new Set(['ci', 'clean-install', 'ic', 'install-clean', 'isntall-clean', 'cit', 'install-ci-test', 'clean-install-test', 'sit']);
+const PNPM_INSTALL = new Set(['install', 'i', 'add', 'remove', 'rm', 'uninstall', 'un', 'update', 'up', 'upgrade', 'prune', 'rebuild', 'rb',
+  'link', 'ln', 'unlink', 'dedupe', 'import', 'install-test', 'it']);
+const YARN_INSTALL = new Set(['install', 'add', 'remove', 'upgrade', 'up', 'upgrade-interactive', 'dedupe', 'link', 'unlink', 'import']);
+// Options that consume the next word, per manager.
+const VALUE_OPTIONS = {
+  npm: new Set(['--prefix', '-C', '--dir', '--workspace', '-w', '--userconfig', '--cache', '--registry', '--loglevel', '--tag', '--omit', '--include', '--install-strategy']),
+  pnpm: new Set(['-C', '--dir', '--prefix', '--filter', '-F', '--workspace-dir', '--store-dir', '--virtual-store-dir', '--reporter', '--loglevel', '--registry', '--config']),
+  yarn: new Set(['--cwd', '--modules-folder', '--cache-folder', '--mutex', '--network-timeout', '--registry', '--global-folder', '--link-folder']),
+};
+// The options that name the package root an install works in.
+const ROOT_OPTIONS = ['--prefix', '-C', '--dir', '--cwd'];
+
+const optionValue = (args, names) => {
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (names.includes(a) && args[i + 1] != null) return args[i + 1];
+    const eq = names.find((n) => n.startsWith('--') && a.startsWith(`${n}=`));
+    if (eq) return a.slice(eq.length + 1);
+  }
+  return null;
+};
+
+/** The package root an install of `argv` works in: --prefix / -C / --dir / --cwd, else the nearest package.json above `cwd`. */
+export function packageRootOf(argv, cwd = process.cwd()) {
+  const given = optionValue(argv.map(String), ROOT_OPTIONS);
+  if (given) return path.resolve(cwd, given);
+  for (let d = path.resolve(cwd); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, 'package.json'))) return d;
+    if (path.dirname(d) === d) return null;
+  }
+}
+
+// `nm` when it is a link (a junction or symlink, or a directory whose real path is not its own place), else null.
+function linkAt(nm) {
+  let st; try { st = fs.lstatSync(nm); } catch { return null; }
+  let linked = st.isSymbolicLink();
+  if (!linked && st.isDirectory()) {
+    try { linked = path.resolve(fs.realpathSync.native(nm)).toLowerCase() !== path.join(fs.realpathSync.native(path.dirname(nm)), path.basename(nm)).toLowerCase(); }
+    catch { linked = true; }
+  }
+  if (!linked) return null;
+  let target = null; try { target = fs.realpathSync.native(nm); } catch { /* dangling */ }
+  return { nodeModules: nm, target };
+}
+
+// The workspace root above `root` (a package.json with "workspaces", or a pnpm-workspace.yaml), whose node_modules a
+// workspace install also writes; null when there is none.
+function workspaceRootAbove(root) {
+  for (let d = path.dirname(root); path.dirname(d) !== d; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, 'pnpm-workspace.yaml'))) return d;
+    try { if (JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8'))?.workspaces) return d; } catch { /* none or unreadable */ }
+  }
+  return null;
+}
 
 /**
- * The node_modules an install in `cwd` would rewrite, when it is a LINK (junction/symlink) - or null. npm reifies
- * through a linked node_modules and empties its target: proven 2026-09-28 (npm 11.6, "Removing non-directory
- * node_modules" left the junction's target empty), which is how the runtime's live .claude/node_modules was wiped from
- * a checkout whose node_modules is a junction to it (land scratch, [Worker] staging, product worktree overlays).
- * The package root is --prefix/-C when given, else the nearest directory holding package.json. Never throws.
+ * The node_modules an install of `program argv` in `cwd` would rewrite that is a LINK (junction/symlink), or null. npm
+ * reifies through a linked node_modules and empties its target: proven 2026-09-28 (npm 11.6, "Removing non-directory
+ * node_modules" left the junction's target empty), and the wipes kept coming (the runtime's live .claude/node_modules;
+ * 2026-10-01 a lane's `npm ci` emptied main's packages/grammar/node_modules through its junction). Checked in order:
+ * the package root's node_modules (yarn --modules-folder when given), every node_modules the root itself sits inside,
+ * and the workspace root's node_modules. A node_modules that does not exist yet is no link. Never throws.
  */
-export function linkedNodeModulesOf(argv, cwd = process.cwd()) {
+export function linkedNodeModulesOf(program, argv, cwd = process.cwd()) {
   try {
     const args = argv.map(String);
-    const at = args.findIndex((a) => a === '--prefix' || a === '-C');
-    let root = at >= 0 && args[at + 1] ? path.resolve(cwd, args[at + 1]) : null;
-    if (!root) { for (let d = path.resolve(cwd); ; d = path.dirname(d)) { if (fs.existsSync(path.join(d, 'package.json'))) { root = d; break; } if (path.dirname(d) === d) break; } }
+    const root = packageRootOf(args, cwd);
     if (!root) return null;
-    const nm = path.join(root, 'node_modules');
-    let st; try { st = fs.lstatSync(nm); } catch { return null; }
-    let linked = st.isSymbolicLink();
-    if (!linked && st.isDirectory()) { try { linked = path.resolve(fs.realpathSync.native(nm)).toLowerCase() !== path.join(fs.realpathSync.native(root), 'node_modules').toLowerCase(); } catch { linked = true; } }
-    if (!linked) return null;
-    let target = null; try { target = fs.realpathSync.native(nm); } catch { /* dangling */ }
-    return { nodeModules: nm, target };
+    const modulesFolder = program === 'yarn' ? optionValue(args, ['--modules-folder']) : null;
+    const candidates = [modulesFolder ? path.resolve(root, modulesFolder) : path.join(root, 'node_modules')];
+    for (let d = root; path.dirname(d) !== d; d = path.dirname(d)) if (path.basename(d).toLowerCase() === 'node_modules') candidates.push(d);
+    const ws = workspaceRootAbove(root);
+    if (ws) candidates.push(path.join(ws, 'node_modules'));
+    for (const nm of candidates) { const hit = linkAt(nm); if (hit) return hit; }
+    return null;
   } catch { return null; }
 }
 
-/** classifyNpm(argv) -> {kind: 'pass'|'install'|'clean-install', sub} */
-export function classifyNpm(argv) {
+/** classifyInstall(program, argv) -> {kind: 'pass'|'install'|'clean-install', sub}: whether the command rewrites node_modules. */
+export function classifyInstall(program, argv) {
+  if (!PACKAGE_MANAGERS.includes(program)) return { kind: 'pass', sub: null };
   const args = argv.map(String);
+  const valued = VALUE_OPTIONS[program];
   let sub = null;
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
-    if (NPM_VALUE_OPTIONS.has(a)) { i += 1; continue; }
+    if (valued.has(a)) { i += 1; continue; }
     if (a.startsWith('-')) continue;
     sub = a;
     break;
   }
-  const global = args.some((a) => a === '-g' || a === '--global' || a === '--location=global');
-  const dry = args.some((a) => a === '--dry-run');
-  if (!sub || global || dry) return { kind: 'pass', sub };
-  if (CLEAN_INSTALL.has(sub)) return { kind: 'clean-install', sub };
-  if (INSTALL.has(sub)) return { kind: 'install', sub };
-  return { kind: 'pass', sub };
+  const global = args.some((a) => a === '-g' || a === '--global' || a === '--location=global') || (program === 'yarn' && sub === 'global');
+  const dry = args.some((a) => a === '--dry-run' || a === '--lockfile-only');
+  if (global || dry) return { kind: 'pass', sub };
+  if (program === 'npm') {
+    if (NPM_CLEAN_INSTALL.has(sub)) return { kind: 'clean-install', sub };
+    return { kind: sub && NPM_INSTALL.has(sub) ? 'install' : 'pass', sub };
+  }
+  if (program === 'pnpm') return { kind: sub && PNPM_INSTALL.has(sub) ? 'install' : 'pass', sub };
+  // yarn with no subcommand installs; any other word runs a script.
+  return { kind: !sub || YARN_INSTALL.has(sub) ? 'install' : 'pass', sub };
 }
 
 /** Jobs of OTHER workflows of this ledger that hold a lease right now (read-only). */

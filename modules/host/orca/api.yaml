@@ -279,6 +279,8 @@ starciOrchestrationAllowlist:
     - terminal close
     - terminal read
     - terminal send
+  # An op or [Worker] may check its own Run's deliveries; the Kernel may not (command guard KERNEL_ORCA_CHECK: its
+  # --ack would consume deliveries before the ledger records them; it reads through api messages / api questions).
   operationAgent:
     - orchestration send
     - orchestration ask

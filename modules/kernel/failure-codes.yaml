@@ -1340,12 +1340,13 @@ DEPS_DELETE_WHILE_PEER_LEASED:
   kind: dispatch-refusal
 
 DEPS_THROUGH_LINK:
-  title: "npm through linked node_modules refused"
-  title_vi: "Không chạy npm qua node_modules liên kết"
-  meaning_vi: "Lệnh npm bị từ chối vì node_modules là liên kết sang cây khác và npm sẽ làm rỗng thư mục thật."
+  title: "Install through linked node_modules refused"
+  title_vi: "Không cài gói qua node_modules liên kết"
+  meaning_vi: "Lệnh cài gói của npm, pnpm hoặc yarn (ci, install, add, uninstall, prune...) bị từ chối vì node_modules ở thư mục gói, thư mục node_modules chứa nó, hoặc node_modules của gốc workspace là liên kết (junction hoặc symlink) sang checkout khác; trình cài gói sẽ làm rỗng thư mục thật mà liên kết trỏ tới. Luật này áp dụng cả khi cửa sổ không có tệp bảo vệ."
   causes_vi:
-    - "Chạy npm install trong cây dùng node_modules liên kết"
-  nextStep_vi: "Cổng bảo vệ từ chối; không cài ở đây, thay đổi phụ thuộc phải đi qua đơn vị phụ thuộc tuần tự hoặc báo môi trường bị chặn."
+    - "Chạy npm ci hoặc npm install trong worktree có node_modules là junction tới checkout chính"
+    - "Dùng --prefix, -C, --dir hoặc --cwd trỏ vào thư mục có node_modules liên kết"
+  nextStep_vi: "Lệnh không được chạy; gỡ liên kết trước (cmd /c rmdir trên junction, không xóa đệ quy) rồi cài thật vào thư mục node_modules riêng."
   owner: op-retry
   kind: dispatch-refusal
 
@@ -3115,6 +3116,16 @@ INVALID_INPUT:
   nextStep_vi: "Bộ quét dừng với lỗi đầu vào; người gọi phải sửa lời gọi rồi chạy lại."
   owner: runtime-core
   kind: input-invalid
+
+KERNEL_ORCA_CHECK:
+  title: "Kernel read of the Orca mailbox refused"
+  title_vi: "Kernel không được tự đọc hộp thư Orca"
+  meaning_vi: "Lệnh orca orchestration check từ cửa sổ Kernel bị chặn: cờ --ack sẽ xác nhận và tiêu thụ tin nhắn trước khi sổ ghi kịp lưu lại, nên tin nhắn có thể mất."
+  causes_vi:
+    - "Kernel làm theo thông báo của Orca bảo chạy orca orchestration check"
+  nextStep_vi: "Lệnh không được chạy; Kernel đọc tin nhắn bằng api messages và câu hỏi bằng api questions, runtime tự xử lý hộp thư."
+  owner: op-retry
+  kind: verb-refusal
 
 KERNEL_GATED:
   title: "Kernel seat is gated"

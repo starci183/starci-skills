@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList } from '../scripts/guards/git-policy.mjs';
-import { classifyNpm, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
+import { classifyInstall, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch, bindGuardTerminal } from '../scripts/guards/install.mjs';
 import { commandVerdict } from '../scripts/guards/command-guard.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
@@ -141,19 +141,19 @@ test('discarding, staging and committing are scoped to the op owned paths', () =
 });
 
 test('npm install-family commands are installs; npm ci is the node_modules delete', () => {
-  assert.equal(classifyNpm(['ci']).kind, 'clean-install');
-  assert.equal(classifyNpm(['install']).kind, 'install');
-  assert.equal(classifyNpm(['i', '-D', 'x']).kind, 'install');
-  assert.equal(classifyNpm(['--prefix', 'apps/web', 'install']).kind, 'install');
-  assert.equal(classifyNpm(['uninstall', 'x']).kind, 'install');
-  assert.equal(classifyNpm(['install', '-g', 'x']).kind, 'pass');
-  assert.equal(classifyNpm(['run', 'test']).kind, 'pass');
-  assert.equal(classifyNpm(['test']).kind, 'pass');
-  assert.equal(classifyNpm(['exec', 'jest']).kind, 'pass');
-  assert.equal(classifyNpm(['--version']).kind, 'pass');
+  assert.equal(classifyInstall('npm', ['ci']).kind, 'clean-install');
+  assert.equal(classifyInstall('npm', ['install']).kind, 'install');
+  assert.equal(classifyInstall('npm', ['i', '-D', 'x']).kind, 'install');
+  assert.equal(classifyInstall('npm', ['--prefix', 'apps/web', 'install']).kind, 'install');
+  assert.equal(classifyInstall('npm', ['uninstall', 'x']).kind, 'install');
+  assert.equal(classifyInstall('npm', ['install', '-g', 'x']).kind, 'pass');
+  assert.equal(classifyInstall('npm', ['run', 'test']).kind, 'pass');
+  assert.equal(classifyInstall('npm', ['test']).kind, 'pass');
+  assert.equal(classifyInstall('npm', ['exec', 'jest']).kind, 'pass');
+  assert.equal(classifyInstall('npm', ['--version']).kind, 'pass');
   // npm's aliases of ci-and-test delete node_modules too
-  for (const sub of ['cit', 'install-ci-test', 'clean-install-test', 'sit']) assert.equal(classifyNpm([sub]).kind, 'clean-install', sub);
-  for (const sub of ['it', 'install-test']) assert.equal(classifyNpm([sub]).kind, 'install', sub);
+  for (const sub of ['cit', 'install-ci-test', 'clean-install-test', 'sit']) assert.equal(classifyInstall('npm', [sub]).kind, 'clean-install', sub);
+  for (const sub of ['it', 'install-test']) assert.equal(classifyInstall('npm', [sub]).kind, 'install', sub);
 });
 
 test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {

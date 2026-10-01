@@ -1,0 +1,33 @@
+id: install-through-link
+effectiveAt: '2026-10-02T12:00:00+07:00'
+summary: >-
+  INSTALLS THROUGH A LINKED node_modules ARE REFUSED FOR EVERY CALLER, AND THE KERNEL NEVER CHECKS ITS ORCA MAILBOX
+  (lane C0-KGUARD2). (1) The third junction wipe (2026-10-01: a lane's `npm ci` emptied main's
+  packages/grammar/node_modules) came from a session with no guard file, which the command guard let through.
+  scripts/guards/deps-guard.mjs now reads npm, pnpm and yarn (classifyInstall, PACKAGE_MANAGERS; classifyNpm is
+  deleted): ci, install/i, add, uninstall/remove, prune, update, rebuild, link and their aliases, and yarn with no
+  subcommand. The package root comes from the cwd, --prefix, -C, --dir or --cwd (packageRootOf), and
+  linkedNodeModulesOf(program, argv, cwd) checks the root's node_modules (yarn --modules-folder when given), every
+  node_modules the root sits inside, and the workspace root's node_modules. A link refuses DEPS_THROUGH_LINK with the
+  remedy "node_modules here is a link to another checkout: unlink it first (cmd /c rmdir) and install for real".
+  scripts/guards/command-guard.mjs applies this one rule with no guard file too (unguardedVerdict; hookDecision returns
+  guard null), wherever the hook is registered, through cmd, PowerShell, bash, npx and corepack wrappers (cmd's
+  `cd /d <dir>` now moves the cwd). A real node_modules, or none yet, passes. (2) a raw mailbox check (the calls.yaml check call) from a
+  guard of role kernel is refused KERNEL_ORCA_CHECK: its --ack consumes deliveries before the ledger records them; the
+  Kernel reads through api messages / api questions and the runtime drains. Ops and [Worker]s keep that check
+  (modules/host/orca/api.yaml operationAgent): they read their own Run's deliveries, which no ledger record depends on.
+adds:
+  codes:
+    - KERNEL_ORCA_CHECK
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/install-through-link.yaml
+  - scripts/guards/deps-guard.mjs
+  - scripts/guards/command-guard.mjs
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/api.yaml
+  - modules/host/orca/api.yaml
+  - CHANGELOG.md
+  - tests/install-link-guard.spec.mjs
+  - tests/node-modules-link-guard.spec.mjs
+  - tests/shared-checkout-guard.spec.mjs
