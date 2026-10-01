@@ -490,6 +490,21 @@ function typeScriptContext(config, loaded, paths) {
       // project is then the boundary it always was.
       const reviewable = isInside(config.root, actualTarget)
         || (config.repository && isInside(config.repository, actualTarget) && !slash(actualTarget).includes('/node_modules/'));
+      // A side of an app (config.root is be/ or fe/) imports nothing of the app outside itself: the root holds no source, the other
+      // side is another program, and a declared read (sides.fe.reads, be/contracts/) is codegen input, never an import.
+      const crossesSide = config.packageRoot !== undefined && config.packageRoot !== config.root
+        && isInside(config.packageRoot, actualTarget) && !isInside(config.root, actualTarget) && !slash(actualTarget).includes('/node_modules/');
+      if (internal && crossesSide) {
+        errors.push({
+          ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
+          project: project.relative,
+          path: relativePath(config.root, sourceFile.fileName),
+          ...sourceLocation(sourceFile, reference.node),
+          specifier: reference.specifier,
+          message: `Internal import ${reference.specifier} leaves the ${path.basename(config.root)} side for ${slash(path.relative(config.packageRoot, actualTarget))}; nothing crosses the sides of an app.`,
+        });
+        continue;
+      }
       if (internal && !reviewable) {
         errors.push({
           ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',

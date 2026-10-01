@@ -71,8 +71,7 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
       noEmit: true,
     },
     include: ['src/**/*', 'apps/**/*'],
-  }, null, 2)}
-`;
+  }, null, 2)}\n`;
   const baseline = {
     '../.gitattributes': '* text=auto eol=lf\n',
     '../.github/workflows/check.yml': 'name: check\n',
@@ -90,12 +89,14 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
       '.sops.yaml': 'creation_rules: []\n',
       '.starcistacks/application-stacks.yaml': 'environments: []\n',
       '../.starciwork/.gitignore': 'runtime.sqlite\n',
+      'tsconfig.build.json': '{}\n',
       'jest.config.js': 'module.exports = {};\n',
       'nest-cli.json': '{}\n',
       'src/tests/fixtures/.keep': '',
       [`apps/${app}/src/main.ts`]: 'void 0\n',
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
     } : {
+      'stylelint.config.mjs': 'export default {};\n',
       [`apps/${app}/next.config.ts`]: 'export default {};\n',
       [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
       [`apps/${app}/tsconfig.json`]: JSON.stringify({ extends: '../../tsconfig.json', include: ['src/**/*'] }),
@@ -329,7 +330,7 @@ test('check emits one actionable JSON record and uses target-local TypeScript', 
     'src/modules/domain/value.ts': 'export const value=1\n',
     'src/features/feature.ts': 'import { value } from "@modules/value"; export const feature=value\n',
   });
-  const targetModules = path.join(root, 'node_modules');
+  const targetModules = path.join(root, '..', 'node_modules');
   fs.mkdirSync(targetModules);
   const installedTypeScript = path.dirname(require.resolve('typescript/package.json'));
   fs.cpSync(installedTypeScript, path.join(targetModules, 'typescript'), { recursive: true });
@@ -873,17 +874,21 @@ test('derived Grammar contract binds public code, style entry, peers, and produc
   assert.ok(invalid.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID'), JSON.stringify(invalid, null, 2));
 });
 
-test('internal aliases and relative imports cannot resolve outside the checked repository', t => {
+test('internal aliases and relative imports cannot resolve outside the checked repository, nor into the other side of the app', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/alias.ts': 'import { outside } from "@outside/value"; export const alias=outside\n',
     'src/modules/domain/relative.ts': '',
     'src/features/present.ts': 'export const present=1\n',
   });
-  const outside = `${root}-outside`;
+  const outside = `${path.dirname(root)}-outside`;
   t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
   fs.mkdirSync(outside, { recursive: true });
   fs.writeFileSync(path.join(outside, 'value.ts'), 'export const outside=1\n');
-  fs.writeFileSync(path.join(root, 'src/modules/domain/relative.ts'), `import { outside } from "../../../../${path.basename(outside)}/value"; export const relative=outside\n`);
+  fs.writeFileSync(path.join(root, 'src/modules/domain/relative.ts'), `import { outside } from "../../../../../${path.basename(outside)}/value"; export const relative=outside\n`);
+  // The fe side is inside the same checkout, so it is reviewable source, and still not this side's to import.
+  fs.mkdirSync(path.join(root, '..', 'fe'), { recursive: true });
+  fs.writeFileSync(path.join(root, '..', 'fe', 'shared.ts'), 'export const shared=1\n');
+  fs.writeFileSync(path.join(root, 'src/modules/domain/cross.ts'), 'import { shared } from "../../../../fe/shared"; export const cross=shared\n');
   let linked = false;
   try {
     fs.symlinkSync(outside, path.join(root, 'src/outside-link'), 'junction');
@@ -891,10 +896,10 @@ test('internal aliases and relative imports cannot resolve outside the checked r
     linked = true;
   } catch { /* Link creation can be unavailable on a locked-down Windows host. */ }
   const configFile = path.join(root, 'tsconfig.json'), config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.compilerOptions.paths['@outside/*'] = [`../${path.basename(outside)}/*`];
+  config.compilerOptions.paths['@outside/*'] = [`../../${path.basename(outside)}/*`];
   fs.writeFileSync(configFile, JSON.stringify(config));
   const result = check(root), outsideErrors = result.errors.filter(item => item.ruleId === 'ARCH_INTERNAL_IMPORT_OUTSIDE');
-  const expected = new Set(['@outside/value', `../../../../${path.basename(outside)}/value`]);
+  const expected = new Set(['@outside/value', `../../../../../${path.basename(outside)}/value`, '../../../../fe/shared']);
   if (linked) expected.add('../../outside-link/value');
   assert.deepEqual(new Set(outsideErrors.map(item => item.specifier)), expected);
 });
