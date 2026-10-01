@@ -21,6 +21,9 @@
 //      Kernel seat (scripts/kernel/watchdog.mjs --once --repair, the Host controller's own call);
 //   7. the checklist, re-read until green or --wait seconds (default 120) pass.
 // --check runs only the read-only checklist (steps 1 and 7, one pass). Exit 0 only when every REQUIRED item is green.
+// The config row orca-depth reports config.yaml orca.maxWorkerDepth; with STARCI_ORCA_LIVE=1 (and Orca reachable) it
+// also measures Orca's real limit with no-op workers it starts and releases (scripts/agent/depth-probe.mjs) and is red
+// when the two differ.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -31,7 +34,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../lib/hk-orphan-ledgers.mjs';
 import { quickCheck } from './ledger-health.mjs';
-import { loadConfig } from '../../engine/config.mjs';
+import { loadConfig, orcaSettings } from '../../engine/config.mjs';
+import { compareMeasuredDepth } from '../lib/worker-depth.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { probeOrcaAsync, runChild, serviceRegistry, servicePorts, startService } from './services.mjs';
@@ -305,7 +309,7 @@ async function json(cmd, args, { timeoutMs = 120_000, run = runChild } = {}) {
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
  */
-export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true } = {}) {
+export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, depthProbe = null } = {}) {
   const items = [];
   const push = (...rows) => items.push(...rows.flat());
   // preflight
@@ -349,7 +353,34 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   } else push(mode === 'kernel' ? red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again') : supervisorItem({ mode }));
   push(orcaProbe.ok === false ? red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${orcaProbe.error ? `: ${orcaProbe.error}` : ''}`, 'open Orca yourself, then run start again') : orcaProbe.ok ? green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`) : []);
   if (seats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config }));
+  push(await depthItems({ env, config, orcaOk: orcaProbe.ok === true, ...(depthProbe ? { probe: depthProbe } : {}) }));
   return items;
+}
+
+/**
+ * The orca-depth row: config.yaml orca.maxWorkerDepth, which must equal the Orca app's worker depth setting (Orca has
+ * no read of it). Only with STARCI_ORCA_LIVE=1 and Orca reachable is Orca's limit measured (no-op workers, all
+ * released) and compared: red on a mismatch or a worker the probe could not release. Seam: probe.
+ */
+export async function depthItems({ env = process.env, config = null, orcaOk = false, probe = null } = {}) {
+  const NAME = 'Orca worker depth (orca.maxWorkerDepth)';
+  let settings;
+  try { settings = orcaSettings(config ?? {}); }
+  catch (error) { return [red('config', 'orca-depth', NAME, String(error?.message ?? error).slice(0, 300), 'fix config.yaml orca.maxWorkerDepth (an integer equal to the Orca app setting)')]; }
+  const configured = settings.maxWorkerDepth;
+  const base = `orca.maxWorkerDepth ${configured} (${settings.source}); it must equal the Orca app's worker depth setting`;
+  if (env.STARCI_ORCA_LIVE !== '1') return [green('config', 'orca-depth', NAME, `${base}; not measured (STARCI_ORCA_LIVE=1 measures it)`, { required: false })];
+  if (!orcaOk) return [warn('config', 'orca-depth', NAME, `${base}; not measured: Orca is not reachable`, 'open Orca, then run start --check with STARCI_ORCA_LIVE=1 again')];
+  const measure = probe ?? (async (opts) => (await import('../agent/depth-probe.mjs')).probeWorkerDepth(opts));
+  let measured;
+  try { measured = await measure({ entry: env.ORCA_TERMINAL_HANDLE || null, worktree: SKILL_ROOT, agent: env.STARCI_DEPTH_PROBE_AGENT || 'claude' }); }
+  catch (error) { measured = { ok: false, error: String(error?.message ?? error) }; }
+  const leaked = (measured?.released ?? []).filter((w) => !w.released);
+  if (leaked.length) return [red('config', 'orca-depth', NAME, `${base}; the probe could not release ${leaked.map((w) => w.dispatchId).join(', ')}`, 'orca orchestration worker-release --dispatch <id> for each, then run the check again')];
+  const cmp = compareMeasuredDepth({ configured, measured: measured?.ok ? measured.measured : null });
+  if (cmp.status === 'match') return [green('config', 'orca-depth', NAME, `${cmp.detail} (probe depths ${(measured.depths ?? []).join(', ')})`)];
+  if (cmp.status === 'mismatch') return [red('config', 'orca-depth', NAME, cmp.detail, `set config.yaml orca.maxWorkerDepth: ${cmp.measured}, or change the Orca app setting to ${configured}`)];
+  return [warn('config', 'orca-depth', NAME, `${cmp.detail}: ${measured?.error ?? 'the probe returned nothing'}`, 'run start --check with STARCI_ORCA_LIVE=1 again')];
 }
 
 /**

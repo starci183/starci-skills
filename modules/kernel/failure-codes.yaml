@@ -10152,6 +10152,16 @@ worker-active:
   nextStep_vi: "Không gõ gì vào terminal; Kernel chờ và thử nhắc lại sau nếu cần."
   owner: op-retry
   kind: verb-refusal
+worker-depth-exceeded:
+  title: "Worker would nest deeper than the Orca depth setting"
+  title_vi: "Worker sẽ lồng sâu hơn giới hạn độ sâu của Orca"
+  meaning_vi: "Runtime từ chối khởi động một worker trước khi gọi worker-start, vì worker đó sẽ nằm sâu hơn orca.maxWorkerDepth trong config.yaml (giá trị phải bằng cài đặt độ sâu worker trong ứng dụng Orca); Orca sẽ từ chối nó bằng nested_worker_depth_exceeded."
+  causes_vi:
+    - "Kernel được khởi động từ một worker đã nằm sâu, nên op hoặc critic bên dưới vượt giới hạn"
+    - "orca.maxWorkerDepth nhỏ hơn cài đặt thật trong ứng dụng Orca"
+  nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; Supervisor khởi động lại từ một cửa sổ nông hơn, hoặc chủ dự án đổi cài đặt độ sâu trong Orca và orca.maxWorkerDepth cùng lúc (start --check với STARCI_ORCA_LIVE=1 đo và so sánh hai giá trị)."
+  owner: supervisor
+  kind: dispatch-refusal
 worker-died-no-report:
   title: "Worker died without report"
   title_vi: "Worker chết mà chưa báo cáo"

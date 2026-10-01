@@ -16,7 +16,7 @@ import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
-import { spawnAgent } from '../../agent/lib.mjs';
+import { spawnAgent, depthPreflight } from '../../agent/lib.mjs';
 import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from '../api-lib/rows.mjs';
 import { DISPATCHES, requirePhase } from '../api-lib/lifecycle.mjs';
 import { PEER_WAIT, leaseCanonOf, openPeerWaits, releaseTypedWaits } from '../api-lib/peers.mjs';
@@ -464,14 +464,14 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // A rejection before the launch has no effect; a launch rejection arrives already reconciled by spawnAgent
   // (worker-show before any stop on an unknown effect, cleanupManagedWorker on a partial one).
   const reject = ({ step, signal = null, error = null, dispatchId = null, incident = false,
-    effectState = 'none', observation = null, cleanup = null, details = null }) => {
+    effectState = 'none', observation = null, cleanup = null, details = null, code = null }) => {
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
       effectState, details, settled: cleanup, trust,
     });
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
-      managed: { step, dispatchId, effectState, ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
+      managed: { step, dispatchId, effectState, ...(code ? { code } : {}), ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
     emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${effectState}${cleanup ? `, worker ${dispatchId} cleanup stop=${cleanup.stop?.ok} release=${cleanup.release?.ok}` : ''}`, args.json);
     process.exit(1);
   };
@@ -485,6 +485,10 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const run = ensureWorkflowRun(ledger, { job, jobId, payload });
   if (!run.ok) return reject({ step: 'run-create', error: run.error });
   const { runId, kernelHandle } = run;
+  // 2b. Depth (contract change worker-depth-limit): the op nests under its Kernel's Dispatch; one deeper than
+  // config.yaml orca.maxWorkerDepth is refused worker-depth-exceeded before its Task exists (no try spent).
+  const preflight = depthPreflight({ parentDispatch: run.kernelPayload?.managed?.dispatchId ?? null });
+  if (preflight.refusal) return reject({ step: 'depth', code: preflight.refusal.code, error: preflight.refusal.error });
 
   // 3. Task — the operation's contract. The spec is the rendered packet prompt.
   const task = createOperationTask({ runId, prompt, op, title, attempt: job.try_no, kernelHandle, jobId, packetFile });
@@ -497,7 +501,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // the exact assignee (dispatch-show, never a second orchestration dispatch), its [Op] title, and the attestation
   // that the worker's EFFECTIVE agent/model equal the route - a mismatch is a provider-side defect, rejected with the
   // typed infra-provider incident.
-  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, task: taskId, run: runId, from: kernelHandle,
+  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, task: taskId, run: runId, from: kernelHandle, preflight,
     onCreated: (handle) => recordLaunchTerminal(ledger, jobId, handle), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
   if (!launched.ok) {

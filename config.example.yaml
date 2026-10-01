@@ -156,6 +156,13 @@ asks:
 # reclaimed. STARCI_UAT_MAX_CONCURRENT overrides it for one process tree.
 uat:
   maxConcurrent: 10
+# orca — the owner's Orca app settings the runtime must know (engine/config.mjs orcaSettings). maxWorkerDepth MUST equal
+# the worker depth set in the Orca app: the deepest worker Orca starts under the owner's chat (chat 0, Kernel or
+# Supervisor 1, op or [Worker] 2, draw critic 3). Orca exposes no read of it, so the runtime trusts this value and refuses
+# a deeper launch before worker-start (worker-depth-exceeded). `start --check` with STARCI_ORCA_LIVE=1 measures Orca's
+# real limit and turns red when the two differ.
+orca:
+  maxWorkerDepth: 4
 # claudeDebug — the core-debug chat (skills/claude-debug). `/claude-debug` starts one Claude Code
 # `/loop <interval> /claude-debug pass` per host (a second invocation starts none); each tick is one read-only pass
 # (scripts/supervisor/debug-pass.mjs). worktreeLimit: more registered worktrees than this in one repository is an alert.

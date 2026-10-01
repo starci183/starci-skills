@@ -196,6 +196,7 @@ function clientOf(orca) {
   const o = orca ?? {};
   return {
     launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate, taskCreate: o.taskCreate,
+      workerList: o.workerList ?? (() => ({ ok: false, error: 'the fake client lists no workers' })),
       spawn: { trust: o.trust, start: o.workerStart, assignee: o.dispatchShow, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,
@@ -237,9 +238,9 @@ const gitRootOf = (cwd) => { const r = gitResult(['rev-parse', '--show-toplevel'
  * task-create, worker-start --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
  * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
  */
-export function launchCriticWorker({ critic, dir, prompt, entry = null, orca = null }) {
+export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null }) {
   return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir,
-    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry });
+    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry, parentDispatch });
 }
 
 /**
@@ -278,10 +279,12 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
  * rubricFor, `critic` {provider, model, effort, timeoutMs} from criticFor. `orca` replaces the Orca client (tests: a
  * fake of the wrappers - runCreate, taskCreate, trust, workerStart, dispatchShow, terminalRename, workerShow,
  * workerStop, workerRelease, check, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
- * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context).
+ * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context);
+ * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight, contract change worker-depth-limit).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
 export async function runCritic({ images, html, rubric, critic, orca = null, entry = process.env.ORCA_TERMINAL_HANDLE || null, placement = {},
+  parentDispatch = placement?.context?.dispatchId ?? (orca ? null : opContextOf()?.dispatchId ?? null),
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
   if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || !(Number(critic.timeoutMs) > 0)) {
@@ -307,7 +310,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
     base.critic.promptSha256 = sha256(prompt);
     const started = now();
-    launched = launchCriticWorker({ critic, dir, prompt, entry, orca });
+    launched = launchCriticWorker({ critic, dir, prompt, entry, parentDispatch, orca });
     if (!launched?.ok) {
       return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
     }
