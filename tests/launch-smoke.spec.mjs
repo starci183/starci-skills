@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROLES, SMOKE_SCHEMA, noopAgent, noopSpec, runSmoke, runStage, markResult } from '../scripts/kernel/launch-smoke.mjs';
+import { ROLES, SMOKE_SCHEMA, noopAgent, noopSpec, runSmoke, runStage, markResult, resolveState, stateParentOf } from '../scripts/kernel/launch-smoke.mjs';
 import { startAgent } from '../scripts/agent/lib.mjs';
 import { startWorkerAgent } from '../scripts/supervisor/workers.mjs';
-import { criticWorkspace, launchCriticWorker, removeCriticWorkspace } from '../scripts/work/draw-critic.mjs';
+import { launchCriticWorker } from '../scripts/work/draw-critic.mjs';
 
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@1) drives the runtime's own
 // launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), workers.mjs startWorkerAgent ([Worker])
@@ -68,8 +68,9 @@ function fakeOrca(t, { refuse = null, silent = null } = {}) {
   const client = {
     startAgent: (opts) => startAgent({ ...opts, io }),
     startWorkerAgent: (opts) => startWorkerAgent({ ...opts, start: client.startAgent }),
-    criticWorkspace: rec('critic-workspace', () => criticWorkspace({ tmpRoot: tmp })),
-    removeCriticWorkspace: rec('critic-workspace-remove', (dir) => removeCriticWorkspace(dir)),
+    // The placement is a temp directory here; tests/draw-critic-worker-start.spec.mjs proves the real worktree placement.
+    criticWorkspace: rec('critic-workspace', () => ({ ok: true, dir: fs.mkdtempSync(path.join(tmp, 'starci-draw-critic-')), repoRoot: tmp })),
+    removeCriticWorkspace: rec('critic-workspace-remove', ({ dir }) => { fs.rmSync(dir, { recursive: true, force: true }); return { ok: true }; }),
     launchCriticWorker: (opts) => launchCriticWorker({ ...opts, orca: { ...wrappers } }),
     workerShow: wrappers.workerShow, workerRead: wrappers.workerRead, workerStop: wrappers.workerStop,
     workerRelease: wrappers.workerRelease, taskUpdate: wrappers.taskUpdate, inbox: wrappers.inbox,
@@ -79,10 +80,11 @@ function fakeOrca(t, { refuse = null, silent = null } = {}) {
     while (pending.length) {
       const w = pending.shift();
       if (w.role === silent) continue;
-      const state = /--state "([^"]+)"/.exec(w.spec)[1];
       const role = /--as (\w+)/.exec(w.spec)[1];
+      const env = { ORCA_TERMINAL_HANDLE: w.terminal };
+      const { state } = await resolveState({ role, env, parent: stateParentOf(tmp), waitMs: 0 });
       const stage = / stage --as /.test(w.spec)
-        ? await runStage({ role, state, orca: client, env: { ORCA_TERMINAL_HANDLE: w.terminal }, sleep: async () => {} })
+        ? await runStage({ role, state, orca: client, env, sleep: async () => {} })
         : markResult({ role, state });
       w.status = stage.ok ? 'completed' : 'failed';
       messages.unshift({ id: `m_${w.role}`, type: 'worker_done', from_handle: w.terminal, payload: JSON.stringify({ dispatchId: w.id, taskId: w.task }) });
@@ -128,7 +130,8 @@ test('both nesting paths start through the runtime launchers at the depth Orca r
   assert.equal(names.includes('worker-stop'), false, 'a worker that sent worker_done is not stopped');
   assert.equal(names.includes('task-update'), false, 'worker_done settled every Task');
   assert.deepEqual(r.cleanup.find((c) => c.role === 'critic'), { role: 'critic', dispatchId: 'ctx_critic', stopped: null, released: true, taskClosed: 'by-worker_done', workspaceRemoved: true });
-  assert.deepEqual(fs.readdirSync(fake.tmp).filter((n) => n.startsWith('starci-')), [], 'the state directory and the critic placement are removed');
+  assert.deepEqual(fs.readdirSync(fake.tmp).filter((n) => n.startsWith('starci-draw-critic-')), [], 'the critic placement is removed');
+  assert.deepEqual(fs.readdirSync(stateParentOf(fake.tmp)), [], 'the state directory is removed');
 });
 
 test('a refused critic placement fails the op-critic path only; every started agent is still released', async (t) => {
@@ -190,11 +193,11 @@ test('the no-op agent is the cheapest priced model a runtimes.yaml pool pins, wi
 });
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {
-  const parent = noopSpec({ role: 'op', state: 'D:/s', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
-  assert.match(parent, /node "D:\/r\/scripts\/kernel\/launch-smoke.mjs" stage --as op --state "D:\/s"/);
+  const parent = noopSpec({ role: 'op', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
+  assert.match(parent, /node "D:\/r\/scripts\/kernel\/launch-smoke.mjs" stage --as op$/m, 'the command names only the role: nothing random to mistype');
   assert.match(parent, /timeout of at least 300 seconds/);
-  const leaf = noopSpec({ role: 'critic', state: 'D:/s', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
-  assert.match(leaf, / mark --as critic --state /);
+  const leaf = noopSpec({ role: 'critic', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
+  assert.match(leaf, / mark --as critic$/m);
   for (const s of [parent, leaf]) assert.match(s, /report worker_done exactly once/);
   assert.doesNotMatch(leaf, / stage /);
 });
@@ -205,4 +208,27 @@ test('the live client loads every runtime launcher and wrapper the smoke calls (
   for (const k of ['startAgent', 'startWorkerAgent', 'criticWorkspace', 'removeCriticWorkspace', 'launchCriticWorker', 'workerShow', 'workerRead', 'workerStop', 'workerRelease', 'taskUpdate', 'inbox']) {
     assert.equal(typeof client[k], 'function', k);
   }
+});
+
+test('an agent finds its smoke run by its own terminal; without a handle only an unambiguous run is taken', async (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-resolve-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const parent = stateParentOf(tmp);
+  const run = (name, terminal, marked = false) => {
+    const d = path.join(parent, name);
+    fs.mkdirSync(path.join(d, 'agents'), { recursive: true });
+    fs.writeFileSync(path.join(d, 'plan.json'), JSON.stringify({ noop }));
+    fs.writeFileSync(path.join(d, 'agents', 'kernel.json'), JSON.stringify({ role: 'kernel', terminal }));
+    if (marked) markResult({ role: 'kernel', state: d });
+    return d;
+  };
+  const a = run('run-a', 'term_a', true);
+  const b = run('run-b', 'term_b');
+  const opts = { role: 'kernel', parent, waitMs: 0 };
+  assert.equal((await resolveState({ ...opts, env: { ORCA_TERMINAL_HANDLE: 'term_a' } })).state, a);
+  assert.equal((await resolveState({ ...opts, env: { ORCA_TERMINAL_HANDLE: 'term_b' } })).state, b);
+  assert.match((await resolveState({ ...opts, env: { ORCA_TERMINAL_HANDLE: 'term_x' } })).error, /launched kernel into terminal term_x/);
+  assert.equal((await resolveState({ ...opts, env: {} })).state, b, 'no handle: the one run whose kernel is not yet marked');
+  run('run-c', 'term_c');
+  assert.match((await resolveState({ ...opts, env: {} })).error, /2 smoke runs launched kernel/);
 });

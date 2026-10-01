@@ -21,10 +21,13 @@
 //   node scripts/kernel/launch-smoke.mjs [--entry <terminal>] [--timeout-ms <n>] [--out <file>]
 //     the smoke; the entry is the terminal it runs in (ORCA_TERMINAL_HANDLE) - the owner's chat or a plain shell,
 //     never an agent. Exit 0 when every path is ok, 1 otherwise, 2 with no entry terminal.
-//   node scripts/kernel/launch-smoke.mjs stage --as <role> --state <dir>   (a parent agent runs it in its terminal)
-//   node scripts/kernel/launch-smoke.mjs mark --as <role> --state <dir>    (every agent runs it: its result line)
+//   node scripts/kernel/launch-smoke.mjs stage --as <role>   (a parent agent runs it in its terminal)
+//   node scripts/kernel/launch-smoke.mjs mark --as <role>    (every agent runs it: its result line)
+// An agent's command names only its role: the smoke's state directory (under <os temp>/starci-launch-smoke/) is found
+// by the agent's own terminal, ORCA_TERMINAL_HANDLE (resolveState). A random path in a spec is one an agent can mistype
+// (the first live run: a Kernel dropped one character of it and its stage never ran).
 //
-// It is step `launch-smoke` of the pre-workflow readiness (docs/release-checklist.md); it starts real agents, so it
+// It is step `launch-smoke` of the pre-workflow readiness (docs/releasing.md "Pre-workflow readiness", docs/host-contract.md); it starts real agents, so it
 // is run by hand once per runtime release, never by a check or a spec (tests/launch-smoke.spec.mjs fakes the client).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -89,6 +92,8 @@ export async function defaultClient() {
 }
 
 // ------------------------------------------------------------------ state directory
+/** Where every smoke run keeps its state directory. */
+export const stateParentOf = (tmp = os.tmpdir()) => path.join(tmp, 'starci-launch-smoke');
 const dirs = (state) => ({ agents: path.join(state, 'agents'), stages: path.join(state, 'stages'), results: path.join(state, 'results') });
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const writeJson = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`); };
@@ -100,8 +105,8 @@ export const agentOf = (state, role) => readJson(agentFile(state, role));
 const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
 /** The no-op Task spec of `role`: a parent runs its stage (starting its child), every agent marks its result line. */
-export function noopSpec({ role, state, script = SCRIPT }) {
-  const node = (verb) => `node "${slash(script)}" ${verb} --as ${role} --state "${slash(state)}"`;
+export function noopSpec({ role, script = SCRIPT }) {
+  const node = (verb) => `node "${slash(script)}" ${verb} --as ${role}`;
   const steps = CHILD[role]
     ? [`1. Run exactly: ${node('stage')}`,
       '   It starts one more no-op agent and can take up to 3 minutes: give the command a timeout of at least 300 seconds (300000 ms) and wait for it to exit.',
@@ -122,7 +127,7 @@ export function noopSpec({ role, state, script = SCRIPT }) {
 export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRIPT }) {
   const plan = planOf(state);
   const noop = plan.noop;
-  const prompt = noopSpec({ role, state, script });
+  const prompt = noopSpec({ role, script });
   const { title } = ROLES[role];
   const objective = `${SMOKE_SCHEMA} ${role}`;
   const record = (extra) => writeJson(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
@@ -131,9 +136,14 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   if (role === 'worker') {
     launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, onCreated });
   } else if (role === 'critic') {
-    const { dir } = orca.criticWorkspace({});
-    record({ workspace: dir });
-    launched = orca.launchCriticWorker({ critic: { provider: noop.provider, model: noop.model, effort: noop.effort }, dir, prompt, entry });
+    // draw-critic's own placement, in the runtime repository (no op job owns it: the smoke removes it).
+    const placed = orca.criticWorkspace({ repoRoot: root, context: null });
+    if (!placed?.ok) {
+      launched = { ok: false, step: 'placement', error: `criticWorkspace: ${placed?.error ?? 'no placement'}` };
+    } else {
+      record({ workspace: placed.dir, workspaceRepo: placed.repoRoot ?? null });
+      launched = orca.launchCriticWorker({ critic: { provider: noop.provider, model: noop.model, effort: noop.effort }, dir: placed.dir, prompt, entry });
+    }
   } else {
     launched = orca.startAgent({ provider: noop.provider, model: noop.model, effort: noop.effort, worktree: root, title, prompt, objective, entry, onCreated });
   }
@@ -143,6 +153,26 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
       ...(r?.ok ? {} : { error: r?.error ?? 'no launch receipt', step: r?.step ?? null, errorCode: r?.errorCode ?? null }) });
     return r;
   });
+}
+
+/**
+ * The state directory of the smoke run that launched `role` into this terminal: the run under `parent` whose
+ * agents/<role>.json names ORCA_TERMINAL_HANDLE; with no handle in the environment, the one run whose `role` is
+ * launched and not yet marked. A launch is recorded after attestation at the latest, so it waits up to `waitMs`.
+ * {state} | {error}.
+ */
+export async function resolveState({ role, env = process.env, parent = stateParentOf(), waitMs = 60000, sleep = defaultSleep, now = Date.now }) {
+  const handle = env.ORCA_TERMINAL_HANDLE || null;
+  for (const deadline = now() + waitMs; ;) {
+    let runs = [];
+    try { runs = fs.readdirSync(parent).map((n) => path.join(parent, n)).filter((d) => planOf(d)); } catch { runs = []; }
+    const launched = runs.filter((d) => agentOf(d, role));
+    const mine = handle ? launched.filter((d) => agentOf(d, role).terminal === handle) : launched.filter((d) => !fs.existsSync(resultFile(d, role)));
+    if (mine.length === 1) return { state: mine[0] };
+    if (mine.length > 1) return { error: `${mine.length} smoke runs launched ${role}${handle ? ` into ${handle}` : ''}: ${mine.map(slash).join(', ')}` };
+    if (now() >= deadline) return { error: `no smoke run under ${slash(parent)} launched ${role}${handle ? ` into terminal ${handle}` : ''}` };
+    await sleep(500);
+  }
 }
 
 /** `mark`: the role's one result line. */
@@ -197,7 +227,8 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     paths: {}, agents: {}, cleanup: [], error: null };
   if (!entry) return { ...out, error: 'no entry terminal: run the smoke inside an Orca terminal (ORCA_TERMINAL_HANDLE) or pass --entry' };
   if (noop?.error) return { ...out, error: noop.error };
-  const state = fs.mkdtempSync(path.join(stateRoot, 'starci-launch-smoke-'));
+  fs.mkdirSync(stateParentOf(stateRoot), { recursive: true });
+  const state = fs.mkdtempSync(path.join(stateParentOf(stateRoot), 'run-'));
   writeJson(path.join(state, 'plan.json'), { schema: SMOKE_SCHEMA, root: slash(root), entry, noop: out.noop });
   const seen = {};
   const doneMessages = new Set();
@@ -246,7 +277,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
         creatorTerminal: a.creatorTerminal ?? null, effective: a.effective ?? null, ...(a.workspace ? { workspace: slash(a.workspace) } : {}),
         depth: o.depth, expectedDepth: ROLES[role].depth, creatorDispatchId: o.creatorDispatchId, expectedCreatorDispatchId: creatorExpected,
         status: o.status, state: o.state, workerDone: doneMessages.has(a.dispatchId) || o.status === 'completed' || o.status === 'succeeded',
-        result, read: { ok: read?.ok === true, source: read?.source ?? null, rows: read?.rows?.length ?? 0, ...(read?.ok ? {} : { error: read?.error ?? null }) },
+        result, read: { ok: read?.ok === true, source: read?.source ?? null, liveness: read?.status?.liveness ?? null, rows: read?.rows?.length ?? 0, ...(read?.ok ? {} : { error: read?.error ?? null }) },
         ...(a.ok ? {} : { error: a.error ?? null, step: a.step ?? null }),
       };
     }
@@ -255,7 +286,8 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
   } finally {
     for (const role of CLEANUP_ORDER) {
       const a = agentOf(state, role);
-      if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: settle(() => orca.removeCriticWorkspace(a.workspace))?.ok !== false });
+      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null }))?.ok === true;
+      if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
       if (!a?.dispatchId) continue;
       const before = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
       const settled = settledOf(before) || doneMessages.has(a.dispatchId);
@@ -265,7 +297,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
       const task = completed || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
       const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : completed ? 'by-worker_done' : null,
         ...(release?.ok ? {} : { releaseError: release?.error ?? release?.outcome ?? null }) };
-      if (a.workspace) entryOut.workspaceRemoved = settle(() => orca.removeCriticWorkspace(a.workspace))?.ok !== false;
+      if (a.workspace) entryOut.workspaceRemoved = unplace();
       out.cleanup.push(entryOut);
     }
     safeRemoveTree(state);
@@ -298,8 +330,9 @@ async function main(argv) {
   const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
   if (verb === 'mark' || verb === 'stage') {
     const role = argOf(argv, 'as');
-    const state = argOf(argv, 'state');
-    if (!ROLES[role] || !state || !planOf(state)) { console.error(`usage: launch-smoke.mjs ${verb} --as <${Object.keys(ROLES).join('|')}> --state <dir>`); return 2; }
+    if (!ROLES[role]) { console.error(`usage: launch-smoke.mjs ${verb} --as <${Object.keys(ROLES).join('|')}>`); return 2; }
+    const { state, error } = await resolveState({ role });
+    if (!state) { console.log(JSON.stringify({ ok: false, role, error })); return 1; }
     const r = verb === 'mark' ? markResult({ role, state }) : await runStage({ role, state, orca: await defaultClient() });
     console.log(JSON.stringify(r));
     return r.ok ? 0 : 1;

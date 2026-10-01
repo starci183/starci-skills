@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFAULT_RUBRIC, VERDICT_FILE, criticFor, runCritic } from '../scripts/work/draw-critic.mjs';
+import { spawnSync } from 'node:child_process';
+import { DEFAULT_RUBRIC, VERDICT_FILE, criticFor, runCritic, criticWorkspace, removeCriticWorkspace } from '../scripts/work/draw-critic.mjs';
+import { withMachine } from '../engine/machine-db.mjs';
 import { allocationSettings } from '../engine/config.mjs';
 import { agentCliSpawns } from '../scripts/checks/check-host-boundary.mjs';
 import { fakeCriticOrca, passingVerdict } from './helpers/fake-critic-orca.mjs';
@@ -36,7 +38,7 @@ test('the critic is started through worker-start with the configured provider, m
   const r = round(t);
   let seen = null;
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
-  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: criticFor(settings, 'devin').critic, orca, tmpRoot: r.dir, entry: 'term_op', ...clock() });
+  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: criticFor(settings, 'devin').critic, orca, placement: { tmpRoot: r.dir }, entry: 'term_op', ...clock() });
   assert.equal(critique.outcome, 'judged', critique.error);
   assert.equal(critique.verdict.beauty, 8);
   assert.deepEqual(critique.verdict.failed, []);
@@ -53,7 +55,7 @@ test('the critic is started through worker-start with the configured provider, m
   assert.match(spec, /worker_done/);
   const names = orca.names();
   assert.ok(names.indexOf('inbox') > names.indexOf('worker-start'), 'the worker_done is awaited through the orchestration inbox');
-  assert.deepEqual(names.slice(-3), ['worker-stop', 'worker-release', 'task-update'], 'the verdict is read, then the worker is released and its Task closed');
+  assert.deepEqual(names.slice(-4), ['worker-stop', 'worker-release', 'task-update', 'critic-workspace-remove'], 'the verdict is read, then the worker is released, its Task closed and its placement removed');
   assert.equal(orca.calls.find((c) => c[0] === 'worker-release')[1].dispatch, critique.critic.dispatchId);
   assert.deepEqual(critique.critic.cleanup, { stopped: true, released: true, taskClosed: true });
   assert.equal(critique.critic.launch, 'orchestration worker-start');
@@ -63,7 +65,7 @@ test('the critic is started through worker-start with the configured provider, m
 test('a Codex drawer is judged by the Claude worker of criticWhenDrawer.codex', async (t) => {
   const r = round(t);
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) });
-  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: criticFor(settings, 'codex').critic, orca, tmpRoot: r.dir, ...clock() });
+  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: criticFor(settings, 'codex').critic, orca, placement: { tmpRoot: r.dir }, ...clock() });
   assert.equal(critique.outcome, 'judged');
   assert.deepEqual([startOf(orca).agent, startOf(orca).model], ['claude', settings.criticWhenDrawer.codex.model]);
 });
@@ -72,7 +74,7 @@ test('a critic with no worker_done within timeoutMs is a timeout: no verdict, th
   const r = round(t);
   const orca = fakeCriticOrca({ mode: 'silent' });
   const c = clock();
-  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: { ...settings.critic, timeoutMs: 60000 }, orca, tmpRoot: r.dir, pollMs: 5000, ...c });
+  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: { ...settings.critic, timeoutMs: 60000 }, orca, placement: { tmpRoot: r.dir }, pollMs: 5000, ...c });
   assert.equal(critique.outcome, 'timeout');
   assert.equal(critique.verdict, null);
   assert.match(critique.error, /no worker_done within 60000ms/);
@@ -85,7 +87,7 @@ test('a refusal, an ended worker, a missing verdict and a failed launch are type
   const run = async (mode) => {
     const r = round(t);
     const orca = fakeCriticOrca({ mode });
-    return { critique: await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: settings.critic, orca, tmpRoot: r.dir, ...clock() }), orca };
+    return { critique: await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: settings.critic, orca, placement: { tmpRoot: r.dir }, ...clock() }), orca };
   };
   const escalated = await run('escalate');
   assert.deepEqual([escalated.critique.outcome, escalated.critique.verdict], ['refused', null]);
@@ -110,4 +112,49 @@ test('the critic runs no agent CLI as a child process', () => {
   assert.deepEqual(agentCliSpawns(text, file), []);
   assert.doesNotMatch(text, /from 'node:child_process'/, 'no child-process path is left');
   for (const c of [settings.critic, ...Object.values(settings.criticWhenDrawer ?? {})]) assert.equal(c.command, undefined, 'a critic is a provider, not a command');
+});
+
+// Orca places a worker only on a worktree it resolves: a bare temp directory is refused selector_not_found (live launch
+// smoke 2026-10-01, scripts/kernel/launch-smoke.mjs). The placement is a runtime worktree of the repository the loop runs
+// in, detached at the empty tree, registered like every runtime worktree and removed through the same API.
+test('the critic placement is a registered runtime worktree at the empty tree, and is removed through worktrees.mjs', (t) => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-critic-place-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const repo = path.join(base, 'product');
+  fs.mkdirSync(repo);
+  const git = (...args) => { const r = spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.email', 'spec@starci.test');
+  git('config', 'user.name', 'spec');
+  fs.writeFileSync(path.join(repo, 'brief.md'), 'the drawing brief the critic must never see\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'init');
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite') };
+  const op = { workflowId: 'wf-critic-place', jobId: 'job-draw-1' };
+  const placed = criticWorkspace({ repoRoot: repo, context: op, env });
+  assert.equal(placed.ok, true, placed.error);
+  assert.deepEqual(fs.readdirSync(placed.dir), ['.git'], 'the placement holds no file of the repository');
+  assert.equal(path.relative(path.join(repo, '.starciwork', 'worktrees'), placed.dir).startsWith('..'), false, 'under the runtime worktrees root');
+  const listed = git('worktree', 'list', '--porcelain').split(/\r?\n\r?\n/).find((b) => b.includes('draw-critic-'));
+  assert.ok(listed && path.resolve(listed.split(/\r?\n/)[0].slice('worktree '.length)) === path.resolve(placed.dir) && /\ndetached/.test(listed), 'a detached git worktree Orca resolves');
+  assert.equal(spawnSync('git', ['ls-tree', '-r', 'HEAD'], { cwd: placed.dir, encoding: 'utf8' }).stdout.trim(), '', 'its HEAD is the empty tree');
+  const row = withMachine((m) => m.worktreeRow(placed.dir), { env });
+  assert.deepEqual([row.kind, row.job_id, row.workflow_id, row.removed_at], ['op', 'job-draw-1', 'wf-critic-place', null], 'registered, owned by the op job (the worktree GC reclaims it after the op settles)');
+  const removed = removeCriticWorkspace({ dir: placed.dir, repoRoot: placed.repoRoot, env });
+  assert.equal(removed.ok, true, removed.reason);
+  assert.equal(fs.existsSync(placed.dir), false);
+  assert.doesNotMatch(git('worktree', 'list', '--porcelain'), /draw-critic-/);
+  assert.notEqual(withMachine((m) => m.worktreeRow(placed.dir), { env }).removed_at, null);
+  const nowhere = criticWorkspace({ repoRoot: null, context: null, env });
+  assert.equal(nowhere.ok, false, 'no repository, no placement - the critic is launch-failed, never placed in a bare directory');
+});
+
+test('a critic with no placement is launch-failed and starts no worker', async (t) => {
+  const r = round(t);
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8) });
+  orca.criticWorkspace = () => ({ ok: false, error: 'no git repository at /x to place the critic worktree in' });
+  const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: settings.critic, orca, ...clock() });
+  assert.deepEqual([critique.outcome, critique.verdict], ['launch-failed', null]);
+  assert.match(critique.error, /no placement: no git repository/);
+  assert.equal(orca.names().includes('worker-start'), false);
 });

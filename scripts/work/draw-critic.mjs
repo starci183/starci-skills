@@ -2,14 +2,14 @@
 // fix; the beauty and hierarchy judgement comes from a critic that did NOT draw it). The critic is a fresh Orca worker
 // with no drawing context, launched like every other agent through orchestration worker-start
 // (scripts/agent/lib.mjs startAgent; modules/kernel/contract-changes/draw-critic-worker-start.yaml) with the provider,
-// model and effort of modules/models/runtimes.yaml allocation.drawLoop.critic. Its placement is a clean temp
-// directory that holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
+// model and effort of modules/models/runtimes.yaml allocation.drawLoop.critic. Its placement (criticWorkspace) is a
+// runtime worktree detached at the empty tree, so it holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
 // and the one file it may write, verdict.json (starci/draw-critique@1: every rubric check pass/fail with evidence and
 // fix, a 1-10 beauty score with its anchor), and forbids every other write. The runtime waits for the worker's
 // worker_done (or its escalation, or the worker ending) through the orchestration commands, bounded by the critic's
 // timeoutMs, reads verdict.json, then stops and releases the worker and closes its Task. A launch failure, a timeout,
 // a refusal or a missing verdict is a typed outcome with an error and no verdict - never a pass. The provider, model,
-// exact prompt, dispatch and verdict are recorded in the round's critique.json; the temp directory is removed.
+// exact prompt, dispatch and verdict are recorded in the round's critique.json; the placement worktree is removed.
 //
 // The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27 draw-devin-brand-claude: Devin draws,
 // Codex critiques). criticFor picks it: allocation.drawLoop.critic, unless the drawer (draw-loop.mjs round --drawer,
@@ -23,11 +23,13 @@
 // brand-neutral, in the work/brand@1 rubric shape; knowledge/ui/examples/brand-direction.nivo.yaml seeds a product's
 // own).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import crypto from 'node:crypto';
+import { gitResult } from '../lib/git.mjs';
+import { createWorktree, removeWorktree, mainRootOf, worktreesRootOf } from '../lib/worktrees.mjs';
+import { opContextOf } from '../kernel/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
@@ -203,16 +205,32 @@ function clientOf(orca) {
 }
 
 /**
- * The critic's placement: a clean directory that holds only what the critic may read. {dir}. removeCriticWorkspace
- * takes it away again once the worker is released.
+ * The critic's placement: Orca places a worker only on a worktree it resolves (a git worktree of a known repository;
+ * a bare temp directory is refused selector_not_found - launch smoke 2026-10-01). So the clean directory is a runtime
+ * worktree (scripts/lib/worktrees.mjs createWorktree, kind op, owned by the op job running the loop when there is one)
+ * of the repository the loop runs in, detached at a commit of the EMPTY tree: it holds nothing but its `.git` file
+ * until the round's images, HTML and rubric are copied in. Under <repo>/.starciwork/worktrees (git-excluded); never
+ * capped (the op's own worktree already counts). {ok, dir, repoRoot} | {ok:false, error}.
  */
-export function criticWorkspace({ tmpRoot = os.tmpdir() } = {}) {
-  return { dir: fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-')) };
+export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context = opContextOf(), env = process.env } = {}) {
+  if (!repoRoot) return { ok: false, error: `no git repository at ${slash(process.cwd())} to place the critic worktree in` };
+  const git = (args, input = undefined) => gitResult(['-c', 'user.name=StarCi runtime', '-c', 'user.email=runtime@starci.invalid', ...args], { cwd: repoRoot, input });
+  const tree = git(['hash-object', '-t', 'tree', '-w', '--stdin'], '');
+  if (!tree.ok) return { ok: false, error: `empty tree: ${tree.error}` };
+  const commit = git(['commit-tree', tree.stdout.trim(), '-m', 'draw critic placement (empty tree)']);
+  if (!commit.ok) return { ok: false, error: `empty commit: ${commit.error}` };
+  const dir = path.join(worktreesRootOf(mainRootOf(repoRoot)), `draw-critic-${crypto.randomBytes(4).toString('hex')}`);
+  const made = createWorktree({ repoRoot, dir, kind: 'op', base: commit.stdout.trim(), detach: true, cap: null, env,
+    owner: { workflowId: context?.workflowId ?? null, jobId: context?.jobId ?? null } });
+  return made.ok ? { ok: true, dir: made.path, repoRoot: path.resolve(repoRoot) } : { ok: false, error: `${made.reason}: ${made.detail ?? ''}`.trim() };
 }
 
-export function removeCriticWorkspace(dir) {
-  return safeRemoveTree(dir);
+/** Remove the critic's placement worktree (scripts/lib/worktrees.mjs removeWorktree). {ok, ...}. */
+export function removeCriticWorkspace({ dir, repoRoot, env = process.env }) {
+  return removeWorktree({ repoRoot, dir, env });
 }
+
+const gitRootOf = (cwd) => { const r = gitResult(['rev-parse', '--show-toplevel'], { cwd }); return r.ok && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
 
 /**
  * Start the critic worker on its placement `dir` through worker-start (startAgent: run-create --from `entry`,
@@ -253,10 +271,11 @@ async function awaitCritic({ client, dispatchId, terminal, taskId, timeoutMs, po
  * Run the independent critic over one round. `images` [{path, label}], `html` the round's source, `rubric` from
  * rubricFor, `critic` {provider, model, effort, timeoutMs} from criticFor. `orca` replaces the Orca client (tests: a
  * fake of the wrappers - runCreate, taskCreate, trust, workerStart, dispatchShow, terminalRename, workerShow,
- * workerStop, workerRelease, inbox, taskUpdate); `entry` is the coordinator terminal (the op's ORCA_TERMINAL_HANDLE).
+ * workerStop, workerRelease, inbox, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
+ * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
-export async function runCritic({ images, html, rubric, critic, orca = null, entry = process.env.ORCA_TERMINAL_HANDLE || null, tmpRoot = os.tmpdir(),
+export async function runCritic({ images, html, rubric, critic, orca = null, entry = process.env.ORCA_TERMINAL_HANDLE || null, placement = {},
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
   if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || !(Number(critic.timeoutMs) > 0)) {
@@ -264,12 +283,16 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
   }
   const client = clientOf(orca);
-  const { dir } = criticWorkspace({ tmpRoot });
+  const place = orca?.criticWorkspace ?? criticWorkspace;
+  const unplace = orca?.removeCriticWorkspace ?? removeCriticWorkspace;
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
   const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider, model: critic.model, effort: critic.effort ?? null, timeoutMs: Number(critic.timeoutMs),
     launch: 'orchestration worker-start', independent: !orca, cleanDir: true }, rubric: rubricInfo };
   const failed = (outcome, error) => ({ ...base, outcome, verdict: null, error });
   let launched = null;
+  const workspace = place(placement);
+  if (!workspace?.ok) return failed('launch-failed', `the critic has no placement: ${workspace?.error ?? 'criticWorkspace returned nothing'}`);
+  const { dir } = workspace;
   try {
     for (const f of files) fs.copyFileSync(f.from, path.join(dir, f.file));
     fs.writeFileSync(path.join(dir, 'screen.html'), fs.readFileSync(html));
@@ -305,6 +328,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
       base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
     }
-    removeCriticWorkspace(dir);
+    const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot }));
+    if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
   }
 }

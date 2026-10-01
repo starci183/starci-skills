@@ -8,13 +8,14 @@ import { orcaCall, arg } from './lib.mjs';
 export function workerRead({ dispatch, source = null, cursor = null, limit = null }) {
   const r = orcaCall('worker-read', { dispatch, source, cursor, limit });
   const result = r.result;
-  const rows = result?.rows ?? result?.entries ?? result?.items ?? null;
+  // A transcript source returns result.transcript.messages; a terminal source returns its labelled lines.
+  const rows = result?.transcript?.messages ?? result?.terminal?.lines ?? result?.lines ?? null;
   return {
     ok: r.exitCode === 0 && Boolean(result),
     source: result?.source ?? null,
     status: result?.status ?? null,
     rows: Array.isArray(rows) ? rows : [],
-    cursor: result?.cursor ?? result?.nextCursor ?? null,
+    cursor: result?.cursor ?? result?.transcript?.nextCursor ?? null,
     result,
     error: r.error,
     hostUnavailable: r.hostUnavailable === true,
