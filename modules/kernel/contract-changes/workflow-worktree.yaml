@@ -48,6 +48,7 @@ paths:
   - scripts/kernel/launch-smoke.mjs
   - scripts/api/orca/worktree-list.mjs
   - modules/host/orca/index.yaml
+  - modules/host/orca/calls.yaml
   - modules/kernel/dispatch.yaml
   - modules/kernel/api-commands/dispatch.yaml
   - modules/kernel/api-commands/incident.yaml
