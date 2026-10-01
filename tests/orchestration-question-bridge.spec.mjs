@@ -11,9 +11,11 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhas
 // (runtime-seam-ask-unreachable), starci-next base-repos backend.scaffold: Orca's preamble tells a worker to
 // reach its coordinator with an orchestration ask; the coordinator is the Kernel terminal, which may not call
 // Orca, and api had no verb to read or answer those messages. A cut ordinal waited on an ESLint question and
-// a seam retry on a background ask while status said engaged. The bridge: status projects the pending
-// question as the actionable frontier `worker-question`, `api questions` bridges it into the ledger inbox,
-// `api reply` answers it (or routes it to the owner through outcome ask) via the Orca reply wrapper.
+// a seam retry on a background ask while status said engaged. The bridge (map REPLACE #7): status, questions,
+// messages and reply drain the workflow's Runs through the consuming `orchestration check --run <run> --terminal
+// <kernel>` into the ledger inbox, ack each Delivery after the commit, and project the pending question as the
+// actionable frontier `worker-question`; `api reply` answers it (or routes it to the owner through outcome ask)
+// via the Orca reply wrapper.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
@@ -55,7 +57,7 @@ const fixture=t=>{
   return {repo,workflowId,jobId,api,orcaState,writeState,read};
 };
 
-// Orca's inbox row for a worker ask (the shape `orchestration inbox --json` returns).
+// Orca's message row for a worker ask (the shape `orchestration check --json` delivers).
 const question=(id,{run='run-fake-1',dispatch,text,options=[]})=>({id,run_id:run,delivery_contract:'current_delivery',
   from_handle:`dispatch:${dispatch}`,to_handle:`run:${run}`,subject:'Question',body:text,type:'question',priority:'normal',
   thread_id:id,payload:JSON.stringify({taskId:'task-fake-1',dispatchId:dispatch,question:text,options}),read:0,created_at:new Date().toISOString()});
@@ -78,14 +80,20 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
   assert.equal(status.frontier.state,'worker-question');
   assert.equal(status.frontier.actionable,true);
   assert.deepEqual(status.frontier.workerQuestionJobs,[fx.jobId]);
-  assert.deepEqual(status.workerQuestions.map(q=>[q.messageId,q.jobId,q.question,q.bridged]),[['msg_q1',fx.jobId,eslint,false]]);
+  assert.deepEqual(status.workerQuestions.map(q=>[q.messageId,q.jobId,q.question]),[['msg_q1',fx.jobId,eslint]]);
   assert.deepEqual(status.workerQuestions[0].options,['Only my paths','Wait for ordinal 1']);
-  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n),0,'status writes nothing');
+  // status drained the Run: the question is a ledger row, and the Delivery was acknowledged after that commit.
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n),1,'status bridges the Delivery');
+  const checks=fx.orcaState().checks;
+  assert.deepEqual(checks[0],{run:'run-fake-1',terminal:'fake-kernel-terminal',ack:null},'the Run is checked naming the Kernel terminal');
+  assert.equal(checks[1].ack,'delivery_1','the Delivery is acknowledged after the ledger commit');
+  assert.ok(Object.values(fx.orcaState().deliveries).every(d=>d.acked));
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='orchestration-delivery-bridged'").get().n),1);
 
-  // questions bridges it once into the ledger inbox.
+  // questions finds it bridged once; a second drain writes nothing.
   const bridged=fx.api(['questions','--workflow',fx.workflowId]);
   assert.equal(bridged.status,0,bridged.stderr);
-  assert.deepEqual([json(bridged.stdout).bridged,json(bridged.stdout).pending.map(q=>q.messageId)],[1,['msg_q1']]);
+  assert.deepEqual([json(bridged.stdout).bridged,json(bridged.stdout).pending.map(q=>q.messageId)],[0,['msg_q1']]);
   assert.equal(json(fx.api(['questions','--workflow',fx.workflowId]).stdout).bridged,0,'idempotent');
   const row=fx.read(db=>db.prepare("SELECT * FROM inbox WHERE kind='worker-question' AND key='msg_q1'").get());
   assert.equal(row.status,'pending');
@@ -122,9 +130,10 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
   assert.equal(json(failed.stdout).reason,'reply-failed');
   assert.deepEqual(json(fx.api(['status','--workflow',fx.workflowId]).stdout).workerQuestions.map(q=>q.messageId),['msg_q3']);
 
-  // Answered in Orca directly: no longer the Kernel's.
+  // Answered in Orca directly (a status row threaded onto the question, delivered to the Run): no longer the Kernel's.
   fx.writeState(s=>{s.messages=[{id:'msg_r3',run_id:'run-fake-1',from_handle:'run:run-fake-1',type:'status',subject:'Re: Question',body:'yes',thread_id:'msg_q3',payload:null},...s.messages];});
   assert.deepEqual(json(fx.api(['status','--workflow',fx.workflowId]).stdout).workerQuestions,[]);
+  assert.equal(fx.read(db=>json(db.prepare("SELECT disposition_json FROM inbox WHERE kind='worker-question' AND key='msg_q3'").get().disposition_json).reason),'replied-elsewhere');
 
   // A settled job's bridged question is closed; nothing is left to answer.
   fx.writeState(s=>{s.messages=[question('msg_q4',{dispatch:dispatchId,text:'Still there?'}),...s.messages];});
@@ -139,9 +148,10 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
 
 // inc-13ab4be5059f: a nivo run's inbox (thousands of worker heartbeats) passed spawnSync's 1 MB default and
 // every `api questions` failed with `spawnSync orca.exe ENOBUFS`, so Codex ops blocked in `orca orchestration
-// ask` (inc-884fc91be4bc, inc-ee62686a70a3) never reached the Kernel. Reads get a 64 MB buffer and the inbox
-// wrapper drops heartbeat/progress rows before anything is bridged.
-test('a multi-megabyte inbox of heartbeats still bridges the Codex worker asks inside it',t=>{
+// ask` (inc-884fc91be4bc, inc-ee62686a70a3) never reached the Kernel. A consuming check delivers 50 messages at a
+// time: the drain walks every Delivery, counts heartbeats on the Delivery event (Orca keeps lastHeartbeatAt) and
+// bridges the ask inside them.
+test('a Run of 1600 heartbeats still bridges the Codex worker ask inside it, every Delivery acknowledged',t=>{
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -149,35 +159,27 @@ test('a multi-megabyte inbox of heartbeats still bridges the Codex worker asks i
   const handle=fx.read(db=>{const p=json(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(fx.jobId).payload_json);
     return p.managed?.agentTerminalHandle??p.orca?.agentTerminalHandle??p.hierarchy?.runtime?.terminalHandle;});
   assert.ok(handle,'the dispatched op has an exact terminal');
-  const pad='x'.repeat(900);
   const beat=i=>({id:`msg_hb_${i}`,run_id:'run-fake-1',delivery_contract:'current_delivery',from_handle:handle,to_handle:'run:run-fake-1',
-    subject:'alive',body:'',type:i%7?'heartbeat':'progress',priority:'normal',thread_id:null,
-    payload:JSON.stringify({taskId:'task-fake-1',dispatchId,phase:`verifying ${pad}`}),read:0,sequence:i,created_at:new Date().toISOString()});
-  // The shape a Codex op's `orca orchestration ask --from term_…` left in the nivo inbox: sent from its
+    subject:'alive',body:'',type:'heartbeat',priority:'normal',thread_id:null,
+    payload:JSON.stringify({taskId:'task-fake-1',dispatchId}),read:0,sequence:i,created_at:new Date().toISOString()});
+  // The shape a Codex op's `orca orchestration ask --from term_...` left in the nivo inbox: sent from its
   // terminal handle, the question only in the body, a payload without a question field.
   const codexAsk={...question('msg_codex_ask',{dispatch:dispatchId,text:'Reissue contract, continue per source contract, or report blocked?'}),
     from_handle:handle,payload:JSON.stringify({taskId:'task-fake-1'})};
   fx.writeState(s=>{s.messages=[...Array.from({length:400},(_,i)=>beat(i)),codexAsk,...Array.from({length:1200},(_,i)=>beat(400+i))];});
-  assert.ok(fs.statSync(path.join(path.dirname(fx.repo),'state.json')).size>1.5*1024*1024,'the inbox read is well past the 1 MB default buffer');
 
-  const status=json(fx.api(['status','--workflow',fx.workflowId]).stdout);
-  assert.equal(status.frontier.state,'worker-question');
   const bridged=fx.api(['questions','--workflow',fx.workflowId]);
   assert.equal(bridged.status,0,bridged.stderr);
   const out=json(bridged.stdout);
-  assert.equal(out.error,undefined,'the host inbox was readable');
+  assert.equal(out.error,undefined,'every check answered');
   assert.equal(out.bridged,1);
+  assert.equal(out.deliveries,33,'1601 messages are 33 Deliveries of at most 50');
   assert.deepEqual(out.pending.map(q=>[q.messageId,q.jobId,q.question]),[['msg_codex_ask',fx.jobId,codexAsk.body]]);
-
-  // The wrapper itself: heartbeat and progress rows never leave it; --all keeps them.
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([path.join(path.dirname(fx.repo),'fake-orca.mjs')]),
-    STARCI_FAKE_ORCA_STATE:path.join(path.dirname(fx.repo),'state.json')};
-  const inbox=args=>json(spawnSync(process.execPath,[path.join(ROOT,'scripts','api','orca','orch-inbox.mjs'),...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env,maxBuffer:64*1024*1024}).stdout);
-  const filtered=inbox(['--limit','5000']);
-  assert.equal(filtered.ok,true);
-  assert.deepEqual(filtered.messages.map(m=>m.id),['msg_codex_ask']);
-  assert.equal(filtered.dropped,1600);
-  assert.equal(inbox(['--limit','5000','--all']).messages.length,1601);
+  assert.ok(Object.values(fx.orcaState().deliveries).every(x=>x.acked),'every Delivery acknowledged');
+  const beats=fx.read(db=>db.prepare("SELECT payload_json FROM events WHERE kind='orchestration-delivery-bridged'").all().reduce((n,r)=>n+json(r.payload_json).heartbeats,0));
+  assert.equal(beats,1600,'heartbeats are counted on the Delivery events');
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='orchestration-message'").get().n),0,'no row per heartbeat');
+  assert.equal(json(fx.api(['status','--workflow',fx.workflowId]).stdout).frontier.state,'worker-question');
 });
 
 // nivo inc-6e7b57326aa5: a Codex op sent escalation msg_8173221888c2 ("Blocked: frontend source boundary
