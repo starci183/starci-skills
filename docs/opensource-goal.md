@@ -1,8 +1,8 @@
 # OPENSOURCE GOAL — StarCi
 
 > **Status: DRAFT / EXPERIMENTAL** — this document and everything it references
-> (`modules/`, `engine/`, `scripts/`, `.experiments/QUALITY-BAR.md`,
-> `.experiments/practices/`) is in trial until every S* row below holds with
+> (`modules/`, `engine/`, `scripts/`, `docs/quality-bar.md`,
+> `benchmark/findings/`) is in trial until every S* row below holds with
 > fresh evidence. Nothing is official until the goal is
 > met; treat all contracts as provisional and expect them to be revised by
 > practice.
@@ -25,7 +25,7 @@ Not "tests pass" — *a stranger can clone it, run it, understand it, and trust 
 | **Durability** | `.starciwork/runtime.sqlite` is the single truth — state survives worktree deletion, reboots, agent churn. Zero input loss, zero lease drift. |
 | **Correctness** | Work-correction policy enforced: wrong business flow → re-run from affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |
 | **Test quality** | E2E via real HTTP/GraphQL clients over real `TestingModule` stacks on BOTH example apps. Unit tests cover real business journeys, not stub assertions. Sonar + Codecov wired and green. |
-| **Product quality** | Output projects meet `.experiments/QUALITY-BAR.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code sát design bám grammar, evidence proves every claim. |
+| **Product quality** | Output projects meet `docs/quality-bar.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code that follows the design and the grammar closely, evidence proves every claim. |
 | **Determinism** | Model/op routing is declarative and reproducible — same inputs → same selection, with cited reasons. Spine code (not agent prose) settles truth. |
 | **Docs** | CONTEXT.md load order is accurate; a new agent cold-starts correctly from `AGENTS.md` alone. Architecture docs match what the code actually does. |
 | **Demonstrability** | The whole loop is showable: prompt → plan → dispatched ops → evidence → settled verdict. This is the content story. |
@@ -51,7 +51,7 @@ How agents operate is part of the product — the standard a public demo must sh
 | **Main-line development** | Code lands on `main`, not per-task worktrees. Worktrees are disposable scratch, not integration branches — the ledger, not the branch, carries state. Conflicts are prevented by ownership boundaries in dispatch packets and resolved by the op agent itself when they occur. |
 | **Pattern convergence** | All source refactors toward standard StarCi patterns. Staleness is detected by `scripts/checks/` (drift, staleness, ownership), never by human re-reading. |
 | **Token discipline** | Context/token budget is allocated deterministically per dispatch — `modules/models/selection.yaml` picks the model, the packet carries the budget; agents don't self-allocate. |
-| **Practice-driven upgrade** | `.experiments/practices/` records what a session actually did and what standard was derived. The architecture upgrades from observed practice, not upfront design. |
+| **Practice-driven upgrade** | `benchmark/findings/` records what a session actually did and what standard was derived. The architecture upgrades from observed practice, not upfront design. |
 | **Fresh evidence only** | Every claim of done lands as a marker + report + artifact; stale evidence re-verifies, never refreshes by assertion. |
 
 ## Explicitly out of scope
@@ -62,7 +62,7 @@ How agents operate is part of the product — the standard a public demo must sh
 
 ## Current known gaps
 
-The open drift list lives in `.experiments/fable.md` (history, outside docs/) — every finding,
+The open drift list lives in `benchmark/findings/fable.md` (history, outside docs/) — every finding,
 its file:line and the lane that owns it. Read it there rather than keeping a
 second copy here.
 

@@ -14,6 +14,13 @@
 // a path below a side folder with that side's resolver (profile be or fe, the side folder as its root: the side view), so
 // every check and lint rule runs unchanged with a side folder as its repository root. Nothing crosses sides except the
 // paths the declaration lists in `sides.<side>.reads` (a subset of the manifest's `sides.<side>.reads`).
+//
+// One loader, two manifest kinds. `kind: app` (the default; knowledge/hfs/slots.yaml) is the product standard above.
+// `kind: runtime` (knowledge/hfs/runtime-slots.yaml, schema starci/runtime-slots@<major>) is the standard of the StarCi
+// runtime repository itself: one profile `runtime`, no sides and no app kinds, slot ids runtime.<name>, the tracked value
+// `generated` (a copy written only by the slot's `generatedBy`), and a top-level `pending` list, the one shrink-only
+// allowlist of the runtime check (scripts/hfs/runtime-check.mjs). A runtime repository declares itself with
+// hfs.json {"hfs": <major>, "kind": "runtime", "project": <name>}.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -21,8 +28,11 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from './glob.mjs';
 import { posixPath } from './path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
+import { APP_KIND, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from '../hfs/manifest-shape.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
+/** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
+export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
 export const HFS_DECLARATION_FILE = 'hfs.json';
 
 /** A refusal with a catalogued code (modules/kernel/failure-codes.yaml) and the facts a check reports. */
@@ -35,13 +45,6 @@ export class HfsSlotsError extends Error {
   }
 }
 
-const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
-const NAME = /^[a-z][a-z0-9-]*$/;
-const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
-const SLOT_ID = /^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
-const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
-const TRACKED = ['tracked', 'ignored', 'external'];
-const TESTS = ['unit-beside', 'e2e', 'none'];
 /** The sides of an app; each lives in the folder of its name and is the profile of its slots. */
 const PROFILES = ['be', 'fe'];
 export const SIDES = Object.freeze([...PROFILES]);
@@ -67,8 +70,6 @@ export function appRelativeMessages(side, sideRoot) {
 }
 
 const SCOPES = [APP_SCOPE, ...PROFILES];
-const APP_KIND = 'app';
-const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
 // ------------------------------------------------------------------------------------------------ patterns
 
@@ -151,7 +152,9 @@ const fail = (code, message, details) => { throw new HfsSlotsError(code, message
 function manifestShapeProblems(m) {
   const bad = [];
   if (!isPlainObject(m)) return ['the manifest is not a map'];
-  const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
+  if (!MANIFEST_KINDS.includes(manifestKind(m))) return [`kind must be one of ${MANIFEST_KINDS.join(', ')}`];
+  if (manifestKind(m) === RUNTIME_KIND) return runtimeShapeProblems(m);
+  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -174,12 +177,7 @@ function manifestShapeProblems(m) {
     if (kinds !== undefined && (!Array.isArray(kinds) || !kinds.length || !kinds.every((k) => NAME.test(String(k))) || new Set(kinds).size !== kinds.length)) bad.push(`appKinds.${profile} must be a non-empty list of unique names`);
     const tiers = m.tiers?.[profile];
     if (tiers === undefined) continue;
-    if (!isPlainObject(tiers) || !Object.keys(tiers).length) { bad.push(`tiers.${profile} must be a non-empty map`); continue; }
-    for (const [tier, def] of Object.entries(tiers)) {
-      if (!NAME.test(tier)) bad.push(`tiers.${profile}.${tier} is not a tier name`);
-      if (!isPlainObject(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
-      for (const key of Object.keys(def ?? {})) if (!['mayImport', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
-    }
+    bad.push(...tierMapProblems(profile, tiers));
   }
   const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
   const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
@@ -204,37 +202,7 @@ function manifestShapeProblems(m) {
     if (!fileLinesOk(rp.fe.fileLines) || !blockOk(rp.fe.duplicateBlock) || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
-  const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
-  m.slots.forEach((slot, index) => {
-    const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
-    if (!isPlainObject(slot)) { bad.push(`${at} is not a map`); return; }
-    for (const key of Object.keys(slot)) if (!slotKeys.has(key)) bad.push(`${at}: unknown field ${key}`);
-    if (!SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like be.transport.http`);
-    if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => SCOPES.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length || (slot.profiles.includes(APP_SCOPE) && slot.profiles.length !== 1)) bad.push(`${at}: profiles must be [app] or a unique non-empty subset of be, fe`);
-    else if ((slot.profiles[0] === APP_SCOPE) !== String(slot.id).startsWith(`${APP_SCOPE}.`)) bad.push(`${at}: an app-root slot has profiles [app] and an id app.<name>, and only it`);
-    if (typeof slot.path !== 'string' || !slot.path) bad.push(`${at}: path is required`);
-    if (!PRESENCE.includes(slot.presence)) bad.push(`${at}: presence must be one of ${PRESENCE.join(', ')}`);
-    if (!TRACKED.includes(slot.tracked)) bad.push(`${at}: tracked must be one of ${TRACKED.join(', ')}`);
-    if (!NAME.test(String(slot.tier))) bad.push(`${at}: tier must be a tier name, none or inherit`);
-    if (!TESTS.includes(slot.tests)) bad.push(`${at}: tests must be one of ${TESTS.join(', ')}`);
-    if (slot.owner !== undefined && typeof slot.owner !== 'boolean') bad.push(`${at}: owner must be a boolean`);
-    if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
-    if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
-    if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
-    if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
-    for (const key of ['requires', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
-    if (slot.kinds !== undefined && strList(slot.kinds) && (!slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k)))) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
-    if (slot.roles !== undefined && !(isPlainObject(slot.roles) && Object.keys(slot.roles).length && Object.entries(slot.roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/')))) bad.push(`${at}: roles must map a role name to a file name`);
-    if (slot.composedBy !== undefined && !(strList(slot.composedBy) && slot.composedBy.length && new Set(slot.composedBy).size === slot.composedBy.length)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);
-    if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
-    if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
-    if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
-    if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);
-    if (slot.retiredIn !== undefined && !(Number.isInteger(slot.retiredIn) && slot.retiredIn >= 2)) bad.push(`${at}: retiredIn must be a major`);
-    if (slot.retiredIn !== undefined && typeof slot.successor !== 'string') bad.push(`${at}: a retired slot names its successor`);
-    if (slot.tracked === 'external' && (typeof slot.goesTo !== 'string' || slot.presence !== 'forbidden')) bad.push(`${at}: an external slot is forbidden and says where it goes (goesTo)`);
-    if (slot.presence === 'forbidden' && slot.tracked !== 'external') bad.push(`${at}: a forbidden slot is external`);
-  });
+  m.slots.forEach((slot, index) => bad.push(...slotProblems(slot, index, APP_KIND, { appScope: APP_SCOPE, scopes: SCOPES })));
   return bad;
 }
 
@@ -277,6 +245,7 @@ function manifestSemanticProblems(m) {
     for (const kind of slot.composedBy ?? []) if (!slot.profiles.every((p) => m.appKinds[p].includes(kind))) bad.push(`slot ${slot.id}: composedBy names ${kind}, which is not an app kind of every profile of the slot`);
     if (slot.layers !== undefined && slot.tier !== 'none' && !slot.profiles.every((p) => m.tiers[p][slot.tier]?.lowerLayerOnly)) bad.push(`slot ${slot.id}: layers need a lowerLayerOnly tier`);
   }
+  if (manifestKind(m) === RUNTIME_KIND) return [...bad, ...runtimeSemanticProblems(m)];
   for (const side of PROFILES) for (const read of m.sides[side].reads) {
     const [owner, ...rest] = read.split('/');
     const below = rest.join('/');
@@ -317,9 +286,16 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 function declarationShapeProblems(d) {
   const bad = [];
   if (!isPlainObject(d)) return ['hfs.json is not an object'];
+  if (d.kind === RUNTIME_KIND) {
+    // The StarCi runtime repository: no sides and no apps; its tree is the runtime manifest's.
+    for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project'].includes(key)) bad.push(`unknown key ${key} (a runtime declaration is {hfs, kind, project})`);
+    if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
+    if (!NAME.test(String(d.project))) bad.push('project must be a project name');
+    return bad;
+  }
   for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'sides'].includes(key)) bad.push(`unknown key ${key}`);
   if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
-  if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND}: a product is one app repository with a be and an fe side`);
+  if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
   if (!NAME.test(String(d.project))) bad.push('project must be a project name');
   if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
   const names = new Map();
@@ -382,8 +358,24 @@ function sideProblems(manifest, side, s) {
 export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLARATION_FILE, side = null } = {}) {
   const problems = declarationShapeProblems(declaration);
   if (problems.length) declarationInvalid(problems, file);
+  if (declaration.kind !== manifestKind(manifest)) declarationInvalid([`hfs.json is of kind ${declaration.kind}, but the manifest it is judged by is of kind ${manifestKind(manifest)}`], file);
   if (declaration.hfs !== manifest.major)
     fail('HFS_MANIFEST_MAJOR_MISMATCH', `hfs.json pins manifest major ${declaration.hfs} but the manifest is ${manifest.version}`, { pinned: declaration.hfs, manifest: manifest.version, manifestMajor: manifest.major, file });
+  if (declaration.kind === RUNTIME_KIND) {
+    if (side !== null) fail('HFS_DECLARATION_INVALID', 'a runtime repository has no sides', { file, side });
+    return Object.freeze({
+      hfs: declaration.hfs,
+      kind: RUNTIME_KIND,
+      project: declaration.project,
+      side: null,
+      profile: RUNTIME_KIND,
+      apps: Object.freeze([]),
+      optionalSlots: Object.freeze([]),
+      connections: Object.freeze([]),
+      reads: Object.freeze([]),
+      manifestVersion: manifest.version,
+    });
+  }
   const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
   if (bad.length) declarationInvalid(bad, file);
   if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
@@ -599,7 +591,8 @@ function createScopeResolver(manifest, repo) {
       const b = layerIndex(byId.get((toOwner ?? to).slot), toOwner?.root ?? to.root);
       if (a >= 0 && b >= 0 && b <= a) return { allowed: false, reason: 'layerOrder', fromLayer: fromSlot.layers[a], toLayer: fromSlot.layers[b] };
     }
-    if (toOwner) {
+    // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.
+    if (toOwner && repo.kind !== RUNTIME_KIND) {
       const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
       const ownerTier = byId.get(toOwner.slot).tier;
       const entry = isEntryFile(relative) || (ownerTier === 'package' && relative === 'src/index.ts') || (ownerTier === 'app' && relative === 'app.module.ts');
@@ -763,9 +756,10 @@ export function createSlotResolver(manifest, repo) {
   });
 }
 
-/** The rule parameters of one profile (be: fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes; fe: fileLines, duplicateBlock), as a frozen deep copy. */
+/** The rule parameters of one profile (be: fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes; fe: fileLines, duplicateBlock; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. */
 export function ruleParams(manifest, profile) {
-  if (!PROFILES.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
+  const profiles = manifestKind(manifest) === RUNTIME_KIND ? [RUNTIME_KIND] : PROFILES;
+  if (!profiles.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
   const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
   return deepFreeze(structuredClone(manifest.ruleParams[profile]));
 }
@@ -782,12 +776,12 @@ export function openHfs({ root = skillRoot, repoRoot, declaration, side = null, 
 // ------------------------------------------------------------------------------------------ rule catalog
 
 export const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
-export const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar']);
-export const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar']);
+export const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
+export const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
 export const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
-const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar'];
+const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];
 
 /** Shape and semantic problems of a parsed knowledge/hfs/rules.yaml, in the words of modules/schemas/hfs-rules.schema.yaml. */
 function ruleCatalogProblems(d) {
@@ -853,7 +847,7 @@ function ruleCatalogProblems(d) {
       if (e.at !== undefined) {
         if (typeof e.at !== 'string' || !e.at.trim() || e.at.startsWith('/') || e.at.includes('..')) bad.push(`${eat}.at must be a repository-relative path`);
         if (e.status === 'planned') bad.push(`${eat} is planned, so it has no file yet (at)`);
-        if (!FILE_ENFORCERS.includes(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate or sonar enforcer only`);
+        if (!FILE_ENFORCERS.includes(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate, sonar or runtime enforcer only`);
       } else if (FILE_ENFORCERS.includes(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
     });
     if (Array.isArray(r.gates)) {

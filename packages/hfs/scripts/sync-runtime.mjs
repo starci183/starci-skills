@@ -8,7 +8,8 @@
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view) and the project graph
 //                                (scripts/lib/project-rule.mjs -> project-graph.mjs -> the architecture machine) its project rules share
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
-//   node packages/hfs/scripts/sync-runtime.mjs [--check]     --check exits 1 when a copy differs (npm run check runs it)
+//   node packages/hfs/scripts/sync-runtime.mjs [--check]     --check exits 1 when a copy differs; npm run check judges the same
+//                                                            differences as RT_GENERATED_DRIFT (scripts/hfs/runtime-check.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +92,9 @@ export function expectedBundle(bundle) {
 
 const listed = (dir, base = dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listed(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name)).split(path.sep).join('/')]));
 
+/** The finding code of a generated copy that differs from what this script writes (rule R121, judged by scripts/hfs/runtime-check.mjs). */
+export const GENERATED_DRIFT = 'RT_GENERATED_DRIFT';
+
 /** The differences between every copy on disk and what it should be: missing, stale, extra (prefixed by the bundle). */
 export function driftOfRuntime() {
   const problems = [];
@@ -110,7 +114,7 @@ export function driftOfRuntime() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const problems = driftOfRuntime();
-    for (const p of problems) process.stderr.write(`runtime copy drift: ${p} (run node packages/hfs/scripts/sync-runtime.mjs)\n`);
+    for (const p of problems) process.stderr.write(`${GENERATED_DRIFT} runtime copy drift: ${p} (run node packages/hfs/scripts/sync-runtime.mjs)\n`);
     if (!problems.length) process.stdout.write(`OK: ${Object.keys(BUNDLES).length} runtime copies match the runtime\n`);
     process.exitCode = problems.length ? 1 : 0;
   } else {

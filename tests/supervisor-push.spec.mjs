@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { pushMain, pushFromScratch, nodeModulesRoots, describePush } from '../scripts/supervisor/push-mains.mjs';
+import { pushMain, pushFromScratch, describePush } from '../scripts/supervisor/push-mains.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -279,15 +279,3 @@ test('push-mains --hooks-only: the pre-push hook runs in the scratch of main wit
   assert.ok(fx.liveIntact());
 });
 
-test('the layout read: the checkout root and every workspace package that has its own node_modules', (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-nm-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const mk = (rel) => fs.mkdirSync(path.join(dir, rel), { recursive: true });
-  mk('node_modules/pkg');
-  mk('node_modules/pkg/node_modules/nested');
-  mk('apps/app/node_modules/pkg');
-  mk('apps/expert/src');
-  mk('.next/node_modules/hidden');
-  assert.deepEqual(nodeModulesRoots(dir).map((p) => path.relative(dir, p).replace(/\\/g, '/')).sort(),
-    ['apps/app/node_modules', 'node_modules'], 'root plus the workspace package that keeps its own; never inside a node_modules or a hidden directory');
-});

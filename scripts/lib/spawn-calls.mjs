@@ -1,6 +1,6 @@
 // spawn-calls.mjs — every child-process call in one source text, read with the TypeScript AST (never a text grep), and
-// the program each one can run. The checks that judge spawns read it: check-layers.mjs (which system may be spawned
-// where) and check-host-boundary.mjs (no agent CLI as a child process).
+// the program each one can run. The checks that judge spawns read it: scripts/hfs/runtime-rules/external-owner.mjs
+// (RT_EXTERNAL_OWNER: which program may be spawned where) and check-host-boundary.mjs (no agent CLI as a child process).
 //
 //   spawnCalls(text, file) -> {imports: [{line, module}], calls: [{line, callee, programs, resolved}]}
 //     imports   every import/require/import() of child_process (a scripts/lib module may hold none)

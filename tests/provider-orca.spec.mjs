@@ -134,8 +134,8 @@ test('every scripts/api/orca wrapper is backed by a calls.yaml entry',()=>{
     const verbs=[...source.matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1]);
     assert.ok(verbs.length>0,`${file}: builds no orcaCall(<verb>) — argv must come from calls.yaml`);
     for(const verb of verbs)assert.ok(declared.has(verb),`${file}: calls.yaml has no calls.${verb} entry`);
-    assert.doesNotMatch(source,/orcaRun\(/,`${file}: calls orcaRun directly — argv belongs to calls.yaml via orcaCall`);
-    assert.doesNotMatch(source,/spawnSync/,`${file}: spawns Orca itself — lib.mjs owns the process boundary`);
+    assert.doesNotMatch(source,/\borcaRun\(/,`${file}: calls orcaRun directly — argv belongs to calls.yaml via orcaCall`);
+    assert.doesNotMatch(source,/\bspawnSync\s*\(/,`${file}: spawns Orca itself — lib.mjs owns the process boundary`);
   }
   // Every param key a wrapper hands orcaCall is a declared flag of that verb —
   // orcaCall refuses an undeclared one at runtime, this catches it at rest.

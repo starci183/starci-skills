@@ -54,6 +54,7 @@ import { openMachine } from '../../engine/machine-db.mjs';
 import { createOrcaWorktree } from '../api/orca/worktree-provision.mjs';
 import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
 import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
+import { ci } from '../api/npm/ci.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -65,9 +66,9 @@ import { outageInText } from '../agent/provider-outage.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/install.mjs guardLaunch), bound to
- * the worker's terminal once it starts: its staging checkout's node_modules is a junction to the LIVE runtime's, and
- * npm reifying through that junction empties it (node-modules-link-wipe, 2026-09-28) - the command guard
- * (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
+ * the worker's terminal once it starts: its staging checkout has its own node_modules (createStaging runs npm ci), and
+ * an install through a node_modules link would empty the link's target (node-modules-link-wipe, 2026-09-28) - the
+ * command guard (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
  * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
  * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
  * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
@@ -228,8 +229,8 @@ export const stagingNameOf = (jobId) => `sup-${jobId}`;
 /**
  * Create the job's staging checkout through Orca: createOrcaWorktree (the slot registered with its [Worker] job for the
  * GC, `orca worktree create --repo path:<runtime> --name sup-<job> --base-branch main --setup skip`, stamped
- * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), plus a node_modules junction and a copy of the owner config so specs run there as they do
- * live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
+ * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), its own npm ci (never a node_modules junction, RT_NODE_MODULES_LINK) and a copy of the
+ * owner config so specs run there as they do live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
  */
 export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient }) {
   const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', owner: { lane: jobId }, env, orca });
@@ -239,8 +240,11 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'orca-worktree-create-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `orca worktree create reported no ${made.branch ? 'head' : 'branch'} for ${made.path}` };
   }
-  const nm = path.join(root, 'node_modules');
-  try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(made.path, 'node_modules'), 'junction'); } catch { /* specs without deps still run */ }
+  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? ci(made.path) : { ok: true };
+  if (!deps.ok) {
+    removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
+    return { ok: false, reason: 'staging-install-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `npm ci in the staging checkout failed (exit ${deps.status ?? 'unknown'}): ${deps.stderr.slice(-400)}` };
+  }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(made.path, 'config.yaml')); } catch { /* optional */ }
   return { ok: true, path: made.path, branch: made.branch, base: made.head, orcaId: made.id };
 }
@@ -249,7 +253,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
 export const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
- * Unlink `<dir>/node_modules` when it is a link (the junction createStaging/land make to the live one).
+ * Unlink `<dir>/node_modules` when it is a link (one an older runtime made; no runtime code makes one, RT_NODE_MODULES_LINK).
  * true when no link is left there; a real directory is left alone (true: it is the checkout's own).
  */
 export function unlinkNodeModulesLink(dir) {

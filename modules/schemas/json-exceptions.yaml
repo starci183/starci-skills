@@ -147,6 +147,10 @@ exceptions:
     reason: npm lockfile for the todo-app example ; package managers require JSON filename and syntax.
   - path: examples/todo-app/package.json
     reason: npm package manifest for the todo-app example ; Node/npm require JSON filename and syntax.
+  - path: hfs.json
+    reason: >
+      HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
+      reads hfs.json as JSON in every repository it judges, so the runtime's own declaration keeps the same form.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception; all other authored knowledge JSON

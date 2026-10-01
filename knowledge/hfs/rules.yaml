@@ -12,7 +12,9 @@
 # (`at`) that emits one of the rule's codes. scripts/checks/check-hfs-rules.mjs holds all of this to the packages, the
 # scripts and modules/kernel/failure-codes.yaml.
 #
-# Every rule is an error from 2.0. There is no baseline, allowlist or suppression file. Codes are quoted: the failure-code
+# Every rule is an error from 2.0. There is no baseline, allowlist or suppression file for a product. The runtime gate
+# (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only `pending`
+# list of that manifest, held by RT_PENDING_STALE and RT_PENDING_ADDED. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
 schema: starci/hfs-rules@2
 version: 2.0.0
@@ -23,6 +25,7 @@ gates:
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
   ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the services' coverage at 100
+  runtime: "`starci check` (npm run check) of the StarCi runtime repository itself: scripts/checks/check-runtime.mjs runs node --check, scripts/hfs/runtime-check.mjs with knowledge/hfs/runtime-slots.yaml, and the retained self-checks"
 enforcerKinds:
   eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
   eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
@@ -31,36 +34,40 @@ enforcerKinds:
   hfs: a check of the hfs CLI that reads the repository tree, configuration, contracts or catalogs
   work-validate: a check of scripts/checks/work-validate.mjs over a .starciwork tree
   sonar: a condition of the Sonar quality gate
+  runtime: a rule module of the runtime check (scripts/hfs/runtime-check.mjs, scripts/hfs/runtime-rules/*) or an emitter whose findings it judges, over the runtime repository
 rules:
   - id: R01
     code: "HFS_SLOT_UNDECLARED"
     law: "Every tracked path matches exactly one slot."
     kinds: [check, lint]
-    gates: [pre-push, settle, land, ci]
+    gates: [pre-push, settle, land, ci, runtime]
     failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED", "HFS_ROOT_ENTRY_FORBIDDEN", "HFS_ROOT_MARKDOWN_FORBIDDEN", "HFS_ROOT_SRC_FORBIDDEN_FE", "HFS_SRC_LAYOUT_INVALID", "HFS_MODULE_TIER_INVALID", "HFS_WORK_IN_FE", "HFS_STACKS_IN_SIDE"]
     enforcers:
       - {kind: hfs, id: slot-undeclared, at: scripts/lib/hfs-check.mjs}
       - {kind: eslint-be, id: slot-undeclared}
       - {kind: eslint-fe, id: slot-undeclared}
       - {kind: machine, id: repository-tree-layout, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: runtime, id: runtime-tree, at: scripts/hfs/runtime-check.mjs}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
     law: "A slot is missing a required file (feature `index.ts`, app `main.ts`, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."
     kinds: [check, codemod]
-    gates: [settle, land, ci]
+    gates: [settle, land, ci, runtime]
     failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES", "BE_REQUIRED_MODULE_MISSING", "HFS_REQUIRED_FILE_MISSING", "HFS_ROOT_ENTRY_MISSING", "HFS_APPS_REQUIRED", "HFS_APP_LAYOUT_INVALID", "HFS_README_TITLE_INVALID", "HFS_README_DESCRIPTION_INVALID", "HFS_README_SECTION_MISSING", "HFS_README_SECTION_ORDER", "HFS_README_DEVELOPMENT_INCOMPLETE", "HFS_README_WORK_POINTER_MISSING", "HFS_README_PRIVATE_URL", "HFS_README_BADGE_NOT_LIVE"]
     enforcers:
       - {kind: hfs, id: slot-required-missing, at: scripts/lib/hfs-check.mjs}
       - {kind: machine, id: required-files, at: scripts/checks/architecture/required-files.mjs}
       - {kind: machine, id: repository-tree-required, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: runtime, id: runtime-required, at: scripts/hfs/runtime-check.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
     law: "No untracked or ignored entry outside an `ignored` slot."
     kinds: [check, codemod]
-    gates: [pre-push, land, ci]
+    gates: [pre-push, land, ci, runtime]
     failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY", "HFS_EMPTY_DIR", "HFS_GHOST_TREE"]
     enforcers:
       - {kind: hfs, id: untracked-root-entry, at: scripts/lib/hfs-check.mjs}
+      - {kind: runtime, id: runtime-untracked, at: scripts/hfs/runtime-check.mjs}
   - id: R04
     code: "HFS_GITIGNORE_BLOCK_DRIFT"
     law: "The managed `.gitignore` block equals its render."
@@ -200,12 +207,13 @@ rules:
     code: "HFS_SIZE_GROWTH"
     law: "Over-budget files do not grow; new files are inside budget."
     kinds: [lint, design]
-    gates: [land, ci, sonar]
+    gates: [land, ci, sonar, runtime]
     failureCodes: ["HFS_SIZE_GROWTH", "HFS_SIZE_SOFT_BACKLOG"]
     enforcers:
       - {kind: eslint-be, id: file-size-growth}
       - {kind: eslint-fe, id: file-size-growth}
       - {kind: sonar, id: cognitive-complexity, at: knowledge/sonar-gate.yaml}
+      - {kind: runtime, id: runtime-size, at: scripts/hfs/runtime-rules/size.mjs}
   - id: R21
     code: "HFS_DUPLICATE_CODE"
     law: "No duplicated blocks or twice-defined helpers."
@@ -271,11 +279,12 @@ rules:
     code: "ARCH_OWNER_CYCLE"
     law: "No owner cycles, type-only included."
     kinds: [lint, design]
-    gates: [pre-push, settle, land, ci]
+    gates: [pre-push, settle, land, ci, runtime]
     failureCodes: ["ARCH_OWNER_CYCLE"]
     enforcers:
       - {kind: eslint-be, id: owner-cycle}
       - {kind: eslint-fe, id: owner-cycle}
+      - {kind: runtime, id: runtime-cycles, at: scripts/hfs/runtime-rules/tier-direction.mjs}
   - id: R28
     code: "BE_FEATURE_IMPORTS_FEATURE"
     law: "A feature never imports a feature."
@@ -1151,3 +1160,107 @@ rules:
     failureCodes: ["BE_INTEGRATION_SPEC_MISSING"]
     enforcers:
       - {kind: hfs, id: integration-specs, at: scripts/lib/hfs-rules/integration-specs.mjs}
+  - id: R114
+    code: "RT_EXTERNAL_OWNER"
+    law: "In the runtime repository a process, the network, SQLite or an external binary is reached only by its owner in ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml: an owned module specifier, global or spawned program word is used only by the files of scripts/api/<system> or engine/db that the map names."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_EXTERNAL_OWNER"]
+    enforcers:
+      - {kind: runtime, id: external-owner, at: scripts/hfs/runtime-rules/external-owner.mjs}
+  - id: R115
+    code: "RT_TIER_DIRECTION"
+    law: "Every relative import between two runtime owners goes from a tier to a tier its mayImport lists in tiers.runtime of knowledge/hfs/runtime-slots.yaml; owner cycles are ARCH_OWNER_CYCLE."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_TIER_DIRECTION"]
+    enforcers:
+      - {kind: runtime, id: runtime-tiers, at: scripts/hfs/runtime-rules/tier-direction.mjs}
+  - id: R116
+    code: "RT_BASE_IMPURE"
+    law: "The runtime base tier (the engine foundation and scripts/lib) never writes the filesystem and reads process.env only in a declared seam of ruleParams.runtime.baseEnvSeams."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_BASE_IMPURE"]
+    enforcers:
+      - {kind: runtime, id: base-pure, at: scripts/hfs/runtime-rules/base-pure.mjs}
+  - id: R117
+    code: "RT_API_SHAPE"
+    law: "A call file of scripts/api/<system>/ exports exactly one function named in camelCase after the file; only the files of its own system import its lib.mjs; no api system imports another; a system with a calls contract has a call file only for a call id the contract declares."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_API_SHAPE"]
+    enforcers:
+      - {kind: runtime, id: api-shape, at: scripts/hfs/runtime-rules/api-shape.mjs}
+  - id: R118
+    code: "RT_SPEC_PLACEMENT"
+    law: "A runtime spec is tests/<area>/<module>[.<topic>].spec.mjs, shared spec code is tests/helpers/<name>.mjs, preloads tests/setup/<name>.mjs and data tests/fixtures/**; a package spec sits beside its source as <name>.spec.*; no file uses the .test. suffix."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SPEC_PLACEMENT"]
+    enforcers:
+      - {kind: runtime, id: spec-placement, at: scripts/hfs/runtime-rules/test-layout.mjs}
+  - id: R119
+    code: "RT_SOURCE_NAME"
+    law: "A runtime source file is named <kebab-name>.mjs, never a one-off of ruleParams.runtime.oneOffNames (_*, tmp-*, fix-*, *-backfill, migrate-*, *-old, *.bak*), and its basename is unique inside its tier except lib.mjs and index.mjs."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SOURCE_NAME"]
+    enforcers:
+      - {kind: runtime, id: source-name, at: scripts/hfs/runtime-rules/source-name.mjs}
+  - id: R120
+    code: "RT_RETIRED_PRESENT"
+    law: "No path of retired[] and no `from` of moved[] in modules/kernel/retired-paths.yaml is tracked again, and no symbol of its retiredSymbols[] is declared in runtime production code."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RETIRED_PRESENT"]
+    enforcers:
+      - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
+  - id: R121
+    code: "RT_GENERATED_DRIFT"
+    law: "A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what packages/hfs/scripts/sync-runtime.mjs writes from the single source."
+    kinds: [check, codemod]
+    gates: [land, runtime]
+    failureCodes: ["RT_GENERATED_DRIFT"]
+    enforcers:
+      - {kind: runtime, id: generated-drift, at: packages/hfs/scripts/sync-runtime.mjs}
+  - id: R122
+    code: "RT_CITED_PATH_MISSING"
+    law: "A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CITED_PATH_MISSING"]
+    enforcers:
+      - {kind: runtime, id: cited-path, at: scripts/checks/check-contract-cites.mjs}
+  - id: R123
+    code: "RT_PENDING_STALE"
+    law: "Every entry of the pending list of knowledge/hfs/runtime-slots.yaml names a runtime finding code and still allows a finding, and no entry allows a finding the base revision's list did not allow: the list only shrinks."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PENDING_STALE", "RT_PENDING_ADDED"]
+    enforcers:
+      - {kind: runtime, id: pending-ratchet, at: scripts/hfs/runtime-rules/pending.mjs}
+  - id: R124
+    code: "RT_PINNED_PATH_MOVED"
+    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the fleet stopped."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PINNED_PATH_MOVED"]
+    enforcers:
+      - {kind: runtime, id: pinned-path, at: scripts/hfs/runtime-rules/retired.mjs}
+  - id: R125
+    code: "RT_NODE_MODULES_LINK"
+    law: "No runtime source creates a junction or a symlink for a node_modules folder, through node:fs (symlink, symlinkSync, directly or through a local wrapper) or a spawned link command (mklink /J or /D, New-Item -ItemType Junction or SymbolicLink, ln -s): every checkout installs its own dependencies with a real npm ci from the cache."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_NODE_MODULES_LINK"]
+    enforcers:
+      - {kind: runtime, id: node-modules-link, at: scripts/hfs/runtime-rules/node-modules-link.mjs}
+  - id: R126
+    code: "RT_CONTROL_CHARACTER"
+    law: "Tracked text source of the runtime (*.mjs, *.cjs, *.js, *.ts, *.tsx, *.yaml, *.yml, *.md, *.json outside the generated copies) holds no raw control character (U+0000 to U+001F except tab, LF and CR, and U+007F); the character is written as its escape."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CONTROL_CHARACTER"]
+    enforcers:
+      - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}

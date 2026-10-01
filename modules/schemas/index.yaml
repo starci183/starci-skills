@@ -423,44 +423,18 @@ schemas:
       whenNot: Not the goal record itself — the goal lives in the goals table; this is only the derived-plan file contract.
       selectedBy: The kernel agent's plan step — driver-loop.yaml tick.plan.
 
-  - id: starci/retired-paths@1
+  - id: starci/retired-paths@2
     file: modules/kernel/retired-paths.yaml
     dialect: prose-data
     subsystem: kernel
-    governs: "The path ledger for intentionally retired runtime files, their removal lane and replacement owner."
-    binds: "modules/kernel/retired-paths.yaml retired[] entries"
-    usedBy: [scripts/checks/check-contract-cites.mjs]
+    governs: "The path ledger for intentionally retired runtime files (retired[]), moved files (moved[] from -> to, the chunk that moved them, quiesced for a pinned path) and replaced symbols (retiredSymbols[])."
+    binds: "modules/kernel/retired-paths.yaml retired[], moved[] and retiredSymbols[] entries"
+    usedBy: [scripts/checks/check-contract-cites.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
     business:
-      question: "Is a cited deleted path an intentional retirement rather than a broken live contract cite?"
-      whenNeeded: Checking historical contract-change and owner-ruling citations to removed files.
-      whenNot: Never authorizes a live runtime reference to a deleted file.
-      selectedBy: The retired-path citation exception in check-contract-cites.mjs.
-
-  - id: starci/runtime-layers@1
-    file: modules/kernel/runtime-layers.yaml
-    dialect: prose-data
-    subsystem: kernel
-    governs: "The layering of the runtime's own source: each external system's api home and programs, and what a layer may not hold."
-    binds: "modules/kernel/runtime-layers.yaml scan, apiRoot, systems[] and layers[]"
-    usedBy: [scripts/checks/check-layers.mjs, scripts/checks/check-host-boundary.mjs]
-    business:
-      question: "May this file start this program, or import child_process at all?"
-      whenNeeded: Every npm run check (check-layers.mjs) over scripts, engine, bin, ext, modules and init.
-      whenNot: Not product code layering; that is the hfs slots of each app.
-      selectedBy: check-layers.mjs readRules.
-
-  - id: starci/runtime-layers-allow@1
-    file: modules/kernel/runtime-layers.allow.yaml
-    dialect: prose-data
-    subsystem: kernel
-    governs: "The one reviewed list of exceptions to the runtime layers, each with its lane and reason."
-    binds: "modules/kernel/runtime-layers.allow.yaml entries[] {path, code, system, lane, reason}"
-    usedBy: [scripts/checks/check-layers.mjs]
-    business:
-      question: "Is this layer finding a reviewed exception or a temporary one a named lane removes?"
-      whenNeeded: Every check-layers run; an entry no finding matches is RT_LAYER_ALLOW_STALE.
-      whenNot: Never an exception without a reason; an invalid entry allows nothing.
-      selectedBy: check-layers.mjs readRules.
+      question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path or symbol stay gone?"
+      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, the pending ratchet across a move).
+      whenNot: Never authorizes a live runtime reference to a deleted or moved file.
+      selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
   - id: starci/push-scan-allow@1
     file: modules/supervisor/push-scan-allow.yaml

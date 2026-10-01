@@ -12,16 +12,22 @@
 // A `{a,b}` group expands; a `*` glob, an `<angle>` placeholder or a
 // .starciwork/ runtime path is unverifiable and is skipped by name.
 //
-// History may name what was deleted on purpose: a path listed in
-// modules/kernel/retired-paths.yaml is a valid cite from a contract-change entry
+// History may name what was deleted or moved on purpose: a path listed in
+// modules/kernel/retired-paths.yaml (retired[].path, moved[].from) is a valid cite from a contract-change entry
 // (modules/kernel/contract-changes/**), modules/kernel/owner-rulings.yaml or the registry itself, and a
-// dead cite everywhere else (live contract text must name what runs now).
+// dead cite everywhere else (live contract text must name what runs now; a moved path names its moved[].to).
+//
+// RT_CITED_PATH_MISSING (rule R122, gate runtime): citedPathFindings() runs the same reading over the runtime's live prose
+// (runtimeCiteScan: the runtime contracts, docs/*.md, skills, init, CONTEXT.md, README.md, CONTRIBUTING.md and the ui docs)
+// and returns each dead cite as a finding; scripts/checks/check-runtime.mjs (`starci check`) judges it with the runtime check.
+// knowledge/, modules/schemas/ and docs/examples/ describe product repositories, whose paths are not this tree's.
 // Exit 0 clean, 1 lists every dead cite as file:line, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { walkFiles } from './common.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { movedTo } from '../hfs/runtime-rules/retired.mjs';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -41,14 +47,28 @@ class CiteInputError extends Error {}
 
 export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel === 'modules/kernel/owner-rulings.yaml' || rel === RETIRED_PATHS_FILE;
+/** The generated copy roots of the runtime (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml), each a byte mirror of the runtime layout. */
+const generatedRoots = (root) => {
+  const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
+  if (!fs.existsSync(file)) return [];
+  return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? []).map((g) => `${String(g.root).replace(/\/$/, '')}/`);
+};
+/** A path inside a generated copy is the runtime path it mirrors (packages/hfs/runtime/scripts/x.mjs -> scripts/x.mjs). */
+const mirrored = (roots, target) => { const r = roots.find((g) => target.startsWith(g)); return r ? target.slice(r.length) : target; };
+
+const readRegistry = (root) => {
+  const file = path.join(root, RETIRED_PATHS_FILE);
+  return fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8')) ?? {}) : {};
+};
 
 /** The retired paths of `root` (modules/kernel/retired-paths.yaml `retired[].path`); an empty set when there is none. */
 export function retiredPaths(root = DEFAULT_ROOT) {
-  const file = path.join(root, RETIRED_PATHS_FILE);
-  if (!fs.existsSync(file)) return new Set();
-  const doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
+  const doc = readRegistry(root);
   return new Set((Array.isArray(doc.retired) ? doc.retired : []).map((r) => String(r?.path ?? '')).filter(Boolean));
 }
+
+/** (path) -> where it moved under `root`'s modules/kernel/retired-paths.yaml `moved[]` (a directory row covers what is below it), or null. */
+export const movedPaths = (root = DEFAULT_ROOT) => movedTo(readRegistry(root).moved);
 
 const expandBraces = (token) => {
   const open = token.indexOf('{');
@@ -138,6 +158,9 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   };
   const files = collectScanFiles(root, scan);
   const retired = retiredPaths(root);
+  const moved = movedPaths(root);
+  const roots = generatedRoots(root);
+  const retiredOrMoved = (target) => retired.has(target) || moved(target) || retired.has(mirrored(roots, target)) || moved(mirrored(roots, target));
   let checked = 0, historic = 0;
   for (const file of files) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
@@ -158,15 +181,33 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
         continue;
       }
-      if (retired.has(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
+      if (retiredOrMoved(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
       const body = readTarget(path.join(root, cite.target));
-      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'no such file' }); continue; }
+      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, symbol: cite.symbol, why: 'symbol not in file' });
       }
     }
   }
   return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, retiredCites: historic, dead };
+}
+
+export const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';
+/** The runtime's live prose (rule R122): the runtime contracts and the human and agent docs of this tree. */
+export const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
+
+/** The scan of rule R122 under `root`: RUNTIME_CITE_ROOTS that exist plus every docs/*.md (docs/examples/ describes product apps). */
+export function runtimeCiteScan(root = DEFAULT_ROOT) {
+  const docs = fs.existsSync(path.join(root, 'docs')) ? fs.readdirSync(path.join(root, 'docs')).filter((name) => name.endsWith('.md')).sort().map((name) => `docs/${name}`) : [];
+  return [...RUNTIME_CITE_ROOTS.filter((rel) => fs.existsSync(path.join(root, rel))), ...docs];
+}
+
+/** RT_CITED_PATH_MISSING findings of the runtime's live prose under `root`. */
+export function citedPathFindings(root = DEFAULT_ROOT) {
+  return checkContractCites(root, runtimeCiteScan(root)).dead.map((d) => ({
+    code: CITED_PATH_MISSING, level: 'error', path: d.file, line: d.line,
+    message: `${d.file}:${d.line} cites ${d.target}${d.symbol ? `::${d.symbol}` : ''}: ${d.why} (${d.form})`,
+  }));
 }
 
 export function checkContractCitesMain(argv) {

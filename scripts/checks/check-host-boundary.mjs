@@ -4,7 +4,7 @@
 //   code   — a .mjs outside scripts/api/orca/ imports the raw runner (ORCA,
 //            orcaRun, orcaCall) from the wrapper lib instead of calling a
 //            wrapper, or (tests/ and packages/ only) spawns orca. A spawn of orca
-//            in runtime code is scripts/checks/check-layers.mjs's finding.
+//            in the runtime's source roots is RT_EXTERNAL_OWNER's finding (scripts/hfs/runtime-check.mjs).
 //   prose  — agent-facing text tells an agent to run `orca <verb>`, to run a
 //            node path that is not a scripts/api/orca/<verb>.mjs wrapper, or to
 //            load/read modules/host/orca/*.
@@ -22,7 +22,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {walkFiles} from './common.mjs';
 import {spawnCalls} from '../lib/spawn-calls.mjs';
-import {readRules} from './check-layers.mjs';
+import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../lib/hfs-slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
 const ALLOW_FILE='scripts/checks/host-boundary.allow';
@@ -101,6 +101,13 @@ export function agentCliSpawns(text,file='x.mjs'){
   });
 }
 
+/** ruleParams.runtime.sourceRoots of the runtime manifest under `root`, or [] when the tree has none. */
+function runtimeSourceRoots(root){
+  const file=path.join(root,RUNTIME_MANIFEST_FILE);
+  if(!fs.existsSync(file))return [];
+  return ruleParams(loadSlotManifest({root,file}),'runtime').sourceRoots;
+}
+
 const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
@@ -115,15 +122,16 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
     found.push({where:key,rule,...(code?{code}:{}),detail});
   };
 
-  // (a) code: one place builds orca's argv. Who may spawn orca in runtime code is check-layers.mjs's rule (its scan
-  // roots); the roots it does not scan (tests/, packages/) are read here with the same AST reading.
-  const layerScan=readRules(root).rules.scan??[];
+  // (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
+  // rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (tests/, packages/,
+  // modules/, init/) are read here with the same AST reading. A tree without a runtime manifest is read whole.
+  const layerScan=runtimeSourceRoots(root);
   for(const dir of CODE_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       const relative=rel(root,file);
       if(relative.startsWith(`${WRAPPER_DIR}/`))continue;
       const text=fs.readFileSync(file,'utf8');
-      if(!layerScan.some(d=>relative.startsWith(`${d}/`)))
+      if(!layerScan.some(d=>relative===d||relative.startsWith(`${d}/`)))
         for(const call of spawnCalls(text,file).calls)
           if(call.programs.includes('orca'))flag(file,call.line,'spawns-orca',`spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
       const lines=text.split(/\r?\n/);

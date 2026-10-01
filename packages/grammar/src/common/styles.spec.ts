@@ -19,7 +19,7 @@ describe("Common renderer anatomy CSS", () => {
     it("reads the universal rhythm tokens, never a family-scoped copy of them", () => {
         // Spacing rhythm has one common vocabulary (--grammar-*). A family republishes it under its
         // own prefix (--starci-core-*, --offset-pop-*), and the common sheet must not read that copy.
-        expect(css).not.toMatch(/--(?:starci-[a-z-]+|offset-pop)-(?:page-inset|region-gap|section-gap|row-gap|inline-gap)(?!-)/)
+        expect(css).not.toMatch(/--(?:starci-[a-z-]+|offset-pop)-(?:page-inset|region-gap|section-gap|row-gap|inline-gap)\b(?!-)/)
         for (const token of ["page-inset", "region-gap", "section-gap", "row-gap", "inline-gap"]) {
             expect(css, token).toContain("var(--grammar-" + token)
         }

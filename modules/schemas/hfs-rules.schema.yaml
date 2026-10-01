@@ -19,7 +19,7 @@ properties:
   gates:
     type: object
     additionalProperties: false
-    required: [pre-commit, pre-push, settle, land, ci, sonar]
+    required: [pre-commit, pre-push, settle, land, ci, sonar, runtime]
     properties:
       pre-commit: {type: string, minLength: 1}
       pre-push: {type: string, minLength: 1}
@@ -27,10 +27,11 @@ properties:
       land: {type: string, minLength: 1}
       ci: {type: string, minLength: 1}
       sonar: {type: string, minLength: 1}
+      runtime: {type: string, minLength: 1}
   enforcerKinds:
     type: object
     additionalProperties: false
-    required: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar]
+    required: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar, runtime]
     properties:
       eslint-be: {type: string, minLength: 1}
       eslint-fe: {type: string, minLength: 1}
@@ -39,6 +40,7 @@ properties:
       hfs: {type: string, minLength: 1}
       work-validate: {type: string, minLength: 1}
       sonar: {type: string, minLength: 1}
+      runtime: {type: string, minLength: 1}
   rules:
     type: array
     minItems: 1
@@ -65,7 +67,7 @@ $defs:
         type: array
         minItems: 1
         uniqueItems: true
-        items: {enum: [pre-commit, pre-push, settle, land, ci, sonar]}
+        items: {enum: [pre-commit, pre-push, settle, land, ci, sonar, runtime]}
       failureCodes:
         type: array
         minItems: 1
@@ -81,7 +83,7 @@ $defs:
     additionalProperties: false
     required: [kind, id]
     properties:
-      kind: {enum: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar]}
+      kind: {enum: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar, runtime]}
       id: {type: string, pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'}
       status: {const: planned, description: Present only while the enforcer is owed; absent means it exists.}
-      at: {type: string, minLength: 1, description: Repository-relative file that emits one of the rule's failure codes; only an existing machine, hfs or work-validate enforcer carries it.}
+      at: {type: string, minLength: 1, description: Repository-relative file that emits one of the rule's failure codes; only an existing machine, hfs, work-validate or runtime enforcer carries it.}

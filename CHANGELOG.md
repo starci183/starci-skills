@@ -2,7 +2,7 @@
 
 All notable changes to StarCi are documented here. The project is pre-publication on the
 `1.0.0-alpha.N` line: contracts are provisional until every S* row in
-`.experiments/OPENSOURCE-GOAL.md` holds with fresh evidence, then `1.0.0` freezes them.
+`docs/opensource-goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
 ## [1.0.0-alpha.4] — in preparation

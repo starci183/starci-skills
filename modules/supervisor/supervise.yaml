@@ -176,7 +176,7 @@ selfLearning:
     auto: "lands through lanes without asking, logged and reported in the owner digest: bug fixes in checkers/scripts/runtime; checker calibration WITH a spec showing a correct example the check wrongly blocked; grammar additions/fixes (a release bump - npm publish still needs the owner, grammarRelease aside); brief and prompt improvements; scheduling/throughput tuning within the owner's caps"
     propose: "a concise proposal to the owner (lessons.mjs propose --title --evidence --options --recommendation --send), never blocking other work while it waits: changes to owner rulings or brand direction/records, knowledge rule meaning, removing or weakening a gate class, architectural changes to the op graph or the kernel contract, budget/cap increases (config.yaml), anything with an external or irreversible effect. lessons.mjs land refuses these paths (tierOf)"
   guardrails:
-    - "never relax or disable a check to turn it green: a changed checker lands only with --wrongly-blocked <tests/x.spec.mjs>, a spec in the same change holding the correct example the check wrongly blocked (its text says 'wrongly blocked')"
+    - "never relax or disable a check to turn it green: a changed checker lands only with --wrongly-blocked <tests/<name>.spec.mjs>, a spec in the same change holding the correct example the check wrongly blocked (its text says 'wrongly blocked')"
     - "revert on measured regression, automatically (experiment-revert); a kept experiment is a lesson, a reverted one a 'did not work' lesson"
     - "at most runtimes.yaml supervisorLearning.dailyAutoLandCap autonomous landings in any 24 h"
     - "every change through a lane and the land gate (and its draw-rules freeze/release windows); never an edit of the live tree"

@@ -434,7 +434,7 @@ function releaseManagedWorker(dispatchId, handle = null) {
 // A stale command-terminal kernel (launch: terminal — the Devin/Codex
 // seat) leaves a live Orca terminal behind: clearing the signal removes the
 // ledger's handle on it, not the PTY. That is how one workflow grew two
-// [Kernel] rows in the sidebar (docs/fable.md orca-hierarchy, root cause 2). The
+// [Kernel] rows in the sidebar (benchmark/findings/fable.md orca-hierarchy, root cause 2). The
 // close is best-effort but never silent: a failure is returned and recorded
 // as kernel-stale-terminal-unclosed. A disconnected terminal may still have a
 // persisted tab, so a disconnected show alone is not proof of removal.

@@ -7,8 +7,8 @@
 // (HFS_RULES_INVALID). On top of that this check refuses:
 //   - a rule with no enforcer, or a `lint`/`check` kind with no enforcer of that family        HFS_RULE_NO_ENFORCER
 //   - an existing eslint-be / eslint-fe enforcer whose id is not a rule of the plugin in packages/eslint/{be,fe},
-//     or an existing machine / hfs / work-validate / sonar enforcer whose file (`at`) is missing or emits none of the
-//     rule's codes                                                                            HFS_RULE_ENFORCER_MISSING
+//     or an existing machine / hfs / work-validate / runtime / sonar enforcer whose file (`at`) is missing or emits none
+//     of the rule's codes                                                                            HFS_RULE_ENFORCER_MISSING
 //   - a `status: planned` enforcer that already ships: an eslint id the plugin has, or a machine / hfs /
 //     work-validate enforcer whose rule code an emitter of that family already emits (drop the status, name `at`)
 //                                                                                             HFS_RULE_ENFORCER_STALE
@@ -41,7 +41,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, REFUSAL_CODES } from '../lib/hfs-check.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../lib/hfs-slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from './architecture/index.mjs';
-import { isMain } from './common.mjs';
+import { isMain, walkFiles } from './common.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const RULES_README = 'knowledge/hfs/README.md';
@@ -50,6 +50,7 @@ export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/checks/architecture.mjs', 'scripts/checks/architecture'],
   hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-rules', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
   'work-validate': ['scripts/checks/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/checks/check-work-artifacts.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'packages/hfs/scripts/sync-runtime.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -59,7 +60,7 @@ export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/ind
 export const STYLELINT_WHY = 'packages/stylelint/lib/why.mjs';
 const LINT_PLUGINS = Object.keys(PLUGIN_ENTRY);
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
-const CHECK_FAMILY = ['machine', 'hfs', 'work-validate'];
+const CHECK_FAMILY = ['machine', 'hfs', 'work-validate', 'runtime'];
 // A check spells its code as a string literal ('CODE') or as the `[CODE]` tail of a finding line.
 const quoted = (code) => new RegExp(`['"\`]${code}['"\`]|\\[${code}\\]`);
 
@@ -80,7 +81,9 @@ export function readEmitters(root) {
 /** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, stylelint: [text], specs: [text]}. */
 export function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
-  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs: texts('tests', /\.spec\.mjs$/) };
+  // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
+  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => /\.spec\.mjs$/.test(name), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
+  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs };
 }
 
 /** True when a RuleTester run of `id` carries both valid and invalid cases. */
@@ -181,7 +184,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     if (!rule.enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer`);
     // Owner acceptance 2026-09-30: every rule ships at error on the day the canon ships; an owed enforcer is a gap, not a plan.
     for (const e of rule.enforcers) if (e.planned) add('HFS_RULE_ENFORCER_PLANNED', rule.id, `${rule.id} lists ${e.kind}:${e.id} as planned: build it (with a violating and a passing test) or delete it; the catalog carries no owed enforcer`, `${e.kind}:${e.id}`);
-    for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs or work-validate check']]) {
+    for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs, work-validate or runtime check']]) {
       if (rule.kinds.includes(kind) && !rule.enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what}`);
     }
     for (const enforcer of rule.enforcers) {

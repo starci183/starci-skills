@@ -137,7 +137,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
   `node scripts/supervisor/lessons.mjs match --signature <s>` / `--text <symptom>`. Owner lessons outweigh your own.
 - A signature that repeats opens a hypothesis automatically (the tick). Fix it in a lane with a spec that reproduces
   the signature, then land EVERY change you author through
-  `node scripts/supervisor/lessons.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/x.spec.mjs>] --reason <text>`
+  `node scripts/supervisor/lessons.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/<name>.spec.mjs>] --reason <text>`
   (it enforces the tier, the check guardrail and the daily cap, then calls the land gate and records the experiment).
 - Tiers. AUTO (land it, it shows in the digest): bug fixes in checkers/scripts/runtime; checker calibration WITH a
   spec holding the correct example the check wrongly blocked; grammar additions/fixes (a release bump; npm publish
