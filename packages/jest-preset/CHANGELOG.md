@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.4 - 2026-10-02
+
+- Changed: the world runner runs up to `min(--maxWorkers, slots)` files of the integration, e2e and contract projects at once,
+  each still in a fresh process of its own (never in band), each bound to one data slot of `@starci/test-world` 1.1.0: the
+  file's process is forked with `STARCI_TEST_WORLD_SLOT=<k>`, and no two files ever hold one slot at the same time. The slot
+  count is the one the world's globalSetup published in its state file. This lifts the 2.2.0 limitation "one file at a time".
+- Changed: the runner reads test-world state protocol 2 only. A missing state file or another protocol fails the run with
+  `JEST_PRESET_WORLD_PAIR_MISMATCH`, naming this preset, the test-world that wrote the file and the fix (pin both together per
+  knowledge/hfs/canon-pins.yaml); there is no fallback mode.
+
 ## 2.2.2 - 2026-10-01
 
 - Changed: the coverage reporters are `text-summary`, `text` and `lcov`. The unit run writes `coverage/lcov.info`, which Sonar (`sonar.javascript.lcov.reportPaths`) and Codecov import with the scope `hfs sync` renders from `COVERAGE_SOURCES` (services only). Coverage is still collected from `src/**/*.service.ts` only, with the per-file threshold of 100. Contract change `sonar-services-coverage`.

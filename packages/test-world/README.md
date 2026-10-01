@@ -79,18 +79,21 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 
 `starci-test-stack up|down|status` (the managed `npm run test:stack -- up`). The globalSetup attaches to the stack or starts it. Containers are keyed by image (`starci-ts-<service>-<hash of image>`): two repositories on the same Postgres image share one container, another version gets its own. Machine state lives in `~/.starci/test-stack` (registry with leases, cross-process lock).
 
-Per-repository isolation is enforced by the library from the namespace `<package>_<6 hex of the checkout path>`: Postgres databases `<ns>_<connection>`, a Keycloak realm `<ns>-<realm>`, a Redis DB index leased per namespace, MinIO buckets `<ns>-<name>`, Qdrant collection and Kafka topic prefixes, k3d namespaces `<ns>-<name>`, toxiproxy proxies per run. Two repositories (or two checkouts of one) run e2e concurrently; two runs of the same checkout collide with `TEST_WORLD_NAMESPACE_BUSY`. Kafka advertises its address, so its proxy is stack-wide (a documented exception).
+Per-repository and per-slot isolation is enforced by the library from the namespace `<package>_<6 hex of the checkout path>_w<slot>`: Postgres databases `<ns>_<connection>`, a Keycloak realm `<ns>-<realm>`, a Redis DB index leased per namespace, MinIO buckets `<ns>-<name>`, Qdrant collection and Kafka topic prefixes, k3d namespaces `<ns>-<name>`, toxiproxy proxies per run. Two repositories (or two checkouts of one) run e2e concurrently; two runs of the same checkout collide with `TEST_WORLD_NAMESPACE_BUSY`. Kafka advertises its address, so its proxy is stack-wide (a documented exception).
 
 k3d: one cluster per k3s image plus a local registry with pull-through mirrors for vendor images; own images are built by content hash (Dockerfile + lockfile + COPY'd sources), reused when the tag exists, and garbage-collected keeping the last 3 `src-*` tags.
 
-## Per run and per spec
+## Per run, per slot and per spec
 
-globalSetup: validate declaration, read the stack definition, start the fakes host, attach the stack (provision), start siblings, run `migrate` once, apply `seeds`, snapshot the tables the migrate/seed step filled. Per spec file (`useTestWorld` `beforeAll`): reset (truncate every table except migration ledgers and seeded tables, delete non-imported realm users, flush the Redis DB, drop namespaces, reset fakes), reserve ports, build the wiring, `AppModule.register(options)`, listen, open the db handles. Teardown drops what the run provisioned; shared containers stay warm.
+A run has N data slots, N = min(jest `maxWorkers`, the declaration's `workers`, default 2), so world spec files run in parallel: `@starci/jest-preset`'s world runner (the paired 2.2.4) runs up to N files at once, each in its own process bound to one slot (`STARCI_TEST_WORLD_SLOT`), never two files on one slot. A slot is a complete run of its own: its namespace and run token, databases, realm, Redis DB, prefixes, fakes host, proxies, run directory and outage lock. The state file (protocol 2) lists every slot; a state file of another protocol, or a process without a slot of the run, is `TEST_WORLD_PAIR_MISMATCH` (pin both packages together per canon-pins).
+
+globalSetup, per slot: validate declaration, read the stack definition, start the slot's fakes host, attach the stack (provision the slot's namespace), start siblings, run `migrate`, apply `seeds`, snapshot the tables the migrate/seed step filled. Per spec file (`useTestWorld` `beforeAll`): reset (truncate every table except migration ledgers and seeded tables, delete non-imported realm users, flush the Redis DB, drop namespaces, reset fakes), reserve ports, build the wiring, `AppModule.register(options)`, listen, open the db handles. Teardown drops what every slot provisioned; shared containers stay warm.
 
 ## Outages and parallel spec files
 
-The spec files of one run share the run's stack, so an outage is serialized by the library itself: the run's outage lock (in
-the run directory) is held SHARED by every world while it boots, around every test (`beforeEach`/`afterEach` that
+Spec files of different slots share nothing but the warm containers (each slot has its own proxies), so an outage in one slot
+never reaches another (Kafka excepted: its proxy is stack-wide). Within a slot an outage is serialized by the library itself: the slot's outage lock (in
+the slot's run directory) is held SHARED by every world while it boots, around every test (`beforeEach`/`afterEach` that
 `useTestWorld` registers) and while it stops, and EXCLUSIVELY by every outage call: `world.infra.<svc>.cut()`, `latency(ms)`
 and `during(fn)` take it before they touch toxiproxy and keep it until `restore()` (or the world stops),
 `keycloak.rotateClientSecret` keeps it until the world stops (a rotation is never undone). An outage therefore waits for the

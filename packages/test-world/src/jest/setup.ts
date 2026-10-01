@@ -1,5 +1,8 @@
 /**
- * The run setup, shared by the jest globalSetup and the tests of the library. In order:
+ * The run setup, shared by the jest globalSetup and the tests of the library. A run has N data slots (N = the run's jest
+ * workers, capped by the declaration's `workers`, default {@link DEFAULT_WORKERS}); a slot is a complete, independent set of
+ * everything below, named from its own namespace (`<ns>_w<k>`) and run token (`<run>-w<k>`), so the spec files of different
+ * slots run at the same time without touching each other's data. The slots are provisioned one after another. Per slot:
  *  1. validate the declaration and read the stack definition (`.starcistacks/<env>`: service list and image versions);
  *  2. start the network-edge fakes of every SaaS (one control server) in this process;
  *  3. attach to the shared warm stack, or start it: postgres, redis, minio, qdrant, kafka, keycloak behind toxiproxy, the
@@ -8,8 +11,9 @@
  *  4. start the sibling services (our own images from other repositories);
  *  5. run `apps/migrate` once against the run's databases, then the seed files, and remember which tables the migrate/seed step filled
  *     (the per-spec reset keeps them);
- *  6. publish the coordinates to the spec workers through the state file.
- * A failure removes whatever was started before it is rethrown: jest does not call the teardown after a failed setup.
+ * Then the coordinates of every slot are published to the spec processes through the state file (protocol 2).
+ * A failure removes whatever was started before it is rethrown (every slot already made, and the failing slot's parts): jest
+ * does not call the teardown after a failed setup.
  */
 import { randomBytes } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
@@ -27,16 +31,29 @@ import type { AttachRequest, Namespace, RunInfra } from "../stack/contracts"
 import { namespaceOf, runToken } from "../stack/namespace"
 import { removeSiblings, startSiblings } from "./siblings"
 import type { StartedSibling } from "./siblings"
-import { writeRunContext } from "./context"
+import { writeRunState } from "./context"
 import type { RunContext } from "./context"
 
-/** What the teardown needs from the setup: kept in the parent process, because jest runs both there. */
-export interface SetupHandles {
+/** The slot count when the declaration names no `workers` cap: each slot holds a share of the real stack, so it stays small. */
+export const DEFAULT_WORKERS = 2
+
+/** What the teardown needs of one slot. */
+export interface SlotHandles {
     readonly context: RunContext
     readonly fakes: FakesHost
     readonly siblings: ReadonlyArray<StartedSibling>
+}
+
+/** What the teardown needs from the setup: kept in the parent process, because jest runs both there. */
+export interface SetupHandles {
+    readonly runId: string
+    readonly slots: ReadonlyArray<SlotHandles>
     readonly config: AnyTestWorldConfig
 }
+
+/** The number of slots of a run: one per jest worker, at most the declaration's `workers` (default {@link DEFAULT_WORKERS}). */
+export const slotCountOf = (config: AnyTestWorldConfig, maxWorkers: number | undefined): number =>
+    Math.max(1, Math.min(maxWorkers ?? 1, config.workers ?? DEFAULT_WORKERS))
 
 const MIGRATION_TABLE = /migrations|typeorm_metadata/i
 
@@ -137,30 +154,57 @@ export const appRootOf = (projectDirectory: string): string => {
     return existsSync(join(parent, "hfs.json")) ? parent : own
 }
 
-/** Starts the run and publishes its coordinates. `rootDirectory` is the jest project's rootDir (the be side of an app). */
-export const setupWorld = async (config: AnyTestWorldConfig, rootDirectory: string): Promise<SetupHandles> => {
-    const root = resolve(config.root ?? appRootOf(rootDirectory))
-    const selected: ReadonlyArray<InfraName> = validateDeclaration(config, root)
-    const definition = readStackDefinition(root, config.stack)
-    const images = resolveInfraImages(config.stacks, definition, config.stack).filter((image) => selected.includes(image.service))
-    const siblingImages = resolveSiblingImages(config.services ?? {}, definition, config.stack)
-    const namespace = namespaceOf(root)
-    const runId = runToken(4)
-    const secretSeed = randomBytes(24).toString("hex")
+interface SlotPlan {
+    readonly config: AnyTestWorldConfig
+    readonly root: string
+    readonly images: ReturnType<typeof resolveInfraImages>
+    readonly siblingImages: ReturnType<typeof resolveSiblingImages>
+    readonly runId: string
+    readonly secretSeed: string
+}
+
+/** Disposes one slot: its fakes host, siblings, stack attachment and run directory; answers the failures it met. */
+export const disposeSlot = async (slot: SlotHandles): Promise<ReadonlyArray<unknown>> => {
+    const failures: Array<unknown> = []
+    const attempt = async (work: () => Promise<unknown> | unknown): Promise<void> => {
+        try {
+            await work()
+        } catch (cause) {
+            failures.push(cause)
+        }
+    }
+    const { context } = slot
+    await attempt(() => slot.fakes.close())
+    await attempt(() => removeSiblings(slot.siblings))
+    await attempt(async () => {
+        const { stack } = await import("../stack")
+        await stack.detach({ namespace: context.namespace, runId: context.runId, infra: context.infra })
+    })
+    await attempt(() => {
+        for (const directory of Object.values(context.directories)) rmSync(directory, { recursive: true, force: true })
+    })
+    return failures
+}
+
+/** Provisions one slot: its fakes, its stack attachment, its siblings, migrate and seeds, and the tables the reset keeps. */
+const setupSlot = async (plan: SlotPlan, slot: number): Promise<SlotHandles> => {
+    const { config, root } = plan
+    const namespace = namespaceOf(root, slot)
+    const runId = `${plan.runId}-w${slot}`
     const runDirectory = mkdtempSync(join(tmpdir(), `starci-tw-${runId}-`))
     mkdirSync(runDirectory, { recursive: true })
-    const fakes = new FakesHost(config.fakes ?? {}, { runId, secret: (label) => secretOf(secretSeed, label), now: () => new Date() })
+    const fakes = new FakesHost(config.fakes ?? {}, { runId, secret: (label) => secretOf(plan.secretSeed, label), now: () => new Date() })
     const { stack } = await import("../stack")
     let infra: RunInfra | null = null
     let siblings: ReadonlyArray<StartedSibling> = []
     try {
         const started = await fakes.start()
-        infra = await stack.attach(attachRequest(config, root, namespace, runId, images))
+        infra = await stack.attach(attachRequest(config, root, namespace, runId, plan.images))
         const base: RunContext = {
-            version: 1,
+            slot,
             runId,
             namespace,
-            secretSeed,
+            secretSeed: plan.secretSeed,
             infra,
             fakes: { controlUrl: started.controlUrl, entries: started.fakes },
             services: {},
@@ -168,7 +212,7 @@ export const setupWorld = async (config: AnyTestWorldConfig, rootDirectory: stri
             keepTables: {},
             root,
         }
-        siblings = await startSiblings(config.services ?? {}, siblingImages, base)
+        siblings = await startSiblings(config.services ?? {}, plan.siblingImages, base)
         const withServices: RunContext = {
             ...base,
             services: Object.fromEntries(siblings.map((s) => [s.name, { url: s.url, host: "127.0.0.1", port: s.port, container: s.container }])),
@@ -182,14 +226,39 @@ export const setupWorld = async (config: AnyTestWorldConfig, rootDirectory: stri
             if (database === undefined) continue
             keepTables[connection.name] = [...new Set([...(connection.keep ?? []), ...(await filledTables(database.url))])]
         }
-        const context: RunContext = { ...withServices, keepTables }
-        writeRunContext(context)
-        return { context, fakes, siblings, config }
+        return { context: { ...withServices, keepTables }, fakes, siblings }
     } catch (cause) {
         await removeSiblings(siblings)
         await fakes.close().catch(() => undefined)
         if (infra !== null) await stack.detach({ namespace, runId, infra }).catch(() => undefined)
         rmSync(runDirectory, { recursive: true, force: true })
+        throw cause
+    }
+}
+
+/**
+ * Starts the run and publishes its coordinates. `rootDirectory` is the jest project's rootDir (the be side of an app);
+ * `maxWorkers` is the run's jest worker count (the globalConfig's), which sizes the slots with the declaration's cap.
+ */
+export const setupWorld = async (config: AnyTestWorldConfig, rootDirectory: string, maxWorkers?: number): Promise<SetupHandles> => {
+    const root = resolve(config.root ?? appRootOf(rootDirectory))
+    const selected: ReadonlyArray<InfraName> = validateDeclaration(config, root)
+    const definition = readStackDefinition(root, config.stack)
+    const plan: SlotPlan = {
+        config,
+        root,
+        images: resolveInfraImages(config.stacks, definition, config.stack).filter((image) => selected.includes(image.service)),
+        siblingImages: resolveSiblingImages(config.services ?? {}, definition, config.stack),
+        runId: runToken(4),
+        secretSeed: randomBytes(24).toString("hex"),
+    }
+    const slots: Array<SlotHandles> = []
+    try {
+        for (let slot = 1; slot <= slotCountOf(config, maxWorkers); slot += 1) slots.push(await setupSlot(plan, slot))
+        writeRunState(plan.runId, slots.map((entry) => entry.context))
+        return { runId: plan.runId, slots, config }
+    } catch (cause) {
+        for (const made of slots) await disposeSlot(made)
         throw cause
     }
 }

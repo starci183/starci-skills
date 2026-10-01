@@ -30,6 +30,10 @@ export const validateDeclaration = (config: TestWorldConfig, root: string): Read
         problems.push(`stack: the directory ${config.stack} does not exist under ${root}`)
     }
 
+    if (config.workers !== undefined && (!Number.isInteger(config.workers) || config.workers < 1)) {
+        problems.push(`workers: the most data slots of a run is a positive integer, got ${String(config.workers)}`)
+    }
+
     const stacks = asRecord(config.stacks)
     if (stacks === undefined) problems.push("stacks: the block is required")
     for (const [key, entry] of Object.entries(stacks ?? {})) {

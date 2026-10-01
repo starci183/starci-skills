@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os"
 import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync } from "node:fs"
 import { join } from "node:path"
@@ -10,8 +11,7 @@ import type { PgClient } from "./pg"
 import { createStack } from "./index"
 import { containerName } from "./naming"
 
-mkdirSync("D:/starci-tmp/hfs/devin/tw-a1", { recursive: true })
-const scratch = mkdtempSync(join("D:/starci-tmp/hfs/devin/tw-a1", "stack-"))
+const scratch = mkdtempSync(join(tmpdir(), "starci-tw-stack-"))
 let counter = 0
 
 /** A scripted docker: containers, published ports and the calls made. */

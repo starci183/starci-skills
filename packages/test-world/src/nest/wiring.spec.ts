@@ -7,7 +7,7 @@ import type { RunContext } from "../jest/context"
 import { buildWiring, secretOf } from "./wiring"
 
 const context = (overrides: Partial<RunContext["infra"]> = {}): RunContext => ({
-    version: 1,
+    slot: 1,
     runId: "ab12",
     namespace: { snake: "shop_a1b2c3", kebab: "shop-a1b2c3", root: "/repo" },
     secretSeed: "seed",

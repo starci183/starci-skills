@@ -20,10 +20,12 @@ const packageNameOf = (root: string): string => {
 export const normalisedRoot = (root: string): string => resolve(root).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
 
 /**
- * The isolation identity of a checkout: `<package name slug>_<6 hex of sha256(normalised root)>`. Two checkouts of the same
- * package get different namespaces; the snake form is at most 40 characters so `<snake>_<connection>` fits a Postgres identifier.
+ * The isolation identity of one data slot of a checkout: `<package name slug>_<6 hex of sha256(normalised root)>_w<slot>`. Two
+ * checkouts of the same package get different namespaces, and so do two slots of one run (each jest worker owns a slot); the
+ * snake form is at most 40 characters so `<snake>_<connection>` fits a Postgres identifier.
  */
-export const namespaceOf = (root: string): Namespace => {
+export const namespaceOf = (root: string, slot: number): Namespace => {
+    if (!Number.isInteger(slot) || slot < 1) throw new RangeError(`a slot is a positive integer, got ${slot}`)
     const absolute = resolve(root)
     const unscoped = packageNameOf(absolute).replace(/^@[^/]+\//, "")
     let slug = unscoped
@@ -34,8 +36,9 @@ export const namespaceOf = (root: string): Namespace => {
     if (slug === "") slug = "repo"
     if (/^[0-9]/.test(slug)) slug = `r_${slug}`
     const hash = createHash("sha256").update(normalisedRoot(absolute)).digest("hex").slice(0, HASH_LENGTH)
-    const trimmed = slug.slice(0, MAX_SNAKE_LENGTH - HASH_LENGTH - 1).replace(/_+$/, "")
-    const snake = `${trimmed}_${hash}`
+    const suffix = `_${hash}_w${slot}`
+    const trimmed = slug.slice(0, MAX_SNAKE_LENGTH - suffix.length).replace(/_+$/, "")
+    const snake = `${trimmed}${suffix}`
     return { snake, kebab: snake.replace(/_/g, "-"), root: absolute }
 }
 
