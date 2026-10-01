@@ -3885,14 +3885,27 @@ PRIMARY_ABSENT:
   owner: other-op:interface.draw
   kind: check-finding
 
+ENV_DUMP:
+  title: "Environment dump refused"
+  title_vi: "Không được in toàn bộ biến môi trường"
+  meaning_vi: "Lệnh bị chặn vì nó ghi toàn bộ biến môi trường ra đầu ra (env, printenv, set không đối số, export -p, declare -x, Get-ChildItem env:, [Environment]::GetEnvironmentVariables(), node -p process.env, python -c print(os.environ), cmd /c set). Môi trường chứa mọi token và khóa của phiên; lọc bằng grep hay che bằng sed sau đó vẫn làm lộ các tên không khớp mẫu (giá trị AWS, Azure và Anthropic đã lọt vào transcript theo cách này)."
+  causes_vi:
+    - "Chạy env | grep ... để tìm một biến thay vì đọc đúng biến cần"
+    - "In toàn bộ process.env hoặc os.environ để gỡ lỗi"
+    - "Liệt kê Get-ChildItem env: rồi lọc bằng Where-Object"
+  nextStep_vi: "Lệnh không được chạy; chỉ đọc đúng một biến có tên và không phải bí mật (echo $NAME, $env:NAME, printenv NAME), không bao giờ in toàn bộ môi trường."
+  owner: op-retry
+  kind: verb-refusal
+
 PROCESS_KILL_BY_NAME:
   title: "Kill by process name refused"
   title_vi: "Không được dừng tiến trình theo tên"
-  meaning_vi: "Lệnh bị chặn vì nó dừng tiến trình theo tên hoặc mẫu (taskkill /IM hay /FI, pkill, killall, Stop-Process -Name), tức là dừng cả Orca và tiến trình của mọi agent khác trên máy."
+  meaning_vi: "Lệnh bị chặn vì nó dừng tiến trình theo tên hoặc mẫu (taskkill /IM hay /FI, pkill, killall, Stop-Process -Name, wmic process ... delete) hoặc dừng tiến trình mà mục tiêu do một truy vấn tiến trình tìm ra (Get-CimInstance Win32_Process, Get-Process, ps | grep, pgrep rồi Stop-Process, kill, .Terminate()), tức là dừng cả Orca và tiến trình của mọi agent khác trên máy."
   causes_vi:
     - "Dùng taskkill /IM node.exe, pkill hoặc killall để dọn một lần chạy bị treo"
     - "Dùng Stop-Process -Name hoặc wmic process where name=... thay vì PID của chính mình"
-  nextStep_vi: "Lệnh không được chạy; chỉ dừng PID do chính mình khởi động (taskkill /PID, kill <pid>, Stop-Process -Id), tiến trình không phải của mình thì báo lại, không bao giờ dừng."
+    - "Lọc tiến trình theo CommandLine, đường dẫn hay tiến trình cha rồi đưa kết quả vào Stop-Process, kill hoặc taskkill /PID"
+  nextStep_vi: "Lệnh không được chạy; chỉ dừng PID do chính mình khởi động và đã ghi lại (taskkill /PID, kill <pid>, Stop-Process -Id), không bao giờ theo truy vấn; tiến trình không phải của mình thì báo lại, không bao giờ dừng."
   owner: op-retry
   kind: verb-refusal
 
