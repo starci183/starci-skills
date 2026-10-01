@@ -6,29 +6,40 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { lintRepository, parseLintArgs } from '../packages/hfs/lint/run.mjs';
+import { appDeclarationText, DEFAULT_APPS } from './_hfs-arch-fixture.mjs';
 
 const made = [];
 test.after(() => { for (const dir of made) fs.rmSync(dir, { recursive: true, force: true }); });
 
-const fakeEslint = (dir, output) => {
-  const pkg = path.join(dir, 'node_modules', 'eslint');
+/** A fake linter package in `side`'s node_modules whose bin prints `output` as its json report (stylelint prints on stderr). */
+const fakeLinter = (side, name, output, stream = 'stdout') => {
+  const pkg = path.join(side, 'node_modules', name);
   fs.mkdirSync(pkg, { recursive: true });
-  fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name: 'eslint', version: '9.0.0', bin: { eslint: 'bin.js' } }));
-  fs.writeFileSync(path.join(pkg, 'bin.js'), `process.stdout.write(${JSON.stringify(JSON.stringify(output))});\n`);
+  fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name, version: '9.0.0', bin: { [name]: 'bin.js' } }));
+  fs.writeFileSync(path.join(pkg, 'bin.js'), `process.${stream}.write(${JSON.stringify(JSON.stringify(output))});\n`);
 };
-/** A temp repository; `messages` are the ESLint messages on src/a.ts (null: no ESLint install at all). */
+/**
+ * A temp app (hfs lint runs at the app root, the folder of a kind: app hfs.json): `messages` are the ESLint messages on
+ * be/src/a.ts (null: no ESLint install at all). The fe side lints clean and has a clean stylelint.
+ */
 const repoWith = (messages) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-lint-'));
   made.push(dir);
+  fs.writeFileSync(path.join(dir, 'hfs.json'), appDeclarationText('be', { apps: DEFAULT_APPS.be }));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true }));
-  fs.writeFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.sources=src\n');
-  for (const file of ['src/a.ts', 'src/b.ts']) { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), 'export {};\n'); }
-  if (messages !== null) fakeEslint(dir, messages.length ? [{ filePath: path.join(dir, 'src', 'a.ts'), messages }] : []);
+  fs.writeFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.sources=be/src\n');
+  for (const file of ['be/src/a.ts', 'be/src/b.ts']) { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), 'export {};\n'); }
+  fs.mkdirSync(path.join(dir, 'fe'), { recursive: true });
+  if (messages !== null) {
+    fakeLinter(path.join(dir, 'be'), 'eslint', messages.length ? [{ filePath: path.join(dir, 'be', 'src', 'a.ts'), messages }] : []);
+    fakeLinter(path.join(dir, 'fe'), 'eslint', []);
+  }
+  fakeLinter(path.join(dir, 'fe'), 'stylelint', [], 'stderr');
   return dir;
 };
 const hfsOf = (...findings) => async () => ({ findings, tracked: [] });
 const finding = (code, file) => ({ level: 'error', code, path: file, message: `${code} message` });
-const run = (dir, argv, hfsCheck) => lintRepository({ repoRoot: dir, opts: parseLintArgs(argv), hfsCheck, trackedFiles: () => ['src/a.ts', 'src/b.ts'] });
+const run = (dir, argv, hfsCheck) => lintRepository({ repoRoot: dir, opts: parseLintArgs(argv), hfsCheck, trackedFiles: () => ['be/src/a.ts', 'be/src/b.ts'] });
 
 test('a clean repository exits 0 with ok true and an empty sonar document', async () => {
   const { report, sonar, exit } = await run(repoWith([]), [], hfsOf());
@@ -44,18 +55,18 @@ test('an ESLint finding with a [CODE] message exits 1, carries its code, and is 
   const { report, sonar, exit } = await run(dir, [], hfsOf());
   assert.equal(exit, 1);
   assert.equal(report.ok, false);
-  assert.deepEqual(report.findings.map((f) => [f.engine, f.rule, f.code, f.path, f.line]), [['eslint', 'starci-be/tier-direction', 'BE_TIER_DIRECTION', 'src/a.ts', 7]]);
-  assert.deepEqual(sonar.issues.map((i) => [i.ruleId, i.primaryLocation.filePath, i.primaryLocation.textRange.startLine]), [['starci-be/tier-direction', 'src/a.ts', 7]]);
+  assert.deepEqual(report.findings.map((f) => [f.engine, f.rule, f.code, f.path, f.line]), [['eslint', 'starci-be/tier-direction', 'BE_TIER_DIRECTION', 'be/src/a.ts', 7]]);
+  assert.deepEqual(sonar.issues.map((i) => [i.ruleId, i.primaryLocation.filePath, i.primaryLocation.textRange.startLine]), [['starci-be/tier-direction', 'be/src/a.ts', 7]]);
   assert.equal(sonar.rules.find((rule) => rule.id === 'starci-be/tier-direction').engineId, 'eslint');
 });
 
 test('--changed keeps an hfs finding with no path and one on a changed file, and drops one on an unchanged file', async () => {
   const dir = repoWith([]);
-  const hfsCheck = hfsOf(finding('HFS_PIN_DRIFT', null), finding('HFS_X', 'src/b.ts'), finding('HFS_Y', 'src/a.ts'));
-  const { report, exit } = await run(dir, ['--changed', 'src/a.ts'], hfsCheck);
+  const hfsCheck = hfsOf(finding('HFS_PIN_DRIFT', null), finding('HFS_X', 'be/src/b.ts'), finding('HFS_Y', 'be/src/a.ts'));
+  const { report, exit } = await run(dir, ['--changed', 'be/src/a.ts'], hfsCheck);
   assert.equal(exit, 1);
   assert.deepEqual(report.findings.map((f) => f.code).sort(), ['HFS_PIN_DRIFT', 'HFS_Y']);
-  assert.deepEqual(report.changed, ['src/a.ts']);
+  assert.deepEqual(report.changed, ['be/src/a.ts']);
   const whole = await run(dir, [], hfsCheck);
   assert.equal(whole.report.findings.length, 3, 'without --changed every repository finding stays');
 });
@@ -75,7 +86,7 @@ test('a crashed hfs check is exit 2, not a pass', async () => {
 
 test('the merged sonar document holds the rules of both engines, sorted', async () => {
   const dir = repoWith([{ ruleId: 'starci-be/zeta', line: 2, message: 'z' }, { ruleId: 'starci-be/alpha', line: 1, message: 'a' }]);
-  const { sonar } = await run(dir, [], hfsOf(finding('HFS_SLOT_UNDECLARED', 'src/b.ts')));
+  const { sonar } = await run(dir, [], hfsOf(finding('HFS_SLOT_UNDECLARED', 'be/src/b.ts')));
   const ids = sonar.rules.map((rule) => rule.id);
   assert.deepEqual(ids, [...ids].sort());
   assert.deepEqual(ids, ['HFS_SLOT_UNDECLARED', 'starci-be/alpha', 'starci-be/zeta']);
