@@ -46,17 +46,19 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
 })
 ```
 
-`w` (the wiring) carries every URL of the run, built before any app boots: `w.apps.<name>.{url,port}` (ports are reserved first, so apps that call each other know each other), `w.db.<conn>.{url,host,port,user,password,database}`, `w.redis`, `w.minio`, `w.qdrant`, `w.kafka`, `w.keycloak.{baseUrl,realm,issuer,tokenUrl,jwksUrl,clientId}`, `w.fake.<name>.{url,port,values,endpoints}`, `w.services`, `w.cluster`, `w.directory(name)`, `w.secret(label)`. A service the declaration does not run throws `TEST_WORLD_NOT_DECLARED` when read.
+`w` (the wiring) carries every URL of the run, built before any app boots: `w.apps.<name>.{url,port}` (ports are reserved first, so apps that call each other know each other), `w.db.<conn>.{url,host,port,user,password,database}`, `w.redis`, `w.minio`, `w.qdrant`, `w.kafka`, `w.keycloak.{baseUrl,realm,issuer,tokenUrl,jwksUrl,clientId,clientSecret(client)}` (every confidential client of the realm file gets a secret generated per run; the file never carries one), `w.fake.<name>.{url,port,values,endpoints}`, `w.services`, `w.cluster`, `w.directory(name)`, `w.secret(label)`. A service the declaration does not run throws `TEST_WORLD_NOT_DECLARED` when read.
 
 ## The spec-facing API (frozen)
 
 ```ts
 const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true }, or { modules: [(w) => CatalogModule.register({ isGlobal: true })] }
+// a modules world may boot real peer apps beside its modules: { modules: [(w) => OrderApiModule.register({ isGlobal: true, url: w.apps.order.url })], apps: ["order"] }
 ```
 
 | | |
 |---|---|
 | `world.apps.<name>.restart()` | stop and re-boot one app in the same world (same typed options, port, database, stack): proves state survives a process restart. |
+| `world.apps.<name>.during(fn)` | the outage of an app as its peers see it: stop it, run `fn`, boot it again (same options and port), under the run's outage lock. |
 | `world.applicationOrigin(app?)` | `scheme://host:port` of a booted app, for a correct `Origin` header. |
 | `world.withRequest({ principal, locale?, plan?, ... }, (scope) => ...)` | modules mode: a REAL Nest request scope (cqrs `AsyncContext`: ContextId + registered request); `scope.commandBus/queryBus.execute`, `scope.resolve(Class)`; request-scoped providers read the values through `@Inject(REQUEST)`. |
 | `world.apps.<name>.api` | `graphql(op, vars?, lang?)`, `read/mutate`, `get/post/put/delete` (Buffer body = raw bytes), `as(token)` / `bearing(token)`, `signIn`, `baseUrl`. `op` is a key of the app's `operations` registry or a document string. Refusals resolve as data (`errorCode`). |

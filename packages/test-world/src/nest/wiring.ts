@@ -145,6 +145,11 @@ export const buildWiring = (context: RunContext, options: WiringOptions = {}): W
             tokenUrl: `${issuer}/protocol/openid-connect/token`,
             jwksUrl: `${issuer}/protocol/openid-connect/certs`,
             clientId: infra.keycloak.clientId,
+            clientSecret: (client: string): string => {
+                const secret = infra.keycloak?.clientSecrets?.[client]
+                if (secret === undefined) throw worldError(TestWorldErrorCode.NotDeclared, `the realm ${infra.keycloak?.realm ?? ""} has no confidential client ${client}; declare it in the realm file (publicClient false)`)
+                return secret
+            },
         }
         wiring["keycloak"] = keycloak
     }

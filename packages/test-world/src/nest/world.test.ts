@@ -319,6 +319,34 @@ test("resolve answers a provider of a modules world by its class, its symbol or 
     }
 })
 
+test("a modules world boots named peer apps beside the modules, wires their url, and apps.<peer>.during takes the peer down and back", async () => {
+    await publish()
+    const PEER_URL = Symbol("peer-url")
+    @Module({})
+    class PeerClient {
+        static register(url: string): DynamicModule {
+            return { module: PeerClient, providers: [{ provide: PEER_URL, useValue: url }], exports: [PEER_URL] }
+        }
+    }
+    const config = { ...declaration([]), modules: { base: () => [] } } as unknown as AnyTestWorldConfig
+    const spec = { modules: [(w: { apps: Record<string, { url: string }> }) => PeerClient.register(w.apps["api"]?.url ?? "none")], apps: ["api"] }
+    const world = new World(config, spec as unknown as WorldSpec, { resetRun: async () => undefined, lockIntervalMs: 5 })
+    await world.start()
+    try {
+        const url = world.resolve<string>(PEER_URL)
+        assert.match(url, /^http:\/\/127\.0\.0\.1:\d+$/)
+        const answer = async (): Promise<number> => (await fetch(`${url}/hello`, { signal: AbortSignal.timeout(2000) })).status
+        assert.equal(await answer(), 200)
+        const peer = world.apps["api" as keyof typeof world.apps] as { during<T>(fn: () => Promise<T>): Promise<T> }
+        const whileDown = await peer.during(async () => answer().then(() => "answered", () => "refused"))
+        assert.equal(whileDown, "refused")
+        assert.equal(await answer(), 200)
+        assert.throws(() => world.apps["worker" as keyof typeof world.apps], /apps\.worker was not declared/)
+    } finally {
+        await world.stop()
+    }
+})
+
 /** A toxiproxy API that records every call and answers what the client expects. */
 const fakeToxiproxy = async (): Promise<{ readonly url: string; readonly calls: Array<string> }> => {
     const calls: Array<string> = []

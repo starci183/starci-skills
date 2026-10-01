@@ -121,6 +121,8 @@ export interface RunKeycloak extends ProxiedEndpoint {
     readonly clientId: string
     readonly adminUser: string
     readonly adminPassword: string
+    /** The secret the realm import gave each confidential client, by clientId (absent for a run provisioned before 1.0.5). */
+    readonly clientSecrets?: Readonly<Record<string, string>>
 }
 
 /** The cluster of a run. */

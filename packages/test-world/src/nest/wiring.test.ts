@@ -35,6 +35,7 @@ const context = (overrides: Partial<RunContext["infra"]> = {}): RunContext => ({
             clientId: "todo-api",
             adminUser: "admin",
             adminPassword: "admin",
+            clientSecrets: { "admin-reader": "generated-secret" },
         },
         ...overrides,
     },
@@ -64,6 +65,8 @@ test("keycloak urls derive from the proxied base and the namespaced realm", () =
     assert.equal(keycloak.tokenUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo/protocol/openid-connect/token")
     assert.equal(keycloak.jwksUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo/protocol/openid-connect/certs")
     assert.equal(keycloak.clientId, "todo-api")
+    assert.equal(keycloak.clientSecret("admin-reader"), "generated-secret")
+    assert.throws(() => keycloak.clientSecret("todo-api"), /TEST_WORLD_NOT_DECLARED.*no confidential client todo-api/)
 })
 
 test("a service the declaration does not run throws NotDeclared when read, never undefined", () => {

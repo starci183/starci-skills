@@ -154,6 +154,24 @@ describe("keycloak realm preparation", () => {
         assert.deepEqual(prepared.seedUsers, ["admin"])
     })
 
+    it("gives every confidential client a secret generated for the run, never the file's, and leaves public clients alone", () => {
+        const withSecrets = JSON.stringify({
+            realm: "shop",
+            clients: [
+                { clientId: "web", publicClient: true, directAccessGrantsEnabled: true },
+                { clientId: "admin-reader", publicClient: false, serviceAccountsEnabled: true, secret: "committed" },
+                { clientId: "api", bearerOnly: true },
+            ],
+        })
+        let next = 0
+        const prepared = prepareRealm(withSecrets, "k", "realm.json", () => `generated-${(next += 1)}`)
+        assert.deepEqual(prepared.clientSecrets, { "admin-reader": "generated-1" })
+        const clients = prepared.body.clients as ReadonlyArray<Record<string, unknown>>
+        assert.equal(clients.find((client) => client.clientId === "admin-reader")?.secret, "generated-1")
+        assert.equal("secret" in (clients.find((client) => client.clientId === "web") ?? {}), false)
+        assert.equal("secret" in (clients.find((client) => client.clientId === "api") ?? {}), false)
+    })
+
     it("refuses a file without a realm name", () => {
         assert.throws(() => prepareRealm("{}", "k", "realm.json"), /no "realm"/)
     })

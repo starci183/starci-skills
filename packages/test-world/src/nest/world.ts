@@ -71,7 +71,7 @@ const notDeclared = (what: string) => worldError(TestWorldErrorCode.NotDeclared,
 const isModulesSpec = (spec: WorldSpec): spec is ModulesWorldSpec => "modules" in spec
 
 const appNamesOf = (spec: WorldSpec): ReadonlyArray<string> => {
-    if (isModulesSpec(spec)) return []
+    if (isModulesSpec(spec)) return [...(spec.apps ?? [])]
     return Array.isArray(spec.apps) ? [...spec.apps] : Object.keys(spec.apps)
 }
 
@@ -224,6 +224,7 @@ export class World {
                         name,
                         url: app.url,
                         restart: () => this.restartApp(name),
+                        during: <T>(during: () => Promise<T>) => this.appDuring(name, during),
                         get api(): TestApi {
                             if (app.api === null) throw worldError(TestWorldErrorCode.NotDeclared, `apps.${name} has no listener, so it has no api`)
                             return app.api
@@ -249,6 +250,30 @@ export class World {
         if (previous === undefined || decl === undefined) throw notDeclared(`apps.${name}`)
         await previous.context.close()
         runtime.apps[index] = await this.boot(name, decl, runtime.wiring, runtime.ports[name] ?? null)
+    }
+
+    /**
+     * Stops one app, runs `during` while it is down, then boots it again (same options, same port): the outage its peers see.
+     * The run's outage lock is held exclusively from before the stop until the app answers again.
+     */
+    async appDuring<T>(name: string, during: () => Promise<T>): Promise<T> {
+        const runtime = this.booted()
+        const index = runtime.apps.findIndex((candidate) => candidate.name === name)
+        const previous = runtime.apps[index]
+        const decl = (this.declaration.apps as Readonly<Record<string, AppDeclaration<never>>>)[name]
+        if (previous === undefined || decl === undefined) throw notDeclared(`apps.${name}`)
+        const key = `app:${name}`
+        await this.beginOutage(key)
+        try {
+            await previous.context.close()
+            try {
+                return await during()
+            } finally {
+                runtime.apps[index] = await this.boot(name, decl, runtime.wiring, runtime.ports[name] ?? null)
+            }
+        } finally {
+            this.endOutage(key)
+        }
     }
 
     /** The shared entity manager of each connection. */

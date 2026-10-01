@@ -21,10 +21,19 @@ export interface RealmFile {
     readonly passwordClientId: string | null
     /** Lowercase usernames of the users the file seeds. */
     readonly seedUsers: ReadonlyArray<string>
+    /** The secret the import gives every confidential client, by clientId: generated per run, never read from the file. */
+    readonly clientSecrets: Readonly<Record<string, string>>
 }
 
-/** Parses a realm export and re-targets it at `<namespace.kebab>-<realm>`. */
-export const prepareRealm = (json: string, kebab: string, file: string): RealmFile & { readonly stored: string } => {
+/** Whether a realm client is confidential: not public and not bearer-only, so it authenticates with a secret. */
+const isConfidential = (client: Record<string, unknown>): boolean => client.publicClient !== true && client.bearerOnly !== true
+
+/**
+ * Parses a realm export and re-targets it at `<namespace.kebab>-<realm>`. Every confidential client gets a secret generated
+ * for the run (`secret()`), whatever the file says: a repository never commits a client secret, and the wiring hands the
+ * generated one to the app options (`w.keycloak.clientSecret(client)`).
+ */
+export const prepareRealm = (json: string, kebab: string, file: string, secret: () => string = randomSecret): RealmFile & { readonly stored: string } => {
     const parsed: unknown = JSON.parse(json)
     if (!isRecord(parsed) || typeof parsed.realm !== "string" || parsed.realm === "") {
         throw worldError(TestWorldErrorCode.ConfigInvalid, `the keycloak realm file ${file} has no "realm" name`)
@@ -34,10 +43,18 @@ export const prepareRealm = (json: string, kebab: string, file: string): RealmFi
     const clients = Array.isArray(parsed.clients) ? parsed.clients.filter(isRecord) : []
     const passwordClient = clients.find((client) => client.directAccessGrantsEnabled === true && typeof client.clientId === "string")
     const users = Array.isArray(parsed.users) ? parsed.users.filter(isRecord) : []
+    const clientSecrets: Record<string, string> = {}
+    const preparedClients = (Array.isArray(parsed.clients) ? parsed.clients : []).map((client: unknown) => {
+        if (!isRecord(client) || typeof client.clientId !== "string" || !isConfidential(client)) return client
+        const generated = secret()
+        clientSecrets[client.clientId] = generated
+        return { ...client, secret: generated }
+    })
     return {
         realm: parsed.realm,
         stored,
-        body: { ...rest, realm: stored },
+        clientSecrets,
+        body: { ...rest, realm: stored, ...(Array.isArray(parsed.clients) ? { clients: preparedClients } : {}) },
         passwordClientId: typeof passwordClient?.clientId === "string" ? passwordClient.clientId : null,
         seedUsers: users.flatMap((user) => (typeof user.username === "string" ? [user.username.toLowerCase()] : [])),
     }
@@ -116,7 +133,7 @@ export const keycloakService: ServiceDefinition<RunKeycloak> = {
         const imported = await admin(target, token, "POST", "/realms", prepared.body)
         if (imported.status !== 201) throw worldError(TestWorldErrorCode.InfrastructureFailed, `keycloak realm import answered ${imported.status}: ${JSON.stringify(imported.json).slice(0, 500)}`)
         return {
-            run: { realm: prepared.stored, clientId, adminUser, adminPassword },
+            run: { realm: prepared.stored, clientId, adminUser, adminPassword, clientSecrets: prepared.clientSecrets },
             notes: { [seedNoteKey(prepared.stored)]: JSON.stringify(prepared.seedUsers) },
         }
     },

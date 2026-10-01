@@ -42,15 +42,20 @@ export interface AppsWorldSpec<TName extends string = string> {
 }
 
 /** A modules world: only these capability modules, over the platform base of the declaration. */
-export interface ModulesWorldSpec {
+export interface ModulesWorldSpec<TName extends string = string> {
     /** The capability modules, each built from the wiring of the run. */
     readonly modules: ReadonlyArray<ModuleFactory>
+    /**
+     * Real peer apps of the declaration booted beside the modules (their ports reserved first, so `w.apps.<peer>.url` is wired
+     * for the modules): the integration client of one app against the real other app. `world.apps.<peer>.during(fn)` is its outage.
+     */
+    readonly apps?: ReadonlyArray<TName>
     /** The jest timeout of every hook and step of the spec, in milliseconds. */
     readonly testTimeoutMs?: number
 }
 
 /** What a spec asks the world for. */
-export type WorldSpec<TName extends string = string> = AppsWorldSpec<TName> | ModulesWorldSpec
+export type WorldSpec<TName extends string = string> = AppsWorldSpec<TName> | ModulesWorldSpec<TName>
 
 /** One booted app. */
 export interface AppHandle {
@@ -62,6 +67,11 @@ export interface AppHandle {
     readonly url: string | null
     /** Stops this app and boots it again in the same world (same typed options, port, database and stack): proves state survives a process restart. */
     restart(): Promise<void>
+    /**
+     * The outage of this app as its peers see it: stops it, runs `during` while it is down, then boots it again (same options and
+     * port). It takes and keeps the run's outage lock like every other outage.
+     */
+    during<T>(during: () => Promise<T>): Promise<T>
 }
 
 /**

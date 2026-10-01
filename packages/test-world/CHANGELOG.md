@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.5
+
+- Added: a modules world boots real peer apps beside its modules: `useTestWorld({ modules, apps: ["order"] })` reserves the
+  peers' ports first and wires `w.apps.<peer>.url`, so the integration client of one app runs against the real other app.
+- Added: `world.apps.<name>.during(fn)`, the outage of an app as its peers see it: stop it, run `fn`, boot it again with the
+  same options and port; it takes and keeps the run's outage lock like every other outage.
+- Added: `w.keycloak.clientSecret(client)`. The realm import gives every confidential client (not public, not bearer-only) a
+  secret generated for the run, whatever the realm file says; a repository never commits a client secret.
+
 ## 1.0.4
 
 - Changed: `world.resolve(token)` and `scope.resolve(token)` take any Nest provider token (`ProviderToken<T>`: a class, a
