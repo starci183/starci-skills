@@ -627,8 +627,16 @@ else if (verb === 'orchestration worker-release') {
 }
 else if (verb === 'orchestration worker-abandon')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });
-else if (verb === 'orchestration worker-list')
-  out({ ok: true, result: { workers: [] } });
+// state.workerRows seeds Orca's worker accounting (worker-list row shape): filtered by --run and
+// --terminal-state, paged by --limit with an opaque numeric cursor. A run filter reports scope flag.
+else if (verb === 'orchestration worker-list') {
+  const rows = (state.workerRows || []).filter((w) => (!arg('run') || w.runId === arg('run')) && (!arg('terminal-state') || w.terminalState === arg('terminal-state')));
+  const limit = Number(arg('limit')) || 100;
+  const start = Number(arg('cursor')) || 0;
+  const more = start + limit < rows.length;
+  out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: { source: arg('run') ? 'flag' : 'all' },
+    page: { limit, total: rows.length, hasMore: more, nextCursor: more ? String(start + limit) : null } } });
+}
 else if (verb === 'orchestration worker-read')
   out({ ok: true, result: { dispatch: arg('dispatch'), lines: [] } });
 else if (verb === 'orchestration dispatch')

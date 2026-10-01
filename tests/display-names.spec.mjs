@@ -152,12 +152,13 @@ test('api rename refuses a bad name, a bad --by, an unknown workflow and an op c
   assert.notEqual(op.status, 0); assert.match(op.stderr, /op-context-refused/);
 }));
 
-test('the orca-tree check knows a [Kernel] tab by its display name; a name no workflow here holds is foreign', (t) => withLedger(t, ({ ledger }) => {
+test('the orca-tree check never identifies a kernel by its [Kernel] tab title, display name or not', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-tree-named', state: { phase: 'running', job: 'tree-slug' } });
   ledger.db.prepare("UPDATE workflows SET phase='running', display_name='Nivo · Cây' WHERE workflow_id='wf-tree-named'").run();
   const term = (handle, title) => ({ handle, title, live: true, worktreePath: null });
+  // Former false positive: two tabs titled with the workflow's display name read as a duplicate kernel.
   const dup = orcaTreeFindings(ledger.db, [term('t1', '[Kernel] Nivo · Cây'), term('t2', '[Kernel] Nivo · Cây')], { owned: new Set() });
-  assert.deepEqual(dup.filter((f) => f.code === 'DUPLICATE_KERNEL').map((f) => f.terminals), [['t1', 't2']]);
+  assert.deepEqual(dup.filter((f) => f.code === 'DUPLICATE_KERNEL'), []);
   const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] StarCi Next · Nền tảng')], { owned: new Set() });
   assert.deepEqual(foreign.filter((f) => f.terminal === 't9'), [], 'another ledger\'s kernel is not this ledger\'s orphan');
 }));

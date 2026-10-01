@@ -19,18 +19,17 @@
 // (lessons.mjs recordLeftover): a leftover is a bug in the step that owned it.
 //
 // Collectors:
-//   agents    Orca terminals the runtime created whose owner is done, identified by the ledgers (worker_id, launch
-//             handle, kernel signal) and by the tab title the runtime gave them ([Worker] / [Kernel] / [Op] /
-//             [Supervisor]) or, for a [Worker] whose agent rewrote its title, the staging path on its screen:
-//               sup-worker       a [Worker] whose job is succeeded/failed/cancelled, or a duplicate of a live job's worker
-//               supervisor-seat  a [Supervisor] terminal that is not the live seat (a replaced seat)
-//               kernel           a [Kernel] of a finished/archived workflow, or one that is not the seat of its live workflow
-//               op-worker        an [Op] of a settled job / an ended workflow, or an unbound [Op] of a live workflow
+//   agents    Orca's own worker accounting (orchestration worker-list, scripts/api/orca/worker-list.mjs), read Run by
+//             Run for every Orca Run the ledgers and the Supervisor's jobs name and paged past 100 rows: a worker Orca
+//             holds as reclaimable (settled, terminal not released) whose liveness is live or exited and whose literal
+//             nextAction is `worker-release --dispatch <id>` is released (worker-release archives its output, then
+//             closes only that terminal). A row whose liveness is unverifiable, whose next action is anything else, or
+//             whose release Orca could not confirm (release_unknown) is reported and never touched (lib/
+//             worker-accounting.mjs releasePlan). A terminal the ledgers bind to a settled job, an ended workflow or a
+//             finished [Worker] job that Orca does not account for as a worker is closed and verified; a terminal Orca
+//             accounts for is left to the release above. Nothing is identified by its tab title or its screen.
 //             Never: the live Supervisor seat, a live Kernel, the terminal of a queued/leased/running/answering/reported
-//             job, and nothing the runtime did not create (an owner's own terminal has none of those marks). A live
-//             workflow whose running job's registered terminal Orca no longer lists (an Orca restart re-issued handles)
-//             is left alone entirely: its unbound tab may be that job. An unbound terminal of a live workflow must have
-//             been seen for gcMinAgeMs first.
+//             job, and nothing the runtime did not create.
 //   shells    idle bare shells: a plain Orca shell tab (title "Terminal <n>" or the worktree's name), no agent, bound to
 //             nothing, whose screen holds nothing but prompts, older than gcMinAgeMs (by first sight, or by the age of
 //             every child-less `powershell -NoExit` under the Orca daemon). 322 of them held ~20 GB on 2026-09-28.
@@ -66,6 +65,8 @@ import { spawnSync } from 'node:child_process';
 import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { workerListAll, activeWorkersAllRuns } from '../api/orca/worker-list.mjs';
+import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
@@ -78,12 +79,13 @@ import { pathKey } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
-import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../lib/terminal-ledger.mjs';
+import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../lib/terminal-ledger.mjs';
 import { SKILL_ROOT, landRoot, productRepos, seatOf, stagingRoot, readSupervisor, withSupervisor } from './home.mjs';
 import { jobsOf, removeStaging } from './workers.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { pidAlive } from '../../engine/machine-db.mjs';
-import { LANE_IDLE_MS, laneOwnerOf, tabTitles } from '../lib/lane-owner.mjs';
+import { LANE_IDLE_MS, laneOwnerOf } from '../lib/lane-owner.mjs';
+import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -101,13 +103,11 @@ export const LEFTOVER_OWNERS = Object.freeze({
 const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
 const LANE_LOG = /\.(err|json|log)$/i;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
-const HOLDING_JOB = new Set(['running', 'answering']);
 const SUP_LIVE = new Set(['queued', 'spawning', 'running', 'reported']);
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
 const SHELL_TITLE = /^Terminal \d+$/;
 const PROMPT = /PS [A-Za-z]:\\[^>\r\n]*>/g;
-const STAGING_ON_SCREEN = /starci-lanes[\\/]+staging[\\/]+(fix-[a-z0-9-]+?-[0-9a-f]{6})\b/i;
 
 const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 /** The gc windows of runtimes.yaml allocation.housekeeping, with their defaults. */
@@ -170,18 +170,17 @@ export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAUL
 
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
-/** {seen: {handle: firstSeenMs}}: the open terminals rows' opened_at (the first sighting of a GC candidate). */
+/** {seen: {handle: firstSeenMs}}: the open terminals rows' opened_at (the first sighting of an idle-shell candidate). */
 export function readState(env = process.env) {
   return { seen: readSupervisor((m) => Object.fromEntries(m.db.prepare('SELECT handle, opened_at FROM terminals WHERE closed_at IS NULL AND opened_at IS NOT NULL').all()
     .map((r) => [r.handle, Number(r.opened_at)])), {}, { env }) };
 }
 
-const TERMINAL_ROLES = new Set(['op', 'kernel', 'worker', 'supervisor', 'shell']);
 /** The GC collector of a report item's class (gc_items.collector). */
 const collectorOf = (klass) => ({ 'idle-shell': 'shells', lane: 'lanes', evidence: 'evidence', tmp: 'tmp', task: 'tasks', lease: 'leases', 'lane-log': 'lanelogs', process: 'processes' }[klass] ?? 'agents');
 
 /**
- * The run's machine records: a candidate terminal's first sighting (terminals.opened_at, a row created when absent),
+ * The run's machine records: a candidate shell's first sighting (terminals.opened_at, a row created when absent),
  * a closed terminal (terminals.closed_at, verified), and - for an apply run - one gc_runs row with one gc_items row per
  * collected / refused / kept item and its final outcome (done | dropped | gave-up). Returns the gc_runs id or null.
  */
@@ -190,7 +189,7 @@ export function writeState({ seen = {}, closed = [], report = null, trigger = 's
     return withSupervisor((m) => m.transaction(() => {
       for (const [handle, s] of Object.entries(seen)) {
         const row = m.db.prepare('SELECT opened_at FROM terminals WHERE handle=?').get(handle);
-        if (!row) m.upsertTerminal({ handle, title: s.title ?? null, role: TERMINAL_ROLES.has(s.role) ? s.role : 'other', openedAt: s.at });
+        if (!row) m.upsertTerminal({ handle, title: s.title ?? null, role: 'shell', openedAt: s.at });
         else if (row.opened_at == null) m.update('terminals', { opened_at: s.at }, { handle });
       }
       for (const handle of closed) m.closeTerminal(handle, { by: 'gc', verified: true });
@@ -209,18 +208,34 @@ export function writeState({ seen = {}, closed = [], report = null, trigger = 's
 
 /* ------------------------------------------------------------ pure classification */
 
-// tabTitles and laneOwnerOf live in scripts/lib/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
-export { tabTitles, laneOwnerOf };
+// laneOwnerOf lives in scripts/lib/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
+export { laneOwnerOf };
 
-/** The runtime role a title marks: supervisor | worker | kernel | op | shell | null. `worktreeName` is the tab's worktree folder. */
-export function roleOfTitle(title, { worktreeName = null } = {}) {
+/** Tab titles by handle from terminal-list visualLayouts (the title Orca gave the tab, which agents never rewrite). */
+export function tabTitles(visualLayouts = []) {
+  const out = new Map();
+  const panes = (p, tab) => {
+    if (!p) return;
+    if (p.type === 'terminal' && p.handle) out.set(p.handle, tab);
+    for (const c of p.children ?? []) panes(c, tab);
+    if (p.first) panes(p.first, tab);
+    if (p.second) panes(p.second, tab);
+  };
+  const walk = (n) => {
+    if (!n) return;
+    for (const t of n.tabs ?? []) panes(t.panes, t.title ?? null);
+    for (const c of n.children ?? []) walk(c);
+    if (n.first) walk(n.first);
+    if (n.second) walk(n.second);
+  };
+  for (const l of visualLayouts ?? []) walk(l.root);
+  return out;
+}
+
+/** True when a title is a plain Orca shell tab's: "Terminal <n>", or the name of its worktree folder. */
+export function isShellTitle(title, { worktreeName = null } = {}) {
   const t = String(title ?? '').trim();
-  if (/^\[Supervisor\]/.test(t) || /You are the \[Supervisor\] kernel/.test(t)) return 'supervisor';
-  if (/^\[Worker\]\s/.test(t)) return 'worker';
-  if (/^\[Kernel\]\s/.test(t)) return 'kernel';
-  if (/^\[Op\]\s/.test(t)) return 'op';
-  if (SHELL_TITLE.test(t) || (worktreeName && t === worktreeName)) return 'shell';
-  return null;
+  return SHELL_TITLE.test(t) || Boolean(worktreeName && t === worktreeName);
 }
 
 /** True when a terminal screen holds nothing but PowerShell prompts (wrapped lines joined back). */
@@ -231,29 +246,16 @@ export function onlyPrompts(screen) {
   return joined.replace(PROMPT, '').trim() === '';
 }
 
-/** The workflows of a ledger view whose display name the title names ([Kernel] <name> / [Op] ... · <name>). */
-export function workflowsNamed(title, workflows) {
-  const rest = String(title ?? '').replace(/^\[(?:Kernel|Op)\]\s*/, '').trim();
-  const clipped = rest.endsWith('…') ? rest.slice(0, -1).trim() : null;
-  return workflows.filter((w) => {
-    const name = String(w.name ?? '').trim();
-    if (!name) return false;
-    if (rest === name || rest.endsWith(` · ${name}`) || rest === w.workflowId) return true;
-    if (clipped && (name.startsWith(clipped) || clipped.endsWith(name))) return true;
-    return false;
-  });
-}
-
 /* ------------------------------------------------------------ registry: what the ledgers own */
 
-/** The Supervisor's view (machine.sqlite): {seat, jobs: [{jobId, status, cluster, handle, stagingPath, branch, base}], leases}. */
+/** The Supervisor's view (machine.sqlite): {seat, jobs: [{jobId, status, cluster, handle, stagingPath, branch, base, runId, dispatch}], leases}. */
 export function supervisorView({ env = process.env, now = Date.now() } = {}) {
   return readSupervisor((m) => {
     const seat = seatOf(m, now);
     const jobs = jobsOf(m).map((r) => {
       const p = r.payload ?? {};
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
-        stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, updatedAt: r.updated_at };
+        stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, runId: p.runId ?? null, dispatch: p.dispatch ?? null, updatedAt: r.updated_at };
     });
     return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: supLeaseRowsOf(m) };
   }, { seat: null, jobs: [], leases: [] }, { env });
@@ -372,15 +374,14 @@ export function collectLaneLogs({ apply = false, env = process.env, now = Date.n
 
 /**
  * Decide every listed terminal. Pure over its inputs: terminals (terminal-list rows), titles (handle -> tab title),
- * sup (supervisorView), ledgers (ledgerView[]), screenOf(handle) -> screen text | null, procs (host-health rows | null),
- * seen ({handle: firstSeenMs}), now, minAgeMs. Returns [{handle, role, klass, verdict: 'collect'|'keep'|'refuse',
- * reason, owner?, title}].
+ * sup (supervisorView), ledgers (ledgerView[]), workers (the handles Orca accounts for as workers it has not released,
+ * lib/worker-accounting.mjs workerTerminalHandles), screenOf(handle) -> screen text | null, procs (host-health rows |
+ * null), seen ({handle: firstSeenMs}), now, minAgeMs. Returns [{handle, role, klass, verdict: 'collect'|'keep'|'refuse',
+ * reason, owner?, title}]. A worker terminal is Orca's to account for (the agents collector releases it from
+ * worker-list); this decides only the terminals the ledgers bind by handle and Orca does not account for, and the
+ * idle bare shells. Nothing is identified by a tab title beyond the plain shell title.
  */
-export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, runtimeRoot = SKILL_ROOT, keepTitles = [],
-  lanesBase = null, laneExists = null }) {
-  const laneRootDir = lanesBase ?? (() => { try { return lanesRoot(); } catch { return null; } })();
-  const laneAlive = laneExists ?? ((name) => (laneRootDir ? fs.existsSync(path.join(laneRootDir, name)) : true));
-  const listed = new Set(terminals.filter((t) => t.connected !== false).map((t) => t.handle));
+export function classifyTerminals({ terminals, titles, sup, ledgers, workers = new Set(), screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, keepTitles = [] }) {
   const out = [];
   const aged = (h) => seen[h] != null && now - seen[h] >= minAgeMs;
   // Every child-less `powershell -NoExit` under the Orca daemon older than minAgeMs: no shell can be younger.
@@ -404,38 +405,23 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
     if (!ownerOf.has(j.handle) || SUP_LIVE.has(j.status)) ownerOf.set(j.handle, { type: 'sup-job', job: j });
     if (SUP_LIVE.has(j.status)) liveJobHandles.add(j.handle);
   }
-  // A live workflow is "unsafe" when a job holding a worker has none of its registered terminals in the listing.
-  const unsafeWorkflows = new Set();
-  for (const l of ledgers) for (const j of l.jobs) if (HOLDING_JOB.has(j.status) && !j.handles.some((h) => listed.has(h))) unsafeWorkflows.add(j.workflowId);
-  const ledgerOfPath = (p) => ledgers.find((l) => pathUnder(p, l.repo)) ?? null;
+  const listed = new Set(terminals.filter((t) => t.connected !== false).map((t) => t.handle));
 
   for (const t of terminals) {
     const h = t.handle;
     const title = titles.get(h) ?? t.title ?? '';
     const worktreeName = path.basename(String(t.worktreePath ?? ''));
-    let role = roleOfTitle(title, { worktreeName }) ?? roleOfTitle(t.title, { worktreeName });
+    const shellTitled = isShellTitle(title, { worktreeName }) || isShellTitle(t.title, { worktreeName });
+    const role = shellTitled ? 'shell' : null;
     const row = (verdict, klass, reason, extra = {}) => out.push({ handle: h, role, klass, verdict, reason, title: String(title).slice(0, 120), worktree: t.worktreePath ?? null, ...extra });
-    // MB-13: a runtime-titled terminal no ledger job owns is matched to a lane (its worktree under the lanes root, or
-    // "[Worker] <lane>"): a lane whose worktree is gone is over, so its aged terminal is collected; otherwise it is
-    // refused as ownerless (the GC controller escalates it once after ownerlessEscalateMs), never refused silently forever.
-    const ownerless = (klass, why) => {
-      const wt = String(t.worktreePath ?? '');
-      const inLane = laneRootDir && wt && pathUnder(wt, laneRootDir) ? path.relative(laneRootDir, wt).split(/[\\/]/)[0] : null;
-      const named = /^\[Worker\]\s+(\S+)/.exec(String(title).trim())?.[1] ?? null;
-      const lane = [inLane, named].find((n) => n && !['staging', 'land'].includes(n)) ?? null;
-      // Only a terminal whose own working directory was the removed lane is proven the lane's; a title alone is not.
-      if (inLane && lane === inLane && !laneAlive(lane) && aged(h)) return row('collect', klass, `${why}; its lane ${lane} is gone (worktree removed)`, { owner: `lane:${lane}` });
-      const laneWhy = !lane ? '; no lane matches it' : laneAlive(lane) ? `; lane ${lane} still exists`
-        : inLane ? `; its lane ${lane} is gone, closed once seen for ${Math.round(minAgeMs / 60000)}m` : `; its title names lane ${lane}, which has no worktree (a title is no proof)`;
-      return row('refuse', klass, `${why}${laneWhy}`, { ownerless: true, lane, ...(inLane && !laneAlive(lane) ? { pendingAge: true } : {}) });
-    };
     if (sup.seat?.handle === h) { row('keep', 'supervisor-seat', 'the live Supervisor seat'); continue; }
     if (keepTitles.some((re) => re.test(String(title)) || re.test(String(t.title ?? '')))) { row('keep', 'unknown', 'allowlisted (allocation.gc.keepTitles)'); continue; }
     if (t.connected === false) { row('keep', role ?? 'unknown', 'already disconnected'); continue; }
+    if (workers.has(h)) { row('keep', 'orca-worker', 'a worker Orca accounts for (worker-list): released by the agents collector once Orca holds it reclaimable'); continue; }
     const owner = ownerOf.get(h);
     if (owner) {
       if (owner.type === 'kernel') {
-        if (owner.workflow.ended) row('collect', 'kernel', `Kernel of ${owner.workflow.workflowId}, which is ${owner.workflow.ended ? 'finished/archived' : 'live'}`, { owner: owner.workflow.workflowId });
+        if (owner.workflow.ended) row('collect', 'kernel', `Kernel of ${owner.workflow.workflowId}, which is finished/archived`, { owner: owner.workflow.workflowId });
         else row('keep', 'kernel', `live Kernel seat of ${owner.workflow.workflowId}`);
       } else if (owner.type === 'job') {
         if (liveJobHandles.has(h)) row('keep', owner.job.kind === 'kernel' ? 'kernel' : 'op-worker', `terminal of ${owner.job.status} job ${owner.job.jobId}`);
@@ -450,49 +436,40 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
       }
       continue;
     }
-    // Not bound by any ledger: only what the runtime visibly created is ever collected.
-    const screen = () => { const s = screenOf(h); return s == null ? null : String(s); };
-    if (!role && pathUnder(t.worktreePath ?? '', runtimeRoot)) {
-      const m = STAGING_ON_SCREEN.exec(screen() ?? '');
-      if (m) role = 'worker';
-    }
-    if (role === 'supervisor') {
-      if (sup.seat?.live && sup.seat.handle && listed.has(sup.seat.handle)) row('collect', 'supervisor-seat', 'a [Supervisor] terminal that is not the live seat (replaced)');
-      else row('refuse', 'supervisor-seat', 'no live seat terminal is listed: this may be the seat under a new handle');
-    } else if (role === 'worker') {
-      const s = screen() ?? '';
-      const byStaging = STAGING_ON_SCREEN.exec(s)?.[1] ?? null;
-      const cluster = /^\[Worker\]\s+(.+)$/.exec(String(title).trim())?.[1]?.trim() ?? null;
-      const jobs = sup.jobs.filter((j) => (byStaging && j.jobId.toLowerCase() === byStaging.toLowerCase()) || (!byStaging && cluster && j.cluster === cluster));
-      if (!jobs.length) { ownerless('sup-worker', `no supervisor job matches ${byStaging ?? cluster ?? 'this worker'}`); continue; }
-      const live = jobs.filter((j) => SUP_LIVE.has(j.status));
-      if (!live.length) row('collect', 'sup-worker', `[Worker] of ${jobs.map((j) => `${j.jobId} ${j.status}`).join(', ')}`, { owner: jobs.map((j) => j.jobId).join(',') });
-      else if (live.every((j) => j.handle && listed.has(j.handle)) && aged(h)) row('collect', 'sup-worker', `duplicate of live job ${live.map((j) => j.jobId).join(', ')}'s worker ${live.map((j) => j.handle).join(', ')}`, { owner: live[0].jobId });
-      else row('refuse', 'sup-worker', `job ${live.map((j) => j.jobId).join(', ')} is ${live.map((j) => j.status).join('/')} and this may be its worker`);
-    } else if (role === 'kernel' || role === 'op') {
-      const l = ledgerOfPath(t.worktreePath ?? '');
-      if (!l) { ownerless(role === 'op' ? 'op-worker' : 'kernel', 'no ledger owns its worktree'); continue; }
-      const named = workflowsNamed(title, l.workflows);
-      const candidates = named.length ? named : l.workflows;
-      const liveOnes = candidates.filter((w) => !w.ended);
-      const klass = role === 'op' ? 'op-worker' : 'kernel';
-      if (!liveOnes.length) { row('collect', klass, `every workflow it can belong to has ended (${candidates.map((w) => w.workflowId).slice(0, 3).join(', ')}${candidates.length > 3 ? ', ...' : ''})`, { owner: candidates[0]?.workflowId ?? null }); continue; }
-      const unsafe = liveOnes.filter((w) => unsafeWorkflows.has(w.workflowId) || (role === 'kernel' && (!w.kernelHandle || !listed.has(w.kernelHandle))));
-      if (unsafe.length) { row('refuse', klass, `live ${unsafe.map((w) => w.workflowId).join(', ')} has a running worker or seat Orca does not list: this may be it`); continue; }
-      if (!aged(h)) { row('refuse', klass, `unbound terminal of live ${liveOnes.map((w) => w.workflowId).join(', ')} seen for less than ${Math.round(minAgeMs / 60000)}m`, { pendingAge: true }); continue; }
-      row('collect', klass, `unbound ${role === 'op' ? '[Op]' : '[Kernel]'} of live ${liveOnes.map((w) => w.workflowId).join(', ')} (a replaced or settled one; every live job and the seat hold other terminals)`, { owner: liveOnes[0].workflowId });
-    } else if (role === 'shell') {
-      if (t.agentIdentity) { row('keep', 'unknown', `shell-titled terminal running ${t.agentIdentity}`); continue; }
-      if (liveJobHandles.has(h)) { row('keep', 'idle-shell', 'bound to a live job'); continue; }
-      // A shell no registry knows with output in the last minAgeMs may be the owner's own: reported, never closed.
-      if (Number(t.lastOutputAt) > 0 && now - Number(t.lastOutputAt) < minAgeMs) { row('refuse', 'idle-shell', `recent activity ${Math.round((now - Number(t.lastOutputAt)) / 60000)}m ago: may be the owner's, reported not closed`); continue; }
-      const s = screen();
-      if (!onlyPrompts(s)) { row('keep', 'unknown', s == null ? 'screen unreadable' : 'shell with something on its screen besides prompts'); continue; }
-      if (!(shellsAllOld || aged(h))) { row('refuse', 'idle-shell', `idle bare shell seen for less than ${Math.round(minAgeMs / 60000)}m`, { pendingAge: true }); continue; }
-      row('collect', 'idle-shell', 'idle bare shell: no agent, bound to nothing, only prompts on screen');
-    } else row('keep', 'unknown', 'not created by the runtime (no ledger binding, no runtime title)');
+    if (!shellTitled) { row('keep', 'unknown', 'not a worker Orca accounts for, bound to no ledger and not a plain shell'); continue; }
+    if (t.agentIdentity) { row('keep', 'unknown', `shell-titled terminal running ${t.agentIdentity}`); continue; }
+    // A shell no registry knows with output in the last minAgeMs may be the owner's own: reported, never closed.
+    if (Number(t.lastOutputAt) > 0 && now - Number(t.lastOutputAt) < minAgeMs) { row('refuse', 'idle-shell', `recent activity ${Math.round((now - Number(t.lastOutputAt)) / 60000)}m ago: may be the owner's, reported not closed`); continue; }
+    const screen = screenOf(h);
+    const s = screen == null ? null : String(screen);
+    if (!onlyPrompts(s)) { row('keep', 'unknown', s == null ? 'screen unreadable' : 'shell with something on its screen besides prompts'); continue; }
+    if (!(shellsAllOld || aged(h))) { row('refuse', 'idle-shell', `idle bare shell seen for less than ${Math.round(minAgeMs / 60000)}m`, { pendingAge: true }); continue; }
+    row('collect', 'idle-shell', 'idle bare shell: no agent, bound to nothing, only prompts on screen');
   }
   return out;
+}
+
+/** The typed failure of a Run whose worker-list did not answer (modules/kernel/failure-codes.yaml). */
+export const WORKER_LIST_UNAVAILABLE = 'WORKER_LIST_UNAVAILABLE';
+
+/** The Orca Runs the runtime owns: every Run a product ledger's job or a Supervisor job names, first-seen order. */
+export const runtimeRuns = ({ sup, ledgers }) => distinctRuns([...ledgers.flatMap((l) => l.jobs.map((j) => j.task?.runId)), ...sup.jobs.map((j) => j.runId)]);
+
+/**
+ * Orca's worker accounting for the runtime's Runs: every Orca Run a product ledger's job or a Supervisor job names,
+ * each listed with --run (never the caller's bound Run) and paged past 100 rows. {rows, runs, errors}: a Run whose
+ * listing failed contributes no row, so none of its workers is touched.
+ */
+export function runtimeWorkers({ sup, ledgers, list = (run) => workerListAll({ run }) }) {
+  const runs = runtimeRuns({ sup, ledgers });
+  const rows = [], errors = [];
+  for (const run of runs) {
+    let listed;
+    try { listed = list(run); } catch (error) { listed = { ok: false, error: String(error?.message ?? error) }; }
+    if (!listed?.ok) { errors.push(`${WORKER_LIST_UNAVAILABLE}: worker-list --run ${run}: ${listed?.error ?? 'Orca did not answer'} - no worker of that Run was touched`); continue; }
+    rows.push(...listed.workers);
+  }
+  return { rows, runs, errors };
 }
 
 /* ------------------------------------------------------------ processes */
@@ -576,7 +553,7 @@ export const writeLaneCursor = (value, env = process.env) => { try { withSupervi
  * (`clock` is the seam); `progress` says how far it got and where the next pass resumes. A removal that changed the main
  * checkout (safeRemoveWorktree fatal) stops the collector at once. Returns {items, freedBytes, errors, progress, fatal?}.
  */
-export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, terminals = [], titles = new Map(),
+export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, workers = [],
   cursor = null, clock = Date.now }) {
   const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
   const base = lanesRoot({ env });
@@ -663,7 +640,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     const idle = act.lastActiveMs == null ? null : now - act.lastActiveMs;
     const idleMs = settings.laneIdleMs ?? settings.laneGraceMs;
     if (idle == null || idle < idleMs) { item('keep', w.path, `landed but git activity ${idle == null ? '?' : Math.round(idle / 60000)}m ago (< ${Math.round(idleMs / 60000)}m)`, { branch }); continue; }
-    const owner = laneOwnerOf({ lanePath: w.path, branch, terminals, titles, sup });
+    const owner = laneOwnerOf({ lanePath: w.path, branch, workers, sup });
     if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
@@ -696,8 +673,8 @@ export function gcLine(counts, { language = 'vi', apply = true } = {}) {
 }
 
 /**
- * One GC run. `only` restricts the collectors; `deps` replaces the host seams (list, read, close, procs, ledgers, sup,
- * git, purge, sweepTmp, taskUpdate, log, lesson, freemem). Returns the report (see the header).
+ * One GC run. `only` restricts the collectors; `deps` replaces the host seams (workers (run) -> worker-list of one Run,
+ * release, activeWorkers, list, read, close, procs, ledgers, sup, git, purge, sweepTmp, taskUpdate, log, lesson, freemem). Returns the report (see the header).
  */
 export async function runGc({ apply = false, only = null, env = process.env, now = Date.now(), deps = {}, allocation = null, language = null, trigger = 'sweep' } = {}) {
   const started = Date.now();
@@ -725,31 +702,59 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const ledgers = (deps.ledgers ?? (() => repos.map((r) => { try { return ledgerView(r); } catch { return null; } }).filter(Boolean)))();
   const freeBefore = (deps.freemem ?? os.freemem)();
 
-  let agentsBeforeOuter = null, lastListedCount = 0, lanesListing = null;
+  let agentsBeforeOuter = null, lastListedCount = 0;
+  // Orca's worker accounting for the runtime's Runs: the agents collector releases from it, and every terminal it
+  // accounts for is Orca's (the terminal decisions below leave it alone).
+  let workerRows = [];
+  if (want.has('agents') || want.has('shells')) {
+    const w = runtimeWorkers({ sup, ledgers, list: deps.workers ?? ((run) => workerListAll({ run })) });
+    workerRows = w.rows;
+    if (w.errors.length) { report.ok = false; report.errors.push(...w.errors); }
+  }
+  if (want.has('agents') && apply) { try { const t = (deps.table ?? processTable)(); agentsBeforeOuter = t ? orcaAgents(t) : null; } catch { agentsBeforeOuter = null; } }
+  if (want.has('agents')) {
+    // When the job that held a worker's terminal last changed (its settle): the age of a worker Orca still holds.
+    const settledAt = new Map([...ledgers.flatMap((l) => l.jobs.flatMap((j) => j.handles.map((h) => [h, j.updatedAt ?? null]))),
+      ...sup.jobs.filter((j) => j.handle).map((j) => [j.handle, j.updatedAt ?? null])]);
+    for (const d of releasePlan(workerRows)) {
+      if (d.verdict === 'keep') continue;
+      const since = Number(settledAt.get(d.terminalHandle)) || null;
+      const it = { class: 'worker', action: 'release-worker', target: d.dispatchId, terminal: d.terminalHandle, run: d.runId, reason: d.reason, verdict: d.verdict === 'release' ? 'collect' : 'refuse',
+        terminalState: d.terminalState, liveness: d.liveness, leftover: d.verdict === 'release' };
+      if (d.verdict === 'refuse') { report.items.push({ ...it, code: 'WORKER_RELEASE_REFUSED', since, ageMs: since == null ? null : Math.max(0, now - since) }); report.counts.refused += 1; continue; }
+      if (!apply) { report.items.push({ ...it, ok: null }); }
+      else {
+        let r;
+        try { r = (deps.release ?? workerRelease)({ dispatch: d.dispatchId }); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
+        report.items.push({ ...it, ok: r?.ok === true, state: r?.state ?? null, ...(r?.ok ? {} : { code: 'WORKER_RELEASE_FAILED', error: r?.error ?? r?.outcome ?? 'release failed' }) });
+        if (!r?.ok) { report.errors.push(`WORKER_RELEASE_FAILED: worker-release --dispatch ${d.dispatchId}: ${r?.error ?? r?.outcome ?? 'failed'}`); continue; }
+      }
+      report.counts.agents += 1;
+      report.counts.leftovers += 1;
+    }
+  }
   if (want.has('agents') || want.has('shells')) {
     const listed = (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
-    if (listed?.ok) lanesListing = listed;
     if (!listed?.ok) { report.ok = false; report.errors.push(`terminal list: ${listed?.error ?? 'Orca did not answer'} - no terminal was touched`); }
     else {
       let procs = null;
       if (want.has('shells')) { try { procs = (deps.procs ?? (async () => (await import('./host-health.mjs')).listProcessesAsync()))(); procs = await procs; } catch { procs = null; } }
       const screens = new Map();
       const screenOf = (h) => { if (!screens.has(h)) { let s = null; try { const r = (deps.read ?? terminalRead)({ terminal: h, screen: true }); s = r?.ok ? r.screen ?? '' : null; } catch { s = null; } screens.set(h, s); } return screens.get(h); };
-      const decided = classifyTerminals({ terminals: listed.terminals ?? [], titles: tabTitles(listed.visualLayouts), sup, ledgers, screenOf, procs, seen: state.seen, now, minAgeMs: settings.minAgeMs, keepTitles: settings.keepTitles });
-      // The agents inside Orca terminals before any close: whichever lingers outside Orca afterwards is reaped below.
+      const decided = classifyTerminals({ terminals: listed.terminals ?? [], titles: tabTitles(listed.visualLayouts), sup, ledgers, workers: workerTerminalHandles(workerRows), screenOf, procs, seen: state.seen, now, minAgeMs: settings.minAgeMs, keepTitles: settings.keepTitles });
       lastListedCount = (listed.terminals ?? []).filter((t) => t.connected !== false).length;
-      if (apply) { try { const t = (deps.table ?? processTable)(); agentsBeforeOuter = t ? orcaAgents(t) : null; } catch { agentsBeforeOuter = null; } }
       for (const d of decided) {
         const isShell = d.klass === 'idle-shell';
         if (isShell ? !want.has('shells') : !want.has('agents')) continue;
-        if (d.verdict !== 'keep') seenNow[d.handle] = { at: state.seen[d.handle] ?? now, role: d.role ?? null, title: d.title ?? null };
+        // First sightings are kept for shells only: they alone wait out an age before they are closed.
+        if (isShell && d.verdict !== 'keep') seenNow[d.handle] = { at: state.seen[d.handle] ?? now, title: d.title ?? null };
         if (d.verdict === 'keep') {
           // Not the runtime's: named in the report (never touched) so the owner sees what was left alone and why.
           if (d.klass === 'unknown') report.items.push({ class: 'unknown', action: 'none', target: d.handle, title: d.title, reason: d.reason, verdict: 'keep' });
           continue;
         }
         const it = { class: d.klass, action: 'close-terminal', target: d.handle, title: d.title, reason: d.reason, owner: d.owner ?? null, verdict: d.verdict, leftover: !isShell,
-          firstSeenAt: seenNow[d.handle] ?? now, ...(d.ownerless ? { ownerless: true, lane: d.lane ?? null } : {}) };
+          ...(isShell ? { firstSeenAt: seenNow[d.handle]?.at ?? now } : {}) };
         if (d.verdict === 'refuse') { report.items.push(it); if (!d.pendingAge) report.counts.refused += 1; continue; }
         if (!apply) { report.items.push({ ...it, ok: null }); }
         else {
@@ -757,12 +762,11 @@ export async function runGc({ apply = false, only = null, env = process.env, now
           report.items.push({ ...it, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.ok ? {} : { error: r?.reason ?? r?.error ?? 'close failed' }) });
           if (!r?.ok) { report.errors.push(`close ${d.handle} (${d.klass}): ${r?.reason ?? r?.error ?? 'failed'}`); continue; }
           delete seenNow[d.handle];
-          closedNow.push(d.handle);
+          if (isShell) closedNow.push(d.handle);
         }
         if (isShell) report.counts.terminals += 1; else report.counts.agents += 1;
         if (!isShell) report.counts.leftovers += 1;
       }
-      // Seen-state of shells and runtime terminals is kept only for handles still listed and still candidates.
     }
   }
 
@@ -796,17 +800,13 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   if (want.has('lanes')) {
     let landBusy = false;
     try { landBusy = (deps.landBusy ?? (async () => (await import('./land.mjs')).landStatus({ env }).busy))(); landBusy = await landBusy; } catch { landBusy = true; }
-    // The live owners of a lane: the terminal listing (the agents block's, else one read now; null when Orca is down).
-    let laneTerms = null, laneTitles = new Map();
-    try {
-      const lt = lanesListing ?? (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
-      if (lt?.ok) { laneTerms = lt.terminals ?? []; laneTitles = tabTitles(lt.visualLayouts); }
-    } catch { laneTerms = null; }
+    // The live owners of a lane: Orca's active workers over every Run (null when Orca is down or answers for one Run).
+    const laneWorkers = (deps.activeWorkers ?? (() => activeWorkersAllRuns()))();
     // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
     // (node scripts/lib/worktrees.mjs resume): the same stop mark as the worktree GC.
     const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
     const cursor = (deps.laneCursor ?? readLaneCursor)(env);
-    const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, terminals: laneTerms, titles: laneTitles, cursor, clock: deps.clock ?? Date.now });
+    const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, workers: laneWorkers, cursor, clock: deps.clock ?? Date.now });
     report.progress = { ...(report.progress ?? {}), lanes: l.progress };
     // A partial pass resumes where it stopped; a complete one starts over next time (a dry run never moves the cursor).
     if (apply && !stoppedMark) (deps.writeLaneCursor ?? writeLaneCursor)(l.progress.complete ? null : l.progress.next, env);

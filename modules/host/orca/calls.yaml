@@ -194,6 +194,12 @@ calls:
     required: [dispatch]
     receipt: [result]
     note: Bounded worker output (hook transcript or labelled terminal output). Read it before worker-release; a Dispatch released without a preserved output archive has none.
+  worker-list:
+    command: orchestration worker-list
+    kind: read
+    flags: [run, terminal-state, cursor, limit]
+    receipt: [result.workers]
+    note: Orca's worker terminal resource accounting, the one source for which worker terminal is active, reclaimable, retained or released, with each row's liveness and literal nextAction argv. At most 100 rows a page, newest first; follow page.nextCursor unchanged. Without --run it is scoped to the caller's bound Run (scope.source bound), else every Run (all). A row whose liveness is unverifiable is never acted on.
   worker-stop:
     command: orchestration worker-stop
     kind: mutation

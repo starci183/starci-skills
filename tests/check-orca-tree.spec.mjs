@@ -35,6 +35,9 @@ const healthy=(ledger,{workflowId='wf-tree',runId='run-1'}={})=>seedWorkflow(led
   ],
 });
 const healthyTerminals=()=>[term(KERNEL,'[Kernel] wf-tree'),term('term-op-1','[Op] code.refactor a1 · wf-tree')];
+// An Orca worker-list row of an active worker of the workflow's Run on terminal `handle`.
+const worker=(handle,{runId='run-1',terminalState='active'}={})=>({dispatchId:`ctx_${handle}`,runId,terminalState,agentTerminalHandle:handle,
+  resource:{terminalHandle:handle},projection:{liveness:{verdict:'live'}}});
 
 test('the codes are the six the contract names, and a matching tree is clean',t=>{
   assert.deepEqual(FINDING_CODES,['DUPLICATE_KERNEL','ORPHAN_TERMINAL','STRAY_TERMINAL','DEAD_KERNEL','TITLE_DRIFT','TASK_OUTSIDE_RUN']);
@@ -44,13 +47,15 @@ test('the codes are the six the contract names, and a matching tree is clean',t=
   });
 });
 
-test('DUPLICATE_KERNEL: a second live [Kernel] terminal for one workflow',t=>{
+test('a second live worker in the workflow Run that no job holds is ORPHAN_TERMINAL; a [Kernel] title alone is no finding',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    const findings=orcaTreeFindings(ledger.db,seen(...healthyTerminals(),term('term-kernel-old','[Kernel] wf-tree')));
-    assert.deepEqual(findings.map(f=>f.code),['DUPLICATE_KERNEL']);
-    assert.deepEqual(findings[0].terminals.sort(),[KERNEL,'term-kernel-old'].sort());
-    assert.equal(findings[0].workflowId,'wf-tree');
+    const rows=seen(...healthyTerminals(),term('term-kernel-old','[Kernel] wf-tree'));
+    // Former false positive: the tab title made an owner's tab named "[Kernel] wf-tree" a duplicate kernel.
+    assert.deepEqual(orcaTreeFindings(ledger.db,rows),[]);
+    const findings=orcaTreeFindings(ledger.db,rows,{workers:[worker(KERNEL),worker('term-op-1'),worker('term-kernel-old')]});
+    assert.deepEqual(findings.map(f=>[f.code,f.terminal]),[['ORPHAN_TERMINAL','term-kernel-old']]);
+    assert.match(findings[0].detail,/live Orca worker of this ledger's Run that no job holds/);
   });
 });
 
@@ -67,7 +72,7 @@ test('ORPHAN_TERMINAL: a live terminal whose job already failed, and one no job 
   withLedger(t,({ledger})=>{
     healthy(ledger);
     ledger.db.prepare("UPDATE jobs SET status='failed' WHERE job_id='job-op-1'").run();
-    const findings=orcaTreeFindings(ledger.db,seen(...healthyTerminals(),term('term-stray','[Op] interface.audit a4 · wf-tree')));
+    const findings=orcaTreeFindings(ledger.db,seen(...healthyTerminals(),term('term-stray','[Op] interface.audit a4 · wf-tree')),{workers:[worker('term-stray',{terminalState:'reclaimable'})]});
     const orphans=findings.filter(f=>f.code==='ORPHAN_TERMINAL');
     assert.deepEqual(orphans.map(f=>f.terminal).sort(),['term-op-1','term-stray']);
     assert.match(orphans.find(f=>f.terminal==='term-op-1').detail,/job job-op-1 is failed/);
@@ -158,12 +163,16 @@ test('the CLI exits 1 on findings, 0 clean, 2 on a bad invocation',t=>{
     assert.equal(json(clean.stdout)?.schema,'starci/orca-tree-check@1');
 
     fs.writeFileSync(file,JSON.stringify(listing([...healthyTerminals(),term('term-kernel-old','[Kernel] wf-tree')])));
-    const dirty=run('--repo',repoRoot,'--terminals',file,'--json');
+    const workersFile=path.join(repoRoot,'workers.json');
+    fs.writeFileSync(workersFile,JSON.stringify({ok:true,result:{workers:[worker('term-kernel-old')]}}));
+    assert.equal(run('--repo',repoRoot,'--terminals',file,'--json').status,0,'a title without an Orca worker is no finding');
+    const dirty=run('--repo',repoRoot,'--terminals',file,'--workers',workersFile,'--json');
     assert.equal(dirty.status,1,'a finding is a red check');
-    assert.deepEqual(json(dirty.stdout)?.findings.map(f=>f.code),['DUPLICATE_KERNEL']);
-    const text=run('--repo',repoRoot,'--terminals',file);
+    assert.deepEqual(json(dirty.stdout)?.findings.map(f=>f.code),['ORPHAN_TERMINAL']);
+    const text=run('--repo',repoRoot,'--terminals',file,'--workers',workersFile);
     assert.equal(text.status,1);
-    assert.match(text.stdout,/^DUPLICATE_KERNEL wf-tree: /m);
+    assert.match(text.stdout,/^ORPHAN_TERMINAL -: terminal term-kernel-old /m);
+    assert.equal(run('--repo',repoRoot,'--workers',workersFile,'--live').status,2,'--workers goes with --terminals');
 
     assert.equal(run('--terminals',file).status,2,'no --repo is a usage error');
     assert.equal(run('--repo',repoRoot).status,2,'neither --terminals nor --live is a usage error');
@@ -213,9 +222,10 @@ test('STRAY_TERMINAL names a live terminal in the project worktree that is no li
     const f=orcaTreeFindings(ledger.db,rows,{repo:'D:/Repositories/nivo-backend'});
     assert.deepEqual(f.filter(x=>x.code==='STRAY_TERMINAL').map(x=>x.terminal).sort(),['term-old','term-shell']);
     assert.equal(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='STRAY_TERMINAL').length,0,'without a repo the placement check is off');
-    // A managed [Op] tab title names no workflow: in another project's worktree it is that project's worker.
+    // Another project's worker is in another Run: never this ledger's orphan, whatever its title.
     const other=readTerminals([...healthyTerminals().map(at('D:/Repositories/nivo-backend')),at('D:/Repositories/nivo-backend')(term('term-nivo-op','[Op] architecture.decide'))]);
     assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/starci-next'}).some(x=>x.terminal==='term-nivo-op'),false,'another project [Op] worker is not this ledger orphan');
-    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend'}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','in its own project it still is');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend'}).find(x=>x.terminal==='term-nivo-op')?.code,'STRAY_TERMINAL','in its own project with no worker of its Runs it is stray');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend',workers:[worker('term-nivo-op')]}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','a worker of its Run no job holds is an orphan');
   });
 });

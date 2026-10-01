@@ -144,7 +144,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   // The live owners (scripts/lib/lane-owner.mjs, the same rule gc.mjs applies), read once when a lane gets that far.
   // A spec process with no owners passed reads none (never the live host's Orca).
   let ownerInfo = owners ?? null;
-  const ownersNow = () => (ownerInfo ??= (process.env.NODE_TEST_CONTEXT ? { terminals: [], titles: new Map(), sup: { jobs: [] } } : liveLaneOwners({ env })));
+  const ownersNow = () => (ownerInfo ??= (process.env.NODE_TEST_CONTEXT ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
   const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
   for (const w of worktrees) {
     const key = pathKey(w.path);
@@ -173,7 +173,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
       continue;
     }
     const o = ownersNow();
-    const owner = laneOwnerOf({ lanePath: w.path, branch: w.branch, terminals: o.terminals, titles: o.titles, sup: o.sup });
+    const owner = laneOwnerOf({ lanePath: w.path, branch: w.branch, workers: o.workers, sup: o.sup });
     if (owner) { skip(w.path, 'live-owner', owner); continue; }
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
