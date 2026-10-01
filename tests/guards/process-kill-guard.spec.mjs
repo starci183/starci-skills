@@ -150,3 +150,26 @@ test('the PreToolUse hook blocks a kill by name before it runs (exit 2) and logs
   const logged = fs.readFileSync(path.join(guardsRoot(ROOT), 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((line) => JSON.parse(line));
   assert.ok(logged.some((entry) => entry.jobId === 'op-kill-guard-spec' && entry.code === 'PROCESS_KILL_BY_NAME'));
 });
+
+// A kill whose variable was set in an EARLIER call is not judged: a tool call is a fresh shell, so the variable carries no
+// provenance the guard can see, and refusing every non-literal target would refuse a recorded PID file (the remedy's own
+// advice). Only what the call itself shows - a process query feeding the kill - is refused.
+test('a kill of a variable or PID file set outside the call passes; the same variable fed by a query in the call is refused', async () => {
+  const passed = [
+    ['Stop-Process -Id $x', 'powershell'],
+    ['Stop-Process -Id $x -Force', 'powershell'],
+    ['Stop-Process -Id $script:pidFromBefore', 'powershell'],
+    ['Stop-Process -Id (Get-Content run.pid)', 'powershell'],
+    ['kill $pid', 'bash'],
+    ['kill $(cat run.pid)', 'bash'],
+    ['kill -9 "$PID_FROM_FILE"', 'bash'],
+    ['taskkill /PID $x /F', 'powershell'],
+  ];
+  for (const [command, dialect] of passed) assert.equal(await verdict(command, dialect), null, `${command} (${dialect})`);
+  const refused = [
+    ['$x = (Get-Process node).Id; Stop-Process -Id $x', 'powershell'],
+    ['x=$(pgrep node); kill $x', 'bash'],
+    ['$x = (Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "a" }).ProcessId; Stop-Process -Id $x', 'powershell'],
+  ];
+  for (const [command, dialect] of refused) assert.equal((await verdict(command, dialect))?.code, 'PROCESS_KILL_BY_NAME', `${command} (${dialect})`);
+});

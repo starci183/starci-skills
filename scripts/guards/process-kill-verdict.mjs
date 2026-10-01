@@ -5,6 +5,14 @@
 // `kill <pid>`, `Stop-Process -Id <pid>`, or a variable assigned from its own Start-Process or `cmd & pid=$!`.
 // Reads (Get-CimInstance listing, `ps aux | grep node`) and text that only mentions these commands pass: the query rule
 // judges parsed commands, so an echo, a commit message or a heredoc never reaches it.
+// A kill whose variable was set in an EARLIER shell call (`$x = ...` in one call, `Stop-Process -Id $x` or `kill $pid` in the
+// next) is not judged, by design. The guard sees one call's text and keeps no state: a Bash or PowerShell tool call is a
+// fresh shell, so a variable never survives into the next call - what carries a PID across calls is a file, an environment
+// value or the model's own memory of a literal, none of which the guard can trace to its source. Refusing every non-literal
+// target would refuse `Stop-Process -Id (Get-Content run.pid)` and `kill $(cat run.pid)`, the PID file the remedy itself
+// tells an agent to keep; a query stage is the one evidence of a foreign target, and it is judged only where it is visible,
+// in the same call. Tracking provenance across calls would need a ledger of the PIDs an agent started, which no hook can
+// fill soundly; the by-name rule above and the same-call query rule are the sound part.
 import { assignedCommand } from './assigned-command.mjs';
 const TASKKILL_SELECTOR = /^(?:\/\/?|-)(?:im|fi)$/i;
 const NAME_PARAMETER = /^-(?:n|na|nam|name|processname)(?::.*)?$/i;
