@@ -339,12 +339,12 @@ slots:
   - id: runtime.lib-retired
     profiles: [runtime]
     # Every name is spelled out: a wildcard segment ranks below the <name>.mjs of runtime.lib.
-    path: "scripts/lib/{hfs-allows.mjs,hfs-check.mjs,hfs-path-findings.mjs,hfs-slots.mjs,hfs-tree.mjs,hfs-view.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-claude.mjs,hk-devin.mjs,hk-git-locks.mjs,hk-lanes.mjs,hk-ledger.mjs,hk-logs.mjs,hk-orphan-ledgers.mjs,hk-sessions.mjs,hk-tmp.mjs,yaml.mjs}"
+    path: "scripts/lib/{hfs-allows.mjs,hfs-check.mjs,hfs-path-findings.mjs,hfs-slots.mjs,hfs-tree.mjs,hfs-view.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-claude.mjs,hk-devin.mjs,hk-git-locks.mjs,hk-lanes.mjs,hk-ledger.mjs,hk-logs.mjs,hk-orphan-ledgers.mjs,hk-sessions.mjs,hk-tmp.mjs,yaml.mjs}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "scripts/hfs/ (hfs-*, project-*: C1), scripts/api/<system>/ (git: C5; low-priority, safe-remove, rename-over, zip-archive, sops-exec-env, test-secrets, canon-digest, self-reload: C2a), engine/db/blob.mjs (artifact-store, blob-lookup: C3), scripts/machine/ (worktrees ... close-verify: C3), scripts/housekeeping/ (hk-*: C3), scripts/lib/read-yaml.mjs (yaml: C6); the exact map lands in modules/kernel/retired-paths.yaml moved[]"
+    goesTo: "scripts/hfs/ (hfs-*, project-*: C1), scripts/api/<system>/ (git-index-lock: C5; low-priority, safe-remove, rename-over, zip-archive, sops-exec-env, test-secrets, canon-digest, self-reload: C2a), engine/db/blob.mjs (artifact-store, blob-lookup: C3), scripts/machine/ (worktrees ... close-verify: C3), scripts/housekeeping/ (hk-*: C3), scripts/lib/read-yaml.mjs (yaml: C6); the exact map lands in modules/kernel/retired-paths.yaml moved[]"
   - id: runtime.hfs
     profiles: [runtime]
     # The ONE standard engine: product HFS (slots, check, architecture machine) and this runtime HFS. Bundled into the
@@ -674,7 +674,7 @@ pending:
   - {path: "scripts/supervisor/poll.mjs", rule: RT_TIER_DIRECTION, lane: C4, since: 2026-10-01, reason: "domain modules import the Work judges and checks of scripts/checks/; the judges move to scripts/work/ and scripts/gates/"}
   - {path: "scripts/work/work-graph-model.mjs", rule: RT_TIER_DIRECTION, lane: C4, since: 2026-10-01, reason: "domain modules import the Work judges and checks of scripts/checks/; the judges move to scripts/work/ and scripts/gates/"}
   - {path: "scripts/api/git/snapshot-commit.mjs", rule: ARCH_OWNER_CYCLE, lane: C5, since: 2026-10-01, reason: "scripts/lib imports scripts/api/git while api/git imports scripts/lib"}
-  - {path: "scripts/lib/{git-index-lock.mjs,git.mjs}", rule: HFS_FORBIDDEN_PRESENT, lane: C5, since: 2026-10-01, reason: "the git runner moves to scripts/api/git/ (lib.mjs and one call file per subcommand)"}
+  - {path: "scripts/lib/git-index-lock.mjs", rule: HFS_FORBIDDEN_PRESENT, lane: C5, since: 2026-10-01, reason: "the git runner moves to scripts/api/git/ (lib.mjs and one call file per subcommand)"}
   - {path: "engine/machine-db.mjs", rule: RT_API_SHAPE, lane: C5, since: 2026-10-01, reason: "git call files export one call each; callers use call files, never the git runner"}
   - {path: "scripts/agent/trust.mjs", rule: RT_API_SHAPE, lane: C5, since: 2026-10-01, reason: "git call files export one call each; callers use call files, never the git runner"}
   - {path: "scripts/api/git/{branch-delete.mjs,merge-base.mjs,worktree-add.mjs,worktree-list.mjs,worktree-remove.mjs}", rule: RT_API_SHAPE, lane: C5, since: 2026-10-01, reason: "git call files export one call each; callers use call files, never the git runner"}
