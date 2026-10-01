@@ -54,7 +54,7 @@ test('ending a PID you started, and text that only mentions a kill, pass', async
 });
 
 test('the PreToolUse hook blocks a kill by name before it runs (exit 2) and logs the refusal', (t) => {
-  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'kill-guard-')));
+  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-kill-guard-')));
   t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
   const jobFile = writeJobGuard({ skillRoot: scratch, jobId: 'op-kill-guard-spec', workflowId: 'wf-kill', ledgerRepo: null, owned: [scratch] });
   const handle = `term_spec-kill-hook-${process.pid}`;
