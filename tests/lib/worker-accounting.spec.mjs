@@ -94,13 +94,12 @@ test('lane owner: an active worker in the lane or below it owns it; a released o
   assert.match(laneOwnerOf({ lanePath: lane, branch: 'lane/slim', workers: [], sup: { jobs: [{ jobId: 'fix-1', status: 'running', branch: 'lane/slim' }] } }), /Supervisor job fix-1/);
 });
 
-test('machine.sqlite 0004: terminals keeps only shell/other sightings; worker columns and worker rows are gone', (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-machine-0004-'));
+test('machine.sqlite: terminals keeps only shell/other sightings; worker columns and worker rows are gone', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-machine-terminals-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const m = openMachine({ file: path.join(dir, 'machine.sqlite') });
   try {
-    assert.equal(MACHINE_VERSION, 4);
-    assert.equal(m.db.prepare('SELECT status FROM schema_migrations WHERE version=4').get()?.status, 'done');
+    assert.equal(MACHINE_VERSION, 1);
     const cols = m.db.prepare("SELECT name FROM pragma_table_info('terminals')").all().map((r) => r.name);
     assert.deepEqual(cols, ['handle', 'title', 'role', 'opened_at', 'closed_at', 'close_verified_at', 'closed_by']);
     m.upsertTerminal({ handle: 'term_s', title: 'Terminal 3', role: 'shell', openedAt: 1 });

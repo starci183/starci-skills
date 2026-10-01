@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createRequire} from 'node:module';
 import {spawnSync} from 'node:child_process';
 import {changeWorkflowPhase,ledgerFileFor,openLedger,recordCheckRun,recordJobResult,setJobStatus,startAttempt,updateAttempt} from '../../engine/db/ledger.mjs';
 import {catalogProblems,emittedCodes,readCatalog} from '../../scripts/checks/check-failure-codes.mjs';
@@ -150,29 +149,6 @@ test('recordWhy stores the why with the attempt; whyOf returns it; v_op_history 
   ledger.transaction(db=>{db.prepare("UPDATE op_attempts SET verdict=NULL, report_outcome=NULL, end_state='requeued', settle_json=? WHERE attempt_id=?").run(json({reason:'dispatch-rejected',step:'submission'}),attemptId);});
   assert.equal(view().ui,'rejected');
   assert.equal(view().attempt_state,'rejected');
-});
-
-test('a ledger at migration 3 gains why_json and the recreated views through migration 0004, once',t=>{
-  const repo=tmp(t);
-  const file=ledgerFileFor(repo);
-  openLedger({file}).close();
-  const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');
-  const old=new DatabaseSync(file);
-  old.exec('DROP VIEW v_op_history; DROP VIEW v_attempt_state; ALTER TABLE op_attempts DROP COLUMN why_json');
-  old.exec('DELETE FROM schema_migrations WHERE version=4; PRAGMA user_version=3');
-  assert.equal(old.prepare("SELECT count(*) n FROM pragma_table_info('op_attempts') WHERE name='why_json'").get().n,0);
-  old.close();
-  const l=openLedger({file});
-  t.after(()=>{try{l.close();}catch{}});
-  assert.equal(l.db.prepare("SELECT count(*) n FROM pragma_table_info('op_attempts') WHERE name='why_json'").get().n,1);
-  assert.equal(Number(l.db.prepare('PRAGMA user_version').get().user_version),4);
-  assert.equal(l.db.prepare('SELECT count(*) n FROM v_op_history').get().n,0,'the recreated view answers');
-  assert.equal(l.db.prepare('SELECT name FROM schema_migrations WHERE version=4').get().name,'0004-attempt-why');
-  assert.equal(fs.existsSync(file+'.pre-0004-attempt-why.bak'),true,'a backup precedes the migration');
-  l.close();
-  const again=openLedger({file});
-  t.after(()=>{try{again.close();}catch{}});
-  assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations WHERE version=4').get().n,1,'a second open changes nothing');
 });
 
 test('kernelNotesOf reads the Kernel decisions (opened, closed) and proposals of a workflow from the events table',t=>{

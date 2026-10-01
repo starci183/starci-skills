@@ -5611,16 +5611,6 @@ STARCI_MACHINE_NOT_WAL:
   owner: owner
   kind: runtime-fault
 
-STARCI_MACHINE_SCHEMA_NEWER:
-  title: "Machine DB newer than runtime"
-  title_vi: "Cơ sở dữ liệu máy mới hơn runtime"
-  meaning_vi: "machine.sqlite do bản runtime mới hơn tạo ra nên bản đang chạy không mở."
-  causes_vi:
-    - "Chạy lại bản runtime cũ trên máy đã nâng cấp"
-  nextStep_vi: "Cần nâng runtime lên phiên bản mới hơn rồi chạy lại."
-  owner: owner
-  kind: runtime-fault
-
 STARCI_MACHINE_SCHEMA_OLD:
   title: "Machine DB older than runtime"
   title_vi: "Cơ sở dữ liệu máy cũ hơn runtime"
@@ -11118,48 +11108,6 @@ DESIGN_NOT_SETTLED:
   owner: "other-op:interface.draw"
   kind: dispatch-refusal
 
-STARCI_LEDGER_MIGRATE_REFUSED:
-  title: "Ledger migration refused"
-  title_vi: "Từ chối nâng cấp cấu trúc ledger"
-  meaning_vi: "File ledger cũ không qua kiểm tra toàn vẹn nên runtime không nâng cấp nó lên cấu trúc mới."
-  causes_vi:
-    - "File runtime.sqlite bị hỏng"
-    - "Ổ đĩa lỗi hoặc file bị ghi dở"
-  nextStep_vi: "Runtime không mở ledger; Supervisor kiểm tra PRAGMA integrity_check và khôi phục từ bản .bak nếu cần."
-  owner: supervisor
-  kind: runtime-fault
-
-STARCI_LEDGER_MIGRATE_FAILED:
-  title: "Ledger migration failed"
-  title_vi: "Nâng cấp cấu trúc ledger thất bại"
-  meaning_vi: "Bước nâng cấp để lại lỗi khóa ngoại hoặc không qua quick_check nên đã được hoàn tác."
-  causes_vi:
-    - "Dữ liệu cũ vi phạm ràng buộc mới"
-    - "Lỗi trong tệp migration"
-  nextStep_vi: "Ledger giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
-  owner: runtime-core
-  kind: runtime-fault
-STARCI_MACHINE_MIGRATE_REFUSED:
-  title: "machine.sqlite migration refused"
-  title_vi: "Từ chối nâng cấp cấu trúc machine.sqlite"
-  meaning_vi: "File machine.sqlite cũ không qua kiểm tra toàn vẹn nên runtime không nâng cấp nó lên cấu trúc mới."
-  causes_vi:
-    - "File machine.sqlite bị hỏng"
-    - "Ổ đĩa lỗi hoặc file bị ghi dở"
-  nextStep_vi: "Runtime không mở machine.sqlite; Supervisor kiểm tra PRAGMA integrity_check và khôi phục từ bản .bak nếu cần."
-  owner: supervisor
-  kind: runtime-fault
-
-STARCI_MACHINE_MIGRATE_FAILED:
-  title: "machine.sqlite migration failed"
-  title_vi: "Nâng cấp cấu trúc machine.sqlite thất bại"
-  meaning_vi: "Bước nâng cấp để lại lỗi khóa ngoại hoặc không qua quick_check nên đã được hoàn tác."
-  causes_vi:
-    - "Dữ liệu cũ vi phạm ràng buộc mới"
-    - "Lỗi trong tệp migration"
-  nextStep_vi: "machine.sqlite giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
-  owner: runtime-core
-  kind: runtime-fault
 git-unusable:
   title: "Git unusable while landing"
   title_vi: "Git không dùng được khi land"

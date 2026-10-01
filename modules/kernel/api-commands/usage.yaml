@@ -17,8 +17,7 @@ returns: >-
 refuses:
   - workflow-unknown: '--workflow names no workflow of this ledger'
 unavailable: >-
-  an attempt whose usage cannot be measured is stored with op_attempts.usage_source 'unavailable' and usage_reason (migration
-  0003-usage-unavailable): at once when its agent has no adapter, else once it has been over 30 minutes with no session file found
+  an attempt whose usage cannot be measured is stored with op_attempts.usage_source 'unavailable' and usage_reason: at once when its agent has no adapter, else once it has been over 30 minutes with no session file found
   live or in the session archive. It is never given a number. coverage.pending counts settled attempts not yet decided (their
   session may still be archived); the sweep looks again until it measures or marks them
 usedBy: 'the Kernel and the Supervisor reading what a workflow spent; `api status` carries the same summary as its `usage` field'

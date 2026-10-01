@@ -180,6 +180,12 @@ retired:
   - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
   - {path: scripts/checks/check-db-openers.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'superseded by RT_EXTERNAL_OWNER (node:sqlite only in engine/db), scripts/hfs/runtime-rules/external-owner.mjs'}
   - {path: tests/check-db-openers.spec.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'the spec of scripts/checks/check-db-openers.mjs, superseded by RT_EXTERNAL_OWNER (tests/runtime-hfs-rules.spec.mjs)'}
+  - {path: engine/db/migrations/machine/0002-worktrees-no-workflow-kind.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: engine/db/migrations/machine/0003-worktrees-workflow-orca.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: engine/db/migrations/machine/0004-terminals-shells-only.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: engine/db/migrations/runtime/0003-usage-unavailable.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: engine/db/migrations/runtime/0004-attempt-why.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: engine/db/migrations/runtime/0005-ended-workflow-views.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
