@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 - 2026-10-01
+
+- Changed: declares its build tool vite as a devDependency (lane PKGT clean proof); no source change. The published package.json differs from 0.8.0, so the version moves.
+
 ## 0.8.0 - 2026-10-01
 
 Minor, additive (lane FONT; owner: the brand layer must be able to set the brand typeface).

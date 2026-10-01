@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 - 2026-10-01
+
+- Changed: declares its test toolchain as devDependencies and @jest/globals as an optional peer, with a lockfile (lane PKGT clean proof); no preset change. The published package.json differs from 2.2.0, so the version moves.
+
 ## 2.2.0 - 2026-10-01
 
 - Fixed: in one `npm run test:e2e` every e2e file after the first failed to boot with "Cannot determine a GraphQL output type":

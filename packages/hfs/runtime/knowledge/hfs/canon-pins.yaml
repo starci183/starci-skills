@@ -17,7 +17,7 @@ pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
   '@starci/grammar':
-    version: 0.8.0
+    version: 0.8.1
     group: starci
     install: registry
     side: fe
@@ -45,7 +45,7 @@ pins:
     source: packages/stylelint/package.json
     why: '2.0.2: no-class-selector refuses a compound class selector (`div.card`), which the 2.0.1 pattern let through. 2.0.1 accepts `--font-sans` and `--font-mono` in the brand layer (the vocabulary follows the grammar 0.8.0). 2.0.0 adds status-contrast (HeroUI soft pairs measured per theme), fixes brand-layer-shape on the shared :root,.light,.dark block and the info soft pair, and derives appTokens with loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
-    version: 2.0.0
+    version: 2.0.1
     group: starci
     install: registry
     side: both
@@ -57,7 +57,7 @@ pins:
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.2.0
+    version: 2.2.1
     group: starci
     install: registry
     side: be

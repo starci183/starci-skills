@@ -99,6 +99,16 @@ test('an edit to a copy bundled into the canon runtime/ folder is published cont
   assert.match(error, /^CANON_BINDING_DIGEST next: .*runtime\/ folder \(canon-pins, failure codes, slots\) included, so this change needs a version bump/);
 });
 
+test('the bundled YAML data (canon-pins, slots) is in the digest: editing it demands a bump and a rebinding', (t) => {
+  const dir = runtimeCopy(t);
+  for (const data of ['runtime/knowledge/hfs/canon-pins.yaml', 'runtime/knowledge/hfs/slots.yaml']) {
+    assert.ok(selectedByPolicy(data, profiles().nest.canon.contentDigest), `${data} is selected by the digest policy`);
+  }
+  append(path.join(dir, 'packages', 'eslint', 'be', 'runtime', 'knowledge', 'hfs', 'canon-pins.yaml'), '# edit\n');
+  const errors = checkCanonBindings({ root: dir }).errors;
+  assert.deepEqual(errors.map((line) => line.split(':')[0]), ['CANON_BINDING_DIGEST nest']);
+});
+
 test('a canon.version that differs from the package or its pin fails the check', (t) => {
   const dir = runtimeCopy(t);
   const file = path.join(dir, PROFILES_FILE);
