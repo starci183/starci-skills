@@ -1,0 +1,23 @@
+id: guidance-matches-command-guard
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: >-
+  Agent-facing guidance no longer tells an agent to run what the command guard refuses. The Supervisor's runtime-defect
+  class and chat-seat duties opened "an Opus lane (git worktree add ...)"; they now open the Supervisor's own staged
+  lane (scripts/supervisor/workers.mjs stage --self, made by the runtime worktree API, removed by its land.mjs
+  --commit land). The land-gate step reads as land.mjs's own compare-and-swap; claude-debug creates lanes with stage
+  --self and starts workers through worker-start instead of git worktree add, mklink /J and a raw agent spawn; push-git
+  fixers start in a staged lane; docs/verify-proof.md describes runAtBase's createWorktree/safeRemoveWorktree. The new
+  check scripts/checks/check-guidance-commands.mjs (RT_GUIDANCE_REFUSED_COMMAND, part of npm run check) evaluates every
+  command an agent is told to run in modules/**/*.yaml fields, modules/**/*.md prompts and skills/**/SKILL.md with the
+  guard's own commandVerdict; a command under a prohibition or in a runtime-internal or incident description passes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/guidance-matches-command-guard.yaml
+  - modules/supervisor/supervise.yaml
+  - modules/kernel/failure-codes.yaml
+  - skills/claude-debug/SKILL.md
+  - skills/push-git/SKILL.md
+  - docs/verify-proof.md
+  - scripts/checks/check-guidance-commands.mjs
+  - tests/check-guidance-commands.spec.mjs
+  - package.json
