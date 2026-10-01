@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { helperOnceFindings } from '../scripts/checks/check-helper-once.mjs';
 
-// RED15 and RED17: a shared helper has one home (where git may be spawned is scripts/checks/check-layers.mjs).
+// RED15 and RED17: a shared helper has one home (where git may be spawned is RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs).
 const run = (files) => helperOnceFindings({ tracked: Object.keys(files), read: (rel) => files[rel] });
 const summary = (findings) => findings.map((f) => [f.code, f.path]);
 

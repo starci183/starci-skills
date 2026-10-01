@@ -108,7 +108,7 @@ one thing, once, in the present tense. These six rules are the bar for any edit 
 line; a review that finds a violation sends the change back.
 
 1. **Present tense, no ghosts.** Describe the tree as it is. Never define something by negating
-   a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md` or `.experiments/practices/`, never into the
+   a state the tree no longer has (a removed directory, a former layout, a compatibility mode). History goes to `CHANGELOG.md` or `benchmark/findings/`, never into the
    sentence that defines the present.
 2. **Replace, never append.** A feedback edit rewrites the sentence that holds the rule. Do not
    add a second sentence under the first, and do not leave the old condition clause standing

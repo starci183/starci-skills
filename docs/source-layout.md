@@ -181,3 +181,62 @@ its folder) and the architecture machine (`scripts/checks/architecture.mjs`, run
 The kernel lifecycle validates the bound app checkout and both side folders before workflow
 effects. A valid result proves the filesystem shape and explicit ownership routing. It does not
 prove application behavior, builds, tests, deployment readiness or feature completeness.
+
+## Runtime layout
+
+The StarCi runtime repository (this tree) follows the same standard as a product app, through the same engine. Its
+standard is `knowledge/hfs/runtime-slots.yaml`, a slot manifest of kind `runtime` read by `scripts/lib/hfs-slots.mjs`,
+and the root `hfs.json` declares `{"hfs": 1, "kind": "runtime", "project": "starci"}`. The manifest has slots for the
+current tree and for the target tree of the runtime HFS migration. A current path that the target moves is a forbidden
+slot whose `goesTo` names its successor.
+
+Tiers and the import direction (`tiers.runtime`):
+
+| Tier | Paths | May import |
+|---|---|---|
+| entry | `bin/starci.mjs`, `ui/` (server and API) | every tier below |
+| checks | `scripts/checks/check-<topic>.mjs` | reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package |
+| reconciler | `scripts/reconciler/` | supervisor, kernel, domain, gates, machine, hfs, api, db, base |
+| supervisor | `scripts/supervisor/` | kernel, domain, gates, machine, hfs, api, db, base |
+| kernel | `scripts/kernel/` | domain, gates, machine, hfs, api, db, base |
+| domain | `scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work}/` | domain (no owner cycle), gates, machine, hfs, api, db, base |
+| gates | `scripts/gates/` | machine, hfs, api, db, base, package |
+| machine | `scripts/machine/` | api, db, base |
+| hfs | `scripts/hfs/` | api, base, package |
+| api | `scripts/api/<system>/` | base, and only its own system's `lib.mjs` |
+| db | `engine/db/` | base |
+| base | the engine foundation and `scripts/lib/` | base (no cycle) |
+
+External systems are reached only from their owner (`ruleParams.runtime.infraOwners`): `node:child_process` only in
+`scripts/api/*`, `node:sqlite` only in `engine/db`, `fetch` and `node:http(s)` only in the http-speaking api systems,
+and each program word (`git`, `npm`, `orca`, `powershell`, `node` for `process.execPath`, ...) only in its system's
+folder. An api system is `lib.mjs` (the runner) plus one call file per call, each exporting one function named after the
+file. The api systems today: `orca`, `git`, `npm`, `fs`, `process`, `sops`, `node`; `quota` leaves `scripts/api/` in
+chunk C2a.
+
+### Enforcement
+
+`npm run check` is `node bin/starci.mjs check`, which runs `scripts/checks/check-runtime.mjs`:
+
+1. `node --check` over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`;
+2. `scripts/hfs/runtime-check.mjs`: the tree law (`checkRepo` of `scripts/lib/hfs-check.mjs` with the runtime
+   manifest, and each slot's `allows`/`forbids`), then the runtime rules of `knowledge/hfs/rules.yaml` with gate
+   `runtime`, one module each under `scripts/hfs/runtime-rules/` (`RT_EXTERNAL_OWNER`, `RT_TIER_DIRECTION`,
+   `ARCH_OWNER_CYCLE`, `RT_BASE_IMPURE`, `RT_API_SHAPE`, `RT_SPEC_PLACEMENT`, `RT_SOURCE_NAME`, `RT_RETIRED_PRESENT`,
+   `RT_PINNED_PATH_MOVED`, `HFS_SIZE_GROWTH`, `RT_GENERATED_DRIFT`), with `RT_CITED_PATH_MISSING` of
+   `scripts/checks/check-contract-cites.mjs` over the live prose;
+3. the retained self-checks listed in `ruleParams.runtime.selfChecks`, in order.
+
+Every source file is read with the TypeScript AST (`scripts/hfs/runtime-rules/source-ast.mjs`,
+`scripts/lib/spawn-calls.mjs`); no text is grepped.
+
+The `pending` list of the manifest is the one allowlist. Each entry is `{path, rule, lane, since, reason}`: a glob, a
+finding code, the chunk of the migration (C1 to C8) that deletes it, and a date. A finding an entry allows is printed at
+level pending and never fails. The list only shrinks:
+
+- `RT_PENDING_STALE`: an entry that allows no finding, or names a code no runtime rule reports;
+- `RT_PENDING_ADDED`: an entry that allows a finding the base revision's list did not allow (the base is the merge-base
+  of HEAD with main). A file moved through `modules/kernel/retired-paths.yaml` `moved[]` keeps its allowance.
+
+Files move with the codemod of the migration (`D:/starci-tmp/hfs/devin/c0/rh-move.mjs`, outside the repository), which
+runs `git mv`, rewrites relative imports and cited paths, rewrites the pending paths, and appends the `moved[]` entries.

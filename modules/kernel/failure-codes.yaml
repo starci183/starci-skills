@@ -4388,56 +4388,135 @@ RT_HELPER_REDEFINED:
   owner: supervisor
   kind: check-finding
 
-RT_LAYER_EXTERNAL_SPAWN:
-  title: "External system spawned outside its api"
-  title_vi: "Gọi hệ thống bên ngoài ngoài thư mục api của nó"
-  meaning_vi: "Một tiến trình con chạy chương trình của một hệ thống bên ngoài (git, npm/npx, orca, sonar, docker) nằm ngoài thư mục scripts/api/<hệ thống>/ mà modules/kernel/runtime-layers.yaml khai báo cho hệ thống đó."
+RT_EXTERNAL_OWNER:
+  title: "External system reached outside its owner"
+  title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"
+  meaning_vi: "Trong mã nguồn runtime, một tệp import một module bên ngoài (node:child_process, node:http, node:sqlite...), gọi một hàm toàn cục (fetch) hoặc khởi chạy một chương trình (git, npm, orca, powershell, node...) mà ruleParams.runtime.infraOwners của knowledge/hfs/runtime-slots.yaml không giao cho thư mục của tệp đó. Chỉ scripts/api/<hệ thống>/ (và engine/db cho SQLite) được gọi ra bên ngoài."
   causes_vi:
-    - "Gọi spawnSync/execFile với 'git' hay 'npm' trực tiếp trong tầng nghiệp vụ"
-    - "Một hàm chạy lệnh cục bộ (run, sync) được gọi với tên chương trình của hệ thống bên ngoài"
-  nextStep_vi: "Người giám sát chuyển lời gọi vào scripts/api/<hệ thống>/ (một tệp cho một lệnh) rồi gọi hàm đó từ tầng nghiệp vụ, qua một lane đã land; mục tạm trong runtime-layers.allow.yaml được xóa cùng commit."
+    - "Gọi spawnSync/execFile hay fetch trực tiếp trong tầng nghiệp vụ hoặc trong scripts/lib"
+    - "Một tệp api của hệ thống này khởi chạy chương trình của hệ thống khác"
+  nextStep_vi: "Người giám sát chuyển lời gọi vào một tệp lệnh của scripts/api/<hệ thống>/ rồi gọi hàm đó, qua lane của chunk ghi trong mục pending; mục pending được xóa cùng commit."
   owner: supervisor
   kind: check-finding
 
-RT_LAYER_LIB_CHILD_PROCESS:
-  title: "child_process in scripts/lib"
-  title_vi: "scripts/lib dùng child_process"
-  meaning_vi: "Một module trong scripts/lib import child_process (import, require hoặc import()). scripts/lib chỉ chứa hàm thuần và logic dùng chung, không khởi chạy tiến trình nào."
+RT_TIER_DIRECTION:
+  title: "Runtime import against the tier direction"
+  title_vi: "Import ngược chiều tầng của runtime"
+  meaning_vi: "Một import tương đối giữa hai chủ sở hữu trong runtime đi từ một tầng tới một tầng không nằm trong mayImport của tầng đó (tiers.runtime trong knowledge/hfs/runtime-slots.yaml), ví dụ kernel import supervisor hay scripts/lib import một miền nghiệp vụ."
   causes_vi:
-    - "Thêm một lời gọi tiến trình vào thư viện dùng chung thay vì vào scripts/api"
-  nextStep_vi: "Người giám sát chuyển lời gọi vào scripts/api/<hệ thống>/ và để thư viện import hàm của api, qua một lane đã land."
+    - "Một dịch vụ dùng chung nằm ở tầng cao hơn nơi dùng nó"
+    - "Thư viện cơ sở import mã nghiệp vụ"
+  nextStep_vi: "Người giám sát chuyển phần dùng chung xuống tầng được phép (machine, lib) hoặc đảo chiều phụ thuộc, qua lane của chunk ghi trong mục pending."
   owner: supervisor
   kind: check-finding
 
-RT_LAYER_SPAWN_UNRESOLVED:
-  title: "Spawned program cannot be named"
-  title_vi: "Không xác định được chương trình được khởi chạy"
-  meaning_vi: "Ngoài scripts/api/, một lời gọi spawn/exec khởi chạy một chương trình mà cây cú pháp không xác định được tên (một biến, một thuộc tính, một tham số không có nơi gọi nào trong tệp truyền giá trị cố định)."
+RT_BASE_IMPURE:
+  title: "Base tier writes or reads the environment"
+  title_vi: "Tầng cơ sở ghi tệp hoặc đọc biến môi trường"
+  meaning_vi: "Một tệp của tầng cơ sở (engine nền tảng, scripts/lib) gọi một hàm ghi của node:fs (writeFileSync, rmSync, mkdirSync...) hoặc đọc process.env ngoài các điểm khai báo trong ruleParams.runtime.baseEnvSeams. Tầng cơ sở chỉ chứa hàm thuần."
   causes_vi:
-    - "Tên chương trình đến từ cấu hình hoặc từ tham số của một hàm được export"
-    - "Một trình chạy lệnh được khai báo (UAT, ví dụ) chưa được ghi là ngoại lệ đã duyệt"
-  nextStep_vi: "Người giám sát đặt tên chương trình bằng hằng, chuyển lời gọi vào scripts/api/<hệ thống>/, hoặc ghi một ngoại lệ đã duyệt (lane: reviewed, có lý do) vào modules/kernel/runtime-layers.allow.yaml."
+    - "Một hàm tiện ích tự ghi tệp thay vì trả dữ liệu cho nơi gọi"
+    - "Đọc cấu hình từ biến môi trường bên trong thư viện"
+  nextStep_vi: "Người giám sát chuyển thao tác ghi vào chủ sở hữu của nó (scripts/api/fs, engine/db hoặc một module nghiệp vụ) và truyền giá trị môi trường vào dưới dạng tham số."
   owner: supervisor
   kind: check-finding
 
-RT_LAYER_ALLOW_STALE:
-  title: "Stale layer exception"
-  title_vi: "Ngoại lệ phân tầng đã cũ"
-  meaning_vi: "Một mục trong modules/kernel/runtime-layers.allow.yaml không còn khớp với phát hiện nào: lời gọi đã được chuyển hoặc tệp đã bị xóa."
+RT_API_SHAPE:
+  title: "api folder breaks its shape"
+  title_vi: "Thư mục api sai hình dạng"
+  meaning_vi: "Một tệp lệnh trong scripts/api/<hệ thống>/ export nhiều hơn một hàm hoặc không export hàm mang tên của tệp, một tệp bên ngoài hệ thống import lib.mjs của hệ thống đó, một hệ thống api import hệ thống khác, hoặc một tệp lệnh không phải là id trong hợp đồng calls của hệ thống."
   causes_vi:
-    - "Lane đã chuyển lời gọi vào scripts/api nhưng quên xóa mục tạm"
-  nextStep_vi: "Người giám sát xóa mục đó khỏi runtime-layers.allow.yaml trong cùng commit đã chuyển lời gọi."
+    - "Thêm hằng số hay hàm phụ vào một tệp lệnh"
+    - "Gọi thẳng trình chạy lib.mjs thay vì tệp lệnh"
+  nextStep_vi: "Người giám sát tách mỗi lệnh thành một tệp riêng mang tên lệnh, chuyển hằng dùng chung vào lib.mjs của hệ thống và để nơi gọi dùng tệp lệnh."
   owner: supervisor
   kind: check-finding
 
-RT_LAYER_RULES_INVALID:
-  title: "Layer rule set invalid"
-  title_vi: "Bộ luật phân tầng không hợp lệ"
-  meaning_vi: "modules/kernel/runtime-layers.yaml hoặc runtime-layers.allow.yaml không đọc được, thiếu danh sách bắt buộc, hoặc có một mục ngoại lệ thiếu đường dẫn, mã, hệ thống hay lý do. Mục không hợp lệ không miễn trừ gì."
+RT_SPEC_PLACEMENT:
+  title: "Runtime spec out of place"
+  title_vi: "Spec của runtime đặt sai chỗ"
+  meaning_vi: "Một spec của runtime không nằm ở tests/<khu vực>/<module>[.<chủ đề>].spec.mjs, mã dùng chung cho spec không nằm ở tests/helpers/, hoặc một tệp trong packages dùng hậu tố .test. thay vì .spec."
   causes_vi:
-    - "Sửa tay tệp luật và làm hỏng YAML"
-    - "Thêm ngoại lệ mà không ghi lý do"
-  nextStep_vi: "Người giám sát sửa tệp luật theo thông báo, qua một lane đã land."
+    - "Spec để phẳng ngay trong tests/"
+    - "Tệp dùng chung có tiền tố _ ở gốc tests/"
+  nextStep_vi: "Người giám sát chuyển tệp vào đúng thư mục bằng script di chuyển (rh-move.mjs) để import được viết lại, qua lane của chunk C7."
+  owner: supervisor
+  kind: check-finding
+
+RT_SOURCE_NAME:
+  title: "Runtime source name breaks the convention"
+  title_vi: "Tên tệp nguồn runtime sai quy ước"
+  meaning_vi: "Một tệp nguồn của runtime không đặt tên kebab-case, mang tên dùng một lần (_*, tmp-*, fix-*, *-backfill, migrate-*, *.bak*), hoặc trùng tên với một tệp khác trong cùng tầng (trừ lib.mjs và index.mjs)."
+  causes_vi:
+    - "Để lại một script dùng một lần trong cây nguồn"
+    - "Hai module ở hai thư mục cùng tầng mang cùng một tên"
+  nextStep_vi: "Người giám sát đổi tên tệp (bằng script di chuyển để import được viết lại) hoặc xóa script dùng một lần."
+  owner: supervisor
+  kind: check-finding
+
+RT_RETIRED_PRESENT:
+  title: "Retired path or symbol is back"
+  title_vi: "Đường dẫn hoặc ký hiệu đã loại bỏ xuất hiện lại"
+  meaning_vi: "Một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml lại được git theo dõi, hoặc một ký hiệu trong retiredSymbols[] lại được khai báo trong mã runtime. Thứ đã được thay thế (kể cả các chức năng Orca có sẵn) phải giữ nguyên là đã thay thế."
+  causes_vi:
+    - "Khôi phục một tệp cũ thay vì dùng tệp kế nhiệm"
+    - "Viết lại một cơ chế mà Orca đã cung cấp sẵn"
+  nextStep_vi: "Người giám sát xóa tệp hoặc ký hiệu và dùng phần thay thế ghi trong retired-paths.yaml."
+  owner: supervisor
+  kind: check-finding
+
+RT_GENERATED_DRIFT:
+  title: "Generated copy drifted"
+  title_vi: "Bản sao sinh tự động bị lệch"
+  meaning_vi: "Một bản sao sinh tự động trong packages/hfs/runtime, packages/eslint/be/runtime hoặc packages/eslint/fe/runtime khác với nội dung mà packages/hfs/scripts/sync-runtime.mjs ghi ra từ nguồn duy nhất: thiếu, cũ, hoặc thừa tệp."
+  causes_vi:
+    - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
+    - "Sửa tay một tệp trong thư mục runtime/ của gói"
+  nextStep_vi: "Người giám sát chạy node packages/hfs/scripts/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
+  owner: supervisor
+  kind: check-finding
+
+RT_CITED_PATH_MISSING:
+  title: "Cited runtime path does not exist"
+  title_vi: "Đường dẫn được trích dẫn không tồn tại"
+  meaning_vi: "Văn bản đang dùng (modules ngoài lịch sử hợp đồng, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, tài liệu ui) trích dẫn một đường dẫn runtime không tồn tại, hoặc trích dẫn một đường dẫn đã loại bỏ hay đã chuyển chỗ mà chỉ lịch sử mới được nhắc."
+  causes_vi:
+    - "Di chuyển hay xóa tệp mà không cập nhật tài liệu"
+    - "Gõ sai đường dẫn trong tài liệu"
+  nextStep_vi: "Người giám sát sửa trích dẫn thành đường dẫn hiện tại (moved[].to của retired-paths.yaml cho tệp đã chuyển) hoặc xóa câu đó."
+  owner: supervisor
+  kind: check-finding
+
+RT_PENDING_STALE:
+  title: "Pending entry is stale"
+  title_vi: "Mục pending đã cũ"
+  meaning_vi: "Một mục trong danh sách pending của knowledge/hfs/runtime-slots.yaml không còn cho phép phát hiện nào (khoản nợ đã trả) hoặc ghi một mã mà không luật runtime nào báo."
+  causes_vi:
+    - "Lane đã sửa vi phạm nhưng quên xóa mục pending"
+    - "Gõ sai mã luật trong mục pending"
+  nextStep_vi: "Người giám sát xóa mục đó trong cùng commit đã sửa vi phạm."
+  owner: supervisor
+  kind: check-finding
+
+RT_PENDING_ADDED:
+  title: "Pending list grew"
+  title_vi: "Danh sách pending bị nới rộng"
+  meaning_vi: "Một mục pending cho phép một phát hiện mà danh sách pending của bản gốc (merge-base với main) không cho phép. Danh sách chỉ được thu hẹp: vi phạm mới phải được sửa, không được ghi thêm."
+  causes_vi:
+    - "Thêm mục pending để làm xanh kiểm tra thay vì sửa mã"
+    - "Mở rộng glob của một mục có sẵn"
+  nextStep_vi: "Người giám sát sửa vi phạm mới và bỏ phần mở rộng của danh sách pending; một tệp được chuyển chỗ giữ quyền của nó qua moved[] trong retired-paths.yaml."
+  owner: supervisor
+  kind: check-finding
+
+RT_PINNED_PATH_MOVED:
+  title: "Pinned path moved"
+  title_vi: "Đường dẫn được ghim bị chuyển chỗ"
+  meaning_vi: "Một đường dẫn được ghim (ruleParams.runtime.pinned: được lưu ngoài git trong hook, settings, tác vụ định kỳ, prompt) không còn tồn tại mà không có mục moved[] trong retired-paths.yaml, hoặc được chuyển bằng một mục moved[] không có quiesced: true."
+  causes_vi:
+    - "Đổi tên một tệp mà hook hay tác vụ định kỳ đang trỏ tới"
+    - "Chuyển tệp khi fleet còn đang chạy"
+  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi fleet đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
   owner: supervisor
   kind: check-finding
 

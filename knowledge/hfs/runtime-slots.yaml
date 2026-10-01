@@ -315,7 +315,7 @@ slots:
     minInstances: 1
     requires: [lib.mjs]
     allows: [lib.mjs, "<call>.mjs"]
-    forbids: ["*/", index.mjs]
+    forbids: [index.mjs]
     tests: none
     rules: [RT_API_SHAPE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_SOURCE_NAME]
   - id: runtime.api-retired
@@ -338,7 +338,8 @@ slots:
     rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_SOURCE_NAME]
   - id: runtime.lib-retired
     profiles: [runtime]
-    path: "scripts/lib/{hfs-*.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-*.mjs,yaml.mjs}"
+    # Every name is spelled out: a wildcard segment ranks below the <name>.mjs of runtime.lib.
+    path: "scripts/lib/{hfs-allows.mjs,hfs-check.mjs,hfs-path-findings.mjs,hfs-slots.mjs,hfs-tree.mjs,hfs-view.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-claude.mjs,hk-devin.mjs,hk-git-locks.mjs,hk-lanes.mjs,hk-ledger.mjs,hk-logs.mjs,hk-orphan-ledgers.mjs,hk-sessions.mjs,hk-tmp.mjs,yaml.mjs}"
     presence: forbidden
     tracked: external
     tier: none

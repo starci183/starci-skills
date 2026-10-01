@@ -76,7 +76,7 @@ concerns:
 # stall-alert) are deleted (owner ruling 2026-09-28 "delete on any error"; modules/kernel/retired-paths.yaml).
 
 routing:
-  source: every ledger's events (sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay
+  source: every ledger's events (scripts/reconciler/sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay
   ledgers: config.yaml supervisor.repos (ledgerId = folder name) + the Supervisor (ledgerId supervisor, its events in machine.sqlite sup_events)
   examples:   # DESIGN §7.4
     op-reported: 'job:<ledgerId>:<jobId>'

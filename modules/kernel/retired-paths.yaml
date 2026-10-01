@@ -3,7 +3,13 @@
 # (modules/kernel/contract-changes/**) or modules/kernel/owner-rulings.yaml citing one of these paths is valid
 # (scripts/checks/check-contract-cites.mjs); live contract text must name what runs now. `replacedBy` names the
 # reconciler controller that owns the duty (modules/reconciler/reconciler.yaml), `removedIn` the lane.
-schema: starci/retired-paths@1
+#
+# moved[]: a file that moved, one entry per move ({from, to, movedIn: the chunk, quiesced: true only for a pinned path moved
+# with the fleet stopped}); written by the move codemod of the runtime HFS migration. History may cite `from`, live prose
+# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again, and the pending ratchet keeps a moved file's entry.
+# retiredSymbols[]: a name replaced by an Orca built-in or another mechanism ({symbol, replacedBy}); RT_RETIRED_PRESENT
+# refuses a declaration of it in runtime production code (scripts/hfs/runtime-rules/retired.mjs).
+schema: starci/retired-paths@2
 retired:
   - {path: scripts/supervisor/stall-alert.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (stall DIs, escalation), fleet Notifier (owner digest, host-resource push), gc controller (housekeeping status); ownerPush moved to scripts/connectors/telegram.mjs'}
   - {path: scripts/supervisor/tick.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'host (host, orca, statusApp), fleet (digest push, owed, land, alerts), workflow (workflows, progress), resource (sample, census, throttle), gc (gc) controllers; digest reads: poll.mjs --once'}
@@ -149,7 +155,7 @@ retired:
   - {path: tests/next-error-context.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
   - {path: tests/next-error-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
   - {path: tests/next-framework-pinned-names.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/next.mjs'}
-  - {path: docs/fable.md, retiredAt: 2026-10-01, removedIn: c0-close, replacedBy: '.experiments/fable.md: the dated drift journal is history, kept outside docs/ so no doc check reads it as current knowledge'}
+  - {path: docs/fable.md, retiredAt: 2026-10-01, removedIn: c0-close, replacedBy: 'benchmark/findings/fable.md: the dated drift journal is history, kept outside docs/ so no doc check reads it as current knowledge'}
   - {path: packages/hfs/sync/skeleton.mjs, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/scaffold/app.mjs: the app scaffold writes the skeleton (the per-app Next tsconfig from code)'}
   - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/ci.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
   - {path: packages/hfs/templates/be/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
@@ -165,3 +171,18 @@ retired:
   - {path: scripts/lib/process-list.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/process-list.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}
   - {path: scripts/lib/kill-tree.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/kill-tree.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}
   - {path: scripts/lib/hide-child-windows.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/hide-child-windows.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}
+  - {path: _e11.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'nothing: a one-off codemod of one spec; one-off scripts live in the agent scratchpad (runtime.agent-output of knowledge/hfs/runtime-slots.yaml)'}
+  - {path: .experiments/practices/2026-09-22-supervisor-round1.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'nothing: a practice note only benchmark/findings/fable.md cited; .experiments/ is forbidden in the runtime tree'}
+  - {path: scripts/checks/check-layers.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs (ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml), run by scripts/hfs/runtime-check.mjs in npm run check'}
+  - {path: modules/kernel/runtime-layers.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'knowledge/hfs/runtime-slots.yaml ruleParams.runtime.infraOwners and tiers.runtime'}
+  - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'the pending list of knowledge/hfs/runtime-slots.yaml (shrink-only, one entry per finding path and code, each with its chunk)'}
+  - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
+moved:
+  - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
+  - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
+  - {from: .experiments/fable.md, to: benchmark/findings/fable.md, movedIn: C0, quiesced: false}
+  - {from: .experiments/practices/2026-09-23-parallel-gear.md, to: benchmark/findings/2026-09-23-parallel-gear.md, movedIn: C0, quiesced: false}
+# Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
+# staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
+# deletes the symbol.
+retiredSymbols: []

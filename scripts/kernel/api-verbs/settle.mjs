@@ -468,7 +468,7 @@ export default {
   // The op's Orca Task is closed with its worker. Settling only the worker
   // left every finished operation as an open Task in the workflow Run, which
   // is what the owner saw as ticked [Op] rows sitting at the sidebar root
-  // (docs/fable.md orca-hierarchy, row 3). A close failure never un-settles the
+  // (benchmark/findings/fable.md orca-hierarchy, row 3). A close failure never un-settles the
   // job; the ledger row is already the record.
   const taskClosed = closeOperationTask(db, job, settledPayload);
 

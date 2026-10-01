@@ -19,7 +19,7 @@ how it is *proven* — declaration never counts, evidence does.
       identity ambiguity → owner escalation, never guessed
 - [ ] Every re-plan emits a ledger event: what changed, why, which legs died
 
-## 2. interface.draw — "vẽ đẹp", not placeholder-grade
+## 2. interface.draw — beautiful, not placeholder-grade
 
 - [ ] Design tokens real: spacing scale, type ramp, elevation, radius — from the
       project's design system, not ad-hoc px
@@ -34,7 +34,7 @@ how it is *proven* — declaration never counts, evidence does.
 - [ ] Density, rhythm, alignment pass — no orphaned labels, clipped text,
       misaligned grids
 
-## 3. UX completeness — "nuột"
+## 3. UX completeness — smooth
 
 - [ ] Loading: skeleton screens for content regions (not page-wide spinner);
       spinners only for short indeterminate actions

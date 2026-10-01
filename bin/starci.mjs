@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The one command line of StarCi: a thin dispatcher over the installed tree's own executables.
 // install/update/doctor/version are the installer (scripts/install/install.mjs); api is the kernel
-// agent's mutation gate; start boots a workflow kernel; goal defines one. Anything else is the help.
+// agent's mutation gate; start boots a workflow kernel; goal defines one; check judges this runtime tree (npm run check).
+// Anything else is the help.
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +15,7 @@ const ROUTES = {
   start: '../scripts/kernel/start-workflow.mjs',
   goal: '../scripts/goal/define-goal.mjs',
   validate: '../scripts/checks/work-validate.mjs',
+  check: '../scripts/checks/check-runtime.mjs',
 };
 
 const HELP = `starci — kernel-agent workflow runtime
@@ -24,6 +26,8 @@ const HELP = `starci — kernel-agent workflow runtime
   starci goal [args]                  define a goal: assess, plan table, persist to the ledger
   starci validate <work-root>         read-only Work record/layout validation
                   [--strict]          also compile every record against its named JSON schema
+  starci check [--json]               judge this runtime tree: node --check, the runtime HFS check
+                                      (knowledge/hfs/runtime-slots.yaml) and the retained self-checks
   starci help                         this text
 `;
 
