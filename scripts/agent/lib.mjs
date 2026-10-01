@@ -29,6 +29,8 @@ import { runShow } from '../api/orca/run-show.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
 import { taskSpecOf } from '../kernel/task-spec.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { orcaSettings } from '../../engine/config.mjs';
+import { dispatchDepthOf, launchDepth, depthVerdict } from '../lib/worker-depth.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -383,13 +385,20 @@ export function cleanupDeliveryArtifact(artifact) {
 // an effect is reconciled before the failure returns, so no caller ever owns a half launch.
 // `onCreated(handle, dispatchId)` runs the moment the assignee terminal is known, before attestation: the caller
 // records it durably (nivo inc-e523617a3c31).
+// Depth preflight (contract change worker-depth-limit): `parentDispatch` is the Dispatch of the runtime-launched worker
+// this one nests under (an op under its Kernel, the critic under its op), none under the owner's chat. Its depth
+// (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'
+// with worker-depth-exceeded before anything is trusted or started (effectState none). An unreadable parent depth
+// proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, task, run, from = null,
-  retryOf = null, onCreated = null, io = null } = {}) {
+  retryOf = null, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow, assignee: io?.assignee ?? dispatchShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? workerRelease,
     trust: io?.trust ?? ensureLaunchTrust };
   const { card, error: cardError } = loadAdapter(provider);
   if (cardError) return { ok: false, step: 'card', error: cardError, provider };
+  const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
+  if (refusal) return { ...refusal, provider, taskId: task ?? null, runId: run ?? null };
   const takesModel = card?.start?.modelArgument !== false;
   if (effort === 'none') effort = null;
   let trust = null;
@@ -452,8 +461,25 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   }
   return { ok: true, terminal, dispatchId, taskId: task ?? null, runId: run ?? null, provider, model: takesModel ? model : null,
     effort: takesModel && model ? effort : null, effective: { agent: effAgent, model: effModel }, titleApplied: renamed?.ok === true,
-    ...(trust ? { trust } : {}) };
+    depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(trust ? { trust } : {}) };
 }
+
+/**
+ * The depth preflight of one launch: {depth, limit, refusal|null}. `show` reads the parent's Dispatch (worker-show).
+ * refusal is the typed step-'depth' receipt (effectState none) when the new worker would nest past the limit.
+ */
+export function depthPreflight({ parentDispatch = null, maxDepth = null, show = workerShow } = {}) {
+  const limit = Number.isInteger(maxDepth) ? maxDepth : configuredMaxDepth();
+  const parentDepth = parentDispatch ? dispatchDepthOf(bestEffortCall(() => show({ dispatch: parentDispatch }))) : null;
+  const depth = launchDepth({ parentDispatch, parentDepth });
+  const tooDeep = depthVerdict({ depth, maxDepth: limit });
+  return { depth, limit, refusal: tooDeep ? { ok: false, step: 'depth', error: tooDeep.error, errorCode: tooDeep.code, code: 'worker-depth-exceeded',
+    effectState: 'none', depth, maxDepth: limit, parentDispatch } : null };
+}
+
+// config.yaml orca.maxWorkerDepth; an unreadable or invalid owner config falls back to the default (start --check
+// reports the config itself).
+const configuredMaxDepth = () => { try { return orcaSettings().maxWorkerDepth; } catch { return orcaSettings({}).maxWorkerDepth; } };
 
 const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
@@ -464,8 +490,11 @@ const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: f
 // a Task to it). The Task spec is the prompt, spilled to `specFile` past the host's argv (task-spec.mjs).
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create'|'task-create', effectState:'none'}.
 export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
-  heading = null, objective, entry = null, priorRunId = null, onCreated = null, io = null } = {}) {
+  heading = null, objective, entry = null, priorRunId = null, onCreated = null, parentDispatch = null, maxDepth = null, io = null } = {}) {
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate, taskCreate: io?.taskCreate ?? taskCreate };
+  // The depth preflight runs before the Run and Task exist, so a refused launch leaves nothing behind in Orca.
+  const preflight = depthPreflight({ parentDispatch, maxDepth, show: io?.spawn?.show ?? workerShow });
+  if (preflight.refusal) return { ...preflight.refusal, provider };
   const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
   const from = entry ? { from: entry } : {};
   const newRun = () => {
@@ -484,5 +513,6 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   }
   if (!task?.ok || !task.taskId) return { ok: false, step: 'task-create', error: task?.error ?? 'task-create returned no taskId', provider, runId, effectState: 'none',
     ...(task?.hostUnavailable ? { hostUnavailable: true } : {}) };
-  return spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, task: task.taskId, run: runId, from: entry, onCreated, io: io?.spawn ?? null });
+  return spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, task: task.taskId, run: runId, from: entry, onCreated,
+    parentDispatch, maxDepth, preflight, io: io?.spawn ?? null });
 }

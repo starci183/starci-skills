@@ -24,7 +24,7 @@ test('the op context is the job the ledger binds to the caller\'s Orca terminal,
   bind('term_draw', 'op-draw-1');
   const env = (extra) => ({ ...process.env, ...extra });
   assert.deepEqual(opContextOf({ env: env({ ORCA_TERMINAL_HANDLE: 'term_draw' }), root: skillRoot }),
-    { jobId: 'op-draw-1', workflowId: WF, scratchDir: scratch, provider: 'devin', handle: 'term_draw', ledgerRepo: path.resolve(repoRoot) });
+    { jobId: 'op-draw-1', workflowId: WF, scratchDir: scratch, provider: 'devin', dispatchId: 'seed:op-draw-1', handle: 'term_draw', ledgerRepo: path.resolve(repoRoot) });
   // No terminal, a terminal with no guard (the Kernel's, the owner's), or a guard the ledger does not bind to that
   // terminal: no op. An env marker never names one.
   assert.equal(opContextOf({ env: env({ ORCA_TERMINAL_HANDLE: '', STARCI_OP_JOB: 'op-draw-1', STARCI_JOB_SCRATCH: scratch, STARCI_OP_PROVIDER: 'devin' }), root: skillRoot }), null);

@@ -225,6 +225,30 @@ export function uatSettings(config=loadConfig()){
   return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
 }
 /**
+ * config.yaml `orca` — the owner's Orca app settings the runtime must know. maxWorkerDepth is the deepest worker Orca
+ * lets start under the owner's chat (chat = depth 0, a Kernel or the [Supervisor] 1, an op or a [Worker] 2, the draw
+ * critic 3); a deeper worker-start is refused by Orca with nested_worker_depth_exceeded. Orca exposes no read of that
+ * setting, so it is declared here and MUST equal the Orca app setting: scripts/agent/lib.mjs spawnAgent refuses a launch
+ * deeper than it before worker-start (worker-depth-exceeded), and `start --check` with STARCI_ORCA_LIVE=1 compares it with
+ * a measured probe (scripts/agent/depth-probe.mjs).
+ */
+export const ORCA_DEFAULTS=Object.freeze({maxWorkerDepth:4});
+export const MAX_WORKER_DEPTH_CEILING=16;
+function validateOrca(orca){
+  if(orca===null)return;
+  const bad=invalid('orca');
+  if(!plain(orca))bad(' must be {maxWorkerDepth?} or null.');
+  for(const key of Object.keys(orca))if(key!=='maxWorkerDepth')bad(` has unknown key ${key} (allowed: maxWorkerDepth).`);
+  const v=orca.maxWorkerDepth;
+  if(v!==undefined&&v!==null&&!(Number.isInteger(v)&&v>=1&&v<=MAX_WORKER_DEPTH_CEILING))bad(`.maxWorkerDepth must be an integer from 1 to ${MAX_WORKER_DEPTH_CEILING} equal to the Orca app's worker depth setting (default ${ORCA_DEFAULTS.maxWorkerDepth}), or null.`);
+}
+/** The owner's Orca settings: {maxWorkerDepth, source: 'orca'|'default'}. An absent or null block or key is the default. */
+export function orcaSettings(config=loadConfig()){
+  if(config?.orca!==undefined)validateOrca(config.orca);
+  const value=plain(config?.orca)?config.orca.maxWorkerDepth:null;
+  return Number.isInteger(value)?{maxWorkerDepth:value,source:'orca'}:{maxWorkerDepth:ORCA_DEFAULTS.maxWorkerDepth,source:'default'};
+}
+/**
  * config.yaml `allocation` beyond mode/preferredProvider — how `api route` spreads jobs over the pools
  * (scripts/agent/models.mjs selectPool):
  *   policy: prefer-then-overflow (the runtimes.yaml default) | balanced — among the eligible pools, the one
@@ -280,10 +304,11 @@ function refuseRetiredProvider(value,where){
   if(typeof value==='string'&&/^qwen(?:-agent)?$/i.test(value.trim()))throw Error(`Invalid config.yaml: ${where} names qwen. Qwen đã bị gỡ; dùng claude, codex hoặc devin.`);
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
+  if(config?.orca!==undefined)validateOrca(config.orca);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).

@@ -589,7 +589,9 @@ else if (verb === 'orchestration worker-show') {
       terminal: { handle: 'fake-terminal-1', connected: false, writable: false },
       observation: { exactWorker: true, status: 'exited' } } });
   else
-    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null },
+    // dispatchDepths[dispatch]: the depth Orca reports for a Dispatch (none when unseeded).
+    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null,
+      ...(state.dispatchDepths?.[arg('dispatch')] != null ? { depth: state.dispatchDepths[arg('dispatch')] } : {}) },
       // workerStates[dispatch]: what worker-stop / worker-release left (a seeded Dispatch reads ready).
       worker: { state: state.workerStates?.[arg('dispatch')] ?? 'ready', agent_terminal_handle: 'fake-terminal-1',
         // STARCI_FAKE_ORCA_EFFECTIVE_MODEL: the model the worker really runs, when it is not the requested one.

@@ -1,0 +1,39 @@
+id: worker-depth-limit
+effectiveAt: '2026-10-02T12:00:00+07:00'
+summary: >-
+  THE RUNTIME KNOWS ORCA'S WORKER DEPTH LIMIT (lane C0-KDEPTH, deep map F9/O4). Orca nests every worker under the Dispatch
+  that started it (the owner's chat 0, a Kernel or the [Supervisor] 1, an op or a [Worker] 2, the draw critic 3) and
+  refuses a deeper worker-start with nested_worker_depth_exceeded; it exposes no read of that setting. config.yaml gains
+  `orca: {maxWorkerDepth}` (engine/config.mjs orcaSettings, validated integer 1..16, default 4 = the owner's Orca app
+  setting), which MUST equal the Orca app setting. scripts/lib/worker-depth.mjs holds the pure depth logic. scripts/agent/lib.mjs
+  depthPreflight reads the parent Dispatch's depth (worker-show, the existing wrapper) and refuses a launch at parent
+  depth + 1 > orca.maxWorkerDepth with the new code worker-depth-exceeded, effectState none, before anything is trusted
+  or started: startAgent before its Run and Task exist, spawnAgent before worker-start, api dispatch before the op's Task
+  (the op nests under its Kernel's managed.dispatchId; the rejection carries managed.code, no try spent), and the draw
+  critic under its op (opContextOf gains the op's dispatchId; runCritic parentDispatch). A launch with no runtime-launched
+  parent (a Kernel or the [Supervisor] from a chat or shell) counts as depth 1; an unreadable parent depth proves nothing
+  and Orca stays the authority. The receipt carries the attested depth. `start --check` gains the config row orca-depth:
+  the configured value, and with STARCI_ORCA_LIVE=1 and Orca reachable a measured probe (scripts/agent/depth-probe.mjs:
+  no-op workers chained by --from until Orca refuses for depth, all stopped and released deepest first), red on a
+  mismatch or a worker it could not release.
+adds:
+  codes:
+    - worker-depth-exceeded
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/worker-depth-limit.yaml
+  - engine/config.mjs
+  - config.example.yaml
+  - scripts/lib/worker-depth.mjs
+  - scripts/agent/lib.mjs
+  - scripts/agent/depth-probe.mjs
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - scripts/kernel/op-context.mjs
+  - scripts/work/draw-critic.mjs
+  - scripts/reconciler/start.mjs
+  - modules/kernel/failure-codes.yaml
+  - CHANGELOG.md
+  - tests/worker-depth.spec.mjs
+  - tests/helpers/fake-orca.mjs
+  - tests/config.spec.mjs
+  - tests/op-context.spec.mjs

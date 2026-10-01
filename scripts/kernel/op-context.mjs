@@ -16,7 +16,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const cache = new Map();
 
 /**
- * opContextOf({env}) -> {jobId, workflowId, scratchDir, provider, handle, ledgerRepo} | null. Read once per process
+ * opContextOf({env}) -> {jobId, workflowId, scratchDir, provider, dispatchId, handle, ledgerRepo} | null. Read once per process
  * and handle. Never throws: an unreadable binding or ledger is no context.
  */
 export function opContextOf({ env = process.env, root = SKILL_ROOT } = {}) {
@@ -33,8 +33,8 @@ export function opContextOf({ env = process.env, root = SKILL_ROOT } = {}) {
         const caller = callerOf(db, { ORCA_TERMINAL_HANDLE: handle });
         if (caller.role === OP_ROLE && caller.jobId) {
           const job = db.prepare('SELECT job_id, workflow_id FROM jobs WHERE job_id=?').get(caller.jobId);
-          const attempt = db.prepare('SELECT scratch_dir, provider FROM op_attempts WHERE job_id=? ORDER BY dispatch_seq DESC, attempt_id DESC LIMIT 1').get(caller.jobId);
-          context = { jobId: job.job_id, workflowId: job.workflow_id, scratchDir: attempt?.scratch_dir ?? null, provider: attempt?.provider ?? null, handle, ledgerRepo: path.resolve(guard.ledgerRepo) };
+          const attempt = db.prepare('SELECT scratch_dir, provider, dispatch_id FROM op_attempts WHERE job_id=? ORDER BY dispatch_seq DESC, attempt_id DESC LIMIT 1').get(caller.jobId);
+          context = { jobId: job.job_id, workflowId: job.workflow_id, scratchDir: attempt?.scratch_dir ?? null, provider: attempt?.provider ?? null, dispatchId: attempt?.dispatch_id ?? null, handle, ledgerRepo: path.resolve(guard.ledgerRepo) };
         }
       } finally { db.close(); }
     }
