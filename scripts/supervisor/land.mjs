@@ -461,8 +461,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   const touches = changed.map(normPath).filter((f) => !mirrored || f === MIRROR_CHECK || files.has(f) || mirrored.bundles.some((b) => f.startsWith(`${b}/`)));
   if (!touches.length) return null;
   const r = mirrorRun(dir);
-  const script = MIRROR_CHECK;
-  const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
+  const { ok, newFindings } = baselineVerdict(MIRROR_CHECK, baseline?.[MIRROR_CHECK], r);
   return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
 }
 
@@ -735,7 +734,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
     try {
       const baseline = {};
       if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
-      if (!deps.runChecks) { const script = MIRROR_CHECK; baseline[script] = mirrorRun(scratch.dir); }
+      if (!deps.runChecks) baseline[MIRROR_CHECK] = mirrorRun(scratch.dir);
       const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
       if (!pick.ok) {
         const said = pick.stderr || pick.stdout || pick.error || '';

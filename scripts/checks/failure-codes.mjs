@@ -49,7 +49,10 @@ function* walk(dir) {
 
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
-const BRACKET_RE = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
+// A bracketed code in text ('[TARGET_MISSING] ...', a flow list `[A_B]`). A computed member access (`baseline[KEY]`,
+// `x?.[KEY]`, `f()[KEY]`, `a[0][KEY]`) reads a constant and emits nothing, so a bracket right after an identifier,
+// `)`, `]` or `?.` is not a code.
+const BRACKET_RE = /(?<![\w$)\]]|\?\.)\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
 const KEBAB_RES = [
   new RegExp(`\\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\\s*:\\s*(['"])(${KEBAB})\\1`, 'g'),
   new RegExp(`\\breason\\s*:\\s*\`(${KEBAB})(?=[:\`$])`, 'g'),

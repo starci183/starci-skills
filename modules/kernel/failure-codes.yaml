@@ -5726,15 +5726,6 @@ TITLE_DRIFT:
   owner: runtime-core
   kind: runtime-fault
 
-TRANSCRIPT_CODE:
-  title: "Transcript-missing clock code"
-  title_vi: "Mã theo dõi thiếu bản ghi hội thoại"
-  meaning_vi: "Đây là tên mã dùng để đếm giờ cho trường hợp thiếu bản ghi hội thoại của một lượt làm."
-  causes_vi:
-    - "Chụp bản ghi hội thoại chưa xong"
-  nextStep_vi: "Xem mã TRANSCRIPT_MISSING; mục này chỉ là hằng số trỏ tới mã đó."
-  owner: runtime-core
-  kind: runtime-fault
 
 TRANSCRIPT_MISSING:
   title: "Transcript not captured in time"
