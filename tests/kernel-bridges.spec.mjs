@@ -79,6 +79,10 @@ test('api messages shows every orchestration message of the workflow\'s Runs, wi
     w.unit(l, 'wf-msg', 'u-msg-1', 'code.refactor', 'docs/');
     l.enqueueJob({ jobId: 'op-code.refactor-aaaaaaaaaa', workflowId: 'wf-msg', unitId: 'u-msg-1', opId: 'code.refactor', kind: 'op',
       payload: { opId: 'code.refactor', owned_paths: ['docs/'], orca: { runId: 'run-msg-1', dispatchId: 'ctx_msg_1', agentTerminalHandle: 'term-op-1' } } });
+    // The Kernel terminal is the consumer the drain names on every orchestration check.
+    l.enqueueJob({ jobId: 'kernel-wf-msg', workflowId: 'wf-msg', kind: 'kernel', role: 'kernel', payload: { orca: { runId: 'run-msg-1' } } });
+    for (const to of ['ready', 'leased']) l.write.setJobStatus({ jobId: 'kernel-wf-msg', to, reason: 'seed' });
+    l.write.setJobStatus({ jobId: 'kernel-wf-msg', to: 'running', reason: 'seed', workerId: 'term-kernel-msg' });
   });
   const row = (id, type, extra = {}) => ({ id, run_id: 'run-msg-1', from_handle: 'dispatch:ctx_msg_1', to_handle: 'run:run-msg-1', subject: `${type} subject`,
     body: `${type} body`, type, thread_id: id, payload: JSON.stringify({ dispatchId: 'ctx_msg_1' }), read: 0, created_at: new Date().toISOString(), ...extra });
@@ -87,7 +91,9 @@ test('api messages shows every orchestration message of the workflow\'s Runs, wi
   const first = w.api(['messages', '--workflow', 'wf-msg']);
   assert.equal(first.status, 0, first.stderr);
   const out = json(first.stdout);
+  assert.equal(out.error, undefined, 'the Run was checked');
   assert.deepEqual(out.messages.map((m) => m.id).sort(), ['m_done', 'm_q', 'm_status'], 'heartbeats and other Runs are left out');
+  assert.equal(out.heartbeats, 1, 'a heartbeat is counted, not listed');
   assert.equal(out.new, 3);
   const done = out.messages.find((m) => m.id === 'm_done');
   assert.equal(done.jobId, 'op-code.refactor-aaaaaaaaaa');
@@ -95,7 +101,11 @@ test('api messages shows every orchestration message of the workflow\'s Runs, wi
   assert.match(out.messages.find((m) => m.id === 'm_q').handle, /api reply/);
   const second = json(w.api(['messages', '--workflow', 'wf-msg']).stdout);
   assert.equal(second.new, 0, 'what the Kernel read is remembered');
-  assert.equal(w.read((db) => db.prepare("SELECT count(*) n FROM inbox").get().n), 0, 'nothing is bridged or acknowledged');
+  // The Delivery was written into the ledger (the question as an inbox row, the rest as events) and only then acknowledged.
+  assert.equal(w.read((db) => db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n), 1);
+  assert.equal(w.read((db) => db.prepare("SELECT count(*) n FROM events WHERE kind='orchestration-message'").get().n), 2);
+  const orca = json(fs.readFileSync(path.join(w.root, 'orca-state.json'), 'utf8'));
+  assert.ok(Object.values(orca.deliveries).every((d) => d.acked), 'every Delivery acknowledged');
   // an op terminal (the one the ledger binds to the op job) may not read the Kernel's messages
   const op = spawnSync(process.execPath, [API, 'messages', '--workflow', 'wf-msg', '--repo', w.repo, '--json'],
     { cwd: ROOT, encoding: 'utf8', env: { ...process.env, ORCA_TERMINAL_HANDLE: 'term-op-1' } });
