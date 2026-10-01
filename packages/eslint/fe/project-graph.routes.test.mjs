@@ -186,24 +186,25 @@ const lifecycle = {
 }
 const swrHeader = "import {cache,mutateCache} from '../../shared/cache';\nconst QUERY_COURSE='QUERY_COURSE', MUTATE_COURSE='MUTATE_COURSE';\nconst useViewerKey=():string|undefined=>'viewer';"
 const SWR = {
-    "package.json": `${JSON.stringify({
+    // the app root's one package.json and its one install
+    "../package.json": `${JSON.stringify({
         private: true,
         dependencies: { swr: "^2.3.8" },
         starci: { codePatterns: { next: { schema: "starci/next-code-pattern-contract@1", owners: [], closedVocabularies: [], dataLifecycle: lifecycle } } },
     }, null, 2)}\n`,
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", strict: true, jsx: "react-jsx", skipLibCheck: true, noEmit: true }, include: ["src/**/*", "apps/**/*"] }),
-    "node_modules/swr/package.json": JSON.stringify({ name: "swr", version: "2.3.8", types: "./index.d.ts", exports: {
+    "../node_modules/swr/package.json": JSON.stringify({ name: "swr", version: "2.3.8", types: "./index.d.ts", exports: {
         ".": { types: "./index.d.ts", default: "./index.js" },
         "./immutable": { types: "./immutable.d.ts", default: "./immutable.js" },
         "./mutation": { types: "./mutation.d.ts", default: "./mutation.js" },
         "./package.json": "./package.json",
     } }),
-    "node_modules/swr/index.d.ts": "declare function useSWR<T=unknown>(key:unknown,fetcher?:unknown):{data:T,error?:unknown,mutate:(data?:T)=>Promise<T|undefined>};\nexport default useSWR;\nexport declare function mutate(key:unknown,data?:unknown,options?:unknown):Promise<unknown>;\nexport declare function useSWRConfig():{mutate:typeof mutate};\n",
-    "node_modules/swr/immutable.d.ts": "import useSWR from \"./index\"; export default useSWR;\n",
-    "node_modules/swr/mutation.d.ts": "export default function useSWRMutation<T=unknown>(key:unknown,fetcher?:unknown):{data:T,trigger:(arg?:unknown)=>Promise<T>};\n",
-    "node_modules/swr/index.js": "export default function useSWR(){}; export const mutate=()=>{}; export const useSWRConfig=()=>({mutate});\n",
-    "node_modules/swr/immutable.js": "export {default} from \"./index.js\";\n",
-    "node_modules/swr/mutation.js": "export default function useSWRMutation(){}\n",
+    "../node_modules/swr/index.d.ts": "declare function useSWR<T=unknown>(key:unknown,fetcher?:unknown):{data:T,error?:unknown,mutate:(data?:T)=>Promise<T|undefined>};\nexport default useSWR;\nexport declare function mutate(key:unknown,data?:unknown,options?:unknown):Promise<unknown>;\nexport declare function useSWRConfig():{mutate:typeof mutate};\n",
+    "../node_modules/swr/immutable.d.ts": "import useSWR from \"./index\"; export default useSWR;\n",
+    "../node_modules/swr/mutation.d.ts": "export default function useSWRMutation<T=unknown>(key:unknown,fetcher?:unknown):{data:T,trigger:(arg?:unknown)=>Promise<T>};\n",
+    "../node_modules/swr/index.js": "export default function useSWR(){}; export const mutate=()=>{}; export const useSWRConfig=()=>({mutate});\n",
+    "../node_modules/swr/immutable.js": "export {default} from \"./index.js\";\n",
+    "../node_modules/swr/mutation.js": "export default function useSWRMutation(){}\n",
     "src/shared/cache.ts": "export {default as cache} from \"swr\"; export {default as mutateCache} from \"swr/mutation\";\n",
     "src/features/course/use-disabled.ts": "import {cache} from '../../shared/cache'; export const useDisabled=()=>cache(null,async()=>null);\n",
     // the former false positives: a transparent alias of an identity and of the params object are the same identity

@@ -629,13 +629,13 @@ const grammarPackage = (version) => ({
     "dist/core/styles.css": '@import "../common/styles.css";\n',
 })
 
+// The app root's one package.json declares the grammar and its peers for every app; the one install is at the app root.
 const grammarFiles = () => {
     const files = {
-        "package.json": JSON.stringify({ private: true, workspaces: ["apps/*"] }),
+        "../package.json": JSON.stringify({ name: "fixture", private: true, dependencies: { "@starci/grammar": "0.4.11", react: "19.0.0", "@heroui/react": "2.0.0" } }),
     }
-    for (const [file, text] of Object.entries(grammarPackage("0.4.11"))) files[`node_modules/@starci/grammar/${file}`] = text
+    for (const [file, text] of Object.entries(grammarPackage("0.4.11"))) files[`../node_modules/@starci/grammar/${file}`] = text
     for (const app of ["app", "landing"]) {
-        files[`apps/${app}/package.json`] = JSON.stringify({ name: `@m/${app}`, private: true, dependencies: { "@starci/grammar": "0.4.11", react: "19.0.0", "@heroui/react": "2.0.0" } })
         files[`apps/${app}/src/app/globals.css`] = '@import "@starci/grammar/common.css";\n'
         files[`apps/${app}/src/app/page.tsx`] = 'import { Button } from "@starci/grammar/common"\nexport default function Route() { return <Button /> }\n'
     }
@@ -672,7 +672,8 @@ test("ARCH_GRAMMAR_EXPORT_BYPASS: vendor grammar is reached only through its dec
 // ---- package-imports-app, package-export-bypass (ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS) -----------------------
 
 const packageTree = () => ({
-    "package.json": JSON.stringify({ name: "fixture-fe", private: true, workspaces: ["apps/*", "packages/*"] }),
+    // the app root's one package.json: its workspaces are the fe side's packages
+    "../package.json": JSON.stringify({ name: "fixture", private: true, workspaces: ["fe/packages/*"] }),
     "tsconfig.json": JSON.stringify({
         compilerOptions: {
             target: "ES2022", module: "ESNext", moduleResolution: "Bundler", jsx: "preserve", allowJs: true, skipLibCheck: true, noEmit: true, baseUrl: ".",

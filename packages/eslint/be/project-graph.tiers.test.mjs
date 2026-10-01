@@ -258,9 +258,9 @@ const tsconfig = (paths, include = ["src/**/*", "apps/**/*", "packages/**/*"]) =
 
 test("a package never imports an app", () => {
     const files = {
-        "package.json": JSON.stringify({ private: true, workspaces: ["apps/*", "packages/*"] }),
+        // the app root's one package.json: its workspaces are the side's packages
+        "../package.json": JSON.stringify({ private: true, workspaces: ["be/packages/*"] }),
         "tsconfig.json": tsconfig({ "@fixture/api/*": ["apps/api/src/*"], "@fixture/ui": ["packages/ui/src/index.ts"], "@fixture/ui/*": ["packages/ui/src/*"] }),
-        "apps/api/package.json": JSON.stringify({ name: "@fixture/api", private: true }),
         "apps/api/src/main.ts": "import { Public } from '@fixture/ui/public';\nvoid Public;\n",
         "apps/api/src/app.module.ts": "export class AppModule {}\n",
         "apps/api/src/contract.ts": "export type AppContract = string\n",
@@ -284,9 +284,9 @@ test("a package never imports an app", () => {
 
 test("a package is imported only through its declared exports", () => {
     const files = {
-        "package.json": JSON.stringify({ private: true, workspaces: ["apps/*", "packages/*"] }),
+        // the app root's one package.json: its workspaces are the side's packages
+        "../package.json": JSON.stringify({ private: true, workspaces: ["be/packages/*"] }),
         "tsconfig.json": tsconfig({ "@fixture/ui": ["packages/ui/src/index.ts"], "@fixture/ui/*": ["packages/ui/src/*"] }),
-        "apps/api/package.json": JSON.stringify({ name: "@fixture/api", private: true }),
         "apps/api/src/main.ts": "import { Public } from '@fixture/ui/public';\nimport { Private } from '@fixture/ui/private';\nvoid [Public, Private];\n",
         "apps/api/src/app.module.ts": "import { Public } from '@fixture/ui/public';\nimport { ui } from '@fixture/ui';\nexport class AppModule { static uses = [Public, ui] }\n",
         "packages/ui/package.json": JSON.stringify({ name: "@fixture/ui", private: true, exports: { ".": "./src/index.ts", "./public": "./src/public/index.ts" } }),

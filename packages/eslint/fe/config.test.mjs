@@ -9,7 +9,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { ESLint } from "eslint"
-import tsParser from "@typescript-eslint/parser"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import plugin, {
@@ -97,21 +96,25 @@ test("the blocks refuse inline directives and register the canon plugin", () => 
 })
 
 test("the factory's config lints a real file: a hardcoded copy string is an error", async () => {
+  // The factory's own block and the rule's own entry in it, linted from its tsconfigRootDir (the fixture side). The file need not
+  // exist: the project service types it with the fixture's tsconfig.json as the default project, as the typed rule tester does.
+  // The machine-backed rules of the block read the side from disk and are proven by the project-graph specs, not here.
+  const [block] = single
+  const RULE = "starci-fe/no-hardcoded-copy"
+  const parserOptions = {
+    ...block.languageOptions.parserOptions,
+    projectService: { allowDefaultProject: ["apps/*/src/components/*/*/*.tsx"], defaultProject: "tsconfig.json" },
+  }
   const eslint = new ESLint({
-    cwd: process.cwd(),
+    cwd: ROOT,
     overrideConfigFile: true,
-    overrideConfig: [
-      {
-        files: ["**/*.tsx"],
-        languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
-      },
-      { ...single[0], files: ["**/*.tsx"] },
-    ],
+    overrideConfig: [{ ...block, rules: { [RULE]: block.rules[RULE] }, languageOptions: { ...block.languageOptions, parserOptions } }],
   })
   const [result] = await eslint.lintText("export const E = () => <p>Nothing to show yet</p>\n", {
-    filePath: `${process.cwd()}/src/components/blocks/Feed/index.tsx`,
+    filePath: join(ROOT, "apps", "web", "src", "components", "blocks", "Feed", "index.tsx"),
   })
-  const rule = result.messages.find((message) => message.ruleId === "starci-fe/no-hardcoded-copy")
+  assert.deepEqual(result.messages.filter((message) => message.fatal), [], "the file parses with types")
+  const rule = result.messages.find((message) => message.ruleId === RULE)
   assert.ok(rule, `no-hardcoded-copy did not report: ${JSON.stringify(result.messages.map((m) => m.ruleId))}`)
   assert.equal(rule.severity, 2)
 })
