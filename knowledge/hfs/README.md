@@ -407,17 +407,17 @@ packages/<pkg>/                       any other code two apps share (FE_CROSS_AP
 
 ## 8. `.starciwork`, `.starcistacks`, secrets
 
-- `.starciwork` (backend only) holds flat product records `features/<f>/<family>/<name>/index.yaml`, `br/<rule>/ac/<name>/`,
+- `.starciwork` (at the app root) holds flat product records `features/<f>/<family>/<name>/index.yaml`, `br/<rule>/ac/<name>/`,
   `workspace.yaml`, `brand/`, `shell/index.yaml`, `_resources/{identities,environments,fixtures}/<slug>/resource.yaml`
   and accepted ui-screen assets. There is no `work/node` record (R08). `_derived/` is generated and not tracked.
-- An identity record holds role, provider, realm and `custody.sealed: .starcistacks/<env>/secrets/identity-<slug>.enc`
-  (R09). UAT `accounts.yaml` selects an identity by role; several flows share one identity per role. A record that holds
+- An identity record holds role, provider, realm and `custody.sealed: be/.starcistacks/<env>/secrets/identity-<slug>.enc`
+  (R09; the path is app-relative, like every path a record names). UAT `accounts.yaml` selects an identity by role; several flows share one identity per role. A record that holds
   no secret uses `custody.provider: none`.
-- `.starcistacks` (backend only) is `application-stacks.yaml` plus `<env>/{README.md, environment.json,
+- `.starcistacks` (the be side only: `be/.starcistacks`) is `application-stacks.yaml` plus `<env>/{README.md, environment.json,
   infra/{compose,k8s,terraform}, runtime/{config,env}, secrets/<slug>.enc, seeds/}`. There is no `runtime/files/`.
   `runtime/env/KEYS.md` names slugs only. The Sonar block is `owner: host` and points at `.claude/ext/sonar`. Root
   `DESIGN.md`, `deployment.json` and `k8s/` do not exist (R10).
-- Secrets exist only as sops `*.enc` at `.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value is never written into
+- Secrets exist only as sops `*.enc` at `be/.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value is never written into
   the repository tree, ignored or not; it lives in memory or under `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`
   and is passed by `*_FILE` (R06). Agents never read, print or commit a secret value and never generate or rotate keys.
   Owner ruling 2026-09-29: ONE shared master age identity (`~/.starci/master.identity`) decrypts every project's SOPS

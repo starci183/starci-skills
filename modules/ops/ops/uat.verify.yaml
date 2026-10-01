@@ -57,7 +57,7 @@ reads:
         expectations are resolved before mutation, not guessed from current behavior.
   - id: accounts
     path: .starciwork/_resources/identities/<identity>/resource.yaml + selected account requirements and
-      sealed custody (custody.sealed, always .starcistacks/<env>/secrets/<slug>.enc)
+      sealed custody (custody.sealed, always be/.starcistacks/<env>/secrets/<slug>.enc, app-relative)
     purpose:
       en: Resolve an existing suitable test account, role, membership and credential custody; otherwise
         create a scoped test account through the actual supported identity owner when the UAT
@@ -230,7 +230,7 @@ steps:
         provider/script; verify actual login, role and membership. Resolve credentials at use time
         and isolate browser sessions for distinct actors while retaining the session continuity each
         sequential flow requires. Track disposable account ownership separately from reused
-        identities. A sealed identity secret is written to exactly one place, .starcistacks/<env>/secrets/<identity-slug>.enc (sops age, created with the repo's stack-secret set command), and the identity record's custody.sealed names that path; never a sealed file, a secrets.enc.yaml or a plaintext value under .starciwork (the validator refuses it with SEALED_CUSTODY_LOCATION or SEALED_FILE_IN_WORK). Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
+        identities. A sealed identity secret is written to exactly one place, be/.starcistacks/<env>/secrets/<identity-slug>.enc (sops age, created with the repo's stack-secret set command), and the identity record's custody.sealed names that path; never a sealed file, a secrets.enc.yaml or a plaintext value under .starciwork (the validator refuses it with SEALED_CUSTODY_LOCATION or SEALED_FILE_IN_WORK). Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the app keeps every credential - be/.starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
   - reads:
       - fixtures
       - scripts

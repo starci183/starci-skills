@@ -871,15 +871,22 @@ const flowFor = (role) => ({
 });
 
 test('an identity whose custody.sealed is not identity-<slug>.enc is refused as HFS_IDENTITY_CUSTODY', () => {
-  const bad = refusalsFor(identityFor('.starcistacks/dev/secrets/uat.enc'));
+  const bad = refusalsFor(identityFor('be/.starcistacks/dev/secrets/uat.enc'));
   assert.ok(bad.some(p => p.includes('identity-demo.enc') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
-  const good = refusalsFor(identityFor('.starcistacks/dev/secrets/identity-demo.enc'));
+  const good = refusalsFor(identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'));
   assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
 });
 
+test('an identity custody.sealed is app-relative: a side-relative .starcistacks/... without the be/ prefix is refused as HFS_IDENTITY_CUSTODY', () => {
+  for (const sealed of ['.starcistacks/dev/secrets/identity-demo.enc', 'fe/.starcistacks/dev/secrets/identity-demo.enc']) {
+    const bad = refusalsFor(identityFor(sealed));
+    assert.ok(bad.some(p => p.includes(sealed) && p.includes('be/.starcistacks/<env>/secrets/identity-demo.enc') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
+  }
+});
+
 test('a UAT flow that selects a role its identity does not present is refused as HFS_IDENTITY_CUSTODY', () => {
-  const bad = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('admin') });
+  const bad = refusalsFor({ ...identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('admin') });
   assert.ok(bad.some(p => p.includes('role admin') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
-  const good = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
+  const good = refusalsFor({ ...identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
   assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
 });

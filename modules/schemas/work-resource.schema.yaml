@@ -186,9 +186,9 @@ properties:
           does not exist fails quietly.
       sealed:
         type: string
-        pattern: ^\.starcistacks/[a-z0-9]+(?:-[a-z0-9]+)*/secrets/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$
-        description: "The encrypted custody file, by repository-relative path: exactly
-          .starcistacks/<env>/secrets/<slug>.enc, a sops (age) file, where <slug> is the identity or resource
+        pattern: ^be/\.starcistacks/[a-z0-9]+(?:-[a-z0-9]+)*/secrets/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$
+        description: "The encrypted custody file, by app-relative path: exactly
+          be/.starcistacks/<env>/secrets/<slug>.enc (.starcistacks is the be side's, .starciwork the app root's), a sops (age) file, where <slug> is the identity or resource
           slug. This is the only location a sealed secret has; the Work tree holds this record and never the
           sealed file or any plaintext value. The schema has no not-sealed-yet form: an identity whose secret is
           not sealed yet still names the path it will be sealed at, and the validator reports the path as an
@@ -912,4 +912,4 @@ $defs:
                     custody:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
+                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is be/.starcistacks/<env>/secrets/<slug>.enc (app-relative), outside the Work tree."

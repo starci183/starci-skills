@@ -23,7 +23,7 @@ sideEffects:
     scope
   - scenario-owned data created in that sandbox account and disposed by the same run
   - reading the owner-provided credential through sops from the declared identity custody
-    (.starcistacks/<env>/secrets/<slug>.enc), inside the checking process only,
+    (be/.starcistacks/<env>/secrets/<slug>.enc, app-relative), inside the checking process only,
     never writing its value
 graphPolicy:
   mode: read-only
@@ -77,7 +77,7 @@ reads:
         it actually reads the credential from. The proof binds the exact tested tree, so a claim
         without a resolved repository and a named client is not a proof.
   - id: credential
-    path: .starciwork/_resources/identities/<slug>/resource.yaml + .starcistacks/<env>/secrets/<slug>.enc (the one sealed location; the record's custody.sealed names it), read with the runtime's sops-exec-env helper (format stated with --input-type) at the moment of use
+    path: .starciwork/_resources/identities/<slug>/resource.yaml + be/.starcistacks/<env>/secrets/<slug>.enc (the one sealed location, app-relative; the record's custody.sealed names it), read with the runtime's sops-exec-env helper (format stated with --input-type) at the moment of use
     purpose:
       en: Resolve the identity alias, variable names and selected environment from the backend Stack
         declaration and readable resource metadata. The encrypted value authenticates the live call
@@ -189,7 +189,7 @@ steps:
     writes: [evidence]
     action:
       en: "Run everything that needs the credential inside `node <Source>/.claude/scripts/lib/sops-exec-env.mjs
-        --input-type yaml .starcistacks/<env>/secrets/<slug>.enc '<command>'` (the sealed file is
+        --input-type yaml be/.starcistacks/<env>/secrets/<slug>.enc '<command>'` from the app root (the sealed file is
         `<slug>.enc` and the helper states its format to sops; plain `sops exec-env` cannot read it),
         so the value is
         resolved from exactly that variable in exactly that process and nowhere else. If sops is not

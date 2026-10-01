@@ -95,7 +95,7 @@ rules:
     hfsRules: [R09, R06]
     requirement: |
       `_resources/identities/<slug>/resource.yaml` holds the role, provider and realm and `custody.sealed`, exactly
-      `.starcistacks/<env>/secrets/identity-<slug>.enc`; an identity that holds no secret uses `custody.provider: none` and
+      `be/.starcistacks/<env>/secrets/identity-<slug>.enc` (app-relative); an identity that holds no secret uses `custody.provider: none` and
       carries no sealed key. UAT `accounts.yaml` selects an identity by role, so several flows share one identity per role and
       no identity is created per flow. No identity file holds a value.
     rationale: |

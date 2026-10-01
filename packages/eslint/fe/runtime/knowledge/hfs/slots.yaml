@@ -529,7 +529,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: ".starcistacks/<env>/secrets/<slug>.enc (BE repo); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
+    goesTo: "be/.starcistacks/<env>/secrets/<slug>.enc; decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
   - id: be.root-e2e
     profiles: [be]
