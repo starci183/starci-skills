@@ -10,7 +10,6 @@ const GOOD = {
   'src/features/a/a.module.ts': E,
   'src/features/a/application/run.command.ts': E,
   'src/features/a/application/run.handler.ts': E,
-  'src/features/a/application/run.handler.spec.ts': E,
   'src/features/a/application/support/run-order.policy.ts': E,
   'src/features/a/transport/graphql/a-graphql.module.ts': E,
   'src/features/a/transport/graphql/run.resolver.ts': E,
@@ -52,8 +51,12 @@ test('a protocol-named folder under application/ and an unknown transport protoc
   assert.deepEqual(paths(report), ['src/features/a/application/graphql/run.resolver.ts', 'src/features/a/transport/grpc/run.service.ts']);
 });
 
+// A handler has no spec of its own (BE-CONVENTION 1.16 unit standard, owner-locked lane UT; slot be.feature.application
+// tests: none): only a <name>.service.ts has a colocated <name>.service.spec.ts, so a spec in a feature folder is a role
+// the folder does not allow.
 test('a file of a role its folder does not allow is BE_FEATURE_SHAPE (application and transport slots)', t => {
   const report = run(t, {
+    'src/features/a/application/run.handler.spec.ts': E,
     'src/features/a/application/run.use-case.ts': E,
     'src/features/a/application/run.service.ts': E,
     'src/features/a/transport/graphql/run.controller.ts': E,
@@ -61,6 +64,7 @@ test('a file of a role its folder does not allow is BE_FEATURE_SHAPE (applicatio
     'src/features/a/messages/other.messages.ts': E,
   });
   assert.deepEqual(paths(report), [
+    'src/features/a/application/run.handler.spec.ts',
     'src/features/a/application/run.service.ts',
     'src/features/a/application/run.use-case.ts',
     'src/features/a/messages/other.messages.ts',

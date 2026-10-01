@@ -38,11 +38,21 @@ test('a [lang] segment under app/ and a page.tsx inside a hooks domain are FE_SL
   assert.deepEqual(paths, ['apps/web/src/app/[lang]/page.tsx', 'apps/web/src/hooks/orders/page.tsx']);
 });
 
-test('a hook file directly in hooks/ and a .test.tsx or stray file beside a component are FE_SLOT_FILE_ROLE', t => {
+test('a hook file directly in hooks/ and a stray file beside a component are FE_SLOT_FILE_ROLE', t => {
   const paths = hits(run(t, {
     'apps/web/src/hooks/useLoose.ts': 'export const useLoose = () => 1;\n',
-    'apps/web/src/components/leaves/Chip/index.test.tsx': 'export {};\n',
     'apps/web/src/components/leaves/Chip/helpers.ts': 'export const h = 1;\n',
   })).map(item => item.path).sort();
-  assert.deepEqual(paths, ['apps/web/src/components/leaves/Chip/helpers.ts', 'apps/web/src/components/leaves/Chip/index.test.tsx', 'apps/web/src/hooks/useLoose.ts']);
+  assert.deepEqual(paths, ['apps/web/src/components/leaves/Chip/helpers.ts', 'apps/web/src/hooks/useLoose.ts']);
+});
+
+// R97 FE_NO_TESTS (contract-change fe-no-tests): a test path of a front end has exactly one finding, FE_NO_TESTS
+// (tests/hfs-fe-no-tests.spec.mjs); the slot check leaves it alone, so a spec or test file is never FE_SLOT_FILE_ROLE too.
+test('a .spec.tsx or .test.tsx beside a component and a spec in a hooks domain are never FE_SLOT_FILE_ROLE (they are FE_NO_TESTS findings)', t => {
+  const report = run(t, {
+    'apps/web/src/components/leaves/Chip/index.spec.tsx': 'export {};\n',
+    'apps/web/src/components/leaves/Chip/index.test.tsx': 'export {};\n',
+    'apps/web/src/hooks/orders/useOrders.spec.ts': 'export {};\n',
+  });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
