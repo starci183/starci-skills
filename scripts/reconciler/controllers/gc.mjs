@@ -18,8 +18,9 @@
 //   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/lib/worktrees.mjs
 //      gcWorktrees. ALWAYS ACTIVE, whatever the controller's mode (owner order lane WT: 600+ orphan worktrees piled up
 //      while the GC ran shadow): a worktree whose branch is merged, whose owner op settled, or whose owner process has
-//      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed. Every item
-//      is a gc_items row.
+//      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed; a tree
+//      stamped as the runtime's in Orca's worktree ps with no registry row is adopted (recorded keep) or preserved
+//      and removed. Every item is a gc_items row.
 //
 // Shadow: every actuator goes through ctx.run (the engine records a reconciler.would row and runs nothing) or, for an
 // in-process one (the sweep, a staging removal), a reconciler.would row written here; the sweep runs gc.mjs as a dry
@@ -435,12 +436,12 @@ export function createGcController(overrides = {}) {
     const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
     const failed = items.filter((i) => i.ok === false);
     if (items.length) {
-      ctx.log('reconciler.gc.worktrees', `worktree gc: ${removed} removed, ${items.filter((i) => i.action === 'unregister').length} unregistered, ${failed.length} failed`,
+      ctx.log('reconciler.gc.worktrees', `worktree gc: ${removed} removed, ${items.filter((i) => i.action === 'unregister').length} unregistered, ${items.filter((i) => i.action === 'adopt' && i.ok).length} adopted, ${failed.length} failed`,
         { controller: NAME, items: items.slice(0, 50) });
       try {
         await deps.recordRun({ trigger: 'sweep', items: items.map((i) => ({ collector: 'gc-worktrees', kind: 'worktree', target: String(i.path ?? ''), ownerRef: i.preserved ?? null,
-          action: i.ok === false ? 'failed' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
-          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : { verifiedGoneAt: ctx.now() }) })) });
+          action: i.ok === false ? 'failed' : i.action === 'adopt' ? 'keep' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
+          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : i.action === 'adopt' ? {} : { verifiedGoneAt: ctx.now() }) })) });
       } catch (error) { ctx.log('reconciler.gc.record.error', `gc_items write failed: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
     }
     finishDuty(ctx, { controller: NAME, duty: 'worktrees', result: failed.length ? 'failed' : 'done', now: ctx.now() });

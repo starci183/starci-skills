@@ -13,8 +13,9 @@
 //             failed/blocked/cancelled, wedged / dead-worker / stale-operation / stuck jobs, open owner asks
 //   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `api usage` verb)
 //   LEDGER    a registered ledger whose state directory or every source root is gone (hk-orphan-ledgers)
-//   WORKTREE  per repository (the runtime and every active ledger's repo): more than claudeDebug.worktreeLimit worktrees,
-//             or a registered worktree whose directory is gone
+//   WORKTREE  per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`: more than
+//             claudeDebug.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
+//             ownership stamp with no registry row (the GC adopts or removes it)
 //   INTEGRITY the runtime's main checkout: tracked files deleted, node_modules or packages/node_modules missing or empty
 //   GATE      in the last day: a lane whose latest land run did not pass, a repository whose latest push failed
 //   CONFIG    config.yaml claudeDebug missing or invalid
@@ -33,6 +34,8 @@ import { claudeDebugSettings } from '../../engine/config.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { parseWorktreeList } from '../lib/hk-lanes.mjs';
 import { orphanLedgerFindings } from '../lib/hk-orphan-ledgers.mjs';
+import { parseRuntimeStamp } from '../lib/orca-orphans.mjs';
+import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from '../reconciler/state.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -201,21 +204,32 @@ function worktreesOf(repo, git = gitResult) {
   return r.ok ? parseWorktreeList(r.stdout) : null;
 }
 
+/** The Orca ids of every live registry row (machine.sqlite worktrees, read only). */
+const registeredOrcaIds = () => new Set(readMachine((m) => m.db.prepare('SELECT orca_id FROM worktrees WHERE orca_id IS NOT NULL AND removed_at IS NULL').all().map((r) => r.orca_id), []));
+const sameDir = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
 /**
- * Worktree count and orphans per repository (the runtime and every active ledger's repo): more than `worktreeLimit`
- * registered worktrees, or a registered worktree whose directory is gone (git marks it prunable). Read only: it never
- * prunes. `worktreeLimit` null (config.yaml has no claudeDebug block) checks orphans only.
+ * Worktree count and orphans per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`
+ * (the source of truth for worktrees): more than `worktreeLimit` worktrees, a tree whose directory is gone, or a tree
+ * stamped as the runtime's (scripts/lib/orca-orphans.mjs) with no live registry row. A repository Orca does not know has
+ * no Orca tree to judge. Read only. `worktreeLimit` null (config.yaml has no claudeDebug block) checks orphans only.
  */
-export function worktreeFacts(repos, { worktreeLimit = null, git = gitResult, exists = fs.existsSync } = {}) {
+export function worktreeFacts(repos, { worktreeLimit = null, ps = worktreePs, registered = registeredOrcaIds, exists = fs.existsSync } = {}) {
   const facts = new Map();
+  const page = ps();
+  if (!page?.ok) { facts.set('worktrees:orca', `orca worktree ps failed: ${String(page?.error ?? 'no answer').slice(0, 160)}`); return facts; }
+  facts.set('worktrees:orca', null);
+  const ids = registered();
   for (const repo of repos) {
     const key = `worktrees:${path.basename(repo)}`;
-    const list = worktreesOf(repo, git);
-    if (!list) { facts.set(key, `git worktree list failed in ${repo}`); continue; }
-    const orphans = list.filter((w) => w.prunable || !exists(w.path)).map((w) => w.path);
+    const main = page.worktrees.find((w) => w.isMainWorktree && w.path && sameDir(w.path, repo));
+    const list = main ? page.worktrees.filter((w) => w.repoId === main.repoId && w.hostId === main.hostId) : [];
+    const gone = list.filter((w) => !exists(w.path)).map((w) => w.path);
+    const unbound = list.filter((w) => !w.isMainWorktree && parseRuntimeStamp(w.comment) && !ids.has(w.id)).map((w) => w.path);
     const problems = [];
     if (worktreeLimit != null && list.length > worktreeLimit) problems.push(`${list.length} worktrees (limit ${worktreeLimit})`);
-    if (orphans.length) problems.push(`${orphans.length} orphan (directory gone): ${orphans.slice(0, 3).join(', ')}`);
+    if (gone.length) problems.push(`${gone.length} orphan (directory gone): ${gone.slice(0, 3).join(', ')}`);
+    if (unbound.length) problems.push(`${unbound.length} runtime-stamped tree(s) with no registry row: ${unbound.slice(0, 3).join(', ')}`);
     facts.set(key, problems.length ? problems.join('; ') : null);
   }
   return facts;

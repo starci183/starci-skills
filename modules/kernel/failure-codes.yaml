@@ -8301,6 +8301,35 @@ no-longer-reported:
   nextStep_vi: "Bỏ qua; không cần làm gì thêm."
   owner: op-retry
   kind: settle-reason
+orca-orphan:
+  title: "An orphaned runtime worktree was preserved and removed"
+  title_vi: "Cây làm việc mồ côi của runtime đã được giữ việc rồi gỡ"
+  meaning_vi: "Orca còn một cây làm việc mang dấu sở hữu của runtime (starci:<kind>:<slot>) nhưng registry không có dòng nào cho nó, và chủ của nó (workflow hoặc job của critic) đã kết thúc hoặc không còn ai biết sau thời gian chờ. GC tạo dòng registry, giữ toàn bộ việc chưa commit và commit chưa land vào preserved/orphan/<id>, gỡ cây qua đường an toàn với liên kết rồi qua Orca, đóng dòng và ghi một sự cố (machine_logs kind worktree.orphan)."
+  causes_vi:
+    - "Tiến trình tạo cây dừng giữa lệnh tạo của Orca và bước đăng ký"
+    - "Chỗ giữ cây đã được trả lại (slot-never-bound) trong khi Orca đã tạo cây"
+  nextStep_vi: "Không mất gì: việc nằm ở nhánh preserved/orphan/<id>. Xem sự cố worktree.orphan trong machine_logs; nếu cần dùng lại việc đó, lấy từ nhánh preserved."
+  owner: runtime-core
+  kind: runtime-fault
+orca-orphan-adopted:
+  title: "An unregistered runtime worktree was adopted"
+  title_vi: "Cây làm việc chưa đăng ký của runtime đã được nhận lại"
+  meaning_vi: "Orca còn một cây làm việc mang dấu sở hữu của runtime nhưng registry không có dòng nào cho nó, trong khi chủ của nó vẫn đang chạy hoặc Orca báo còn terminal trong cây. GC tạo dòng registry cho cây, nên lần tra cứu sau của chủ tìm thấy và dùng lại nó thay vì tạo cây mới."
+  causes_vi:
+    - "Tiến trình tạo cây dừng giữa lệnh tạo của Orca và bước đăng ký, còn workflow vẫn chạy"
+  nextStep_vi: "Không cần làm gì: cây đã có dòng registry và được GC xử lý như mọi cây khác khi chủ kết thúc."
+  owner: runtime-core
+  kind: runtime-fault
+orca-tree-unlisted:
+  title: "Orca no longer lists a registered worktree"
+  title_vi: "Orca không còn liệt kê một cây làm việc đã đăng ký"
+  meaning_vi: "Registry có dòng cho một cây do Orca tạo và cây đó đã tới lúc gỡ, nhưng trang worktree ps đầy đủ của Orca không còn liệt kê nó. Runtime chỉ gỡ cây của Orca qua Orca, nên cây được để nguyên, dòng được đánh dấu remove_error và một sự cố được ghi."
+  causes_vi:
+    - "Cây bị gỡ khỏi Orca bằng tay nhưng thư mục còn lại"
+    - "Dữ liệu của Orca bị đặt lại"
+  nextStep_vi: "Xem nội dung thư mục, giữ lại việc cần giữ, rồi gỡ nó qua API worktree của runtime (removeScratchWorktree hoặc safeRemoveWorktree); không bao giờ xoá tay."
+  owner: runtime-core
+  kind: runtime-fault
 orca-worktree-create-failed:
   title: "Orca did not create the worktree"
   title_vi: "Orca không tạo được cây làm việc"
@@ -9694,7 +9723,7 @@ slot-never-bound:
   causes_vi:
     - "Tiến trình khởi động Kernel bị dừng giữa chừng"
     - "Orca không trả lời lệnh tạo cây"
-  nextStep_vi: "Chỗ đã được trả lại. Nếu Orca có tạo cây, cây đó hiện trong danh sách worktree của Orca (scripts/api/orca/worktree-list.mjs); gỡ nó qua scripts/api/orca/worktree-rm.mjs sau khi xem nội dung."
+  nextStep_vi: "Chỗ đã được trả lại. Nếu Orca có tạo cây, cây đó mang dấu sở hữu của runtime, và cùng lượt GC nhận lại nó (orca-orphan-adopted) hoặc giữ việc rồi gỡ nó (orca-orphan)."
   owner: runtime-core
   kind: runtime-fault
 spawn-failed:

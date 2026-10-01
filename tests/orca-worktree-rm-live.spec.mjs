@@ -10,7 +10,9 @@
 // never runs it: it runs only on an explicit opt-in, STARCI_ORCA_LIVE=1, or STARCI_REQUIRE_ORCA_LIVE=1 (CI and the
 // release verification), and then a missing Orca fails the test instead of skipping it. Without an opt-in it prints one
 // SKIPPED line and makes no Orca call at all - not even a status probe. The throwaway repo lives in a fresh directory
-// under the spec's isolated temp root and is removed with every worktree the spec creates.
+// under the spec's isolated temp root and is removed with every worktree the spec creates; its Orca registration is
+// removed in the teardown through `project setup-delete` (Orca has no `repo rm`; a repo-backed setup's id is the repo id
+// that `repo add` answered), so no fake repository is left in Orca.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,6 +22,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { orcaStatus } from '../scripts/api/orca/status.mjs';
 import { repoAdd } from '../scripts/api/orca/repo-add.mjs';
+import { projectSetupDelete } from '../scripts/api/orca/project-setup-delete.mjs';
 import { worktreeCreate } from '../scripts/api/orca/worktree-create.mjs';
 import { worktreeRm } from '../scripts/api/orca/worktree-rm.mjs';
 import { removeOrcaWorktree } from '../scripts/api/orca/worktree-remove.mjs';
@@ -67,7 +70,7 @@ function picture(root) {
   walk(root);
   return out;
 }
-/** The throwaway "main": tracked files, real node_modules and packages/node_modules content, registered in Orca. */
+/** The throwaway "main": tracked files, real node_modules and packages/node_modules content, registered in Orca. Its repo id. */
 function fakeMain() {
   if (!fs.existsSync(path.join(PROBE, '.git'))) {
     fs.mkdirSync(path.join(PROBE, 'packages'), { recursive: true });
@@ -88,6 +91,7 @@ function fakeMain() {
   }
   const added = repoAdd({ path: posix(PROBE) });
   assert.ok(added.ok, `orca repo add: ${added.error}`);
+  return added.repoId;
 }
 /** An Orca worktree of the fake main with node_modules and packages/node_modules junctioned into the fake main. */
 function linkedTree(name) {
@@ -108,7 +112,8 @@ test('orca worktree rm with junctions into the main checkout leaves it byte-iden
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-orca-rm-probe-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   PROBE = path.join(home, 'fake-main');
-  fakeMain();
+  const repoId = fakeMain();
+  t.after(() => { const gone = projectSetupDelete({ setup: repoId }); assert.ok(gone.ok, `orca project setup-delete ${repoId}: ${gone.error}`); });
   const before = picture(PROBE);
   assert.equal(Object.keys(before).filter((f) => f.includes('node_modules')).length, 10, 'real files in both node_modules');
   // 1. Orca alone, links still in place: the measurement.

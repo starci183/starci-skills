@@ -3,7 +3,8 @@
 // the same shape (tests/helpers/fake-orca-worktrees.mjs).
 import { worktreeCreate } from './worktree-create.mjs';
 import { worktreeRm } from './worktree-rm.mjs';
-import { worktreeList } from './worktree-list.mjs';
+import { worktreePs } from './worktree-ps.mjs';
 import { repoAdd } from './repo-add.mjs';
 
-export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, list: worktreeList, addRepo: repoAdd });
+// ps (worktree-ps.mjs) is the worktree GC's source of truth (scripts/lib/worktrees.mjs gcWorktrees).
+export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, ps: worktreePs, addRepo: repoAdd });

@@ -1,0 +1,48 @@
+id: orca-orphan-worktrees
+effectiveAt: '2026-10-02T00:00:00+07:00'
+summary: >-
+  ORPHAN WORKTREES AFTER A CRASH, FROM ORCA'S WORKTREE PS (lane dv-c0-orphan2; deep map REPLACE #5 WT4 and #6 P3).
+  scripts/api/orca/worktree-provision.mjs createOrcaWorktree always passes `--comment` with the runtime's ownership
+  stamp `starci:<kind>:<slot>[;wf=..][;job=..][;ledger=..][;sup=..]` (scripts/lib/orca-orphans.mjs runtimeStampOf), in the
+  same call that creates the tree; the `comment` option is gone. The stamped kinds are workflow, critic and
+  supervisor-staging (owned by a Supervisor job, judged by its sup_jobs status), so lane WSTAGE's staging tree is covered
+  once it is an Orca kind; until then a staging stamp is left alone. gcWorktrees reads Orca's `worktree ps` (new wrapper
+  scripts/api/orca/worktree-ps.mjs, calls.yaml `worktree-ps`, in scripts/api/orca/worktree-client.mjs in place of list) FIRST and the registry after it. A workflow tree's live
+  terminals are ps `liveTerminalCount` (the ledger's workflowTerminalsLive count is deleted); an unreadable page, or an
+  incomplete one (truncated, or a host omitted) for a tree it does not list, keeps the tree. The orphan pass judges
+  every stamped tree on this host with no registry row from its stamped owner (orphanVerdict): a live owner (or a live
+  terminal in the tree) -> the row is created (orca-orphan-adopted) and the owner's next lookup reuses it; an ended
+  owner, or one no ledger knows after worktrees.ownerGoneMs -> the row is created, the work (uncommitted changes and
+  unlanded commits, never node_modules) preserved to refs/heads/preserved/orphan/<slot>-<digest>, the tree removed
+  link-safely through removeOrcaWorktree (links first, then scripts/api/orca/worktree-rm.mjs), the branch deleted after the preserve
+  and the row closed (orca-orphan); a fresh pending slot of the same owner means its creation is running and the tree
+  is left alone. Every adoption and removal writes a machine_logs incident (actor gc, kind worktree.orphan). A tree with
+  no stamp (a lane, a human's tree) is foreign and never touched; no row is ever made for it. A registered Orca tree that
+  a complete ps page no longer lists is never removed by other means: reported orca-tree-unlisted, its row marked
+  remove_error, an incident logged. The reconciler GC controller records an adoption as gc_items action keep. The
+  core-watch WORKTREE fact reads ps: per repository the count, trees whose directory is gone and stamped trees with no
+  registry row; `worktrees:orca` alerts when ps itself fails. Live specs that `repo add` a throwaway repository remove it
+  in teardown through the new `project setup-delete` call (scripts/api/orca/project-setup-delete.mjs; a repo-backed
+  setup's id is the repo id); the three leaked fake-main registrations were removed once. Adds the
+  codes orca-orphan, orca-orphan-adopted and orca-tree-unlisted.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/orca-orphan-worktrees.yaml
+  - scripts/lib/worktrees.mjs
+  - scripts/api/orca/worktree-provision.mjs
+  - scripts/api/orca/worktree-client.mjs
+  - scripts/lib/orca-orphans.mjs
+  - scripts/api/orca/worktree-ps.mjs
+  - scripts/api/orca/project-setup-delete.mjs
+  - scripts/reconciler/controllers/gc.mjs
+  - scripts/supervisor/core-watch.mjs
+  - modules/host/orca/calls.yaml
+  - modules/kernel/failure-codes.yaml
+  - skills/claude-debug/SKILL.md
+  - CHANGELOG.md
+  - tests/orca-orphans.spec.mjs
+  - tests/helpers/fake-orca-worktrees.mjs
+  - tests/worktree-lifecycle.spec.mjs
+  - tests/workflow-worktree.spec.mjs
+  - tests/supervisor-debug-pass.spec.mjs
+  - tests/orca-worktree-rm-live.spec.mjs
