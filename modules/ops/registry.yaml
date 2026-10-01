@@ -1542,8 +1542,8 @@ ops:
     kindInferred: verify
   - id: unit.verify
     family: unit
-    goal: Run the product repository's FULL unit suite (npm run test:unit) against the delivered source
-      and report the observed result - never a subset presented as the whole suite, never a repaired
+    goal: Run the product repository's FULL unit suite (npm test) against the delivered source and
+      report the observed result - never a subset presented as the whole suite, never a repaired
       product.
     params:
       gateRounds:

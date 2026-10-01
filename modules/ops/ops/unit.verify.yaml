@@ -1,7 +1,7 @@
 schema: starci/op@1
 id: unit.verify
 goal:
-  en: Run the product repository's FULL unit suite (npm run test:unit) against the delivered source and report the observed
+  en: Run the product repository's FULL unit suite (npm test) against the delivered source and report the observed
     result - never a subset presented as the whole suite, never a repaired product. Dispatched only when the goal or the owner
     explicitly asks for the full unit run.
 params:
@@ -36,7 +36,7 @@ reads:
     path: repository:<repo-id>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read package.json scripts (the
-        unit command is `test:unit`, the unit project as opposed to e2e), the unit runner configuration and the
+        unit command is the app's managed `test` script, the be unit project as opposed to e2e), the unit runner configuration and the
         delivered source. The evidence binds the exact tested tree, so a run without a resolved repository is
         not a unit result.
   - id: request
@@ -67,7 +67,7 @@ writes:
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, unit-run.json, result.md]
     content:
-      en: "Record the exact command (npm run test:unit), cwd/repo, source commit/tree, environment, exit code, and the
+      en: "Record the exact command (npm test), cwd/repo, source commit/tree, environment, exit code, and the
         observed totals - suites, tests, passed, failed, skipped - with the sanitized raw output attached from
         STARCI_JOB_SCRATCH through api report. Every failure is listed grouped by spec file with its test name and
         message, so a repair can be routed per file. The run is the repository's whole unit suite: a filtered run,
@@ -98,7 +98,7 @@ steps:
     writes: [evidence]
     action:
       en: Confirm the request asks for the full unit run and resolve the repository's unit command from its
-        package.json (`test:unit`); a repository without one is a blocker, never an invented runner. Resolve the
+        package.json (the managed `test` script); a repository without one is a blocker, never an invented runner. Resolve the
         execution profile and actual tool availability; this does not switch the model/runtime or spawn workers.
   - reads:
       - repo
@@ -140,7 +140,7 @@ proofs:
 blockers:
   - code: UNIT_RUNNER_MISSING
     condition:
-      en: The repository declares no test:unit command or the runner cannot start here and the cause is provably
+      en: The repository declares no managed test script or the runner cannot start here and the cause is provably
         unfixable from the allowlist - report blocked with blocker kind environment naming the missing piece.
   - code: UNIT_RUN_NOT_REQUESTED
     condition:
@@ -162,7 +162,7 @@ layoutPolicy:
 policy:
   unitPolicy:
     surface: delivered-source
-    command: test:unit
+    command: test
     suite: whole-unit-suite-only
     e2e: never
     productCode: unchanged

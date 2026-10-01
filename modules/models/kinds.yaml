@@ -789,7 +789,7 @@ kinds:
     checks: [scripts/checks/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
-    purpose: Run the product repository's whole unit suite (npm run test:unit) on the delivered source and report the observed result, only when the goal or the owner explicitly asks for the full unit run; a code-writing op never runs it.
+    purpose: Run the product repository's whole unit suite (npm test) on the delivered source and report the observed result, only when the goal or the owner explicitly asks for the full unit run; a code-writing op never runs it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, environment, authority]

@@ -14,9 +14,10 @@
 //      paths are reported and NOTHING is stashed, reset or cleaned. (Untracked files are counted, not blocking.)
 //   2. the full suite of that repository, each step to a log file:
 //        .claude          npm test, npm run check
-//        product repo     npm run typecheck, npm run lint, npm run test:unit (unit only - e2e is manual-only
-//                         and never run here), npm run build where the script exists, canon-scan
-//                         (scripts/checks/canon-scan.mjs --root <repo>); a script the repository lacks is `absent`.
+//        app              the app's managed scripts (packages/hfs/templates/app/package-scripts): npm run typecheck,
+//                         npm run lint, npm test (the be unit project only - e2e is manual-only and never run here),
+//                         every npm run build:<side> the app declares (build:be, build:fe), canon-scan
+//                         (scripts/checks/canon-scan.mjs --root <repo>); a managed script the app lacks is `absent`.
 //   3. red: a failure list grouped by spec file (or by file for typecheck/lint/canon), exit 1, and the flow STOPS -
 //      no push, no later repository. The skill (skills/push-git/SKILL.md) spawns one fixer per failing group, lands
 //      the fixes (land.mjs --specs touching / ff-main.mjs) and runs /push-git again. main must not move between
@@ -65,9 +66,10 @@ export const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runt
 const readPackage = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')); } catch { return null; } };
 
 /**
- * The full-suite steps of one checkout. Runtime: npm test + npm run check. Product: typecheck, lint, test:unit,
- * build (each only when the repository's package.json declares the script - a missing one is an `absent` step, never
- * a pass by silence) and canon-scan. e2e is never a step.
+ * The full-suite steps of one checkout. Runtime: npm test + npm run check. App: the managed scripts typecheck, lint,
+ * test (the unit project) and every build:<side> the package declares, sorted (each runs only when the package.json
+ * declares it - a missing one is an `absent` step, never a pass by silence; no build:<side> at all is one absent
+ * `npm run build:<side>`), then canon-scan. e2e is never a step.
  * Returns {kind, steps: [{name, cmd: 'npm'|'node', args, absent?, after?}]}.
  */
 export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo), skillRoot = SKILL_ROOT } = {}) {
@@ -78,13 +80,15 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
   const npmStep = (script, extra = {}) => (scripts[script]
     ? { name: `npm run ${script}`, cmd: 'npm', args: ['run', script], ...extra }
     : { name: `npm run ${script}`, absent: true, ...extra });
+  const builds = Object.keys(scripts).filter((name) => /^build:[\w-]+$/.test(name)).sort();
+  const after = { after: 'npm run typecheck' };
   return {
     kind: 'product',
     steps: [
       npmStep('typecheck'),
       npmStep('lint'),
-      npmStep('test:unit'),
-      npmStep('build', { after: 'npm run typecheck' }),
+      scripts.test ? { name: 'npm test', cmd: 'npm', args: ['test'] } : { name: 'npm test', absent: true },
+      ...(builds.length ? builds.map((name) => npmStep(name, after)) : [{ name: 'npm run build:<side>', absent: true, ...after }]),
       { name: 'canon-scan', cmd: 'node', args: [path.join(skillRoot, 'scripts', 'checks', 'canon-scan.mjs'), '--root', repo] },
     ],
   };
