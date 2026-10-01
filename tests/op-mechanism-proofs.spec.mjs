@@ -244,6 +244,14 @@ test('fe-lint: missing, a lint that could not run, and an fe/ finding refuse; a 
   assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [fe], errors: [] }, feRelevant, 'fe/')), 'op-lint-findings');
   assert.equal(judgeLint({ schema: LINT_SCHEMA, findings: [be], errors: [] }, feRelevant, 'fe/').status, 'pass');
   assert.equal(judgeLint(greenLint(), feRelevant, 'fe/').status, 'pass');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-op-proof-lint-'));
+  try {
+    const record = { engine: 'hfs', rule: 'WORK_YAML_UNPARSEABLE', code: 'WORK_YAML_UNPARSEABLE', path: '.starciwork/features/a/ui/b/index.yaml', line: 3, message: 'unparseable' };
+    const abs = path.join(dir, 'lint.json');
+    fs.writeFileSync(abs, JSON.stringify({ schema: LINT_SCHEMA, findings: [record], errors: [] }));
+    assert.equal(judgeJobProofs({ op: 'interface.draw', files: [{ abs, name: 'lint.json' }] }).judged.code, 'op-lint-findings', 'a drawing is judged on every file it produced, .starciwork included');
+    assert.equal(judgeJobProofs({ op: 'interface.audit', files: [{ abs, name: 'lint.json' }] }).judged.status, 'pass', 'an audit is judged on the fe/ side only');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 // ---- review ----

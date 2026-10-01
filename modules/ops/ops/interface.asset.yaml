@@ -4,6 +4,16 @@ goal:
   en: Generate every artwork the approved interface candidate embeds as a real repository asset at the
     size, format and brand references the design record declares, and bind each produced file back
     to its slot.
+params:
+  gateRounds:
+    type: integer
+    default: 5
+    min: 1
+    max: 10
+    setBy: owner
+    doc:
+      en: "Rounds of FIX then hfs lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
+      vi: "Số vòng SỬA rồi chạy lại hfs lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
 nodeKinds: [ui]
 completionProfile: ui
 sideEffects: [generated artwork files inside the owned asset paths of the bound repository]
@@ -101,6 +111,12 @@ writes:
         provenance, and the inspection of every produced file against its brief and the brand rules.
         Record an honest unproduced or failed slot; a slot reported as produced without opened bytes
         is a failure, not a draft.
+  - id: lint
+    path: STARCI_JOB_SCRATCH/lint.json
+    schema: starci/lint@1
+    content:
+      en: "The hfs lint report of the produced asset files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo hfs lint của các tệp tài sản đã tạo (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -165,6 +181,11 @@ steps:
         state and region, so the drawing declares it instead of this operation guessing at it. An
         asset path outside the allowlist is blocked with the exact paths. Stop without wiring
         anything into a component and without advancing the workflow.
+  - reads: [repo, brand]
+    writes: [lint, evidence]
+    action:
+      en: "FORCE THE FE CANON over what the op produced: hfs lint --changed <every asset and binding file the op wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks (an asset off the brand palette or the declared format is a finding). FIX the produced files and run it again, at most params.gateRounds rounds. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
+      vi: "ÉP CHẠY CANON FE trên những gì op tạo ra: hfs lint --changed <mọi tài sản và tệp gắn kết mà op đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu (tài sản lệch bảng màu thương hiệu hoặc định dạng đã khai báo là một lỗi). SỬA các tệp đã tạo rồi chạy lại, tối đa params.gateRounds vòng. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
 proofs:
   - id: slot-coverage
     requirement:
@@ -189,6 +210,11 @@ proofs:
         inside the allowlisted asset scope, the declared slot briefs, regions, sizes and crops are
         byte-identical to what the drawing authored, and no product code changed. An honest not-run
         cannot earn done.
+  - id: produced-lint
+    requirement:
+      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
+      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: BRAND_RULE_UNSATISFIABLE
     condition:

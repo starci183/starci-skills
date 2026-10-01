@@ -18,7 +18,9 @@
 //   unit-kit        op-unit-proof-missing, op-unit-run-red, op-unit-coverage-below, op-unit-kit-violation (unit-run.mjs)
 //   security-lint   op-lint-proof-missing, op-lint-tool-failed, op-security-findings-missing, op-security-finding-unreported
 //                   (hfs lint --format json, and every security canon finding carried by rule in security-findings.json)
-//   fe-lint         op-lint-proof-missing, op-lint-tool-failed, op-lint-findings (hfs lint --format json)
+//   fe-lint,
+//   produced-lint   op-lint-proof-missing, op-lint-tool-failed, op-lint-findings (hfs lint --format json: fe/ findings of an audit,
+//                   any finding over the files a drawing or an asset op produced)
 //   review-gate     op-gate-proof-missing, op-gate-tool-failed, op-gate-new-findings (gate.mjs over the reviewed range)
 //   review-defects  op-review-defects-missing, op-review-defect-unclassified, op-review-missing-check-unrecorded
 //   release         op-release-proof-missing, op-release-step-skipped, op-release-step-red (release-proof.mjs)
@@ -292,6 +294,7 @@ export function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } =
     case 'unit-kit': return judgeUnitRun(read(UNIT_RUN_SCHEMA));
     case 'security-lint': return judgeSecurityLint(read(LINT_SCHEMA), read(SECURITY_FINDINGS_SCHEMA), securityRelevant(doc));
     case 'fe-lint': return judgeLint(read(LINT_SCHEMA), feRelevant, 'fe/');
+    case 'produced-lint': return judgeLint(read(LINT_SCHEMA), () => true, 'produced-file');
     case 'review-gate': return judgeReviewGate(read(GATE_SCHEMA, (g) => !isDocGate(g)));
     case 'review-defects': return judgeReviewDefects(read(REVIEW_DEFECTS_SCHEMA));
     case 'release': return judgeRelease(read(RELEASE_PROOF_SCHEMA));

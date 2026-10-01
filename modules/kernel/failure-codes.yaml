@@ -12053,9 +12053,9 @@ op-lint-tool-failed:
   kind: settle-reason
 
 op-lint-findings:
-  title: "hfs lint reports fe/ findings under an interface verdict"
-  title_vi: "hfs lint báo lỗi dưới fe/ mà op giao diện vẫn chốt done"
-  meaning_vi: "Báo cáo lint của interface.audit, interface.draw hoặc interface.asset còn lỗi dưới fe/ (canon FE, stylelint, ngữ pháp thương hiệu); op không thể chốt done khi các lỗi đó còn."
+  title: "hfs lint reports findings under an interface verdict"
+  title_vi: "hfs lint báo lỗi mà op giao diện vẫn chốt done"
+  meaning_vi: "Báo cáo lint của interface.audit còn lỗi dưới fe/, hoặc báo cáo lint của interface.draw hay interface.asset còn lỗi trên các tệp op đã tạo (canon FE, stylelint, ngữ pháp thương hiệu, kiểm tra app); op không thể chốt done khi các lỗi đó còn."
   causes_vi:
     - "Mã giao diện vi phạm canon FE hoặc stylelint"
     - "Tệp vẽ hoặc tài sản mới sai ngữ pháp thương hiệu"

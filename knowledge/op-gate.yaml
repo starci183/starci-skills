@@ -162,6 +162,12 @@ proofs:
     purpose: >-
       `hfs lint --format json` at the app root (the FE canon, stylelint and the brand grammar): no finding under fe/ may stand
       under a done interface audit, drawing or asset.
+  produced-lint:
+    schema: starci/lint@1
+    attach: lint.json
+    purpose: >-
+      `hfs lint --changed <every file the op produced> --format json` at the app root (the FE canon, stylelint, the brand
+      grammar and the app checks over .starciwork records and assets): no finding may stand under a done drawing or asset.
   review-gate:
     schema: starci/gate@1
     attach: gate.json
@@ -198,8 +204,8 @@ opProofs:
   knowledge.repair: [read-knowledge, doc-gate]
   work.author: [read-knowledge, doc-gate]
   interface.audit: [fe-lint]
-  interface.draw: [fe-lint]
-  interface.asset: [fe-lint]
+  interface.draw: [produced-lint]
+  interface.asset: [produced-lint]
   architecture.decide: [read-knowledge]
   scope.define: [read-knowledge]
   scope.finish: [read-knowledge]

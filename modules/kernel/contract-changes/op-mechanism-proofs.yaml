@@ -14,8 +14,8 @@ summary: >-
   op-unit-kit-violation. security.verify attaches hfs lint and its typed findings by rule
   (starci/security-findings@1), and every finding of the security canon codes (R41, R42, R44, R49, R71, R90, R107; op-gate.yaml
   securityCodes and securityRules) must be carried: op-lint-proof-missing, op-lint-tool-failed, op-security-findings-missing,
-  op-security-finding-unreported. interface.audit, interface.draw and interface.asset attach hfs lint over what they audit or
-  produce and may not stand done on an fe/ finding: op-lint-findings. review.verify runs gate.mjs read-only over the reviewed range
+  op-security-finding-unreported. interface.audit attaches hfs lint over the audited fe/ files and may not stand done on an fe/
+  finding; interface.draw and interface.asset lint every file they produce and may not stand done on any finding: op-lint-findings. review.verify runs gate.mjs read-only over the reviewed range
   (merge guard included) in its code modes and classifies every defect business or non-business, a non-business defect no check
   caught carrying a missingCheck for .claude (starci/review-defects@1): op-gate-proof-missing, op-gate-tool-failed,
   op-gate-new-findings, op-review-defects-missing, op-review-defect-unclassified, op-review-missing-check-unrecorded.

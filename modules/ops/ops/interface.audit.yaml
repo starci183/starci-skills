@@ -180,6 +180,12 @@ writes:
         `deviations.json` and `deviation-brief.md` preserve every claimed intentional departure, its
         exact visual delta and the full case for/against accepting it. Evidence is diagnostic, not a
         patch, baseline mutation or independent acceptance.
+  - id: lint
+    path: STARCI_JOB_SCRATCH/lint.json
+    schema: starci/lint@1
+    content:
+      en: "The hfs lint report of the audited fe/ files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo hfs lint của các tệp fe/ được audit (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -363,6 +369,11 @@ steps:
         the capture, but a direction image the owner is shown is the drawn part - page content, overlay
         panel alone, layout drawing - never the composite. review.verify and uat.verify remain
         independent."
+  - reads: [repo, grammar, brand-assets]
+    writes: [lint, evidence]
+    action:
+      en: "Run the FE canon over the audited implementation: hfs lint --changed <the fe/ files of the audited slice> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon (eslint-canon-fe), stylelint and the brand grammar's checks. Every finding under fe/ is actionable drift of the implementation and maps like any other (boundedImplementationDrift, route interface.implement, failed), cited by rule, path and line; a lint that could not run is a not-run measurement, never a clean one. The audit repairs nothing it finds. REPORT with lint.json attached."
+      vi: "Chạy canon FE trên phần triển khai được audit: hfs lint --changed <các tệp fe/ của slice được audit> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE (eslint-canon-fe), stylelint và các kiểm tra của ngữ pháp thương hiệu. Mọi lỗi dưới fe/ là độ lệch có thể xử lý của phần triển khai và được ánh xạ như mọi độ lệch khác (boundedImplementationDrift, route interface.implement, failed), dẫn theo luật, đường dẫn và dòng; lint không chạy được là phép đo chưa chạy, không bao giờ là sạch. Bản audit không sửa gì nó tìm thấy. BÁO CÁO kèm lint.json."
 proofs:
   - id: accepted-draw-lineage
     requirement:
@@ -447,6 +458,11 @@ proofs:
     requirement:
       en: "`starci validate` passes, `starci validate --strict` passes on every record directory it
         writes, and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
+  - id: fe-lint
+    requirement:
+      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof fe-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with a finding under fe/ (op-lint-findings) is refused."
+      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof fe-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có lỗi dưới fe/ (op-lint-findings) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: PRODUCT_DEFECT_OWNER
     condition:

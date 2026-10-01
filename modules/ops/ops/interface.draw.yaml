@@ -26,6 +26,15 @@ params:
         reaches the owner; above the default only when the owner sets it. Every drawing files its draw-review
         ask and only the owner accepts it (on Telegram - an album of the drawn parts, a reply 'ok' or an equivalent approval word accepts,
         anything else is feedback and a redraw).
+  gateRounds:
+    type: integer
+    default: 5
+    min: 1
+    max: 10
+    setBy: owner
+    doc:
+      en: "Rounds of FIX then hfs lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
+      vi: "Số vòng SỬA rồi chạy lại hfs lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
 nodeKinds: [ui]
 completionProfile: ui
 grammarContext: required
@@ -252,6 +261,12 @@ writes:
     fields: [domains, nodes, edges]
     content:
       en: The workflow's next work-graph version - each shape this op drew attached to its slice.
+  - id: lint
+    path: STARCI_JOB_SCRATCH/lint.json
+    schema: starci/lint@1
+    content:
+      en: "The hfs lint report of the drawn files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo hfs lint của các tệp đã vẽ (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -598,6 +613,11 @@ steps:
         golden) and file done. An autopilot redraw answer's note lists the failing gates: that list is the brief -
         fix every finding through the draw loop and ask again. A brand.direction archetype carrying a provisional
         acceptance (brand.mjs evidence.provisional) is ready to draw from, like an accepted one."
+  - reads: [repo, grammar, brand]
+    writes: [lint, evidence]
+    action:
+      en: "FORCE THE FE CANON over what the draw produced: hfs lint --changed <every .draw.tsx, render source, stylesheet, asset and record file the draw wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks. FIX the drawn files and run it again, at most params.gateRounds rounds; a finding in a file the draw did not write is reported for its owner, never edited here. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
+      vi: "ÉP CHẠY CANON FE trên những gì bản vẽ tạo ra: hfs lint --changed <mọi tệp .draw.tsx, nguồn render, stylesheet, tài sản và bản ghi mà bản vẽ đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu. SỬA các tệp đã vẽ rồi chạy lại, tối đa params.gateRounds vòng; lỗi trong tệp bản vẽ không viết được báo cho chủ sở hữu, không sửa ở đây. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
 proofs:
   - id: render-provenance
     requirement:
@@ -786,6 +806,11 @@ proofs:
         pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
         refuses not-landed while one of them is untracked or dirty; authored Work never settles
         outside the repository history.
+  - id: produced-lint
+    requirement:
+      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
+      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:
