@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../../example/example-ownership.mjs';
+import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 
 /**
  * Every check in the fleet so far reads one record and asks whether that record agrees with itself: an id

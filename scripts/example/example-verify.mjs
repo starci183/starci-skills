@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
-import {loadRecords, resolveRecordRef} from './example-ownership.mjs';
+import {loadRecords, resolveRecordRef} from '../work/record-ownership.mjs';
 
 /**
  * Re-runs every assertion in one example record's evidence.yaml against a real --cwd and compares the

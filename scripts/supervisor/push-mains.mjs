@@ -58,7 +58,7 @@ const selfFile = fileURLToPath(import.meta.url);
 import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
-import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**

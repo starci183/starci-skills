@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {checkWorkConsistencyTree, checkTreeParity, declaredStateValues} from '../../scripts/work/validate/check-work-consistency.mjs';
-import {loadRecords} from '../../scripts/example/example-ownership.mjs';
+import {loadRecords} from '../../scripts/work/record-ownership.mjs';
 import {walk} from '../../scripts/work/validate/check-example-work.mjs';
 
 /**

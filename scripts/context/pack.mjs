@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
+import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 

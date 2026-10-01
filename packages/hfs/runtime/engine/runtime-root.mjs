@@ -16,6 +16,11 @@ const moduleRoot = path.dirname(fileURLToPath(new URL('../package.json', import.
 
 /** The runtime root: this source tree (or an immutable sealed payload of it). */
 export const skillRoot = moduleRoot;
+/**
+ * The StarCi Source root (the host containing .claude and .workspaces): STARCI_SOURCE_ROOT overrides it, else the directory
+ * holding this runtime checkout. Parameterized over `env`, so a spec can inject a fixture Source.
+ */
+export const starciSourceRoot = (env = process.env) => (env.STARCI_SOURCE_ROOT ? path.resolve(env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
 
 /**
  * Read a runtime contract document. `parts` are path segments under `skillRoot`

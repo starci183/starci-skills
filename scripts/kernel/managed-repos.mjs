@@ -10,7 +10,7 @@ import path from 'node:path';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
-import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 /**
  * The managed product ledgers: {repos, missing, configError?}. `missing` names listed paths that hold no ledger;

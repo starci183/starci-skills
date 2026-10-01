@@ -5,7 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
-import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../../example/example-ownership.mjs';
+import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
 import {resolveBlob} from '../../../engine/db/blob.mjs';
 

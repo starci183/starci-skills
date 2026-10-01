@@ -6,7 +6,7 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256} from '../../../engine/digest.mjs';
 import { gitOutput } from '../../api/git/lib.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
-import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../../example/example-ownership.mjs';
+import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../record-ownership.mjs';
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:

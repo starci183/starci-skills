@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
-import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from './example-ownership.mjs';
+import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from '../work/record-ownership.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
@@ -29,7 +29,7 @@ import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveReco
  * ever writes evidence.yaml; it never edits a record's own index.yaml or its `state` field.
  *
  * codeDigest (concept 1): alongside recordDigest, this script also hashes the actual source the record's
- * `owners[].path`/`module` name (resolved via scripts/example/example-ownership.mjs - the record's own repository,
+ * `owners[].path`/`module` name (resolved via scripts/work/record-ownership.mjs - the record's own repository,
  * or, when it names no owners/module itself, every work/implementation@1 whose `proves` names this record)
  * and writes `codeDigest: {algorithm, files: [{path, sha256}], digest}`. This is what lets a later code
  * change stale a proof without anyone touching the record: scripts/work/validate/check-example-work.mjs refuses an

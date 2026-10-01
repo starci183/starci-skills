@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {capturesOf} from '../work/impl-captures.mjs';
+import {capturesOf} from './impl-captures.mjs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../work/ui/render.mjs';
-import {readWorkspace, loadRecords} from './example-ownership.mjs';
+import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from './ui/render.mjs';
+import {readWorkspace, loadRecords} from './record-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
 
 /**
@@ -27,12 +27,12 @@ import {slash} from '../lib/path-key.mjs';
  * uncheckable claim is not a pass. `mascot-slot-missing` is advisory like the canon: a fail refuses, a
  * skip (a surface the brand does not allow the mascot on) does not.
  *
- * CLI (`node scripts/example/example-render-proof.mjs --work <path-to-.starciwork> --record <id>`) runs the same
+ * CLI (`node scripts/work/render-proof.mjs --work <path-to-.starciwork> --record <id>`) runs the same
  * proof for one implementation record regardless of its state, printing every refusal and exiting 1 when
  * any exist - the replayable command an evidence.yaml assertion names when it binds this proof.
  */
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
   .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);

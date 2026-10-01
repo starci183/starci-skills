@@ -19,7 +19,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { isWorkRecordSchema, readWorkspace } from '../../example/example-ownership.mjs';
+import { isWorkRecordSchema, readWorkspace } from '../record-ownership.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SKIPPED_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);

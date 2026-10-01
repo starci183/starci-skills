@@ -5,7 +5,7 @@ import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
-import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
+import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 

@@ -90,7 +90,7 @@ export function ownerPathProblem(rawPath, appRoot) {
   const hint = 'an owner path is app-relative: be/<path>, fe/<path> or a directory of the app root';
   if (/^repository:/.test(rel)) return `${rawPath} names a repository; ${hint}`;
   if (path.isAbsolute(rawPath) || /^[A-Za-z]:/.test(rel)) return `${rawPath} is absolute; ${hint}`;
-  if (rel === '..' || rel.startsWith('../') || rel.startsWith('./')) return `${rawPath} is relative to another directory; ${hint}`;
+  if (rel === '..' || rel.startsWith('../') || rel.startsWith('../example/')) return `${rawPath} is relative to another directory; ${hint}`;
   const head = moduleRootOf(rel).split('/')[0];
   if (APP_SIDES.includes(head) || fs.existsSync(path.join(appRoot, head))) return null;
   const sides = APP_SIDES.filter(side => fs.existsSync(path.join(appRoot, side, head))).map(side => `${side}/${moduleRootOf(rel)}`);

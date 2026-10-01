@@ -15,7 +15,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWithDraft, wakeDeliveryOf,
-  WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
+  WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS, collapse as squash } from '../lib/terminal-liveness.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
@@ -79,7 +79,6 @@ const failureMatchers = (adapter) => {
 // The runtime's own delivered text (the launch command, the pasted Task) is never failure evidence: a screen line
 // that is a fragment of it is dropped before matching. Terminal wrapping cuts a delivered line into fragments, so a
 // line counts when its whitespace-collapsed text (12+ chars) is a substring of the delivered text.
-const squash = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 const withoutDelivered = (screen, delivered) => {
   const own = squash(Array.isArray(delivered) ? delivered.filter(Boolean).join('\n') : delivered);
   if (!own) return screen ?? '';

@@ -32,6 +32,7 @@ import {
 } from './grammar-geometry.mjs';
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
+import { collapse as oneLine } from '../../lib/terminal-liveness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge', 'ui');
@@ -329,7 +330,6 @@ function fontPx(knowledge, ruleId, scope) {
   return v?.px ?? null;
 }
 
-const oneLine = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
 
 /** The brief as text. */
 export function briefText(b) {

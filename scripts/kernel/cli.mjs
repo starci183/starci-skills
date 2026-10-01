@@ -182,7 +182,7 @@ import { taskSpecOf } from '../machine/task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
-import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one

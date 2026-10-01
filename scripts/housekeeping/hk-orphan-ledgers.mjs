@@ -35,7 +35,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
-import { skillRoot } from '../../engine/runtime-root.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
@@ -56,13 +56,6 @@ const canonicalRoot = (p) => path.resolve(String(p)).replace(/\\/g, '/');
 /** YYYYMMDD, the same stamp scripts/housekeeping/blob-gc.mjs and scripts/work/purge-workflow.mjs archive folders use. */
 export const dateStamp = (now = Date.now()) => new Date(now).toISOString().slice(0, 10).replace(/-/g, '');
 
-/**
- * The StarCi Source root (the host containing .claude and .workspaces): STARCI_SOURCE_ROOT overrides it, else the
- * directory holding this runtime checkout (the same seam scripts/kernel/target-repo.mjs and
- * scripts/connectors/lib.mjs sourceRootOf compute — reimplemented here, parameterized over `env`, so a spec can
- * inject a fixture Source without importing either of those heavier modules).
- */
-export const starciSourceRoot = (env = process.env) => (env.STARCI_SOURCE_ROOT ? path.resolve(env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
 
 /**
  * Every repository root any .workspaces/projects/*\/work.json binds (modules/schemas/workspace-routing.yaml

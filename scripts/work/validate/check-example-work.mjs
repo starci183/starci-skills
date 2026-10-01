@@ -3,8 +3,8 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
-import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../../example/example-ownership.mjs';
-import {renderProofProblems} from '../../example/example-render-proof.mjs';
+import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../record-ownership.mjs';
+import {renderProofProblems} from '../render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from '../ui/ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
 import { walkFiles } from '../../lib/walk.mjs';
@@ -563,7 +563,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       }
     }
     // `owners[].path` / `module` name module-root directories (schemas/work-layout.yaml's `impl` shape
-    // entry; scripts/example/example-ownership.mjs's moduleRootOf normalises a file or `/**` glob path down
+    // entry; scripts/work/record-ownership.mjs's moduleRootOf normalises a file or `/**` glob path down
     // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
     // warned, since the module a todo record targets may not have been built yet.
     // Every owner path is app-relative (be/<path>, fe/<path> or an app-root directory); any other spelling is refused.

@@ -16,6 +16,7 @@ import { clipLine } from './clip.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
 import { readYamlFile } from './read-yaml.mjs';
+import { collapse as oneLine } from './terminal-liveness.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
 export const DISPLAY_NAME_LIMIT = 80;
@@ -40,7 +41,6 @@ export function opLabel(op, language = 'vi') {
 }
 
 /** One line, whitespace collapsed; '' for nothing. */
-const oneLine = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 /** `text` cut at a word boundary to at most `max` characters, ending in an ellipsis when cut. */
 export function clipWords(text, max) {
   const s = oneLine(text);

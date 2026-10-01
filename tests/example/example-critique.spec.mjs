@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {computeCritique, runCritique} from '../../scripts/example/example-critique.mjs';
-import {repoRootFor} from '../../scripts/example/example-ownership.mjs';
+import {repoRootFor} from '../../scripts/work/record-ownership.mjs';
 
 /**
  * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live

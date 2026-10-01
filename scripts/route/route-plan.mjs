@@ -37,7 +37,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { asList, routeFields } from './route-fields.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
-} from '../example/example-ownership.mjs';
+} from '../work/record-ownership.mjs';
 import { ownerSpecs, planLegDeferral } from './spec-deferral.mjs';
 import { normalizeText, phraseHits } from './phrase-match.mjs';
 

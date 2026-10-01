@@ -15,12 +15,11 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/db/ledger.mjs';
 import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { skillRoot } from '../../engine/runtime-root.mjs';
+import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 
 
 /** When this host last booted (ms). */

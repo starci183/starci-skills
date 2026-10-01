@@ -4,7 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {appRootOf, readWorkspace, resolveOwnedDirs, loadRecords} from '../../example/example-ownership.mjs';
+import {appRootOf, readWorkspace, resolveOwnedDirs, loadRecords} from '../record-ownership.mjs';
 import {slash, sameOrUnder} from '../../lib/path-key.mjs';
 import { runGit } from '../../api/git/lib.mjs';
 import {isDir} from '../../lib/fs-kind.mjs';
@@ -150,7 +150,7 @@ function newestSourceChange(repoRoot, relPaths, gitCache, revision) {
 
 /**
  * Every file under the record's owner directories, keyed the way `codeDigest.files[].path` is keyed:
- * `<owner dir's declared rel>/<path inside it>`, which is what scripts/example/example-ownership.mjs's
+ * `<owner dir's declared rel>/<path inside it>`, which is what scripts/work/record-ownership.mjs's
  * `hashOwnedDirs` writes. A codeDigest path is therefore owner-relative, not repository-relative, and a
  * record whose owners span two repositories (a ui-screen proven by a frontend and a backend module) has
  * rows from both in one flat list with nothing but that key to tell them apart.

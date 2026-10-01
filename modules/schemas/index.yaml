@@ -91,7 +91,7 @@ schemas:
     subsystem: work-tree
     governs: "The product's brand as ONE root record beside features/ — identity inputs every feature shares."
     binds: .starciwork/brand/index.yaml (+ brand/assets/**)
-    usedBy: ["scripts/example/example-render-proof.mjs (the record's own brand: spec is what render checks read)"]
+    usedBy: ["scripts/work/render-proof.mjs (the record's own brand: spec is what render checks read)"]
     business:
       question: "What does the product look and sound like, once, for everyone?"
       whenNeeded: UI design and render-proof lanes read it as shared context.
@@ -399,7 +399,7 @@ schemas:
     subsystem: work-tree
     governs: "One append-only UAT run — its assertions (expected/observed, with not-run as a real third value), every capture's exact bytes, and the two commits that were being served."
     binds: .starciwork/features/<feature>/uat/<flow>/runs/<runId>/manifest.yaml
-    usedBy: [scripts/example/example-ownership.mjs (isWorkRecordSchema — a non-work/ stamp is artifact payload), scripts/work/validate/check-example-work.mjs (PAYLOAD_SKIPPED)]
+    usedBy: [scripts/work/record-ownership.mjs (isWorkRecordSchema — a non-work/ stamp is artifact payload), scripts/work/validate/check-example-work.mjs (PAYLOAD_SKIPPED)]
     business:
       question: "What did a walk against the running product actually observe, and against which build?"
       whenNeeded: Every uat.verify run; a done uat-flow's evidence.yaml settles on exactly one runId.

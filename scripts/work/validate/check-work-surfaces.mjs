@@ -6,7 +6,7 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {isLocaleSegment} from '../layout-tree.mjs';
 import {createRequire} from 'node:module';
-import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../../example/example-ownership.mjs';
+import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 
 /**
  * The audits' sharpest surface complaint was the `/buyers` vs `/internal/buyers` class: a done contract

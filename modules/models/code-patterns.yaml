@@ -8,10 +8,10 @@ profiles:
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
-        exclude: ['**/*.test.mjs']
+        exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: b2c12fe869dace129a6f2bd49431f49f26a7e109d27605bb58567f5ce987b237
-        files: 134
+        value: 9537989e590a99222a1b1bbc130e4d1c53c5a1899da714818fd82fe508311dff
+        files: 135
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -557,10 +557,10 @@ profiles:
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
-        exclude: ['**/*.test.mjs']
+        exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 16e02f684dd1c1ea8ea6ef59eead1fe27d361ab6180aeafa1612b49c39a53ae1
-        files: 147
+        value: 55c3ea13a6cb173732bacfabc49990a00abfe345c0ad5c110d6b1d274099fa22
+        files: 148
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:

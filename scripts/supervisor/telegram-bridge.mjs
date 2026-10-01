@@ -82,7 +82,7 @@ import { answerDrawReviewByReply, askClassOf } from '../kernel/ask-server.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../machine/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
 
