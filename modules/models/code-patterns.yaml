@@ -4,14 +4,14 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 3.0.7
+      version: 3.0.8
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 11c92ed84b7cfa848af32bcd95eb3db25f387789b96bb1d605b4d231f2f7329d
-        files: 132
+        value: 2645f32888bdc9161bdbe33ec1564bfc6c0898db75c2ee627c193343f9430ceb
+        files: 133
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -553,14 +553,14 @@ profiles:
     title: StarCi Next.js code pattern
     canon:
       package: '@starci/eslint-canon-fe'
-      version: 8.0.7
+      version: 8.0.8
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: ae43a3549b8f76d925f8d2dcf0384ab1eb326fd35d2a4f1916d0fb12d3193970
-        files: 145
+        value: 59f6d5e9572a534283f0a2461d4af6ddde73abacbcd62d4a129160f6795f75d8
+        files: 146
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:
