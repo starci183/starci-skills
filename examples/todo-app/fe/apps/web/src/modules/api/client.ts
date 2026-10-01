@@ -6,7 +6,7 @@ import type { Outcome } from "./outcome"
 const REQUEST_TIMEOUT_MS = 8000
 
 /** The codes the backend uses when the caller has no session or may not do what it asked. */
-const REFUSED_CODES: ReadonlyArray<string> = ["UNAUTHENTICATED", "UNAUTHORIZED", "FORBIDDEN"]
+const REFUSED_CODES: ReadonlySet<string> = new Set(["UNAUTHENTICATED", "UNAUTHORIZED", "FORBIDDEN"])
 
 /** One GraphQL operation of the client: which document, with which variables, for whose session. */
 export interface GraphqlRequest {
@@ -34,8 +34,8 @@ const bodyOutcome = (body: unknown): Outcome<unknown> => {
     if (!isRecord(body)) return { kind: "unavailable" }
     if (Array.isArray(body.errors) && body.errors.length > 0) {
         const code = errorCodeOf(body.errors)
-        if (code !== undefined && REFUSED_CODES.includes(code)) return { kind: "refused", code }
-        if (code !== undefined && code.endsWith("NOT_FOUND")) return { kind: "not-found" }
+        if (code !== undefined && REFUSED_CODES.has(code)) return { kind: "refused", code }
+        if (code?.endsWith("NOT_FOUND")) return { kind: "not-found" }
         return { kind: "invalid", code }
     }
     const payload = isRecord(body.data) ? Object.values(body.data)[0] : undefined

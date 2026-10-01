@@ -14,6 +14,41 @@ const EMAIL_FIELD_CODES = new Set(["SHARE_INVALID_EMAIL", "SHARE_INVITATION_ALRE
 const codeOf = (error: unknown): string | null =>
     error instanceof Error && error.cause instanceof Error ? error.cause.message : null
 
+/** The share namespace's translator, the one the refusal sentences are read from. */
+type ShareTranslator = ReturnType<typeof useTranslations<"share">>
+
+/** The three lifecycles whose failures the screen reports, in the order the reader meets them. */
+type ShareFailures = {
+    readonly read: unknown
+    readonly invite: unknown
+    readonly revoke: unknown
+}
+
+/** The one refusal sentence the screen shows: the collaborators read first, then the invite, then the revoke. */
+const refusalOf = (t: ShareTranslator, failures: ShareFailures, inviteCode: string | null): string | null => {
+    if (failures.read) return t("sessionEnded")
+    if (failures.invite) return inviteCode === "SHARE_INVALID_EMAIL" ? t("invalidEmail") : t("inviteRefusal")
+    if (failures.revoke) return t("revokeRefusal")
+    return null
+}
+
+/** The collaborator fields the state is read from. */
+type CollaboratorStatus = {
+    readonly status: string
+}
+
+/** Which state the view renders: a failure, a running invite, then what the collaborator list holds. */
+const stateOf = (
+    failures: ShareFailures,
+    isInviting: boolean,
+    collaborators: ReadonlyArray<CollaboratorStatus>,
+): ShareInviteState => {
+    if (failures.read || failures.invite || failures.revoke) return "refused"
+    if (isInviting) return "inviting"
+    if (collaborators.some((collaborator) => collaborator.status === "accepted")) return "accepted"
+    return collaborators.length > 0 ? "pending-list" : "empty"
+}
+
 /** ShareInviteBlock's only external input: the task this screen shares, from the route's own params. */
 type ShareInviteBlockProps = {
     readonly taskId: string
@@ -40,27 +75,11 @@ export const ShareInviteBlock = (props: ShareInviteBlockProps) => {
 
     const collaborators = collaboratorsQuery.data ?? []
     const inviteCode = codeOf(invite.error)
-    const refusal = collaboratorsQuery.error
-        ? t("sessionEnded")
-        : invite.error
-          ? inviteCode === "SHARE_INVALID_EMAIL"
-              ? t("invalidEmail")
-              : t("inviteRefusal")
-          : revoke.error
-            ? t("revokeRefusal")
-            : null
+    const failures: ShareFailures = { read: collaboratorsQuery.error, invite: invite.error, revoke: revoke.error }
+    const refusal = refusalOf(t, failures, inviteCode)
     const refusalTarget: "email" | "form" = inviteCode !== null && EMAIL_FIELD_CODES.has(inviteCode) ? "email" : "form"
 
-    const state: ShareInviteState =
-        collaboratorsQuery.error || invite.error || revoke.error
-            ? "refused"
-            : invite.isMutating
-              ? "inviting"
-              : collaborators.some((collaborator) => collaborator.status === "accepted")
-                ? "accepted"
-                : collaborators.length > 0
-                  ? "pending-list"
-                  : "empty"
+    const state = stateOf(failures, invite.isMutating, collaborators)
 
     const onInvite = () => {
         void invite.trigger({ email: email.trim(), role }, { throwOnError: false }).then((invited) => {

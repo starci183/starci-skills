@@ -6,6 +6,21 @@ import { usePlanUsage } from "@/hooks/plan"
 import { useAccountShellCopy } from "@/hooks/shell"
 import { UsageScreenView, type UsageScreenViewState } from "./component"
 
+/** The usage numbers the state is read from; `cap` is null on the paid plan. */
+type UsageReading = {
+    readonly activeCount: number
+    readonly cap: number | null
+}
+
+/** Which state the view renders: a refused read, a pending read, then where the count sits against the cap. */
+const stateOf = (isRefused: boolean, usage: UsageReading | undefined): UsageScreenViewState => {
+    if (isRefused) return "refused"
+    if (usage === undefined) return "loading"
+    if (usage.cap === null) return "paid-unlimited"
+    if (usage.activeCount > usage.cap) return "over-cap-frozen"
+    return usage.activeCount === usage.cap ? "at-cap" : "under-cap"
+}
+
 /** The usage screen takes nothing from its page: it owns its own session gate and usage read. */
 type PlanUsageScreenProps = Record<never, never>
 
@@ -26,18 +41,8 @@ export const PlanUsageScreen = (props: PlanUsageScreenProps) => {
     const { signedIn, usageQuery, upgrade } = usePlanUsage()
 
     const usage = usageQuery.data
-    const state: UsageScreenViewState =
-        !signedIn || usageQuery.error
-            ? "refused"
-            : usage === undefined
-              ? "loading"
-              : usage.cap === null
-                ? "paid-unlimited"
-                : usage.activeCount > usage.cap
-                  ? "over-cap-frozen"
-                  : usage.activeCount === usage.cap
-                    ? "at-cap"
-                    : "under-cap"
+    const isRefused = !signedIn || Boolean(usageQuery.error)
+    const state = stateOf(isRefused, usage)
 
     const onUpgrade = () => {
         void upgrade.trigger(undefined, { throwOnError: false }).then((checkout) => {
@@ -51,7 +56,7 @@ export const PlanUsageScreen = (props: PlanUsageScreenProps) => {
             plan={usage?.plan ?? null}
             activeCount={usage?.activeCount ?? 0}
             cap={usage?.cap ?? null}
-            readRefusal={usageQuery.error || !signedIn ? t("sessionEnded") : null}
+            readRefusal={isRefused ? t("sessionEnded") : null}
             upgradeRefusal={upgrade.error ? t("checkoutRefusal") : null}
             isUpgrading={upgrade.isMutating}
             copy={{

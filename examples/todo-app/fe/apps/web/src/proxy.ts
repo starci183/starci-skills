@@ -22,9 +22,10 @@ export const config = {
      *
      * `_next` is the build output, `api` is not localised, and the last alternative excludes any
      * path with a dot in it - `favicon.ico`, `sign-in/turtle-master.png`, every file under
-     * `public/`. Without that last one the middleware would redirect an asset request to
+     * `public/`; `[.]` is a literal dot, written as a class so the pattern needs no escaping.
+     * Without that last one the middleware would redirect an asset request to
      * `/en/logo.svg` and the file would 404 in one locale and not the other; the brand turtle's own
      * route handler lives at the unprefixed path for exactly this reason.
      */
-    matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+    matcher: ["/((?!api|_next|_vercel|.*[.].*).*)"],
 }

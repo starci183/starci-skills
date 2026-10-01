@@ -67,6 +67,7 @@ export const PrivacyView = (props: PrivacyViewProps) => {
     const { state, refusal, exportRefusal } = props
     const erasureBusy = state === "erasure-pending"
     const complete = state === "erasure-complete"
+    const confirming = state === "requesting-erasure"
 
     return (
         <GrammarRoot data-state={state}>
@@ -102,9 +103,8 @@ export const PrivacyView = (props: PrivacyViewProps) => {
                         {state === "erasure-refused" && refusal !== null ? (
                             <Text live="assertive">{refusal}</Text>
                         ) : null}
-                        {complete ? (
-                            <Text live="polite">{copy.erasureComplete}</Text>
-                        ) : state === "requesting-erasure" ? (
+                        {complete ? <Text live="polite">{copy.erasureComplete}</Text> : null}
+                        {confirming ? (
                             <div className={CONFIRM_ROW_CLASS_NAME}>
                                 <Button onPress={props.onConfirmErasure} variant="outline">
                                     {copy.erasureConfirm}
@@ -113,7 +113,8 @@ export const PrivacyView = (props: PrivacyViewProps) => {
                                     {copy.erasureCancel}
                                 </Button>
                             </div>
-                        ) : (
+                        ) : null}
+                        {complete || confirming ? null : (
                             <>
                                 {erasureBusy ? (
                                     <Text live="polite" tone="muted">

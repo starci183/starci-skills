@@ -6,6 +6,14 @@ import { useNotifyPreferences } from "@/hooks/notify"
 import { useAccountShellCopy } from "@/hooks/shell"
 import { NotifyPreferencesView, type NotifyPreferencesState } from "./component"
 
+/** Which state the view renders: a running save first, then a refusal, then the loaded preference. */
+const stateOf = (isSaving: boolean, isRefused: boolean, subscribed: boolean | null): NotifyPreferencesState => {
+    if (isSaving) return "saving"
+    if (isRefused) return "refused"
+    if (subscribed === null) return "loading"
+    return subscribed ? "subscribed" : "unsubscribed"
+}
+
 /** The preferences block takes nothing from its page: the screen owns its own session gate. */
 type NotifyPreferencesBlockProps = Record<never, never>
 
@@ -24,16 +32,7 @@ export const NotifyPreferencesBlock = (props: NotifyPreferencesBlockProps) => {
 
     const refusal = refusalKey === null ? null : t(refusalKey)
 
-    const state: NotifyPreferencesState =
-        pending === "save"
-            ? "saving"
-            : refusal !== null
-              ? "refused"
-              : subscribed === null
-                ? "loading"
-                : subscribed
-                  ? "subscribed"
-                  : "unsubscribed"
+    const state = stateOf(pending === "save", refusal !== null, subscribed)
 
     return (
         <NotifyPreferencesView
