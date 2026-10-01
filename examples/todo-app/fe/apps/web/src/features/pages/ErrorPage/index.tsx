@@ -10,10 +10,5 @@ type ErrorPageProps = { readonly onRetry: () => void }
  */
 export const ErrorPage = (props: ErrorPageProps) => {
     const t = useTranslations("errors.page")
-    return (
-        <ErrorPageBase
-            props={{ title: t("title"), retryLabel: t("retry") }}
-            on={{ retry: props.onRetry }}
-        />
-    )
+    return <ErrorPageBase props={{ title: t("title"), retryLabel: t("retry") }} on={{ retry: props.onRetry }} />
 }

@@ -4,6 +4,4 @@ import { TaskSharePageBase } from "./component"
 type TaskSharePageProps = { readonly taskId: string }
 
 /** The share route's connected half: it hands the task the segment names down to the screen. */
-export const TaskSharePage = (props: TaskSharePageProps) => (
-    <TaskSharePageBase props={{ taskId: props.taskId }} />
-)
+export const TaskSharePage = (props: TaskSharePageProps) => <TaskSharePageBase props={{ taskId: props.taskId }} />

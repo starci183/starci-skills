@@ -11,7 +11,5 @@ type RecurPageProps = { readonly task: string | undefined }
  * so the route binds it as `?task=<title>` rather than inventing an id the API cannot resolve.
  */
 export const RecurPage = (props: RecurPageProps) => (
-    <RecurPageBase
-        props={{ taskTitle: props.task === undefined || props.task === "" ? null : props.task }}
-    />
+    <RecurPageBase props={{ taskTitle: props.task === undefined || props.task === "" ? null : props.task }} />
 )
