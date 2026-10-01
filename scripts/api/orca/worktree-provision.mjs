@@ -10,6 +10,7 @@ import { orcaWorktreeClient } from './worktree-client.mjs';
 import { removeOrcaWorktree } from './worktree-remove.mjs';
 import { mainRootOf } from '../git/worktree-list.mjs';
 import { ORCA_KINDS, worktreeSettings, withRegistry, claimWorktree, pendingPathOf, releaseOrcaSlot } from '../../lib/worktree-registry.mjs';
+import { runtimeStampOf } from '../../lib/orca-orphans.mjs';
 
 const posixPath = (p) => String(p).replace(/\\/g, '/');
 
@@ -65,11 +66,14 @@ export function bindOrcaWorktree({ pending = null, repoRoot, kind, orcaId, dir, 
  * the row bound to what Orca returned (its id, path and branch).
  * {ok, id, path, branch, head} | {ok:false, reason:'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed', detail}
  */
-export function createOrcaWorktree({ repoRoot, kind, name, base, setup = 'skip', owner = {}, ownerPid = process.pid, cap = undefined, comment = null, env = process.env, git = null,
+export function createOrcaWorktree({ repoRoot, kind, name, base, setup = 'skip', owner = {}, ownerPid = process.pid, cap = undefined, env = process.env, git = null,
   orca = orcaWorktreeClient, settings = worktreeSettings() }) {
   const slot = reserveOrcaSlot({ repoRoot, kind, slotKey: name, owner, cap, env, git, settings });
   if (!slot.ok) return slot;
-  const ask = () => orca.create({ repo: `path:${posixPath(slot.repoRoot)}`, name, baseBranch: base, setup, ...(comment ? { comment } : {}) });
+  // The runtime's ownership stamp, always, in the creating call itself: a tree whose bind never happens is still
+  // recognisably the runtime's (scripts/lib/orca-orphans.mjs; the GC's orphan pass).
+  const comment = runtimeStampOf({ kind, slot: name, owner: { ...owner, supJobId: owner.lane ?? null } });
+  const ask = () => orca.create({ repo: `path:${posixPath(slot.repoRoot)}`, name, baseBranch: base, setup, comment });
   let made = ask();
   // A repository Orca does not know yet is registered once (idempotent), then the creation is asked again.
   if (!made?.ok && made?.errorCode === 'repo_not_found' && orca.addRepo && orca.addRepo({ path: posixPath(slot.repoRoot) })?.ok) made = ask();

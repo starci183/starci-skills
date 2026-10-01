@@ -87,7 +87,8 @@ test('Orca creates the workflow worktree once; the registry keys it by Orca\'s i
   assert.ok(made.ok && made.created, JSON.stringify(made));
   const rec = made.record;
   assert.deepEqual(orca.names(), ['create']);
-  assert.deepEqual({ ...orca.calls[0][1], repo: undefined }, { repo: undefined, name: 'wf-wf-shop-k2', baseBranch: 'main', setup: 'run' });
+  assert.deepEqual({ ...orca.calls[0][1], repo: undefined }, { repo: undefined, name: 'wf-wf-shop-k2', baseBranch: 'main', setup: 'run',
+    comment: 'starci:workflow:wf-wf-shop-k2;wf=wf-shop-k2;ledger=ledger-1' }, 'the ownership stamp rides on the create');
   assert.equal(orca.calls[0][1].repo, `path:${app.replace(/\\/g, '/')}`);
   assert.ok(!rec.path.startsWith(app), 'Orca places it under its own workspace root, not inside the app checkout');
   assert.equal(rec.branch, 'wf-wf-shop-k2');
@@ -248,8 +249,8 @@ test('release is host-side: a release-pending worktree with live terminals stays
   assert.deepEqual(markReleasePending(ctx, 'wf-fin'), { ok: true });
   assert.equal(workflowWorktreeOf(ctx, 'wf-fin').releasePending, true);
   assert.deepEqual(markReleasePending(ctx, 'wf-none'), { ok: false });
-  let live = 2; // the Kernel and one op still hold a terminal
-  const lookup = Object.assign(() => null, { workflowPhase: () => 'finished', workflowTerminalsLive: () => live });
+  orca.terminals.set(rec.orcaWorktreeId, 2); // Orca's worktree ps: the Kernel and one op still hold a terminal in it
+  const lookup = Object.assign(() => null, { workflowPhase: () => 'finished' });
   const held = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca });
   assert.equal(held.find((i) => i.path && path.resolve(i.path) === rec.path), undefined, 'never removed while an agent works in it');
   assert.ok(fs.existsSync(rec.path));
@@ -257,7 +258,7 @@ test('release is host-side: a release-pending worktree with live terminals stays
   // Never from inside itself either.
   assert.deepEqual([releaseWorkflowWorktree(ctx, 'wf-fin', { cwd: path.join(rec.path, 'be') }).reason], ['release-from-inside']);
   assert.ok(fs.existsSync(rec.path));
-  live = 0; // the Kernel's and the ops' terminals are released
+  orca.terminals.set(rec.orcaWorktreeId, 0); // the Kernel's and the ops' terminals are released
   const items = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca });
   const item = items.find((i) => i.path && path.resolve(i.path) === rec.path);
   assert.deepEqual([item?.reason, item?.home, item?.ok], ['release-pending', 'orca', true], JSON.stringify(items));

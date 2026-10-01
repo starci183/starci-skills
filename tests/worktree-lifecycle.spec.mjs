@@ -235,7 +235,8 @@ test('a worktree with nested junctions into a fake main is removed and the fake 
 });
 
 test('a removal that changes the main checkout stops the GC, and it stays stopped until resumed', (t) => {
-  const { repo, env } = fixture(t);
+  const { base, repo, env } = fixture(t);
+  const orca = fakeOrcaWorktrees({ root: path.join(base, 'orca') });
   const dead = 2 ** 22 + 12345;
   const later = Date.now() + 2 * HOUR;
   const one = path.join(worktreesRootOf(repo), 'bad1');
@@ -246,19 +247,19 @@ test('a removal that changes the main checkout stops the GC, and it stays stoppe
     if (args[0] === 'worktree' && args[1] === 'remove') fs.rmSync(path.join(repo, 'src', 'b.ts'));
     return r;
   };
-  const items = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false, git: hostile });
+  const items = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false, git: hostile, orca });
   const bad = items.find((i) => i.fatal);
   assert.ok(bad, JSON.stringify(items));
   assert.match(bad.damage.join(' '), /tracked file deleted: src\/b\.ts/);
   assert.equal(items.at(-1).action, 'stopped');
   assert.equal(items.filter((i) => i.action === 'remove').length, 1, 'nothing after the violation is touched');
   assert.equal(withMachine((m) => m.worktreeGcStop(), { env }).path, bad.path);
-  const next = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false });
+  const next = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false, orca });
   assert.deepEqual(next.map((i) => i.action), ['stopped'], 'a later pass refuses to remove anything');
   assert.ok(fs.existsSync(path.join(worktreesRootOf(repo))) && liveRows(env).length >= 1, 'the other scratch tree is still there');
   withMachine((m) => m.setWorktreeGcStop(null), { env });
   git(repo, 'checkout', '--', 'src/b.ts');
-  const resumed = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false });
+  const resumed = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false, orca });
   assert.ok(resumed.every((i) => i.ok !== false), JSON.stringify(resumed));
   assert.ok(!fs.existsSync(one));
   assert.deepEqual(mainCheckoutDamage({ ok: true, deleted: new Set(), nodeModules: 3, packagesNodeModules: null }, { ok: true, deleted: new Set(['x']), nodeModules: 2, packagesNodeModules: null }),

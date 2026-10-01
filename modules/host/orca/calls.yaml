@@ -308,7 +308,9 @@ calls:
       (--no-parent). --setup skip keeps the creation a git operation only. Orca names the branch after --name with
       every '/' turned into '-' and a -2, -3 suffix when the name is taken, and places the tree under its own
       workspace root, so result.worktree carries what the runtime records: the Orca id (<repo-id>::<path>), the path and
-      the branch ref; it never guesses either. --base-branch takes a branch, a ref or a commit sha.
+      the branch ref; it never guesses either. --base-branch takes a branch, a ref or a commit sha. createOrcaWorktree
+      always passes --comment with the runtime's ownership stamp (starci:<kind>:<slot>, scripts/lib/orca-orphans.mjs), so
+      a tree left by a crash between this call and the registry bind is still recognised by the GC (worktree-ps).
     flags: [repo, name, base-branch, setup, no-parent, parent-worktree, comment]
     required: [repo, name]
     receipt: [result.worktree.id, result.worktree.path]
@@ -332,7 +334,19 @@ calls:
     kind: read
     flags: [repo, limit]
     receipt: [result.worktrees]
-    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/api/orca/worktree-client.mjs (orcaWorktreeClient) reads it to find a workflow worktree Orca created, and the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
+    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
+  worktree-ps:
+    command: worktree ps
+    kind: read
+    flags: [limit]
+    receipt: [result.worktrees]
+    note: |-
+      Every worktree Orca knows across the hosts it covers, each with its id (<repo-id>::<path>), path, branch, comment,
+      liveTerminalCount and lastActivityAt; result.truncated and result.hostScope.omittedHostIds say what the page does not
+      cover. It is the worktree GC's source of truth (scripts/lib/worktrees.mjs gcWorktrees): a stamped tree with no
+      registry row is adopted or preserved and removed, an unstamped one is never touched, and a workflow tree's live
+      terminals are its liveTerminalCount. The core-watch WORKTREE fact reads it too. A truncated page or an omitted host
+      proves nothing about a tree it does not list.
   worktree-set:
     command: worktree set
     kind: mutation
@@ -340,6 +354,17 @@ calls:
     note: Metadata write without retry-request support; it is naturally idempotent, so an unknown result is re-read with worktree-show.
     flags: [worktree, parent-worktree, display-name, workspace-status, no-parent]
     required: [worktree]
+    receipt: [result]
+  project-setup-delete:
+    command: project setup-delete
+    kind: mutation
+    replay: none
+    note: |-
+      Removes a project host setup; a repo-backed setup's id is the repo id that repo add answered, and deleting it removes
+      the repository registration (Orca has no repo rm). Live specs that register a throwaway repository remove it with
+      this call in their teardown (tests/orca-worktree-rm-live.spec.mjs).
+    flags: [setup]
+    required: [setup]
     receipt: [result]
   worktree-show:
     command: worktree show

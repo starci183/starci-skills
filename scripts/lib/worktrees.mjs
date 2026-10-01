@@ -12,7 +12,13 @@
 //   gc       gcWorktrees removes a live tree whose owner ended - a workflow: its phase is stopped, finished or archived;
 //            a critic: its owner job settled; a scratch tree: its branch is in main or its creating process has been
 //            gone for worktrees.ownerGoneMs - always after preserving its work, each through the home that made it
-//            (orca_id -> Orca, none -> git). It also reclaims unregistered git trees under <repo>/.starciwork/worktrees
+//            (orca_id -> Orca, none -> git). Orca's `worktree ps` is the source of truth for Orca trees: a workflow
+//            tree's live terminals are its liveTerminalCount; a tree stamped as the runtime's (scripts/lib/orca-orphans.mjs,
+//            written by worktree-provision.mjs at create) with no registry row - a crash between Orca's create and the bind
+//            - is adopted while its owner lives, or preserved to preserved/orphan/<id> and removed once its owner ended
+//            or is unknown, its row created then closed and an incident logged; an unstamped tree is foreign and never
+//            touched; a registered Orca tree that a complete ps page no longer lists is reported (orca-tree-unlisted),
+//            never removed by other means. It also reclaims unregistered git trees under <repo>/.starciwork/worktrees
 //            whose job is not live. The reconciler GC controller runs it ACTIVE (controllers/gc.mjs key gc:worktrees).
 //   counts   worktreeCounts: each repo's live count against its cap and its orphans (start.mjs --check).
 //
@@ -25,9 +31,10 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from './safe-remove.mjs';
 import {
-  worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason,
-  treeKey, sameTree, insideTree, worktreesRootOf, TERMINAL_JOB_STATUSES, SETTLED_JOBS,
+  worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason, pendingPathOf,
+  treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ORCA_KINDS, ENDED_WORKFLOW_PHASES,
 } from './worktree-registry.mjs';
+import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict, SUP_FINAL_STATUSES } from './orca-orphans.mjs';
 import { gitWorktreeList, mainRootOf, registeredAt } from '../api/git/worktree-list.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { isAncestor } from '../api/git/merge-base.mjs';
@@ -35,7 +42,8 @@ import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeScratchWorktree } from '../api/git/worktree-remove.mjs';
 import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
 import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
-import { pidAlive } from '../../engine/machine-db.mjs';
+import { bindOrcaWorktree } from '../api/orca/worktree-provision.mjs';
+import { pidAlive, machineLog } from '../../engine/machine-db.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -71,8 +79,8 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
 /* ------------------------------------------------------------ gc */
 
 /**
- * The default owner lookups over every registered ledger, read-only, cached for one pass: a job's status, a workflow's
- * phase, how many of a workflow's agents still hold a terminal.
+ * The default owner lookups over every registered ledger, read-only, cached for one pass: a job's status and a
+ * workflow's phase. Whether an agent still works in a tree is Orca's fact (`worktree ps` liveTerminalCount).
  */
 function ledgerLookup(env) {
   const cache = new Map();
@@ -96,11 +104,6 @@ function ledgerLookup(env) {
   };
   const jobStatus = (ledgerId, jobId) => ask(ledgerId, 'job', 'SELECT status FROM jobs WHERE job_id=?', jobId);
   jobStatus.workflowPhase = (ledgerId, workflowId) => ask(ledgerId, 'wf', 'SELECT phase FROM workflows WHERE workflow_id=?', workflowId);
-  // The workflow's agents still holding a terminal: its Kernel job running, or an op holding a worker. A row only when
-  // the ledger has the workflow, so another ledger never answers 0 for it.
-  jobStatus.workflowTerminalsLive = (ledgerId, workflowId) => ask(ledgerId, 'terms',
-    `SELECT (SELECT COUNT(*) FROM jobs WHERE workflow_id=? AND ((kind='kernel' AND status='running') OR (kind='op' AND status IN (${TERMINAL_JOB_STATUSES.map((s) => `'${s}'`).join(',')})))) AS live FROM workflows WHERE workflow_id=?`,
-    workflowId, workflowId);
   jobStatus.close = () => { for (const h of readers.values()) { try { h?.close?.(); } catch { /* closed */ } } };
   return jobStatus;
 }
@@ -111,17 +114,19 @@ const supLookup = (jobId, env) => { try { return withRegistry((m) => m.supJob(jo
 
 /**
  * One GC pass over every worktree the runtime owns, run on the host (the reconciler GC controller). Seams:
- * jobStatusOf(ledgerId, jobId) -> status | null (its .workflowPhase(ledgerId, workflowId) -> phase | null and
- * .workflowTerminalsLive(ledgerId, workflowId) -> count), supStatusOf(supJobId), ownerAlive(pid) -> bool, now, orca (the
- * Orca client of removeOrcaWorktree). A workflow worktree goes: links unlinked, `orca worktree rm`, the row closed, then
- * `git branch -d` of its branch (a release-pending one is merged; an abandoned one is preserved first and `-D`).
- * apply false: the plan only. [{path, repoRoot, reason, action, ok, preserved, error}]
+ * jobStatusOf(ledgerId, jobId) -> status | null (its .workflowPhase(ledgerId, workflowId) -> phase | null),
+ * supStatusOf(supJobId), ownerAlive(pid) -> bool, now, orca (the Orca client: ps, remove). Orca's `worktree ps` is read
+ * FIRST and the registry after it: a tree Orca lists was created before the registry read, so its pending slot or its
+ * bound row is in that read unless its creator crashed. A workflow worktree goes once Orca reports no live terminal in
+ * it (an unreadable or incomplete ps keeps it): links unlinked, `orca worktree rm`, the row closed, then `git branch -d`
+ * of its branch (a release-pending one is merged; an abandoned one is preserved first and `-D`). Then the orphan pass
+ * (collectOrcaOrphans). apply false: the plan only. [{path, repoRoot, reason, action, ok, preserved, error}]
  */
 export function gcWorktrees({ env = process.env, now = Date.now(), apply = true, jobStatusOf = null, supStatusOf = null, ownerAlive = pidAlive, settings = worktreeSettings(), repos = [], git = null,
   budgetMs = settings.gcBudgetMs, clock = Date.now, orca = orcaWorktreeClient } = {}) {
   const lookup = jobStatusOf ?? ledgerLookup(env);
   const phaseOf = lookup.workflowPhase ?? (() => null);
-  const terminalsOf = lookup.workflowTerminalsLive ?? (() => 0);
+  const supOf = supStatusOf ?? ((jobId) => supLookup(jobId, env));
   const items = [];
   const started = clock();
   // A removal that ever changed a main checkout stops the worktree GC until an operator clears it (worktrees.mjs resume).
@@ -140,14 +145,24 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
     if (apply && clock() - started > budgetMs) { items.push({ action: 'deferred', ok: null, reason: 'time-budget', error: null }); return true; }
     return false;
   };
+  // Orca's view before the registry's (see above). An unreadable page proves nothing: no Orca tree is judged from it.
+  let ps = null;
+  try { ps = orca.ps(); } catch (error) { ps = { ok: false, error: String(error?.message ?? error) }; }
+  const cover = psCoverage(ps);
+  const byId = new Map(), byPath = new Map();
+  if (cover.ok) for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); }
+  const orcaTreeOf = (row) => (cover.ok ? byId.get(row.orca_id) ?? byPath.get(treeKey(row.path)) ?? null : null);
+  // A workflow tree's live terminals are Orca's count; a tree a complete page does not list holds none; otherwise unknown
+  // (Infinity: kept).
+  const liveTerminalsOf = (row) => { const w = orcaTreeOf(row); return w ? w.liveTerminalCount : cover.complete ? 0 : Infinity; };
   try {
     let rows = [];
     try { rows = withRegistry((m) => m.liveWorktrees(), env); } catch (error) { return [{ action: 'error', ok: false, error: String(error?.message ?? error).slice(0, 200) }]; }
     for (const row of rows) {
       const repoRoot = path.resolve(row.repo_root);
       if (isPendingRow(row)) {
-        // A slot whose creator died before Orca answered: the slot goes back (an Orca tree it may have left is listed by
-        // `orca worktree list` and released by hand; alpha.5 adopts it).
+        // A slot whose creator died before Orca answered: the slot goes back. A tree Orca may have made for it carries the
+        // runtime's stamp, and the orphan pass below adopts or removes it.
         if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) releaseOrcaSlot(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
         continue;
       }
@@ -161,12 +176,15 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       let pid = null;
       if (row.claim_id != null) { try { pid = withRegistry((m) => m.db.prepare('SELECT owner_pid FROM claims WHERE claim_id=?').get(row.claim_id)?.owner_pid ?? null, env); } catch { pid = null; } }
       const workflowPhase = row.kind === 'workflow' && row.workflow_id ? phaseOf(row.ledger_id, row.workflow_id) : null;
-      const terminalsLive = row.kind === 'workflow' && row.workflow_id ? Number(terminalsOf(row.ledger_id, row.workflow_id) ?? 0) : 0;
+      const terminalsLive = row.kind === 'workflow' ? liveTerminalsOf(row) : 0;
       const ownerStatus = row.kind === 'workflow' ? null : row.job_id ? lookup(row.ledger_id, row.job_id)
-        : row.kind === 'supervisor-staging' && row.lane ? (supStatusOf ?? supLookup)(row.lane, env) : null;
+        : row.kind === 'supervisor-staging' && row.lane ? supOf(row.lane) : null;
       const reason = collectReason({ row, jobStatus: ownerStatus, workflowPhase, terminalsLive, merged, ownerAlive: pid == null ? false : ownerAlive(Number(pid)), now, ownerGoneMs: settings.ownerGoneMs });
       if (!reason) continue;
       if (halt()) return items;
+      // A registered Orca tree that a complete ps page no longer lists cannot be removed through Orca, and is never
+      // removed by any other means: reported, its row marked, an incident logged.
+      if (row.orca_id && cover.complete && !orcaTreeOf(row)) { items.push(unlisted({ row, repoRoot, reason, apply, env })); continue; }
       items.push(collect({ row, repoRoot, dir: row.path, branch: row.branch, name: row.workflow_id && row.kind === 'workflow' ? `${row.workflow_id}/gc` : row.job_id ?? row.lane ?? `${row.kind}-${hashOf(row.path)}`,
         reason, merged, apply, env, git, orca }));
     }
@@ -187,6 +205,7 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       }
       if (apply) removeEmptyDirs(worktreesRootOf(repoRoot));
     }
+    if (cover.ok && collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, apply, settings, env, git, orca })) return items;
     if (items.at(-1)?.fatal) halt();
   } finally { lookup.close?.(); }
   return items;
@@ -201,6 +220,78 @@ function removeEmptyDirs(root) {
     if (dir !== root) { try { if (!fs.readdirSync(dir).length) fs.rmdirSync(dir); } catch { /* busy or not empty */ } }
   };
   visit(root);
+}
+
+const ENDED = new Set(ENDED_WORKFLOW_PHASES);
+const SUP_FINAL = new Set(SUP_FINAL_STATUSES);
+
+/** One incident line in machine_logs (actor gc, kind worktree.orphan): what the orphan scan found and did. */
+function orphanIncident({ level = 'warn', msg, owner = {}, data, env }) {
+  machineLog({ actor: 'gc', kind: 'worktree.orphan', level, msg: msg.slice(0, 500), ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null,
+    jobId: owner.jobId ?? null, data }, { env });
+}
+
+/** A registered Orca tree Orca no longer lists (orca-tree-unlisted): reported and marked, never removed by other means. */
+function unlisted({ row, repoRoot, reason, apply, env }) {
+  if (apply) {
+    markRemoved(row.path, { error: 'orca-tree-unlisted', env });
+    orphanIncident({ level: 'error', msg: `registered Orca tree ${row.orca_id} at ${row.path} is collectable (${reason}) but Orca no longer lists it: left in place`,
+      owner: { ledgerId: row.ledger_id, workflowId: row.workflow_id, jobId: row.job_id }, data: { orcaId: row.orca_id, path: row.path, collectReason: reason }, env });
+  }
+  return { path: row.path, repoRoot, reason: 'orca-tree-unlisted', action: 'keep', home: 'orca', ok: false, error: 'orca-tree-unlisted' };
+}
+
+/**
+ * The orphan pass over Orca's `worktree ps` page: every STAMPED tree on this host with no registry row (a crash between
+ * Orca's create and the bind, or a slot the GC gave back as slot-never-bound). An unstamped tree is foreign and never
+ * touched; a stamped kind that is not an Orca kind on this runtime is left for the lane that makes it one. The registry
+ * is re-read here, after the page. Its owner (from the stamp: a workflow's phase, a critic's op job, a staging tree's
+ * Supervisor job) decides (orca-orphans.mjs orphanVerdict): live -> adopted (the row created, so its owner's next lookup
+ * finds it); ended, or unknown past ownerGoneMs -> the row created, its work preserved to preserved/orphan/<id>, removed
+ * through removeOrcaWorktree (links first, then Orca), the row closed; a fresh pending slot of the same owner -> its
+ * creation is still running, left alone. Every adoption and removal logs an incident. true when the pass must stop.
+ */
+function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, apply, settings, env, git, orca }) {
+  let fresh;
+  try { fresh = withRegistry((m) => m.liveWorktrees(), env); } catch { return false; }
+  const mains = new Map(ps.worktrees.filter((w) => w.isMainWorktree && w.repoId && w.path).map((w) => [w.repoId, w.path]));
+  for (const w of ps.worktrees) {
+    if (w.isMainWorktree || !w.id || !w.path || w.hostId !== 'local') continue;
+    const stamp = parseRuntimeStamp(w.comment);
+    if (!stamp || !ORCA_KINDS.includes(stamp.kind)) continue; // foreign: never touched
+    if (fresh.some((r) => r.orca_id === w.id || (!isPendingRow(r) && sameTree(r.path, w.path)))) continue; // registered
+    const slotName = path.basename(pendingPathOf('', stamp.kind, stamp.slot));
+    const inFlight = fresh.some((r) => isPendingRow(r) && r.kind === stamp.kind && path.basename(r.path) === slotName && !stalePending(r, now, settings.ownerGoneMs));
+    const staging = stamp.kind === 'supervisor-staging';
+    const owner = { workflowId: stamp.workflowId ?? (stamp.kind === 'workflow' ? stamp.slot : null), jobId: stamp.jobId, ledgerId: stamp.ledgerId,
+      lane: staging ? stamp.supJobId ?? stamp.slot : null };
+    const ageMs = Math.min(ageOf(w.path, now), w.lastActivityAt ? now - w.lastActivityAt : Infinity);
+    const v = orphanVerdict({ stamp, inFlight, liveTerminals: w.liveTerminalCount, ageMs, ownerGoneMs: settings.ownerGoneMs, endedPhases: ENDED,
+      settledStatuses: staging ? SUP_FINAL : SETTLED_JOBS,
+      workflowPhase: stamp.kind === 'workflow' && owner.workflowId ? phaseOf(owner.ledgerId, owner.workflowId) : null,
+      jobStatus: staging ? (owner.lane ? supOf(owner.lane) : null) : owner.jobId ? lookup(owner.ledgerId, owner.jobId) : null });
+    if (v.verdict !== 'adopt' && v.verdict !== 'collect') continue;
+    const repoRoot = mains.get(w.repoId) ?? (fs.existsSync(w.path) ? mainRootOf(w.path, { git }) : null);
+    if (!repoRoot) continue;
+    const dir = path.resolve(w.path);
+    const base = { path: dir, repoRoot: path.resolve(repoRoot), home: 'orca', owner: v.owner };
+    if (!apply) { items.push({ ...base, reason: v.verdict === 'adopt' ? 'orca-orphan-adopted' : 'orca-orphan', action: v.verdict === 'adopt' ? 'would-adopt' : 'would-remove', ok: null }); continue; }
+    if (halt()) return true;
+    const bound = bindOrcaWorktree({ repoRoot, kind: stamp.kind, orcaId: w.id, dir, branch: w.branch, owner, env, git });
+    if (!bound.ok) { items.push({ ...base, reason: bound.reason, action: v.verdict === 'adopt' ? 'adopt' : 'remove', ok: false, error: bound.reason }); continue; }
+    if (v.verdict === 'adopt') {
+      orphanIncident({ msg: `adopted the unregistered Orca tree ${w.id} (${w.comment}): its owner is live`, owner, data: { orcaId: w.id, path: dir, stamp: w.comment }, env });
+      items.push({ ...base, reason: 'orca-orphan-adopted', action: 'adopt', ok: true });
+      continue;
+    }
+    const r = removeOrcaWorktree({ repoRoot, orcaId: w.id, dir, branch: w.branch, deleteBranch: w.branch ? 'force' : null,
+      preserve: { name: orphanPreserveName({ slot: stamp.slot, orcaId: w.id, digest: (x) => crypto.createHash('sha1').update(x).digest('hex') }) }, env, git, orca });
+    orphanIncident({ level: r.ok ? 'warn' : 'error', msg: `orphaned Orca tree ${w.id} (${w.comment}), owner ${v.owner}: ${r.ok ? 'preserved and removed' : `removal failed: ${r.reason}`}`,
+      owner, data: { orcaId: w.id, path: dir, stamp: w.comment, preserved: r.preserved?.ref ?? null, error: r.ok ? null : r.reason }, env });
+    items.push({ ...base, reason: 'orca-orphan', action: 'remove', ok: r.ok, preserved: r.preserved?.ref ?? null, ...(r.ok ? {} : { error: r.reason }), ...(r.fatal ? { fatal: true, damage: r.damage } : {}) });
+    if (r.fatal) return halt();
+  }
+  return false;
 }
 
 /** Remove one collectable tree through the home that made it: Orca (the row has an orca_id) or git. */
