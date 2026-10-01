@@ -97,7 +97,7 @@ import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
 import { foundationDutyFor } from './api-lib/foundation-duty.mjs';
 import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatchedReportBinding, parseAttempt, reportIdentityOf } from './api-lib/report-binding.mjs';
 import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './api-lib/hierarchy.mjs';
-import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workflowRunIdsOf } from './api-lib/messages.mjs';
+import { WORKER_QUESTION } from './api-lib/messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { slash } from '../lib/path-key.mjs';
@@ -157,7 +157,6 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { workflowDisplayName } from '../lib/display-names.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
-import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import {
   SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK, cutSeamSettings, isSeamCut, recutPlanOf, seamPriorityOf,
   seamReconcileOf, seamStateOf, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf,
@@ -1450,7 +1449,7 @@ function seamActionsOf(set) {
 //     STARCI_GIT_MEMO_DIR (default <tmpdir>/starci-git-memo). Such an answer is immutable, so the memo
 //     needs no invalidation; only a clean exit (status 0, no spawn error) is kept, so a timeout or a
 //     revision git does not know yet is asked again.
-// The Orca reads status makes (terminal show and read per worker terminal, the orchestration inbox) each
+// The Orca reads status makes (terminal show and read per worker terminal) each
 // cost 1-3 s of orca.exe start under load and ran one after another; prefetchStatusOrcaReads runs them in
 // parallel just before the projection, and the projection's own call takes the prefetched answer once
 // (a failed or timed-out prefetch is asked again live). STARCI_STATUS_MEMO=off turns all of it off.
@@ -1655,8 +1654,8 @@ const spawnAsyncOf = ({ command, argv, options }) => new Promise((resolve) => {
 const STATUS_PREFETCH_CONCURRENCY = 8;
 /**
  * The Orca reads status is about to make for `workflowId` - terminal show and read of every observed
- * worker terminal (a released worker is not observed), and the orchestration inbox when a worker terminal
- * and a run exist - run in parallel: {spawnKeyOf: result} for withStatusSpawnMemo.
+ * worker terminal (a released worker is not observed) - run in parallel: {spawnKeyOf: result} for
+ * withStatusSpawnMemo. The orchestration check is never prefetched: it consumes a Delivery.
  */
 async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
   const prefetched = new Map();
@@ -1666,7 +1665,6 @@ async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
   const handles = [...new Set(rows.filter((job) => jobPayloadOf(job).workerReleased?.custody?.state !== 'released').map((job) => operationTerminalHandleOf(job)))];
   const calls = recordSpawns(() => {
     for (const terminal of handles) { terminalShow({ terminal }); terminalRead({ terminal, screen: true }); }
-    if (workflowRunIdsOf(db, workflowId).size) orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT });
   });
   const results = await mapConcurrent(calls, STATUS_PREFETCH_CONCURRENCY, spawnAsyncOf);
   calls.forEach((call, index) => { if (results[index]) prefetched.set(spawnKeyOf(call.command, call.argv), results[index]); });

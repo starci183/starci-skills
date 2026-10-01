@@ -37,7 +37,7 @@ import { startAgent } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
-import { orchInbox } from '../api/orca/orch-inbox.mjs';
+import { orchCheck } from '../api/orca/orch-check.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 
 export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
@@ -200,7 +200,7 @@ function clientOf(orca) {
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,
     release: o.workerRelease ?? workerRelease,
-    inbox: o.inbox ?? orchInbox,
+    check: o.check ?? orchCheck,
     taskUpdate: o.taskUpdate ?? taskUpdate,
   };
 }
@@ -243,18 +243,24 @@ export function launchCriticWorker({ critic, dir, prompt, entry = null, orca = n
 }
 
 /**
- * Wait for the critic worker through the orchestration commands: its worker_done or escalation (the non-consuming
- * inbox, matched by the worker's terminal, dispatch or Task), else the worker ending (worker-show), else the deadline.
+ * Wait for the critic worker through the orchestration commands: its worker_done or escalation (the consuming
+ * orchestration check of the critic's own Run, named by its coordinator `entry`, each Delivery acknowledged once read;
+ * matched by the worker's terminal, dispatch or Task), else the worker ending (worker-show), else the deadline.
  * {signal: 'worker_done'|'escalation'|'ended'|'timeout', message?, state?}.
  */
-async function awaitCritic({ client, dispatchId, terminal, taskId, timeoutMs, pollMs, sleep, now }) {
+async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId, timeoutMs, pollMs, sleep, now }) {
   const deadline = now() + timeoutMs;
+  const mine = [];
   for (;;) {
-    const listed = settle(() => client.inbox({ limit: 200 }));
-    const mine = (listed?.messages ?? []).filter((m) => {
-      const p = payloadOf(m);
-      return (terminal && m?.from_handle === terminal) || (dispatchId && p?.dispatchId === dispatchId) || (taskId && p?.taskId === taskId);
-    });
+    // Every Delivery of the Run is read whole, then acknowledged; the ack call answers the next one.
+    for (let delivery = settle(() => client.check({ run: runId, ...(entry ? { terminal: entry } : {}) })); delivery?.ok && delivery.deliveryId;) {
+      mine.push(...delivery.messages.filter((m) => {
+        const p = payloadOf(m);
+        return (terminal && m?.from_handle === terminal) || (dispatchId && p?.dispatchId === dispatchId) || (taskId && p?.taskId === taskId);
+      }));
+      const { deliveryId } = delivery;
+      delivery = settle(() => client.check({ run: runId, ...(entry ? { terminal: entry } : {}), ack: deliveryId }));
+    }
     const done = mine.find((m) => m?.type === 'worker_done');
     if (done) return { signal: 'worker_done', message: done };
     const escalation = mine.find((m) => m?.type === 'escalation');
@@ -271,7 +277,7 @@ async function awaitCritic({ client, dispatchId, terminal, taskId, timeoutMs, po
  * Run the independent critic over one round. `images` [{path, label}], `html` the round's source, `rubric` from
  * rubricFor, `critic` {provider, model, effort, timeoutMs} from criticFor. `orca` replaces the Orca client (tests: a
  * fake of the wrappers - runCreate, taskCreate, trust, workerStart, dispatchShow, terminalRename, workerShow,
- * workerStop, workerRelease, inbox, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
+ * workerStop, workerRelease, check, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
  * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
@@ -306,7 +312,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
     }
     Object.assign(base.critic, { dispatchId: launched.dispatchId, taskId: launched.taskId, runId: launched.runId, effective: launched.effective ?? null });
-    const waited = await awaitCritic({ client, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
+    const waited = await awaitCritic({ client, runId: launched.runId, entry, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
       timeoutMs: Number(critic.timeoutMs), pollMs, sleep, now });
     base.critic.ms = now() - started;
     base.critic.signal = waited.signal;

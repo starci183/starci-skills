@@ -10,6 +10,7 @@ import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const apiFile = path.join(root, 'scripts', 'kernel', 'api.mjs');
+const read0 = (repo, env) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return l.db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n; } finally { l.close(); } };
 test('a filed report makes its worker question inactive before job settlement', (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-question-inactive-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -42,7 +43,9 @@ test('a filed report makes its worker question inactive before job settlement', 
     payload: JSON.stringify({ dispatchId, question: 'Still waiting?' }), created_at: new Date().toISOString() };
   fs.writeFileSync(state, JSON.stringify({ messages: [message] }));
   assert.deepEqual(api('status', '--workflow', workflowId).body.frontier.workerQuestionJobs, [jobId]);
-  assert.equal(api('questions', '--workflow', workflowId).body.bridged, 1);
+  // status drained the Run and bridged the question; questions finds it already in the ledger.
+  assert.equal(read0(repo, env), 1);
+  assert.equal(api('questions', '--workflow', workflowId).body.bridged, 0);
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo,{env}) }); try { return fn(l.db); } finally { l.close(); } };
   const write = openLedger({ file: ledgerFileFor(repo,{env}) });
   try { const attemptId=write.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
@@ -53,8 +56,9 @@ test('a filed report makes its worker question inactive before job settlement', 
   const status = api('status', '--workflow', workflowId).body;
   assert.deepEqual(status.workerQuestions, []);
   assert.deepEqual(status.frontier.workerQuestionJobs, []);
+  // The status drain closed it already: a filed report makes the question inactive.
   const questions = api('questions', '--workflow', workflowId).body;
-  assert.equal(questions.closed, 1);
+  assert.equal(questions.closed, 0);
   assert.deepEqual(questions.pending, []);
   assert.equal(read(db => JSON.parse(db.prepare("SELECT disposition_json FROM inbox WHERE key='msg_dead'").get().disposition_json).reason), 'dispatch-inactive');
 });

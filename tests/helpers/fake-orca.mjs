@@ -643,14 +643,31 @@ else if (verb === 'orchestration dispatch')
   out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: process.env.STARCI_FAKE_ORCA_PREAMBLE || 'fake dispatch preamble' } });
 else if (verb === 'orchestration dispatch-show')
   out({ ok: true, result: { dispatch: { id: state.dispatchId ?? 'dispatch-fake-1', assignee_handle: state.assignee ?? (uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1') } } });
-else if (verb === 'orchestration check')
-  out({ ok: true, result: { deliveries: [] } });
+// Orca's consuming check: state.messages (newest first) addressed to run:<id> are delivered oldest first, up to 50 a
+// Delivery; an open Delivery replays until --ack names it, and the ack call answers the next one. A --terminal that
+// is not the Run's coordinator (state.runs) is refused consumer_fenced, as Orca 1.4.209 did in smoke E2.
+// STARCI_FAKE_ORCA_CHECK_FAILS=1 refuses every check.
+else if (verb === 'orchestration check') {
+  const run = arg('run'), terminal = arg('terminal'), ack = arg('ack');
+  if (process.env.STARCI_FAKE_ORCA_CHECK_FAILS === '1') fail({ ok: false, error: { code: 'runtime_error', message: 'check refused' } });
+  const coordinator = state.runs?.[run]?.coordinator;
+  if (terminal && coordinator && coordinator !== terminal)
+    fail({ ok: false, error: { code: 'consumer_fenced', message: 'This coordinator terminal is no longer bound to Run ' + run + '.' } });
+  state.acked = state.acked || {}; state.deliveries = state.deliveries || {};
+  if (ack && state.deliveries[ack]) { for (const id of state.deliveries[ack].ids) state.acked[id] = true; state.deliveries[ack].acked = true; }
+  let open = Object.entries(state.deliveries).find(([, d]) => d.run === run && !d.acked);
+  if (!open) {
+    const due = (state.messages || []).filter(m => m.run_id === run && (!m.to_handle || m.to_handle === 'run:' + run) && !state.acked[m.id]).reverse().slice(0, 50);
+    if (due.length) { const id = 'delivery_' + (Object.keys(state.deliveries).length + 1); state.deliveries[id] = { run, ids: due.map(m => m.id) }; open = [id, state.deliveries[id]]; }
+  }
+  state.checks = [...(state.checks || []), { run, terminal, ack }];
+  save();
+  const messages = open ? open[1].ids.map(id => (state.messages || []).find(m => m.id === id)).filter(Boolean) : [];
+  out({ ok: true, result: { runId: run, deliveryId: open ? open[0] : null, messages, count: messages.length, acknowledged: ack || null } });
+}
 else if (verb === 'orchestration send')
   out({ ok: true, result: { sent: true } });
-// state.messages seeds the orchestration inbox (newest first, Orca's row shape);
-// a reply is recorded in state.replies and threaded onto the inbox like Orca does.
-else if (verb === 'orchestration inbox')
-  out({ ok: true, result: { messages: (state.messages || []).slice(0, Number(arg('limit')) || undefined), count: (state.messages || []).length } });
+// A reply is recorded in state.replies and threaded onto state.messages (to the worker, not the Run) like Orca does.
 else if (verb === 'orchestration reply') {
   if (process.env.STARCI_FAKE_ORCA_REPLY_FAILS === '1')
     fail({ ok: false, error: { code: 'message_not_found', message: 'no such question' } });

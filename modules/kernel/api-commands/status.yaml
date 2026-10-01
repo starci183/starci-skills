@@ -10,7 +10,10 @@ status:
   writes: >-
     Status can resolve met typed waits, sweep autopilot asks and gates, renew
     leases of live workers, and record provider outages observed on worker
-    screens. Its projection reflects those transitions in the same call.
+    screens. Unless the workflow finished, it drains the workflow's Orca Runs
+    into the ledger first (the same drain as api questions, scripts/kernel/api-lib/messages.mjs:
+    orchestration check, one ledger transaction, then --ack). Its projection
+    reflects those transitions in the same call.
   returns:
     ok: true
     title: '<the workflow''s display name: workflows.display_name (api rename, define-goal), else the goal slug, else the id> — a label; workflowId stays the key'
@@ -293,13 +296,12 @@ status:
     activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
     inboxPending: '<n> — unclaimed inbox rows for this workflow'
     workerQuestions: >-
-      [{messageId, jobId, opId, attempt, question, options[], askedAt, bridged}] — pending
-      `question` messages a running worker sent its coordinator with an Orca orchestration ask
-      (Orca's preamble tells it to), read through the non-consuming host inbox
-      (scripts/api/orca/orch-inbox.mjs) whenever a live operation terminal exists, plus rows `api
-      questions` already bridged. Any entry makes the frontier `worker-question` (actionable): the
-      worker is blocked until `api reply` answers (inc-b944cbaef24b, inc-20449a260df8).
-      workerQuestionsError names an unreadable host inbox; status never writes the bridge itself
+      [{messageId, type, jobId, opId, attempt, question, options[], askedAt}] — pending
+      `question` and `escalation` messages a running worker sent its coordinator (Orca's preamble
+      tells it to ask), read from the ledger rows the drain wrote. Any entry makes the frontier
+      `worker-question` (actionable): the worker is blocked until `api reply` answers
+      (inc-b944cbaef24b, inc-20449a260df8). workerQuestionsError names a Run whose orchestration
+      check failed
     cutSets: >-
       [{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?, closingJob?,
       closingCheck?}] — every cut set of the workflow with an ordinal whose latest job has not settled

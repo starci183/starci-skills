@@ -17,6 +17,8 @@ import path from 'node:path';
 export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null } = {}) {
   const calls = [];
   const messages = [];
+  const acked = new Set();
+  let delivery = null, deliveries = 0;
   const workers = new Map();
   let n = 0;
   const rec = (name, fn) => (args = {}) => { calls.push([name, args]); return fn(args); };
@@ -53,7 +55,13 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
     }),
     workerStop: rec('worker-stop', () => ({ ok: true })),
     workerRelease: rec('worker-release', () => ({ ok: true })),
-    inbox: rec('inbox', () => ({ ok: true, messages: [...messages] })),
+    // Orca's consuming check: every unacknowledged message is one Delivery, replayed until --ack names it.
+    check: rec('check', ({ ack = null }) => {
+      if (ack && delivery?.id === ack) { for (const m of delivery.messages) acked.add(m.id); delivery = null; }
+      const open = messages.filter((m) => !acked.has(m.id)).reverse();
+      if (!delivery && open.length) { deliveries += 1; delivery = { id: `delivery_${deliveries}`, messages: open }; }
+      return { ok: true, deliveryId: delivery?.id ?? null, messages: delivery ? [...delivery.messages] : [], acked: ack };
+    }),
     taskUpdate: rec('task-update', ({ id, status }) => ({ ok: true, taskId: id, status })),
   };
   return client;
