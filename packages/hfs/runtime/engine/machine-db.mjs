@@ -1,4 +1,4 @@
-// engine/machine-db.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version 1).
+// engine/machine-db.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version MACHINE_VERSION).
 //
 // machine.sqlite is the host's single operational store: the ledger registry, the Supervisor (sup_*), the engine
 // reconciler (process_runs, engine_leader, leader_history, schedules, engine_actions, controller_modes, sla_episodes),
@@ -24,8 +24,9 @@
 //              and the next flushOutbox (the land gate) applies it. Only idempotent writers are deferrable (DEFERRABLE).
 //   reader   : readOnly, query_only=ON, busy_timeout=15000
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; an old-schema file
-//              (anything that is not 'starci/machine@1') is refused, never migrated — a fresh machine.sqlite is
-//              created by openMachine on first use.
+//              (anything that is not 'starci/machine@1') is refused — a fresh machine.sqlite is created by openMachine on
+//              first use. A starci/machine@1 file at an older user_version is brought forward by migrateMachine
+//              (engine/migrations/machine/000N-*.sql after 0001-init) on the first writer open.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader /
 // withMachine / readMachine and the typed functions on the handle.
 import fs from 'node:fs';
@@ -42,7 +43,9 @@ import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
-export const MACHINE_VERSION = 1;
+export const MACHINE_VERSION = 2;
+/** Forward migrations after 0001-init, in order; each bumps user_version to its `version` (migrateMachine). */
+export const MACHINE_MIGRATIONS = Object.freeze([{ version: 2, name: '0002-worktrees-no-workflow-kind' }]);
 export const MACHINE_BUSY_TIMEOUT_MS = 15000;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 export const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
@@ -256,7 +259,7 @@ export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(
 
 /** An old or foreign store: refuse it; a fresh store is created by openMachine on first use. */
 function refuseOld(file, why) {
-  throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; this runtime opens only '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) — move the refused file aside and openMachine creates a fresh machine.sqlite on first use`),
+  throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; this runtime opens only '${MACHINE_SCHEMA}' (user_version 1..${MACHINE_VERSION}) — move the refused file aside and openMachine creates a fresh machine.sqlite on first use`),
     { code: 'STARCI_MACHINE_SCHEMA_OLD' });
 }
 
@@ -267,7 +270,51 @@ function checkSchema(db, file) {
   const schema = db.prepare("SELECT value FROM machine_meta WHERE key='schema'").get()?.value;
   if (schema !== MACHINE_SCHEMA) refuseOld(file, `is schema '${schema ?? 'none'}'`);
   if (version > MACHINE_VERSION) throw Object.assign(Error(`machine-schema-newer: ${file} user_version ${version} > ${MACHINE_VERSION}; upgrade the runtime`), { code: 'STARCI_MACHINE_SCHEMA_NEWER' });
-  if (version !== MACHINE_VERSION) refuseOld(file, `is user_version ${version}`);
+  // 1..MACHINE_VERSION: an older version is brought forward on the first writer open (migrateMachine); a reader reads it as is.
+  if (!(version >= 1)) refuseOld(file, `is user_version ${version}`);
+}
+
+/**
+ * Bring an older machine.sqlite forward: for each MACHINE_MIGRATIONS entry above user_version and not yet in schema_migrations -
+ * integrity_check and a VACUUM INTO backup (`<file>.pre-<name>.bak`, skipped for a store created by this open) first, then in one
+ * transaction the migration SQL, schema_version+1, user_version, its schema_migrations row, foreign_key_check and quick_check
+ * before COMMIT. Idempotent and safe across processes (re-checked under the lock). Returns the names applied.
+ */
+export function migrateMachine(db, { file, now = Date.now, backup: wantBackup = true } = {}) {
+  const version = () => Number(pragma(db, 'user_version'));
+  const pending = () => MACHINE_MIGRATIONS.filter((m) => version() < m.version && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get(m.version));
+  if (!pending().length) return [];
+  const check = db.prepare('PRAGMA integrity_check').all();
+  need(check.length === 1 && check[0].integrity_check === 'ok', `machine-migrate-refused: ${file} fails integrity_check`, 'STARCI_MACHINE_MIGRATE_REFUSED');
+  const applied = [];
+  for (const m of pending()) {
+    const sql = fs.readFileSync(path.join(ENGINE_DIR, 'migrations', 'machine', `${m.name}.sql`), 'utf8');
+    const backup = wantBackup && file ? `${path.resolve(file)}.pre-${m.name}.bak` : null;
+    if (backup && !fs.existsSync(backup)) db.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`);
+    db.exec('BEGIN IMMEDIATE');
+    let relaxed = false;
+    try {
+      if (version() >= m.version) { db.exec('ROLLBACK'); continue; }
+      if (typeof db.enableDefensive === 'function') { db.enableDefensive(false); relaxed = true; }   // writable_schema is refused while defensive
+      const started = now();
+      db.exec(sql);
+      db.exec(`PRAGMA schema_version=${Number(pragma(db, 'schema_version')) + 1}`);
+      db.exec('PRAGMA writable_schema=OFF');
+      db.exec(`PRAGMA user_version=${m.version}`);
+      db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,backup_path,started_at,finished_at,status) VALUES(?,?,?,?,?,?,?,'done')")
+        .run(m.version, m.name, runtimeRev(), sha256(sql), backup, started, now());
+      need(db.prepare('PRAGMA foreign_key_check').all().length === 0, `machine-migrate-failed: ${m.name} left a foreign key violation`, 'STARCI_MACHINE_MIGRATE_FAILED');
+      const quick = db.prepare('PRAGMA quick_check').all();
+      need(quick.length === 1 && quick[0].quick_check === 'ok', `machine-migrate-failed: ${m.name} fails quick_check`, 'STARCI_MACHINE_MIGRATE_FAILED');
+      db.exec('COMMIT');
+      applied.push(m.name);
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch { /* none */ }
+      try { db.exec('PRAGMA writable_schema=OFF'); } catch { /* none */ }
+      throw error;
+    } finally { if (relaxed) db.enableDefensive(true); }
+  }
+  return applied;
 }
 
 function createSchema(db, { file, env, now }) {
@@ -288,7 +335,7 @@ function createSchema(db, { file, env, now }) {
         db.prepare("INSERT INTO mode_changes(controller,from_mode,to_mode,by,reason,at) VALUES(?,NULL,'shadow','machine-db:init','0001-init',?)").run(controller, at);
         db.prepare("INSERT INTO controller_modes(controller,mode,set_at,set_by) VALUES(?,'shadow',?,'machine-db:init')").run(controller, at);
       }
-      db.exec(`PRAGMA user_version=${MACHINE_VERSION}`);
+      db.exec('PRAGMA user_version=1');   // 0001; the forward files follow in migrateMachine
     }
     db.exec('COMMIT');
   } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none */ } throw error; }
@@ -327,6 +374,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
         createSchema(db, { file, env, now });
       }
       checkSchema(db, file);
+      migrateMachine(db, { file, now, backup: !fresh });
       recordFacts(db);
       return db;
     } catch (error) {
