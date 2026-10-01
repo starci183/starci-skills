@@ -9,9 +9,6 @@ const TEASER_COUNT = 3
 /** Pillar order is layout, not copy: the titles and sentences live in the dictionary. */
 const PILLAR_IDS = ["repairable", "onePrice", "carbonNeutral"] as const
 
-/** Props for the connected landing page: the route mounts it empty and it reads its own world. */
-type LandingPageProps = Record<never, never>
-
 /**
  * The connected landing page. Everything the screen says and links to is resolved here on the
  * server - the catalogue slice with its prices formatted in the reader's language, the shop origin
@@ -19,14 +16,12 @@ type LandingPageProps = Record<never, never>
  * from a fixture with no dictionary, no request and no provider. The locale joins the shop hand-off
  * URL so the reader keeps their language across the origin change.
  */
-export const LandingPage = async (props: LandingPageProps) => {
-    void props
+export const LandingPage = async () => {
     const t = await getTranslations("landing")
     const locale = await getLocale()
     const format = await getFormatter()
     return (
         <LandingPageBase
-            state="ready"
             props={{
                 heroTitle: t("hero.title"),
                 heroLede: t("hero.lede"),
@@ -48,7 +43,6 @@ export const LandingPage = async (props: LandingPageProps) => {
                 })),
                 shopHref: `${SHOP_URL}/${locale}`,
             }}
-            on={{}}
         />
     )
 }

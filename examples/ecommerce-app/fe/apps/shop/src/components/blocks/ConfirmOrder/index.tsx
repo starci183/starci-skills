@@ -17,7 +17,6 @@ export const ConfirmOrder = (props: ConfirmOrderProps) => {
     const receipt = useDownloadReceipt(confirmedOrderId)
     return (
         <ConfirmOrderBase
-            state="ready"
             props={{
                 ...props,
                 ...confirm.props,

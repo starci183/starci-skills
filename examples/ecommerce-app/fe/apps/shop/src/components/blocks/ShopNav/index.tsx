@@ -28,7 +28,6 @@ export const ShopNav = (props: ShopNavProps) => {
     const pathname = useLocalePath()
     return (
         <ShopNavBase
-            state="ready"
             props={{
                 label: t("label"),
                 links: LINKS.map((link) => ({
@@ -37,7 +36,6 @@ export const ShopNav = (props: ShopNavProps) => {
                     isCurrent: pathname === link.href || pathname.startsWith(`${link.href}/`),
                 })),
             }}
-            on={{}}
         />
     )
 }

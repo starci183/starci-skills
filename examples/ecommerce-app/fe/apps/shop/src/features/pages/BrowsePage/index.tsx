@@ -7,9 +7,6 @@ import { readSessionToken } from "../../../modules/session"
 import { BrowsePageBase } from "./component"
 import type { BrowsePageState } from "./component"
 
-/** Props for the connected browse page: the route mounts it empty and it reads its own world. */
-type BrowsePageProps = Record<never, never>
-
 /**
  * The screen situation a catalogue read settles. The catalog rides the session-guarded `cart`
  * query, so a dead or absent token is the signed-out gate, a transport failure is the refusal, and
@@ -23,8 +20,7 @@ const browsePageStateOf = (outcome: Outcome<ReadonlyArray<Product>>): BrowsePage
  * data, not build-time content), and every sentence - including the refusal with the service URL
  * interpolated - and every price in the reader's language is resolved before the pure twin sees a prop.
  */
-export const BrowsePage = async (props: BrowsePageProps) => {
-    void props
+export const BrowsePage = async () => {
     const [t, format, sessionToken] = await Promise.all([
         getTranslations("shop.browse"),
         getFormatter(),
@@ -67,7 +63,6 @@ export const BrowsePage = async (props: BrowsePageProps) => {
                 emptyTitle: t("empty.title"),
                 emptyDescription: t("empty.description"),
             }}
-            on={{}}
         />
     )
 }

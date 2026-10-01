@@ -10,15 +10,11 @@ export type ShopNavLink = {
 
 /** The shop nav's resolved inputs: its accessible name and every link settled. */
 export type ShopNavBaseProps = {
-    /** Whole-surface situations this nav settles; it has no alternatives. */
-    readonly state: "ready"
     /** The data payload for whatever state is showing. */
     readonly props: {
         readonly label: string
         readonly links: ReadonlyArray<ShopNavLink>
     }
-    /** What the surface reports upward; the nav is read-only. */
-    readonly on: Record<never, never>
 }
 
 /** The section nav: one real `TextAction` destination per section, `isCurrent` being its real current marker. */

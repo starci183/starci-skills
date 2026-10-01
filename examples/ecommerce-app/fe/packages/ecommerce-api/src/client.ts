@@ -4,12 +4,12 @@ import type { Outcome } from "./outcome"
 const DEFAULT_TIMEOUT_MS = 2500
 
 /** The codes the backends use when the caller has no live session, a wrong pair, or may not do what it asked. */
-const REFUSED_CODES: ReadonlyArray<string> = [
+const REFUSED_CODES: ReadonlySet<string> = new Set([
     "SESSION_INVALID",
     "ACCOUNT_INVALID_CREDENTIALS",
     "IDENTITY_UNAUTHENTICATED",
     "IDENTITY_FORBIDDEN",
-]
+])
 
 /** One request of the client: the caller's own signal is joined with the timeout. */
 export interface ClientRequest {
@@ -59,8 +59,8 @@ const refusalOf = (body: unknown): { readonly code?: string; readonly details?: 
 /** A refusal body as an Outcome: a missing-session code is `refused`, a `_NOT_FOUND` code is `not-found`, the rest is the door's own named refusal. */
 const refusalOutcome = (body: unknown): Outcome<never> => {
     const { code, details } = refusalOf(body)
-    if (code !== undefined && REFUSED_CODES.includes(code)) return { kind: "refused", code }
-    if (code !== undefined && code.endsWith("NOT_FOUND")) return { kind: "not-found" }
+    if (code !== undefined && REFUSED_CODES.has(code)) return { kind: "refused", code }
+    if (code?.endsWith("NOT_FOUND")) return { kind: "not-found" }
     return { kind: "invalid", ...(code === undefined ? {} : { code }), ...(details === undefined ? {} : { details }) }
 }
 

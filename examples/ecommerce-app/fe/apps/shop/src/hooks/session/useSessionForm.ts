@@ -44,7 +44,9 @@ export const useSessionForm = () => {
         setPassword("")
     }
 
-    const state: FormState = refusal ? "refused" : working ? "working" : "ready"
+    let state: FormState = "ready"
+    if (refusal) state = "refused"
+    else if (working) state = "working"
     return {
         state,
         props: {

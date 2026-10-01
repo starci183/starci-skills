@@ -5,7 +5,6 @@ import type { OrderConfirmation } from "../../../modules/types"
 
 /** Resolved checkout copy and the answer of one confirmation attempt. */
 export type ConfirmOrderBaseProps = {
-    readonly state: "ready"
     readonly props: {
         readonly attemptKey: string
         readonly productNames: Readonly<Record<string, string>>

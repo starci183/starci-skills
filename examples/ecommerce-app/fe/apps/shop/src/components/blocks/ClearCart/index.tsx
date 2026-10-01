@@ -14,5 +14,5 @@ type ClearCartControlProps = Pick<ClearCartControlBaseProps["props"], "clearLabe
  */
 export const ClearCartControl = (props: ClearCartControlProps) => {
     const clear = useClearCart()
-    return <ClearCartControlBase state="ready" props={{ ...props, ...clear.props }} on={clear.on} />
+    return <ClearCartControlBase props={{ ...props, ...clear.props }} on={clear.on} />
 }

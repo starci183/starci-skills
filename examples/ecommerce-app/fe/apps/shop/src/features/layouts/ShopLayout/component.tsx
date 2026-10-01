@@ -4,8 +4,6 @@ import { ShopNav } from "../../../components/blocks/ShopNav"
 
 /** The shop chrome's resolved inputs: the brand, its home link and the display controls' words already settled. */
 export type ShopLayoutBaseProps = {
-    /** Whole-screen situations this surface settles; the chrome has no alternatives. */
-    readonly state: "ready"
     /** The data payload for whatever state is showing. */
     readonly props: {
         readonly brand: string
@@ -19,8 +17,6 @@ export type ShopLayoutBaseProps = {
             readonly localeNames: { readonly en: string; readonly vi: string }
         }
     }
-    /** What the surface reports upward; the chrome is read-only. */
-    readonly on: Record<never, never>
     /** The routed page body supplied by the router to this layout. */
     readonly children: ReactNode
 }

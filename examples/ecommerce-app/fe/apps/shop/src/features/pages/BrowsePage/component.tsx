@@ -36,8 +36,6 @@ export type BrowsePageProps = {
         readonly emptyTitle: string
         readonly emptyDescription: string
     }
-    /** What the surface reports upward; browse itself is read-only (adds ride the tile control). */
-    readonly on: Record<never, never>
 }
 
 /**

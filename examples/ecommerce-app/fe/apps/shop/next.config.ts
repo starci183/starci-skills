@@ -7,7 +7,7 @@ import createNextIntlPlugin from "next-intl/plugin"
 const withNextIntl = createNextIntlPlugin("./src/modules/i18n/request.ts")
 
 /** The npm workspace root: Turbopack resolves the workspace packages from it, and output tracing is pinned to it. */
-const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
+const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 
 const nextConfig: NextConfig = {
     reactStrictMode: true,

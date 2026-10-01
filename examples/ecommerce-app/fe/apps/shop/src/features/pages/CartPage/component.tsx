@@ -35,8 +35,6 @@ export type CartPageProps = {
         readonly gate: GateNoticeProps | null
         readonly slotLabels: SlotLabels
     }
-    /** What the surface reports upward; the cart's write rides the clear control. */
-    readonly on: Record<never, never>
 }
 
 /**

@@ -2,7 +2,6 @@ import { Button, Text } from "@starci/grammar/common"
 
 /** Resolved labels and local action outcome for the add control. */
 export type AddToCartControlBaseProps = {
-    readonly state: "ready"
     readonly props: {
         readonly addLabel: string
         readonly addingLabel: string

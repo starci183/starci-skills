@@ -49,8 +49,6 @@ export type CheckoutPageProps = {
         readonly browseHref: string
         readonly accountHref: string
     }
-    /** What the surface reports upward; the confirmation rides the confirm control. */
-    readonly on: Record<never, never>
 }
 
 /**
