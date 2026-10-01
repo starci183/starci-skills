@@ -68,7 +68,7 @@ const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
  * `.workspaces`. A ledger for a root inside the runtime checkout is refused by name.
  */
 const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
-  &&fs.existsSync(path.join(root,'engine','ledger-db.mjs'));
+  &&fs.existsSync(path.join(root,'engine','db','ledger.mjs'));
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';

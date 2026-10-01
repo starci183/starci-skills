@@ -16,7 +16,7 @@ import { resolveIntroducer } from '../../scripts/kernel/introducer.mjs';
 //  - uncut retry lineage across unrelated work (nivo inc-6a0cfe1b39d4, mia inc-bca4d2034f8c, inc-2f7968ede59c)
 //  - the landed proof: filed report files and foreign paths (inc-5d7ce049e810, inc-40fed684fff8)
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const lastErr = (r) => json(String(r.stderr).trim().split('\n').at(-1));
 
@@ -340,6 +340,6 @@ test('dispatch files the contract row for the worker-start Dispatch; an early op
   assert.ok(guard?.jobFile, 'the dispatch receipt names the shared-checkout guard');
   // A worker-start worker can read its contract before the running transaction commits it (fast Codex workers read
   // contract-missing, nivo Modules inc-e09140ad9c22): op-contract waits while its job is still leased.
-  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'op-contract.mjs'), 'utf8');
+  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'op-contract.mjs'), 'utf8');
   assert.match(code, /if \(status !== 'leased'\) break;/, 'op-contract waits out the leased window instead of answering missing');
 });

@@ -19,7 +19,7 @@ import {checkShellConformance} from '../../scripts/work/ui/shell-conformance.mjs
 // suspect for that leg, and a change meant to reach in-flight work becomes a follow-up leg, never a
 // hold on the running one.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 const T0=Date.parse('2026-09-24T01:00:00+07:00');           // before every change below
@@ -115,9 +115,9 @@ test('shell-conformance demotes the codes added after a leg\'s admission to susp
   const admitted=checkShellConformance(work,{advisoryCodes:['SHELL_RECORD_MISSING']});
   assert.equal(admitted.ok,true);
   assert.ok(admitted.suspect.some(line=>line.includes('SHELL_RECORD_MISSING')&&line.includes('added after this leg was admitted')));
-  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','checks','shell-conformance.mjs'),work,'--admitted-at','2026-09-24T00:00:00+07:00'],{cwd:ROOT,encoding:'utf8',windowsHide:true});
+  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','2026-09-24T00:00:00+07:00'],{cwd:ROOT,encoding:'utf8',windowsHide:true});
   assert.equal(cli.status,0,cli.stdout);
-  assert.equal(spawnSync(process.execPath,[path.join(ROOT,'scripts','checks','shell-conformance.mjs'),work,'--admitted-at','soon'],{cwd:ROOT,encoding:'utf8',windowsHide:true}).status,2);
+  assert.equal(spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','soon'],{cwd:ROOT,encoding:'utf8',windowsHide:true}).status,2);
 });
 
 const fixture=t=>{

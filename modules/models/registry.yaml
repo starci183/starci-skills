@@ -14,7 +14,7 @@ executionModel:
   host: orca
   chat: trigger-and-monitor-only
   workflowKernel: one-long-lived-agent-per-workflow
-  kernelAuthority: sole-workflow-state-writer-through-scripts/kernel/api.mjs
+  kernelAuthority: sole-workflow-state-writer-through-scripts/kernel/cli.mjs
   operationAgent: one-ephemeral-agent-per-job
   operationMapping: one-operation-instance-one-agent
   isolationBoundary: operation

@@ -40,7 +40,6 @@
 // in the last hour.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -56,11 +55,11 @@ import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
 import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../machine/close-verify.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
+import { machineLoad } from '../machine/host-resources.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
-import { CONTRACT_CHANGES_DIR } from '../kernel/contract-changes-store.mjs';
+import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 
@@ -73,7 +72,7 @@ import { outageInText } from '../agent/provider-outage.mjs';
  * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
  * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
  * there (the land gate's staging-branch cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
- * files resolved against its staging checkout, absolute like op leases (scripts/kernel/api.mjs opGuardLaunch): a
+ * files resolved against its staging checkout, absolute like op leases (scripts/kernel/cli.mjs opGuardLaunch): a
  * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
  * against the Supervisor's cwd), the command guard refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
  * commit (worker-guard-owned-empty). {receipt}.
@@ -110,26 +109,6 @@ export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined
 }
 
 /* ------------------------------------------------------------ cap */
-
-/**
- * The machine's RAM right now: {totalRamBytes, freeRamBytes, freeMem} — freeMem is the 0..1 fraction
- * machineLoad reports. The memory half of the cap's load sample, exported so the dispatch host-resources
- * guard (scripts/machine/host-resources.mjs) reads the same probe instead of writing a second one.
- */
-export function memoryProbe({ mem = os } = {}) {
-  const totalRamBytes = mem.totalmem(), freeRamBytes = mem.freemem();
-  return { totalRamBytes, freeRamBytes, freeMem: totalRamBytes > 0 ? freeRamBytes / totalRamBytes : 0 };
-}
-
-/** One machine-load sample: {cpuBusy, freeMem} as fractions; CPU over `sampleMs`. */
-export function machineLoad({ sampleMs = 400 } = {}) {
-  const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
-  const a = snap();
-  sleepSync(sampleMs);
-  const b = snap();
-  const total = b.total - a.total;
-  return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: memoryProbe().freeMem };
-}
 
 /** The adaptive worker cap: {cap, base, max, queued, running, load, reason}. Pure given `load`. */
 export function adaptiveCap({ base = 4, max = 10, queued = 0, running = 0, load = null } = {}) {

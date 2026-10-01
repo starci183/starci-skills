@@ -17,7 +17,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 // the lease key is the app-relative path, held rows are compared in that form through their holder
 // job, and on Windows the comparison ignores case. be/x and fe/x never overlap.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const VI='apps/app/src/messages/vi.json',MESSAGES='apps/app/src/messages';
 const git=(cwd,...args)=>{
   const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});

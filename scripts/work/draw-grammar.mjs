@@ -22,7 +22,7 @@ import { runGit } from '../api/git/lib.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-source.mjs';
-import { grammarDistStatus } from '../checks/check-grammar-dist.mjs';
+import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);

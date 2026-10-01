@@ -6,7 +6,7 @@
 // max), transactions/s, log rows stored and SQLITE_BUSY failures per scenario:
 //
 //   inline   logs in the ledger, one transaction per row (appendLog), tuned pragmas and beginImmediate (WITHOUT the buffered writer)
-//   after    logs in the ledger through the buffered writer (scripts/kernel/log-writer.mjs), tuned pragmas and
+//   after    logs in the ledger through the buffered writer (scripts/machine/log-writer.mjs), tuned pragmas and
 //            beginImmediate (engine/db/ledger.mjs: spin for the lock before the busy handler's sleeps); 1 row in 10
 //            is written like `api log` (flushed at once), the rest queued (flushed every 250 ms or 200 rows)
 //   nolog    tuned pragmas, beginImmediate and no logging: the baseline the target compares with
@@ -22,7 +22,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, appendEvent, appendLog, createUnit, createWorkflow, changeWorkflowPhase, enqueueJob, setJobStatus } from '../../engine/db/ledger.mjs';
-import { logWriterFor } from '../kernel/log-writer.mjs';
+import { logWriterFor } from '../machine/log-writer.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 const SELF = fileURLToPath(import.meta.url);

@@ -18,7 +18,7 @@ import {checkOpManifest} from '../../scripts/checks/check-op-manifest.mjs';
 import {HANDOVER_DECISIONS,HANDOVER_OP,decisionOf,handoverAskProblem} from '../../scripts/kernel/handover.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const PLAN=path.join(ROOT,'scripts','route','route-plan.mjs');
 const readYaml=rel=>parseYaml(fs.readFileSync(path.join(ROOT,rel),'utf8'));
 const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,

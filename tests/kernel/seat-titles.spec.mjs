@@ -23,7 +23,7 @@ test('launchers declare runtime tab titles and do not disable managed Claude tit
   const kernel = fs.readFileSync(new URL('../../scripts/kernel/start-workflow.mjs', import.meta.url), 'utf8');
   const supervisor = fs.readFileSync(new URL('../../scripts/supervisor/start-supervisor.mjs', import.meta.url), 'utf8');
   const workers = fs.readFileSync(new URL('../../scripts/supervisor/workers.mjs', import.meta.url), 'utf8');
-  const ops = fs.readFileSync(new URL('../../scripts/kernel/api.mjs', import.meta.url), 'utf8');
+  const ops = fs.readFileSync(new URL('../../scripts/kernel/cli.mjs', import.meta.url), 'utf8');
   assert.match(kernel, /const title = `\[Kernel\] \$\{kernelName\}`/);
   assert.match(supervisor, /title: SUPERVISOR_TITLE, prompt/);
   assert.match(workers, /const title = `\$\{WORKER_TITLE_PREFIX\} \$\{job\.payload\.cluster\}`/);

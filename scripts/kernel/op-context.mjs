@@ -2,7 +2,7 @@
 //
 // Every agent launches through Orca worker-start, which owns the agent's environment: nothing the runtime sets reaches
 // the op's shell, so no environment variable names its job, scratch or provider. Orca exports ORCA_TERMINAL_HANDLE
-// into the terminal, and the dispatch binds that handle twice: the op's guard (runtime/guards/terminals/<handle>.json,
+// into the terminal, and the dispatch binds that handle twice: the op's guard (<guards root>/terminals/<handle>.json,
 // which names the ledger) and the ledger's own job record (api-lib/caller.mjs callerOf). The context is the job the
 // LEDGER binds to the handle, with its latest attempt's scratch directory and provider (op_attempts); a terminal no op
 // is bound to (the Kernel's, the owner's, a [Worker]'s) has none.

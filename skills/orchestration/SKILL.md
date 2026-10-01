@@ -17,7 +17,7 @@ description: >-
 
 # Orca Orchestration
 
-For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/api.mjs` or `scripts/api/orca/*.mjs`.
+For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/cli.mjs` or `scripts/api/orca/*.mjs`.
 
 Every agent is started with `orchestration worker-start --agent <provider> [--model <id> --effort <level>]` - the
 StarCi Kernel, Supervisor, [Worker]s and [Op]s included (runtime contract

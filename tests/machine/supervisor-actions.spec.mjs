@@ -21,7 +21,7 @@ const envOf = (t) => {
 
 test('owed actions: each stuck item gets one class and one action; an incident a cluster carries is not listed twice', () => {
   const clusters = [
-    { id: 'runtime-api-mjs', size: 1, oldestMin: 90, summary: 'api.mjs dead-end', incidents: ['inc-aaaaaaaaaaaa'], workflows: ['wf-a'], items: [{ repo: 'D:/r', kind: 'source-runtime-defect' }] },
+    { id: 'runtime-api-mjs', size: 1, oldestMin: 90, summary: 'cli.mjs dead-end', incidents: ['inc-aaaaaaaaaaaa'], workflows: ['wf-a'], items: [{ repo: 'D:/r', kind: 'source-runtime-defect' }] },
     { id: 'runtime-pattern-retry-loop-op-x', size: 1, oldestMin: 300, summary: 'x: 4 failed', incidents: [], workflows: ['wf-a'], items: [{ repo: 'D:/r', pattern: 'retry-loop' }] },
     { id: 'decision-failed-retries-the-same-op', size: 1, oldestMin: 60, summary: 'route failed-retries-the-same-op already fired 3 of 3 times', incidents: ['inc-bbbbbbbbbbbb'], workflows: ['wf-b'], items: [{ repo: 'D:/r', kind: 'decision' }] },
     { id: 'checker-fixed', size: 1, oldestMin: 30, summary: 'fixed', fixedBy: 'abcdef1234567', incidents: ['inc-cccccccccccc'], workflows: ['wf-b'], items: [{ repo: 'D:/r' }] },

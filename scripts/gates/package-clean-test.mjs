@@ -33,7 +33,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
-import { loadPins } from '../checks/check-canon-pins.mjs';
+import { loadPins } from './canon-pins.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { runGit } from '../api/git/lib.mjs';

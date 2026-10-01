@@ -15,7 +15,7 @@ import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-de
 // although the wake sat on the worker's screen (landed, or queued behind its running turn). Nudge now reads
 // the frame before and after the send and reports delivered / queued / failed from the screen.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 const WAKE='Operation liveness wake for durable job op-architecture.decide-173438ab83 (architecture.decide) attempt 1. Your accepted contract remains running but no durable report is filed.';

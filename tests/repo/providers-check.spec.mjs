@@ -10,7 +10,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 // Static by default; --live also compares every modules/host/orca/calls.yaml
 // entry against the live `orca agent-context --json` signature.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const CHECK=path.join(ROOT,'scripts','checks','providers.mjs');
+const CHECK=path.join(ROOT,'scripts','checks','check-providers.mjs');
 
 const run=(args=[],env={})=>{
   const r=spawnSync(process.execPath,[CHECK,...args],

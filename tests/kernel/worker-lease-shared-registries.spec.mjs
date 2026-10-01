@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createJob, spawnWorkers, leaseConflicts, workerGuard } from '../../scripts/supervisor/workers.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
-import { CONTRACT_CHANGES_DIR } from '../../scripts/kernel/contract-changes-store.mjs';
+import { CONTRACT_CHANGES_DIR } from '../../scripts/lib/contract-changes-path.mjs';
 
 const TEMP_DIRS = [];
 after(() => { for (const dir of TEMP_DIRS) { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* still held */ } } });

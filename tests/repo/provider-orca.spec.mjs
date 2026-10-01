@@ -35,7 +35,7 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.match(contract.workflowKernel.calls.boot.cli,/orchestration worker-start .*--agent <agent>/);
   assert.doesNotMatch(JSON.stringify(contract),/terminal create/,'no call in the host index creates a terminal');
   assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
-  assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/api.mjs');
+  assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/cli.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'dispatch');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
   assert.equal(contract.operationAgent.qwen,undefined,'the Qwen agent is removed from the host contract');

@@ -32,7 +32,7 @@ about:
     field, not a side-channel: suspicion text becomes a backward edge to the
     boundary that owns the wrongness.
   sources:
-    - scripts/kernel/api.mjs
+    - scripts/kernel/cli.mjs
     - modules/models/kinds.yaml
     - engine/db/ledger.mjs
 
@@ -203,7 +203,7 @@ retryAccounting:
 accepts:
   - layer: schema-valid
     rule: "validateOpReport passes: known schema, known outcome, outcome's required payload present, signal matches outcome, files inside the allowlist"
-    citation: "scripts/kernel/api.mjs settle validation"
+    citation: "scripts/kernel/cli.mjs settle validation"
   - layer: identity-bound
     rule: >-
       The report binds the exact dispatch: its identity fields {run, task,
@@ -272,7 +272,7 @@ rejects:
     citation: "modules/ops/ops/review.verify.yaml business/workflow modes; modules/kernel/driver-loop.yaml finish"
   - id: done-without-proof
     rule: "'done' with zero checks, a failing check, or open items -> invalid; report failed or partial instead"
-    citation: "scripts/kernel/api.mjs settle validation"
+    citation: "scripts/kernel/cli.mjs settle validation"
   - id: done-from-last-words
     rule: >-
       A dead worker's recovered last words are honoured for partial/failed/
@@ -299,7 +299,7 @@ rejects:
       {workflow_id,op_id,attempt,generation,token} must equal its job's);
       a settle against an already-settled job is refused (job-settled).
       An agent cannot graft evidence or a lease onto another job.
-    citation: "engine/db/migrations/runtime/0001-init.sql leases_match_job triggers; scripts/kernel/api.mjs settle job-settled refusal"
+    citation: "engine/db/migrations/runtime/0001-init.sql leases_match_job triggers; scripts/kernel/cli.mjs settle job-settled refusal"
   - id: unverifiable-evidence
     rule: >-
       Declared bytes missing/empty/wrong-magic/wrong-digest refuse the run

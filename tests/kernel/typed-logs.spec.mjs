@@ -19,7 +19,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 // 2026-09-27), validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
 // are idempotent.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 // Every handle a test opens closes before its temp tree is removed (Windows holds an open sqlite file).
 const scopes = new WeakMap();
 const repoDir = (t) => {

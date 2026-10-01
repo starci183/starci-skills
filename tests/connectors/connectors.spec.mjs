@@ -412,7 +412,7 @@ test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the
   assert.doesNotMatch(serveAsk,/notifyAsk\(\{ ledgerFile: file/,'a binding form never sends a message (the bridge edits the notice)');
   for(const p of ['scripts/supervisor/poll.mjs','scripts/kernel/kernel-watchdog.mjs'])
     assert.doesNotMatch(read(p),/connectors\/telegram|api\.telegram\.org/,`${p} must not notify`);
-  const api=read('scripts/kernel/api.mjs');
+  const api=read('scripts/kernel/cli.mjs');
   assert.doesNotMatch(api,/sendMessage\(|api\.telegram\.org|connectors\/telegram\.mjs/,'the kernel api reaches Telegram only through serve-ask.mjs parkAsk/closeAskMessages');
   assert.match(read('scripts/kernel/verbs/serve-ask.mjs'),/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
 });

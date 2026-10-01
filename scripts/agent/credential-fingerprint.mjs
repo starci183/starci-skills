@@ -1,7 +1,7 @@
 // scripts/agent/credential-fingerprint.mjs — which credential a provider
 // launch would use right now, as a non-reversible fingerprint.
 //
-// An auth circuit (scripts/kernel/api.mjs writeProviderCircuit) records the
+// An auth circuit (scripts/kernel/cli.mjs writeProviderCircuit) records the
 // fingerprint of the credential in effect when it opened. A later reader
 // (scripts/agent/models.mjs providerCircuitOf) treats that circuit as CLOSED
 // when the current fingerprint is a different one: the credential that was

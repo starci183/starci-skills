@@ -4,7 +4,7 @@
 //   STARCI_GUARD_FILE=<guard> node verify-commit.mjs <old> <new>
 //
 // The commits a protected-branch update brings carry only the op's owned paths. The hook names the op's guard (the
-// file bound to its Orca terminal, runtime/guards/terminals/<handle>.json) in STARCI_GUARD_FILE for this one call.
+// file bound to its Orca terminal, <guards root>/terminals/<handle>.json) in STARCI_GUARD_FILE for this one call.
 // Fail-open on the check's OWN faults: a bug here must never block a commit, so an internal error lets it land.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

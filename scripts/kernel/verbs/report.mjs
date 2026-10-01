@@ -78,7 +78,7 @@ export default {
     const carried = report.question?.autopilot;
     const total = bundle.counts.provisional + bundle.counts.deferred + bundle.counts.deferredToHandover;
     if (total > 0 && (carried?.schema !== bundle.schema || ['provisional', 'deferred', 'deferredToHandover'].some((k) => Number(carried?.counts?.[k]) !== bundle.counts[k]))) {
-      throw Object.assign(new Error(`report fails the handover ask: under autopilot it carries the final review bundle as question.autopilot, verbatim from the .autopilot block of \`node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} survey --repo <repo> --workflow ${job.workflow_id} --deliveries --json\` (now ${JSON.stringify(bundle.counts)}), and lists the provisional images in question.assets`), { code: 'report-invalid' });
+      throw Object.assign(new Error(`report fails the handover ask: under autopilot it carries the final review bundle as question.autopilot, verbatim from the .autopilot block of \`node ${path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs')} survey --repo <repo> --workflow ${job.workflow_id} --deliveries --json\` (now ${JSON.stringify(bundle.counts)}), and lists the provisional images in question.assets`), { code: 'report-invalid' });
     }
   }
   // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once

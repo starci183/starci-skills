@@ -167,7 +167,7 @@ export const SETTLED_JOB_LIST=Object.freeze(['succeeded','failed',AWAITING_OWNER
 /** The tries of a unit that spent budget: every try but the ones that only waited on the owner. */
 export const spentTries=tries=>tries.filter(job=>job.status!==AWAITING_OWNER_STATUS).length;
 // An attempt the environment killed with effects on the tree (a host terminal wipe: every Orca terminal
-// gone at once, scripts/kernel/api.mjs hostTerminalWipeOf) settles failed with this retryClass: its retry
+// gone at once, scripts/kernel/cli.mjs hostTerminalWipeOf) settles failed with this retryClass: its retry
 // is a new durable attempt that continues the partial tree and spends no business retry.
 export const RETRY_CLASS_ENVIRONMENT='environment';
 

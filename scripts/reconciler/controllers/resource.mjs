@@ -168,7 +168,7 @@ const liveDeps = {
   poolBackoff: () => import('../../machine/pool-backoff.mjs'),
   pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
     .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
-  load: async () => { try { return (await import('../../supervisor/workers.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
+  load: async () => { try { return (await import('../../machine/host-resources.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
   census: async () => (await import('../../machine/ram-throttle.mjs')).fleetCensus({}),
   footprints: async (limit, env) => { try { return (await import('../../machine/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
   // async: the sync process-table read blocks the engine's one thread for minutes on a loaded host (ENGINE-STALL)

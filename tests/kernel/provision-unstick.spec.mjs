@@ -15,7 +15,7 @@ import {GATE_WAITS_ON_JOB,legOrderExemption} from '../../scripts/kernel/leg-orde
 import {TASK_SPEC_MAX_CHARS,packetFileOf,taskSpecOf} from '../../scripts/kernel/task-spec.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const tmp=(t,prefix)=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return dir;};
 

@@ -134,7 +134,7 @@ export function agentDataCategory(rel, { dir = false } = {}) {
  * agent file is removed by the change that drops it, not by this ignore.
  *
  * The template is read on first use, never at import: a caller that only needs the boundary predicates
- * (api.mjs reaches this module through check-example-work.mjs) must keep loading on a tree that carries no
+ * (cli.mjs reaches this module through check-example-work.mjs) must keep loading on a tree that carries no
  * packages/hfs/templates copy; the read still fails loudly the moment the text itself is asked for.
  */
 let cachedLines;

@@ -42,7 +42,7 @@ const SESSION_GREP_BYTES = 256 * 1024;
 // allocation.housekeeping.archiveRoot's declared default (runtimes.yaml).
 export const DEFAULT_SESSION_ARCHIVE_ROOT = 'D:/starci-archive';
 
-// The agent provider of a job payload — the same read api.mjs agentOfJob
+// The agent provider of a job payload — the same read cli.mjs agentOfJob
 // makes, kept local so the module is usable without the api's bindings.
 export const sessionAgentOf = (payload) =>
   /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()

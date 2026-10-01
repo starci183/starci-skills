@@ -38,7 +38,7 @@ overwrite an old receipt or reuse its run directory.
   declares pass, settles a job or invents workflow identity.
 - The enclosing dispatched operation verifies the exact receipt and artifacts, independently reruns its
   machine checks, builds its ordinary `starci/op-report@1`, and files that through
-  `scripts/kernel/api.mjs report`. A human `ok` means only “the requested manual action finished”; the
+  `scripts/kernel/cli.mjs report`. A human `ok` means only “the requested manual action finished”; the
   receipt records `meaning: execution-finished-not-pass`.
 
 ## Chat execution

@@ -1,4 +1,4 @@
-// api cut-seam: split from api.mjs.
+// api cut-seam: split from cli.mjs.
 import { OP_ROLE } from './shared/caller.mjs';
 import { csvList, getWorkflow, jobOpOf, jobPayloadOf } from './shared/rows.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';

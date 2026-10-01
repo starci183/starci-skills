@@ -10,6 +10,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { isMain } from './is-main.mjs';
+import { walkFiles } from './walk.mjs';
 
 let typescript = null;
 const ts = () => (typescript ??= createRequire(import.meta.url)('typescript'));
@@ -63,8 +65,9 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
 }
 
 // CLI: node scripts/lib/spec-deps.mjs <root> <changed-file>... -> prints the dependent spec paths, one per line.
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))) {
+if (isMain(import.meta.url)) {
   const [root, ...changed] = process.argv.slice(2);
-  const specs = fs.readdirSync(path.join(root, 'tests')).filter((f) => f.endsWith('.spec.mjs')).map((f) => `tests/${f}`);
+  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => name.endsWith('.spec.mjs'), exclude: (name) => name === 'node_modules' })
+    .map((file) => path.relative(root, file).split(path.sep).join('/'));
   for (const spec of specsDependingOn(path.resolve(root), changed, specs)) console.log(spec);
 }

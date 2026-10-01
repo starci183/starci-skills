@@ -4,10 +4,10 @@ There are two surfaces: `bin/starci.mjs` (through a reviewed npm archive, or
 `node <host>/.claude/bin/starci.mjs`), and direct `node scripts/*` invocation
 from an installed `.claude/` tree. `bin/starci.mjs` is a thin dispatcher — it
 forwards `init|update|doctor|version` to the installer, `api` to
-`scripts/kernel/api.mjs`, `start` to `scripts/kernel/start-workflow.mjs`,
+`scripts/kernel/cli.mjs`, `start` to `scripts/kernel/start-workflow.mjs`,
 `goal` to `scripts/goal/define-goal.mjs` and `validate` to
 `scripts/work/validate/work-validate.mjs`. The kernel agent calls
-`scripts/kernel/api.mjs` itself.
+`scripts/kernel/cli.mjs` itself.
 
 ## Install verbs
 
@@ -39,9 +39,9 @@ node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> [--age
 # without --goal: claims the earliest pending inbox goal
 
 # The kernel's only ledger gate. `modules/kernel/api.yaml` names every verb,
-# what it reads, what it writes and when it refuses; `api.mjs --help` prints
+# what it reads, what it writes and when it refuses; `cli.mjs --help` prints
 # the same list with each verb's arguments.
-node scripts/kernel/api.mjs <verb> --repo <path> [...]
+node scripts/kernel/cli.mjs <verb> --repo <path> [...]
 
 # Read-only Work record/layout validation
 node scripts/work/validate/work-validate.mjs <work-root>

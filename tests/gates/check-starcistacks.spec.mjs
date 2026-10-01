@@ -178,7 +178,7 @@ test('api report refuses an ask for a declared credential and files any other as
   const { product, host } = workspace(t);
   const env = { ...process.env, STARCI_SOURCE_ROOT: host };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
-  const api = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'api.mjs'), ...args], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const api = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'cli.mjs'), ...args], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
   const { setJobStatus, startAttempt, writeContract } = await import('../../engine/db/ledger.mjs');
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(product) }); try { return fn(l); } finally { l.close(); } };

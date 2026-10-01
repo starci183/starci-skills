@@ -10,7 +10,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assertDigestPolicy, canonContentDigest, installedFiles, packedFiles, selectedByPolicy } from '../../scripts/gates/canon-digest.mjs';
-import { checkCanonBindings, PINS_FILE, PROFILES_FILE, SCHEMA_FILE } from '../../scripts/checks/check-canon-pins.mjs';
+import { checkCanonBindings } from '../../scripts/checks/check-canon-pins.mjs';
+import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE } from '../../scripts/gates/canon-pins.mjs';
 import { GATE_EXIT, installedCanonFindings, runGate } from '../../scripts/gates/gate.mjs';
 import { installCanons, publishedCanons } from '../helpers/canon-install-fixture.mjs';
 

@@ -83,7 +83,7 @@ export function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
   // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
   const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => /\.spec\.mjs$/.test(name), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
-  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs };
+  return { 'eslint-be': texts('packages/eslint/be', /\.spec\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.spec\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.spec\.mjs$/), specs };
 }
 
 /** True when a RuleTester run of `id` carries both valid and invalid cases. */
@@ -224,9 +224,9 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     if (tests !== undefined) for (const e of rule.enforcers) {
       if (e.planned) continue;
       if (e.kind === 'stylelint') {
-        if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.test.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
+        if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.spec.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
       } else if (LINT_FAMILY.includes(e.kind)) {
-        if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.test.mjs`, `${e.kind}:${e.id}`);
+        if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.spec.mjs`, `${e.kind}:${e.id}`);
       } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
         add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
       }

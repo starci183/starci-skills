@@ -23,7 +23,7 @@ properties:
       host: {const: orca}
       chat: {const: trigger-and-monitor-only}
       workflowKernel: {const: one-long-lived-agent-per-workflow}
-      kernelAuthority: {const: sole-workflow-state-writer-through-scripts/kernel/api.mjs}
+      kernelAuthority: {const: sole-workflow-state-writer-through-scripts/kernel/cli.mjs}
       operationAgent: {const: one-ephemeral-agent-per-job}
       operationMapping: {const: one-operation-instance-one-agent}
       isolationBoundary: {const: operation}
@@ -32,7 +32,7 @@ properties:
       fanOutWithinOperation: {const: forbidden}
       concreteAgentBinding: {const: provider-profile-model}
       # A pointer, never a number: the slot counts live in runtimes.yaml, which
-      # is the only file scripts/kernel/api.mjs and scripts/agent/models.mjs read
+      # is the only file scripts/kernel/cli.mjs and scripts/agent/models.mjs read
       # for capacity.
       concurrency: {type: string, minLength: 1}
   defaults: {type: object}

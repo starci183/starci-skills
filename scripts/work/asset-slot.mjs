@@ -21,7 +21,7 @@
 //
 // The ledger: settling an interface.draw or interface.asset job records one `asset-slot-owed` event per owed slot of
 // the files it binds and one `asset-slot-filled` per filled one; `api status` lists the open ones as assetSlotsOwed[]
-// and its nextActions propose an interface.asset leg for them (scripts/kernel/api.mjs).
+// and its nextActions propose an interface.asset leg for them (scripts/kernel/cli.mjs).
 //
 //   node scripts/work/asset-slot.mjs list <file|dir>... [--json]    every slot, owed or filled, with its request
 //   node scripts/work/asset-slot.mjs check <file|dir>... [--json]   exit 1 when a slot has no request

@@ -17,7 +17,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // archived workflows.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const op=(id,title='backend.implement #1')=>({id,status:'ready',task_title:title,display_name:'[Op] backend.implement',created_at:'2026-09-23 08:36:57'});
 
 const world=t=>{

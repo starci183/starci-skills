@@ -75,7 +75,7 @@ test("a raw git commit or git worktree add from the Kernel's terminal is refused
 
 test("the Kernel's legitimate api calls, git reads and Orca orchestration pass", async (t) => {
   const { decide } = kernelSeat(t);
-  const api = path.join(ROOT, 'scripts', 'kernel', 'api.mjs').replace(/\\/g, '/');
+  const api = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs').replace(/\\/g, '/');
   for (const command of [
     `node ${api} status --repo D:/app --workflow wf-kguard`,
     `node ${api} dispatch-ready --repo D:/app --workflow wf-kguard`,

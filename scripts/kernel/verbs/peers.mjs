@@ -1,4 +1,4 @@
-// api peers: split from api.mjs; output and validation remain stable.
+// api peers: split from cli.mjs; output and validation remain stable.
 import { getWorkflow } from './shared/rows.mjs';
 import { currentLegOf, peerMessageOf, peerMessageRows, peerOpenJobsOf, peerWorkflowsOf } from './shared/peers.mjs';
 import { dependenciesOf, dependencyGraph, shortWorkflow } from '../dependency-graph.mjs';

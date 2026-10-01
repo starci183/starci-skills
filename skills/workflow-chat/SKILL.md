@@ -13,7 +13,7 @@ description: >-
 You are the owner's chat, monitoring one workflow. You relay; the kernel
 decides. One chat monitors one workflow. The workflow's brain is ONE long-lived `[Kernel] <workflow_id>`
 agent running on an Orca terminal; its durable state is the ledger at
-`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, mutated only through `scripts/kernel/api.mjs`. The chat adds
+`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, mutated only through `scripts/kernel/cli.mjs`. The chat adds
 no second mechanism and no second mutation surface: it reads ledger projections through the api and
 speaks to the kernel through its terminal. The chat is a monitor, never an agent layer above the
 kernel and never an operation.
@@ -32,7 +32,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - Every runtime call goes through the runtime's own scripts, run from anywhere:
 
   ```
-  node <skill root>/scripts/kernel/api.mjs <command> --repo <repo> ...
+  node <skill root>/scripts/kernel/cli.mjs <command> --repo <repo> ...
   node <skill root>/scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen]
   node <skill root>/scripts/api/orca/terminal-send.mjs --terminal <handle> --text "..." --enter
   node <skill root>/scripts/api/orca/terminal-show.mjs --terminal <handle>
@@ -72,8 +72,8 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 
 ## 3. Poll and relay
 
-- On each owner check-in or Kernel question, run `api.mjs status --workflow <id>` for the cheap projection (phase, job
-  counts, pending inbox rows), and `api.mjs survey --workflow <id>` when you need the detail —
+- On each owner check-in or Kernel question, run `cli.mjs status --workflow <id>` for the cheap projection (phase, job
+  counts, pending inbox rows), and `cli.mjs survey --workflow <id>` when you need the detail —
   open jobs, live signals, the events tail, open incidents.
 - The reconciler Host controller owns Kernel seat liveness and runs
   `scripts/kernel/kernel-watchdog.mjs --once --repair` as a single pass. The Workflow
@@ -93,7 +93,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 ## 4. Owner answers go into the kernel terminal
 
 - `terminal-send --terminal <kernel handle> --text "<the owner's words, verbatim>" --enter`. The
-  kernel agent folds them into its loop and records what it decides through `api.mjs` — an answer
+  kernel agent folds them into its loop and records what it decides through `cli.mjs` — an answer
   is never delivered by you editing the ledger, a report or a record.
 - Never pick an option, approve, or settle a question on your own judgement. If the kernel reports
   a dispatch refusal the host cannot serve — `managed-agent` or `tool-unavailable` (api.yaml
@@ -115,14 +115,14 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - When the owner says stop, send that to the kernel terminal — every api write is a single
   transaction, so a kernel that stands down (or whose terminal is closed) leaves no half-write; the
   claimed goal waits in the `inbox` until a replacement kernel is booted.
-- `phase=finished` in `api.mjs status` means the kernel called `finish`: the goal is finished and the
+- `phase=finished` in `cli.mjs status` means the kernel called `finish`: the goal is finished and the
   history preserved. Report the outcome and the settled/failed job counts; a finish with open
   incidents is the owner's open questions, not a defect.
 
 ## Never
 
 - Write the runtime ledger (`runtime.sqlite`), or keep workflow state in a file of your own — the kernel
-  mutates the ledger only through `scripts/kernel/api.mjs` and the chat mutates nothing at all. A
+  mutates the ledger only through `scripts/kernel/cli.mjs` and the chat mutates nothing at all. A
   live kernel is driven through its `inbox` rows and its terminal.
 - Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's
   literal word; a relayed "looks fine to me" is not approval unless the owner typed it.

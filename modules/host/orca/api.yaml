@@ -253,7 +253,7 @@ starciOrchestrationAllowlist:
     - orchestration run-use
     - orchestration run-current
   workflowKernel:
-    # Issued on the kernel's behalf by scripts/kernel/api.mjs through
+    # Issued on the kernel's behalf by scripts/kernel/cli.mjs through
     # scripts/api/orca/ — the kernel agent never runs orca itself.
     - orchestration task-create
     - orchestration task-list

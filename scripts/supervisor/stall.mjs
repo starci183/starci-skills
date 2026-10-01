@@ -64,7 +64,7 @@ import { minutes } from '../lib/time.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
+const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 
 export const DEFAULT_STALL_MINUTES = 30;
 /** A gate younger than this is not judged: the Kernel may still be parking the ask that justifies it. */
@@ -72,9 +72,9 @@ export const GATE_GRACE_MS = 10 * 60_000;
 /** Ledger events that are the workflow moving (not the Kernel or the watchdog merely looking at it). */
 export const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'plan-derived',
   'job-enqueued', 'incident-resolved', 'ask-answered', 'dispatch-reconciled', 'phase-transition', 'run-created', 'goal-defined'];
-/** Incident kinds that hold queued jobs (scripts/kernel/api.mjs OWNER_GATE_KINDS). */
+/** Incident kinds that hold queued jobs (scripts/kernel/cli.mjs OWNER_GATE_KINDS). */
 export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'supervisor-gate'];
-/** The typed wait on a peer workflow (scripts/kernel/api.mjs PEER_WAIT, openPeerWaits). */
+/** The typed wait on a peer workflow (scripts/kernel/cli.mjs PEER_WAIT, openPeerWaits). */
 export const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
 export const WORKING_LIVENESS = ['active', 'active-unclassified'];

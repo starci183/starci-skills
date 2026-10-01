@@ -4,9 +4,9 @@
 // (scripts/kernel/start-workflow.mjs, role 'kernel') call guardLaunch() for every agent they start
 // (modules/kernel/api.yaml conventions.sharedCheckout). Each layer is idempotent and best effort - a
 // guard that cannot be installed is reported on the dispatch receipt, never a reason to refuse the launch:
-//  1. runtime/guards/jobs/<job>.json — the job's identity and owned paths as absolute paths. worker-start owns the
+//  1. <guards root>/jobs/<job>.json — the job's identity and owned paths as absolute paths. worker-start owns the
 //     agent's environment, so the launch binds it to the agent's Orca terminal (bindGuardTerminal ->
-//     runtime/guards/terminals/<handle>.json, unbound when that terminal closes). The agent's host runs
+//     <guards root>/terminals/<handle>.json, unbound when that terminal closes). The agent's host runs
 //     scripts/guards/command-guard.mjs as a PreToolUse hook (registered by launch trust, scripts/agent/trust.mjs):
 //     it finds the guard by ORCA_TERMINAL_HANDLE and refuses a shell command the policy forbids before it runs.
 //  2. the target repository's reference-transaction hook (git runs it for every ref update, whoever the caller is):
@@ -63,7 +63,7 @@ function writeGuardFile(dir, name, body) {
  */
 export const GUARD_ROLES = Object.freeze(['op', 'kernel']);
 
-/** runtime/guards/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
+/** <guards root>/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
 export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op' }) {
   if (!GUARD_ROLES.includes(role)) throw new Error(`unknown guard role ${role}`);
   return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId,
@@ -74,7 +74,7 @@ export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobI
 }
 
 /**
- * runtime/guards/terminals/<handle>.json — the job guard of a managed op, keyed by the Orca terminal its agent runs
+ * <guards root>/terminals/<handle>.json — the job guard of a managed op, keyed by the Orca terminal its agent runs
  * in. worker-start owns a managed agent's environment; Orca exports ORCA_TERMINAL_HANDLE into that terminal, and the
  * command guard (PreToolUse hook) and the history hook find the op's guard by it.
  */
@@ -84,7 +84,7 @@ export function bindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), 
 }
 
 /**
- * runtime/guards/seats/<handle>.json — the tools a seat's agent may not use, keyed by the Orca terminal it runs in.
+ * <guards root>/seats/<handle>.json — the tools a seat's agent may not use, keyed by the Orca terminal it runs in.
  * worker-start takes no provider argv, so a seat's tool denial (the [Supervisor]'s Agent/Task, start-supervisor.mjs
  * SEAT_DENIED_TOOLS) is enforced by the project PreToolUse hook (.claude/settings.json -> scripts/guards/seat-tools.mjs),
  * which denies a tool only for the terminal bound here.
@@ -113,7 +113,7 @@ export function historyHookBody({ branches = [], verify, nodePath = process.exec
 # ${HOOK_MARKER} v${HOOK_VERSION} — installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # The shared branch is append-only (modules/ops/_common.yaml "Evidence, completion and commits"):
 # a protected branch only moves forward and is never deleted. An op - named by the Orca terminal it runs in
-# (runtime/guards/terminals/<handle>.json) - never creates a worktree, and the commits it lands carry only its
+# (<guards root>/terminals/<handle>.json) - never creates a worktree, and the commits it lands carry only its
 # owned paths (scripts/guards/verify-commit.mjs).
 if [ "$1" != "prepared" ]; then cat >/dev/null; exit 0; fi
 PROTECTED=" ${protectedList} "
@@ -260,7 +260,7 @@ export function ensureWorkHook(repoRoot, { skillRoot = path.resolve(here, '..', 
   const target = hookTarget(repoRoot, 'pre-commit');
   if (target.installed === false) return target;
   const { hooksDir, file } = target;
-  const body = workHookBody({ check: path.join(skillRoot, 'scripts', 'checks', 'work-hygiene.mjs'), nodePath });
+  const body = workHookBody({ check: path.join(skillRoot, 'scripts', 'work', 'validate', 'work-hygiene.mjs'), nodePath });
   if (fs.existsSync(file)) {
     const current = fs.readFileSync(file, 'utf8');
     if (current.includes(WORK_HOOK_MARKER)) { if (current === body) return { installed: true, path: file, changed: false }; }

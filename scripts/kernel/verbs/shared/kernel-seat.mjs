@@ -1,5 +1,5 @@
 // api-lib/kernel-seat.mjs — the live Kernel job of a workflow and the terminal its seat names
-// (split out of api.mjs, lane slim-api). Read projections only.
+// (split out of cli.mjs, lane slim-api). Read projections only.
 import { parseJson } from '../../../lib/json.mjs';
 import { jobPayloadOf } from './rows.mjs';
 

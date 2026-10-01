@@ -7,7 +7,7 @@
 //   ctx.status(ledgerId, wf)    the cached `api status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
 //   ctx.statusRead(ledgerId, wf) the same read as {value, failure}: failure names why it gave no value (statusFailureOf)
 //   ctx.api(ledgerId, verb, argv, {timeoutMs})
-//                               `node scripts/kernel/api.mjs <verb> --repo <repo> ...argv --json` as a child with
+//                               `node scripts/kernel/cli.mjs <verb> --repo <repo> ...argv --json` as a child with
 //                               STARCI_ACTOR=reconciler/<controller> and STARCI_RECONCILER_EPOCH. In shadow it does NOT
 //                               run: one `reconciler.would` typed row, {ok: true, shadow: true}.
 //   ctx.run(cmd, args, {timeoutMs})  the same gate for a non-api actuator ('node' = this node; 'scripts/..' paths
@@ -33,12 +33,13 @@ import { spawn } from 'node:child_process';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineLog } from '../../engine/db/machine.mjs';
 import { LOG_KINDS } from '../kernel/typed-logs.mjs';
+import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
 
-export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
-export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'decisions.mjs');
+export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
+export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
 export const DEFAULT_TIMEOUT_MS = 120_000;
 /** The same would-row (controller, verb, argv) is written at most once per this window. */
 export const WOULD_DEDUPE_MS = 10 * 60_000;
@@ -132,7 +133,7 @@ export function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT, time
 
 /**
  * Why an `api status --json` child gave no value, or null when it did: {cause, error, code, timedOut, stderrHead}.
- * cause is 'timeout' | 'spawn' | 'refused' (a typed {ok:false,error} answer, on stdout or on stderr: api.mjs prints
+ * cause is 'timeout' | 'spawn' | 'refused' (a typed {ok:false,error} answer, on stdout or on stderr: cli.mjs prints
  * its refusal JSON on stderr and exits 1, e.g. plan-edges-missing) | 'exit' (non-zero, no JSON) | 'no-json' (exit 0,
  * stdout carried no JSON line). Pure.
  */
@@ -313,7 +314,7 @@ export function createCtx({
       // MB-02: a new Supervisor DI rings the Supervisor seat at once (a busy seat defers; the watchdog pass reminds).
       if (opened?.ok && opened.value?.created && item.ledger === 'supervisor' && typeof mod.ringSupervisor === 'function') {
         try {
-          const rung = await mod.ringSupervisor({ env: childEnv(), now: now() });
+          const rung = await mod.ringSupervisor({ env: childEnv(), wake: wakeKernel, now: now() });
           log('reconciler.event', `supervisor doorbell ${rung?.action ?? 'unknown'} for ${item.idempotencyKey ?? item.kind}`, { kind: 'reconciler.supervisor-ring', action: rung?.action ?? null, open: rung?.open ?? null });
         } catch (error) { log('reconciler.error', `supervisor doorbell failed: ${clip(error?.message ?? error, 200)}`, { kind: 'reconciler.supervisor-ring.error' }); }
       }

@@ -61,7 +61,7 @@ import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
-import { grammarDistStatus, grammarDistMessage } from '../checks/check-grammar-dist.mjs';
+import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';

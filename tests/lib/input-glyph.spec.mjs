@@ -6,7 +6,7 @@ import { stagedInputRegion, frameWithDraft, classifyAgentScreen } from '../../sc
 
 // Five call sites grew five spellings of "the glyph an agent CLI draws at the head of its input
 // row" ([>›❯❭], [>›❯❭»], [>›❯❭], [›❯❭], [>❯❭]). scripts/lib/input-glyph.mjs is the one source;
-// api.mjs keeps its own only because only the w2-api lanes may edit it.
+// cli.mjs keeps its own only because only the w2-api lanes may edit it.
 
 test('the classes name every provider glyph', () => {
   for (const char of ['>', '›', '❯', '❭', '»']) {
@@ -46,6 +46,6 @@ test('the five former copies are gone from the runtime scripts', () => {
   assert.doesNotMatch(read('../../scripts/kernel/terminal-liveness.mjs'), /\[>›❯❭\]|\[›❯❭\](?!\])/);
   assert.doesNotMatch(read('../../scripts/agent/lib.mjs'), /\[>❯❭\]|\[›❯❭\](?!\])/);
   assert.doesNotMatch(read('../../scripts/supervisor/supervisor-watchdog.mjs'), /\[>›❯❭\](?!\])/);
-  // api.mjs is reserved for the w2-api lanes: its INPUT_ROW_GLYPH copy stays until they adopt it.
-  assert.match(read('../../scripts/kernel/api.mjs'), /INPUT_ROW_GLYPH/);
+  // cli.mjs is reserved for the w2-api lanes: its INPUT_ROW_GLYPH copy stays until they adopt it.
+  assert.match(read('../../scripts/kernel/cli.mjs'), /INPUT_ROW_GLYPH/);
 });

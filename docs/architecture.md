@@ -11,7 +11,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
                          │  define-goal / start-kernel / answers
                          ▼
    ┌────────────── Kernel seat (one per workflow) ─────────────┐
-   │  reads Decision Items, decides, calls scripts/kernel/api.mjs│
+   │  reads Decision Items, decides, calls scripts/kernel/cli.mjs│
    └───────────────┬────────────────────────────────────────────┘
                    │ api verbs (one transaction + one event each)
                    ▼
@@ -59,7 +59,7 @@ The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
-| `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/api.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
+| `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/cli.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
 | `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and fleet digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
@@ -100,10 +100,10 @@ awaiting-approval ──► queued ──► running ──► finished ──�
   `workflows_phase_guard` trigger refuses a change without one. Finishing or archiving a workflow
   closes its open incidents; an archived workflow accepts no new events or jobs.
 
-## The Kernel API: `scripts/kernel/api.mjs`
+## The Kernel API: `scripts/kernel/cli.mjs`
 
 ```text
-node scripts/kernel/api.mjs <verb> --repo <path> [...]
+node scripts/kernel/cli.mjs <verb> --repo <path> [...]
 ```
 
 `modules/kernel/api.yaml` and `modules/kernel/api-commands/<verb>.yaml` name every verb with its
@@ -190,7 +190,7 @@ custody, encrypted with sops; they never enter a database or a blob.
 | --- | --- |
 | Agent entry and load order | `CONTEXT.md` |
 | Project binding | `.workspaces/projects/<p>/work.json` (`modules/schemas/workspace-routing.yaml`) |
-| Kernel decisions and API | `modules/kernel/*.yaml`, `scripts/kernel/api.mjs` |
+| Kernel decisions and API | `modules/kernel/*.yaml`, `scripts/kernel/cli.mjs` |
 | Host runtime loop | `modules/reconciler/reconciler.yaml`, `scripts/reconciler/engine.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |

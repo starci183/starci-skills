@@ -102,7 +102,7 @@ incident:
     Otherwise it refuses owner-claim-unproven and writes nothing: keep the incident
     open and raise or keep an owner ask, or resolve --by kernel|supervisor stating
     what landed. incident-resolved records ownerAnswer {dispatchId, workflowId,
-    receiptPath}. scripts/kernel/owner-claim.mjs; nivo wf-nivo-workspace-provision-mujek7cb
+    receiptPath}. scripts/machine/owner-claim.mjs; nivo wf-nivo-workspace-provision-mujek7cb
     inc-2474f6593dfe and inc-f19d118298f1 were resolved "Owner confirmed" with no owner
     answer)
   ownerClaimLint: >-

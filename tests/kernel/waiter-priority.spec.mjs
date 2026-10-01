@@ -18,7 +18,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // names the heavier job to dispatch first, a job blocking a peer past the threshold without being
 // dispatched gets its own Kernel a heads-up, and the supervisor prints one BLOCKING line per job.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const WAITER='wf-wp-waiter',OWNER='wf-wp-owner',THIRD='wf-wp-third';
 

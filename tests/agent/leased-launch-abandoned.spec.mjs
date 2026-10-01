@@ -17,7 +17,7 @@ import {spawnAgent} from '../../scripts/agent/lib.mjs';
 // launch in flight until that deadline and `launch-abandoned` after it: status reads it worker-dead and
 // reconcile --dead-worker returns it to queued (or settles it) like any dead worker.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 const fixture=(t,{deadline,launchTerminal=null})=>{

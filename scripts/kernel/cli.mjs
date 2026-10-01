@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// api.mjs — the kernel agent's ONLY gate to the ledger. One thin command per
+// cli.mjs — the kernel agent's ONLY gate to the ledger. One thin command per
 // state operation; the long-lived [Kernel] never opens .starciwork/runtime.sqlite
 // itself and never spawns op terminals by hand — `dispatch` owns that.
 //
-//   node scripts/kernel/api.mjs <cmd> --repo <path> [...] [--json]
+//   node scripts/kernel/cli.mjs <cmd> --repo <path> [...] [--json]
 //
 //   survey   --repo <path> --workflow <id> [--deliveries]
 //   status   --repo <path> --workflow <id>
@@ -285,7 +285,7 @@ const summarizeCheckEvidence = (value) => {
 };
 
 const usage = (code) => {
-  console.error(`use: node scripts/kernel/api.mjs <cmd> --repo <path> [...] [--json]
+  console.error(`use: node scripts/kernel/cli.mjs <cmd> --repo <path> [...] [--json]
   survey   --workflow <id> [--deliveries]
   status   --workflow <id>
   hierarchy --workflow <id>

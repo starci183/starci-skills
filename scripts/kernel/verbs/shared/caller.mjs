@@ -1,5 +1,5 @@
 // api-lib/caller.mjs — who is calling: the op-caller guard of the kernel api (split out of
-// api.mjs, lane slim-api). A worker running with unattended permissions can still read the
+// cli.mjs, lane slim-api). A worker running with unattended permissions can still read the
 // ledger file or unset the marker; the api cannot stop raw file access, only refuse its verbs
 // (modules/kernel/api.yaml conventions.callerBoundary).
 export const OP_ROLE = 'op';

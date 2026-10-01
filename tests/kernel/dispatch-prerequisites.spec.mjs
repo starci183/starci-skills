@@ -15,7 +15,7 @@ import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../../scrip
 // the design gate (an implementation record whose proved ui record has no settled interface.draw).
 // Unknown is never unmet.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const AUDIT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','ops','ops','interface.audit.yaml'),'utf8'));
 // interface.audit's `target` read is now a packet/ledger reference (params.audit + the
 // interface_audits row), not a repository file; the file-path form below is the shape

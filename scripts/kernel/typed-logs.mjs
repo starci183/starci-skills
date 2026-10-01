@@ -11,7 +11,7 @@
 // owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
 // verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (alpha.3: no log file
 // anywhere in a repository - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
-//   - `api log` (scripts/kernel/api.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
+//   - `api log` (scripts/kernel/cli.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
 //     lines an op kept in <STARCI_JOB_SCRATCH>/log.jsonl instead are ingested by api report (ingestScratchLog)
 //     before it deletes the scratch;
 //   - the ledger's own events (syncDerivedLogs): dispatch, report, checks, settle, land, incident rows are
@@ -40,7 +40,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from './verbs/shared/rows.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
-import { logWriterFor } from './log-writer.mjs';
+import { logWriterFor } from '../machine/log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
@@ -87,7 +87,7 @@ export const LOG_KINDS = Object.freeze({
   land: { req: { head: S }, opt: { repo: S, headCheck: S, paths: A } },
   incident: { req: { id: S, state: S }, opt: { kind: S, detail: S, holds: A } },
   'job.drop': { req: { reason: S }, opt: { op: S, attempt: I } },
-  // The Supervisor's act on an owed action (scripts/supervisor/sup-log.mjs; supervisor ledger only).
+  // The Supervisor's act on an owed action (scripts/machine/sup-log.mjs; supervisor ledger only).
   'supervisor.action': { req: { action: S, item: S }, opt: { reason: S, class: S, workflowId: S, repo: S, delivered: B } },
   // The Supervisor's garbage collection (scripts/supervisor/gc.mjs; supervisor ledger only): one gc.collect per
   // thing closed, removed, archived or refused, one gc.summary per run.

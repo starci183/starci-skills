@@ -20,7 +20,7 @@ for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE
 // runtime derives itself (cmd.run per check, file.edit per patch file, render/video/trace per artifact) and the
 // LOG_TYPED_MISSING warning when an op logged nothing of its own.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000002000154a24f5d0000000049454e44ae426082', 'hex');
 const json = (v) => JSON.stringify(v ?? null);
 const tmp = (t, prefix = 'starci-subkind-') => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
@@ -191,7 +191,7 @@ test('the typed-log rules reach every new dispatch and every kernel boot', async
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);
   assert.match(prompt, /api\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
-  const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'dispatch.mjs'), 'utf8');
+  const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
   assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'api dispatch renders the op prompt with the logging block');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);

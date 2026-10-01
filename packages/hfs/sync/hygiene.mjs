@@ -90,7 +90,7 @@ export function judge(cwd, files) {
 const ledgerHygieneScript = cwd => {
   try {
     const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' }).trim();
-    return path.join(root, 'scripts', 'checks', 'ledger-hygiene.mjs');
+    return path.join(root, 'scripts', 'housekeeping', 'ledger-hygiene.mjs');
   } catch {
     return null;
   }

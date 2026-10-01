@@ -17,7 +17,7 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhas
 // actionable frontier `worker-question`; `api reply` answers it (or routes it to the owner through outcome ask)
 // via the Orca reply wrapper.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 const fixture=t=>{

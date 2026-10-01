@@ -14,12 +14,9 @@
 // Every read is best effort — an unreadable ledger contributes nothing, and the
 // result names the ledgers it counted.
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { createRequire } from 'node:module';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
-import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
+import { isFixtureLedgerPath, machineLedgerFiles } from '../machine/ledger-files.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -29,20 +26,6 @@ const HOUR_MS = 3600000;
 const openReadOnly = (file) => {
   return openLedgerReader(file);
 };
-const norm = (file) => path.resolve(String(file)).replace(/\\/g, '/').toLowerCase();
-const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).map(norm))];
-const FIXTURE_SEGMENT = /^fixtures?$/i;
-
-/**
- * True when a ledger path is a test fixture, never a product ledger: under the OS temp directory, or with a
- * directory segment named `fixture` or `fixtures` anywhere above the file.
- */
-export function isFixtureLedgerPath(file, { env = process.env } = {}) {
-  if (!file) return false;
-  const resolved = norm(file);
-  if (tempDirs(env).some((dir) => resolved.startsWith(`${dir}/`))) return true;
-  return resolved.split('/').slice(0, -1).some((segment) => FIXTURE_SEGMENT.test(segment));
-}
 
 /** {pool: count} of op jobs routed to a pool and created at or after sinceMs, in one open ledger db. */
 export function recentPoolCounts(db, sinceMs) {
@@ -51,18 +34,6 @@ export function recentPoolCounts(db, sinceMs) {
     WHERE kind='op' AND created_at>=? AND json_extract(payload_json,'$.model') IS NOT NULL GROUP BY 1`).all(sinceMs);
   for (const row of rows) if (row.pool) counts[row.pool] = (counts[row.pool] ?? 0) + Number(row.n);
   return counts;
-}
-
-/**
- * The other product ledgers the machine arbiter registered: present on disk and not a fixture
- * (isFixtureLedgerPath). `machineFile` injects the registry (a spec's own machine.sqlite); it defaults to
- * the host's, resolved from `env`.
- */
-export function machineLedgerFiles({ env = process.env, exclude = [], machineFile = null } = {}) {
-  const skip = new Set(exclude.filter(Boolean).map(norm));
-  const files = readMachine((m) => m.listLedgers().map((l) => l.file), [], { file: machineFile ?? machineFileFor(env), env });
-  return [...new Set(files.filter(Boolean).map((file) => path.resolve(file)))]
-    .filter((file) => !isFixtureLedgerPath(file, { env }) && !skip.has(norm(file)) && fs.existsSync(file));
 }
 
 /**

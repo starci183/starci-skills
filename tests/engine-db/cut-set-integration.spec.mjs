@@ -15,7 +15,7 @@ import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 // slice checks alone - no pass ever ran the unchanged full gates over the finished set. The pass that leaves
 // no other ordinal open closes the set and is the one held to full-regression-final.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const refusal=r=>{try{return JSON.parse(r.stderr.trim().split('\n').at(-1));}catch{return null;}};

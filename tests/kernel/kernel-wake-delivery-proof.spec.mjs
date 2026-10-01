@@ -14,8 +14,8 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 // scripts/kernel/wake-delivery.mjs: a wake the screen shows landed or queued is delivered, only a
 // screen that shows none of it fails.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
-const WATCHDOG=path.join(ROOT,'scripts','kernel','watchdog.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
+const WATCHDOG=path.join(ROOT,'scripts','kernel','kernel-watchdog.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const KERNEL='kernel-terminal-1';
 const CHROME=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];

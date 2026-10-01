@@ -16,7 +16,7 @@ import { changeWorkflowPhase, ledgerFileFor, openLedger } from '../../engine/db/
 import { blockingDecisions, claimDecision, escalateDecision, escalateDue, listDecisions, openDecisionRow, resolveDecision, ringDoorbellWith } from '../../scripts/machine/decisions.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const WF = 'wf-di-archive', OTHER = 'wf-di-other', WF_ARCH = 'wf-di-archived', WF_FIN = 'wf-di-finished';
 
 const repoWithLedger = (t, workflowIds) => {

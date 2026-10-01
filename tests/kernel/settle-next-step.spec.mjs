@@ -1,4 +1,4 @@
-// A failed settle always leaves its next step in the ledger (scripts/kernel/api.mjs enqueueNextStep over
+// A failed settle always leaves its next step in the ledger (scripts/kernel/cli.mjs enqueueNextStep over
 // modules/models/kinds.yaml routes), and `api status` names the Kernel's next moves as nextActions and
 // colours every leg. Before it `api settle --verdict fail` enqueued nothing, the frontier fell to
 // orphaned-frontier, and a worker that died without a report was retried without a cap
@@ -18,7 +18,7 @@ import {unitSubjectKey} from '../../engine/admission.mjs';
 process.env.STARCI_AUTOPILOT ??= 'off';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 
 const world=(t,{legs=['docs.author'],edges=legs.slice(1).map((op,i)=>[legs[i],op])}={})=>{

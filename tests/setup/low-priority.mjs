@@ -1,3 +1,3 @@
-import { lowerOwnPriority } from '../../scripts/api/process/set-priority.mjs';
+import { setPriority } from '../../scripts/api/process/set-priority.mjs';
 
-lowerOwnPriority();
+setPriority();

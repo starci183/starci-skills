@@ -1,4 +1,4 @@
-// api foundation: split from api.mjs.
+// api foundation: split from cli.mjs.
 import path from 'node:path';
 import { resolveIncident } from '../../../engine/db/ledger.mjs';
 import { csvList, getWorkflow, workflowRunning } from './shared/rows.mjs';

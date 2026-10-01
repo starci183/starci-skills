@@ -287,7 +287,7 @@ const readable = (v) => Boolean(v && typeof v === 'object' && v.ok !== false && 
 /**
  * One api status read: {value, error, failure}; error names why it is unreadable (a throw, {ok:false,error}, no value).
  * Through ctx.statusRead when the ctx has it: failure = the spawn's cause (timeout | spawn | refused | exit | no-json),
- * exit code and stderr head, so a refusal api.mjs printed on stderr (plan-edges-missing) is named, not 'no value'.
+ * exit code and stderr head, so a refusal cli.mjs printed on stderr (plan-edges-missing) is named, not 'no value'.
  */
 async function readStatus(ctx, ledgerId, workflowId) {
   try {
@@ -345,7 +345,7 @@ async function decisionsMod() {
 async function ringKernelDoorbell(ctx, { ledgerId, workflowId, keys }) {
   const mod = ctx.mode === 'active' ? await decisionsMod() : null;
   if (mod && typeof mod.ringDoorbell === 'function') {
-    try { return { rung: true, result: await mod.ringDoorbell(ctx, { ledgerId, workflowId, decider: 'kernel', keys }) }; } catch (error) { return { rung: false, error: String(error?.message ?? error).slice(0, 160) }; }
+    try { return { rung: true, result: await mod.ringDoorbell(ctx, { ledgerId, workflowId, decider: 'kernel', keys, wake: (await import('../../kernel/wake-delivery.mjs')).wakeKernel }) }; } catch (error) { return { rung: false, error: String(error?.message ?? error).slice(0, 160) }; }
   }
   try { await ctx.log?.('reconciler.would', `doorbell kernel ${workflowId}: ${keys.length} decision(s)`, { controller: 'workflow', action: 'doorbell', ledgerId, workflowId, keys }); } catch { /* best effort */ }
   return { rung: false, would: true };

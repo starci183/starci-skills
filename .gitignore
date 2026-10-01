@@ -3,11 +3,6 @@ dist/
 
 # Local tools and scratch are not distributable skill sources.
 /.venv/
-/mcp/
-/runtime/
-
-# Actual local Git checkouts are not product completion storage.
-worktrees/
 
 # Runtime state: the installed product writes .starciwork/runtime.sqlite and
 # ledger artifacts into the CONSUMER repo — consumers must ignore .starciwork/

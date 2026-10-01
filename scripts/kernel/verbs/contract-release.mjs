@@ -1,4 +1,4 @@
-// api contract-release: split from api.mjs.
+// api contract-release: split from cli.mjs.
 import { JOB_ROW, getWorkflow, jobPayloadOf } from './shared/rows.mjs';
 import { recordJobResult, setJobStatus, updateJob } from '../../../engine/db/ledger.mjs';
 import { dispatchEvidenceOf } from './shared/dispatch-state.mjs';

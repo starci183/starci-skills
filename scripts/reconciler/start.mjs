@@ -381,7 +381,7 @@ export async function kernelSeatItems({ orcaOk = true, config = null, repair = f
   for (const { repo, workflowId } of rows) {
     const ledger = path.basename(repo);
     if (!orcaOk) { out.push(red('seats', `seat:kernel:${ledger}:${workflowId}`, `Kernel seat ${workflowId}`, 'Orca is not reachable', 'open Orca, then run start again')); continue; }
-    const args = [path.join(SKILL_ROOT, 'scripts', 'kernel', 'watchdog.mjs'), '--repo', repo, '--workflow', workflowId, '--once', '--json', ...(repair ? ['--repair'] : [])];
+    const args = [path.join(SKILL_ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs'), '--repo', repo, '--workflow', workflowId, '--once', '--json', ...(repair ? ['--repair'] : [])];
     const answer = await json(process.execPath, args, { timeoutMs: 300_000 });
     out.push(kernelSeatItem({ ledger, workflowId, answer, seatState: answer?.action ? seatStateOf(answer.action) : null }));
   }

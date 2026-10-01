@@ -6,7 +6,7 @@
 // in (land/push scratch, the verify-proof base tree, the revert lane) is made by git in ONE function:
 // scripts/api/git/worktree-add.mjs createScratchWorktree, which registers it in machine.sqlite and hands it to the GC. A
 // `git worktree add` anywhere else - another file, or the worktree API outside that function - is red, and so is a
-// createScratchWorktree call that names an Orca kind (scripts/machine/worktree-registry.mjs ORCA_KINDS: an agent's workspace made by
+// createScratchWorktree call that names an Orca kind (scripts/lib/worktree-kinds.mjs ORCA_KINDS: an agent's workspace made by
 // git; createScratchWorktree also refuses it at run time). A land gate tree check (scripts/supervisor/land.mjs
 // TREE_CHECKS) and part of `npm run check`.
 //
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
-import { ORCA_KINDS } from '../machine/worktree-registry.mjs';
+import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 
 export const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 /** The one function of WORKTREE_API that may run `git worktree add`. */

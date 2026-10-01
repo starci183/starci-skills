@@ -4,7 +4,7 @@
 // payload fields a job's terminal can hide in, the same "still holds a worker" statuses and
 // the same two SELECTs; start-supervisor reads the same facts through workers.mjs
 // openWorkerHandles (the supervisor ledger) and identifies the terminal's agent through
-// quit-agent.mjs agentOfTerminal. kernel/api.mjs carries the same field list at
+// quit-agent.mjs agentOfTerminal. kernel/cli.mjs carries the same field list at
 // operationTerminalHandleOf - that file is reserved to the w2-api lanes.
 import { parseJson } from '../lib/json.mjs';
 

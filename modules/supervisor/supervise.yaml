@@ -129,7 +129,7 @@ mission:
     - "REPORT and YIELD: a short report in this terminal (what was acted on, what is still open and why), then yield. The Fleet Notifier sends the owner digest."
   classes:
     progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its api status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
-    kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lessons.mjs land; IMPORTANT -> lessons.mjs propose to the owner; record the result."
+    kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lesson-actions.mjs land; IMPORTANT -> lesson-actions.mjs propose to the owner; record the result."
     runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - your own staged lane (workers.mjs stage --self --name <slug> --files <csv> makes the checkout through the runtime worktree API; commit there and land with land.mjs --commit <sha> --lane <slug>, which removes the checkout) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
     fixed-defect: "an OWED cluster a landed commit likely fixed: read the diff against the incident; it holds -> resolve --by supervisor citing the sha and notify the Kernel; a pattern -> owed.mjs ack --item <key> --commits <sha>; it does not hold -> runtime-defect."
     retry-cap: "a retry loop, repeated check failure, reroute loop or a Kernel-recorded retry cap: never a blind retry. Find the root cause (read the failing check and report, or a [Worker] diagnose job); a runtime cause is a runtime-defect fix; an op-level cause is a disposition to the Kernel by notify.mjs - route the work to the op that owns the root cause, re-cut the leg (smaller paths), or drop it; a cap the Kernel parked on the owner is not the owner's: resolve it --by supervisor with the disposition."
@@ -144,7 +144,7 @@ mission:
     orphaned: "an orphaned frontier across ticks: wake the Kernel to name its next step; a plan that cannot continue -> send the Kernel a revise disposition (the define-goal --revise path itself runs only in the owner's chat) and record it, or archive --by supervisor a hopeless attempt with the reason."
     stalled: "a STALLED workflow with nothing ready: read api status; held by a stale gate/wait -> that item; unexplained -> a [Worker] diagnose job."
     contract-stale: "api status kernelRev.stale: notify the Kernel to re-read the changed runtime files it names and api kernel-ack-rev --rev <sha>; never a restart for this alone (restart-cooldown)."
-    experiment-revert: "a self-learning experiment measured no improvement or a regression (selfLearning.measure): node scripts/machine/lessons.mjs revert --experiment <id> --apply - a revert lane through the land gate that records 'did not work'."
+    experiment-revert: "a self-learning experiment measured no improvement or a regression (selfLearning.measure): node scripts/supervisor/lesson-actions.mjs revert --experiment <id> --apply - a revert lane through the land gate that records 'did not work'."
     push-refused: "a refused push of main: classify it (secret / lint / test / hook) from the refusal and route the fix to a lane (a secret is taken out of the unpushed history in a lane and named only by custody ref); never --no-verify, never force."
   message:
     kernels: "only as Decision Items: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> [--entity <type>:<id>] opens a supervisor-ruling DI (api decisions --open --by supervisor; the notice is its text; it supersedes the Kernel's live DIs on that entity) and rings the doorbell only when the Kernel seat is turn-idle - a busy Kernel is 'queued', never a failure, and the Kernel reads it first on its next wake. Plus the api incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
@@ -168,13 +168,13 @@ selfLearning:
   loop:
     observe: "every tick: the owed actions carry a failure SIGNATURE (an OWED cluster id - root-cause label + distinctive token: check name, finding code, file - or <class>:<subject>); SLA breaches and op-metrics failure classes feed the same list"
     diagnose: "a signature repeated >= runtimes.yaml supervisorLearning.minRepeats times opens ONE hypothesis (supervisor-hypothesis: symptom, cause class gate-defect | brief-gap | runtime-flow | env | contract-churn, evidence refs). Consult first: lessons.mjs match --signature <s> (owner lessons weigh ownerWeight, above self-derived ones)"
-    experiment: "the Supervisor (or its [Worker]s, per workers) fixes it in a lane with a spec reproducing the signature and lands it ONLY through lessons.mjs land --signature <s> --commit <sha> --lane <name> [--wrongly-blocked <spec>]: the authority tier, the check guardrail and the daily cap are enforced there, then land.mjs (and the draw-rules freeze windows it enforces) lands it and a supervisor-experiment records its baseline"
-    measure: "every tick (lessons.mjs learnTick): the signature recurring after the land, a new signature naming a file the fix changed, or an op success rate lower by supervisorLearning.successDrop -> revert due (owed action experiment-revert; lessons.mjs revert --experiment <id> --apply lands the revert lane and records 'did not work'); quiet for measureMs -> kept"
+    experiment: "the Supervisor (or its [Worker]s, per workers) fixes it in a lane with a spec reproducing the signature and lands it ONLY through lesson-actions.mjs land --signature <s> --commit <sha> --lane <name> [--wrongly-blocked <spec>]: the authority tier, the check guardrail and the daily cap are enforced there, then land.mjs (and the draw-rules freeze windows it enforces) lands it and a supervisor-experiment records its baseline"
+    measure: "every tick (lessons.mjs learnTick): the signature recurring after the land, a new signature naming a file the fix changed, or an op success rate lower by supervisorLearning.successDrop -> revert due (owed action experiment-revert; lesson-actions.mjs revert --experiment <id> --apply lands the revert lane and records 'did not work'); quiet for measureMs -> kept"
     learn: "every hypothesis, experiment, result, refusal, owner feedback and proposal is a supervisor-ledger event and a typed log row; lessons.mjs export --write regenerates the versioned modules/supervisor/lessons.yaml (committed in a lane); matching lessons ride on each owed action (lesson: lines) and api dispatch injects them beside a retry's prior attempt failures"
   ownerFeedback: "owner feedback (the chat relay, Telegram, draw notes) is recorded as a lesson with source owner: node scripts/machine/lessons.mjs feedback --text <t> [--signature <s>] --via chat|telegram|draw-note; it weighs runtimes.yaml supervisorLearning.ownerWeight and wins over a self-derived lesson on the same signature"
   tiers:
     auto: "lands through lanes without asking, logged and reported in the owner digest: bug fixes in checkers/scripts/runtime; checker calibration WITH a spec showing a correct example the check wrongly blocked; grammar additions/fixes (a release bump - npm publish still needs the owner, grammarRelease aside); brief and prompt improvements; scheduling/throughput tuning within the owner's caps"
-    propose: "a concise proposal to the owner (lessons.mjs propose --title --evidence --options --recommendation --send), never blocking other work while it waits: changes to owner rulings or brand direction/records, knowledge rule meaning, removing or weakening a gate class, architectural changes to the op graph or the kernel contract, budget/cap increases (config.yaml), anything with an external or irreversible effect. lessons.mjs land refuses these paths (tierOf)"
+    propose: "a concise proposal to the owner (lesson-actions.mjs propose --title --evidence --options --recommendation --send), never blocking other work while it waits: changes to owner rulings or brand direction/records, knowledge rule meaning, removing or weakening a gate class, architectural changes to the op graph or the kernel contract, budget/cap increases (config.yaml), anything with an external or irreversible effect. lesson-actions.mjs land refuses these paths (tierOf)"
   guardrails:
     - "never relax or disable a check to turn it green: a changed checker lands only with --wrongly-blocked <tests/<name>.spec.mjs>, a spec in the same change holding the correct example the check wrongly blocked (its text says 'wrongly blocked')"
     - "revert on measured regression, automatically (experiment-revert); a kept experiment is a lesson, a reverted one a 'did not work' lesson"
@@ -187,7 +187,7 @@ machineLog:
     Owner, 2026-09-28: the Supervisor writes "the machine's root log". Every observation, decision, action, message and
     experiment of the Supervisor is a typed log row (scripts/kernel/typed-logs.mjs) in the logs table of the SUPERVISOR
     ledger (<supervisor home>/.starciwork/runtime.sqlite, the machine-wide ledger), workflow wf-supervisor, actor
-    runtime, written by scripts/supervisor/sup-log.mjs. Kinds: supervisor.action (an owed-action act), decision
+    runtime, written by scripts/machine/sup-log.mjs. Kinds: supervisor.action (an owed-action act), decision
     (hypotheses, experiment results, proposals), narration (tick summaries, lessons, owner digests), cmd.run (pushes),
     check.result (host, Orca, status UI), warning (alerts, SLA breaches, refusals), error (tick step failures), gc.collect
     (one thing the garbage collection closed, removed, archived or refused), gc.summary (one per GC run). refs name
@@ -197,7 +197,7 @@ machineLog:
 
 lanes:
   kernel:
-    does: orchestrates one approved goal end-to-end via scripts/kernel/api.mjs only
+    does: orchestrates one approved goal end-to-end via scripts/kernel/cli.mjs only
     never: sees or fixes its own systemic contract flaws — it works inside the contract
   watchdog:
     does: scripts/kernel/kernel-watchdog.mjs — liveness only; wakes/replaces a dead kernel terminal. While the
@@ -252,7 +252,7 @@ kernelSeat:
     - works the mission loop (mission) on every wake - reads the OWED ACTIONS list (scripts/supervisor/actions.mjs list), acts on each item with its class action and records each action (actions.mjs record, notify.mjs --item), so no stuck item outlives the SLA
     - resolves a gate itself with api incident --resolve <inc> --by supervisor citing the fix or the evidence, and archives a hopeless attempt with api archive --by supervisor (mission.classes)
     - leaves periodic owner digest delivery to the Fleet Notifier and never asks the owner anything except the final credentials step and the handover
-    - runs the self-learning loop (selfLearning) - hypotheses from repeated signatures, experiments landed through lessons.mjs land, measured, kept or reverted - records owner feedback as lessons, and proposes only the IMPORTANT upgrades (tiers.propose) to the owner
+    - runs the self-learning loop (selfLearning) - hypotheses from repeated signatures, experiments landed through lesson-actions.mjs land, measured, kept or reverted - records owner feedback as lessons, and proposes only the IMPORTANT upgrades (tiers.propose) to the owner
     - writes every observation, decision, action and message as a typed row of the machine log (machineLog)
     - clusters OWED items by root cause (scripts/supervisor/cluster.mjs) and closes every cluster the same tick
     - makes the rulings itself (runtime and cross-workflow conflicts, delegated decisions) and records them
@@ -683,7 +683,7 @@ guardrails:
   - id: no-op-authority
     rule: the supervisor never runs op work, dispatches jobs, settles reports, or writes
       .starciwork product records — analysis may conclude "the op must redo this" but the redo is
-      issued as an owner-worded disposition to the kernel, which re-plans through api.mjs
+      issued as an owner-worded disposition to the kernel, which re-plans through cli.mjs
   - id: owner-word
     rule: pending asks are surfaced verbatim, with the form URL only while the digest tags it
       `live`; the supervisor relays, never answers — accept/reject stays the owner's word
@@ -703,7 +703,7 @@ guardrails:
       Kernel read the new rules - its running legs keep their admitted contract.
       FROZEN families (modules/kernel/contract-freeze.yaml; owner 2026-09-28 "Freeze the drawing
       rules", interface.draw): their changes are batched and reach a workflow created before them
-      only at a release YOU run - node scripts/kernel/api.mjs contract-release --family <op>
+      only at a release YOU run - node scripts/kernel/cli.mjs contract-release --family <op>
       --repo <ledger owner> [--dry-run] - after reading the land gate's gate-stability report
       (how many accepted legs of live workflows the new gates would flip). One release per
       batch, never one per landing: a leg then owes ONE follow-up for the whole released set.

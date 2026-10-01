@@ -1,6 +1,6 @@
 // api coverage — every FR, shape and applicable proof case of the workflow's scope with its evidence
 // (proof-integrity.mjs coverageOf); read-only. The proof cases of each ui record come from
-// ui-proof-brief.mjs buildBrief. Split out of api.mjs (lane slim-04); its help line stays in api.mjs
+// ui-proof-brief.mjs buildBrief. Split out of cli.mjs (lane slim-04); its help line stays in cli.mjs
 // usage() (usageInCore).
 //
 //   coverage --workflow <id>

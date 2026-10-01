@@ -104,4 +104,4 @@ outage API takes it. Only the world that injected an outage restores proxies at 
 
 ## Developing the library
 
-`npm test` builds and runs `node --test dist/**/*.test.js` (no docker needed; every layer is unit-tested against a scripted exec). Peer dependencies: `@nestjs/common`, `@nestjs/core`, `typeorm`, `pg`, `jest`, `tsconfig-paths`.
+`npm test` builds and runs `node --test dist/**/*.spec.js` (no docker needed; every layer is unit-tested against a scripted exec). Peer dependencies: `@nestjs/common`, `@nestjs/core`, `typeorm`, `pg`, `jest`, `tsconfig-paths`.

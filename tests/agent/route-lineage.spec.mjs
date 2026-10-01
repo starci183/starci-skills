@@ -23,7 +23,7 @@ import { selectPool } from '../../scripts/agent/models.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (v) => JSON.stringify(v ?? null);
 const WF = 'wf-sn-foundation';
 const OP = 'interface.implement';

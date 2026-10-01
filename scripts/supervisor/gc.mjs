@@ -33,7 +33,7 @@
 //   shells    idle bare shells: a plain Orca shell tab (title "Terminal <n>" or the worktree's name), no agent, bound to
 //             nothing, whose screen holds nothing but prompts, older than gcMinAgeMs (by first sight, or by the age of
 //             every child-less `powershell -NoExit` under the Orca daemon). 322 of them held ~20 GB on 2026-09-28.
-//   lanes     worktrees under the lanes root (hk-lanes.mjs lanesRoot): a lane/* branch landed by patch, ledger or
+//   lanes     worktrees under the lanes root (home.mjs lanesRoot): a lane/* branch landed by patch, ledger or
 //             file content with a clean tree, idle for gcLaneGraceMs; a detached land scratch while no land runs; an
 //             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
 //             the worktree GC (scripts/machine/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
@@ -73,7 +73,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../machine/close-verify.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../housekeeping/hk-lanes.mjs';
+import { parseWorktreeList, laneActivity, treeBytes } from '../housekeeping/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { pathKey } from '../lib/path-key.mjs';
@@ -81,10 +81,9 @@ import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
-import { SKILL_ROOT, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
+import { SKILL_ROOT, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
 import { jobsOf } from './workers.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
-import { pidAlive } from '../../engine/db/machine.mjs';
+import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -98,7 +97,7 @@ export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_80
   leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
-  lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
+  lease: 'settle/reconcile did not release the job lease (scripts/kernel/cli.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
   'lane-log': 'the lane process left its log at the lanes root instead of cleaning it after land',
 });
 const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
@@ -128,36 +127,6 @@ export function gcSettings(allocation = allocationSettings()) {
 }
 
 
-/* ------------------------------------------------------------ host lock: one GC apply at a time */
-
-export const GC_LOCK = 'gc';
-/**
- * The host lock `gc` (machine.sqlite host_locks, ttl staleMs): an apply run (the tick, a hand-run `gc.mjs --apply`,
- * blob-gc, the reconciler GC controller) holds it so two never overlap. {ok, release()} | {ok:false, holder: {holder,
- * pid, at}}. A lock past its ttl, or whose holder process is gone, is taken over; a busy one is polled for waitMs.
- */
-export function acquireGcLock({ env = process.env, holder = 'gc', waitMs = 0, staleMs = 3_600_000, pollMs = 250 } = {}) {
-  const started = Date.now();
-  for (;;) {
-    const r = withSupervisor((m) => {
-      const got = m.acquireHostLock({ name: GC_LOCK, holder, ttlMs: staleMs });
-      if (got.ok || pidAlive(got.holder?.holder_pid)) return got;
-      m.releaseHostLock({ name: GC_LOCK, force: true });
-      return m.acquireHostLock({ name: GC_LOCK, holder, ttlMs: staleMs });
-    }, { env });
-    if (r.ok) {
-      let released = false;
-      const release = () => {
-        if (released) return;
-        released = true;
-        try { withSupervisor((m) => m.releaseHostLock({ name: GC_LOCK }), { env }); } catch { /* expires by its ttl */ }
-      };
-      return { ok: true, release };
-    }
-    if (Date.now() - started >= waitMs) return { ok: false, holder: { holder: r.holder?.holder ?? null, pid: r.holder?.holder_pid ?? null, at: r.holder?.started_at ? new Date(r.holder.started_at).toISOString() : null } };
-    sleepSync(pollMs);
-  }
-}
 
 /**
  * Whether the periodic sweep is due (owner 2026-09-28: every allocation.gc.sweepMs, default 30 minutes; the tick only

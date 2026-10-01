@@ -21,7 +21,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (v) => JSON.stringify(v ?? null);
 const out = (r) => { try { return JSON.parse(r.stdout); } catch { return null; } };
 const errOf = (r) => { try { return JSON.parse(r.stderr.trim().split('\n').pop()); } catch { return null; } };

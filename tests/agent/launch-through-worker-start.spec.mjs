@@ -18,7 +18,7 @@ import {pathToFileURL} from 'node:url';
 
 process.env.STARCI_SLEEP_SCALE??='0.02';
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};

@@ -23,14 +23,14 @@ const enqueueFixtureJob=(ledger,args)=>{
 };
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 // Managed dispatch rides the scripts/api/orca orchestration wrappers
 // (runCreate/taskCreate/workerStart/orchDispatch/workerShow/workerStop/
-// workerRelease), api.mjs's managed-agent branch and
+// workerRelease), cli.mjs's managed-agent branch and
 // scripts/agent/quota/index.mjs probeQuota. Kernel boot deliberately does not
 // use those orchestration wrappers: every Kernel is a dedicated Orca
 // terminal, while operation agents retain their routed managed lifecycle.

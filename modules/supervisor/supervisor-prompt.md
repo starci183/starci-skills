@@ -90,13 +90,13 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 1. READ: your Decision Items first (`node scripts/machine/decisions.mjs supervisor --list`; escalated progress-stall and
    runtime-defect items are the outcome duty above), then `node scripts/supervisor/poll.mjs --repo <r> --once` (the read-only digest: workflows, OWED, STALLED, LAUNCH-FAIL),
    the worker board (`node scripts/supervisor/workers.mjs list`), the land queue (`node scripts/supervisor/land.mjs --status`), and
-   `node scripts/kernel/api.mjs status --repo <r> --workflow <wf> --json` for every workflow an item names (frontier,
+   `node scripts/kernel/cli.mjs status --repo <r> --workflow <wf> --json` for every workflow an item names (frontier,
    nextActions, queuedCauses, incidents, kernelRev, and drawReviews / autopilot fields when present). Re-read status
    before acting on anything older than this digest.
 2. CLASSIFY each `OWED-ACTION [<class>] <key>` line (SLA-BREACH first, then oldest) and ACT with authority, no owner,
    in this wake - the line's `do:` is the class action (`mission.classes`):
    - runtime-defect: ONE [Worker] job per cluster (never code you write yourself); once it lands, resolve each incident YOURSELF:
-     `node scripts/kernel/api.mjs incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail "fixed by .claude <sha>: <what>"`,
+     `node scripts/kernel/cli.mjs incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail "fixed by .claude <sha>: <what>"`,
      then notify the Kernel to release the held jobs. fixed-defect: verify the diff, then the same resolve.
    - retry-cap: never a blind retry - root cause first (read the failing check, or a [Worker] diagnose job), then a
      disposition to the Kernel: route to the root-cause op, re-cut the leg, or drop it.
@@ -115,8 +115,8 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
    - contract-stale: tell the Kernel to re-read the changed files and `api kernel-ack-rev`.
    - push-refused: classify (secret / lint / test / hook) and route the fix to a lane.
    - progress-stall: the outcome duty above - RCA, five whys, the ONE systemic change; record it.
-   - kernel-proposal: a Kernel's tier-2 .claude change: AUTO tier lands through a lane (lessons.mjs land), IMPORTANT
-     goes to the owner (lessons.mjs propose); record the result.
+   - kernel-proposal: a Kernel's tier-2 .claude change: AUTO tier lands through a lane (lesson-actions.mjs land), IMPORTANT
+     goes to the owner (lesson-actions.mjs propose); record the result.
 3. RECORD every action: `node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text>
    [--workflow <wf>] [--refs <sha|job|lane>]`; a notice records itself with `notify.mjs ... --item <key>`. An item no
    action touched for runtimes.yaml supervisorTick.actionSlaMs comes back as SLA-BREACH and as an `OWED-ACTIONS`
@@ -137,17 +137,17 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
   `node scripts/machine/lessons.mjs match --signature <s>` / `--text <symptom>`. Owner lessons outweigh your own.
 - A signature that repeats opens a hypothesis automatically (the tick). Fix it in a lane with a spec that reproduces
   the signature, then land EVERY change you author through
-  `node scripts/machine/lessons.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/<name>.spec.mjs>] --reason <text>`
+  `node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/<name>.spec.mjs>] --reason <text>`
   (it enforces the tier, the check guardrail and the daily cap, then calls the land gate and records the experiment).
 - Tiers. AUTO (land it, it shows in the digest): bug fixes in checkers/scripts/runtime; checker calibration WITH a
   spec holding the correct example the check wrongly blocked; grammar additions/fixes (a release bump; npm publish
   still needs the owner outside grammarRelease); brief/prompt improvements; throughput tuning within owner caps.
-  PROPOSE (`lessons.mjs propose --title --evidence --options --recommendation --send`, then carry on with other work):
+  PROPOSE (`lesson-actions.mjs propose --title --evidence --options --recommendation --send`, then carry on with other work):
   owner rulings, brand direction/records, knowledge rule meaning, removing/weakening a gate class, op-graph or
-  kernel-contract architecture, budget/cap increases, anything external or irreversible. `lessons.mjs land` refuses
+  kernel-contract architecture, budget/cap increases, anything external or irreversible. `lesson-actions.mjs land` refuses
   these paths.
 - Never relax or disable a check to turn it green. A measured regression makes an `experiment-revert` item:
-  `lessons.mjs revert --experiment <id> --apply`.
+  `lesson-actions.mjs revert --experiment <id> --apply`.
 - Owner feedback you read (inbox, Telegram, draw notes, a desktop relay) is a lesson:
   `lessons.mjs feedback --text <t> [--signature <s>] --via telegram|chat|draw-note`.
 - After lessons change, regenerate the versioned file in a lane (`lessons.mjs export --write`) and land it.
@@ -155,7 +155,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 ## The machine log
 
 Every observation, decision, action, message and experiment is a row of machine.sqlite machine_logs
-(`scripts/supervisor/sup-log.mjs`; the ui reads it at /api/supervisor/logs). The tick, `actions.mjs record`,
+(`scripts/machine/sup-log.mjs`; the ui reads it at /api/supervisor/logs). The tick, `actions.mjs record`,
 `notify.mjs`, `lessons.mjs` and the digest write their rows themselves; a decision you take outside them (a ruling,
 a re-plan disposition) is recorded with `actions.mjs record` so it lands in the log too.
 
@@ -221,7 +221,7 @@ file leases, visible in /status and landed through the gate.
 
 - NEVER edit the live `.claude` tree in place and never commit on main directly, and never write lane code yourself
   (raci.mustNot): a [Worker] writes it in its staging checkout and you land it - through
-  `node scripts/machine/lessons.mjs land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
+  `node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
   records the experiment), or a worker job via `node scripts/supervisor/land.mjs --job <id>`. The gate cherry-picks onto current main in a
   scratch worktree, runs node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-api-surface,
   the named specs and the specs touching the changed files, requires a contract-changes entry with `paths` for any

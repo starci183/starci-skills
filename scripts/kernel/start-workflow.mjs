@@ -24,7 +24,7 @@
 // and coordinates it, the Kernel's Task carries its prompt, and `orca orchestration worker-start --agent <agent>
 // [--model <id> --effort <level>]` starts it (scripts/agent/lib.mjs startAgent). worker-show attests the effective
 // agent and model. The Kernel then creates its workflow Run from its own terminal and coordinates its ops there
-// (api.mjs ensureWorkflowRun). A restart reuses the entry Run while Orca knows it and accepts the new Task.
+// (cli.mjs ensureWorkflowRun). A restart reuses the entry Run while Orca knows it and accepts the new Task.
 //
 //   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--agent <name>] [--launched-by watchdog|supervisor] [--plan] [--json]
 //
@@ -97,7 +97,7 @@ const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRo
 const probeCache = new Map();
 async function probeAgent(agent) {
   if (probeCache.has(agent)) return probeCache.get(agent);
-  const file = path.join(skillRoot, 'scripts', 'api', 'quota', 'index.mjs');
+  const file = path.join(skillRoot, 'scripts', 'agent', 'quota', 'index.mjs');
   let probe = { state: 'unknown', detail: 'quota probe not installed' };
   if (fs.existsSync(file)) {
     try {
@@ -326,7 +326,7 @@ function projectContext() {
 }
 
 const context = projectContext();
-const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
+const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
 // The runtime rev this boot reads its kernel files at (runtime-rev.mjs): named in the prompt and recorded as
 // the Kernel's first runtime-rev-acked (source boot), so a later wake names only what changed since.
@@ -695,7 +695,7 @@ try {
   // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/hook-install.mjs
   // guardLaunch), role 'kernel', naming the workflow worktree and owning no path. It is bound to the Kernel's Orca
   // terminal the moment worker-start names it, so the PreToolUse command guard refuses the Kernel's raw git history
-  // changes, worktree adds, recursive deletes, kills by name and raw agent launches; its `node api.mjs <verb>` calls
+  // changes, worktree adds, recursive deletes, kills by name and raw agent launches; its `node cli.mjs <verb>` calls
   // pass. The history hook is refreshed in the workflow worktree so it skips the kernel role (the runtime's own git
   // under the Kernel's api calls). Best effort, as for an op: a guard that cannot be put in place rides on the
   // kernel-booted receipt as kernel-guard-unbound, never refusing the boot.

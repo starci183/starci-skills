@@ -11,7 +11,7 @@ const ROUTES = {
   update: '../scripts/install/install.mjs',
   doctor: '../scripts/install/install.mjs',
   version: '../scripts/install/install.mjs',
-  api: '../scripts/kernel/api.mjs',
+  api: '../scripts/kernel/cli.mjs',
   start: '../scripts/kernel/start-workflow.mjs',
   goal: '../scripts/goal/define-goal.mjs',
   validate: '../scripts/work/validate/work-validate.mjs',

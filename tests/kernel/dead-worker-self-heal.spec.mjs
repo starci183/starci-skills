@@ -21,7 +21,7 @@ import {JOB_ROW} from '../../scripts/kernel/verbs/shared/rows.mjs';
 //   - the watchdog runs the recovery for every frontier deadWorkerJobs entry.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WF='wf-self-heal',JOB='job-self-heal',HANDLE='term-self-heal',OP='docs.author';
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const HOUR=3600*1000,MIN=60*1000;

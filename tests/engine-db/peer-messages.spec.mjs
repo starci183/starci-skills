@@ -14,7 +14,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // message each other through inbox rows of kind peer-message, a pending one wakes the Kernel
 // through status frontier.actionable, and enqueue sends a heads-up when owned_paths overlap.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 

@@ -16,7 +16,7 @@ import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName}
 // landing notifies every dependent and releases those waits. A workflow created after the change
 // declares its foundations before its first leg once the ledger plans foundations at all.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 const MOD='wf-nivo-modules',COLLAB='wf-nivo-collab',AUTH='wf-nivo-auth',OLD='wf-nivo-old';

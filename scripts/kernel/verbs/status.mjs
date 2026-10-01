@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { sameUnit } from '../../../engine/admission.mjs';
 import { runtimeProfile } from '../../../engine/config.mjs';
-import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../owner-claim.mjs';
+import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../../machine/owner-claim.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { planAncestorsOf } from '../../route/plan-edges.mjs';
 import { workGraphStatus } from '../../work/work-graph-store.mjs';
@@ -502,7 +502,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (typedWaits.open.length) frontier.gateConditions = typedWaits.open.map(gateConditionView);
   if (typedWaits.resolved.length) frontier.autoResolved = typedWaits.resolved.map(({ incidentId, kind, holds, evidence }) => ({ incidentId, kind, holds, evidence }));
   if (blockingOthers.length) frontier.blockingOthers = blockingOthers;
-  // Lints (scripts/kernel/owner-claim.mjs), present only when non-empty: an open owner-gate whose own text
+  // Lints (scripts/machine/owner-claim.mjs), present only when non-empty: an open owner-gate whose own text
   // says it is runtime / not-owner work sits in the owner's queue by mistake; a resolution of this workflow
   // that claims an owner decision no owner answer backs is surfaced, never rewritten.
   const notOwnerGates = ownerGatesNotOwnerWork(db, workflowId);

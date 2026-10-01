@@ -9,7 +9,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow as seedLedgerWorkflow} from '../helpers/ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 // `api observe` is the kernel's READ-ONLY window onto its own job's exact op

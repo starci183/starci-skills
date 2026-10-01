@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PROOF_CODES, PROOF_EXIT, cleanEnv, installUnits, packagesChanged, provePackages, publishSet } from '../../scripts/gates/package-clean-test.mjs';
-import { loadPins } from '../../scripts/checks/check-canon-pins.mjs';
+import { loadPins } from '../../scripts/gates/canon-pins.mjs';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../scripts/supervisor/land.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';

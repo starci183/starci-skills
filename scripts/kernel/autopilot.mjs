@@ -44,7 +44,7 @@ import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import { HANDOVER_OP, OWNER, handoverAsks } from './handover.mjs';
 import { CREDENTIAL_ASK_KINDS, askKindOf, recommendationOf } from './ask-recommendation.mjs';
-import { foldText, ownerAnswerProof } from './owner-claim.mjs';
+import { foldText, ownerAnswerProof } from '../machine/owner-claim.mjs';
 import { isAwaitingOwner } from './failure-steps.mjs';
 import { JOB_ROW } from './verbs/shared/rows.mjs';
 import { askClassOf, custodyPresent, isLiveProofOp, questionFields } from './ask-server.mjs';
@@ -443,7 +443,7 @@ export function deferredQueueCause(db, job, { settings = autopilotSettings() } =
   return null;
 }
 
-/** Route-cap step under autopilot (api.mjs enqueueNextStep): 'supervisor-gate' within the extra budget, else 'deferred'. */
+/** Route-cap step under autopilot (cli.mjs enqueueNextStep): 'supervisor-gate' within the extra budget, else 'deferred'. */
 export function routeCapUnderAutopilot(db, job, { lineage, routeId, settings = autopilotSettings() }) {
   if (!autopilotOn(db, job.workflow_id, settings)) return null;
   let gates = 0;

@@ -23,7 +23,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,
 // every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
 process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 // Contract prose that trips every activity marker the classifier and awaitSubmission know.

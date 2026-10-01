@@ -18,7 +18,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const runtimes = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
 const POOL = 'claude-agent';
 const MAX = runtimes.runtimes[POOL].maxParallel;

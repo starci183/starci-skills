@@ -47,7 +47,7 @@ receipts:
       onDriftWithExactImmutableIdentity: recanonicalize-without-fencing
       effectDecision: never-reject-solely-for-runtime-title-drift
 dispatchAssertions:
-  - The workflow kernel invokes scripts/kernel/api.mjs dispatch; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
+  - The workflow kernel invokes scripts/kernel/cli.mjs dispatch; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
   - One dispatch invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes dispatch for the same attempt to obtain a fallback.
   - A runtime that cannot launch is released, classified and cooled down by the runtime allocator, which then names another runtime; there is no supervisor to replace and no layer to recover.
   - Operation equals an operation of the approved goal before Task creation.

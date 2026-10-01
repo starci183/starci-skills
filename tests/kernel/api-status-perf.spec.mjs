@@ -18,7 +18,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 // call; across calls when every revision is a full commit sha, HEAD pinned to its sha) and runs its Orca reads in
 // parallel ahead of the projection - with the same output.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const rm = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
 const git = (cwd, ...args) => {

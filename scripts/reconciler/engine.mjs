@@ -43,7 +43,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/db/machine.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from './self-reload.mjs';
-import { lowerOwnPriority } from '../api/process/set-priority.mjs';
+import { setPriority } from '../api/process/set-priority.mjs';
 import { crashLoopPlan, crashLoopRecord } from './boot.mjs';
 import { DEFAULT_STALL_MAX_MS, startHeartbeatWorker } from './heartbeat-worker.mjs';
 import { DECISIONS_FILE, createCtx, logRowOf, reconcilerLog, spawnJson } from './ctx.mjs';
@@ -560,7 +560,7 @@ export const reloadWatchedFiles = (root = SKILL_ROOT) => [
 /**
  * What the engine imports in process (controllers, the supervisor helpers they wrap, the ledger engine, the numbers):
  * a new runtime HEAD reloads the engine only when it changed a file under these (MB-01: every land of docs or ops
- * contracts re-exec'd the engine about every 6 minutes). Children (api.mjs, push-mains.mjs, ...) start fresh anyway.
+ * contracts re-exec'd the engine about every 6 minutes). Children (cli.mjs, push-mains.mjs, ...) start fresh anyway.
  */
 export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
   'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
@@ -583,7 +583,7 @@ export function safeForStart({ argv = [], reloaded = false, numbers = reconciler
 const argValue = (argv, name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
 
 async function main(argv = process.argv.slice(2)) {
-  lowerOwnPriority();
+  setPriority();
   const json = argv.includes('--json');
   if (argv.includes('--once')) {
     const apply = argv.includes('--apply');

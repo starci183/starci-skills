@@ -157,7 +157,7 @@ async function workflowFacts(o) {
     const k = `wf:${w.ledger}:${short(w.id)}`;
     if (w.phase !== 'running') { facts.set(`${k}:phase`, w.phase === 'paused' || w.phase === 'queued' ? null : `phase ${w.phase}`); return; }
     // One failed call is noise; the snapshot asks twice and only two failures in a row are a fact.
-    const ask = () => child(['scripts/kernel/api.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
+    const ask = () => child(['scripts/kernel/cli.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
     const parse = (r) => (r.ok || r.stdout ? firstJson(r.stdout) : null);
     let r = await ask();
     let j = parse(r);

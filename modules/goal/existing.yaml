@@ -26,7 +26,7 @@
 # Convention: the camelCase and CAPITALISED names in this file (goalPhase,
 # reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
 # module owns and the kernel agent reasons with; they are not code symbols.
-# The executable surface is scripts/kernel/api.mjs and the contracts under
+# The executable surface is scripts/kernel/cli.mjs and the contracts under
 # modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 

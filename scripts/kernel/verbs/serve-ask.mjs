@@ -1,5 +1,5 @@
 // api serve-ask — park an owner ask. A StarCi Next Kernel held an ask-reserve for an hour
-// (inc-2558dd227dfd) because it could mutate only through api.mjs, so this verb is the Kernel's
+// (inc-2558dd227dfd) because it could mutate only through cli.mjs, so this verb is the Kernel's
 // one way to put a question in front of the owner. Owner, 2026-09-24: a form URL is served only
 // when the owner asks for it. So with Telegram ready this verb serves NOTHING: parkAsk
 // (serve-ask.mjs) supersedes the asks it replaces, sends the owner an approval ask with a
@@ -9,8 +9,8 @@
 // off or unreachable the form is launched at once as before, since nothing else could ever serve
 // it. An ask config.yaml asks.autoAcceptRecommended answers (serve-ask.mjs autoAcceptAsk) is
 // answered here instead, in-process, so the calling Kernel reads the answer in this verb's own
-// output and nothing is served. Split out of api.mjs (lane slim-api); its help line stays in
-// api.mjs usage() (usageInCore).
+// output and nothing is served. Split out of cli.mjs (lane slim-api); its help line stays in
+// cli.mjs usage() (usageInCore).
 //
 //   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
 import path from 'node:path';
@@ -93,7 +93,7 @@ export default {
     // else could serve it. Without a Telegram notice the gateway and tunnel are
     // kept up here (both starts are idempotent) so a public link exists.
     const connectors = parked?.notified ? null : ensureAskConnectors();
-    const script = path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs');
+    const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server.mjs');
     const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
     const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
     child.unref();

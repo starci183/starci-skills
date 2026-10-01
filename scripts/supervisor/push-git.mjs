@@ -89,7 +89,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
       npmStep('lint'),
       scripts.test ? { name: 'npm test', cmd: 'npm', args: ['test'] } : { name: 'npm test', absent: true },
       ...(builds.length ? builds.map((name) => npmStep(name, after)) : [{ name: 'npm run build:<side>', absent: true, ...after }]),
-      { name: 'canon-scan', cmd: 'node', args: [path.join(skillRoot, 'scripts', 'checks', 'canon-scan.mjs'), '--root', repo] },
+      { name: 'canon-scan', cmd: 'node', args: [path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', repo] },
     ],
   };
 }

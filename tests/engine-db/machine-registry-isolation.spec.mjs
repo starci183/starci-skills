@@ -10,14 +10,14 @@ import {TEST_REGISTRY_ENV,isUnderTempDir,LOCAL_ROOT_ENV,machineFileFor,openMachi
 
 /**
  * The host's machine registry (%LOCALAPPDATA%/StarCi/runtime/machine.sqlite `ledgers`) once held 7,829 rows,
- * four of them product ledgers: every spec that ran scripts/kernel/api.mjs, or opened a ledger through a code
+ * four of them product ledgers: every spec that ran scripts/kernel/cli.mjs, or opened a ledger through a code
  * path that reserves, enrolled its temp-folder ledger on the live registry, and the rows outlived the specs
  * in every lease sweep and allocation scan. Two layers keep that from coming back, and each is held here:
  * the test run gets its own registry (preload + node --test fallback), and the live registry refuses a
  * temp-directory ledger. The pre-alpha.3 stores are retired, never migrated (alpha.3 clean slate).
  */
 const runtimeRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..', '..');
-const machineDb=pathToFileURL(path.join(runtimeRoot,'engine','machine-db.mjs')).href;
+const machineDb=pathToFileURL(path.join(runtimeRoot,'engine','db','machine.mjs')).href;
 // One temp root per test; every handle opened in it is closed before the tree is removed (Windows EPERMs
 // an rmSync over an open sqlite file).
 const handles=new WeakMap();

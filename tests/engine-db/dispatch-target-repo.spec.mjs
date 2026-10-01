@@ -18,7 +18,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // prompt names the roots it writes in. A tmp
 // Source binds one app checkout with be/ and fe/ sides; the fake `orca` serves a healthy terminal.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const git=(cwd,...args)=>{
   const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});

@@ -1,7 +1,7 @@
 // api-lib/workflow-end.mjs — the teardown both ways a workflow ends run (`api finish`, `api archive`;
-// split out of api.mjs, lane slim-06): the Kernel seat released, every Task the Run still holds
+// split out of cli.mjs, lane slim-06): the Kernel seat released, every Task the Run still holds
 // closed, the ledger retained, the Kernel terminal closed last. `closeOperationTask` and the worker
-// release helpers stay in api.mjs (the settle and report paths share them) — they arrive through
+// release helpers stay in cli.mjs (the settle and report paths share them) — they arrive through
 // `internals`, the same extension surface the verbs get.
 import { JOB_STATUSES, clearSignal, recordJobResult, releaseLeases, setJobStatus, updateJob } from '../../../../engine/db/ledger.mjs';
 import { retainLedgerDb } from '../../../housekeeping/hk-ledger.mjs';

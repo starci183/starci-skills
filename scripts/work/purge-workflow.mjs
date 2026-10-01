@@ -27,7 +27,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/db/ledger.mjs';
-import { readZip, writeZip } from '../api/fs/zip-write.mjs';
+import { zipWrite } from '../api/fs/zip-write.mjs';
+import { zipRead } from '../api/fs/zip-read.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
@@ -103,10 +104,10 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
         approvedBy, approvalRef, eventsHead: head, counts, entries: described, missingFiles: missing };
       const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2));
       if (fs.existsSync(archive)) fs.renameSync(archive, `${archive}.stale-${Date.now()}`);
-      writeZip(tmp, [...entries, { name: 'manifest.json', data: manifestBuf }]);
+      zipWrite(tmp, [...entries, { name: 'manifest.json', data: manifestBuf }]);
       fs.renameSync(tmp, archive);
       // Verify from disk: every entry inflates, its CRC holds and its sha256 is the manifest's.
-      const read = readZip(archive);
+      const read = zipRead(archive);
       const byName = new Map(read.map((e) => [e.name, e]));
       const onDisk = byName.get('manifest.json');
       if (!onDisk || sha256(onDisk.data) !== sha256(manifestBuf)) throw refuse('archive-verify-failed', `${archive}: manifest.json does not read back`);

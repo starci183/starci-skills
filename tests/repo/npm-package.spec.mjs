@@ -49,7 +49,7 @@ test('actual npm tarball installs a runnable source command without development 
   const receipt=JSON.parse(packed.stdout)[0];
   const shipped=new Set(receipt.files.map(file=>file.path));
   assert.equal([...shipped].some(file=>file.startsWith('.dist')),false,'no compiled bundle is shipped');
-  for(const file of ['bin/starci.mjs','scripts/install/install.mjs','scripts/kernel/api.mjs','engine/db/ledger.mjs','scripts/gates/stacks-gate.mjs'])
+  for(const file of ['bin/starci.mjs','scripts/install/install.mjs','scripts/kernel/cli.mjs','engine/db/ledger.mjs','scripts/gates/stacks-gate.mjs'])
     assert.ok(shipped.has(file),`npm tarball must ship ${file}`);
   for(const dead of ['cli/','hosts/','execution/','workflows/','contracts/','approvals/','specifications/','upgrades/','legacy/','fixtures/'])
     assert.equal([...shipped].some(file=>file.startsWith(dead)),false,`npm tarball must not ship ${dead}`);

@@ -182,7 +182,7 @@ export function criticFor(settings, drawer = null) {
 export const CRITIC_OUTCOMES = Object.freeze(['judged', 'not-configured', 'launch-failed', 'timeout', 'refused', 'verdict-missing']);
 // worker-show states after which the worker does nothing more.
 const ENDED = new Set(['done', 'completed', 'failed', 'stopped', 'released', 'exited']);
-// The Orca Task status a settled Task is closed with (scripts/kernel/api.mjs TASK_CLOSED_STATUS).
+// The Orca Task status a settled Task is closed with (scripts/kernel/cli.mjs TASK_CLOSED_STATUS).
 const TASK_CLOSED = 'completed';
 const DEFAULT_POLL_MS = 5000;
 const payloadOf = (m) => { try { return typeof m?.payload === 'string' ? JSON.parse(m.payload) : m?.payload ?? null; } catch { return null; } };

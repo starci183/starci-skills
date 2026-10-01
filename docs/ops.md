@@ -168,5 +168,5 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
     `node scripts/route/build-ops-registry.mjs` to regenerate the registry and
     `--check` to verify (never hand-edit it; see
     [ops-source-ownership](ops-source-ownership.md)).
-11. Dry-run: `node scripts/kernel/api.mjs dispatch --job <id>` (no `--spawn`)
+11. Dry-run: `node scripts/kernel/cli.mjs dispatch --job <id>` (no `--spawn`)
     prints the packet, params included, without reserving or launching.

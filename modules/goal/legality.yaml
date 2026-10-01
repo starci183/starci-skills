@@ -31,7 +31,7 @@
 # Convention: the camelCase and CAPITALISED names in this file (goalPhase,
 # reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
 # module owns and the kernel agent reasons with; they are not code symbols.
-# The executable surface is scripts/kernel/api.mjs and the contracts under
+# The executable surface is scripts/kernel/cli.mjs and the contracts under
 # modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
@@ -380,7 +380,7 @@ splitRules:
     path-prefix coverage is the test: `src/**` and
     `src/x.ts` overlap, `src/a/**` and `src/b/**` do not. The api enforces it
     at admission — one capacity-1 `path:*` lease per owned_path plus the
-    dispatch-planning conflict check (scripts/kernel/api.mjs;
+    dispatch-planning conflict check (scripts/kernel/cli.mjs;
     modules/kernel/dispatch.yaml fields.owned_paths).
     On a plan ledger the same rule is a schema constraint:
     independent ops must have disjoint path-prefix allowlists (the plan file (modules/schemas/goal-plan.yaml)).

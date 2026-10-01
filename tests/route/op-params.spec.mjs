@@ -15,7 +15,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // chose, `api enqueue --params` carries what the kernel chose, and the dispatch
 // packet delivers the merged values. No step of it reads a number out of prose.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const OPS = path.join(ROOT, 'modules', 'ops', 'ops');
 
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });

@@ -15,8 +15,8 @@ import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
 process.env.STARCI_AUTOPILOT ??= 'off';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
-// api.mjs surface under test:
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
+// cli.mjs surface under test:
 //   survey|status|hierarchy|plan|enqueue|dispatch|settle|incident|finish
 //   --repo <path> --workflow <id> [--job <id>] [--kind <k>] [--op <id>]
 //   [--verdict pass|fail] [--report <file>] --json
@@ -210,7 +210,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
 
 // A queued row is the dispatch candidate; frontier.queued says why each one has
 // not moved, so the Kernel clears the named blocker instead of re-dispatching
-// into the same refusal. Causes and their order: api.mjs QUEUED_BECAUSE.
+// into the same refusal. Causes and their order: cli.mjs QUEUED_BECAUSE.
 test('status explains every queued job: ready, dependency, path-lease, pool-full, circuit-open, max-ops',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-queued-because';
   const owner=ownerConfig(t,{budgets:{maxOps:null}});

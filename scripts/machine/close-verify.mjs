@@ -9,7 +9,7 @@
 // an agent or a bare shell behind. 322 idle shells held ~20 GB of RAM on 2026-09-28 and the host rebooted at 12:20.
 //
 // The ownership model (owner clarification, 2026-09-28):
-//   1. a Kernel closes its own op workers at settle (scripts/kernel/api.mjs settle, a verified close it cannot skip);
+//   1. a Kernel closes its own op workers at settle (scripts/kernel/cli.mjs settle, a verified close it cannot skip);
 //   2. the Supervisor closes its own [Worker]s when they report, are cancelled or land (scripts/supervisor/workers.mjs);
 //   3. the Supervisor's tick GC (scripts/supervisor/gc.mjs) sweeps what slipped past 1 and 2 and records each leftover
 //      as a lesson: a leftover is a bug in 1 or 2.
@@ -223,7 +223,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const out = { ...closeAndVerify(handle, { tree: argv.includes('--tree') }), owner: value('owner') ?? 'runtime' };
   if (argv.includes('--log')) {
     try {
-      const { supLog } = await import('../supervisor/sup-log.mjs');
+      const { supLog } = await import('./sup-log.mjs');
       supLog({ kind: 'gc.collect', level: out.ok ? 'info' : 'warn', msg: `${out.owner} closed its own terminal ${handle}: ${out.ok ? out.proof : `NOT closed (${out.reason ?? out.error ?? '?'})`}`,
         data: { class: 'self-close', action: 'close-terminal', target: handle, owner: out.owner, ok: out.ok, ...(out.proof ? { proof: out.proof } : {}), ...(out.reason ? { reason: out.reason } : {}) } });
     } catch { /* the log is best effort; the close already happened */ }

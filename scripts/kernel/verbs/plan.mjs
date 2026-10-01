@@ -1,4 +1,4 @@
-// api plan: split from api.mjs.
+// api plan: split from cli.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from '../../lib/json.mjs';

@@ -21,7 +21,7 @@ import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const PNG_A=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000002000154a24f5d0000000049454e44ae426082','hex');
 const PNG_B=Buffer.concat([PNG_A,Buffer.from('b')]);

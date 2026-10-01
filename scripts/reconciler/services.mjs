@@ -559,9 +559,9 @@ export async function turnInterrupt({ terminal, agent, repo = null, workflowId =
     if (after.ok && !after.busy) break;
     sleepSync(2000);
   }
-  const d = await import('../machine/decisions.mjs');
+  const [d, { wakeKernel }] = await Promise.all([import('../machine/decisions.mjs'), import('../kernel/wake-delivery.mjs')]);
   let ring;
-  try { ring = supervisor ? await d.ringSupervisor({ minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
+  try { ring = supervisor ? await d.ringSupervisor({ wake: wakeKernel, minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, wake: wakeKernel, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
   return { ok: sent.every((x) => x.ok), terminal, agent, sent, stateAfter: after?.state ?? null, ring: { action: ring?.action ?? null, delivered: ring?.delivered === true, open: ring?.open ?? null } };
 }
 

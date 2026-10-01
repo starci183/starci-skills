@@ -33,6 +33,6 @@
   "scripts": {
     "sync": "node scripts/sync-runtime.mjs",
     "sync:check": "node scripts/sync-runtime.mjs --check",
-    "test": "node --test \"bin/*.test.mjs\""
+    "test": "node --test \"bin/*.spec.mjs\""
   }
 }

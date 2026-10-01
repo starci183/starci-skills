@@ -1,4 +1,4 @@
-// api run-deferred-tests: split from api.mjs.
+// api run-deferred-tests: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { DEFERRAL_KINDS, deferredTestsOf, ownerSpecs, requeueDeferredTests } from '../spec-deferral.mjs';
 

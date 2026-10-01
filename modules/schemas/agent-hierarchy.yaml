@@ -1,6 +1,6 @@
 schema: starci/schema@1
 describes: starci/agent-hierarchy@1
-module: scripts/kernel/api.mjs
+module: scripts/kernel/cli.mjs
 
 purpose: >-
   Define the durable semantic tree exposed by `api hierarchy`: one workflow owns one

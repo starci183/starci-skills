@@ -26,7 +26,7 @@ import {parkedBehindWaits,waitHeldOperations} from '../../scripts/kernel/frontie
 // after the frontier, and its supervisor alert says when it was judged.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const MIN=60_000;
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const WORK='wf-sn-subscription-mufrhhro',PEER='wf-sn-learn-content-mufrhgwz';

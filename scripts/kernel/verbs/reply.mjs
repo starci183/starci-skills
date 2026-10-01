@@ -1,4 +1,4 @@
-// api reply: split from api.mjs.
+// api reply: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatusByKey } from '../../../engine/db/ledger.mjs';
 import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/messages.mjs';

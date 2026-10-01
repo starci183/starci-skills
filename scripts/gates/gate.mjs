@@ -48,12 +48,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
-import { lowerOwnPriority } from '../api/process/set-priority.mjs';
+import { setPriority } from '../api/process/set-priority.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from './canon-digest.mjs';
-import { PROFILES_FILE, loadPins } from '../checks/check-canon-pins.mjs';
+import { PROFILES_FILE, loadPins } from './canon-pins.mjs';
 import { gateBaseAt } from '../kernel/workflow-checkpoint.mjs';
 
 export const GATE_SCHEMA = 'starci/gate@1';
@@ -275,7 +275,7 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
     const listing = lines(gitText(root, ['ls-tree', '-r', '--name-only', '--full-tree', base])).map(posixPath);
     const prefix = (gitText(root, ['rev-parse', '--show-prefix']) ?? '').trim();
     const files = listing.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
-    const { checkRepo } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'lib', 'hfs-check.mjs')).href);
+    const { checkRepo } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'hfs', 'check.mjs')).href);
     const result = checkRepo({ repoRoot: root, files, only: [...headPathOf.keys()], tree: false });
     for (const finding of result.findings.filter((f) => f.level === 'error')) {
       if (!finding.path) add(`|hfs/${finding.code}`);
@@ -813,6 +813,6 @@ export async function gateMain(argv, { stdout = (s) => process.stdout.write(s) }
 }
 
 if (isMain(import.meta.url)) {
-  lowerOwnPriority();
+  setPriority();
   process.exitCode = await gateMain(process.argv.slice(2));
 }

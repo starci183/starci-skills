@@ -15,7 +15,7 @@
 // Each job's `weight` is the sum over its waiters of 1 + hours waited, so more waiters and older
 // waiters both rank it higher. api status orders frontier.queued by it and projects
 // frontier.blockingOthers; when a queued job has blocked another workflow past BLOCKING_HEADS_UP_MS
-// its own Kernel gets one heads-up (api.mjs blockingHeadsUp). The supervisor prints one BLOCKING line
+// its own Kernel gets one heads-up (cli.mjs blockingHeadsUp). The supervisor prints one BLOCKING line
 // per job (scripts/supervisor/poll.mjs) and the progress report names it.
 
 import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';

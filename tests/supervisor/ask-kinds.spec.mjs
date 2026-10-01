@@ -22,7 +22,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // approval ask is pushed at once; the two never share a list or a message.
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const TOKEN = '123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 const OWNER = 4242;
 const EXAMPLE = parseYaml(fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8'));

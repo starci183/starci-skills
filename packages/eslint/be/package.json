@@ -13,7 +13,7 @@
     "*.mjs",
     "lib/*.mjs",
     "runtime/**",
-    "!*.test.mjs",
+    "!*.spec.mjs",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -28,7 +28,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test \"*.test.mjs\""
+    "test": "node --test \"*.spec.mjs\""
   },
   "keywords": [
     "eslint",

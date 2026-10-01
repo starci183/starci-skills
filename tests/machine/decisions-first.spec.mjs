@@ -22,7 +22,7 @@ const fixture = (t) => {
   return { repo, ledger };
 };
 const stall = (ledger, extra = {}, now = T0) => openDecisionRow(ledger, { workflowId: WF, kind: 'progress-stall', entity: { type: 'workflow', id: WF }, summary: 'no unit passed in 60 min',
-  options: [{ key: 'dispatch-ready', verb: `node scripts/kernel/api.mjs dispatch-ready --workflow ${WF}`, title: 'push the ready units' }], by: 'reconciler/workflow', ...extra }, { now }).di;
+  options: [{ key: 'dispatch-ready', verb: `node scripts/kernel/cli.mjs dispatch-ready --workflow ${WF}`, title: 'push the ready units' }], by: 'reconciler/workflow', ...extra }, { now }).di;
 const kernelEnv = {};
 
 test('an open, unclaimed Kernel DI older than 2 min refuses new work with the top item and its commands', (t) => {
@@ -74,8 +74,8 @@ test('the doorbell carries the oldest item in copy-paste form', (t) => {
   assert.equal(r.action, 'rung');
   assert.match(sent[0], /^\[decide\] 1 việc chờ: api decisions --workflow wf-first \| oldest /);
   assert.match(sent[0], new RegExp(`oldest ${di.id}`));
-  assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/api\.mjs dispatch-ready/);
-  assert.match(sent[0], new RegExp(`then: node scripts/kernel/api.mjs decisions --repo D:/r --resolve ${di.id}`));
+  assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/cli\.mjs dispatch-ready/);
+  assert.match(sent[0], new RegExp(`then: node scripts/kernel/cli.mjs decisions --repo D:/r --resolve ${di.id}`));
 });
 
 test('api enqueue and dispatch-ready refuse decisions-first through the CLI; api decisions --next prints the commands', (t) => {
@@ -84,7 +84,7 @@ test('api enqueue and dispatch-ready refuse decisions-first through the CLI; api
   ledger.close();
   const env = { ...process.env, NODE_NO_WARNINGS: '1' };
   delete env[CHILD_ENV]; delete env.STARCI_ACTOR;
-  const run = (...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, env });
+  const run = (...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, env });
   const enq = run('enqueue', '--workflow', WF, '--op', 'code.refactor', '--paths', 'src/a.ts');
   assert.equal(enq.status, 1);
   assert.match(enq.stderr, /decisions-first/);

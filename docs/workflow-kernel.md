@@ -3,7 +3,7 @@
 The kernel is **one long-lived logical LLM agent per workflow**. A provider
 generation may return to its input prompt; the durable Kernel identity spans
 those turn boundaries. It is not a scheduler process: it is an agent that reasons over ledger
-projections and mutates state only through `scripts/kernel/api.mjs`. This page
+projections and mutates state only through `scripts/kernel/cli.mjs`. This page
 is the map; the authoritative contracts are the YAML files it cites — when
 they disagree with prose, the YAML wins.
 
@@ -51,7 +51,7 @@ reports, reconciles dead or held workers and dispatches ready work through the
 existing API. A non-green report opens a `settle-nongreen` Decision Item; the
 Kernel chooses its verdict. The Workflow controller opens progress and stall
 Decision Items and re-parks asks. The Kernel reads its Decision Items first on
-every wake, acts through `scripts/kernel/api.mjs`, then yields when nothing needs
+every wake, acts through `scripts/kernel/cli.mjs`, then yields when nothing needs
 a decision. See `modules/reconciler/reconciler.yaml` and
 `modules/kernel/driver-loop.yaml` for the ownership split.
 
@@ -80,14 +80,14 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 ## The verbs — `modules/kernel/api.yaml`
 
 ```text
-node scripts/kernel/api.mjs <verb> --repo <path> [...]
+node scripts/kernel/cli.mjs <verb> --repo <path> [...]
 ```
 
 `modules/kernel/api.yaml` `commands:` and `modules/kernel/api-commands/<verb>.yaml`
 together form the verb surface: one entry per verb naming what it reads, writes,
 returns and refuses. New verbs use `scripts/kernel/verbs/<verb>.mjs`.
 `scripts/checks/check-api-surface.mjs` checks both contract forms against the
-core and extension code, and `api.mjs --help` prints each verb with its arguments.
+core and extension code, and `cli.mjs --help` prints each verb with its arguments.
 
 Every write is one transaction + one hash-chained `events` row; every refusal
 exits 1 with `{ok:false, reason}` where the reason string is the contract.

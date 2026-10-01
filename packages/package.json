@@ -11,8 +11,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:fe": "npm test --workspace @starci/eslint-canon-fe",
     "test:be": "npm test --workspace @starci/eslint-canon-be",
-    "test:stylelint": "node --test stylelint/*.test.mjs",
-    "test:presets": "node --test tsconfig/*.test.mjs prettier-config/*.test.mjs jest-preset/*.test.mjs"
+    "test:stylelint": "node --test stylelint/*.spec.mjs",
+    "test:presets": "node --test tsconfig/*.spec.mjs prettier-config/*.spec.mjs jest-preset/*.spec.mjs"
   },
   "engines": {
     "node": ">=22.13.0"

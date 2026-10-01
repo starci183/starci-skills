@@ -233,7 +233,7 @@ test('api status lists assetSlotsOwed and proposes an interface.asset leg for th
     ledger.appendEvent({ workflowId: 'wf-art', entityType: 'job', entityId: 'op-interface.draw-1', kind: ASSET_SLOT_OWED, createdAt: Date.now(),
       payload: { key: '.starciwork/features/modules/ui/dashboard#overview-mascot', id: 'overview-mascot', ui: '.starciwork/features/modules/ui/dashboard', html: 'x.html', requested: true, jobId: 'op-interface.draw-1', opId: 'interface.draw' } });
   } finally { ledger.close(); }
-  const st = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'status', '--repo', repo, '--workflow', 'wf-art', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+  const st = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), 'status', '--repo', repo, '--workflow', 'wf-art', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(st.status, 0, st.stderr);
   const body = JSON.parse(st.stdout);
   assert.deepEqual(body.assetSlotsOwed.map((s) => [s.id, s.jobId]), [['overview-mascot', 'op-interface.draw-1']]);

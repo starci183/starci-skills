@@ -58,24 +58,21 @@ import { claimManager, lockHolder } from '../../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
+import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
-const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
+const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 
 export const EVENTS = Object.freeze({
   settled: 'job-settle-settled',
-  needsKernel: 'job-settle-needs-kernel',
+  needsKernel: NEEDS_KERNEL_EVENT,
   released: 'job-settle-released',
   invariant: 'job-settle-invariant-violated',
   checkUnavailable: 'job-settle-check-unavailable',
 });
 export const STATES = Object.freeze({ reported: 'reported', settled: 'settled', released: 'released', kernel: 'needs-kernel' });
-// A job whose op filed its report (api report moves it to reported) until a verdict settles it.
-const LIVE = ['running', 'answering', 'effect_unknown', 'reported', 'deciding'];
 const SETTLED = SETTLED_JOB_LIST;
-/** Ops whose pass is an owner act, never a machine verdict. */
-export const KERNEL_ONLY_OPS = Object.freeze(['handover.review']);
 const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
 
 /** allocation.settler with defaults for a runtime without the block. */
@@ -100,29 +97,6 @@ export const runtimeEnv = (env = process.env) => {
 };
 
 /* ------------------------------------------------------------ reads */
-
-/**
- * The reported jobs: a live op job of a not-archived workflow with a reports row for its
- * contract's dispatch, filed or consumed. Pure SQL over the ledger; the attempt's contract binds the dispatch. [{jobId, workflowId, op, attempt, status, workerId,
- * payload, dispatchId, outcome, consumedAt, filedAt, report}]
- */
-export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
-  const where = ["j.kind='op'", `j.status IN (${LIVE.map(() => '?').join(',')})`];
-  const args = [...LIVE];
-  if (workflowId) { where.push('j.workflow_id=?'); args.push(workflowId); }
-  if (jobId) { where.push('j.job_id=?'); args.push(jobId); }
-  return db.prepare(`SELECT j.job_id, j.workflow_id, j.op_id, j.try_no AS attempt, j.status, j.worker_id, j.payload_json, a.attempt_id,
-      r.dispatch_id, r.outcome, r.consumed_at, r.created_at AS filed_at, r.report_json
-    FROM jobs j
-    JOIN op_attempts a ON a.job_id=j.job_id AND a.attempt_id=(SELECT max(x.attempt_id) FROM op_attempts x WHERE x.job_id=j.job_id)
-    JOIN reports r ON r.attempt_id=a.attempt_id
-    JOIN workflows w ON w.workflow_id=j.workflow_id AND w.phase<>'archived'
-    WHERE ${where.join(' AND ')} ORDER BY r.created_at`).all(...args).map((r) => ({
-    jobId: r.job_id, workflowId: r.workflow_id, op: r.op_id, attempt: r.attempt, attemptId: r.attempt_id, status: r.status, workerId: r.worker_id,
-    payload: parse(r.payload_json) ?? {}, dispatchId: r.dispatch_id, outcome: r.outcome, consumedAt: r.consumed_at ?? null,
-    filedAt: Number(r.filed_at), report: parse(r.report_json) ?? {},
-  }));
-}
 
 /** The latest run of each check of the item's attempt for one runner (check_runs, alpha.3). */
 export function checkRunsOf(db, item, runner = 'op') {
@@ -168,28 +142,6 @@ async function checksFromStore(db, item, { store = null } = {}) {
       ...declared.filter((c) => !checks.some((r) => r.name === c.name)).map((c) => String(c.name)),
     ].slice(0, 8) };
   return { item: { ...item, report: { ...item.report, checks } }, source: 'check-runs' };
-}
-
-/** The latest needs-kernel handover of a job's current dispatch, or null. */
-export function kernelHandoverOf(db, item) {
-  const row = db.prepare(`SELECT payload_json, created_at FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId')=?
-    ORDER BY seq DESC LIMIT 1`).get(EVENTS.needsKernel, item.jobId, item.dispatchId);
-  return row ? { ...(parse(row.payload_json) ?? {}), at: Number(row.created_at) } : null;
-}
-
-/**
- * What waits on the Kernel's decision in one workflow: reported jobs the settler handed over (needs-kernel) and the
- * owner-act ops it never settles (H1: every other outcome the settler settles itself). [{jobId, op, attempt, outcome, reason, ageMin, consumed}] oldest first. `ageMs` filters.
- */
-export function kernelDecisionItems(db, workflowId, { now = Date.now(), ageMs = 0 } = {}) {
-  return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt >= ageMs).flatMap((it) => {
-    const handover = kernelHandoverOf(db, it);
-    const ownerAct = KERNEL_ONLY_OPS.includes(it.op);
-    if (!handover && !ownerAct) return [];
-    return [{ jobId: it.jobId, op: it.op, attempt: it.attempt, outcome: it.outcome, dispatchId: it.dispatchId,
-      reason: handover?.reason ?? 'owner-act',
-      ...(handover?.detail ? { detail: handover.detail } : {}), ageMin: Math.round((now - it.filedAt) / 60_000), consumed: it.consumedAt != null }];
-  });
 }
 
 /**
@@ -423,7 +375,7 @@ const jsonOf = (text) => {
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   return a >= 0 && b > a ? parse(t.slice(a, b + 1)) : null;
 };
-/** `node scripts/kernel/api.mjs <verb> ... --json` as the runtime: {ok, value, error, code} */
+/** `node scripts/kernel/cli.mjs <verb> ... --json` as the runtime: {ok, value, error, code} */
 export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
   const r = spawnSync(process.execPath, [API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const value = jsonOf(r.stdout), err = jsonOf(r.stderr);

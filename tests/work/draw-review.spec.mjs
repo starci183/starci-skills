@@ -25,8 +25,8 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 // after a7 - nothing could ever accept the drawing. interface.draw now parks one draw-review ask of the drawn parts
 // (desktop and mobile, light) for a drawing another leg waits on, and the owner's accept answer writes it done.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
-const SERVE = path.join(ROOT, 'scripts', 'kernel', 'serve-ask.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+const SERVE = path.join(ROOT, 'scripts', 'kernel', 'ask-server.mjs');
 const APP = '/(app)';
 const DESIGN = 'ui.home.app-layout';
 const CHROME = [20, 40, 160, 255];

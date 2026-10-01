@@ -17,7 +17,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // cmdNudge refuses `foreign-input` and types nothing.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WF='wf-launch-grace',JOB='job-launch-grace',OP='decide',DISPATCH='dispatch-fake-1',HANDLE='term-launch-grace';
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const HOUR=3600*1000,MIN=60*1000,SEC=1000;

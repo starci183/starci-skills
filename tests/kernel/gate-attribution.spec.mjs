@@ -18,7 +18,7 @@ import { attemptCauseOf } from '../../scripts/kernel/lineage-route.mjs';
 import { attributeRedGate, failingFromText, failingPath, peerRouteOf } from '../../scripts/kernel/gate-attribution.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const SELF = 'wf-gates-self', PEER = 'wf-gates-peer';
 const DAY = 86_400_000;

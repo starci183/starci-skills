@@ -41,7 +41,7 @@ status:
       [{kind:reread|retry|root-verify|dispatch|impact-check|supervisor-gate|owner-gate|wait, op, jobId?, incidentId?, nodes?, final?, reason, label, displayName?}] (label: the op label, modules/ops/_labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`) — the
       Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files (or
       kernel-prompt.md and driver-loop.yaml in full), then api kernel-ack-rev; it makes the frontier actionable.
-      The rest in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
+      The rest in the order it runs them, from ledger rows only (scripts/kernel/cli.mjs
       graphProjectionOf); empty once finished. retry: a failed job whose settle recorded a nextStep and
       that nothing follows (no retry names it, its step queued nothing, no later attempt of the same work
       succeeded) and no owner gate holds, or an answered ask - enqueue it --retry-of jobId. root-verify /

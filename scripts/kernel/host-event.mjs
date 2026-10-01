@@ -6,7 +6,7 @@
 // interface.draw a3; starci-next learn-content and foundation backend.implement a2 - settled
 // failed-no-report as the ops' own deaths: a business attempt spent each, their pools demoted, the
 // dead-worker pattern fed. The host samples around it (13:02Z 23.7% free RAM, 13:36Z 16.6%) show
-// pressure but no OOM floor; the signature is the simultaneous disconnect. api.mjs hostTerminalWipeOf
+// pressure but no OOM floor; the signature is the simultaneous disconnect. cli.mjs hostTerminalWipeOf
 // already recognised a wipe proven by the worker's OWN Kernel terminal being gone; a disconnect seen
 // through other workflows' Kernels was missed.
 //

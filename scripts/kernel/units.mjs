@@ -2,7 +2,7 @@
 //
 // One unit is one bounded piece of work: one op, one subject key (engine/admission.mjs unitSubjectKey) and one goal
 // revision - a work_units row. Every op job is a try of exactly one unit (jobs.unit_id, try_no, retry_of|resume_of).
-// Every way a job enters the ledger - api enqueue, graph-edit, the failure routes (api.mjs enqueueFollowOn) - admits the
+// Every way a job enters the ledger - api enqueue, graph-edit, the failure routes (cli.mjs enqueueFollowOn) - admits the
 // try HERE, so none of them can start a fresh budget for the same work, chain a retry to another unit's or a passed
 // job, or re-run a passed unit without a reopen reason. The schema triggers refuse the same things; this answers first
 // with a typed refusal the Kernel can act on. admitUnit only reads; writeUnitTry writes inside the caller's transaction.

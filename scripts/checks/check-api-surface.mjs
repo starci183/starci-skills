@@ -2,9 +2,9 @@
 // check-api-surface.mjs — the kernel api verb list has one authority and four
 // mirrors. This check proves the mirrors still say what the code implements.
 //
-//   authority  scripts/kernel/api.mjs   main()'s `case '<verb>': return ...`
+//   authority  scripts/kernel/cli.mjs   main()'s `case '<verb>': return ...`
 //   mirrors    modules/kernel/api.yaml  top-level keys under `commands:`
-//              scripts/kernel/api.mjs   the verbs usage() prints
+//              scripts/kernel/cli.mjs   the verbs usage() prints
 //              bin/starci.mjs           the `starci api <verb>` help line
 //
 // An extension verb (scripts/kernel/api-extensions.mjs) is a file scripts/kernel/verbs/<verb>.mjs: it is
@@ -20,7 +20,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const HELP = `Usage: node scripts/checks/check-api-surface.mjs [--root <tree>] [--json]
 
-Compares the kernel api verb surface across scripts/kernel/api.mjs (dispatch
+Compares the kernel api verb surface across scripts/kernel/cli.mjs (dispatch
 switch + usage text), modules/kernel/api.yaml and bin/starci.mjs.
 Exit 0 agrees, 1 reports the diff, 2 is a bad argument or unreadable source.`;
 
@@ -44,10 +44,10 @@ export function verbsFromSwitch(source) {
 /** The verb column of the usage() heredoc: two-space indent, then the verb. */
 export function verbsFromUsage(source) {
   const start = source.indexOf('const usage = ');
-  if (start < 0) throw new SurfaceInputError('api.mjs has no usage() definition');
+  if (start < 0) throw new SurfaceInputError('cli.mjs has no usage() definition');
   const open = source.indexOf('`', start);
   const close = source.indexOf('`', open + 1);
-  if (open < 0 || close < 0) throw new SurfaceInputError('api.mjs usage() has no template literal');
+  if (open < 0 || close < 0) throw new SurfaceInputError('cli.mjs usage() has no template literal');
   return source.slice(open + 1, close).split('\n')
     .map((line) => /^ {2}([a-z][a-z0-9-]*)(?:\s|$)/.exec(line))
     .filter(Boolean).map((m) => m[1]);
@@ -72,7 +72,7 @@ const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx
 
 /** Extension verbs: {verbs, documented, withUsage, badDocs} from scripts/kernel/verbs and modules/kernel/api-commands. */
 export function extensionSurface(root = DEFAULT_ROOT) {
-  const verbsDir = path.join(root, 'scripts', 'kernel', 'api-verbs');
+  const verbsDir = path.join(root, 'scripts', 'kernel', 'verbs');
   const docsDir = path.join(root, 'modules', 'kernel', 'api-commands');
   const verbs = filesIn(verbsDir, /^[a-z][a-z0-9-]*\.mjs$/).map((n) => n.slice(0, -4));
   const withUsage = verbs.filter((v) => /\busage\s*:/.test(read(path.join(verbsDir, `${v}.mjs`))));
@@ -87,7 +87,7 @@ export function extensionSurface(root = DEFAULT_ROOT) {
 }
 
 export function collectApiSurface(root = DEFAULT_ROOT) {
-  const apiFile = path.join(root, 'scripts', 'kernel', 'api.mjs');
+  const apiFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
   const yamlFile = path.join(root, 'modules', 'kernel', 'api.yaml');
   const binFile = path.join(root, 'bin', 'starci.mjs');
   const apiSource = read(apiFile);
@@ -96,7 +96,7 @@ export function collectApiSurface(root = DEFAULT_ROOT) {
     implemented: [...verbsFromSwitch(apiSource), ...ext.verbs],
     sources: {
       'modules/kernel/api.yaml': [...verbsFromContract(read(yamlFile)), ...ext.documented],
-      'scripts/kernel/api.mjs usage()': [...verbsFromUsage(apiSource), ...ext.withUsage],
+      'scripts/kernel/cli.mjs usage()': [...verbsFromUsage(apiSource), ...ext.withUsage],
       'bin/starci.mjs help': [...verbsFromCliHelp(read(binFile)), ...ext.verbs],
     },
     badDocs: ext.badDocs,
@@ -113,9 +113,9 @@ export function checkApiSurface(root = DEFAULT_ROOT) {
     implementedCount: implemented.length,
     drift: [],
   };
-  if (implemented.length === 0) throw new SurfaceInputError('api.mjs dispatch switch lists no verbs');
+  if (implemented.length === 0) throw new SurfaceInputError('cli.mjs dispatch switch lists no verbs');
   const duplicates = implemented.filter((v, i) => implemented.indexOf(v) !== i);
-  if (duplicates.length) report.drift.push({ source: 'scripts/kernel/api.mjs switch', duplicated: [...new Set(duplicates)] });
+  if (duplicates.length) report.drift.push({ source: 'scripts/kernel/cli.mjs switch', duplicated: [...new Set(duplicates)] });
   for (const [source, listed] of Object.entries(sources)) {
     const missing = missingFrom(implemented, listed);
     const extra = missingFrom(listed, implemented);
@@ -150,7 +150,7 @@ export function checkApiSurfaceMain(argv) {
   }
   if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
   if (report.ok) return { exitCode: 0, text: `check-api-surface: ${report.implementedCount} verbs, all surfaces agree\n` };
-  const lines = [`check-api-surface: verb surface drift (api.mjs implements ${report.implementedCount}: ${report.implemented.join(' ')})`];
+  const lines = [`check-api-surface: verb surface drift (cli.mjs implements ${report.implementedCount}: ${report.implemented.join(' ')})`];
   for (const entry of report.drift) {
     if (entry.duplicated) { lines.push(`  ${entry.source}: duplicated ${entry.duplicated.join(' ')}`); continue; }
     if (entry.unparsable) { lines.push(`  ${entry.source}: not a map ${entry.unparsable.join(' ')}`); continue; }

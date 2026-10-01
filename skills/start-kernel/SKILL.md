@@ -84,7 +84,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   worker-show must report the exact requested model as the worker's effective
   model before the Kernel is recorded running.
 - A `finished` workflow's goal never re-enters the queue — starting it again is refused.
-- The kernel orchestrates only through `node .claude/scripts/kernel/api.mjs <verb>`
+- The kernel orchestrates only through `node .claude/scripts/kernel/cli.mjs <verb>`
   (verbs: `.claude/modules/kernel/api.yaml`); its boundary and op lifecycle are
   `.claude/modules/kernel/driver-loop.yaml`. Hand it no op-level work and no
   direct-ledger instructions.

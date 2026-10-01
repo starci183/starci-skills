@@ -12,7 +12,7 @@
 #   modules/kernel/driver-loop.yaml — the kernel's tick contract; it owns
 #                                  validateGoalRevision, propagateInvalidation
 #                                  and AUTHORITY_WIDENING, which this file cites
-#   modules/kernel/api.yaml         — the scripts/kernel/api.mjs command surface
+#   modules/kernel/api.yaml         — the scripts/kernel/cli.mjs command surface
 #                                  the kernel reasons through
 #   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
 #   modules/schemas/goal-plan.yaml — the api plan --file shape {legs:[{op,paths?,notes?}]}
@@ -27,7 +27,7 @@
 # Convention: the camelCase and CAPITALISED names in this file (goalPhase,
 # reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
 # module owns and the kernel agent reasons with; they are not code symbols.
-# The executable surface is scripts/kernel/api.mjs and the contracts under
+# The executable surface is scripts/kernel/cli.mjs and the contracts under
 # modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
@@ -85,7 +85,7 @@ stateModel:
     extend-vs-add).
   sources:
     - this file (evaluateGoalMetrics, deriveGoalMetrics are its rules)
-    - engine/db/ledger.mjs (record states) + the api's path:* lease admission (scripts/kernel/api.mjs)
+    - engine/db/ledger.mjs (record states) + the api's path:* lease admission (scripts/kernel/cli.mjs)
     - scripts/work/validate/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
     - modules/goal/existing.yaml
 

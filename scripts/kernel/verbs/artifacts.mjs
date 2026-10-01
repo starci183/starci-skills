@@ -1,6 +1,6 @@
 // api artifacts — every indexed proof file of the workflow's jobs (job_artifacts), per job; read-only
-// (scripts/kernel/job-artifacts.mjs listJobArtifacts). Split out of api.mjs (lane slim-04); its help line
-// stays in api.mjs usage() (usageInCore).
+// (scripts/kernel/job-artifacts.mjs listJobArtifacts). Split out of cli.mjs (lane slim-04); its help line
+// stays in cli.mjs usage() (usageInCore).
 //
 //   artifacts --workflow <id> [--job <job_id>] [--kind <kind>]
 import { listJobArtifacts } from '../job-artifacts.mjs';

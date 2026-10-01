@@ -1,14 +1,14 @@
 // scripts/agent/provider-outage.mjs — "this provider cannot serve now", as evidence.
 //
 // A provider whose agent card declares an outage key is classified from what it actually printed, and the
-// match opens its provider-health circuit with that key's failureKind (scripts/kernel/api.mjs):
+// match opens its provider-health circuit with that key's failureKind (scripts/kernel/cli.mjs):
 //   quotaExhausted     failureKind quota: the plan quota is spent. The circuit lasts until the plan reset
 //                      (or allocation.cooldownMs.quota) and its `probe` clears it earlier.
 //   capacityExhausted  failureKind capacity: the provider refuses to serve the model for now. The circuit
 //                      lasts allocation.cooldownMs.capacity, lengthened by allocation.circuitBackoff when it
 //                      reopens.
 // Each key carries:
-//   text     regexes (case-insensitive) over a launch failure's signal/error text (api.mjs rejectDispatch).
+//   text     regexes (case-insensitive) over a launch failure's signal/error text (cli.mjs rejectDispatch).
 //   screen   ONE regex (multiline, case-insensitive) a terminal row must match: an error row the CLI itself
 //            rendered, anchored at the row start, so a worker that merely reads or edits text about the
 //            error never matches.

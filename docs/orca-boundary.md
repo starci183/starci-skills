@@ -95,10 +95,10 @@ is), so such a worker reads unverified, never dead.
 | `kernel/api-verbs/observe.mjs` | output, and the frame for the turn state | T1, T2 | output replaced by `worker-read`; the frame stays |
 | `kernel/close-op-terminal.mjs` capture, `kernel/quit-agent.mjs` capture | output | T1 | deleted; settle reads by Dispatch |
 | `kernel/api-verbs/settle.mjs` (connected after close) | PTY state | T3 | lane SETTLED (worker closes become `worker-release`) |
-| `kernel/api.mjs` `custodyOf`, `quitWorkerTerminal`, release retry, task-update coordinator check | PTY state | T3, D2 | lane SETTLED |
-| `kernel/api.mjs` reap before/after, `reapIfStillLive`; `kernel/reap-agent-process.mjs` | PTY state | T4 | KEEP until smoke E1 |
-| `kernel/api.mjs` status liveness and prefetch; `reconciler/controllers/job.mjs` worker-health; `reconciler/services.mjs` seat turn; `supervisor/poll.mjs` `kernelState`; `supervisor/stall.mjs` `kernelTurnState` | frame classification | T2 | WRAP: the frame stays for turn-idle and rate-limit; the death verdict moves to `worker-list` |
-| `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/watchdog.mjs`; `supervisor/watchdog.mjs`; `kernel/api.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
+| `kernel/cli.mjs` `custodyOf`, `quitWorkerTerminal`, release retry, task-update coordinator check | PTY state | T3, D2 | lane SETTLED |
+| `kernel/cli.mjs` reap before/after, `reapIfStillLive`; `kernel/reap-agent-process.mjs` | PTY state | T4 | KEEP until smoke E1 |
+| `kernel/cli.mjs` status liveness and prefetch; `reconciler/controllers/job.mjs` worker-health; `reconciler/services.mjs` seat turn; `supervisor/poll.mjs` `kernelState`; `supervisor/stall.mjs` `kernelTurnState` | frame classification | T2 | WRAP: the frame stays for turn-idle and rate-limit; the death verdict moves to `worker-list` |
+| `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/watchdog.mjs`; `supervisor/watchdog.mjs`; `kernel/cli.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
 | `kernel/close-op-terminal.mjs` `closeExitedTerminal` | exited-shell proof | T2, T3 | WRAP until lane SETTLED moves worker closes to `worker-release` |
 | `kernel/terminal-dedupe.mjs`; `supervisor/start-supervisor.mjs` seat dedupe | restored-tab frames | T5 | WRAP |
 | `kernel/wake-delivery.mjs`; `kernel/clear-draft.mjs`; `agent/lib.mjs` prompt delivery | frame and draft as proof of a turn | T6 | KEEP |

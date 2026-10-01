@@ -42,7 +42,7 @@ import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'checks', 'gate.mjs');
+const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'gates', 'gate.mjs');
 export const PRESERVED_WORKFLOW_PREFIX = 'preserved';
 export const FINISH_STEPS = Object.freeze(['gate', 'merge-guard', 'review-verify', 'rebase', 'fast-forward', 'push', 'release-pending']);
 export const CHECKPOINT_EVENTS = Object.freeze({ checkpoint: 'workflow-checkpoint', preserved: 'workflow-op-preserved', landed: 'workflow-landed' });

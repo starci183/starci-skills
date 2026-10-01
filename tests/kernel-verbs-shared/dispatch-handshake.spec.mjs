@@ -11,7 +11,7 @@ import {jobResultSql} from '../../scripts/kernel/verbs/shared/rows.mjs';
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 // Lane m13 — the dispatch handshake (defect: `api dispatch` marked a job
 // running although the spawned terminal died at `401 Invalid API-key`).
 // A fake `orca` binary — a node script spawned through the existing

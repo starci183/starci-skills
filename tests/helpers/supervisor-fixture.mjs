@@ -3,7 +3,8 @@
 // spec's fixture server and ui/fixtures/supervisor-*.json. Never the live home: the caller passes a temp env.
 import { recordAction } from '../../scripts/supervisor/actions.mjs';
 import { notifyKernel } from '../../scripts/supervisor/notify.mjs';
-import { recordFeedback, propose } from '../../scripts/machine/lessons.mjs';
+import { recordFeedback } from '../../scripts/machine/lessons.mjs';
+import { propose } from '../../scripts/supervisor/lesson-actions.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 
 export const SEED_NOW = Date.parse('2026-09-28T12:00:00Z');

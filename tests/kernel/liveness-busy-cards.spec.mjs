@@ -18,7 +18,7 @@ import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/kernel/ter
 // Frames are the rows captured from live terminals on 2026-09-25 (nivo term_a51fe9e2, term_ddd12bb0).
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const card=agent=>parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','agents',`${agent}.yaml`),'utf8'));
 
 const DEVIN_FOOT=['──────────────────────────────────────────── (bypass permissions on) ─','❭ Guide Devin while it works',

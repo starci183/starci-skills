@@ -15,7 +15,7 @@
 //
 // A receipt whose answeredBy is not the owner never approves: owner delegation
 // (config.yaml delegation) answers feedback and questions, never the handover.
-// Reads only; every write stays in api.mjs.
+// Reads only; every write stays in cli.mjs.
 import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobResultSql, latestReportOf } from './verbs/shared/rows.mjs';

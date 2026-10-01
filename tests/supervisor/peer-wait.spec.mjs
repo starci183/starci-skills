@@ -19,7 +19,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // not actionable; the held jobs read queuedBecause peer-wait; a message from that peer wakes the Kernel
 // (and resolves an --until-message wait); the supervisor judges the wait instead of alerting STALLED.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 

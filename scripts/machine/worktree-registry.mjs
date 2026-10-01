@@ -1,6 +1,7 @@
-// worktree-registry.mjs — the worktree registry rows, kinds, settings and GC judgement: the pure and in-process part of the
-// runtime's worktree lifecycle. It runs no external tool: git's calls are scripts/api/git/worktree-*.mjs, Orca's are
-// scripts/api/orca/worktree-*.mjs, and the GC pass over all of them is scripts/machine/worktrees.mjs.
+// worktree-registry.mjs — the worktree registry rows, settings and GC judgement: the pure and in-process part of the
+// runtime's worktree lifecycle (the kinds are scripts/lib/worktree-kinds.mjs). It runs no external tool: the git home is
+// scripts/machine/worktree-git.mjs, the Orca home scripts/machine/worktree-orca.mjs, and the GC pass over both is
+// scripts/machine/worktrees.mjs.
 //
 //   cap      every row is reserved in machine.sqlite `worktrees` (owner, repo, branch, kind, created-at) atomically against
 //            the per-repo cap (modules/kernel/product-land.yaml worktrees.capPerRepo): a workflow over the cap is refused
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WORKTREES_REL } from '../lib/worktree-exclude.mjs';
+import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -19,12 +21,6 @@ import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
 export const PRESERVED_PREFIX = 'preserved';
-/** The registry kinds (machine.sqlite worktrees.kind CHECK, 0003-worktrees-workflow-orca). */
-export const WORKTREE_KINDS = Object.freeze(['workflow', 'critic', 'land-scratch', 'push-scratch', 'supervisor-staging', 'lane']);
-/** The kinds Orca creates and removes: an agent's workspace. */
-export const ORCA_KINDS = Object.freeze(['workflow', 'critic', 'supervisor-staging']);
-/** The kinds the runtime creates with git: a runtime-internal scratch tree no agent works in. */
-export const SCRATCH_KINDS = Object.freeze(WORKTREE_KINDS.filter((k) => !ORCA_KINDS.includes(k)));
 /** The workflow phases after which its worktree is collectable (runtime 0001-init workflows.phase). */
 export const ENDED_WORKFLOW_PHASES = Object.freeze(['stopped', 'finished', 'archived']);
 /** Op job statuses whose worker still holds a terminal (runtime 0001-init jobs.status). */

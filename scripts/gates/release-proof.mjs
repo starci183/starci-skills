@@ -36,7 +36,7 @@ const isApp = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo
 const defaultSpawn = (cmd, args, opts) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, ...opts });
 
 export function appInstallsStep({ runtime = runtimeRoot, spawn = defaultSpawn } = {}) {
-  const run = spawn(process.execPath, [path.join(runtime, 'scripts', 'checks', 'release-app-installs.mjs')], { cwd: runtime });
+  const run = spawn(process.execPath, [path.join(runtime, 'scripts', 'gates', 'release-app-installs.mjs')], { cwd: runtime });
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const skipped = output.split(/\r?\n/).filter((l) => /\bSKIPPED:/.test(l));
   const status = run.error || run.status === null ? STEP_STATUS.toolFailed : skipped.length ? STEP_STATUS.skipped : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;

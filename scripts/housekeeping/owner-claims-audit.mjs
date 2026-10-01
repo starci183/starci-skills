@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // owner-claims-audit.mjs — list past incident resolutions that claim an owner decision no owner answer backs,
-// and open owner-gates whose own text says they are not owner work (scripts/kernel/owner-claim.mjs).
+// and open owner-gates whose own text says they are not owner work (scripts/machine/owner-claim.mjs).
 //
 //   node scripts/housekeeping/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]
 //
@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ledgerFileFor } from '../../engine/db/ledger.mjs';
-import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../kernel/owner-claim.mjs';
+import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../machine/owner-claim.mjs';
 
 export async function auditLedger(file, { workflowId = null } = {}) {
   const { openLedgerReader } = await import('../../engine/db/ledger.mjs');

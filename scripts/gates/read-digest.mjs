@@ -109,7 +109,7 @@ export function judgeKnowledgeDigest(digest) {
  */
 export async function explainPaths(root, files, hfs = hfsEntry(root)) {
   let explainPath = null;
-  try { ({ explainPath } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'lib', 'hfs-check.mjs')).href)); } catch { explainPath = null; }
+  try { ({ explainPath } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'hfs', 'check.mjs')).href)); } catch { explainPath = null; }
   return files.map((file) => {
     if (explainPath) {
       try { return explainPath({ repoRoot: root, input: file }); } catch (error) { return { path: file, status: 'unexplained', reason: firstLine(error?.message ?? error) }; }

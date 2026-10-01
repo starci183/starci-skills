@@ -17,7 +17,7 @@ import {buildWhy,checkFacts,loadCatalog} from '../../scripts/kernel/why.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const gate=loadSonarGate();
 const json=v=>JSON.stringify(v??null);
 const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-sonar-settle-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return dir;};

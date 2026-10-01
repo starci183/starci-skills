@@ -12,7 +12,7 @@ import { CLAIM_TTL_MS, openDecision, ringDoorbell, claimDecision, dueStep, escal
 import { readSupervisor } from '../../scripts/machine/home.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const WF = 'wf-di';
 
 const repoWithLedger = (t) => {

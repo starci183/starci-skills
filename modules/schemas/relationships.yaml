@@ -63,7 +63,7 @@ schemaToSchema:
   #     the only schema'd artifact) ------------------------------------------
   - {from: "goals.json.opChain (ledger row)", to: goal-plan, type: delegates,
      note: "the approved opChain legs are the shape api plan diffs the derived {legs:[{op,paths?,notes?}]} file against",
-     source: "scripts/kernel/api.mjs cmdPlan; modules/schemas/goal-plan.yaml"}
+     source: "scripts/kernel/cli.mjs cmdPlan; modules/schemas/goal-plan.yaml"}
   - {from: goal-plan, to: "modules/ops/ops/<op>.yaml", type: delegates,
      note: "each leg's `op` names a catalog op; enqueue refuses unknown-op",
      source: "modules/schemas/goal-plan.yaml rules; modules/kernel/api.yaml enqueue"}

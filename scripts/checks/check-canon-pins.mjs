@@ -30,18 +30,12 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from './check-op-manifest.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
+import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE, loadPins } from '../gates/canon-pins.mjs';
 
-export const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
-export const SCHEMA_FILE = 'modules/schemas/canon-pins.schema.yaml';
-export const PROFILES_FILE = 'modules/models/code-patterns.yaml';
 const BINDING = Object.freeze({ version: 'CANON_BINDING_VERSION', digest: 'CANON_BINDING_DIGEST', invalid: 'CANON_BINDING_INVALID' });
 const DEP_KEYS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
-
-export function loadPins(root = skillRoot) {
-  return parseYaml(fs.readFileSync(path.join(root, PINS_FILE), 'utf8'));
-}
 
 export function checkCanonPins({ root = skillRoot } = {}) {
   const errors = [];

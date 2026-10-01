@@ -14,7 +14,7 @@ StarCi provides:
   op chain in the ledger — the plan survives sessions, restarts and context loss.
 - **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
-  through one `node scripts/kernel/api.mjs <verb>` call. `modules/kernel/api.yaml` and
+  through one `node scripts/kernel/cli.mjs <verb>` call. `modules/kernel/api.yaml` and
   `modules/kernel/api-commands/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
 - **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
   GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
@@ -96,12 +96,12 @@ The installer:
 owner prompt
   └─ define-goal        → goal + op chain queued in the project ledger (runtime.sqlite)
        └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
-            └─ api.mjs  → survey → plan → enqueue → dispatch → settle → finish
+            └─ cli.mjs  → survey → plan → enqueue → dispatch → settle → finish
                  └─ dispatch spawns one ephemeral [Op] agent per job
                       (adapter card injects the provider CLI flags)
 ```
 
-- The kernel agent reasons; `api.mjs` is the only mutation surface. It owns host mechanics —
+- The kernel agent reasons; `cli.mjs` is the only mutation surface. It owns host mechanics —
   terminals, prompt delivery, worker lifecycle — so the kernel never calls a provider CLI directly.
 - Dispatch attests the spawn before a job is marked `running`; `settle` requires a verdict plus
   evidence and closes the worker terminal; `incident` records failures without losing the ledger.
@@ -121,7 +121,7 @@ CONTEXT.md            the one skill every agent loads first
 modules/            contracts as data — goal, kernel, ops, models, host, supervisor,
                     reconciler, schemas
 engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
-scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
+scripts/            executables — kernel/cli.mjs, kernel/start-workflow.mjs, goal/, route/,
                     agent/, api/, reconciler/, supervisor/, connectors/, work/, guards/,
                     uat/, checks/, context/, lib/, reconcile/, example/, install/
 bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal | validate

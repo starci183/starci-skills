@@ -23,7 +23,7 @@ import {changeNoteOf,committedMatches,committedReader,createOwnership,ownerDecla
 // in-flight (uncommitted) rewrite never counts.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const F='wf-sn-foundation',L='wf-sn-learn-content',S='wf-sn-subscription',DONE='wf-finished-import';
 const SUB='.starciwork/features/commerce/br/single-subscription';
 const CH='.starciwork/features/challenges/fr/submit-code-and-evaluate';

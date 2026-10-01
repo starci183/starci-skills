@@ -1,4 +1,4 @@
-// api-lib/peers.mjs — the peer-messaging machinery of the kernel api (split out of api.mjs,
+// api-lib/peers.mjs — the peer-messaging machinery of the kernel api (split out of cli.mjs,
 // lane slim-api). Several workflows of one product repo share its ledger and build in the
 // same source repositories (nivo: Login, workspace provision, modules and
 // collab in nivo-backend + nivo-fe). With no channel between their Kernels a

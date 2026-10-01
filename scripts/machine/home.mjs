@@ -13,11 +13,24 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../../engine/config.mjs';
+import { allocationSettings, loadConfig } from '../../engine/config.mjs';
 import { machineLog, readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { lanesRoot } from '../housekeeping/hk-lanes.mjs';
+import { headTime } from '../api/git/head-time.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * The rev of the runtime this process runs: '<HEAD committer time, ms, 13 digits>:<short sha>' of the .claude checkout
+ * (STARCI_RUNTIME_REV overrides), 'unknown' outside a checkout. The machine db never spawns git: a writer that stamps a
+ * store row passes this in. Computed once per process.
+ */
+let cachedRev = null;
+export function runtimeRevOf() {
+  if (cachedRev) return cachedRev;
+  if (process.env.STARCI_RUNTIME_REV) return (cachedRev = String(process.env.STARCI_RUNTIME_REV));
+  const head = headTime(SKILL_ROOT);
+  return (cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown');
+}
 export const SUPERVISOR_ID = 'main';
 /** The seats row of the one Supervisor seat. */
 export const SEAT_ID = 'supervisor';
@@ -36,9 +49,23 @@ export const DEFAULTS = Object.freeze({
   pollIntervalMs: 600_000,
 });
 
-// The land scratch trees live under the one lanes root (scripts/housekeeping/hk-lanes.mjs: runtimes.yaml
+// The land scratch trees live under the one lanes root (scripts/machine/home.mjs lanesRoot: runtimes.yaml
 // allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:. A [Worker] staging
 // checkout is an Orca worktree (workers.mjs createStaging): Orca places it, the job records where.
+export const DEFAULT_LANES_ROOT = 'D:/starci-lanes';
+
+/**
+ * The one lane-worktree root. `env.STARCI_LANES_ROOT` wins (specs, a one-off run); then the
+ * runtimes.yaml key — pass `allocation` (allocationSettings()) when the caller already holds it,
+ * else it is read here; the declared default applies while the key is absent.
+ */
+export function lanesRoot({ env = process.env, allocation = undefined } = {}) {
+  let configured = null;
+  if (allocation !== undefined) configured = allocation?.housekeeping?.lanesRoot ?? null;
+  else { try { configured = allocationSettings()?.housekeeping?.lanesRoot ?? null; } catch { configured = null; } }
+  return path.resolve(String(env?.STARCI_LANES_ROOT || configured || DEFAULT_LANES_ROOT));
+}
+
 export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'land');
 
 /** fn(machine handle) over a writer, closed afterwards. */

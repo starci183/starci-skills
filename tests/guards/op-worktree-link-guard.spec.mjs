@@ -78,7 +78,7 @@ test('the history hook refuses a worktree an op creates with ANY git binary, and
 });
 
 // A worker-start agent runs with Orca's environment: the dispatch binds its guard to the Orca terminal
-// (runtime/guards/terminals/<handle>.json) and the hook finds it by ORCA_TERMINAL_HANDLE.
+// (<guards root>/terminals/<handle>.json) and the hook finds it by ORCA_TERMINAL_HANDLE.
 test('the history hook applies an op\'s rules to a managed agent found by its bound Orca terminal', (t) => {
   const repo = initRepo(t);
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);

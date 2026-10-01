@@ -1,5 +1,5 @@
 // Every op is an orchestration worker-start worker, and a just-dispatched worker carries the launch grace
-// (runtimes.yaml allocation.liveness.launchGraceMs; scripts/kernel/api.mjs launchGraceOf): until its grace runs out or
+// (runtimes.yaml allocation.liveness.launchGraceMs; scripts/kernel/cli.mjs launchGraceOf): until its grace runs out or
 // a nudge follows the dispatch, liveness reads it `starting` and nudge answers `worker-starting`. A spec that exercises
 // the nudge/liveness of a live worker ends the grace the only way the ledger allows - one seeded op-worker-nudged event
 // (events are append-only) - and reads events without it.

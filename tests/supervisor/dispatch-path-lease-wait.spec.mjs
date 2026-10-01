@@ -19,7 +19,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 // counts it, and once the holder releases the lease the job reads ready and dispatches.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WORKFLOW='wf-lease-wait';
 const OP='code.refactor';
 const EN='apps/app/src/messages/en.json',VI='apps/app/src/messages/vi.json';

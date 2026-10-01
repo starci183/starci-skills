@@ -8,7 +8,7 @@ description: >-
 
 # Computer Use
 
-For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/api.mjs` or `scripts/api/orca/*.mjs`.
+For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/cli.mjs` or `scripts/api/orca/*.mjs`.
 
 ## Shared Orca setup
 

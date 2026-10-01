@@ -23,9 +23,9 @@ test('every shipped skill declares its directory name and a description, and the
   assert.ok(files.some(entry=>entry==='skills'||entry==='skills/'),'package.json files[] ships skills/');
 });
 
-test('the workflow-chat skill supervises the kernel through api.mjs and names no dead runtime paths',()=>{
+test('the workflow-chat skill supervises the kernel through cli.mjs and names no dead runtime paths',()=>{
   const skill=read('skills/workflow-chat/SKILL.md');
-  assert.match(skill,/scripts\/kernel\/api\.mjs|bin\/starci\.mjs api\b/,'the chat drives the kernel through api.mjs, not a removed launcher');
+  assert.match(skill,/scripts\/kernel\/cli\.mjs|bin\/starci\.mjs api\b/,'the chat drives the kernel through cli.mjs, not a removed launcher');
   for(const dead of ['hosts/','cli/main.mjs','workflows/','kernel/store.mjs','launch.mjs','workflow-goal','workflow-run','workflow-approve'])
     assert.equal(skill.includes(dead),false,`workflow-chat must not name the dead surface ${dead}`);
 });
@@ -35,7 +35,7 @@ test('the workflow-chat skill is product-agnostic, forbids writing the store and
   assert.equal(/starci-academy|nivo|miamia|tayson|[A-Z]:\\/i.test(skill),false,'no repository names or machine paths');
   assert.ok(/## Never[\s\S]*runtime\.sqlite/.test(skill),'the Never section covers writing the ledger');
   assert.ok(/## Never[\s\S]*second workflow/.test(skill),'the Never section covers a second workflow');
-  assert.ok(/inbox/.test(skill)&&/kernel terminal|api\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
+  assert.ok(/inbox/.test(skill)&&/kernel terminal|cli\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
   assert.ok(/Never approve/.test(skill),'approval is the owner\'s');
   assert.ok(/`managed-agent` or `tool-unavailable`/.test(skill)&&/Orca host/.test(skill),'the api dispatch refusals the host cannot serve are relayed to the Orca host');
   const entry=read('CONTEXT.md');

@@ -187,11 +187,11 @@ test('rejects primitive, oversized, and unknown manifest shapes without throwing
 test('executes from a relocated installed payload using its authored schema YAML',async t=>{
   const f=fixture(t),payload=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
   const dist=path.join(payload,'payload');fs.mkdirSync(path.join(dist,'scripts','checks'),{recursive:true});fs.mkdirSync(path.join(dist,'engine'),{recursive:true});fs.mkdirSync(path.join(dist,'modules','schemas'),{recursive:true});
-  fs.copyFileSync(new URL('../../scripts/gates/stacks-gate.mjs',import.meta.url),path.join(dist,'scripts','checks','stacks.mjs'));fs.copyFileSync(new URL('../../engine/yaml.mjs',import.meta.url),path.join(dist,'engine','yaml.mjs'));
+  fs.copyFileSync(new URL('../../scripts/gates/stacks-gate.mjs',import.meta.url),path.join(dist,'scripts','gates','stacks-gate.mjs'));fs.copyFileSync(new URL('../../engine/yaml.mjs',import.meta.url),path.join(dist,'engine','yaml.mjs'));
   fs.mkdirSync(path.join(dist,'scripts','lib'),{recursive:true});for(const lib of ['git.mjs','path-key.mjs'])fs.copyFileSync(new URL(`../scripts/lib/${lib}`,import.meta.url),path.join(dist,'scripts','lib',lib)); // the installed payload carries the lib helpers stacks.mjs imports
   fs.copyFileSync(new URL('../../modules/schemas/application-stacks.schema.yaml',import.meta.url),path.join(dist,'modules','schemas','application-stacks.schema.yaml'));
   const {pathToFileURL}=await import('node:url');
-  const relocated=await import(`${pathToFileURL(path.join(dist,'scripts','checks','stacks.mjs')).href}?relocated=${Date.now()}`);
+  const relocated=await import(`${pathToFileURL(path.join(dist,'scripts','gates','stacks-gate.mjs')).href}?relocated=${Date.now()}`);
   const result=relocated.checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});assert.equal(result.ok,true,result.errors.map(x=>x.code).join(','));
 });
 

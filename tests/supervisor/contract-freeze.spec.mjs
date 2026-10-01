@@ -19,7 +19,7 @@ import {compareSides,gateSide} from '../../scripts/supervisor/gate-stability.mjs
 // settled draw legs owe another redo. A frozen family's changes reach a running workflow only at a release; until then
 // new legs are admitted with them withheld and they owe nothing; after it a leg owes ONE redo for the whole set.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 const T0=Date.parse('2026-09-27T10:00:00+07:00');   // the workflow is created

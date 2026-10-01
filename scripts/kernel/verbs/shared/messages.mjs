@@ -162,7 +162,7 @@ export const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
 
 /**
  * Drain every Run of the workflow into the ledger (see the header). `rebind(runId)` re-binds the Kernel's own Run to
- * the current Kernel terminal after a consumer_fenced answer (api.mjs bindRunToKernel); a Run that is not the Kernel's
+ * the current Kernel terminal after a consumer_fenced answer (cli.mjs bindRunToKernel); a Run that is not the Kernel's
  * is never re-bound. `check` replaces the Orca wrapper (specs).
  * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[{runId, code, error}], error}.
  */

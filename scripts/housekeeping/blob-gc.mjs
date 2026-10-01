@@ -30,9 +30,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot } from '../../engine/db/blob.mjs';
-import { writeZip, readZip } from '../api/fs/zip-write.mjs';
+import { zipWrite } from '../api/fs/zip-write.mjs';
+import { zipRead } from '../api/fs/zip-read.mjs';
 import { hasLedgerTable, openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachineReader } from '../../engine/db/machine.mjs';
+import { acquireGcLock } from '../machine/gc-lock.mjs';
 
 export const RETENTION = Object.freeze({ graceMs: 86_400_000, passMs: 30 * 86_400_000, failMs: 90 * 86_400_000, seatMs: 90 * 86_400_000 });
 const SHA = /^[a-f0-9]{64}$/;
@@ -197,8 +199,8 @@ function archiveBlobs(items, dir) {
   const zips = [];
   for (const part of parts) {
     const file = path.join(dir, `blobs-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.zip`);
-    const written = writeZip(file, part.flatMap((it) => [{ name: it.sha, file: it.file }, ...(fs.existsSync(`${it.file}.json`) ? [{ name: `${it.sha}.json`, file: `${it.file}.json` }] : [])]));
-    const read = readZip(file);
+    const written = zipWrite(file, part.flatMap((it) => [{ name: it.sha, file: it.file }, ...(fs.existsSync(`${it.file}.json`) ? [{ name: `${it.sha}.json`, file: `${it.file}.json` }] : [])]));
+    const read = zipRead(file);
     const bad = read.filter((e) => !e.crcOk || (SHA.test(e.name) && crypto.createHash('sha256').update(e.data).digest('hex') !== e.name));
     if (bad.length || read.length !== written.entries.length) { fs.renameSync(file, `${file}.failed`); throw new Error(`${file}: verification failed (${bad.length} bad entries)`); }
     zips.push({ file, bytes: written.bytes, sha256: written.sha256, entries: written.entries.length, shas: part.map((it) => it.sha) });
@@ -214,7 +216,7 @@ export async function runBlobGc({ apply = false, env = process.env, now = Date.n
   const w = writers ?? await gcWriters();
   if (!w.ok) return { ...plan, apply: true, ok: false, refused: `writers missing: ${w.missing.join(', ')}` };
   let lock = null;
-  try { const gc = await import('../supervisor/gc.mjs'); lock = gc.acquireGcLock?.({ env, holder: 'blob-gc' }) ?? null; } catch { lock = null; }
+  try { lock = acquireGcLock({ env, holder: 'blob-gc' }); } catch { lock = null; }
   if (lock && !lock.ok) return { ...plan, apply: true, ok: false, busy: true, refused: 'another GC apply holds the host gc lock' };
   const machine = w.machine.openMachine({ env });
   const items = [];

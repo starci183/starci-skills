@@ -10,7 +10,7 @@
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
 //    runtimes.yaml allocation.landGate.waitMs). Every run is a land_runs row (full output as blobs, G9/MB-10).
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
-//    (scripts/housekeeping/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
+//    (scripts/machine/home.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
 //    already landed and moves nothing. Before a waiter even joins the queue, a lock-free preflight
 //    (`git merge-tree` of each commit onto main, conflictPreflight) refuses a pick that cannot apply, so a lane
@@ -58,13 +58,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
-import { lowerOwnPriority } from '../api/process/set-priority.mjs';
+import { setPriority } from '../api/process/set-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
-import { lanesRoot } from '../housekeeping/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree, safeRemoveWorktree, unlinkNodeModulesLink } from '../api/fs/safe-remove.mjs';
 import { createScratchWorktree } from '../api/git/worktree-add.mjs';
@@ -72,10 +71,11 @@ import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
-import { grammarDistStatus } from '../checks/check-grammar-dist.mjs';
+import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
-import { CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
-import { SKILL_ROOT, landRoot, supervisorSettings } from '../machine/home.mjs';
+import { readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
+import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
+import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 
@@ -708,7 +708,7 @@ export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
     if (!build.ok) return fail('npm run build', `exit ${build.status ?? 'unknown'}${build.error ? ` (${build.error})` : ''}`);
     const dist = grammarDistStatus(packageRoot);
     if (!dist.ok || dist.state !== 'fresh') return fail('grammar-dist', dist.detail);
-    const knowledge = run(process.execPath, [path.join(root, 'scripts', 'checks', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
+    const knowledge = run(process.execPath, [path.join(root, 'scripts', 'work', 'ui', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
     return { ok: true, state: dist.state, knowledge: knowledge.ok ? 'fresh' : 'owed',
       owed: knowledge.ok ? [] : ['grammar-knowledge-snapshots'], ...(knowledge.ok ? {} : { knowledgeDetail: `exit ${knowledge.status ?? 'unknown'}` }) };
   } catch (error) { return fail('exception', String(error?.message ?? error)); }
@@ -1032,7 +1032,7 @@ export function describe(r, { jobId = null } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
-  lowerOwnPriority();
+  setPriority();
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

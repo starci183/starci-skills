@@ -16,7 +16,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // dispatch: the family CSS from the product's brand record and installed @starci/grammar, the StarCi
 // grammar knowledge, knowledge/ui and the product's grammar captures. A missing one refuses the spawn.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const slash=p=>p.replace(/\\/g,'/');
 
 const tmp=t=>{

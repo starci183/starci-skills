@@ -21,7 +21,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,
 // every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
 process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 // Captured 2026-09-24 from term_0982b445 (mia-mia-backend): a Codex op whose agent exited mid-turn. The
@@ -155,7 +155,7 @@ test('status reads an exited worker dead, observe names it, and nudge refuses wi
 const NIVO_TRANSCRIPT=['    … +18 lines (ctrl + t to view transcript)','      }','    }',
   '• Ran orca orchestration check --terminal term_8f9e0611-1faa-415b-a343-4a2c2e3e8','24f --json','  └ {',
   '      "id": "e1790393-c1bf-437a-b6a9-146c93d5b9be",','    … +19 lines (ctrl + t to view transcript)','      }','    }',
-  '• Ran node D:\\Repositories\\starci-academy-backend\\.claude\\scripts\\kernel\\api.mjs',' op-contract --repo D:',
+  '• Ran node D:\\Repositories\\starci-academy-backend\\.claude\\scripts\\kernel\\cli.mjs',' op-contract --repo D:',
   '  │ \\Repositories\\nivo-backend --job op-architecture.decide-e64bfaaea3',
   '  └ # dispatch contract — [Op] architecture.decide (job op-architecture.decide-e','64bfaaea3)',
   '    … +107 lines (ctrl + t to view transcript)','    (node:39400) ExperimentalWarning: SQLite is an experimental feature and migh',

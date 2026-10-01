@@ -20,7 +20,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // are judged against the real thresholds.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WORKFLOW='wf-host-resources';
 const LIGHT_WORKFLOW='wf-host-resources-light';
 const OP='code.refactor';

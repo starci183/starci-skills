@@ -282,7 +282,7 @@ schemas:
     subsystem: work-tree
     governs: "What was observed, when, by whom, against which record/source version — carries recordDigest so expiry is computed not noticed; stale-marked, never rewritten or deleted."
     binds: .starciwork/**/evidence.yaml (and evidence/<id>/ bundles per modules/kernel/verdict-contract.yaml)
-    usedBy: [scripts/kernel/api.mjs (settle persists verdict evidence paths), scripts/example/example-evidence.mjs]
+    usedBy: [scripts/kernel/cli.mjs (settle persists verdict evidence paths), scripts/example/example-evidence.mjs]
     business:
       question: "What proof exists for this record's claim, and is it still about the current version?"
       whenNeeded: Every accepted leaf — done is only as good as its evidence manifest.
@@ -416,7 +416,7 @@ schemas:
     subsystem: kernel
     governs: "The api `plan --file` document: {legs:[{op, paths?, notes?}]} — the kernel's derived op chain diffed structurally against the approved goals.json.opChain.legs."
     binds: "the --file JSON a kernel agent hands to `api plan`"
-    usedBy: [scripts/kernel/api.mjs (cmdPlan legs check + plan-derived event), modules/kernel/api.yaml commands.plan]
+    usedBy: [scripts/kernel/cli.mjs (cmdPlan legs check + plan-derived event), modules/kernel/api.yaml commands.plan]
     business:
       question: "Is the derived plan still the approved op chain — or did it diverge?"
       whenNeeded: Every tick.plan — the api persists digest + structural diff and a divergent plan escalates, never dispatches.
@@ -458,7 +458,7 @@ schemas:
     usedBy:
       - scripts/checks/check-op-manifest.mjs (validates the shape plus PARAM_RESTATED, RULE_DUPLICATED, RULE_IN_DATA, PATH_JOINED, CHECK_MISSING)
       - scripts/route/build-ops-registry.mjs (indexes id/goal/params/route into modules/ops/registry.yaml)
-      - scripts/kernel/api.mjs (enqueue validates --params against the op's params block; dispatch merges defaults into the packet)
+      - scripts/kernel/cli.mjs (enqueue validates --params against the op's params block; dispatch merges defaults into the packet)
     business:
       question: "What is an operation, exactly — and where does each of its rules and numbers live?"
       whenNeeded: Every op manifest edit; the check refuses a stray key, a restated number or a rule written twice.
@@ -515,9 +515,9 @@ schemas:
     dialect: prose-contract
     subsystem: kernel
     governs: "The durable Workflow -> Kernel -> Op ownership tree, including stable node ids, semantic edges and distinct agent/provider/model/profile/runtimePool plus Orca Run/Task/Dispatch/terminal runtime references."
-    binds: "the read-only document emitted by `node scripts/kernel/api.mjs hierarchy --workflow <id>`"
+    binds: "the read-only document emitted by `node scripts/kernel/cli.mjs hierarchy --workflow <id>`"
     usedBy:
-      - scripts/kernel/api.mjs (cmdHierarchy projection)
+      - scripts/kernel/cli.mjs (cmdHierarchy projection)
       - modules/kernel/api.yaml (commands.hierarchy)
       - Orca UI integrations that render workflow agent ownership
     business:
@@ -857,7 +857,7 @@ moduleLocalDocumentKinds:
 
   # --- kernel ---------------------------------------------------------------
   - id: starci/module-kernel-api@1
-    governs: "The scripts/kernel/api.mjs command contract — args, read/write sets, refusal strings."
+    governs: "The scripts/kernel/cli.mjs command contract — args, read/write sets, refusal strings."
     files: [modules/kernel/api.yaml]
   - id: starci/module-kernel-driver-loop@1
     governs: "The tick the kernel agent runs."

@@ -19,13 +19,13 @@ purpose: |-
   `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
   is easy|medium|hard|insane; resolvers accept the S|M|L|XL spellings (and 'high' for 'hard').
 # CONCURRENCY LIVES HERE AND NOWHERE ELSE. `runtimes.<pool>.maxParallel` below is the enforced slot
-# count: scripts/kernel/api.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
+# count: scripts/kernel/cli.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
 # scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
 # `capacity.maxParallel` has drifted from it. Every other contract cites this file instead of
 # restating a number.
 # `maxParallelOps` is the fleet-wide ceiling across every workflow; `budgets.maxOps` in the owner's
 # config.yaml is the per-workflow one. The lower of the two admits: engine/admission.mjs
-# opSlotCeiling takes min(budgets.maxOps, maxParallelOps) and scripts/kernel/api.mjs refuses
+# opSlotCeiling takes min(budgets.maxOps, maxParallelOps) and scripts/kernel/cli.mjs refuses
 # route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
@@ -54,7 +54,7 @@ allocation:
   overflowByOrder:
     review: [claude-agent, codex-agent]
   # Cross-family audit: a verify kind whose records overlap the output of the latest settled non-verify op of
-  # the workflow (scripts/kernel/api.mjs cmdRoute finds that author with scripts/agent/balance.mjs
+  # the workflow (scripts/kernel/cli.mjs cmdRoute finds that author with scripts/agent/balance.mjs
   # auditAuthorOf) routes to an eligible pool of another audit family - the reviewer's provider differs from
   # the implementer's. The audit families are the pools of `frontier` and `hands`: Opus or Sol review what
   # Devin implemented; Sol reviews Opus's records and Opus reviews Sol's. The author's
@@ -75,7 +75,7 @@ allocation:
   #     test.author, the hands-on verify kinds, release/scope finish): Devin first, then Codex and Claude -
   #     Devin passed 70% of backend.implement and 68% of interface.implement over the 72h scorecard.
   #   scaffold (scaffold, docs, content, grammar.update - small work - and every cut slice of a fan-out, which
-  #     scripts/kernel/api.mjs cmdRoute routes on this order): Devin first - backend.scaffold passed 73% on Devin,
+  #     scripts/kernel/cli.mjs cmdRoute routes on this order): Devin first - backend.scaffold passed 73% on Devin,
   #     43% on Codex over the 72h scorecard.
   #   think, decide, plan (every think kind: decide, review and author ops): Claude Opus first, GPT-6 Sol second
   #     and nothing else - Opus passed 72-73% of business/architecture.decide, Sol 60-64%. Think kinds route at a hard floor, where codex-agent pins Sol; the
@@ -593,7 +593,7 @@ allocation:
   # A routed-but-queued job (payload.model set, status queued) holds its pool slot only this long after its latest route
   # decision (payload.routedAt, else its newest route-decided event): long enough for one fan-out's sequential route
   # calls to spread across pools, short enough that a job parked behind a gate, hold, peer-wait, dependency or
-  # readiness loop does not starve the pool (scripts/kernel/api.mjs poolLoadOf, shared by api route and api status).
+  # readiness loop does not starve the pool (scripts/kernel/cli.mjs poolLoadOf, shared by api route and api status).
   # Running, leased and answering jobs always hold theirs. Re-routing refreshes the hold.
   routeHoldMs: 900000
   verifyAvoidsImplementRuntime: true
@@ -610,7 +610,7 @@ allocation:
   # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
   # a provider answering 401 is not a flake, a single refused launch can be.
   # A circuit that reopens for the same failure inside windowMs waits factor
-  # times longer each time, capped at capMs (scripts/kernel/api.mjs
+  # times longer each time, capped at capMs (scripts/kernel/cli.mjs
   # writeProviderCircuit). An un-onboarded CLI does not clear in two minutes.
   circuitBackoff: {factor: 5, capMs: 3600000, windowMs: 3600000}
   providerStrikes: {worker-start: 2, prompt-delivery-stalled: 2}

@@ -15,7 +15,7 @@ import {cutSeamSettings,seamPriorityOf,seamPromptLines,seamReconcileOf,siblingSe
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const ownerConfig=(t,patch)=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -161,9 +161,9 @@ test('the Kernel releases a stuck cut; a sibling dispatched on a stub is told st
   assert.match(lines,/STUB-FIRST/);
   assert.match(lines,/write the minimal stub .* INSIDE your owned paths/);
   assert.match(lines,/seamAssumptions/);
-  const seamLines=seamPromptLines({cut:{id:'chat-impl',ordinal:1,total:3},jobLabel:seam,api:'api.mjs',repoLabel:'R'}).join('\n');
+  const seamLines=seamPromptLines({cut:{id:'chat-impl',ordinal:1,total:3},jobLabel:seam,api:'cli.mjs',repoLabel:'R'}).join('\n');
   assert.match(seamLines,/CONTRACT FIRST/);
-  assert.match(seamLines,new RegExp(`node api.mjs cut-seam --repo R --publish-interface --job ${seam}`));
+  assert.match(seamLines,new RegExp(`node cli.mjs cut-seam --repo R --publish-interface --job ${seam}`));
   settleJob(repo,seam,'succeeded');
   assert.equal(api('cut-seam','--release','--workflow','wf-seam-release','--op','docs.author','--cut-id','chat-impl','--reason','x').stderr.includes('cut-seam-passed'),true);
 });

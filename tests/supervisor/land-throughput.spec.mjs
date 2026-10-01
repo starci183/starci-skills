@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt, isContractChangesPath, entryFileOf, CONTRACT_CHANGES_DIR } from '../../scripts/kernel/contract-changes-store.mjs';
+import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt } from '../../scripts/kernel/contract-changes-store.mjs';
+import { isContractChangesPath, entryFileOf, CONTRACT_CHANGES_DIR } from '../../scripts/lib/contract-changes-path.mjs';
 import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
 import { landCommits, runChecks, governedPaths } from '../../scripts/supervisor/land.mjs';
 import { loadApiExtensions, statusExtras, readFlagsFile, extensionVerbNames } from '../../scripts/kernel/api-extensions.mjs';
@@ -173,8 +174,8 @@ test('api extensions load from files: verbs, flags, status fields; a bad module 
   assert.deepEqual(readFlagsFile(path.join(root, 'absent.txt')), []);
 });
 
-test('api.mjs dispatches an extension verb and check-api-surface counts it', () => {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/api.mjs'), 'extensions', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+test('cli.mjs dispatches an extension verb and check-api-surface counts it', () => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/cli.mjs'), 'extensions', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
   assert.ok(out.verbs.includes('extensions'));
@@ -182,7 +183,7 @@ test('api.mjs dispatches an extension verb and check-api-surface counts it', () 
   const surface = checkApiSurface(ROOT);
   assert.equal(surface.ok, true, JSON.stringify(surface.drift));
   assert.ok(surface.implemented.includes('extensions'));
-  const help = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/api.mjs'), '--help'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+  const help = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/cli.mjs'), '--help'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.match(help.stdout + help.stderr, /extension verbs[\s\S]*extensions \[--json\]/);
 });
 

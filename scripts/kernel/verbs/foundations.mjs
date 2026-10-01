@@ -1,4 +1,4 @@
-// api foundations: split from api.mjs.
+// api foundations: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { openPeerWaits } from './shared/peers.mjs';
 import { readFoundations } from '../foundations.mjs';

@@ -1,7 +1,7 @@
 // api-extensions.mjs — the conflict-free way to grow the kernel api (lane land-throughput, 2026-09-28).
 //
 // Every lane that added a verb, a boolean flag or a status field edited the same few shared lines of
-// scripts/kernel/api.mjs (the boolean-flag list, KERNEL_ONLY_VERBS, the `required` map, the dispatch switch,
+// scripts/kernel/cli.mjs (the boolean-flag list, KERNEL_ONLY_VERBS, the `required` map, the dispatch switch,
 // usage(), cmdStatus's `out` line), of modules/kernel/api.yaml (`commands:` tail) and of bin/starci.mjs (the
 // verb help line), so each land invalidated every queued lane. New work goes through files instead, one per
 // thing, discovered at startup:
@@ -16,7 +16,7 @@
 //                                            value adds nothing; `lines` adds human lines to `api status`
 //   scripts/kernel/api-boolean-flags.txt     one boolean flag per line (any verb); merge=union, order free
 //
-// The verbs, flags and fields already in api.mjs stay where they are; check-api-surface reads both.
+// The verbs, flags and fields already in cli.mjs stay where they are; check-api-surface reads both.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -90,7 +90,7 @@ export function statusExtras(status, ctx, core = {}) {
   return { fields, lines };
 }
 
-/** The usage lines of the extension verbs, for `api --help`. A verb split out of api.mjs keeps its line
+/** The usage lines of the extension verbs, for `api --help`. A verb split out of cli.mjs keeps its line
  * in that file's usage() (`usageInCore: true`) and prints nothing here, so `api --help` is unchanged. */
 export const extensionUsage = (ext) => [...ext.verbs.values()].filter((s) => s.usageInCore !== true)
   .map((s) => String(s.usage ?? `  ${s.verb}`).replace(/\s+$/, ''));

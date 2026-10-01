@@ -27,12 +27,12 @@ import path from 'node:path';
 import { execFile, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
-import { kernelDecisionItems } from '../kernel/settle/job-settle.mjs';
+import { kernelDecisionItems } from './reported-jobs.mjs';
 import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
-const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
+const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 
 export const DI_SCHEMA = 'starci/decision-item@1';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
@@ -342,7 +342,7 @@ const appOf = (p) => String(p).replace(/\\/g, '/').match(/(?:^|\/)((?:apps|packa
  * integration and parity on the current tip) or drop it. Every command is an existing verb; the api refuses a wrong one.
  */
 export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {}) {
-  const wf = di.workflowId, api = 'node scripts/kernel/api.mjs', R = `--repo ${q(repo)}`;
+  const wf = di.workflowId, api = 'node scripts/kernel/cli.mjs', R = `--repo ${q(repo)}`;
   const base = { id: di.id, kind: di.kind, summary: di.summary };
   const resolve = (verb) => `${api} decisions ${R} --resolve ${di.id} --by kernel:${wf} --verb ${q(verb)} --decision <decide id>`;
   if (!(JOB_KINDS.includes(di.kind) && di.entity?.type === 'job')) {
@@ -416,7 +416,7 @@ export function refuseDecisionsFirst(db, workflowId, verb, { now = Date.now(), r
 
 const argValue = (flag, argv = process.argv) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
 
-/** --resolves <id> from this process's argv (route/dispatch/enqueue parse it in api.mjs; the guard reads it here). */
+/** --resolves <id> from this process's argv (route/dispatch/enqueue parse it in cli.mjs; the guard reads it here). */
 export function resolvesArg(argv = process.argv) { const i = argv.indexOf('--resolves'); return i >= 0 ? argv[i + 1] ?? null : null; }
 
 /**
@@ -544,24 +544,24 @@ const saveRing = (ledger, scope, key, value, now) => ledger.transaction(() => le
  *   rung          the seat read turn-idle and the line was proven on its screen;
  *   deferred      the seat is busy / gated / unavailable: not an error, ring again when it turns idle;
  *   rate-limited  rung less than RING_MIN_GAP_MS ago;  nothing-open  no live Kernel DI.
- * `ledger` (an open write handle) or `repo`; `wake` replaces wake-delivery.mjs wakeKernel in specs.
+ * `ledger` (an open write handle) or `repo`; `wake` is wake-delivery.mjs wakeKernel (the caller passes it in; a spec passes a stub).
  */
 export async function ringDoorbell(first = {}, second = null) {
   // The engine form (lane rc-sla-workflow controllers/workflow.mjs): ringDoorbell(ctx, {ledgerId, workflowId, decider}).
   if (second) {
     const ctx = first ?? {};
     if (ctx.mode && ctx.mode !== 'active') return { action: 'shadow', delivered: false };
-    if (second.decider === 'supervisor') return ringSupervisor({ env: ctx.env ?? process.env, now: ctx.now?.() ?? Date.now() });
+    if (second.decider === 'supervisor') return ringSupervisor({ env: ctx.env ?? process.env, wake: second.wake, now: ctx.now?.() ?? Date.now() });
     const repo = (ctx.ledgers ?? []).find((l) => l.ledgerId === second.ledgerId)?.repo;
     if (!repo) return { action: 'ledger-unknown', delivered: false };
-    return ringDoorbell({ repo, workflowId: second.workflowId, now: ctx.now?.() ?? Date.now() });
+    return ringDoorbell({ repo, workflowId: second.workflowId, wake: second.wake, now: ctx.now?.() ?? Date.now() });
   }
   const { repo = null, workflowId, ledger = null, wake = null, now = Date.now(), minGapMs = RING_MIN_GAP_MS } = first;
-  const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
-  if (ledger) return ringDoorbellWith({ ledger, workflowId, wake: wakeFn, now, minGapMs });
+  if (typeof wake !== 'function') throw new Error('ringDoorbell: pass `wake` (scripts/kernel/wake-delivery.mjs wakeKernel); machine/ does not import the kernel');
+  if (ledger) return ringDoorbellWith({ ledger, workflowId, wake, now, minGapMs });
   const { openLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
   const own = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
-  try { return ringDoorbellWith({ ledger: own, workflowId, wake: wakeFn, now, minGapMs }); } finally { own.close(); }
+  try { return ringDoorbellWith({ ledger: own, workflowId, wake, now, minGapMs }); } finally { own.close(); }
 }
 
 /** ringDoorbell's synchronous core over an open write handle; `wake` is wake-delivery.mjs wakeKernel (or a spec stub). */
@@ -704,7 +704,7 @@ export const SUP_RING_KIND = 'supervisor-ring';
  */
 export async function ringSupervisor({ env = process.env, wake = null, now = Date.now(), minGapMs = RING_MIN_GAP_MS } = {}) {
   const home = await import('./home.mjs');
-  const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
+  if (typeof wake !== 'function') throw new Error('ringSupervisor: pass `wake` (scripts/kernel/wake-delivery.mjs wakeKernel); machine/ does not import the kernel');
   return withSup((m) => {
     const openIds = supervisorDecisions(m, { now }).filter((d) => d.status === 'open').map((d) => d.id);
     const open = openIds.length;
@@ -712,7 +712,7 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
     if (!plan.ring) return { action: plan.reason, delivered: false, open };
     const terminal = home.seatOf(m, now)?.value?.terminal ?? null;
     if (!terminal) return { action: 'deferred', delivered: false, open, wake: 'seat-absent' };
-    const woke = wakeFn({ db: home.terminalSignalDb(terminal), workflowId: home.SEAT_ID, text: plan.text });
+    const woke = wake({ db: home.terminalSignalDb(terminal), workflowId: home.SEAT_ID, text: plan.text });
     const delivered = woke?.delivered === true;
     const ev = home.supervisorEvent(m, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], decisions: delivered ? openIds : [], text: plan.text, delivered, action: woke?.action ?? null } });
     m.recordDelivery({ messageKind: 'doorbell', messageRef: ev.eventId, seatId: home.SEAT_ID, terminalHandle: terminal, channel: 'orca-terminal',

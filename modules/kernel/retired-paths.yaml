@@ -897,6 +897,10 @@ moved:
   - {from: packages/test-world/src/stack/toxiproxy.test.ts, to: packages/test-world/src/stack/toxiproxy.spec.ts, movedIn: C7, quiesced: false}
   - {from: packages/tsconfig/config.test.mjs, to: packages/tsconfig/config.spec.mjs, movedIn: C7, quiesced: false}
   - {from: scripts/checks/common.mjs, to: scripts/lib/is-main.mjs + scripts/lib/walk.mjs, movedIn: C1, quiesced: false}
+  - {from: scripts/kernel/api.mjs, to: scripts/kernel/cli.mjs, movedIn: C8, quiesced: true}
+  - {from: scripts/supervisor/sup-log.mjs, to: scripts/machine/sup-log.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/kernel/log-writer.mjs, to: scripts/machine/log-writer.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/kernel/owner-claim.mjs, to: scripts/machine/owner-claim.mjs, movedIn: C3, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
 # staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
 # deletes the symbol.

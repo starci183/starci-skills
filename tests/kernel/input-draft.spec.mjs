@@ -15,7 +15,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // (nivo collab Kernel, 2026-09-25). The draft is now read, put back in the input row for the
 // classifier, owned or refused before any wake is typed, and cleared with bounded Ctrl+U.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const CHROME=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
 const IDLE=['● Waiting on the code.refactor report.','✻ Brewed for 3m 2s',...CHROME].join('\n');

@@ -18,7 +18,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // tick), before route/dispatch, after a settle and after a peer message, and the runtime resolves the
 // incident once all hold. Opt-in: an incident without them keeps its free-text behaviour exactly.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 const WORK='wf-gc-work',BASE='wf-gc-base',DONE='wf-gc-finished';

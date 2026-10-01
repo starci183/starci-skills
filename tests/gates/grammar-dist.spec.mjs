@@ -5,8 +5,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {
-  GRAMMAR_DIST_FIX,assertGrammarDistFresh,cssTokenDeclarations,grammarDistMain,grammarDistRefusal,grammarDistStatus,grammarPackageOf
-} from '../../scripts/checks/check-grammar-dist.mjs';
+  GRAMMAR_DIST_FIX,assertGrammarDistFresh,cssTokenDeclarations,grammarDistRefusal,grammarDistStatus,grammarPackageOf
+} from '../../scripts/gates/grammar-dist.mjs';
+import {grammarDistMain} from '../../scripts/checks/check-grammar-dist.mjs';
 import {STAMP_FILE,sourceDigest,sourceInputs} from '../../packages/grammar/scripts/build-stamp.mjs';
 import {OLD_DANGER,SRC_CSS,grammarFixture} from '../fixtures/grammar-dist.mjs';
 
@@ -156,7 +157,7 @@ test('npm run check runs the grammar dist check',()=>{
 
 test('the CLI exits non-zero with the exact fix message on a stale dist',t=>{
   const g=grammarFixture(t,{stamp:false});
-  const run=spawnSync(process.execPath,[path.join(repoRoot,'scripts','checks','grammar-dist.mjs'),'--root',g.root],{encoding:'utf8'});
+  const run=spawnSync(process.execPath,[path.join(repoRoot,'scripts','checks','check-grammar-dist.mjs'),'--root',g.root],{encoding:'utf8'});
   assert.equal(run.status,1);
   assert.ok(run.stderr.includes('run npm run build in packages/grammar'),run.stderr);
 });

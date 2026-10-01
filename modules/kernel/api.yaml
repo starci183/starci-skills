@@ -5,7 +5,7 @@
 # agent per workflow (start-workflow.yaml); it never opens
 # .starciwork/runtime.sqlite, never writes a job row, never spawns a terminal
 # itself — every state operation is one call:
-#   node scripts/kernel/api.mjs <command> ...
+#   node scripts/kernel/cli.mjs <command> ...
 # Ops are ephemeral [Op] agents spawned per job by `api dispatch`
 # (dispatch.yaml). The kernel reasons; the api transacts.
 #
@@ -16,7 +16,7 @@
 # contract truth lives in runtime.sqlite through these verbs.
 #
 # Sources (all under .claude/, relative to the skill root):
-#   scripts/kernel/api.mjs      — the executable half; this file is its contract
+#   scripts/kernel/cli.mjs      — the executable half; this file is its contract
 #   engine/db/ledger.mjs        — the tables named below (DDL: engine/db/migrations/runtime/0001-init.sql)
 #   scripts/agent/lib.mjs       — spawnAgent + terminal lifecycle the api drives;
 #                                 the kernel never calls Orca itself
@@ -57,7 +57,7 @@ about:
     checks -> `api check` -> `api settle` (consumption enforced — settle
     marks the report consumed if the kernel did not).
   sources:
-    - scripts/kernel/api.mjs
+    - scripts/kernel/cli.mjs
     - engine/db/ledger.mjs
     - scripts/agent/lib.mjs
 
@@ -65,7 +65,7 @@ about:
 # CONVENTIONS — true of every command below.
 # ============================================================================
 conventions:
-  invoke: 'node scripts/kernel/api.mjs <command> [--repo <path>] [--json]'
+  invoke: 'node scripts/kernel/cli.mjs <command> [--repo <path>] [--json]'
   ledger: >-
     .starciwork/runtime.sqlite under the bound repo (engine/db/ledger.mjs
     ledgerFileFor). Every command opens it first; no file there refuses
@@ -83,7 +83,7 @@ conventions:
     below names the string it prints and every untyped refusal says so
   exitCode: '0 ok / 1 refusal / 2 usage error'
   extensions: >-
-    New verbs, boolean flags and status fields are FILES, never edits of api.mjs's shared lists
+    New verbs, boolean flags and status fields are FILES, never edits of cli.mjs's shared lists
     (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/verbs/<verb>.mjs with its contract
     in modules/kernel/api-commands/<verb>.yaml (what commands.<verb> here would hold); a status field is
     scripts/kernel/status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
@@ -143,8 +143,8 @@ conventions:
     a raw orca orchestration check from the Kernel (KERNEL_ORCA_CHECK), and npm ci while a job of ANOTHER workflow of the ledger is leased; `ln`,
     `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and Create*Link are refused (LINK_CREATE)
     - the hook blocks the command (exit 2) with a typed code and the remedy; (2)
-    runtime/guards/jobs/<job>.json names the job's owned paths as absolute paths, bound to the agent's
-    Orca terminal (runtime/guards/terminals/<handle>.json, bound after dispatch-show, removed when that
+    <guards root>/jobs/<job>.json names the job's owned paths as absolute paths, bound to the agent's
+    Orca terminal (<guards root>/terminals/<handle>.json, bound after dispatch-show, removed when that
     terminal closes); (3) every checkout the job
     writes gets a reference-transaction hook (starci-history-guard) that git runs for every caller:
     main, master and every checked-out branch only move forward and are never deleted, and an op
@@ -158,7 +158,7 @@ conventions:
     (contract change kernel-guard-file): start-workflow.mjs writes it a job guard of role kernel
     (kernel-<workflow>, no owned path, its workflowWorktree) and binds it to the Kernel's terminal, so
     layer (1) refuses its raw git history changes, worktree adds, recursive deletes, kills by name and
-    raw agent launches while its `node api.mjs <verb>` calls pass; layer (3) skips a kernel guard, since
+    raw agent launches while its `node cli.mjs <verb>` calls pass; layer (3) skips a kernel guard, since
     the runtime's own git under the Kernel's api calls inherits its terminal. A guard that could not be
     put in place rides on kernel-booted `guard` with code kernel-guard-unbound
   hierarchy: >-

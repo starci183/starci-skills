@@ -4,7 +4,7 @@
 //
 // scripts/supervisor/land.mjs passes it too. Loaded in the runner before any spec starts, it points
 // STARCI_TEST_MACHINE_FILE (engine/db/machine.mjs TEST_REGISTRY_ENV) at a fresh machine.sqlite and STARCI_ARTIFACT_ROOT
-// at a fresh blob store, both under the OS temp directory; every spec process, and every api.mjs or kernel a spec spawns
+// at a fresh blob store, both under the OS temp directory; every spec process, and every cli.mjs or kernel a spec spawns
 // with the inherited env, writes there instead of the host's live stores, and the runner removes the directory when it
 // exits. A value already set (a nested runner, an explicit choice) is kept. A spec run without this preload is still
 // kept off the live registry: machineFileFor falls back to a temp registry inside any node --test process tree, and the

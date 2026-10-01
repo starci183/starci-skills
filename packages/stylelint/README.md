@@ -53,7 +53,7 @@ The tokens the rules accept are the grammar's own, read from `packages/grammar/s
 `lib/extract-vocabulary.mjs`: every custom property under `--grammar-`, `--starci-core-`, `--heritage-` and
 `--offset-pop-`, the un-prefixed semantic layer the grammar declares (`--accent`, `--surface`, `--border`, ...) and
 the vendor tokens it reads (`--radius-md`, `--font-mono`). `lib/vocabulary.generated.mjs` is the committed result;
-`npm run vocabulary` regenerates it and `vocabulary.test.mjs` fails when it is stale.
+`npm run vocabulary` regenerates it and `vocabulary.spec.mjs` fails when it is stale.
 
 ## Status colours (soft pairs)
 
@@ -76,5 +76,5 @@ queries are not judged.
 Vietnamese next step, in the shape of eslint-canon-fe's `why`.
 
 ```sh
-npm test            # node --test "*.test.mjs"
+npm test            # node --test "*.spec.mjs"
 ```

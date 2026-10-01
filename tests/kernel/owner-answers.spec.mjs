@@ -14,7 +14,7 @@ import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/kerne
 // the job's retry lineage into packet context.owner_answers and the op prompt, and api report refuses an
 // ask that repeats one (modules/kernel/api.yaml dispatch.ownerAnswers, report refuses ask-already-answered).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const OP='docs.author';
 const CUT={id:'business-paths-rag-rev1',ordinal:1,total:2};
 const QUESTION={text:'Which study-day qualifier should the business rules use?',

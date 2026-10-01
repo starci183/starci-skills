@@ -24,6 +24,6 @@
     "prettier": ">=3"
   },
   "scripts": {
-    "test": "node --test \"*.test.mjs\""
+    "test": "node --test \"*.spec.mjs\""
   }
 }

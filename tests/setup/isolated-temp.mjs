@@ -4,7 +4,7 @@
 //
 // node --test runs each spec file in a child process with this import applied, and the child is where the fixtures
 // live. Loaded first — before isolated-registry, so the per-run machine registry lands inside the root too — it
-// points TEMP/TMP/TMPDIR at a fresh directory and marks it with STARCI_TEST_TEMP_DIR; the spec, and every api.mjs
+// points TEMP/TMP/TMPDIR at a fresh directory and marks it with STARCI_TEST_TEMP_DIR; the spec, and every cli.mjs
 // or kernel the spec spawns with the inherited env, then mkdtemps inside that directory. Because the root is
 // dedicated, anything still in it when the spec's process exits is a fixture nobody removed (test temp hygiene:
 // the suite must leave no new starci* dirs in the temp root). The process lists its leftovers as a diagnostic,
@@ -43,7 +43,7 @@ if (!process.env[TEST_TEMP_ENV]) {
 
 // The op guard directory (scripts/guards/guards-root.mjs) is per PROCESS, never inherited from the runner: every spec
 // file gets its own, so two files that bind the same fake Orca handle (fake-terminal-1) never read each other's guard
-// binding, and no spec writes the live runtime/guards. A process this preload did not load (an api.mjs a spec spawns)
+// binding, and no spec writes the live guards root. A process this preload did not load (an cli.mjs a spec spawns)
 // inherits its spec's directory.
 {
   const guards = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-guards-'));

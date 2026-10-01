@@ -9,7 +9,7 @@ import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
-const apiFile = path.join(root, 'scripts', 'kernel', 'api.mjs');
+const apiFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
 const read0 = (repo, env) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return l.db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n; } finally { l.close(); } };
 test('a filed report makes its worker question inactive before job settlement', (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-question-inactive-'));

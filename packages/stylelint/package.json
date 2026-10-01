@@ -12,7 +12,7 @@
   "files": [
     "*.mjs",
     "lib/*.mjs",
-    "!*.test.mjs",
+    "!*.spec.mjs",
     "!testing.mjs",
     "!lib/write-vocabulary.mjs",
     "!lib/extract-values.mjs",
@@ -35,7 +35,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test \"*.test.mjs\"",
+    "test": "node --test \"*.spec.mjs\"",
     "vocabulary": "node lib/write-vocabulary.mjs"
   },
   "keywords": [

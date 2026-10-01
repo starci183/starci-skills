@@ -1,4 +1,4 @@
-// api-lib/rows.mjs — the ledger row reads every api verb shares (split out of api.mjs, lane slim-api).
+// api-lib/rows.mjs — the ledger row reads every api verb shares (split out of cli.mjs, lane slim-api).
 // Pure projections: a db handle in, a row or a parsed field out; nothing writes and nothing
 // opens a ledger of its own.
 import { parseJson } from '../../../lib/json.mjs';

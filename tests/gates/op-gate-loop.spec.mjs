@@ -19,7 +19,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { installCanons } from '../helpers/canon-install-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 const tmp = (t, prefix = 'starci-op-gate-') => { const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 const put = (root, rel, body) => { const abs = path.join(root, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return rel; };

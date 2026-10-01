@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { lanesRoot, DEFAULT_LANES_ROOT, sweepLanes, parseWorktreeList } from '../../scripts/housekeeping/hk-lanes.mjs';
+import { lanesRoot, DEFAULT_LANES_ROOT } from '../../scripts/machine/home.mjs';
+import { sweepLanes, parseWorktreeList } from '../../scripts/housekeeping/hk-lanes.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs';
 
 const tmp = (t, prefix) => {

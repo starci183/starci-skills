@@ -29,10 +29,10 @@ import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { spentTriesOf } from './units.mjs';
 import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
-import { kernelDecisionItems } from './settle/job-settle.mjs';
+import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { CHILD_ENV, refuseDecisionsFirst } from '../machine/decisions.mjs';
 
-export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'api.mjs');
+export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cli.mjs');
 export const OVERRIDE_KIND = 'kernel-op-override';
 export const PROPOSAL_KIND = 'kernel-proposal';
 export const PUSH_KIND = 'kernel-dispatch-push';
@@ -274,7 +274,7 @@ export const settingsN = () => progressSettings().maxUnitsPerEdit;
  * SETTLE-FIRST, the Kernel's half (owner 2026-09-28; narrowed by owner ruling settle-runtime-service): the runtime
  * settles green reports itself (scripts/kernel/settle/job-settle.mjs), so the backlog counts only the reported jobs of this
  * workflow older than allocation.progress.settleBacklog.ageMs that wait on the Kernel's decision - non-green outcomes
- * and done reports the settler handed over - consumed or not (job-settle.mjs kernelDecisionItems).
+ * and done reports the settler handed over - consumed or not (machine/reported-jobs.mjs kernelDecisionItems).
  */
 export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } = {}) {
   // DECISIONS FIRST (coordinator 2026-09-28, fe-canon): an open, unclaimed Kernel Decision Item older than 2 min refuses

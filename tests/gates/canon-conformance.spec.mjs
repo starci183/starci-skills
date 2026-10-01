@@ -137,7 +137,7 @@ module.exports = { ESLint };
 test('canon-scan lints with the runtime canon source, groups by law, and bounds a slice with --paths', () => {
   const root = fixtureRepo();
   try {
-    const scan = (...args) => node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--machines', 'eslint', '--json', ...args]);
+    const scan = (...args) => node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--machines', 'eslint', '--json', ...args]);
     const all = scan();
     assert.equal(all.status, 1, all.stderr);
     const report = JSON.parse(all.stdout);
@@ -159,13 +159,13 @@ test('canon-scan lints with the runtime canon source, groups by law, and bounds 
 test('canon-scan fails closed when a selected machine cannot run', () => {
   const root = fixtureRepo();
   try {
-    const result = node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--json']);
+    const result = node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--json']);
     assert.equal(result.status, 3, result.stdout);
     const report = JSON.parse(result.stdout);
     assert.equal(report.status, 'unavailable');
     assert.equal(report.machines.architecture.status, 'unavailable');
-    assert.equal(node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--fix']).status, 2, '--fix without --paths is refused');
-    const eslintOnly = node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--families', 'naming', '--json']);
+    assert.equal(node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--fix']).status, 2, '--fix without --paths is refused');
+    const eslintOnly = node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', 'naming', '--json']);
     assert.equal(eslintOnly.status, 0, 'families without architecture need only the lint machine');
     assert.deepEqual(JSON.parse(eslintOnly.stdout).scope.machines, ['eslint']);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }

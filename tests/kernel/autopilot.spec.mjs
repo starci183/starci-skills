@@ -15,7 +15,7 @@ import { stringifyYaml, parseYaml } from '../../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot.mjs';
-import { ownerAnswerProof } from '../../scripts/kernel/owner-claim.mjs';
+import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../../scripts/kernel/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
@@ -24,7 +24,7 @@ import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { composeDirection } from '../../scripts/work/compose-direction.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const baseEnv = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1', ORCA_TERMINAL_HANDLE: '', STARCI_ROLE: '' }; delete e.STARCI_OP_JOB; delete e.STARCI_AUTOPILOT; return e; })();
 const run = (env, ...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...baseEnv, ...env } });
 const json = (r) => { try { return JSON.parse(r.stdout); } catch { const s = r.stdout || r.stderr; const open = s.indexOf('{'), close = s.lastIndexOf('}'); return open < 0 ? null : JSON.parse(s.slice(open, close + 1)); } };

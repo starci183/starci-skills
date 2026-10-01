@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { withWindowsHide } from '../../scripts/api/process/hide-child-windows.mjs';
+import { withWindowsHide } from '../../scripts/api/process/lib.mjs';
 
 // The owner saw black console windows flash on every watchdog tick: detached
 // runtime processes have no console, so each orca/powershell/node child they

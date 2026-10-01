@@ -29,7 +29,7 @@ ui:
     - native-agent-icon
     - terminal-title
     - supervised-worker-receipt
-  note: 'A sidebar subtitle such as "Bash: node api.mjs status" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker.'
+  note: 'A sidebar subtitle such as "Bash: node cli.mjs status" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker.'
   semanticHierarchy:
     schema: starci/agent-hierarchy@1
     projection: 'workflow -> Kernel -> Op'
@@ -72,7 +72,7 @@ workflowKernel:
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
   canonicalLauncher:
-    module: scripts/kernel/api.mjs
+    module: scripts/kernel/cli.mjs
     command: dispatch
     authority: exclusive-effectful-construction-path
     calls: calls.yaml

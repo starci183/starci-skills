@@ -1,5 +1,5 @@
 // api-lib/asks.mjs — the ask writes shared by the ask verbs and `api archive` (split out of
-// api.mjs, lane slim-api).
+// cli.mjs, lane slim-api).
 import { ledgerFileFor } from '../../../../engine/db/ledger.mjs';
 import { closeAskMessages } from '../../ask-server.mjs';
 import { getWorkflow } from './rows.mjs';

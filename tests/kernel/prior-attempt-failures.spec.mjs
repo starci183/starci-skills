@@ -16,7 +16,7 @@ import {priorAttemptFailures} from '../../scripts/kernel/prior-failures.mjs';
 // work unit (prior-failures.mjs:17-24 - a unit is one cut ordinal, units.mjs admitUnit), and the checks are
 // the predecessor attempt's check_runs (api-lib/check-evidence.mjs independentChecksOf), never an op-wide row.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const OP='docs.author';
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};

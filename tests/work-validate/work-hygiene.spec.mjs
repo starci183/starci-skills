@@ -22,7 +22,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_PREFIX']) delete process.env[key];
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const FLOW = '.starciwork/features/login/uat/sign-in';
 const CLEAN_ACCOUNTS = 'schema: work/disposable-accounts@1\ndisposable: true\naccounts:\n  - {role: person, identity: identity.todo-app.demo}\n';
 const BROKEN_YAML = 'schema: work/disposable-accounts@1\nsummary: Fix the sign-in bug: it breaks the page\n';

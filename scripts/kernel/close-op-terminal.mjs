@@ -13,7 +13,7 @@ import { unbindGuardTerminal } from '../guards/hook-install.mjs';
 // resuming its finished transcript. `terminal close --tab` waits until the tab
 // is durably removed. A terminal that shares its tab (or whose tab the listing
 // does not name) keeps the pane close. A closed terminal's guard binding
-// (runtime/guards/terminals/<handle>.json) goes with it. The close reads no output: a caller that keeps the
+// (<guards root>/terminals/<handle>.json) goes with it. The close reads no output: a caller that keeps the
 // attempt's transcript captures it by Dispatch first (transcripts.mjs captureWorker, worker-read; deep map T1).
 export const closeOperationTerminal = (handle, { tabOnly = false, list = terminalList, close = terminalClose, unbind = unbindGuardTerminal } = {}) => {
   const closed = (result) => {

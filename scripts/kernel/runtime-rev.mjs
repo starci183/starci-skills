@@ -34,7 +34,8 @@ import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from './contract-version.mjs';
-import { isContractChangesPath, readContractChangesDocAt } from './contract-changes-store.mjs';
+import { readContractChangesDocAt } from './contract-changes-store.mjs';
+import { isContractChangesPath } from '../lib/contract-changes-path.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';

@@ -1,7 +1,7 @@
 // input-glyph.mjs — the one definition of "the glyph that opens an agent CLI's input row".
 //
 // Five call sites spelled it five ways ([>›❯❭*], [>›❯❭»], [>›❯❭], [›❯❭], [>❯❭]) and each grew its
-// own answer to "is this row the input row" (kernel/api.mjs INPUT_ROW_GLYPH is the same copy; only
+// own answer to "is this row the input row" (kernel/cli.mjs INPUT_ROW_GLYPH is the same copy; only
 // the w2-api lanes may edit it). The chars that count:
 //   >   the plain prompt and the "> <text>" sent-message echo
 //   ›   Codex's input row - and what a lifted draft is drawn as when no glyph row is found

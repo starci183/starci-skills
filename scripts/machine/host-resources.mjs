@@ -7,7 +7,7 @@
 //
 // Disk is measured on the drive holding %TEMP% and on the repo's drive when it differs — `drives`
 // reports both and the WORST one binds (drive/freeDiskGb name it). RAM reuses the worker cap's probe
-// (memoryProbe, scripts/supervisor/workers.mjs — `workers.mjs cap` reads the same machine) rather than
+// (memoryProbe below — `workers.mjs cap` reads the same machine) rather than
 // a second memory sample. Thresholds come from modules/models/runtimes.yaml
 // `allocation.resources.minFreeDiskGb` (default 20) and `minFreeRamPct` (default 15) via
 // engine/config.mjs allocationSettings().
@@ -23,8 +23,28 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { memoryProbe } from '../supervisor/workers.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+
+/**
+ * The machine's RAM right now: {totalRamBytes, freeRamBytes, freeMem} — freeMem is the 0..1 fraction
+ * machineLoad reports. The memory half of the worker cap's load sample (scripts/supervisor/workers.mjs) and
+ * of the dispatch host-resources guard: one probe, not two.
+ */
+export function memoryProbe({ mem = os } = {}) {
+  const totalRamBytes = mem.totalmem(), freeRamBytes = mem.freemem();
+  return { totalRamBytes, freeRamBytes, freeMem: totalRamBytes > 0 ? freeRamBytes / totalRamBytes : 0 };
+}
+
+/** One machine-load sample: {cpuBusy, freeMem} as fractions; CPU over `sampleMs`. */
+export function machineLoad({ sampleMs = 400 } = {}) {
+  const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
+  const a = snap();
+  sleepSync(sampleMs);
+  const b = snap();
+  const total = b.total - a.total;
+  return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: memoryProbe().freeMem };
+}
 
 export const HOST_RESOURCES_LOW = 'host-resources-low';
 export const HOST_RESOURCES_ENV = 'STARCI_HOST_RESOURCES_JSON';

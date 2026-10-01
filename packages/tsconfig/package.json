@@ -23,7 +23,7 @@
     "typescript": ">=5.0.0"
   },
   "scripts": {
-    "test": "node --test \"*.test.mjs\""
+    "test": "node --test \"*.spec.mjs\""
   },
   "devDependencies": {
     "typescript": "5.9.3"

@@ -110,7 +110,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 - All state lives in the project's runtime ledger (`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`) — never
   answer "what's queued" from memory; query `inbox`/`goals`/`jobs`. The ledger
   is written ONLY by the executables above (and at runtime by
-  `node .claude/scripts/kernel/api.mjs <cmd>`, the kernel agent's single
+  `node .claude/scripts/kernel/cli.mjs <cmd>`, the kernel agent's single
   mutation surface). Never open or edit the sqlite file by hand.
 - The op chain is derived by `route-plan.mjs` — underivable chains are shown as such,
   never guessed.

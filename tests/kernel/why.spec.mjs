@@ -14,7 +14,7 @@ import {recordWhy} from '../../scripts/kernel/why-record.mjs';
 // (modules/kernel/failure-codes.yaml) names every code the runtime emits, the checker refuses an uncatalogued one, and
 // scripts/kernel/why.mjs builds the {headline, cause, disagreement, next, owner, codes, refs} stored in op_attempts.why_json.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const tmp=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-why-'));fs.mkdirSync(path.join(d,'docs'));t.after(()=>fs.rmSync(d,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return d;};
 

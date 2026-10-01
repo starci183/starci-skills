@@ -41,7 +41,7 @@ test('a clean tree is green and says so',t=>{
     'scripts/api/orca/lib.mjs':`import {spawnSync} from 'node:child_process';
 spawnSync('${O}',['status','--json']);
 `,
-    'scripts/kernel/api.mjs':"import {terminalSend} from '../api/orca/terminal-send.mjs';\nterminalSend({terminal:'t'});\n",
+    'scripts/kernel/cli.mjs':"import {terminalSend} from '../api/orca/terminal-send.mjs';\nterminalSend({terminal:'t'});\n",
     'CONTEXT.md':'Host calls go through `scripts/api/orca/`; agents never run orca and never read `modules/host/**`.\n',
     'modules/kernel/api.yaml':"note: the kernel agent never calls orca directly; it runs the orca call through a wrapper\n",
   });

@@ -6,7 +6,7 @@ import {sha256} from '../../../engine/digest.mjs';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs';
-import {grammarDistRefusal} from '../../checks/check-grammar-dist.mjs';
+import {grammarDistRefusal} from '../../gates/grammar-dist.mjs';
 import {slash, sameOrUnder} from '../../lib/path-key.mjs';
 import { isInside as inside } from '../../lib/walk.mjs';
 import {readJsonFile as readJson} from '../../lib/json.mjs';

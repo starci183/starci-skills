@@ -225,7 +225,7 @@ export default {
       const file = path.join(dir, `${editId}.json`);
       const log = fs.openSync(`${file}.log`, 'a');
       const out = fs.openSync(file, 'w');
-      const child = spawn(process.execPath, [path.join(skillRoot, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
+      const child = spawn(process.execPath, [path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
         { cwd: skillRoot, detached: true, stdio: ['ignore', out, log], windowsHide: true });
       child.unref();
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };

@@ -30,7 +30,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { SLOT_STATUSES, priorityTable, readThrottleState } from '../machine/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
 import { JOB_ROW } from './verbs/shared/rows.mjs';
-import { kernelDecisionItems } from './settle/job-settle.mjs';
+import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 
@@ -353,7 +353,7 @@ const actionKey = (...parts) => parts.join(':');
  * Each: {rank, key, tier: light|heavy|proposal|supervisor, title, command, expected, unblocks, cause, tried}.
  */
 export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo>', decisions = [], missingQueued = [], settings = progressSettings(), recutOp = null, importsBroken = null }) {
-  const api = `node scripts/kernel/api.mjs`;
+  const api = `node scripts/kernel/cli.mjs`;
   const base = `--repo ${q(repo)} --workflow ${workflowId}`;
   const acts = [];
   const add = (a) => acts.push(a);

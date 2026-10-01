@@ -13,7 +13,7 @@
 //       whatever the verdict; a pass with no video sends its screenshots as an
 //       album instead
 //
-// The one send point is the KERNEL's settle: scripts/kernel/api.mjs cmdSettle
+// The one send point is the KERNEL's settle: scripts/kernel/cli.mjs cmdSettle
 // calls queueSettleMedia(), which launches this file detached (`settle` verb),
 // so an upload never slows or fails the settle. The sender's stderr goes to
 // machine_logs (actor connector, kind telegram-media.*). One send per workflow|job|attempt
@@ -559,7 +559,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
 }
 
 /**
- * The settle's hook (scripts/kernel/api.mjs cmdSettle): launch the sender detached when this op has
+ * The settle's hook (scripts/kernel/cli.mjs cmdSettle): launch the sender detached when this op has
  * media to send and Telegram is on, and return at once. Synchronous and never throws, so the settle
  * is never slowed or failed by Telegram; a launch failure is one stderr line.
  */
@@ -569,7 +569,7 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     if (!kind) return { queued: false, skipped: 'not a media op' };
     if (kind === 'draw' && job.verdict !== 'pass') return { queued: false, skipped: 'a draw is sent when it settles pass' };
     if (env.STARCI_CONNECTORS_OFF === '1') return { queued: false, skipped: 'STARCI_CONNECTORS_OFF' };
-    // A spec run (node --test sets NODE_TEST_CONTEXT, which a spawned api.mjs inherits) never
+    // A spec run (node --test sets NODE_TEST_CONTEXT, which a spawned cli.mjs inherits) never
     // reaches the real Bot API: only a spec that points STARCI_TELEGRAM_API_BASE at a fake queues.
     if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
     const settings = telegramSettings({ config: config === undefined ? ownerConfig() : config, env });

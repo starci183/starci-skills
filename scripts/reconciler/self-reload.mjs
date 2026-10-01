@@ -31,17 +31,6 @@ import { sleep as sleepAsync } from '../lib/sleep.mjs';
 export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
 export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
 export const RELOAD_ENV = Object.freeze({ handoverFrom: 'STARCI_RELOAD_HANDOVER_FROM', reloadedAt: 'STARCI_RELOADED_AT' });
-export const LOG_CAP_BYTES = 5 * 1024 * 1024;
-
-/**
- * Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. A text-log helper
- * for the writers that still own a text log (scripts/housekeeping/hk-logs.mjs); the reload loops no longer write one.
- */
-export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
-  fs.mkdirSync(path.dirname(log), { recursive: true });
-  try { if (fs.statSync(log).size > cap) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
-  return log;
-}
 
 /** The runtime checkout's HEAD commit, or null when git does not answer. */
 export function runtimeHead({ root, run = gitSpawn } = {}) {

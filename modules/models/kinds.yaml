@@ -643,7 +643,7 @@ kinds:
   # `shell`): the first draw claims it, another workflow's draw waits (queuedBecause foundation-wait) and a stalled
   # owner opens a Supervisor Decision Item; settle lands the foundation when the tree is settled. Three machines hold
   # it in code: that foundation gate; a cut's non-seam ordinals wait
-  # on ordinal 1 (scripts/kernel/api.mjs queue hold), so a cut whose seam is the layout draw or the layout's
+  # on ordinal 1 (scripts/kernel/cli.mjs queue hold), so a cut whose seam is the layout draw or the layout's
   # own source lands it before any slice under it; and scripts/work/ui/shell-conformance.mjs judges the RESULT,
   # refusing a direction under an unsettled or rev-stale layout at the draw's proof. Parallel slices drawing or
   # building their own chrome is the defect this rule exists for (wf-nivo-modules-agentos: three logos,
@@ -1051,7 +1051,7 @@ lanes:
 # `lane.build` the build step of the reporter's lane, so a frontend repair is never a backend op. `limit`
 # bounds how many times one route may fire for the same node group (the failed job's retry lineage); past it an
 # owner gate holds that job. Ordered: the first matching route wins, and a route with an explicit `from` stands
-# before the `any` one. A failed settle runs its route itself (scripts/kernel/api.mjs enqueueNextStep).
+# before the `any` one. A failed settle runs its route itself (scripts/kernel/cli.mjs enqueueNextStep).
 routes:
   - id: interface-audit-local-drift-repairs-the-interface
     on: {outcome: failed, class: product}

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
-import {notOwnerWorkOf,ownerClaimAudit,ownerClaimOf} from '../../scripts/kernel/owner-claim.mjs';
+import {notOwnerWorkOf,ownerClaimAudit,ownerClaimOf} from '../../scripts/machine/owner-claim.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
@@ -16,7 +16,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // "Owner confirmed: ..." with no owner answer in the ledger. A resolution that claims an owner decision
 // now names a verified owner answer (ask-answered event + receipt, both answeredBy owner) or refuses.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
 const WF='wf-owner-claim';
 
@@ -142,7 +142,7 @@ test('the audit lists a past resolution whose owner claim no answer backs, and a
   const frontier=JSON.parse(status.stdout).frontier;
   assert.deepEqual(frontier.ownerGatesNotOwnerWork.map(g=>g.incidentId),[gate]);
   assert.deepEqual(frontier.ownerClaimsUnproven.map(c=>c.incidentId),[fakeId]);
-  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','checks','owner-claims-audit.mjs'),'--repo',repo,'--json'],{encoding:'utf8',windowsHide:true});
+  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','housekeeping','owner-claims-audit.mjs'),'--repo',repo,'--json'],{encoding:'utf8',windowsHide:true});
   assert.equal(cli.status,1,cli.stderr);
   const out=JSON.parse(cli.stdout);
   assert.deepEqual(out.ledgers[0].unproven.map(f=>f.incidentId),[fakeId]);

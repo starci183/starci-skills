@@ -1,7 +1,7 @@
 // api retire-ask — close an ask the owner should no longer answer (api-lib/asks.mjs retireAsk):
 // the ask is recorded ask-superseded with by:null and the reason, the same terminal kind
 // serve-ask writes for a replaced ask; its Telegram messages leave the owner's chat. Split out
-// of api.mjs (lane slim-api); its help line stays in api.mjs usage() (usageInCore).
+// of cli.mjs (lane slim-api); its help line stays in cli.mjs usage() (usageInCore).
 //
 //   retire-ask --workflow <id> --dispatch <id> --reason <text>
 import { retireAsk } from './shared/asks.mjs';

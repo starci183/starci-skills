@@ -438,7 +438,7 @@ export default {
     : releaseManagedWorker(db, job, settledPayload, repo);
   // A released worker's output stays readable from Orca's archive: the fullest read becomes op_attempts.transcript_sha.
   if (managedWorker && !releasedEarlier && settledAttemptId != null) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, dispatch: managed.dispatchId });
-  // The worker's terminal guard binding (runtime/guards/terminals/<handle>.json) dies with its
+  // The worker's terminal guard binding (<guards root>/terminals/<handle>.json) dies with its
   // terminal: unbind it at settle too, not only inside the close, so a worker released while held,
   // a close that predated binding cleanup, or a failed close that still left the terminal gone never
   // leaves the binding to the seven-day prune. Removing a missing file is a no-op.

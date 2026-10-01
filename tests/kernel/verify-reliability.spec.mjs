@@ -25,7 +25,7 @@ import {recordEnvelopeChecks} from '../../scripts/kernel/verbs/shared/check-evid
 process.env.STARCI_AUTOPILOT ??= 'off';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.yaml'),'utf8'));
 

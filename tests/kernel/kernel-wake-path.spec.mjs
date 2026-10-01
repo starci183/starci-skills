@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { wakeKernel, wakeKernelForTransition, transitionWakeText, WAKE_BOUNDS } from '../../scripts/kernel/wake-delivery.mjs';
 import { wakeAskAnswered } from '../../scripts/kernel/ask-server.mjs';
 
-// One Kernel wake path (scripts/kernel/wake-delivery.mjs wakeKernel) serves the transition wakes (api.mjs),
+// One Kernel wake path (scripts/kernel/wake-delivery.mjs wakeKernel) serves the transition wakes (cli.mjs),
 // the ask-answered wake (serve-ask.mjs) and the stall and supervisor wakes (supervisor/stall-alert.mjs).
 // The ask-answered copy once classified the frame without the stale-active rule: a Kernel whose frame
 // froze on a spinner read turn-idle for every api wake but `active` for the owner's answer, and that

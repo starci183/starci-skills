@@ -416,8 +416,8 @@ export function doctor(opts, log = console.log) {
   const manifest = readManifest(target);
   // The kernel api gate is the modernity marker of the current layout: a tree without it is not an
   // installed StarCi runtime, no matter what else is present.
-  if (!existsSync(path.join(target, 'scripts', 'kernel', 'api.mjs'))) {
-    throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/api.mjs; run init first`);
+  if (!existsSync(path.join(target, 'scripts', 'kernel', 'cli.mjs'))) {
+    throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/cli.mjs; run init first`);
   }
   const testsDir = path.join(target, 'tests');
   const specs = existsSync(testsDir) ? readdirSync(testsDir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith('.spec.mjs')).map((e) => e.name).sort() : [];

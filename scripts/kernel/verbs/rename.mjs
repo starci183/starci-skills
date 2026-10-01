@@ -3,8 +3,8 @@
 // workflows.display_name and appends workflow-renamed {from, to, by, at}; then, best effort,
 // every live tab that shows the name is renamed through the host's terminal-rename call: the
 // Kernel's `[Kernel] <name>` and each open op worker's `[Op] <op label> · <what> · <name>`.
-// --no-terminals leaves the tabs to the next boot/dispatch. Split out of api.mjs (lane
-// slim-api); its help line stays in api.mjs usage() (usageInCore).
+// --no-terminals leaves the tabs to the next boot/dispatch. Split out of cli.mjs (lane
+// slim-api); its help line stays in cli.mjs usage() (usageInCore).
 //
 //   rename --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
 import { ARCHIVED_BY, getWorkflow, jobPayloadOf } from './shared/rows.mjs';

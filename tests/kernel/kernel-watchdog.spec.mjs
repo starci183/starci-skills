@@ -77,7 +77,7 @@ test('a Kernel yield summary that says "Running now:" is turn-idle, not active',
   assert.equal(classifyAgentScreen('• Working (4m 36s · esc to interrupt) · 1 background terminal running\n› Ask Codex').state,'active');
   // A wrapped prose line that happens to start with lowercase "running." is not a spinner.
   assert.equal(classifyAgentScreen(' Yield state:  backend.implement — 3/8 settled; wave 4 (routing)\n running. Remaining: tasks → approval ∥ notification → gateway.\n❭ Ask Devin to build features').state,'turn-idle');
-  assert.equal(classifyAgentScreen('○ Running command\n│ $ node api.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
+  assert.equal(classifyAgentScreen('○ Running command\n│ $ node cli.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
   assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
 });
 
@@ -125,7 +125,7 @@ test('a Claude Code star spinner with a timer is active; its idle prompt is not'
 // (inc-dd8b95e58762, inc-a579fa590ed8, inc-786c9372e7a2, inc-dbdb4244ee2a, inc-5d6556105a98).
 test('any Claude spinner row and a still-executing tool call are active; finished scrollback is not',()=>{
   const chrome=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
-  const pre=['● Bash(node scripts/kernel/api.mjs op-contract --job op-provision.ask-9a2c8f0c8d)',
+  const pre=['● Bash(node scripts/kernel/cli.mjs op-contract --job op-provision.ask-9a2c8f0c8d)',
     '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
   assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
@@ -137,7 +137,7 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
   assert.equal(classifyAgentScreen(['· Reading owned records… (running PreToolUse hook)',...chrome].join('\n')).state,'active','the dim first spinner frame');
   const tool=['● Reading owned records','  ⎿  Running…',...chrome].join('\n');
   assert.equal(classifyAgentScreen(tool).state,'active','a tool call still executing');
-  assert.equal(classifyAgentScreen(['● Bash(node api.mjs status)','  ⎿  Running PreToolUse hook…',...chrome].join('\n')).state,'active');
+  assert.equal(classifyAgentScreen(['● Bash(node cli.mjs status)','  ⎿  Running PreToolUse hook…',...chrome].join('\n')).state,'active');
   // Captured from a running nivo claude-agent op (op-backend.implement-c8cae00a7d) on 2026-09-23.
   const live=['  ⎿  $ cd /d/Repositories/nivo-backend;',
     '     E=.starciwork/features/workspace-provision/impl/nivo-backend/purchase-orchestrator/E; npx jest --config',

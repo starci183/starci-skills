@@ -404,7 +404,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
     } finally { ledger.close(); }
     return jobId;
   };
-  const settle = (jobId) => { const s = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'settle', '--repo', p.repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 300000 }); let body = null; try { body = JSON.parse(s.stdout); } catch { body = null; } return { s, body }; };
+  const settle = (jobId) => { const s = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), 'settle', '--repo', p.repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 300000 }); let body = null; try { body = JSON.parse(s.stdout); } catch { body = null; } return { s, body }; };
   const fresh = settle(seed('op-interface.draw-loop', 'wf-draw', at + 1000));
   assert.equal(fresh.s.status, 1, fresh.s.stdout || fresh.s.stderr);
   assert.equal(fresh.body.reason, 'draw-metrics-failed', 'the stubbed loop said pass; the runtime re-ran the metrics itself and could not verify them on this host');
@@ -414,7 +414,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   assert.equal(old.s.status, 0, old.s.stderr || old.s.stdout);
   // The settle files the drawing's grammar proposal for the owner - proposed, never accepted - and status lists it.
   assert.deepEqual(old.body.grammarProposals.map((g) => g.name), ['Meter.segments']);
-  const st = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'status', '--repo', p.repo, '--workflow', 'wf-draw-old', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+  const st = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), 'status', '--repo', p.repo, '--workflow', 'wf-draw-old', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(st.status, 0, st.stderr);
   assert.deepEqual(JSON.parse(st.stdout).grammarProposals.map((g) => [g.name, g.status, g.jobId]), [['Meter.segments', 'proposed', 'op-interface.draw-old']]);
 });

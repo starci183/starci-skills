@@ -20,7 +20,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 // dispatch path leases and their overlap -> report files -> the settle landed-check, whose git
 // pathspecs must read the name literally (`[id]` as a glob also matches a sibling `i`).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WORKFLOW='wf-app-router';
 const OP='code.refactor';
 

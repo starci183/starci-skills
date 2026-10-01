@@ -209,7 +209,7 @@ test('api dispatch refuses an op whose Kernel already sits at orca.maxWorkerDept
   try { seedWorkflow(ledger, { id: workflowId, jobs: [{ jobId: 'job-deep', opId: 'code.refactor', payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], model: 'claude-agent' } }] }); }
   finally { ledger.close(); }
   const callsBefore = fs.readFileSync(log, 'utf8').trim().split('\n').length;
-  const d = run(['scripts', 'kernel', 'api.mjs'], 'dispatch', '--repo', repo, '--job', 'job-deep', '--model', 'claude-agent', '--spawn', '--json');
+  const d = run(['scripts', 'kernel', 'cli.mjs'], 'dispatch', '--repo', repo, '--job', 'job-deep', '--model', 'claude-agent', '--spawn', '--json');
   assert.equal(d.status, 1, d.stdout);
   const out = JSON.parse(d.stdout);
   assert.equal(out.rejected, 'dispatch-rejected');

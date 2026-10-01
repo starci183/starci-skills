@@ -20,27 +20,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allocationSettings } from '../../engine/config.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { isLinkLike, safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
 import { pathKey } from '../lib/path-key.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { lanesRoot } from '../machine/home.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, liveLaneOwners } from '../machine/lane-owner.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-export const DEFAULT_LANES_ROOT = 'D:/starci-lanes';
-
-/**
- * The one lane-worktree root. `env.STARCI_LANES_ROOT` wins (specs, a one-off run); then the
- * runtimes.yaml key — pass `allocation` (allocationSettings()) when the caller already holds it,
- * else it is read here; the declared default applies while the key is absent.
- */
-export function lanesRoot({ env = process.env, allocation = undefined } = {}) {
-  let configured = null;
-  if (allocation !== undefined) configured = allocation?.housekeeping?.lanesRoot ?? null;
-  else { try { configured = allocationSettings()?.housekeeping?.lanesRoot ?? null; } catch { configured = null; } }
-  return path.resolve(String(env?.STARCI_LANES_ROOT || configured || DEFAULT_LANES_ROOT));
-}
 
 /** `git worktree list --porcelain` as [{path, branch, detached, dirty, locked, prunable}]. */
 export function parseWorktreeList(text) {

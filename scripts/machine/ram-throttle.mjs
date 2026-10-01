@@ -53,9 +53,9 @@
 import { allocationSettings, runtimeProfile } from '../../engine/config.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { hostResourcesFor, resourceThresholds, HOST_RESOURCES_ENV } from './host-resources.mjs';
-import { machineLedgerFiles } from '../agent/balance.mjs';
-import { machineLoad } from '../supervisor/workers.mjs';
+import { runtimeRevOf } from './home.mjs';
+import { hostResourcesFor, resourceThresholds, machineLoad, HOST_RESOURCES_ENV } from './host-resources.mjs';
+import { machineLedgerFiles } from './ledger-files.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
 export const RECONCILER_WRITER = 'reconciler/resource';
@@ -66,7 +66,7 @@ export const OP_RAM_FOOTPRINT = 'op-ram-footprint';
 /** host_samples.kind of one op-ram-footprint sample. */
 export const FOOTPRINT_SAMPLE_KIND = 'op-footprint';
 export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
-// The job statuses that hold a slot (scripts/kernel/api.mjs SLOT_HOLDING_STATUSES: dispatched and not settled).
+// The job statuses that hold a slot (scripts/kernel/cli.mjs SLOT_HOLDING_STATUSES: dispatched and not settled).
 export const SLOT_STATUSES = Object.freeze(['leased', 'running', 'reported', 'effect_unknown', 'answering']);
 
 const DEFAULTS = Object.freeze({
@@ -313,7 +313,7 @@ export function publishThrottle(m, { mode, cpuHot = false, why = null, effective
   return m.transaction(() => {
     const cur = m.throttleState();
     return m.setThrottle({ mode: dbMode(mode), effectiveCap, heavyCap, running, freeRamPct, freeRamMb: freeRamMb == null ? null : Math.round(freeRamMb),
-      cpuPct: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 10, cpuHot: Boolean(cpuHot), reason: why, writer, slotTargets, priorities: cur?.priorities ?? null, sample });
+      cpuPct: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 10, cpuHot: Boolean(cpuHot), reason: why, writer, writerRev: runtimeRevOf(), slotTargets, priorities: cur?.priorities ?? null, sample });
   });
 }
 

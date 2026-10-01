@@ -163,7 +163,7 @@ test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called,
   assert.deepEqual(retiredFindings(ctx), []);
 });
 
-const PINNED_FILES = ['bin/starci.mjs', 'scripts/kernel/api.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
+const PINNED_FILES = ['bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
 
 test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesced: true, is refused', () => {
   const gone = pinnedFindings(ctxOf({}, { files: PINNED_FILES.filter((p) => p !== 'scripts/reconciler/boot.mjs') }));
@@ -257,8 +257,8 @@ ruleParams:
     oneOffNames: ["tmp-*"]
     sharedBasenames: [lib.mjs]
     generated: [{root: packages/x/runtime, generatedBy: scripts/kernel/sync.mjs}]
-    pinned: [{path: scripts/kernel/api.mjs, why: the fixture's pinned entry}]
-    selfChecks: [{id: none, run: scripts/kernel/api.mjs}]
+    pinned: [{path: scripts/kernel/cli.mjs, why: the fixture's pinned entry}]
+    selfChecks: [{id: none, run: scripts/kernel/cli.mjs}]
 slots:
   - {id: runtime.declaration, profiles: [runtime], path: hfs.json, presence: required, tracked: tracked, tier: none, tests: none}
   - {id: runtime.manifest, profiles: [runtime], path: knowledge/hfs/runtime-slots.yaml, presence: required, tracked: tracked, tier: none, tests: none}
@@ -271,7 +271,7 @@ const fixture = (t, files, pending = []) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-hfs-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const pendingText = `pending:\n${pending.map((e) => `  - {path: "${e.path}", rule: ${e.rule}, lane: ${e.lane ?? 'C2a'}, since: 2026-10-01, reason: fixture}`).join('\n')}\n`;
-  const all = { 'hfs.json': '{"hfs": 1, "kind": "runtime", "project": "fixture"}\n', [RUNTIME_MANIFEST_FILE]: `${FIXTURE_MANIFEST}${pending.length ? pendingText : 'pending: []\n'}`, 'scripts/kernel/api.mjs': 'export const api = 1;\n', ...files };
+  const all = { 'hfs.json': '{"hfs": 1, "kind": "runtime", "project": "fixture"}\n', [RUNTIME_MANIFEST_FILE]: `${FIXTURE_MANIFEST}${pending.length ? pendingText : 'pending: []\n'}`, 'scripts/kernel/cli.mjs': 'export const api = 1;\n', ...files };
   for (const [rel, body] of Object.entries(all)) { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), body); }
   return { dir, files: Object.keys(all) };
 };

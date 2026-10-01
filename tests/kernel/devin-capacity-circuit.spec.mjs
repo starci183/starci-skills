@@ -24,7 +24,7 @@ import { readProviderCircuit } from '../../scripts/kernel/provider-circuit.mjs';
 import { JOB_ROW } from '../../scripts/kernel/verbs/shared/rows.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const runtimes = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const CAPACITY_ROW = 'Client error: Protocol error (unimplemented): We are currently experiencing capacity issues with this serving model. Please switch to a different model or try again later. (trace ID: 068a07abe316fe5c299e31dc5871a0bb)';

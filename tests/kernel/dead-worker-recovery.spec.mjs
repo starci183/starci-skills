@@ -20,7 +20,7 @@ import {jobResult} from '../../engine/db/ledger.mjs';
 //   - a live worker is never recovered.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WF='wf-dead-worker',JOB='job-dead-worker',HANDLE='term-dead-worker',OP='docs.author';
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const HOUR=3600*1000;

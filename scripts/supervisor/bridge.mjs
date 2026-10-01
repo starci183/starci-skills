@@ -32,7 +32,7 @@
 // Under autopilot (runtimes.yaml allocation.autopilot.enabled, default on) no owner approval is asked and
 // the record says provisional:true, approvedBy supervisor-autopilot; with autopilot off a write verb needs
 // --owner-ok (the owner said ok in the Supervisor's channel). Writes go only through this landed CLI,
-// define-goal.mjs, start-workflow.mjs and api.mjs incident; nothing here edits a ledger by hand.
+// define-goal.mjs, start-workflow.mjs and cli.mjs incident; nothing here edits a ledger by hand.
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -50,7 +50,7 @@ import { TRANSFER_SCHEMA, createOwnership, normWork } from '../kernel/work-owner
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 const DEFINE_GOAL = path.join(SKILL_ROOT, 'scripts', 'goal', 'define-goal.mjs');
 const START_WORKFLOW = path.join(SKILL_ROOT, 'scripts', 'kernel', 'start-workflow.mjs');
 export const ACTION_KIND = 'supervisor-action';
@@ -86,7 +86,7 @@ export function approvalOf(args, { autopilot = autopilotOn() } = {}) {
 const runNode = (script, argv, { env = process.env, timeout = 180_000 } = {}) => spawnSync(process.execPath, [script, ...argv],
   { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout, env });
 const lastJson = (text) => { const t = String(text ?? '').trim(); return parseJson(t) ?? parseJson(t.split('\n').at(-1)) ?? null; };
-/** One api.mjs call: {ok, body, error, code}. */
+/** One cli.mjs call: {ok, body, error, code}. */
 export function apiCall(repo, argv, opts) {
   const r = runNode(API, [...argv, '--repo', repo, '--json'], opts);
   const body = lastJson(r.stdout) ?? lastJson(r.stderr);

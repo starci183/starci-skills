@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // seat-tools.mjs — the Claude Code PreToolUse hook that enforces a seat's denied tools (.claude/settings.json).
 // worker-start takes no provider argv, so a seat launched through it cannot carry --disallowedTools: the runtime binds
-// the seat's terminal instead (scripts/guards/hook-install.mjs bindSeatGuard -> runtime/guards/seats/<handle>.json) and this
+// the seat's terminal instead (scripts/guards/hook-install.mjs bindSeatGuard -> <guards root>/seats/<handle>.json) and this
 // hook denies exactly those tools for exactly that terminal (ORCA_TERMINAL_HANDLE, which Orca exports into it).
 // Every other session - no Orca handle, or a handle with no seat guard - passes untouched.
 import fs from 'node:fs';

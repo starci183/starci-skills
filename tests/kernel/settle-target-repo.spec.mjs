@@ -16,7 +16,7 @@ for(const key of ['GIT_DIR','GIT_COMMON_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','G
 // sides under a tmp Source, cloned from a local bare origin, the ledger at the
 // app root. STARCI_SOURCE_ROOT points the registry lookup at the tmp Source.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 const git=(cwd,...args)=>{
   const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});

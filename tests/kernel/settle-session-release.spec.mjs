@@ -15,7 +15,7 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { sessionCandidates, sessionHomes, sessionProjectSlug, releaseSettledSession } from '../../scripts/kernel/op-session.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (v) => JSON.stringify(v ?? null);
 
 const runApi = (env, ...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });

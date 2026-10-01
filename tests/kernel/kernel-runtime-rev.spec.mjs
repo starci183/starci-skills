@@ -18,7 +18,7 @@ import { rowsOfEvent } from '../../scripts/kernel/typed-logs.mjs';
 // reached a running Kernel without a restart. Every wake now names the runtime rev and, when the Kernel's acked
 // rev is behind, what to re-read; enqueue/dispatch of a leg whose op contract changed waits for the ack.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const lastJson = (text) => String(text ?? '').trim().split(/\r?\n/).reverse().map(json).find(Boolean) ?? null;
 

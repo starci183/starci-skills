@@ -10,9 +10,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
-  newHypotheses, learnTick, readLearning, tierOf, guardLand, landExperiment, measureExperiments, revertExperiment, recordFeedback, matchLessons,
-  lessonsYaml, learningDigest, propose, signatureOf,
+  newHypotheses, learnTick, readLearning, tierOf, guardLand, measureExperiments, recordFeedback, matchLessons,
+  lessonsYaml, learningDigest, signatureOf,
 } from '../../scripts/machine/lessons.mjs';
+import { landExperiment, revertExperiment, propose } from '../../scripts/supervisor/lesson-actions.mjs';
 import { parseLessonsFile, withLessons } from '../../scripts/machine/lessons-file.mjs';
 import { readSupervisor, supervisorEvent, withSupervisor, writeSeat } from '../../scripts/machine/home.mjs';
 import { readSupervisorState } from '../../scripts/supervisor/state.mjs';

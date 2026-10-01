@@ -120,7 +120,7 @@ settle:
     `api incident --kind shared-blocker --introduced-by <sha>` for a landed one; a sibling job of
     its own workflow is sequenced, not waited on.
   nextStep: >-
-    A fail verdict that no peer check caused runs its route (scripts/kernel/api.mjs enqueueNextStep over
+    A fail verdict that no peer check caused runs its route (scripts/kernel/cli.mjs enqueueNextStep over
     modules/models/kinds.yaml routes) in the settle's transaction: the route key is verdict no-report when
     no report was filed, verdict rejected for a done claim the checks overruled, else the report outcome;
     an explicit `from` wins over `any`. It fires at most `limit` times per node group - the failed job's

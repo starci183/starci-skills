@@ -1,10 +1,10 @@
-// worktree-list.mjs — `git worktree list --porcelain` as {path, branch, head, prunable} rows, and the lookups over it.
+// worktree-list-porcelain.mjs — `git worktree list --porcelain` as {path, branch, head, prunable} rows. The lookups over it
+// (mainRootOf, registeredAt) are scripts/machine/worktree-git.mjs.
 import path from 'node:path';
 import { gitRunner } from './lib.mjs';
-import { sameTree } from '../../machine/worktree-registry.mjs';
 
 /** {path, branch, head, prunable} of every registered worktree of the repository (the main checkout first). */
-export function gitWorktreeList(repoRoot, { git = null } = {}) {
+export function worktreeListPorcelain(repoRoot, { git = null } = {}) {
   const r = gitRunner(git)(['worktree', 'list', '--porcelain'], { cwd: repoRoot });
   const out = [];
   let cur = null;
@@ -16,9 +16,3 @@ export function gitWorktreeList(repoRoot, { git = null } = {}) {
   }
   return out;
 }
-
-/** The repository's main checkout (the first `git worktree list` entry): the registry's repo key, from any of its trees. */
-export const mainRootOf = (repoRoot, opts) => gitWorktreeList(repoRoot, opts)[0]?.path ?? path.resolve(repoRoot);
-
-/** The registration of `dir` in the repository, or null. */
-export const registeredAt = (repoRoot, dir, opts) => gitWorktreeList(repoRoot, opts).find((w) => sameTree(w.path, dir)) ?? null;

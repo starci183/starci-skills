@@ -2,7 +2,7 @@
 // runs it now, and find the operation Tasks nothing holds any more.
 //
 // A workflow has one Orca Run, created by its first operation with the Kernel
-// terminal as coordinator (api.mjs ensureWorkflowRun). A Kernel restart
+// terminal as coordinator (cli.mjs ensureWorkflowRun). A Kernel restart
 // replaces the terminal but not the Run: the Run id is durable on the kernel
 // job, and Orca's coordinator_handle still names the old terminal. Orca then
 // refuses every task-create/task-update the new Kernel issues. After the
@@ -48,7 +48,7 @@ export function bindWorkflowRun({ runId, kernelHandle }, { show = runShow, use =
 // dispatched, blocked) is an open row in the sidebar.
 export const CLOSED_TASK_STATUSES = new Set(['completed', 'failed']);
 // A Task StarCi created: an operation Task is titled `<op> #<attempt>` and
-// displayed `[Op] <op>` (api.mjs createOperationTask).
+// displayed `[Op] <op>` (cli.mjs createOperationTask).
 const STARCI_TASK_TITLE = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9.-]*\s+#\d+$/i;
 export const isStarciTask = (task) => /^\[Op\]\s/.test(String(task?.display_name ?? task?.displayName ?? ''))
   || STARCI_TASK_TITLE.test(String(task?.task_title ?? task?.taskTitle ?? ''));

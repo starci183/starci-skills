@@ -17,7 +17,7 @@
 //   transient      nothing above: the one class the same-op retry route accepts
 //
 // A report may state its class (`failureClass`); the api only accepts one the evidence does not
-// contradict. Nothing here writes: api.mjs settle and enqueueNextStep call it.
+// contradict. Nothing here writes: cli.mjs settle and enqueueNextStep call it.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';

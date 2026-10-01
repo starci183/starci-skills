@@ -13,8 +13,8 @@ import {runningWorkflows} from '../../scripts/kernel/managed-repos.mjs';
 import {jobResult} from '../../engine/db/ledger.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
-const WATCHDOG=path.join(ROOT,'scripts','kernel','watchdog.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
+const WATCHDOG=path.join(ROOT,'scripts','kernel','kernel-watchdog.mjs');
 const WF='wf-archive-spec',PEER='wf-archive-peer',KERNEL_TERM='term-archive-kernel',OP_TERM='term-archive-op';
 const HOUR=3600*1000;
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};

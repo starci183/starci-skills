@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { stallFindings } from '../../scripts/supervisor/stall.mjs';
 
-const API = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'kernel', 'api.mjs');
+const API = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'kernel', 'cli.mjs');
 const WF = 'wf-supervisor-hold-spec';
 const NOW = Date.now();
 const MIN = 60_000;

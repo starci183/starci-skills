@@ -13,7 +13,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // ask-answered; every reader of open asks honours the terminal kinds.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const SERVE_ASK=path.join(ROOT,'scripts','kernel','serve-ask.mjs');
+const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server.mjs');
 const WORKFLOW='wf-serve-ask';
 
 const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now(),refs=null})=>{
@@ -125,12 +125,12 @@ test('--review reads an ask; it never retires one',async t=>{
 
 // A StarCi Next Kernel sat an hour on an ask-reserve (inc-2558dd227dfd): status
 // said re-serve with serve-ask.mjs, but the Kernel may mutate only through
-// api.mjs. `api serve-ask` launches the same form detached.
+// cli.mjs. `api serve-ask` launches the same form detached.
 test('api serve-ask launches the form for a filed ask and refuses one that was never filed',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAskReport(ledger,{dispatchId:'ctx_api'});
-    const API=path.join(ROOT,'scripts','kernel','api.mjs');
+    const API=path.join(ROOT,'scripts','kernel','cli.mjs');
     const api=(...a)=>spawnSync(process.execPath,[API,'serve-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],
       {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,STARCI_CONNECTORS_OFF:'1'}});
     const refused=api('--dispatch','ctx_nope');
@@ -154,7 +154,7 @@ test('api retire-ask closes an obsolete ask so it is no longer open, and needs a
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAskReport(ledger,{dispatchId:'ctx_stale'});
-    const API=path.join(ROOT,'scripts','kernel','api.mjs');
+    const API=path.join(ROOT,'scripts','kernel','cli.mjs');
     const api=(...a)=>spawnSync(process.execPath,[API,'retire-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
     assert.notEqual(api('--dispatch','ctx_stale').status,0,'a retired ask keeps its reason');
     assert.match(api('--dispatch','ctx_nope','--reason','x').stderr,/ask-unknown/);

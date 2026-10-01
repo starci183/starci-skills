@@ -294,7 +294,7 @@ function submitDraft({ terminal, draft, stagedPattern, sentText, reads, interval
 // Orca 1.4.209 binds a send to the terminal's process incarnation: a terminal created before an
 // Orca update shows writable on `terminal show` yet refuses every write terminal_not_writable
 // (nivo inc-f1b576fb6006; the worker side records the same refusal op-worker-unwritable,
-// scripts/kernel/api.mjs). A kernel wake send refused that way is the one writability judgement:
+// scripts/kernel/cli.mjs). A kernel wake send refused that way is the one writability judgement:
 // it is recorded kernel-wake-unwritable, and on a stale-active frame (a frozen spinner whose
 // lastOutputAt is older than activeStaleMs) the watchdog never types into it again - the terminal
 // is closed directly (a typed quit and an Orca interrupt are refused the same way) and

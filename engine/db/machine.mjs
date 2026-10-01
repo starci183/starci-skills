@@ -35,7 +35,6 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { runGit } from '../../scripts/api/git/lib.mjs';
 import { sleepSync as scaledSleepSync } from '../../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from './blob.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs';
@@ -240,20 +239,14 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
 }
 
 /**
- * The rev of the runtime this process runs: '<HEAD committer time, ms, 13 digits>:<short sha>' of the .claude checkout
- * (STARCI_RUNTIME_REV overrides). The time prefix orders two revs, so a writer can refuse a store row written by a NEWER
- * runtime (MB-15). 'unknown' sorts before every real rev. Computed once per process.
+ * The rev of the runtime this process runs, as its callers know it: '<HEAD committer time, ms, 13 digits>:<short sha>' of
+ * the .claude checkout, which scripts/machine/home.mjs runtimeRevOf computes and the caller passes in (`rev`,
+ * `writerRev`, `sourceRev`). The db never spawns git: with no rev passed the default is STARCI_RUNTIME_REV, else
+ * 'unknown'. The time prefix orders two revs, so a writer can refuse a store row written by a NEWER runtime (MB-15);
+ * 'unknown' sorts before every real rev.
  */
-let cachedRev = null;
 export function runtimeRev() {
-  if (cachedRev) return cachedRev;
-  if (process.env.STARCI_RUNTIME_REV) return (cachedRev = String(process.env.STARCI_RUNTIME_REV));
-  try {
-    const r = runGit(['log', '-1', '--format=%ct %h'], { cwd: path.join(ENGINE_DIR, '..', '..'), timeout: 5000 });
-    const [ct, sha] = String(r.stdout ?? '').trim().split(' ');
-    if (r.status === 0 && /^\d+$/.test(ct) && sha) return (cachedRev = `${String(Number(ct) * 1000).padStart(13, '0')}:${sha}`);
-  } catch { /* not a checkout */ }
-  return (cachedRev = 'unknown');
+  return process.env.STARCI_RUNTIME_REV ? String(process.env.STARCI_RUNTIME_REV) : 'unknown';
 }
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };

@@ -17,7 +17,7 @@ import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTok
 // modules/schemas/**) edited after admission is advisory `sourceDrift`, never
 // stale; a product Work record the job read (payload.records under .starciwork),
 // changed after it settled from outside its workflow, is `staleInput`. The
-// runtime root is where api.mjs lives, so each spec runs a private copy of the
+// runtime root is where cli.mjs lives, so each spec runs a private copy of the
 // runtime whose knowledge/ it can edit, beside a product repo whose .starciwork/
 // it can edit.
 
@@ -51,7 +51,7 @@ const fixture=(t,{registry=null}={})=>{
     STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
   if(!registry)delete env.STARCI_CONTRACT_CHANGES;
-  const api=path.join(skill,'scripts','kernel','api.mjs');
+  const api=path.join(skill,'scripts','kernel','cli.mjs');
   const run=(...args)=>spawnSync(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,encoding:'utf8',windowsHide:true,timeout:180000,env});
   const write=(rel,text)=>{const file=path.join(skill,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   const work=(rel,text)=>{const file=path.join(repo,'.starciwork',rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};

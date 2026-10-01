@@ -1,6 +1,6 @@
 // api kernel-ack-rev — the Kernel read the kernel files of runtime rev --rev (event
-// runtime-rev-acked, source ack; scripts/kernel/runtime-rev.mjs). Split out of api.mjs
-// (lane slim-api); its help line stays in api.mjs usage() (usageInCore).
+// runtime-rev-acked, source ack; scripts/kernel/runtime-rev.mjs). Split out of cli.mjs
+// (lane slim-api); its help line stays in cli.mjs usage() (usageInCore).
 //
 //   kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
 import { getWorkflow } from './shared/rows.mjs';

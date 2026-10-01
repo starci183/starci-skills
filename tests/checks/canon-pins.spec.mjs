@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { checkCanonPins, checkRepoPins, loadPins, PINS_FILE, SCHEMA_FILE } from '../../scripts/checks/check-canon-pins.mjs';
+import { checkCanonPins, checkRepoPins } from '../../scripts/checks/check-canon-pins.mjs';
+import { loadPins, PINS_FILE, SCHEMA_FILE } from '../../scripts/gates/canon-pins.mjs';
 import { validateAgainstSchema } from '../../scripts/checks/check-op-manifest.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

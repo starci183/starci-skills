@@ -17,7 +17,7 @@ import {kindOrder} from '../../scripts/agent/models.mjs';
 // persisted route, the unrouted default).
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const RT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8'));
 // brand: brand.decide's own order (Opus, then Sol; owner ruling 2026-09-27) - strategy, frontier-only.
 const STRATEGY_ORDERS=['think','decide','plan','brand','sol-think'];

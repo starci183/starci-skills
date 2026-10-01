@@ -20,7 +20,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 // The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
 process.env.STARCI_SLEEP_SCALE??='0.02';
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const STALE_MS=allocationMs('liveness.activeStaleMs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 

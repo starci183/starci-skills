@@ -6,7 +6,8 @@ import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {configuredAllocationPolicy,parseAllocationGrant,validateConfig} from '../../engine/config.mjs';
 import {balanceDeficits,selectPool} from '../../scripts/agent/models.mjs';
-import {auditAuthorOf,isFixtureLedgerPath,machineLedgerFiles,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../../scripts/agent/balance.mjs';
+import {auditAuthorOf,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../../scripts/agent/balance.mjs';
+import {isFixtureLedgerPath,machineLedgerFiles} from '../../scripts/machine/ledger-files.mjs';
 import {openLedger} from '../../engine/db/ledger.mjs';
 import {withLedger,seedWorkflow,sameDriveTmp} from '../helpers/ledger-fixture.mjs';
 

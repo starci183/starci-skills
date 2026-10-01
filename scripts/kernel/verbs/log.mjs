@@ -3,7 +3,7 @@
 // connection, one short transaction, flushed before this returns), never an events row, so an op
 // logging every step holds the ledger lock for milliseconds only. An op caller logs only for its
 // own job and always as actor op; a Kernel logs as kernel (or names the runtime/check/land actor
-// it speaks for). Split out of api.mjs (lane slim-api); its help line stays in api.mjs usage()
+// it speaks for). Split out of cli.mjs (lane slim-api); its help line stays in cli.mjs usage()
 // (usageInCore).
 //
 //   log --workflow <id> [--job <job_id>] --kind <kind> --msg <text> [--data '<json>'] [--refs <csv>] [--level info|warn|error] [--node <id>] [--actor kernel|runtime|check|land]

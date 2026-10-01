@@ -132,7 +132,7 @@ spawn:
     the agent is ready; the startup reservation is stretched past its timeout first.
     The seat records {terminal, dispatch, runId} and the kernel job payload.managed
     {runId, taskId, dispatchId, agentTerminalHandle}. The Kernel's own workflow Run
-    is created later from its own terminal (api.mjs ensureWorkflowRun).
+    is created later from its own terminal (cli.mjs ensureWorkflowRun).
   command: >-
     No caller composes a Kernel command: Orca launches the agent with the owner's
     per-agent default args (agentDefaultArgs), and the runtime passes only
@@ -145,7 +145,7 @@ spawn:
     absolute API path + {workflow_id, goal_revision} + mandatory load order —
     Source CONTEXT.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
-    mutation goes through node scripts/kernel/api.mjs <cmd>
+    mutation goes through node scripts/kernel/cli.mjs <cmd>
     (the verb surface is modules/kernel/api.yaml `commands` — that file is the
     only list, and two of its verbs are worker-side op IPC) — never
     direct sqlite writes, never self-spawned op workers, never direct
@@ -178,7 +178,7 @@ orcaTree:
     recorded.
   enforcedBy:
     - scripts/kernel/start-workflow.mjs — the restart merges the new seat over the previous kernel payload, so orca.runId and hierarchy.runtime.runId survive, and terminal-closes the previous kernel terminal before the replacement is recorded; a refused close is a kernel-stale-terminal-unclosed event plus an open incident.
-    - scripts/kernel/api.mjs — ensureWorkflowRun creates the Run once per workflow; createOperationTask passes the current kernel terminal as `from`; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; settle closes the worker and the Task; finish closes the kernel terminal and every Task the Run still holds open.
+    - scripts/kernel/cli.mjs — ensureWorkflowRun creates the Run once per workflow; createOperationTask passes the current kernel terminal as `from`; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; settle closes the worker and the Task; finish closes the kernel terminal and every Task the Run still holds open.
     - modules/host/orca/calls.yaml — the typed calls those steps issue (terminal-create --title, terminal-close, task-create --from, task-update).
   titles:
     kernelTerminal: '[Kernel] <workflow_id>'

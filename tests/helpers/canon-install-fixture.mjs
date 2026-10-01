@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { packedFiles } from '../../scripts/gates/canon-digest.mjs';
-import { loadPins, PROFILES_FILE } from '../../scripts/checks/check-canon-pins.mjs';
+import { loadPins, PROFILES_FILE } from '../../scripts/gates/canon-pins.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 let published;

@@ -281,7 +281,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     const land = deps.landStatus ? deps.landStatus() : (await import('../../supervisor/land.mjs')).landStatus({ env: ctx.env ?? process.env });
     const events = deps.landEvents ?? await landEventsOf(ctx, now);
     let dist = deps.dist ?? null;
-    if (!dist && !deps.landStatus) { try { dist = (await import('../../checks/check-grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
+    if (!dist && !deps.landStatus) { try { dist = (await import('../../gates/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
     const plan = planLand({ land, events, dist, now, settings });
     for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'fleet', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
     for (const c of plan.clear) await ctx.clear(c.entity, c.state);

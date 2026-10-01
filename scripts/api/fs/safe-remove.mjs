@@ -13,17 +13,18 @@
 // its own path under its parent's real path (any name-surrogate reparse point). A link that cannot be
 // unlinked stops the removal of everything above it; nothing is ever deleted through it.
 //
-// safeRemoveWorktree removes a git worktree: every link removed as a link first (found without following one), zero
-// links asserted, only then `git worktree remove --force`, and the main checkout asserted untouched afterwards.
+// A worktree's removal composes this with git (scripts/machine/worktree-git.mjs safeRemoveWorktree, the Orca home in
+// scripts/machine/worktree-orca.mjs): every link removed as a link first (removeLinksUnder), zero asserted, only then git
+// or Orca. Whether a tree holds an indexed job artifact is the caller's decision (`hold`: scripts/machine/artifact-hold.mjs
+// artifactHoldReason), taken before anything is deleted.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sleepSync } from '../../lib/sleep-sync.mjs';
 import { samePath } from '../../lib/path-key.mjs';
-import { gitSpawn } from '../git/lib.mjs';
 import { rmdirLink } from './rmdir-link.mjs';
-import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
+import { FS_BUSY } from './lib.mjs';
 import { realpathOr } from '../../lib/fs-kind.mjs';
 
 const WIN = process.platform === 'win32';
@@ -73,7 +74,7 @@ const retrying = (fn, retries) => {
   for (let attempt = 0; ; attempt += 1) {
     try { fn(); return null; } catch (error) {
       if (error?.code === 'ENOENT') return null;
-      if (attempt >= retries || !['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(error?.code)) return error;
+      if (attempt >= retries || ![...FS_BUSY, 'ENOTEMPTY'].includes(error?.code)) return error;
       sleepSync(25 * (attempt + 1));
     }
   }
@@ -105,17 +106,20 @@ export function strictlyInsideReal(p, root) {
  * scratch trees the runtime removes are temp directories and linked worktrees, whose .git is a file).
  * `checkoutsUnder` names a disposable root (hk-tmp's temp root): a checkout strictly inside it by real path
  * is a spec fixture, not a live repository, and is not refused for its .git. Every other refusal stands.
- * A tree holding an indexed job artifact, or inside an evidence directory holding one, is refused whatever the
- * workflow's phase (artifact-hold.mjs).
+ * `hold(path)` is the caller's artifact-hold check (scripts/machine/artifact-hold.mjs artifactHoldReason: a tree holding
+ * an indexed job artifact, or inside an evidence directory holding one, whatever the workflow's phase), its refusal line
+ * or null. It is required: without one every path is refused (fail closed); a caller that removes only a scratch tree
+ * it made itself, outside every ledger's repository, says so with `hold: () => null`.
  */
-export function forbiddenRoot(p, { checkoutsUnder = null } = {}) {
+export function forbiddenRoot(p, { checkoutsUnder = null, hold } = {}) {
   const resolved = path.resolve(p);
   if (path.parse(resolved).root === resolved || same(path.dirname(resolved), resolved)) return 'a filesystem root';
   for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()], ['the runtime', SKILL_ROOT],
     ['the repository hosting the runtime', path.dirname(SKILL_ROOT)], ['the repositories root', path.dirname(path.dirname(SKILL_ROOT))]]) {
     if (dir && same(path.resolve(dir), resolved)) return name;
   }
-  const held = artifactHoldReason(resolved);
+  if (typeof hold !== 'function') return 'a tree no artifact-hold check cleared (pass hold)';
+  const held = hold(resolved);
   if (held) return held;
   let checkout = false;
   try { checkout = fs.lstatSync(path.join(resolved, '.git')).isDirectory(); } catch { /* no .git directory */ }
@@ -125,14 +129,14 @@ export function forbiddenRoot(p, { checkoutsUnder = null } = {}) {
 
 /**
  * Remove `root` and everything under it without ever following a link. Links are unlinked (the link only);
- * plain files and directories are deleted bottom-up. `checkoutsUnder` is forbiddenRoot's disposable root. Returns {ok, root, removed: {files, dirs, links},
+ * plain files and directories are deleted bottom-up. `checkoutsUnder` and `hold` (required) are forbiddenRoot's. Returns {ok, root, removed: {files, dirs, links},
  * errors: [{path, code, message}]}; ok is true only when `root` is gone. A missing root is ok.
  */
-export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}) {
+export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null, hold } = {}) {
   const target = path.resolve(String(root ?? ''));
   const out = { ok: false, root: target, removed: { files: 0, dirs: 0, links: 0 }, errors: [] };
   const fail = (p, error) => { out.errors.push({ path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
-  const refused = root ? forbiddenRoot(target, { checkoutsUnder }) : 'no path';
+  const refused = root ? forbiddenRoot(target, { checkoutsUnder, hold }) : 'no path';
   if (refused) { fail(target, { code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
   let st;
   try { st = fs.lstatSync(target); } catch (error) {
@@ -191,29 +195,8 @@ export function removeLink(p) {
   return unlinkOnly(p);
 }
 
-/** The main checkout's state a removal must never change: its tracked deletions and its node_modules entry counts. */
-export function mainCheckoutGuard(mainRoot, { git = null } = {}) {
-  const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd, maxBuffer: 64 * 1024 * 1024 }));
-  const count = (rel) => { try { return fs.readdirSync(path.join(mainRoot, rel)).length; } catch { return null; } };
-  // porcelain v2 ("1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>"): no leading blank a runner's trim could eat.
-  const st = run(['status', '--porcelain=v2', '--untracked-files=no'], { cwd: mainRoot });
-  const text = String(st?.stdout ?? st?.out ?? '');
-  const ok = st?.ok ?? (!st?.error && st?.status === 0);
-  const deleted = text.split(/\r?\n/).map((l) => l.trim().split(' ')).filter((f) => f[0] === '1' && f.length >= 9 && f[1].includes('D')).map((f) => f.slice(8).join(' '));
-  return { ok: Boolean(ok), deleted: new Set(deleted),
-    nodeModules: count('node_modules'), packagesNodeModules: count(path.join('packages', 'node_modules')) };
-}
-/** What changed in the main checkout between two guards: [] when nothing. */
-export function mainCheckoutDamage(before, after) {
-  const out = [];
-  if (before.ok && after.ok) for (const f of after.deleted) if (!before.deleted.has(f)) out.push(`tracked file deleted: ${f}`);
-  if (before.nodeModules !== after.nodeModules) out.push(`node_modules entries ${before.nodeModules} -> ${after.nodeModules}`);
-  if (before.packagesNodeModules !== after.packagesNodeModules) out.push(`packages/node_modules entries ${before.packagesNodeModules} -> ${after.packagesNodeModules}`);
-  return out;
-}
-
 /**
- * The link step of every worktree removal (git's here, Orca's in scripts/api/orca/worktree-remove.mjs removeOrcaWorktree): every link
+ * The link step of every worktree removal (scripts/machine/worktree-git.mjs safeRemoveWorktree, worktree-orca.mjs removeOrcaWorktree): every link
  * under `target` found WITHOUT following one (linksUnder), each removed as a link (removeLink: `cmd /c rmdir <link>`, never
  * /s), outermost first, then a re-scan that must find ZERO. {ok, links, errors: [{path, code, message}]}; ok false: a link
  * is stuck and the caller removes nothing.
@@ -224,53 +207,6 @@ export function removeLinksUnder(target) {
   for (const link of linksUnder(target)) { if (removeLink(link)) out.links += 1; else out.errors.push({ path: link, code: 'LINK_STUCK', message: 'a link could not be removed' }); }
   for (const l of linksUnder(target)) if (!out.errors.some((e) => e.path === l)) out.errors.push({ path: l, code: 'LINK_STUCK', message: 'a link is still there after removal' });
   out.ok = out.errors.length === 0;
-  return out;
-}
-
-/**
- * Remove a git worktree (the one algorithm; the 490-file .claude incident and nivo-fe inc-c8fbf76aa499):
- *   1. enumerate every link in it WITHOUT following one (linksUnder);
- *   2. remove each as a link (removeLink: `cmd /c rmdir <link>`, never /s), outermost first;
- *   3. re-scan the same way and refuse (link-stuck, nothing deleted) unless ZERO links remain;
- *   4. only then `git worktree remove --force` (a link-free tree: git cannot walk out of it); a directory git does not know
- *      goes through safeRemoveTree (never follows a link); `git worktree prune`;
- *   5. assert the main checkout is untouched: no new tracked deletion, node_modules and packages/node_modules entry counts
- *      unchanged - a violation is {ok:false, fatal:true, reason:'main-checkout-damaged'}: the caller (the GC) stops.
- * Never robocopy, rm -rf or rmdir /s. `git(args, {cwd})` is the caller's git runner; `repo` any checkout of the repository.
- * {ok, root, links, removed, errors, damage?}
- */
-export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } = {}) {
-  const target = path.resolve(String(worktree ?? ''));
-  const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd, maxBuffer: 64 * 1024 * 1024 }));
-  const out = { ok: false, root: target, links: 0, removed: { files: 0, dirs: 0, links: 0 }, errors: [] };
-  const list = repo ? String((run(['worktree', 'list', '--porcelain'], { cwd: repo }) ?? {}).stdout ?? '') : '';
-  const trees = list.split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => path.resolve(l.slice(9).trim()));
-  const mainRoot = trees[0] ?? null;
-  if (mainRoot && same(mainRoot, target)) { out.errors.push({ path: target, code: 'REFUSED', message: 'refusing to remove the main checkout' }); return out; }
-  const refused = forbiddenRoot(target);
-  if (refused) { out.errors.push({ path: target, code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
-  const before = mainRoot ? mainCheckoutGuard(mainRoot, { git: run }) : null;
-  if (fs.existsSync(target)) {
-    const unlinked = removeLinksUnder(target);
-    out.links = unlinked.links;
-    if (!unlinked.ok) { out.errors.push(...unlinked.errors); out.reason = 'link-stuck'; return out; }
-    out.removed.links = out.links;
-    const registered = trees.some((t) => same(t, target));
-    if (registered && repo) run(['worktree', 'remove', '--force', target], { cwd: repo });
-    if (fs.existsSync(target)) {
-      if (linksUnder(target).length) { out.errors.push({ path: target, code: 'LINK_STUCK', message: 'a link appeared during removal' }); out.reason = 'link-stuck'; return out; }
-      const rm = safeRemoveTree(target, { retries });
-      out.removed.files += rm.removed.files; out.removed.dirs += rm.removed.dirs;
-      out.errors.push(...rm.errors);
-    }
-  }
-  if (repo) { try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* the registration is pruned on the next prune */ } }
-  if (before) {
-    const damage = mainCheckoutDamage(before, mainCheckoutGuard(mainRoot, { git: run }));
-    if (damage.length) { out.damage = damage; out.fatal = true; out.reason = 'main-checkout-damaged'; out.errors.push({ path: mainRoot, code: 'main-checkout-damaged', message: damage.join('; ') }); return out; }
-  }
-  out.ok = !fs.existsSync(target) && (() => { try { fs.lstatSync(target); return false; } catch { return true; } })();
-  if (!out.ok && !out.reason) out.reason = 'remove-failed';
   return out;
 }
 

@@ -1,4 +1,4 @@
-// api record-change: split from api.mjs.
+// api record-change: split from cli.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { getWorkflow, workDirOf, workflowRunning } from './shared/rows.mjs';

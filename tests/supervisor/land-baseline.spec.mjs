@@ -58,7 +58,7 @@ test('a green candidate is ok whatever main said', () => {
 
 test('each tree check has identifiable finding lines and its summary line is dropped', () => {
   assert.deepEqual(findingLines('scripts/checks/check-module-yaml.mjs', 'UNPARSEABLE knowledge/patterns/be/cqrs.yaml: Invalid or unsupported YAML\n'), ['UNPARSEABLE knowledge/patterns/be/cqrs.yaml: Invalid or unsupported YAML']);
-  assert.deepEqual(findingLines('scripts/checks/check-api-surface.mjs', 'check-api-surface: verb surface drift (api.mjs implements 57: a b)\n  modules/kernel/api-commands: missing c\n'), ['modules/kernel/api-commands: missing c']);
+  assert.deepEqual(findingLines('scripts/checks/check-api-surface.mjs', 'check-api-surface: verb surface drift (cli.mjs implements 57: a b)\n  modules/kernel/api-commands: missing c\n'), ['modules/kernel/api-commands: missing c']);
   assert.deepEqual(findingLines('scripts/checks/check-db-openers.mjs', '  packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs\ncheck-db-openers: red\n'), ['packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs']);
   assert.deepEqual(findingLines(CITES, cites(DEAD, 5368).full), DEAD);
 });

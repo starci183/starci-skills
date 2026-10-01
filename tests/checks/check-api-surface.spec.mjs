@@ -7,9 +7,9 @@ import { spawnSync } from 'node:child_process';
 import { checkApiSurface, checkApiSurfaceMain } from '../../scripts/checks/check-api-surface.mjs';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..');
-const MIRRORED = ['scripts/kernel/api.mjs', 'modules/kernel/api.yaml', 'bin/starci.mjs'];
+const MIRRORED = ['scripts/kernel/cli.mjs', 'modules/kernel/api.yaml', 'bin/starci.mjs'];
 // Extension verbs and their contracts live in directories (scripts/kernel/api-extensions.mjs): the
-// fixture mirrors them too or the copied api.mjs switch is not the whole implemented surface.
+// fixture mirrors them too or the copied cli.mjs switch is not the whole implemented surface.
 const MIRRORED_DIRS = ['scripts/kernel/verbs', 'modules/kernel/api-commands'];
 
 const fixtureTree = (edit) => {
@@ -38,7 +38,7 @@ test('the real tree agrees on one verb surface across code, contract and CLI hel
   assert.match(run.stdout, new RegExp(`${report.implementedCount} verbs`));
 });
 
-test('a verb dropped from the contract is reported against api.mjs and exits 1', () => {
+test('a verb dropped from the contract is reported against cli.mjs and exits 1', () => {
   const root = fixtureTree((tree) => {
     // Every verb's contract is its own file under modules/kernel/api-commands (api.yaml keeps `commands: {}`).
     const file = path.join(tree, 'modules/kernel/api-commands/estimate.yaml');
@@ -61,7 +61,7 @@ test('a verb dropped from the contract is reported against api.mjs and exits 1',
 
 test('a verb dropped from usage() or from the starci help line is drift too', () => {
   const root = fixtureTree((tree) => {
-    const api = path.join(tree, 'scripts/kernel/api.mjs');
+    const api = path.join(tree, 'scripts/kernel/cli.mjs');
     const text = fs.readFileSync(api, 'utf8');
     assert.match(text, /^ {2}observe\s+--job <job_id> \[--lines <n>\]$/m);
     fs.writeFileSync(api, text.replace(/^ {2}observe(\s+--job <job_id> \[--lines <n>\])$/m, '  observed$1'));
@@ -74,7 +74,7 @@ test('a verb dropped from usage() or from the starci help line is drift too', ()
     const result = checkApiSurfaceMain(['--root', root, '--json']);
     assert.equal(result.exitCode, 1);
     const report = JSON.parse(result.text);
-    const usage = report.drift.find((d) => d.source === 'scripts/kernel/api.mjs usage()');
+    const usage = report.drift.find((d) => d.source === 'scripts/kernel/cli.mjs usage()');
     assert.deepEqual(usage.missing, ['observe']);
     assert.deepEqual(usage.extra, ['observed']);
     const help = report.drift.find((d) => d.source === 'bin/starci.mjs help');

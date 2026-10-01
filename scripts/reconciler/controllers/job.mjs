@@ -36,7 +36,8 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mjs';
 import { clocksOf } from '../sla.mjs';
-import { settlerSettings, reportedJobs, kernelHandoverOf, releaseProofOf, EVENTS as SETTLE_EVENTS, KERNEL_ONLY_OPS } from '../../kernel/settle/job-settle.mjs';
+import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
+import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -115,8 +116,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
   const row = db.prepare("SELECT job_id, workflow_id, op_id, try_no AS attempt, status, worker_id, payload_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind='op'").get(jobId);
   if (!row) return null;
   const payload = parse(row.payload_json) ?? {};
-  const reported = reportedJobs(db, { jobId })[0] ?? null;
-  const handover = reported ? kernelHandoverOf(db, reported) : null;
+  const reported = reportedJobs(db, { jobId })[0] ?? null, handover = reported ? kernelHandoverOf(db, reported) : null;
   const released = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(SETTLE_EVENTS.released, jobId) != null;
   const lastEventAt = (kind) => Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind=?').get(jobId, kind)?.at) || null;
   return {

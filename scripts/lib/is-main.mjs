@@ -1,9 +1,8 @@
-// is-main.mjs - split from scripts/lib/walk.mjs (realPathOf, isMain).
+// is-main.mjs - is this module the process entry point (`node file.mjs`, not an import)? Compared by real path.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-/** True when this module is the process entry point (`node file.mjs`, not an import). */
 /** The real path of a file, or its resolved path when it cannot be read (a missing file is never the entry module). */
 const realPathOf = (file) => { try { return fs.realpathSync.native(path.resolve(file)); } catch { return path.resolve(file); } };
 /**

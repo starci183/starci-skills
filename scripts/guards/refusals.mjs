@@ -1,4 +1,4 @@
-// refusals.mjs — how an op guard refuses: the lines the agent reads and the runtime/guards/refusals.jsonl record.
+// refusals.mjs — how an op guard refuses: the lines the agent reads and the <guards root>/refusals.jsonl record.
 // Shared by the agent command guard (command-guard.mjs, a PreToolUse hook) and the history hook's commit check
 // (verify-commit.mjs).
 import fs from 'node:fs';
@@ -17,7 +17,7 @@ export function refusalLines(tool, verdict) {
   ];
 }
 
-/** Append one refusal to runtime/guards/refusals.jsonl; the refusal stands without its log line. */
+/** Append one refusal to <guards root>/refusals.jsonl; the refusal stands without its log line. */
 export function logRefusal(entry, { root = skillRoot } = {}) {
   try {
     const dir = guardsRoot(root);

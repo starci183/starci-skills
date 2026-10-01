@@ -25,7 +25,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { greenDocGate, greenGate, greenLint, greenReadDigest, greenReleaseProof, greenReviewDefects, greenTestWorldRun, greenUnitRun } from '../helpers/sonar-scan.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const SHA = 'a'.repeat(64);
 const tmp = (t, prefix = 'starci-op-proof-') => { const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 const put = (root, rel, body) => { const abs = path.join(root, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return rel; };
@@ -80,7 +80,7 @@ test('read-digest --knowledge records runtime knowledge files with their sha256 
   assert.deepEqual(digest.files.map((f) => [f.path, f.role]), [['knowledge/hfs/rules.yaml', 'knowledge'], ['knowledge/patterns/be/test.yaml', 'pattern']]);
   assert.ok(digest.files.every((f) => /^[0-9a-f]{64}$/.test(f.sha256)));
   assert.equal(judgeKnowledgeDigest(digest).status, 'pass');
-  await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: ['scripts/kernel/api.mjs'], hfs }), /not a file under the runtime's knowledge/);
+  await assert.rejects(buildReadDigest({ root: app, touch: [], knowledge: ['scripts/kernel/cli.mjs'], hfs }), /not a file under the runtime's knowledge/);
 });
 
 // ---- doc-gate ----

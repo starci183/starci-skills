@@ -17,7 +17,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 // a shared need nobody owns, duplicated work - and the nivo seam: module-studio and collab-group-chat both waiting
 // on ONE queued repair job of workspace-provision (op-e2e.verify-9fb01b4fe6), bridged by a Supervisor workflow.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const WSPV = 'wf-nivo-workspace-provision', STUDIO = 'wf-nivo-module-studio', COLLAB = 'wf-nivo-collab', MOD = 'wf-nivo-modules', AUTH = 'wf-nivo-auth', OLD = 'wf-nivo-fe-debt';
 const JOB = 'op-e2e.verify-9fb01b4fe6';

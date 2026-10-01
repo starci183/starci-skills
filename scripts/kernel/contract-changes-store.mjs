@@ -8,16 +8,10 @@ import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
 
 export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
-/** One file per entry: <dir>/<id>.yaml. */
-export const CONTRACT_CHANGES_DIR = 'modules/kernel/contract-changes';
-
 const norm = (p) => String(p ?? '').replaceAll('\\', '/').replace(/^\.\//, '');
-/** A registry path: an entry file under the directory. */
-export const isContractChangesPath = (rel) => { const f = norm(rel); return f.startsWith(`${CONTRACT_CHANGES_DIR}/`) && /\.ya?ml$/.test(f); };
-/** The entry file of change `id` (runtime-relative). */
-export const entryFileOf = (id) => `${CONTRACT_CHANGES_DIR}/${id}.yaml`;
 
 const plainMap = (v) => v && typeof v === 'object' && !Array.isArray(v);
 

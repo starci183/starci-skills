@@ -1,4 +1,4 @@
-// api inbox: split from api.mjs; output and validation remain stable.
+// api inbox: split from cli.mjs; output and validation remain stable.
 import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatus } from '../../../engine/db/ledger.mjs';
 import { PEER_MESSAGE, peerMessageOf, peerMessageRows, pendingPeerMessagesOf } from './shared/peers.mjs';

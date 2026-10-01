@@ -7,8 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import {
-  createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
+  createReloadWatch, reexecSelf, runtimeHead, moduleStamps, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS,
 } from '../../scripts/reconciler/self-reload.mjs';
+import { rotateLog, LOG_CAP_BYTES } from '../../scripts/housekeeping/hk-logs.mjs';
 import { claimOrTakeOver, claimManager, lockHolder } from '../../scripts/connectors/lib.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 

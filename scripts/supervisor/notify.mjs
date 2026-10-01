@@ -20,7 +20,7 @@ import { openDecision, ringDoorbellWith } from '../machine/decisions.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { supervisorEvent, supervisorLog, withSupervisor } from '../machine/home.mjs';
 import { recordAction } from './actions.mjs';
-import { actionRow, supLog } from './sup-log.mjs';
+import { actionRow, supLog } from '../machine/sup-log.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const NOTICE_TAG = '[supervisor]';

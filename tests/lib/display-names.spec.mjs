@@ -18,7 +18,7 @@ import { orcaTreeFindings } from '../../scripts/checks/check-orca-tree.mjs';
 import { askState } from '../../scripts/connectors/lib.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const OPS = path.join(ROOT, 'modules', 'ops', 'ops');
 const out = (r) => { try { return JSON.parse(r.stdout); } catch { return null; } };
 

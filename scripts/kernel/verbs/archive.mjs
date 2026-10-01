@@ -6,7 +6,7 @@ import { ARCHIVED_BY, JOB_ROW, getWorkflow, jobOpOf, jobPayloadOf, latestAttempt
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { openAskDispatchesOf, retireAsk } from './shared/asks.mjs';
 import { closeHeldTasks, closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
-import { reportedJobs } from '../settle/job-settle.mjs';
+import { reportedJobs } from '../../machine/reported-jobs.mjs';
 import { closeWorkflowDecisions } from '../../machine/decisions.mjs';
 
 const WORKFLOW_ARCHIVED = 'workflow-archived';

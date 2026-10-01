@@ -13,7 +13,7 @@
 // handover.mjs handoverAsks makes for the handover approval. foreignAcceptProof rejects a resolution
 // whose owner claim is unproven, and ownerClaimAudit lists the past ones (read-only; history is never
 // rewritten). notOwnerWorkOf names an owner-gate whose own text says it is runtime / not-owner work.
-// Reads only; every write stays in api.mjs.
+// Reads only; every write stays in cli.mjs.
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 
 export const OWNER = 'owner';

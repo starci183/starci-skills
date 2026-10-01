@@ -1,8 +1,8 @@
 schema: starci/schema@1
 describes: starci/goal-plan@1
-module: scripts/kernel/api.mjs
+module: scripts/kernel/cli.mjs
 purpose: |-
-  The plan file the kernel agent hands to `node scripts/kernel/api.mjs plan --workflow <id> --file
+  The plan file the kernel agent hands to `node scripts/kernel/cli.mjs plan --workflow <id> --file
   <plan.json>`: the derived op chain for the goal, expressed as an ordered list of legs. The api
   persists only the plan's digest and its STRUCTURAL diff against the approved opChain stored in
   goals.json.opChain.legs - the file stays the artifact, the ledger stores what it proves, never a
@@ -27,7 +27,7 @@ rules:
   - "A leg may carry only params the op declares with `setBy: owner`; a `setBy: kernel` param on a leg is params-invalid."
   - Op ids come only from the operator catalog. Dependencies are the edges, never a per-leg dependsOn field. scripts/route/plan-edges.mjs planAncestorsOf reads them for the whole runtime - derivedPlan.edges only (a goal without them is refused plan-edges-missing) - and api status holds a queued job only while a plan ancestor of its op still has a job queued or in flight, so a leg no edge leads from never waits on it.
 validation: |-
-  api.mjs cmdPlan reads the file as JSON and requires plan.legs to be an array whose every element
+  cli.mjs cmdPlan reads the file as JSON and requires plan.legs to be an array whose every element
   has a non-empty string `op`, and `edges` to be an array of [fromLeg, toLeg] string
   pairs ({legs:[{op,paths?,notes?}], edges}). Failure is a typed refusal: plan-file-missing when the
   file does not exist, plan-file-invalid when it does not parse or the legs or edges shape is wrong,

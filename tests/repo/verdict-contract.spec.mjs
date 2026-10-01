@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 // Lane m13: settle is where an op's verdict becomes ledger truth. The verdict
 // enum is the contract (modules/kernel/verdict-contract.yaml): pass|fail|blocked
 // accepted, anything else refused with exit!=0 — a misspelled verdict must never

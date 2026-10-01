@@ -79,9 +79,9 @@ test('a missing recovery key fails loudly at load, never a silent default', (t) 
   const outage = probe(root, `await import(${importOf(root, 'scripts/kernel/host-outage.mjs')});`);
   assert.notEqual(outage.status, 0);
   assert.match(outage.stderr, /allocation\.hostOutage\.waitMs must declare a positive number/);
-  const api = spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'api.mjs'), 'status', '--json'], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  const api = spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'cli.mjs'), 'status', '--json'], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.notEqual(api.status, 0);
-  assert.match(api.stderr, /allocation\.liveness\.quietMs must declare a positive number/, 'api.mjs no longer falls back to a literal quiet window');
+  assert.match(api.stderr, /allocation\.liveness\.quietMs must declare a positive number/, 'cli.mjs no longer falls back to a literal quiet window');
 });
 
 test('no source file keeps a second literal of a moved window', () => {
@@ -112,12 +112,12 @@ test('no source file keeps a second literal of a moved window', () => {
     'scripts/guards/hook-install.mjs': [/7 \* 24/],
   };
   for (const [rel, patterns] of Object.entries(gone)) for (const pattern of patterns) assert.doesNotMatch(read(rel), pattern, `${rel} still carries ${pattern}`);
-  const api = read('scripts/kernel/api.mjs');
+  const api = read('scripts/kernel/cli.mjs');
   assert.match(api, /^const QUIET_MS = allocationMs\('liveness\.quietMs'\);$/m);
   assert.match(api, /^const LAUNCH_GRACE_MS = allocationMs\('liveness\.launchGraceMs'\);$/m);
-  assert.doesNotMatch(api, /1_200_000|return 90_000|5 \* 60 \* 1000/, 'api.mjs keeps no literal copy of a liveness or cooldown window');
+  assert.doesNotMatch(api, /1_200_000|return 90_000|5 \* 60 \* 1000/, 'cli.mjs keeps no literal copy of a liveness or cooldown window');
   // E6: engine/config.mjs runtimeProfile is the one runtimes.yaml loader (loud on a broken file);
-  // api.mjs carried three silent readers of its own.
-  assert.doesNotMatch(api, /readFileSync\([^)]*runtimes\.yaml/, 'api.mjs parses no runtimes.yaml copy of its own — engine/config.mjs runtimeProfile is the one loud loader');
+  // cli.mjs carried three silent readers of its own.
+  assert.doesNotMatch(api, /readFileSync\([^)]*runtimes\.yaml/, 'cli.mjs parses no runtimes.yaml copy of its own — engine/config.mjs runtimeProfile is the one loud loader');
   assert.doesNotMatch(api, /everyMs \?\? \d/, 'the quota probe interval keeps no literal fallback — the card or allocation.cooldownMs.quota owns it');
 });

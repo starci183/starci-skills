@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
-    "test": "node --test src/package-boundary.test.mjs",
+    "test": "node --test src/package-boundary.spec.mjs",
     "prepack": "npm run typecheck && npm run build && npm test"
   },
   "peerDependencies": {

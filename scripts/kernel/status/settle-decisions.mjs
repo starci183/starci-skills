@@ -2,7 +2,7 @@
 // runtime settles every green report itself (scripts/kernel/settle/job-settle.mjs); each item here is a reported job it
 // handed over as needs-kernel-decision - a blocked/failed/ask/partial outcome, or a done report whose declared checks
 // it could not re-verify (reason, detail) - consumed or not. The Kernel decides these FIRST, before its ranked actions.
-import { kernelDecisionItems } from '../settle/job-settle.mjs';
+import { kernelDecisionItems } from '../../machine/reported-jobs.mjs';
 
 export default {
   key: 'settleDecisions',

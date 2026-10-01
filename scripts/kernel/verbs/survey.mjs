@@ -1,4 +1,4 @@
-// api survey: split from api.mjs.
+// api survey: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW, getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './shared/rows.mjs';
 import { deliveriesOf } from '../handover.mjs';

@@ -124,6 +124,6 @@ line; a review that finds a violation sends the change back.
    the yaml says so or the claim is removed. On the alpha line the default is to make the yaml
    tell the truth; add code only where a test shows a real hole.
 5. **Host calls go through `scripts/api/orca/`.** No agent-facing prose tells an agent to run
-   `orca` or to read `modules/host/**`; agents call `scripts/kernel/api.mjs` or a wrapper.
+   `orca` or to read `modules/host/**`; agents call `scripts/kernel/cli.mjs` or a wrapper.
 6. **Every cut lands with evidence.** `node --check` on touched `.mjs`, the specs that cover the
    touched surface, and — when a rule moved — the check that would catch it moving back.

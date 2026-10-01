@@ -1,4 +1,4 @@
-// api op-contract: split from api.mjs.
+// api op-contract: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from './shared/rows.mjs';
 import { admittedContractOf, advisoryCodesFor, loadContractChanges } from '../contract-version.mjs';

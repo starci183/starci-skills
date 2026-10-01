@@ -5,7 +5,7 @@
 # every tick of a project's life — decide non-green verdicts, pick the next leg,
 # route the op and the model, dispatch, wait for the next decision. Declarative rules
 # only; every rule cites the mechanism that owns it. Nothing here executes —
-# scripts/kernel/api.mjs + engine/ are the spine; this file is what an agent
+# scripts/kernel/cli.mjs + engine/ are the spine; this file is what an agent
 # reads to reason like it.
 #
 # Operating model: .claude runs purely on Orca.
@@ -21,7 +21,7 @@
 #                   `[Op] <op-or-task>` (the fleet naming rule).
 #
 # The kernel agent touches NO state directly: every read/write below is one
-# `node scripts/kernel/api.mjs <command>` call (modules/kernel/api.yaml); the
+# `node scripts/kernel/cli.mjs <command>` call (modules/kernel/api.yaml); the
 # packet contract is modules/kernel/dispatch.yaml. modules/kernel/kernel-prompt.md
 # points the spawned kernel here; each rule is stated once, in this file.
 # ============================================================================
@@ -42,7 +42,7 @@ about:
     both ready and legal. It decides order and assignment; it never decides
     scope, identity or authority.
   sources:
-    - scripts/kernel/api.mjs
+    - scripts/kernel/cli.mjs
     - engine/db/ledger.mjs
     - scripts/agent/lib.mjs
 
@@ -128,7 +128,7 @@ boundary:
 # 1 — THE TICK. One iteration of the driver loop, in order — expressed in api
 #    calls. The kernel agent NEVER opens .starciwork/runtime.sqlite and never
 #    spawns a terminal itself: every state operation is
-#    `node scripts/kernel/api.mjs <command>` (modules/kernel/api.yaml — args,
+#    `node scripts/kernel/cli.mjs <command>` (modules/kernel/api.yaml — args,
 #    read/write sets, refusal strings). A refusal is a fact the loop routes,
 #    never a crash. The kernel never skips ahead: a report it has not settled
 #    is a verdict the next pick does not know about.

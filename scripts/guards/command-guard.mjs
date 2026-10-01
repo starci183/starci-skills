@@ -5,11 +5,11 @@
 //
 // Every agent launches through Orca worker-start, which owns the agent's environment, so a guard can no longer ride
 // on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/hook-install.mjs
-// bindGuardTerminal -> runtime/guards/terminals/<handle>.json) and launch trust registers this hook in the launch
+// bindGuardTerminal -> <guards root>/terminals/<handle>.json) and launch trust registers this hook in the launch
 // worktree's PROJECT settings only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
 // .codex/config.toml, .devin/config.local.json), never a user-global settings file. The Kernel's launch binds a guard
 // of role 'kernel' the same way (scripts/kernel/start-workflow.mjs, contract change kernel-guard-file): its raw shell
-// commands meet every rule below, and its `node api.mjs <verb>` calls pass. A session with no Orca terminal, or whose
+// commands meet every rule below, and its `node cli.mjs <verb>` calls pass. A session with no Orca terminal, or whose
 // terminal has no guard bound (the [Supervisor], a lane, the owner's own sessions), meets ONE rule only, wherever this
 // hook is registered: an install through a linked node_modules (below), which no caller ever means to run.
 //
@@ -56,7 +56,7 @@ import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './inst
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 
-/** The guard bound to Orca terminal `handle` (runtime/guards/terminals/<handle>.json), or null. */
+/** The guard bound to Orca terminal `handle` (<guards root>/terminals/<handle>.json), or null. */
 export function boundGuard(handle, { root = skillRoot } = {}) {
   if (!handle) return null;
   try { return JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'terminals', `${safeName(handle)}.json`), 'utf8')); }

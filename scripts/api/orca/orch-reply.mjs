@@ -5,7 +5,7 @@
 // Answers one worker `question` message; the worker's blocking
 // `orca orchestration ask` returns with this body. --from is left to Orca,
 // which resolves it from the calling terminal (the Kernel's own). Returns
-// {ok, result, error}. Only scripts/kernel/api.mjs `reply` issues it.
+// {ok, result, error}. Only scripts/kernel/cli.mjs `reply` issues it.
 import { orcaCall, arg } from './lib.mjs';
 
 export function orchReply({ id, body, run = null }) {

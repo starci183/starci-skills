@@ -103,7 +103,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
     fail('credentialPending must be an array of env var or custody key names');
 
   // rootCause names the node the report blames; settle routes a failure whose node is another op's to a
-  // read-only root verify of it (scripts/kernel/api.mjs enqueueNextStep).
+  // read-only root verify of it (scripts/kernel/cli.mjs enqueueNextStep).
   if (value.rootCause !== undefined) for (const r of rootCauseProblems(value.rootCause)) fail(r);
   // claims name what the job's artifacts prove (scripts/kernel/proof-integrity.mjs): indexed with them at settle.
   if (value.claims !== undefined) for (const r of claimsProblems(value.claims)) fail(r);

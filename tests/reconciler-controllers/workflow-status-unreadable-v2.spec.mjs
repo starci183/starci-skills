@@ -10,7 +10,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 // 1) the runtime-defect:<wf>:status-unreadable DI (decider supervisor) was opened in the PRODUCT ledger (nivo-backend
 //    di-8f93adc4), so `decisions.mjs supervisor --list` never showed it; it belongs in the supervisor ledger.
 // 2) ctx.status mapped every failed spawn to null: the finding said 'no value (api status timed out, exited non-zero or
-//    printed no JSON)'. The real cause: api.mjs status REFUSED plan-edges-missing for wf-nivo-collab-mum8xsop and
+//    printed no JSON)'. The real cause: cli.mjs status REFUSED plan-edges-missing for wf-nivo-collab-mum8xsop and
 //    wf-nivo-module-studio-mum8xt5e - exit 1, its {ok:false,error} JSON on STDERR, stdout empty. The read now names it.
 
 const MIN = 60_000;

@@ -14,7 +14,7 @@
 //     constraints: {model, budget, lease}
 //     returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string}
 //
-// resolveOpParams is exported: scripts/kernel/api.mjs enqueue validates the
+// resolveOpParams is exported: scripts/kernel/cli.mjs enqueue validates the
 // owner's and the kernel's overrides against the brief with the same function
 // that resolves them here, so a value refused at enqueue cannot appear in a packet.
 //

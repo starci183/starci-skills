@@ -83,7 +83,7 @@ export function attemptCauseOf(db, row, previous = null) {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
   }
   if (result.peerBlocked) return { cause: 'peer-blocked', attributable: false, detail: `red only on a peer's change (${(result.peerBlocked.checks ?? []).join(', ')})` };
-  // A worker the host killed with every other terminal (api.mjs hostTerminalWipeOf) says nothing of its pool.
+  // A worker the host killed with every other terminal (cli.mjs hostTerminalWipeOf) says nothing of its pool.
   if (result.reason === FAILED_NO_REPORT && result.retryClass === RETRY_CLASS_ENVIRONMENT) {
     return { cause: result.environment ?? RETRY_CLASS_ENVIRONMENT, attributable: false, detail: `the worker died with no report in a ${result.environment ?? 'host event'} (the environment, not the pool)` };
   }

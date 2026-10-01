@@ -43,7 +43,7 @@ import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
+const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const startFile = path.join(skillRoot, 'scripts', 'kernel', 'start-workflow.mjs');
 
 const argv = process.argv.slice(2);
@@ -153,7 +153,7 @@ const replaceKernel = (base) => {
 
 // Orca 1.4.209 binds a send to the terminal's process incarnation: a kernel terminal created before
 // an Orca update shows writable on `terminal show` yet refuses every write terminal_not_writable
-// (the worker side records the same refusal op-worker-unwritable, scripts/kernel/api.mjs). A refused
+// (the worker side records the same refusal op-worker-unwritable, scripts/kernel/cli.mjs). A refused
 // kernel wake send is recorded kernel-wake-unwritable, and a refusal newer than the terminal's last
 // output is not typed again: the stale incarnation is closed with `terminal close` itself - a typed
 // quit and an Orca interrupt are refused the same way - and start-workflow replaces the seat.

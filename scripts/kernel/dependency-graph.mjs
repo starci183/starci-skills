@@ -215,7 +215,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
     }
   }
 
-  // Refused record-change declarations: the record is a peer's (api.mjs record-change-refused).
+  // Refused record-change declarations: the record is a peer's (cli.mjs record-change-refused).
   for (const ev of db.prepare('SELECT workflow_id,payload_json,created_at FROM events WHERE kind=? AND created_at>=? ORDER BY seq').all(RECORD_CHANGE_REFUSED, now - REFUSAL_WINDOW_MS)) {
     const p = parseJson(ev.payload_json, {}) ?? {};
     for (const owner of [...new Set(list(p.owners).map((o) => o?.workflowId).filter(Boolean))]) {

@@ -3,7 +3,7 @@
 #
 # THE SPAWN CONTRACT — the packet each ephemeral [Op] agent is launched with.
 # The packet flows through `api dispatch`: the [Kernel] agent calls
-# `node scripts/kernel/api.mjs dispatch --job <id> --spawn` and the api —
+# `node scripts/kernel/cli.mjs dispatch --job <id> --spawn` and the api —
 # never the kernel itself — reserves the lease, renders the packet and runs
 # the Orca terminal sequence (modules/kernel/api.yaml dispatch).
 # Every field is defined once, with the kernel mechanism that enforces it
@@ -32,7 +32,7 @@ about:
     and enforced at the database trigger level, so an agent physically cannot
     record evidence for another job.
   sources:
-    - scripts/kernel/api.mjs
+    - scripts/kernel/cli.mjs
     - scripts/agent/lib.mjs
     - engine/db/ledger.mjs
 
@@ -104,7 +104,7 @@ fields:
       The op's authored contract: modules/ops/ops/<id>.yaml is the canonical
       manifest (operator contract + business analysis + route: block); the
       api renders it into the task text the agent receives
-      (scripts/kernel/api.mjs buildPacket/buildPrompt; the rendered markdown
+      (scripts/kernel/cli.mjs buildPacket/buildPrompt; the rendered markdown
       is stored in the contracts table, keyed by workflow/op/attempt — the
       worker reads it back via `api op-contract --job <id>`; the row, not
       the prompt text, is the dispatch authority).
@@ -142,7 +142,7 @@ fields:
     enforcedBy: >-
       `productLocaleFor()` in scripts/kernel/product-locale.mjs resolves it
       from the target repository's .starciwork when the packet is built
-      (scripts/kernel/api.mjs buildPacket) and the prompt states it beside
+      (scripts/kernel/cli.mjs buildPacket) and the prompt states it beside
       owner_language. scripts/work/ui/shell-conformance.mjs refuses a
       content prompt that does not state `Product locale: <default>`
       (SHELL_LOCALE_DRIFT); modules/ops/_common.yaml carries the rule.
@@ -180,7 +180,7 @@ fields:
       that an explicitly bound proposal belongs to the same approved chain;
       it grants no goal-revision authority.
     enforcedBy: >-
-      scripts/kernel/api.mjs freezes the latest approved goal revision and
+      scripts/kernel/cli.mjs freezes the latest approved goal revision and
       identity into jobs.payload_json at enqueue, then combines that binding
       with the job's workflow_id while building the durable contract packet.
       A later goal revision never silently retargets an already queued job.
@@ -245,7 +245,7 @@ fields:
     enforcedBy: >-
       The api's admission takes the leases atomically with a TTL
       (DISPATCH_LEASE_TTL_MS=30min default, --lease-ttl overrides;
-      scripts/kernel/api.mjs); expiry is lazy — an expired row stops
+      scripts/kernel/cli.mjs); expiry is lazy — an expired row stops
       counting against capacity at admission but a path:* row still fences
       its write set until settle/reconcile deletes it — and an unproved
       timed-out worker moves to effect_unknown and DELIBERATELY retains its
@@ -346,7 +346,7 @@ preflight:
 
 spawnMechanics:
   caller: >-
-    The kernel agent invokes `node scripts/kernel/api.mjs dispatch --job
+    The kernel agent invokes `node scripts/kernel/cli.mjs dispatch --job
     <job_id> --spawn` and reads the JSON receipt — it never runs an orca
     terminal-* command itself (modules/kernel/api.yaml conventions.neverDoes;
     its one look at a running op is driver-loop.yaml
@@ -385,14 +385,14 @@ spawnMechanics:
     lease TTL bounds how long a crashed worker's fence holds its successors
     back — an expired row stops counting as a live holder and becomes a
     recovery signal for reconcile/settle
-    (scripts/kernel/api.mjs DISPATCH_LEASE_TTL_MS).
+    (scripts/kernel/cli.mjs DISPATCH_LEASE_TTL_MS).
   oneOpOneAgent: >-
     One operation = one agent = one Dispatch = one terminal. An operation is
     never split among several agents, and a failed agent is never silently
     continued — the attempt is settled and a NEW dispatch carries a fresh
     attempt number (driver-loop.yaml failureHandling.respawnPolicy).
   hierarchy: >-
-    `node scripts/kernel/api.mjs hierarchy --workflow <id> --json` is the
+    `node scripts/kernel/cli.mjs hierarchy --workflow <id> --json` is the
     canonical workflow -> Kernel -> Op projection. Orca tab/pane layout is a
     rendering surface, not the relationship source.
   spawnLines: >-

@@ -12,7 +12,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { recordVersion } from '../../scripts/work/work-graph-store.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const WF = 'wf-graph-runtime';
 const json = (v) => JSON.stringify(v ?? null);
 

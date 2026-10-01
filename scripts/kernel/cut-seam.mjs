@@ -206,7 +206,7 @@ export function digestInterfaceFiles({ repo, payload, files }) {
 }
 
 /** The op-prompt lines for a cut job: the seam's contract-first duty, or a sibling's stub-first duty. */
-export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/api.mjs', repoLabel = '<target-repo>' }) {
+export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/cli.mjs', repoLabel = '<target-repo>' }) {
   if (!cut) return [];
   if (isSeamCut(cut)) {
     return [

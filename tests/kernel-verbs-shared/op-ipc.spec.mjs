@@ -9,9 +9,9 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const API=path.join(ROOT,'scripts','kernel','api.mjs');
+const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 
-// The op-IPC layer lives in scripts/kernel/api.mjs.
+// The op-IPC layer lives in scripts/kernel/cli.mjs.
 //
 // Contract under test:
 //   api dispatch --spawn            writes a contracts row (markdown,

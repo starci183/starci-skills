@@ -13,12 +13,12 @@ import {classifyAgentScreen,staleAwareState} from '../../scripts/kernel/terminal
 // finished answer at the prompt, but older spinner rows stayed in the last lines, so the watchdog
 // reported `action: active, outputAgeMs: 13365199` every tick and never woke them.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const WATCHDOG=path.join(ROOT,'scripts','kernel','watchdog.mjs');
+const WATCHDOG=path.join(ROOT,'scripts','kernel','kernel-watchdog.mjs');
 const STALE_MS=allocationMs('liveness.activeStaleMs');
 
 // A Codex Kernel frame: the old spinner row, then the finished answer, then the prompt.
 const FINISHED_AFTER_SPINNER=[
-  '• Ran node scripts/kernel/api.mjs status --repo D:\\Repositories\\starci-next --workflow wf-x',
+  '• Ran node scripts/kernel/cli.mjs status --repo D:\\Repositories\\starci-next --workflow wf-x',
   '  └ wf-x phase=running frontier=engaged ACTIONABLE',
   '• Working (12m 03s • esc to interrupt) · 1 background terminal running',
   '• No new report or repair is recorded. The queued ordinal-1 retry still has invalid lineage, so',
@@ -30,7 +30,7 @@ const FINISHED_AFTER_SPINNER=[
 // A live Codex turn: the spinner sits directly above the input row.
 const SPINNER_LAST=[
   '• Slice 2 launch was rejected before an accepted contract; rerouting it.',
-  '• Ran node scripts/kernel/api.mjs route --job op-x --json',
+  '• Ran node scripts/kernel/cli.mjs route --job op-x --json',
   '  └ {"ok": true}',
   '• Working (3m 44s • esc to interrupt) · 1 background terminal running · /ps to view',
   '› Ask Codex to do anything',
