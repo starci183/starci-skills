@@ -2,7 +2,7 @@
 // stands for the main checkout, with real files in node_modules and packages/node_modules; Orca creates a worktree of
 // it; the worktree's node_modules and packages/node_modules are junctions into the fake main; `orca worktree rm --force`
 // removes the worktree WITHOUT the runtime unlinking anything first; the fake main must be byte-identical (file list and
-// sha256 of every file). Then the runtime's own path (scripts/lib/worktrees.mjs removeOrcaWorktree: links unlinked
+// sha256 of every file). Then the runtime's own path (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree: links unlinked
 // first, then Orca) is run the same way. Measured result: identical - Orca does not walk junctions; the runtime still
 // unlinks every link first.
 //
@@ -22,7 +22,7 @@ import { orcaStatus } from '../scripts/api/orca/status.mjs';
 import { repoAdd } from '../scripts/api/orca/repo-add.mjs';
 import { worktreeCreate } from '../scripts/api/orca/worktree-create.mjs';
 import { worktreeRm } from '../scripts/api/orca/worktree-rm.mjs';
-import { removeOrcaWorktree } from '../scripts/lib/worktrees.mjs';
+import { removeOrcaWorktree } from '../scripts/api/orca/worktree-remove.mjs';
 
 export const REQUIRE_ORCA_LIVE = process.env.STARCI_REQUIRE_ORCA_LIVE === '1';
 export const ORCA_LIVE_OPT_IN = REQUIRE_ORCA_LIVE || process.env.STARCI_ORCA_LIVE === '1';

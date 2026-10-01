@@ -8,7 +8,7 @@
 // Fail-open on the check's OWN faults: a bug here must never block a commit, so an internal error lets it land.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn } from '../lib/git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { refusalLines, logRefusal } from './refusals.mjs';

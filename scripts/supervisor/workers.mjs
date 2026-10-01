@@ -48,11 +48,12 @@ import {
 } from './home.mjs';
 import { openMachine } from '../../engine/machine-db.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createScratchWorktree, markRemoved } from '../lib/worktrees.mjs';
+import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { markRemoved } from '../lib/worktree-registry.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { gitSpawn } from '../lib/git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../kernel/contract-changes-store.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
@@ -220,7 +221,7 @@ export const branchOf = (jobId) => `sup/${jobId}`;
 
 /**
  * Create the job's staging checkout: a worktree on sup/<job> at <base> of the runtime, made by the one worktree API
- * (scripts/lib/worktrees.mjs, registered with its [Worker] job for the GC), plus a node_modules junction and a copy of
+ * (scripts/api/git/worktree-add.mjs, registered with its [Worker] job for the GC), plus a node_modules junction and a copy of
  * the owner config so specs run there as they do live.
  */
 export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, base = null }) {

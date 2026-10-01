@@ -30,7 +30,7 @@ import { commandVerdict } from '../guards/command-guard.mjs';
 import * as gitPolicy from '../guards/git-policy.mjs';
 import * as depsGuard from '../guards/deps-guard.mjs';
 import { CATALOG_FILE } from './failure-codes.mjs';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { isMain } from './common.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';

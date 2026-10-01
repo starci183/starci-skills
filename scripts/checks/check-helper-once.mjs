@@ -3,17 +3,15 @@
 //   node scripts/checks/check-helper-once.mjs [--json]
 //
 // RT_HELPER_REDEFINED: every tracked `.mjs` under scripts/, engine/, modules/, bin/ and ext/ is parsed with acorn. The
-// helper table is DERIVED from the exports of the shared libs (scripts/lib/*.mjs, engine/*.mjs and the check kit
+// helper table is DERIVED from the exports of the shared libs (scripts/lib/*.mjs, scripts/api/<system>/lib.mjs, engine/*.mjs and the check kit
 // scripts/checks/common.mjs): each exported function/const gets a normalised token sequence (parameters plus body,
 // declared names renamed by first use, comments, whitespace and semicolons dropped). A top-level function/const of any
 // other place whose sequence equals an exported helper's is a copy: import the lib one. A copy with a different body is a
 // different contract and is not flagged. Two libs that export one NAME with different contracts are reported for a rename.
-// RT_RAW_GIT_SPAWN: a spawnSync/execFileSync/spawn/execFile call whose first argument is the literal 'git' outside
-// scripts/lib/git.mjs - every git spawn goes through gitSpawn/runGit/gitResult there.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from './common.mjs';
 
@@ -21,12 +19,10 @@ import { isMain } from './common.mjs';
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
-export const GIT_HOME = 'scripts/lib/git.mjs';
-const SPAWNS = new Set(['spawnSync', 'execFileSync', 'spawn', 'execFile']);
 /** Shortest normalised sequence that counts as a helper body: below it two functions agree by accident. */
 const MIN_TOKENS = 8;
 
-const isLib = (rel) => /^(scripts\/lib|engine)\/[^/]+\.mjs$/.test(rel) || rel === 'scripts/checks/common.mjs';
+const isLib = (rel) => /^(scripts\/lib|engine)\/[^/]+\.mjs$/.test(rel) || /^scripts\/api\/[^/]+\/lib\.mjs$/.test(rel) || rel === 'scripts/checks/common.mjs';
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
 const GENERATED = /^packages\/[^/]+\/runtime\//;
 
@@ -133,25 +129,6 @@ function readsState(source, node, state) {
   return tokens.some((t, i) => t.type.label === 'name' && state.has(t.value) && !local.has(t.value) && !['.', '?.'].includes(tokens[i - 1]?.type.label));
 }
 
-function rawGitSpawns(ast) {
-  const found = [];
-  const visit = (n) => {
-    if (!n || typeof n.type !== 'string') return;
-    if (n.type === 'CallExpression') {
-      const callee = n.callee.type === 'MemberExpression' && !n.callee.computed ? n.callee.property.name : n.callee.name;
-      const first = n.arguments[0];
-      if (SPAWNS.has(callee) && first?.type === 'Literal' && first.value === 'git') found.push(n);
-    }
-    for (const key of Object.keys(n)) {
-      const v = n[key];
-      if (Array.isArray(v)) v.forEach(visit);
-      else if (v && typeof v.type === 'string') visit(v);
-    }
-  };
-  visit(ast);
-  return found;
-}
-
 const lineOf = (source, offset) => source.slice(0, offset).split('\n').length;
 
 /**
@@ -197,12 +174,6 @@ export function helperOnceFindings({ tracked, read }) {
           message: `${row.name} repeats ${home.name} exported by ${home.rel}: import it instead of redefining it` });
       }
     }
-    if (file.rel !== GIT_HOME) {
-      for (const call of rawGitSpawns(parse(file.source))) {
-        findings.push({ code: 'RT_RAW_GIT_SPAWN', path: file.rel, line: lineOf(file.source, call.start),
-          message: `direct spawn of 'git': use gitSpawn/runGit/gitResult from ${GIT_HOME}` });
-      }
-    }
   }
   return findings;
 }
@@ -218,7 +189,7 @@ if (isMain(import.meta.url)) {
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
   else {
     for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: every shared helper has one home and every git spawn goes through scripts/lib/git.mjs.');
+    if (!findings.length) console.log('OK: every shared helper has one home.');
   }
   process.exit(findings.length ? 1 : 0);
 }

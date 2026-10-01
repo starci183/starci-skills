@@ -19,7 +19,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
-import { gitResult, runGit } from '../lib/git.mjs';
+import { gitResult, runGit } from '../api/git/lib.mjs';
 import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';

@@ -18,7 +18,7 @@
 //        without a built dist points it at the live checkout's)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from '../checks/draw-source.mjs';

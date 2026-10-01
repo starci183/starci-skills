@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { helperOnceFindings } from '../scripts/checks/check-helper-once.mjs';
 
-// RED15 and RED17: a shared helper has one home, and git is spawned only in scripts/lib/git.mjs.
+// RED15 and RED17: a shared helper has one home (where git may be spawned is scripts/checks/check-layers.mjs).
 const run = (files) => helperOnceFindings({ tracked: Object.keys(files), read: (rel) => files[rel] });
 const summary = (findings) => findings.map((f) => [f.code, f.path]);
 
@@ -49,13 +49,12 @@ test('two libs exporting one name with different contracts are reported for a re
   assert.match(findings[0].message, /putBlob is exported by engine\/a\.mjs and scripts\/lib\/b\.mjs with different contracts: rename one/);
 });
 
-test("a spawn of the literal 'git' outside scripts/lib/git.mjs is flagged; the lib itself and non-literal names are not", () => {
+test('an api system lib (scripts/api/<system>/lib.mjs) is a helper home: a copy of its export elsewhere is flagged', () => {
   const findings = run({
-    'scripts/lib/git.mjs': "import { spawnSync } from 'node:child_process';\nexport const gitSpawn = (file, args, options = {}) => spawnSync(file, args, options);\nexport const raw = () => spawnSync('git', ['status']);\n",
-    'scripts/kernel/raw.mjs': "import cp, { execFileSync } from 'node:child_process';\nexport const a = () => execFileSync('git', ['status']);\nexport const b = () => cp.spawnSync('git', ['log']);\n",
-    'scripts/kernel/ok.mjs': "import { spawnSync } from 'node:child_process';\nimport { runGit } from '../lib/git.mjs';\nexport const a = () => runGit(['status']);\nexport const b = () => spawnSync(process.execPath, ['-v']);\n",
+    'scripts/api/git/lib.mjs': PATH_KEY,
+    'scripts/kernel/copy.mjs': "const toSlash = (value) => String(value ?? '').replaceAll('-', '/');\nexport const use = (x) => toSlash(x);\n",
   });
-  assert.deepEqual(summary(findings), [['RT_RAW_GIT_SPAWN', 'scripts/kernel/raw.mjs'], ['RT_RAW_GIT_SPAWN', 'scripts/kernel/raw.mjs']]);
+  assert.deepEqual(summary(findings), [['RT_HELPER_REDEFINED', 'scripts/kernel/copy.mjs']]);
 });
 
 test('tests and files outside the runtime roots are not scanned', () => {

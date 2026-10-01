@@ -48,7 +48,7 @@ import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
 import { allowsFile } from './hfs-allows.mjs';
-import { gitOutput } from './git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 import { posixPath } from './path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './hfs-tree.mjs';
 import { contractFindings } from './hfs-rules/contract.mjs';

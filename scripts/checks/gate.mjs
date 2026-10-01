@@ -45,7 +45,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../lib/hfs-slots.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';

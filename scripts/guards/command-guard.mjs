@@ -481,7 +481,7 @@ async function npmVerdict({ args, cwd, guard, deps }) {
 }
 
 const loadDeps = async () => {
-  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../lib/git.mjs'), import('../lib/git-index-lock.mjs')]);
+  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../lib/git-index-lock.mjs')]);
   return { policy, npm, git, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
 };
 

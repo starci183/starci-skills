@@ -10,7 +10,7 @@ import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
 import {walkFiles} from './common.mjs';
 import {blobPath} from '../lib/artifact-store.mjs';
 import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
-import {runGit} from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import {sealedLocationProblem} from './check-work-artifacts.mjs';
 
 /**

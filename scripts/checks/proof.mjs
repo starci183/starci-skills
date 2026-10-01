@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {safeRemoveTree,safeRemoveWorktree} from '../lib/safe-remove.mjs';
-import {createScratchWorktree,markRemoved} from '../lib/worktrees.mjs';
+import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { markRemoved } from '../lib/worktree-registry.mjs';
 import {posixPath,slash} from '../lib/path-key.mjs';
 
 /**
@@ -110,7 +111,7 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
     if(!fs.existsSync(scratch))markRemoved(scratch);
   };
   try{
-    // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed in the finally below.
+    // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed in the finally below.
     const added=createScratchWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git:args=>run(args)});
     if(!added.ok)
       return {...empty('fail-before',baseHead,opHead,commands,`the base worktree of ${short(baseHead)} could not be created: ${tail(added.detail??added.reason,200)}`),

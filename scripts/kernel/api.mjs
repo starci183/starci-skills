@@ -150,7 +150,7 @@ import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
 import { salvageUnfiledReport, unfiledReportCandidates } from './report-salvage.mjs';
-import { gitResult } from '../lib/git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';

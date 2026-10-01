@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn, runGit, gitResult } from '../scripts/lib/git.mjs';
+import { gitSpawn, runGit, gitResult } from '../scripts/api/git/lib.mjs';
 
 // Guard/kernel scripts each spelt the same git spawn by hand: encoding utf8, windowsHide, a cwd
 // here, a `-C` there. scripts/lib/git.mjs is the one helper; gitSpawn keeps the

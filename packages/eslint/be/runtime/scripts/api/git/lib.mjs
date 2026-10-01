@@ -1,11 +1,11 @@
-// git.mjs — the one spawn the runtime's guard/kernel scripts run git through.
+// scripts/api/git/lib.mjs — the one place the runtime spawns git (scripts/checks/check-layers.mjs enforces it).
 //
-// Every copy spelt the same options by hand - encoding:'utf8', windowsHide:true, sometimes a
-// timeout - with two shapes: `git args` in a cwd (shim's pathspec scans, footprint-scan,
-// safe-remove's prune) and `git -C dir args` (settle-landed, install, terminal-dedupe's worktree
-// list). gitOutput is the throwing shape (stdout text, or an Error on a non-zero exit). gitSpawn keeps the spawnSync(file, args, options) signature so an injected runner or a
-// spec's fake takes the same three arguments; runGit is the `-C` convenience; gitResult folds the
-// result into settle-landed's {ok, stdout, error} envelope.
+// Every caller spelt the same options by hand - encoding:'utf8', windowsHide:true, sometimes a timeout - with two shapes:
+// `git args` in a cwd and `git -C dir args`. gitOutput is the throwing shape (stdout text, or an Error on a non-zero exit).
+// gitSpawn keeps the spawnSync(file, args, options) signature so an injected runner or a spec's fake takes the same three
+// arguments; runGit is the `-C` convenience; gitResult folds the result into the {ok, stdout, error} envelope; gitRunner
+// folds any caller's runner into {ok, stdout, stderr}. The call files beside this one (worktree-*.mjs, rev-parse.mjs, ...)
+// each name one git verb.
 import { spawnSync } from 'node:child_process';
 
 /**
@@ -43,11 +43,10 @@ export function gitResult(args, options = {}) {
 }
 
 /**
- * git's C-quoted diff path decoded - `"b\303\251"` a `+++ ` header line prints when core.quotePath
- * covers the name. Octal escapes become \u00XX for JSON.parse (which answers \n, \t, \" and \\);
- * a value not wrapped in quotes passes through unchanged.
+ * A caller's git runner folded to (args, opts) -> {ok, stdout, stderr}. `git`: the caller's runner (args, {cwd}) ->
+ * {ok|status, stdout|out, stderr|err} (a spec's fake); null: runGit with a 5-minute timeout and a 64 MB buffer.
  */
-export const unquoteDiffPath = (value) =>
-  /^".*"$/.test(value)
-    ? JSON.parse(value.replace(/\\([0-7]{3})/g, (_, octal) => `\\u00${Number.parseInt(octal, 8).toString(16).padStart(2, '0')}`))
-    : value;
+export const gitRunner = (git = null) => (args, opts = {}) => {
+  const r = git ? git(args, opts) : runGit(args, { timeout: 300_000, maxBuffer: 64 * 1024 * 1024, ...opts });
+  return { ok: r?.ok ?? (!r?.error && r?.status === 0), stdout: String(r?.stdout ?? r?.out ?? '').trim(), stderr: String(r?.stderr ?? r?.err ?? r?.error?.message ?? r?.error ?? '').trim() };
+};

@@ -16,7 +16,7 @@
 //                stand-in (fixture, example, changeme) is not a literal.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';

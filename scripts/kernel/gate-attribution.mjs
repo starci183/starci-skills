@@ -40,7 +40,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
-import { gitResult } from '../lib/git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from './owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';

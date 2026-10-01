@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { gitResult } from './git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 import { isLinkLike, safeRemoveWorktree } from './safe-remove.mjs';
 import { pathKey } from './path-key.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, liveLaneOwners } from './lane-owner.mjs';

@@ -1,0 +1,30 @@
+id: runtime-api-layers
+effectiveAt: '2026-10-01T23:00:00+07:00'
+summary: >-
+  Lane C0 LAYER-1: the runtime's own source is layered. scripts/api/<system>/ is the only place that talks to an external
+  system. The git spawn (gitSpawn, runGit, gitOutput, gitResult, gitRunner) moved from scripts/lib/git.mjs to
+  scripts/api/git/lib.mjs, and scripts/lib/git.mjs keeps only the pure unquoteDiffPath. scripts/lib/worktrees.mjs was
+  split: registry rows, kinds, settings and collectReason are scripts/lib/worktree-registry.mjs; the git calls are
+  scripts/api/git/{worktree-list,worktree-add,worktree-remove,rev-parse,merge-base,branch-delete,branch-description,
+  snapshot-commit,preserve-work}.mjs; the Orca lifecycle is scripts/api/orca/{worktree-client,worktree-provision,
+  worktree-remove}.mjs; scripts/lib/worktrees.mjs keeps the GC, the counts and its CLI (node scripts/lib/worktrees.mjs
+  gc|counts|resume is unchanged). The link-safe rmdir primitive is scripts/api/fs/rmdir-link.mjs. check-worktree-add
+  names scripts/api/git/worktree-add.mjs createScratchWorktree as the one `git worktree add`. check-helper-once no longer
+  emits RT_RAW_GIT_SPAWN (its catalog entry is removed); where an external tool may be spawned is the layer check's job.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/runtime-api-layers.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/api/git/lib.mjs
+  - scripts/api/git/worktree-add.mjs
+  - scripts/api/git/worktree-remove.mjs
+  - scripts/api/git/worktree-list.mjs
+  - scripts/api/orca/worktree-provision.mjs
+  - scripts/api/orca/worktree-remove.mjs
+  - scripts/api/orca/worktree-client.mjs
+  - scripts/api/fs/rmdir-link.mjs
+  - scripts/lib/git.mjs
+  - scripts/lib/worktrees.mjs
+  - scripts/lib/worktree-registry.mjs
+  - scripts/checks/check-helper-once.mjs
+  - scripts/checks/check-worktree-add.mjs

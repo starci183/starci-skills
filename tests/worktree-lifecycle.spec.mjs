@@ -18,7 +18,12 @@ import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { withMachine } from '../engine/machine-db.mjs';
 import { CHECKPOINT_EVENTS } from '../scripts/kernel/workflow-checkpoint.mjs';
 import { evaluateCondition } from '../scripts/kernel/gate-conditions.mjs';
-import { createScratchWorktree, removeScratchWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit, reserveOrcaSlot } from '../scripts/lib/worktrees.mjs';
+import { createScratchWorktree } from '../scripts/api/git/worktree-add.mjs';
+import { removeScratchWorktree } from '../scripts/api/git/worktree-remove.mjs';
+import { gcWorktrees, worktreeCounts } from '../scripts/lib/worktrees.mjs';
+import { worktreesRootOf } from '../scripts/lib/worktree-registry.mjs';
+import { snapshotCommit } from '../scripts/api/git/snapshot-commit.mjs';
+import { reserveOrcaSlot } from '../scripts/api/orca/worktree-provision.mjs';
 import { ensureWorkflowWorktree } from '../scripts/kernel/workflow-worktree.mjs';
 import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 import { linksUnder, mainCheckoutDamage } from '../scripts/lib/safe-remove.mjs';
@@ -168,14 +173,14 @@ test('the ban check fires on a stray `git worktree add` and on nothing else', (t
     'scripts/tool.ps1': 'git worktree add $dir main\n',
     'scripts/message.mjs': "return { ok: false, error: added.stderr || 'git worktree add failed' };\n",
     'scripts/prose.mjs': "const rule = 'never create a worktree (git worktree add, mklink): report a need';\n// git(['worktree', 'add', x]) in a comment\n",
-    'scripts/lib/worktrees.mjs': "export function createScratchWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\nexport function createOrcaWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\n",
+    'scripts/api/git/worktree-add.mjs': "export function createScratchWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\nexport function createOrcaWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\n",
     'tests/fixture.spec.mjs': "git(root, 'worktree', 'add', lane);\ngit(['worktree', 'add', lane]);\n",
   };
   for (const [rel, text] of Object.entries(files)) write(root, rel, text);
   const r = scanWorktreeAdd(root, { files: Object.keys(files) });
   assert.equal(r.ok, false);
-  assert.deepEqual(r.hits.map((h) => h.file).sort(), ['scripts/lib/worktrees.mjs', 'scripts/shell.mjs', 'scripts/stray.mjs', 'scripts/tool.ps1']);
-  assert.deepEqual(r.hits.filter((h) => h.file === 'scripts/lib/worktrees.mjs').map((h) => h.line), [5], 'the worktree API itself: only its one home may hold the invocation');
+  assert.deepEqual(r.hits.map((h) => h.file).sort(), ['scripts/api/git/worktree-add.mjs', 'scripts/shell.mjs', 'scripts/stray.mjs', 'scripts/tool.ps1']);
+  assert.deepEqual(r.hits.filter((h) => h.file === 'scripts/api/git/worktree-add.mjs').map((h) => h.line), [5], 'the worktree API itself: only its one home may hold the invocation');
   assert.deepEqual(strayLines("git(repoRoot, ['worktree',\t'add', dir])"), [{ line: 1, text: "git(repoRoot, ['worktree',\t'add', dir])" }]);
   const live = scanWorktreeAdd(SKILL_ROOT);
   assert.equal(live.ok, true, `the runtime itself is clean: ${JSON.stringify(live.hits.slice(0, 3))}`);

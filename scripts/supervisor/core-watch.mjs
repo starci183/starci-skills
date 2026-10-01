@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { readMachine } from '../../engine/machine-db.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { claudeDebugSettings } from '../../engine/config.mjs';
-import { gitResult } from '../lib/git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 import { parseWorktreeList } from '../lib/hk-lanes.mjs';
 import { orphanLedgerFindings } from '../lib/hk-orphan-ledgers.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from '../reconciler/state.mjs';

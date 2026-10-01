@@ -27,7 +27,7 @@ import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);

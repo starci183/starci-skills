@@ -18,7 +18,7 @@
 //              (api verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../lib/git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engine/ledger-db.mjs';
 import { getBlob } from '../lib/artifact-store.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';

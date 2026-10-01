@@ -3,7 +3,7 @@
 // they carry the same README title, the same stack-declaration project name and the same sibling repositories.
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from './git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 
 const git = (root, args) => gitOutput(args, { cwd: root }).trim();
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };

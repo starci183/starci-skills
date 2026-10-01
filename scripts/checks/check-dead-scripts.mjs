@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from './common.mjs';
-import { gitOutput } from '../lib/git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
 /** Tracked text files whose mention keeps a script alive (tests excluded: a script only a test reads is dead). */

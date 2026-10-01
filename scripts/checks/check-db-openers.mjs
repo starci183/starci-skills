@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { GENERATED_MIRROR_ROOTS } from './check-json-exceptions.mjs';
 
 export const DB_MODULES = Object.freeze(['engine/ledger-db.mjs', 'engine/machine-db.mjs']);

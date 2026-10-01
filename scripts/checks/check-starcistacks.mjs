@@ -27,7 +27,7 @@
 // Exit 0 clean (suspects allowed), 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { repositoryName, repositoryHome } from '../lib/repo-identity.mjs';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';

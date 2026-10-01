@@ -39,7 +39,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createScratchWorktree, markRemoved } from '../lib/worktrees.mjs';
+import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { markRemoved } from '../lib/worktree-registry.mjs';
 import { getBlob, putBlob } from '../lib/artifact-store.mjs';
 import { redactText } from '../lib/redact.mjs';
 import {sha256} from '../../engine/digest.mjs';
@@ -437,7 +438,7 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   };
   const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };
   try {
-    // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed by cleanup().
+    // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed by cleanup().
     const added = createScratchWorktree({ repoRoot: repo, dir: worktree, kind: 'push-scratch', detach: true, base: 'main', git: run });
     if (!added.ok) return unavailable(added.detail || added.reason || 'git worktree add failed');
     for (const dir of nodeModulesRoots(repo)) {

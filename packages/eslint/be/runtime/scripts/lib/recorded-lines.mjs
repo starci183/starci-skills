@@ -1,7 +1,7 @@
 // recorded-lines.mjs - the one home of the file-size ratchet's arithmetic (R20 HFS_SIZE_GROWTH), shared by the back-end
 // and front-end lint canons (each ships a byte copy in its runtime/ bundle, kept by packages/hfs/scripts/sync-runtime.mjs).
 import path from 'node:path';
-import { runGit } from './git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 
 /** The line count of a text; a trailing newline does not open a line. */
 export const lineCount = (text) => {

@@ -26,7 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { gitSpawn } from '../lib/git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
