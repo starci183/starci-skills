@@ -10,9 +10,10 @@ import test from 'node:test';
 import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
 import { appDeclaration } from './_hfs-arch-fixture.mjs';
 
-/** The fe side folder of a temp app whose root package.json lists `workspaces`. */
-const tree = (workspaces, extra = () => {}) => {
+/** The fe side folder of a temp app (removed when the test ends) whose root package.json lists `workspaces`. */
+const tree = (t, workspaces, extra = () => {}) => {
   const app = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-ws-'));
+  t.after(() => fs.rmSync(app, { recursive: true, force: true }));
   const root = path.join(app, 'fe');
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
   write('../hfs.json', JSON.stringify(appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }], optionalSlots: ['fe.package.ui'] }, 'ws')));
@@ -27,19 +28,19 @@ const tree = (workspaces, extra = () => {}) => {
   return root;
 };
 
-test('a `*` workspace skips a folder with no package.json; the real workspaces are analysed', () => {
-  const root = tree(['fe/packages/*'], (r) => fs.mkdirSync(path.join(r, 'packages', 'draft-ui')));
+test('a `*` workspace skips a folder with no package.json; the real workspaces are analysed', (t) => {
+  const root = tree(t, ['fe/packages/*'], (r) => fs.mkdirSync(path.join(r, 'packages', 'draft-ui')));
   const config = loadArchitectureConfig(root);
   assert.deepEqual(config.workspaces, ['packages/web-ui']);
 });
 
-test('a literal workspace path that does not hold a package.json is still refused', () => {
-  const root = tree(['fe/packages/web-ui', 'fe/packages/draft-ui'], (r) => fs.mkdirSync(path.join(r, 'packages', 'draft-ui')));
+test('a literal workspace path that does not hold a package.json is still refused', (t) => {
+  const root = tree(t, ['fe/packages/web-ui', 'fe/packages/draft-ui'], (r) => fs.mkdirSync(path.join(r, 'packages', 'draft-ui')));
   assert.throws(() => loadArchitectureConfig(root), /workspace packages\/draft-ui must resolve to a regular package.json/);
 });
 
-test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (nivo-fe packages/nivo-ui)', () => {
-  const root = tree(['fe/packages/*'], (r) => {
+test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (nivo-fe packages/nivo-ui)', (t) => {
+  const root = tree(t, ['fe/packages/*'], (r) => {
     for (const [rel, text] of [
       ['packages/web-ui/src/hooks/useToggle.ts', 'export const useToggle = () => null\n'],
       ['apps/web/src/hooks/lesson/index.ts', 'export {}\n'],
