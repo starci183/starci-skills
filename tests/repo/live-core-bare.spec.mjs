@@ -67,14 +67,14 @@ test('the hazard: with a linked worktree\'s GIT_DIR inherited, a temp dir\'s `gi
 
 // One git-fixture test of each spec that builds temp repositories, run in a child that inherited a hook's GIT_DIR.
 const SPECS = [
-  ['supervisor-kernel.spec.mjs', '^staging lifecycle'],
-  ['supervisor-push.spec.mjs', 'a dry run stops at the scan'],
-  ['settle-target-repo.spec.mjs', 'backend op.s bare owned path still resolves'],
+  ['supervisor/supervisor-kernel.spec.mjs', '^staging lifecycle'],
+  ['supervisor/supervisor-push.spec.mjs', 'a dry run stops at the scan'],
+  ['kernel/settle-target-repo.spec.mjs', 'backend op.s bare owned path still resolves'],
 ];
 for (const [spec, pattern] of SPECS) {
   test(`${spec}: its fixtures never write the repository an inherited GIT_DIR names`, (t) => {
     const { main, wt, admin } = repoWithWorktree(t);
-    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, path.join(ROOT, 'tests', spec)],
+    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, path.join(ROOT, 'tests', ...spec.split('/'))],
       { cwd: wt, env: { ...cleanEnv(), GIT_DIR: admin }, encoding: 'utf8', windowsHide: true, timeout: 300_000 });
     assert.match(r.stdout, /# tests [1-9]/, `the pattern ran a test:\n${r.stdout.slice(-1500)}`);
     assertUntouched(main, `${spec} wrote the throwaway main repo's config:\n${r.stdout.slice(-3000)}\n${r.stderr.slice(-1500)}`);

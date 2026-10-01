@@ -18,7 +18,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const GENERATOR = `import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG = 'cat.yaml';
 export const BUNDLES = Object.freeze({ 'mirror': Object.freeze({ files: Object.freeze(['src/a.mjs']), catalog: false }) });
 if (process.argv.includes('--check')) {
@@ -113,11 +113,12 @@ test('drift inherited from main is advisory, not blocking', (t) => {
   assert.equal(check.note, 'red on main too, unchanged by this land');
 });
 
-test('the real generator mirrors ledger-db.mjs and every runtime ledger migration, and main\'s mirrors are current', () => {
+test('the real generator mirrors the published closure only (no ledger writer: the caller owns the artifact hold), and the mirrors on main are current', () => {
   const { files, bundles } = mirroredFiles(ROOT);
   assert.ok(bundles.includes('packages/hfs/runtime'));
-  assert.ok(files.includes('engine/db/ledger.mjs'));
-  for (const sql of fs.readdirSync(path.join(ROOT, 'engine/db/migrations/runtime')).filter((n) => n.endsWith('.sql'))) assert.ok(files.includes(`engine/db/migrations/runtime/${sql}`), sql);
+  assert.ok(files.includes('scripts/hfs/check.mjs'));
+  assert.ok(!files.includes('engine/db/ledger.mjs'), 'safe-remove takes its hold from the caller, so no bundle drags the ledger writer in');
+  for (const file of files.filter((f) => f.startsWith('engine/db/migrations/'))) assert.ok(fs.existsSync(path.join(ROOT, file)), file);
   const r = mirrorRun(ROOT);
   assert.equal(r.ok, true, r.full);
 });

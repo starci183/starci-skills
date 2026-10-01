@@ -28,7 +28,7 @@ families:
     since: '2026-09-27T00:00:00+07:00'
     batch: interface.draw
     gatePaths:
-      - scripts/checks/draw-
+      - scripts/work/draw/
       - scripts/work/draw-
       - scripts/work/grammar-proposal.mjs
       - scripts/work/ui/ui-proof-brief.mjs

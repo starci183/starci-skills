@@ -212,7 +212,7 @@ test('dispatch withholds the frozen changes; api check reads their codes advisor
 });
 
 test('the land gate reports gate stability for a frozen family: which lands touch it, and how many accepted legs would flip',async t=>{
-  const freeze=[{family:'interface.draw',gatePaths:['scripts/checks/draw-','knowledge/grammars/']}];
+  const freeze=[{family:'interface.draw',gatePaths:['scripts/work/draw/','knowledge/grammars/']}];
   assert.deepEqual(gateFamiliesTouched({changed:['scripts/work/draw/draw-dna.mjs','README.md'],freeze}),[{family:'interface.draw',why:['scripts/work/draw/draw-dna.mjs']}]);
   assert.deepEqual(gateFamiliesTouched({changed:['README.md'],freeze}),[]);
   const entry={id:'new-draw-code',ops:['interface.draw'],adds:{codes:['DRAW_X']}};

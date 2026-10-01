@@ -23,6 +23,8 @@ test('a missing credential parks only live proof; build ops code on a placeholde
 // workflows committed there; shared branches are append-only.
 test('a shared branch is append-only: no reset, rebase, amend or force; revert instead', () => {
   const common = read('modules/ops/_common.yaml');
-  assert.match(common, /is append-only: never `git reset`, rebase, amend, drop or\s+force it/);
-  assert.match(common, /undone with a new revert commit/);
+  // The workflow-worktree rule (lane WFWT) replaced the append-only sentence: only the runtime moves the workflow branch,
+  // and the command guard refuses every history or ref change there.
+  assert.match(common, /never reset, rebase or move that branch yourself/);
+  assert.match(common, /refuses\s+every history or ref change, WORKFLOW_HISTORY_CHANGE/);
 });

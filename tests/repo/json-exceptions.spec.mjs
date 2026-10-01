@@ -260,6 +260,6 @@ test('generated runtime mirrors are skipped, so their copies of authored JSON ar
 
 test('the skipped mirror roots are exactly the bundles sync-runtime.mjs writes and --check guards', async () => {
   const { GENERATED_MIRROR_ROOTS } = await import(pathToFileURL(checkerFile).href);
-  const { BUNDLES } = await import(pathToFileURL(path.join(skillRoot, 'packages', 'hfs', 'scripts', 'sync-runtime.mjs')).href);
+  const { BUNDLES } = await import(pathToFileURL(path.join(skillRoot, 'scripts', 'hfs', 'sync-runtime.mjs')).href);
   assert.deepEqual([...GENERATED_MIRROR_ROOTS].sort(), Object.keys(BUNDLES).sort());
 });
