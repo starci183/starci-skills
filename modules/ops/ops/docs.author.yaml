@@ -3,6 +3,16 @@ id: docs.author
 goal:
   en: Author or update the documentation one selected scope needs, derived from the decided records
     and the actual code - a reader's document, never a restated transcript.
+params:
+  gateRounds:
+    type: integer
+    default: 5
+    min: 1
+    max: 10
+    setBy: owner
+    doc:
+      en: "Rounds of FIX then the document gate (gate.mjs --profile docs) before the op stops: a gate still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml docChecks)."
+      vi: "Số vòng SỬA rồi chạy lại cổng tài liệu (gate.mjs --profile docs) trước khi op dừng: hết vòng cuối mà cổng vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml docChecks)."
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects: []
@@ -45,6 +55,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: standard
+    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    purpose:
+      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: N/index.yaml
@@ -74,7 +89,24 @@ writes:
         documents authored or updated with their before/after, and record what stayed undocumented
         with its reason. Operator-specific observed result in evidence/result.md: coverage of the declared
         documentation scope and the open questions that remain."
+  - id: read-digest
+    path: STARCI_JOB_SCRATCH/read-digest.json
+    schema: starci/read-digest@1
+    content:
+      en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
+      vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
+  - id: doc-gate
+    path: STARCI_JOB_SCRATCH/doc-gate.json
+    schema: starci/gate@1
+    content:
+      en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
+      vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
 steps:
+  - reads: [standard, target]
+    writes: [read-digest]
+    action:
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/checks/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml <and the knowledge/patterns/{be,fe} files of the code kinds the document describes> --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). A document that describes code names its parts the way the standard does (slot, layer, pattern id), so the reader can follow it to the source; it is written in English (R96), like every document the app keeps. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml <và các tệp knowledge/patterns/{be,fe} của loại mã mà tài liệu mô tả> --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Tài liệu mô tả mã gọi tên các phần theo cách chuẩn gọi (slot, tầng, mã pattern), để người đọc lần tới nguồn; tài liệu viết bằng tiếng Anh (R96), như mọi tài liệu app giữ. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - target
       - records
@@ -114,6 +146,11 @@ steps:
       en: Declare the authored documents on the node, run the record-class validator `starci validate`
         over the edited tree and report done once with the docs map and open questions. Never
         dispatch a successor.
+  - reads: [standard, records]
+    writes: [doc-gate]
+    action:
+      en: "FORCE THE DOCUMENT CHECKS after writing: run node scripts/checks/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the findings per check (a document that is not English, a Work record with a dead surface or a stale proof, a cite of a file that does not exist, a JSON exception out of place); exit 2 means a check could not run and is never green. Still red after the last round: report blocked with the exact findings. Never report done while the document gate is red or could not run. REPORT with doc-gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA TÀI LIỆU sau khi viết: chạy node scripts/checks/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi theo từng bộ kiểm tra (tài liệu không phải tiếng Anh, bản ghi Work có bề mặt chết hoặc bằng chứng lỗi thời, trích dẫn tới tệp không tồn tại, ngoại lệ JSON sai chỗ); exit 2 là một bộ kiểm tra không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi cổng tài liệu đỏ hoặc không chạy được. BÁO CÁO kèm doc-gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:
@@ -133,6 +170,16 @@ proofs:
       en: The operation authored documents only - no decided record was restated into something else, no
         repository source was written, and no scope, dependency or acceptance was touched to obtain
         pass.
+  - id: read-knowledge
+    requirement:
+      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
+  - id: doc-gate
+    requirement:
+      en: "api settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
+      vi: "api settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: RECORD_UNSETTLED
     condition:

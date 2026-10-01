@@ -43,6 +43,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: standard
+    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    purpose:
+      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: N/index.yaml
@@ -81,7 +86,18 @@ writes:
         replacement IDs where applicable, consumer dispositions and retention/access policy.
         Preserve stable identities and do not relabel unfinished required work na without a real
         scope decision."
+  - id: read-digest
+    path: STARCI_JOB_SCRATCH/read-digest.json
+    schema: starci/read-digest@1
+    content:
+      en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
+      vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
 steps:
+  - reads: [standard, target]
+    writes: [read-digest]
+    action:
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/checks/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/patterns/repo/starcistacks.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). What the finish retires or retains is decided against the standard: the records that must stay as evidence (knowledge/patterns/repo/starciwork.yaml), the slots that own each resource and the stack declaration at the app root; a git worktree the inventory shows is never removed here - the runtime's scripts/lib/worktrees.mjs owns that lifecycle. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/patterns/repo/starcistacks.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Những gì việc kết thúc gỡ bỏ hay giữ lại được quyết theo chuẩn: các bản ghi phải giữ làm bằng chứng (knowledge/patterns/repo/starciwork.yaml), slot sở hữu từng tài nguyên và khai báo stack ở gốc app; git worktree xuất hiện trong danh sách không bao giờ bị xóa ở đây - vòng đời đó thuộc scripts/lib/worktrees.mjs của runtime. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - inventory
       - authority
@@ -140,6 +156,11 @@ proofs:
     requirement:
       en: No required live consumer or sole evidence/custody copy is lost; exact selected effects and
         recovery status are observed.
+  - id: read-knowledge
+    requirement:
+      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: FINISH_UNSAFE
     condition:

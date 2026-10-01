@@ -27,6 +27,15 @@ params:
     setBy: kernel
     doc:
       en: How many components the referenced design may name before the record is cut.
+  gateRounds:
+    type: integer
+    default: 5
+    min: 1
+    max: 10
+    setBy: owner
+    doc:
+      en: "Rounds of FIX then the document gate (gate.mjs --profile docs) before the op stops: a gate still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml docChecks)."
+      vi: "Số vòng SỬA rồi chạy lại cổng tài liệu (gate.mjs --profile docs) trước khi op dừng: hết vòng cuối mà cổng vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml docChecks)."
 nodeKinds: [implementation, uat, ui, operations]
 completionProfile: operations
 sideEffects: []
@@ -81,6 +90,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: standard
+    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    purpose:
+      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: .starciwork/features/<feature>/{impl/<repository>,uat}/<name>/index.yaml
@@ -170,7 +184,24 @@ writes:
     fields: [domains, nodes, edges]
     content:
       en: The cut of one oversized slice into child task nodes of that slice.
+  - id: read-digest
+    path: STARCI_JOB_SCRATCH/read-digest.json
+    schema: starci/read-digest@1
+    content:
+      en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
+      vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
+  - id: doc-gate
+    path: STARCI_JOB_SCRATCH/doc-gate.json
+    schema: starci/gate@1
+    content:
+      en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
+      vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
 steps:
+  - reads: [standard, target]
+    writes: [read-digest]
+    action:
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/checks/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Each record's write scope is app-relative paths in the slots that admit them (be/..., fe/..., .starciwork/..., .starcistacks/... at the app root); each proof demand names its test layer and the check that runs it - unit: <name>.service.spec.ts beside the service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts with useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts with useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts with useSandbox (npm run test:contract). A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Phạm vi ghi của mỗi bản ghi là đường dẫn tương đối theo app nằm trong slot nhận chúng (be/..., fe/..., .starciwork/..., .starcistacks/... ở gốc app); mỗi yêu cầu chứng minh nêu tầng test và lệnh chạy nó - unit: <name>.service.spec.ts cạnh service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts với useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts với useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts với useSandbox (npm run test:contract). Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - application-stacks
       - target
@@ -287,6 +318,11 @@ steps:
         tree and confirm every child is launchable on its own. Record the seam, the children and the
         write scope of each. Build nothing and change no product source; the kernel launches the
         seam first, fans the rest out behind it and proves the whole group once."
+  - reads: [standard, target]
+    writes: [doc-gate]
+    action:
+      en: "FORCE THE DOCUMENT CHECKS after writing: run node scripts/checks/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the findings per check (a document that is not English, a Work record with a dead surface or a stale proof, a cite of a file that does not exist, a JSON exception out of place); exit 2 means a check could not run and is never green. Still red after the last round: report blocked with the exact findings. Never report done while the document gate is red or could not run. REPORT with doc-gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA TÀI LIỆU sau khi viết: chạy node scripts/checks/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi theo từng bộ kiểm tra (tài liệu không phải tiếng Anh, bản ghi Work có bề mặt chết hoặc bằng chứng lỗi thời, trích dẫn tới tệp không tồn tại, ngoại lệ JSON sai chỗ); exit 2 là một bộ kiểm tra không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi cổng tài liệu đỏ hoặc không chạy được. BÁO CÁO kèm doc-gate.json và read-digest.json."
 proofs:
   - id: launchable
     requirement:
@@ -324,6 +360,16 @@ proofs:
         pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
         refuses not-landed while one of them is untracked or dirty; authored Work never settles
         outside the repository history.
+  - id: read-knowledge
+    requirement:
+      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
+  - id: doc-gate
+    requirement:
+      en: "api settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
+      vi: "api settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: SCOPE_UNDETERMINED
     condition:
