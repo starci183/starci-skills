@@ -3,7 +3,6 @@ import type { EntityManager } from "typeorm"
 import type { Secret } from "@modules/platform/config"
 import type { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import type { AppModule as OrderApp } from "../../../apps/order/src/app.module"
-import type { RedisFakeService } from "./fakes/redis/redis-fake.service"
 import type { TestApi } from "./test-api.client"
 
 /** The typed options of the identity api, as `AppModule.register` takes them. */
@@ -48,15 +47,6 @@ export interface TestWiring {
     readonly orderDatabaseUrl: Secret
 }
 
-/**
- * How the world registers a capability module: as the app root does, global. The world passes it to the module a contract
- * spec builds, so the spec never writes `isGlobal` itself (registration is composition, and the world is the composition root).
- */
-export interface ModuleRegistration {
-    /** Always global: the capability is consumed through its injectors. */
-    readonly isGlobal: true
-}
-
 /** Builds one capability module from the wiring of the run. */
 export type TestModuleFactory = (wiring: TestWiring) => DynamicModule
 
@@ -93,10 +83,24 @@ export interface TestApps {
     readonly order: TestAppHandle
 }
 
-/** The network fakes of the external services the apps call; first-party apps run for real. */
-export interface TestFakes {
-    /** The Redis provider behind the cache integration. */
-    readonly redis: RedisFakeService
+/** A real service of the stack the world runs (its container), with the outage a spec drives on it. */
+export interface TestInfraService {
+    /** Takes the service down: its container is killed and every connection to it drops, as when its host crashes. */
+    cut(): void
+    /** Starts the same container again (same port, same data) and waits until the service answers. */
+    restore(): Promise<void>
+}
+
+/** The real Redis behind the cache integration. */
+export interface TestRedis extends TestInfraService {
+    /** How many keys the store holds, read from the server itself. */
+    keyCount(): number
+}
+
+/** The services of the repository's own stack, real in the world; nothing of the stack is faked. */
+export interface TestInfra {
+    /** The Redis of the cache integration. */
+    readonly redis: TestRedis
 }
 
 /** A person a spec registered and signed in. */

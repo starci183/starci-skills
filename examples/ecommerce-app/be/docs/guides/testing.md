@@ -60,12 +60,13 @@ insert real rows for the integration and e2e specs, with the database constraint
 
 Everything else lives under `src/tests/`:
 
-- `src/tests/world/` is the only test infrastructure. `global-setup.ts` starts one Postgres container per connection
-  (identity, order), runs the real `apps/migrate` bootstrap once and applies the dev seeds; `use-test-world.ts` exports
-  `useTestWorld({ apps })`, which boots the real identity and order apps in the spec process, wired to each other over
-  real GraphQL, and returns `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager),
-  `world.fake.<provider>` (a network fake of an external service; Redis today, under `world/fakes/redis/`),
-  `world.auth` and `world.waitFor`. Nothing is overridden in the DI container.
+- `src/tests/world/` is the only test infrastructure. `global-setup.ts` starts the services `.starcistacks/dev` declares,
+  real: one Postgres container per connection (identity, order) and the Redis of the cache. It runs the real
+  `apps/migrate` bootstrap once and applies the dev seeds; `use-test-world.ts` exports `useTestWorld({ apps })`, which
+  boots the real identity and order apps in the spec process, wired to each other over real GraphQL, and returns
+  `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.infra.redis` (the real Redis:
+  `keyCount()`, `cut()`, `restore()`) and `world.waitFor`. Nothing is overridden in the DI container and nothing of the
+  stack is faked; this app calls no external provider, so it has no network fakes and no contract specs.
 - `src/tests/fixtures/` holds the builders, the response shapes and the SQL constants of out-of-band reads.
 - `src/tests/integration/<area>/*.integration-spec.ts` run real capability modules over the world database.
 - `src/tests/e2e/<area>/*.e2e-spec.ts` are flow specs: they call the public GraphQL doors and assert persisted state

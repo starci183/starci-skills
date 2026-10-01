@@ -81,7 +81,7 @@ describe("identity sign-up and sign-in journey", () => {
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
         expect(await readRows(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
-        expect(world.fake.redis.size()).toBeGreaterThan(0)
+        expect(world.infra.redis.keyCount()).toBeGreaterThan(0)
         const identityTables = await readRows(world.db.identity, PUBLIC_TABLES, [])
         const orderTables = await readRows(world.db.order, PUBLIC_TABLES, [])
         expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(

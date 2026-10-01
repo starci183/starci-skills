@@ -5,9 +5,9 @@
  * process, against the shared infrastructure the jest globalSetup started once (one migrated Postgres container per
  * connection). Both modes share this implementation: same options, same boot, same shutdown.
  *
- * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden. The only double is the Redis
- * provider, a network fake the cache integration reaches over a real socket. No sleeps: an asynchronous effect is awaited
- * with `waitFor` against persisted state or a fake.
+ * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden, and every service of the stack
+ * `.starcistacks/dev` declares runs real (Postgres, the Redis of the cache: `world.infra.redis` cuts and restores it). No
+ * sleeps: an asynchronous effect is awaited with `waitFor` against persisted state or a real service.
  */
 import "reflect-metadata"
 import { strict as assert } from "node:assert"
@@ -30,8 +30,7 @@ import { DatabaseModule, parseIdentityDatabaseConfig, parseOrderDatabaseConfig }
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { LoggingModule } from "@modules/platform/logging"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
-import { killContainer, postgresAccepts, startContainer } from "./docker.client"
-import { RedisFakeService } from "./fakes/redis/redis-fake.service"
+import { killContainer, postgresAccepts, redisAccepts, redisKeyCount, startContainer } from "./docker.client"
 import { createTestApi } from "./test-api.client"
 import type { TestApi } from "./test-api.client"
 import type {
@@ -40,7 +39,8 @@ import type {
     TestApps,
     TestConnection,
     TestDb,
-    TestFakes,
+    TestInfra,
+    TestRedis,
     TestSession,
     TestWiring,
     TestWorldSpec,
@@ -48,7 +48,7 @@ import type {
 } from "./test-world.contracts"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { readWorldState } from "./test-world-state.service"
-import type { TestDatabaseState, TestWorldState } from "./test-world-state.service"
+import type { TestDatabaseState, TestRedisState, TestWorldState } from "./test-world-state.service"
 
 const BOOT_TIMEOUT_MS = 240_000
 const STOP_TIMEOUT_MS = 60_000
@@ -56,6 +56,7 @@ const DEFAULT_TEST_TIMEOUT_MS = 120_000
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
 const DATABASE_RETURN_DEADLINE_MS = 120_000
+const REDIS_RETURN_DEADLINE_MS = 60_000
 const RATE_LIMIT_HIGH = 100_000
 const CALL_DEADLINE_MS = 5000
 
@@ -96,7 +97,7 @@ interface Runtime {
     readonly contexts: ReadonlyArray<INestApplicationContext>
     readonly dataSources: ReadonlyArray<DataSource>
     readonly db: TestDb
-    readonly fake: TestFakes
+    readonly infra: TestInfra
     readonly apis: { readonly identity: TestApi; readonly order: TestApi } | null
     readonly root: INestApplicationContext | null
 }
@@ -126,6 +127,18 @@ const openDatabase = async (
     return dataSource
 }
 
+/** The real Redis of the run: its keys read from the server, its outage a kill and a start of its container. */
+const realRedis = (redis: TestRedisState): TestRedis => ({
+    keyCount: () => redisKeyCount(redis.container),
+    cut: () => killContainer(redis.container),
+    restore: async () => {
+        startContainer(redis.container)
+        await retryUntil("the redis answers PING again", REDIS_RETURN_DEADLINE_MS, () =>
+            Promise.resolve(redisAccepts(redis.container)),
+        )
+    },
+})
+
 const databaseOf = (state: TestWorldState, connection: TestConnection): TestDatabaseState =>
     connection === "identity" ? state.identity : state.order
 
@@ -138,7 +151,6 @@ export class TestWorld {
     /** Boots the world; called by the `beforeAll` that `useTestWorld` registers. */
     async start(): Promise<void> {
         const state = readWorldState()
-        const redis = await RedisFakeService.start()
         const identityDb = await openDatabase(
             identityDatabase(state.identity.url).name,
             state.identity.url,
@@ -149,20 +161,19 @@ export class TestWorld {
             state,
             dataSources: [identityDb, orderDb],
             db: { identity: identityDb.manager, order: orderDb.manager },
-            fake: { redis },
+            infra: { redis: realRedis(state.redis) },
         }
         this.runtime =
             "apps" in this.spec ? await this.startApps(this.spec, base) : await this.startModules(this.spec, base)
     }
 
-    /** Closes every booted app, last booted first, then the readers and the fake; called by the `afterAll` of `useTestWorld`. */
+    /** Closes every booted app, last booted first, then the readers; called by the `afterAll` of `useTestWorld`. */
     async stop(): Promise<void> {
         const runtime = this.runtime
         this.runtime = null
         if (runtime === null) return
         const closed = await Promise.allSettled([...runtime.contexts].reverse().map((context) => context.close()))
         await Promise.all(runtime.dataSources.map((dataSource) => dataSource.destroy()))
-        await runtime.fake.redis.stop()
         const failed = closed.find((result) => result.status === "rejected")
         if (failed?.status === "rejected") {
             throw new TestWorldError({
@@ -193,9 +204,9 @@ export class TestWorld {
         return this.booted().db
     }
 
-    /** The network fakes of the external services. */
-    get fake(): TestFakes {
-        return this.booted().fake
+    /** The real services of the stack, with the outages a spec drives on them. */
+    get infra(): TestInfra {
+        return this.booted().infra
     }
 
     /** Resolves a provider of a modules world by its class. */
@@ -276,7 +287,7 @@ export class TestWorld {
     }
 
     private async startApps(spec: AppsWorldSpec, base: Omit<Runtime, "contexts" | "apis" | "root">): Promise<Runtime> {
-        const { state, fake } = base
+        const { state } = base
         const [identityPort = 0, orderPort = 0] = await freePorts(2)
         const identityUrl = `http://127.0.0.1:${identityPort}`
         const orderUrl = `http://127.0.0.1:${orderPort}`
@@ -286,7 +297,7 @@ export class TestWorld {
             spec.apps.identity.module.register({
                 port: identityPort,
                 database: identityDatabase(state.identity.url),
-                cache: { url: new Secret(fake.redis.url) },
+                cache: { url: new Secret(state.redis.url) },
                 orderApi: { url: orderUrl, timeoutMs: CALL_DEADLINE_MS },
                 keycloakAdmin: {
                     url: ABSENT_KEYCLOAK_URL,

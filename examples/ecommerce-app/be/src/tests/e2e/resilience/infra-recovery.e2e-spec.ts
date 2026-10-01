@@ -8,7 +8,7 @@ import { useTestWorld } from "../../world/use-test-world"
  * Infra-down recovery, on the world's own operations. Each dependency is taken down mid-run and put back: the apis must stay
  * alive and answer /health with a clean 503 instead of hanging or crashing, then recover to 200, with the persisted world
  * intact and the public doors working again.
- *  - the cache provider (the Redis fake `interrupt`): identity reports its cache unreachable and order cascades through the
+ *  - the cache (the real Redis, `world.infra.redis` cut and restored): identity reports its cache unreachable and order cascades through the
  *    identity health it probes;
  *  - the order database (`world.interruptDatabase`): order reports its database unreachable, identity stays healthy;
  *  - the identity database: identity reports 503 and so does order, whose probe of identity fails.
@@ -37,10 +37,13 @@ describe("resilience: infra recovery", () => {
         expect(await status("identity")).toBe(200)
         expect(await status("order")).toBe(200)
 
-        await world.fake.redis.interrupt(async () => {
+        world.infra.redis.cut()
+        try {
             await answers("identity", 503, 90_000)
             await answers("order", 503, 90_000)
-        })
+        } finally {
+            await world.infra.redis.restore()
+        }
 
         await answers("identity", 200, 180_000)
         await answers("order", 200, 180_000)

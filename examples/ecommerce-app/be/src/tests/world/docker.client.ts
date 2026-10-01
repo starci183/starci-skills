@@ -1,6 +1,7 @@
 /**
- * The docker calls of the test world: plain `docker run` / `docker kill` / `docker start` / `docker rm -f` on one
- * run-named Postgres container. No compose file and no container library: the host port is allocated by the caller
+ * The docker calls of the test world: plain `docker run` / `docker kill` / `docker start` / `docker rm -f` on the
+ * run-named containers of the stack `.starcistacks/dev` declares (one Postgres per connection, one Redis), each at the image
+ * the stack pins. No compose file and no container library: the host port is allocated by the caller
  * (OS-assigned, loopback only) and published explicitly, so `docker start` after `docker kill` restores the identical
  * endpoint. Every call is bounded: an unresponsive engine fails the run instead of hanging it.
  */
@@ -11,6 +12,8 @@ const DOCKER_TIMEOUT_MS = 120_000
 const OUTPUT_MAX_BYTES = 16 * 1024 * 1024
 const POSTGRES_IMAGE = "postgres:16"
 const POSTGRES_PORT = 5432
+const REDIS_IMAGE = "redis:7"
+const REDIS_PORT = 6379
 
 /** What one Postgres container of the run is made of. */
 export interface PostgresContainerSpec {
@@ -52,7 +55,7 @@ export const runPostgres = (spec: PostgresContainerSpec): void => {
         "--name",
         spec.name,
         "--label",
-        `todo-e2e-run=${spec.runId}`,
+        `ecommerce-e2e-run=${spec.runId}`,
         "-e",
         `POSTGRES_USER=${spec.user}`,
         "-e",
@@ -64,6 +67,37 @@ export const runPostgres = (spec: PostgresContainerSpec): void => {
         POSTGRES_IMAGE,
     ])
 }
+
+/** What the Redis container of the run is made of. */
+export interface RedisContainerSpec {
+    /** The run-scoped container name. */
+    readonly name: string
+    /** The run token, stamped as a label so a leftover of this run can be found by observation. */
+    readonly runId: string
+    /** The loopback host port the container publishes 6379 on. */
+    readonly hostPort: number
+}
+
+/** Starts the Redis container of the run, detached, published on loopback only. */
+export const runRedis = (spec: RedisContainerSpec): void => {
+    docker([
+        "run",
+        "-d",
+        "--name",
+        spec.name,
+        "--label",
+        `ecommerce-e2e-run=${spec.runId}`,
+        "-p",
+        `127.0.0.1:${spec.hostPort}:${REDIS_PORT}`,
+        REDIS_IMAGE,
+    ])
+}
+
+/** True once the Redis server inside the container answers PING; throws while it does not. */
+export const redisAccepts = (name: string): boolean => docker(["exec", name, "redis-cli", "PING"]) === "PONG"
+
+/** How many keys the Redis server inside the container holds (DBSIZE of database 0). */
+export const redisKeyCount = (name: string): number => Number(docker(["exec", name, "redis-cli", "DBSIZE"]))
 
 /** True once the server inside the container answers a query over TCP (the init-time server listens on a socket only); throws while it does not. */
 export const postgresAccepts = (name: string, user: string, database: string): boolean => {

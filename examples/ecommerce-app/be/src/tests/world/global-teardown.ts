@@ -1,6 +1,6 @@
 /**
  * The jest globalTeardown of the test world (default export, Jest API): disposes exactly what globalSetup created and
- * verifies by observation that nothing of the run survives: both database containers are removed with their volumes and
+ * verifies by observation that nothing of the run survives: both database containers and the Redis container are removed with their volumes and
  * the state file is deleted.
  */
 import "tsconfig-paths/register"
@@ -11,7 +11,7 @@ import { readWorldState, removeWorldState } from "./test-world-state.service"
 /** Disposes the shared infrastructure of the run. */
 export default function globalTeardown(): void {
     const state = readWorldState()
-    const containers = [state.identity.container, state.order.container]
+    const containers = [state.identity.container, state.order.container, state.redis.container]
     try {
         containers.forEach(removeContainer)
     } finally {

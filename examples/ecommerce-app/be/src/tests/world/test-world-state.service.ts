@@ -1,6 +1,6 @@
 /**
  * The hand-over between the jest globalSetup and the spec workers: one small JSON file under the OS temp dir that
- * carries the coordinates of the shared infrastructure (one migrated Postgres container per connection). Its path travels
+ * carries the coordinates of the shared infrastructure (one migrated Postgres container per connection, one Redis). Its path travels
  * in one environment variable; the world is the only place that writes `process.env`.
  */
 import { randomUUID } from "node:crypto"
@@ -24,6 +24,14 @@ export interface TestDatabaseState {
     readonly url: string
 }
 
+/** The Redis container of the run, behind the cache integration. */
+export interface TestRedisState {
+    /** The run-scoped container name. */
+    readonly container: string
+    /** The `redis://` URL the cache integration is configured with. */
+    readonly url: string
+}
+
 /** The coordinates of the shared infrastructure of one run. */
 export interface TestWorldState {
     /** The run token; it names the containers. */
@@ -32,6 +40,8 @@ export interface TestWorldState {
     readonly identity: TestDatabaseState
     /** The database of the order connection. */
     readonly order: TestDatabaseState
+    /** The Redis of the cache integration. */
+    readonly redis: TestRedisState
 }
 
 const isDatabase = (value: unknown): value is TestDatabaseState => {
@@ -40,11 +50,20 @@ const isDatabase = (value: unknown): value is TestDatabaseState => {
     return ["container", "user", "database", "url"].every((key) => typeof record.get(key) === "string")
 }
 
+const isRedis = (value: unknown): value is TestRedisState => {
+    if (typeof value !== "object" || value === null) return false
+    const record = new Map(Object.entries(value))
+    return ["container", "url"].every((key) => typeof record.get(key) === "string")
+}
+
 const isState = (value: unknown): value is TestWorldState => {
     if (typeof value !== "object" || value === null) return false
     const record = new Map(Object.entries(value))
     return (
-        typeof record.get("runId") === "string" && isDatabase(record.get("identity")) && isDatabase(record.get("order"))
+        typeof record.get("runId") === "string" &&
+        isDatabase(record.get("identity")) &&
+        isDatabase(record.get("order")) &&
+        isRedis(record.get("redis"))
     )
 }
 
