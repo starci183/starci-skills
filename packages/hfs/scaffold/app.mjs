@@ -101,6 +101,20 @@ function nestCli(app) {
   return { $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${first.name}`, sourceRoot: `apps/${first.name}/src`, projects };
 }
 
+/**
+ * The tsconfig.json of one Next app of the fe side: the side's managed tsconfig plus the app's `@/*` alias and the Next plugin. It is
+ * written from code, not kept as a template file: a tsconfig.json inside templates/ would make every TypeScript tool of this
+ * repository treat the skeleton as a project of its own.
+ */
+function nextAppTsconfig() {
+  return {
+    extends: '../../tsconfig.json',
+    compilerOptions: { plugins: [{ name: 'next' }], incremental: true, paths: { '@/*': ['./src/*'] } },
+    include: ['next-env.d.ts', 'src/**/*.ts', 'src/**/*.tsx', '.next/types/**/*.ts'],
+    exclude: ['node_modules'],
+  };
+}
+
 /** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app) and {{sonarGate}}. */
 const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate']);
 
@@ -151,6 +165,7 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
     { path: 'package.json', content: jsonText(pkg) },
     { path: 'package-lock.json', content: jsonText({ name, version: pkg.version, lockfileVersion: 3, requires: true, packages: { '': { name, version: pkg.version, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } } }) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
   ];
   for (const file of files) {
