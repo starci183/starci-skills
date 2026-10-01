@@ -40,7 +40,7 @@ import {text} from '../lib/stack-declaration.mjs';
  *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
  *        [--isolate]
  *
- * --cwd takes the repository root; a bare repository name (the brief's <repo-id>) resolves to that
+ * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
  * op-backend.implement-792d53da0b: `--cwd starci-next` from inside starci-next read
  * D:/Repositories/starci-next/starci-next and was blocked). --isolate analyses the slice alone: the

@@ -106,7 +106,7 @@ blockers:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
   feature: Selected feature slug
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment label
   identity: Selected actor label
@@ -153,7 +153,7 @@ policy:
               target is a scope/graph gap: report it and propose a separately selected scope op; do
               not create a target or invent its acceptance/graph here."
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
               state; read applicable instructions, manifests, owning code, callers and relevant
@@ -231,7 +231,7 @@ policy:
               dependsOn/refs/required to proceed.
       placeholders:
         feature: Selected feature slug
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
@@ -271,7 +271,7 @@ policy:
               Architecture remains todo until this reconciliation proves the same current source and
               runtime revision; source cannot silently replace its logical contracts.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: Source implementation still needs an actual selected writable repository.
         - id: proofs
@@ -289,7 +289,7 @@ policy:
             en: Read semantic content unchanged and write only state/evidence/blockedBy - plus, on each selected
               work/sds-component@1, its sds-component owners, which architecture.decide leaves absent - the
               role and path module roots of the done implementation records whose proves names the component,
-              copied from those records (repository:<repo>/ prefix for a sibling repository), never guessed;
+              copied from those records as written (app-relative, be/... or fe/...), never guessed;
               a component no done implementation proves keeps none. Author state done only
               on the selected required records after one current reconciliation manifest binds every
               requirement, design, implementation, test/E2E and UAT proof demand to the same
@@ -383,7 +383,7 @@ policy:
               or bound to a different delivery revision; return partial or blocked and never done.
       placeholders:
         feature: Selected feature slug
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
@@ -415,7 +415,7 @@ policy:
               locations. Do not infer another task identity from a title or send a self-message as
               peer delivery.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: Source implementation still needs an actual selected writable repository.
         - id: proofs
@@ -496,7 +496,7 @@ policy:
               never run predecessors or weaken dependsOn/refs/required to proceed.
       placeholders:
         feature: Selected feature slug
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
@@ -526,7 +526,7 @@ policy:
           purpose:
             en: Intent governs expected behavior; source is not a replacement.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: Source implementation still needs an actual selected writable repository.
         - id: environment
@@ -627,7 +627,7 @@ policy:
             en: Guarded state lacks authorized actor/custody or real authenticated product content.
       placeholders:
         feature: Selected feature slug
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
@@ -663,7 +663,7 @@ policy:
           purpose:
             en: Intent governs expected behavior; source is not a replacement.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: Source implementation still needs an actual selected writable repository.
         - id: identity
@@ -756,7 +756,7 @@ policy:
             en: Test data overlaps shared/foreign state or effect authorization is insufficient.
       placeholders:
         feature: Selected feature slug
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         identity: Selected actor resource slug

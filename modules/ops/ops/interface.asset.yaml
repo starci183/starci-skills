@@ -40,7 +40,7 @@ reads:
         (brand.imagery.style, forbidden and promptRules - every prompt is written inside them) - and
         read the actual master files a slot references.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve the bound repository, its checkout and its owned asset paths, and read whatever already
         exists at the slot's destination, so this slot's own earlier generation is reused or replaced
@@ -55,7 +55,7 @@ reads:
         generated one."
 writes:
   - id: source
-    path: repository:<repo-id>/<asset-path>
+    path: <app>/<asset-path>
     fields: [generated artwork files only]
     content:
       en: "Write each slot's artwork at the owned asset path the allowlist names, in the declared format
@@ -217,7 +217,7 @@ blockers:
         or not effectively done. Report the node/resource IDs; never author the missing record, draw
         the missing candidate or run a predecessor here.
 placeholders:
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   asset-path: Owned asset destination declared by the allowlist
 layoutPolicy:

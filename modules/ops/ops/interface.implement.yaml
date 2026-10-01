@@ -64,7 +64,7 @@ reads:
         architecture-first op chain is implied; report genuinely missing required scope before
         proceeding.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
         state; read applicable instructions, manifests, owning code, callers and relevant tests.
@@ -174,7 +174,7 @@ writes:
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields: [source files, tests, migration/assets/config only when selected]
     content:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
@@ -214,7 +214,7 @@ writes:
         and slice-spec proof is the op loop's gate.json (the gate step below); findings the base already
         has are repository debt owed to code.refactor and measured by review.verify's whole-repository hfs
         lint - a note, never an open item, and never refactored outside the grant. Run Sonar only
-        through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait
+        through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <app> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
         comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` attach both files at api report
         (the specs of the changed or added source and the specs that import it - never the repository's whole test:ci, owner 2026-09-29) in this same attempt: it scans against the local SonarQube the
@@ -651,7 +651,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Selected feature slug
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
   environment: Resolved environment label

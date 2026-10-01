@@ -32,7 +32,7 @@ reads:
       en: Read the declared security boundaries - authentication, authorization, tenancy, secrets custody,
         external calls and data ownership - the inspection is held to.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered slice
         - entry points, authz checks, queries, serialization, configuration and dependency
@@ -52,7 +52,7 @@ reads:
         verbatim. Machine output is retained as evidence; the inspected code remains the finding's
         proof, and this read grants no fix-flag or repair authority.
   - id: checks
-    path: selected request checks[] + repository:<repo-id>/<manifest-paths>
+    path: selected request checks[] + <app>/<manifest-paths>
     purpose:
       en: Read the exact scan/analysis commands the request lists and the manifest scripts that define
         them. These commands are run verbatim - read-only by declaration - and nothing else is
@@ -191,7 +191,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   manifest-paths: Manifest and script files defining the listed scan commands
 layoutPolicy:

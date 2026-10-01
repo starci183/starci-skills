@@ -29,7 +29,7 @@ reads:
       en: The accepted behavior, actor, entry, negative cases, observable feedback and postconditions the
         selected UAT records bind.
   - id: build
-    path: repository:<repo-id>/<bound-paths> + selected served-build identity
+    path: <app>/<bound-paths> + selected served-build identity
     purpose:
       en: Resolve exact repository roots, revisions, dirty state, artifact or served-build identity and
         the deterministic command that identifies what the human-assisted run will exercise. A
@@ -42,14 +42,14 @@ reads:
       en: Resolve the exact environment resource, revision, origins, owner, allowed effects and live
         identity.
   - id: browser
-    path: docs/browser-testing.md + repository:<repo-id>/<playwright-manifest-and-lockfile>
+    path: docs/browser-testing.md + <app>/<playwright-manifest-and-lockfile>
     purpose:
       en: Inspect the project's locked Playwright dependency, local runner, browser installation and
         existing test conventions. Reuse them. Readiness requires an actual Chromium launch against
         the intended target, a finalized screenshot and short playable video; package installation
         alone is not readiness.
   - id: automation
-    path: repository:<repo-id>/<existing-browser-suite-and-page-objects>
+    path: <app>/<existing-browser-suite-and-page-objects>
     purpose:
       en: Inspect stable role/test-id locators, authentication/session setup, fixture ownership,
         deterministic clock/locale/network conventions and artifact finalization. Existing
@@ -284,7 +284,7 @@ placeholders:
   feature: Selected feature slug
   flow: Selected UAT flow slug
   flow-id: Stable accepted flow ID rendered to a safe deterministic filename
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment resource slug
   playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright

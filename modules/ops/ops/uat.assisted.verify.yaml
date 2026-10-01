@@ -57,7 +57,7 @@ reads:
         flow/step/gate linkage, timestamps and finalized state. Unlisted nearby files, generated
         stills labelled as video and media from another run cannot satisfy evidence.
   - id: build
-    path: repository:<repo-id>/<bound-paths> + selected served-build identity
+    path: <app>/<bound-paths> + selected served-build identity
     purpose:
       en: Independently resolve the current exact build/served identity by the prepared method and
         recompute buildDigest. A current mismatch makes the receipt stale even if the recorded run
@@ -338,7 +338,7 @@ placeholders:
   flow: Selected UAT flow slug
   flow-id: Stable accepted flow ID rendered to a safe deterministic filename
   run-id: Exact immutable controlled-run ID supplied to verification
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment resource slug
 layoutPolicy:

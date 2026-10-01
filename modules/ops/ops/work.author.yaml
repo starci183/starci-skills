@@ -198,7 +198,9 @@ steps:
         uat.verify) after this one: the owners are the paths the accepted design prescribes - its
         sds-component owners and the architecture module layout - each traced to that design record
         by id, and the record stays todo. In both modes a path neither the design nor the source
-        resolves is an open question, never a guess."
+        resolves is an open question, never a guess. Every owner path is written app-relative - be/<path>,
+        fe/<path> or a directory of the app root - never side-relative and never with a repository:<id>/ prefix
+        (OWNER_PATH_NOT_APP_RELATIVE)."
   - reads:
       - target
       - specification

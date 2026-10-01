@@ -106,7 +106,7 @@ placeholders:
   feature: Selected feature slug
   workflow: The running workflow id the setup entry is keyed by
   mode: The selected execution mode (prepare, import or stacks)
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment label
   resource: Selected owned asset name
@@ -214,8 +214,8 @@ policy:
               to append a selected verified side its repositories[] does not list yet.
               repositories[] names the app's selected sides: one {role, name} per side,
               role as the project binding keys it (be, fe) and name as the side's
-              directory name. Implementation records, `repository:<name>/` paths and
-              evidence servedVersions resolve against the side folder. The app repository owns Work.
+              directory name. An implementation record's repository names its side (where its proof
+              commands run); every owner path is app-relative (be/..., fe/...). The app repository owns Work.
               No _resources repository record exists
               (work-layout.yaml shape.resources admits environments, identities and fixtures only);
               remote, HEAD, default ref and dirty state are observations for
@@ -352,7 +352,7 @@ policy:
       placeholders:
         feature: Selected feature slug
         workflow: The running workflow id the setup entry is keyed by
-        repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
@@ -384,7 +384,7 @@ policy:
               records an earlier import left are read-only source observations. Preserve unaffected
               accepted content.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: When source exists/is selected, resolve the repository through workspace.yaml
               repositories[] and the project binding, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant
@@ -505,7 +505,7 @@ policy:
               action or blocked/not-requested. Imported child product assertions must have no
               fabricated evidence."
         - id: source
-          path: repository:<repo-id>/<removal-target>
+          path: <app>/<removal-target>
           fields:
             - optional exact old artifact-directory removal only; no product implementation edits
           content:
@@ -634,7 +634,7 @@ policy:
       placeholders:
         feature: Selected feature slug
         workflow: The running workflow id the setup entry is keyed by
-        repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
@@ -690,7 +690,7 @@ policy:
           purpose:
             en: The whole-application dev and VPS contract and the declaration's field schema.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: The owner repository checkout, HEAD, dirty state and any existing .starcistacks tree to
               reconcile.
@@ -771,7 +771,7 @@ policy:
         workflow: The running workflow id the setup entry is keyed by
         feature: Feature folder holding the settled design records
         environment: An environment the declaration admits
-        repo-id: Owner repository name from workspace.yaml repositories[] (or its project binding role)
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
 route:
   nodeKinds: [operations]

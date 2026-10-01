@@ -49,13 +49,13 @@ reads:
         under proof. Where the design is silent about the observable effect, report the gap instead
         of inventing an expectation.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve the repository resource, actual checkout/root/HEAD and dirty state; read the delivered
         slice, its public entry points and its existing scenario coverage. The proof binds the exact
         tested tree, so a spec-only claim without a resolved writable repository is not a proof.
   - id: suite
-    path: repository:<repo-id>/<suite-paths>
+    path: <app>/<suite-paths>
     purpose:
       en: Inspect the existing end-to-end suite - how it starts its own dependencies as containers for the
         run, its lifecycle hooks, isolation per run, fixtures, helpers, spec naming convention and
@@ -66,7 +66,7 @@ reads:
       en: Resolve the end-to-end runtime this run may use - the declared container services, images and
         configuration revision, its owner and allowed effects.
   - id: checks
-    path: selected request checks[] + repository:<repo-id>/<manifest-paths>
+    path: selected request checks[] + <app>/<manifest-paths>
     purpose:
       en: Read the exact check commands the request lists and the manifest scripts that define them. These
         commands are run verbatim and nothing else is added, narrowed or substituted.
@@ -106,7 +106,7 @@ writes:
         refs/dependencies/assertions require a reported gap or a separately selected scope update;
         never add or remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields:
       - end-to-end scenario specs
       - scenario fixtures and helpers
@@ -354,7 +354,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   suite-paths: Existing end-to-end suite and fixture paths
   manifest-paths: Manifest and script files defining the listed check commands

@@ -35,7 +35,7 @@ reads:
         they apply to - so each measurement has a stated expectation. Where the design is silent
         about a required metric, report the gap instead of inventing a threshold.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered
         slice, its declared benchmark/load tooling and existing measurement scripts. The evidence
@@ -189,7 +189,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment label
 layoutPolicy:

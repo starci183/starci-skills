@@ -76,12 +76,10 @@ function readTokens(rawPath) {
  * Classify one declared-read token and, when it names concrete files under the
  * runtime root (or the state dir), resolve it. Returns
  *   {token, kind, resolved:[relPaths], missing:[relPaths]}
- * kinds: file | glob | state | repo-ref | template | prose | instance
+ * kinds: file | glob | state | template | prose | instance
  *   file     concrete relative path — existence checked under root
  *   glob     concrete prefix + '*' — expanded under root (bounded)
  *   state    .starciwork-relative — resolved under --state when given
- *   repo-ref `repository:<id>/...` — bound to the target repo at runtime,
- *            not resolvable from the skill tree (declared only)
  *   template carries a `<placeholder>` — resolved by the agent against the
  *            bound records (declared only)
  *   prose    free-text fragment inside a declared path (declared only)
@@ -89,7 +87,6 @@ function readTokens(rawPath) {
  */
 function resolveReadToken(token, { root, stateDir }) {
   const rel = token.replaceAll('\\', '/');
-  if (/^repository:/.test(rel)) return { token, kind: 'repo-ref', resolved: [], missing: [] };
   if (/</.test(rel)) return { token, kind: 'template', resolved: [], missing: [] };
   // Prose fragments ride inside declared paths ("the slice's existing
   // regression suite and its real runner") — declared, never a missing path.
