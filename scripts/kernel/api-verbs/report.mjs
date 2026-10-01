@@ -12,7 +12,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseJson } from '../../lib/json.mjs';
 import { validateOpReport } from '../report-envelope.mjs';
-import { jobPayloadOf, jobOpOf } from '../api-lib/rows.mjs';
+import { jobPayloadOf, jobOpOf, operationDispatchOf } from '../api-lib/rows.mjs';
 import { HANDOVER_OP, handoverAskProblem } from '../handover.mjs';
 import { autopilotOn, autopilotBundle } from '../autopilot.mjs';
 import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../../work/draw-review.mjs';
@@ -190,8 +190,9 @@ export default {
       `report already filed for ${job.job_id} (dispatch ${dispatchId}, report ${reportId})`, args.json);
     return;
   }
-  // The scrollback up to this report; quit-agent.mjs replaces it with the fuller one when the agent is quit.
-  if (!process.env.NODE_TEST_CONTEXT) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, handle: attempt.terminal_handle, repoRoots });
+  // The worker's output up to this report, read by Dispatch; settle replaces it with the fuller one (after the
+  // release, from Orca's archive, or before an unmanaged worker's terminal is closed).
+  if (!process.env.NODE_TEST_CONTEXT) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, dispatch: operationDispatchOf(jobPayloadOf(job)), repoRoots });
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   const kernelWake = reportFiledWake(ledger, {
     workflowId: job.workflow_id,

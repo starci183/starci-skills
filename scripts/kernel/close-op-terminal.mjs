@@ -5,7 +5,6 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { unbindGuardTerminal } from '../guards/install.mjs';
-import { captureTerminal } from './transcripts.mjs';
 
 // An operation terminal is closed with its tab when nothing else lives in
 // that tab. A pane close left the tab in Orca's persisted layout, and Orca
@@ -14,15 +13,12 @@ import { captureTerminal } from './transcripts.mjs';
 // resuming its finished transcript. `terminal close --tab` waits until the tab
 // is durably removed. A terminal that shares its tab (or whose tab the listing
 // does not name) keeps the pane close. A closed terminal's guard binding
-// (runtime/guards/terminals/<handle>.json) goes with it. Before the close the terminal's full scrollback is
-// captured, redacted, into the blob store (transcripts.mjs captureTerminal) and returned as `transcript` for the
-// caller to keep as op_attempts.transcript_sha (transcripts.mjs finalizeTranscriptOfTerminal).
-export const closeOperationTerminal = (handle, { tabOnly = false, list = terminalList, close = terminalClose, unbind = unbindGuardTerminal, capture = captureTerminal } = {}) => {
-  let transcript = null;
-  if (!tabOnly && capture) { try { transcript = capture(handle); } catch { transcript = null; } }
+// (runtime/guards/terminals/<handle>.json) goes with it. The close reads no output: a caller that keeps the
+// attempt's transcript captures it by Dispatch first (transcripts.mjs captureWorker, worker-read; deep map T1).
+export const closeOperationTerminal = (handle, { tabOnly = false, list = terminalList, close = terminalClose, unbind = unbindGuardTerminal } = {}) => {
   const closed = (result) => {
     if (result?.ok) { try { unbind({ handle }); } catch { /* pruned by age later */ } }
-    return transcript && result ? { ...result, transcript } : result;
+    return result;
   };
   let tabId = null, shared = true;
   try {

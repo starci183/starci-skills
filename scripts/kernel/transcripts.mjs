@@ -1,94 +1,103 @@
 #!/usr/bin/env node
-// transcripts.mjs — terminal scrollback as redacted blobs (alpha.3, UI-API §2.10, ARCHITECTURE-DB §4.3).
+// transcripts.mjs — worker output as redacted blobs (alpha.3, UI-API §2.10, ARCHITECTURE-DB §4.3), read by Dispatch.
 //
-//   op attempt, live    attempt_transcript_snapshots: one row per 60 s (TRANSCRIPT_SNAPSHOT_MS) while the attempt's
-//                       terminal is open; an unchanged scrollback adds no row (UNIQUE attempt+sha).
-//   op attempt, ended   op_attempts.transcript_sha: the full scrollback when the attempt ends — at api report, and
-//                       again when the agent is quit (quit-agent.mjs), so the last one written is the fullest.
-//   Kernel/Supervisor   machine.sqlite seat_transcript_snapshots, same cadence, for every live seat.
-// Every scrollback passes scripts/lib/redact.mjs before the put (blobs.redaction='v1').
+//   op attempt, live    attempt_transcript_snapshots: one row per 60 s (TRANSCRIPT_SNAPSHOT_MS) while the attempt
+//                       is open; an unchanged output adds no row (UNIQUE attempt+sha).
+//   op attempt, ended   op_attempts.transcript_sha: the full output when the attempt ends — at api report, before
+//                       an unmanaged worker's terminal is closed, and after a managed worker's release (from Orca's
+//                       archive), so the last one written is the fullest.
+//   Kernel/Supervisor   machine.sqlite seat_transcript_snapshots, same cadence, for every live seat whose record
+//                       names its Dispatch (seats.detail_json value.dispatch).
+//
+// The source is Orca's `worker-read --source auto` (scripts/api/orca/worker-read.mjs workerOutput, paged by its
+// cursor; deep map T1): the exact hook-reported transcript when the provider has one, else labelled terminal output.
+// Orca's archive is unredacted and on Orca's retention, so the sink stays ours: every output passes
+// scripts/lib/redact.mjs before the put (blobs.redaction='v1'). The first line of every stored text is a header
+// that keeps Orca's completeness verdict with the bytes (contentComplete, clipping): a bounded tail or a terminal
+// fallback is never stored as if it were the whole transcript.
 //
 //   node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]
 //     one pass over the repo ledger's open attempts; a periodic caller (the reconciler) runs it every minute.
 import path from 'node:path';
-import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { workerOutput } from '../api/orca/worker-read.mjs';
 import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from './evidence-store.mjs';
+import { parseJson } from '../lib/json.mjs';
+import { operationDispatchOf } from './api-lib/rows.mjs';
 
-/** Rows of retained terminal output a scrollback read asks Orca for. */
-export const SCROLLBACK_LIMIT = 100_000;
+/** The header line that keeps Orca's completeness verdict with the stored output. */
+export const outputHeader = (out) => `[worker-read dispatch=${out.dispatch} source=${out.source}${out.fallbackReason ? ` fallback=${out.fallbackReason}` : ''}`
+  + ` contentComplete=${out.contentComplete === true}${out.clipping?.length ? ` clipping=${out.clipping.join(',')}` : ''}]`;
 
 /**
- * The accumulated (not rendered) output of a terminal, escape sequences stripped, or null when Orca cannot read it.
- * `read` is terminal-read's raw call ({terminal, screen:false, limit}) → {ok, text}.
+ * The whole output of the worker that holds Dispatch `dispatch` (every page), or null when Orca cannot read it.
+ * `read` is worker-read's one-page call ({dispatch, source, cursor, limit}) → workerRead's shape (specs inject it).
+ * Returns {text, source, contentComplete, clipping} where text starts with outputHeader.
  */
-export function readScrollback(handle, { limit = SCROLLBACK_LIMIT, read = null } = {}) {
-  if (!handle) return null;
+export function readWorkerOutput(dispatch, { read = undefined } = {}) {
+  if (!dispatch) return null;
   try {
-    if (read) { const r = read({ terminal: handle, screen: false, limit }); return r?.ok ? String(r.text ?? r.screen ?? '') : null; }
-    const r = terminalRead({ terminal: handle, screen: false, limit });
-    return r.ok ? String(r.screen ?? '') : null;
+    const out = workerOutput({ dispatch, ...(read ? { read } : {}) });
+    if (!out.ok || !out.rows.length) return null;
+    return { text: `${outputHeader(out)}\n${out.text}`, source: out.source, contentComplete: out.contentComplete, clipping: out.clipping };
   } catch { return null; }
 }
 
-/** The scrollback of `handle`, redacted and put in the blob store (outside any transaction): {blob, text} or null. */
-export function captureTerminal(handle, { read = null, repoRoots = [] } = {}) {
-  const text = readScrollback(handle, { read });
-  if (!text) return null;
-  return { text, blob: stageText(text, { repoRoots }) };
+/** The output of Dispatch `dispatch`, redacted and put in the blob store (outside any transaction): {text, blob, ...} or null. */
+export function captureWorker(dispatch, { read = undefined, repoRoots = [] } = {}) {
+  const got = readWorkerOutput(dispatch, { read });
+  if (!got) return null;
+  return { ...got, blob: stageText(got.text, { repoRoots }) };
 }
 
 /**
  * One snapshot pass over a ledger's open attempts (not settled, no end state, terminal not closed): each whose last
- * snapshot is older than `everyMs` gets a new one. Returns {checked, written, unchanged, unreadable}.
+ * snapshot is older than `everyMs` gets a new one, read by the job's Dispatch. Returns {checked, written, unchanged, unreadable}.
  */
-export function snapshotOpenAttempts(ledger, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = null, repoRoots = [] } = {}) {
+export function snapshotOpenAttempts(ledger, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = undefined, repoRoots = [] } = {}) {
   const db = ledger.db;
-  const open = db.prepare(`SELECT a.attempt_id,a.workflow_id,a.terminal_handle,a.worktree_path,
+  const open = db.prepare(`SELECT a.attempt_id,a.workflow_id,a.worktree_path,j.payload_json,
       (SELECT max(at) FROM attempt_transcript_snapshots s WHERE s.attempt_id=a.attempt_id) AS last_at
-    FROM op_attempts a WHERE a.settled_at IS NULL AND a.end_state IS NULL AND a.terminal_handle IS NOT NULL AND a.terminal_closed_at IS NULL`).all();
+    FROM op_attempts a JOIN jobs j ON j.job_id=a.job_id
+    WHERE a.settled_at IS NULL AND a.end_state IS NULL AND a.terminal_handle IS NOT NULL AND a.terminal_closed_at IS NULL`).all();
   const out = { checked: open.length, written: 0, unchanged: 0, unreadable: 0 };
   for (const row of open) {
     if (row.last_at != null && now - row.last_at < everyMs) continue;
-    const captured = captureTerminal(row.terminal_handle, { read, repoRoots: [...repoRoots, row.worktree_path].filter(Boolean) });
+    const dispatch = operationDispatchOf(parseJson(row.payload_json) ?? {});
+    const captured = captureWorker(dispatch, { read, repoRoots: [...repoRoots, row.worktree_path].filter(Boolean) });
     if (!captured) { out.unreadable += 1; continue; }
-    const r = ledger.transaction(() => recordAttemptSnapshot(db, { workflowId: row.workflow_id, attemptId: row.attempt_id, text: captured.text, blob: captured.blob, at: now }));
+    const r = ledger.transaction(() => recordAttemptSnapshot(db, { attemptId: row.attempt_id, text: captured.text, blob: captured.blob, at: now }));
     if (r?.written) out.written += 1; else out.unchanged += 1;
   }
   return out;
 }
 
 /**
- * The attempt's full scrollback at its end → op_attempts.transcript_sha. `captured` is a captureTerminal result
- * taken while the terminal was still readable (quit-agent.mjs takes it before the quit input); without it the
- * terminal is read now. Never throws; returns the sha or null.
+ * The attempt's full output at its end → op_attempts.transcript_sha. `captured` is a captureWorker result taken
+ * before the worker's terminal was closed; without it Dispatch `dispatch` is read now (Orca serves a released
+ * worker from its archive). Never throws; returns the sha or null.
  */
-export function finalizeAttemptTranscript(ledger, { attemptId, handle = null, captured = null, read = null, repoRoots = [], now = Date.now() }) {
+export function finalizeAttemptTranscript(ledger, { attemptId, dispatch = null, captured = null, read = undefined, repoRoots = [], now = Date.now() }) {
   try {
-    const got = captured ?? captureTerminal(handle, { read, repoRoots });
+    const got = captured ?? captureWorker(dispatch, { read, repoRoots });
     if (!got || attemptId == null) return null;
     return ledger.transaction(() => recordFinalTranscript(ledger.db, { attemptId, blob: got.blob, text: got.text, at: now }));
   } catch { return null; }
 }
 
-/** The final transcript of the open attempt that holds terminal `handle` (a quit/close path that knows only the handle). */
-export function finalizeTranscriptOfTerminal(ledger, { handle, captured = null, read = null, now = Date.now() }) {
-  if (!handle) return null;
-  const row = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE terminal_handle=? ORDER BY attempt_id DESC LIMIT 1').get(handle);
-  return row ? finalizeAttemptTranscript(ledger, { attemptId: row.attempt_id, handle, captured, read, now }) : null;
-}
-
 /**
- * One snapshot pass over the machine's live Kernel/Supervisor seats → seat_transcript_snapshots (machine.sqlite).
- * `machine` is the machine writer handle ({db, transaction}). Returns {checked, written, unchanged, unreadable}.
+ * One snapshot pass over the machine's live Kernel/Supervisor seats → seat_transcript_snapshots (machine.sqlite),
+ * read by each seat's Dispatch. `machine` is the machine writer handle ({db, transaction}). A seat whose record
+ * names no Dispatch is unreadable (every seat is a worker-start worker). Returns {checked, written, unchanged, unreadable}.
  */
-export function snapshotSeats(machine, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = null } = {}) {
+export function snapshotSeats(machine, { now = Date.now(), everyMs = TRANSCRIPT_SNAPSHOT_MS, read = undefined } = {}) {
   const db = machine.db;
-  const seats = db.prepare(`SELECT s.seat_id,s.terminal_handle,(SELECT max(at) FROM seat_transcript_snapshots x WHERE x.seat_id=s.seat_id) AS last_at
+  const seats = db.prepare(`SELECT s.seat_id,s.terminal_handle,json_extract(s.detail_json,'$.value.dispatch') AS dispatch,
+      (SELECT max(at) FROM seat_transcript_snapshots x WHERE x.seat_id=s.seat_id) AS last_at
     FROM seats s WHERE s.terminal_handle IS NOT NULL AND s.state IN ('booting','live','busy','stale','replacing')`).all();
   const out = { checked: seats.length, written: 0, unchanged: 0, unreadable: 0 };
   for (const seat of seats) {
     if (seat.last_at != null && now - seat.last_at < everyMs) continue;
-    const captured = captureTerminal(seat.terminal_handle, { read });
+    const captured = captureWorker(seat.dispatch, { read });
     if (!captured) { out.unreadable += 1; continue; }
     const changes = machine.transaction(() => {
       registerBlob(db, captured.blob, { now });

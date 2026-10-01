@@ -90,7 +90,7 @@ import { parseJson } from '../lib/json.mjs';
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf,
   latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestContractOf, latestReportOf, latestAttemptOf,
-  operationTaskOf,
+  operationTaskOf, operationDispatchOf,
 } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
@@ -654,7 +654,7 @@ const sendRefusedAtOf = (db, job, terminal) => (db ? db.prepare(`SELECT MAX(crea
 // stopped rendering, not a stalled turn (inc-f1b576fb6006: frozen 50 minutes, heartbeats every 5-10).
 const heartbeatAtOf = (job) => {
   const payload = jobPayloadOf(job);
-  const dispatch = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId ?? null;
+  const dispatch = operationDispatchOf(payload);
   if (!dispatch) return null;
   try {
     const raw = workerShow({ dispatch })?.dispatch?.lastHeartbeatAt;
