@@ -80,7 +80,7 @@ ruleParams:
         sonar: [api/sonar]
         sops: [api/sops]
         cloudflared: [api/cloudflared]
-        node: [api/node]
+        node: [api/node, api/npm]           # npm runs as node + its bundled npm-cli.js on Windows
         powershell: [api/process]
         pwsh: [api/process]
         schtasks: [api/process]
@@ -627,7 +627,6 @@ pending:
   - {path: "scripts/api/quota/", rule: HFS_FORBIDDEN_PRESENT, lane: C2a, since: 2026-10-01, reason: "process, fs, sops, npm and node helpers move into scripts/api/<system>/ call files; api/quota moves to scripts/agent/quota/ + scripts/api/windsurf/seat-quota.mjs"}
   - {path: "scripts/lib/{canon-digest.mjs,low-priority.mjs,rename-over.mjs,safe-remove.mjs,self-reload.mjs,sops-exec-env.mjs,test-secrets.mjs,zip-archive.mjs}", rule: HFS_FORBIDDEN_PRESENT, lane: C2a, since: 2026-10-01, reason: "process, fs, sops, npm and node helpers move into scripts/api/<system>/ call files; api/quota moves to scripts/agent/quota/ + scripts/api/windsurf/seat-quota.mjs"}
   - {path: "scripts/api/fs/lib.mjs", rule: HFS_SLOT_REQUIRED_MISSING, lane: C2a, since: 2026-10-01, reason: "each api system gets its lib.mjs runner when its calls are reshaped"}
-  - {path: "scripts/api/npm/lib.mjs", rule: HFS_SLOT_REQUIRED_MISSING, lane: C2a, since: 2026-10-01, reason: "each api system gets its lib.mjs runner when its calls are reshaped"}
   - {path: "scripts/api/process/lib.mjs", rule: HFS_SLOT_REQUIRED_MISSING, lane: C2a, since: 2026-10-01, reason: "each api system gets its lib.mjs runner when its calls are reshaped"}
   - {path: "scripts/api/sops/lib.mjs", rule: HFS_SLOT_REQUIRED_MISSING, lane: C2a, since: 2026-10-01, reason: "each api system gets its lib.mjs runner when its calls are reshaped"}
   - {path: "scripts/api/npm/pack-dry-run.mjs", rule: RT_API_SHAPE, lane: C2a, since: 2026-10-01, reason: "process, fs, npm, sops and quota call files are reshaped to one exported call each (api/quota leaves api/)"}

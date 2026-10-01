@@ -309,7 +309,7 @@ describe("Offset Pop DNA and token parity with Core", () => {
      */
     it("gives no hover or focus treatment to the non-interactive StaticStateRow", () => {
         const body = css.replace(/\/\*[\s\S]*?\*\//g, "")
-        expect(body).not.toMatch(/\[data-grammar-row\][^{,]*:(?:hover|focus|focus-within|focus-visible|active)/)
+        expect(body).not.toMatch(/\[data-grammar-row\][^{,]*:(?:hover|focus|focus-within|focus-visible|active)\b/)
         expect(body).not.toMatch(/\[data-grammar-row\]:has\(/)
         expect(readFileSync(resolve(process.cwd(), "src/core/composite/StaticStateRow/index.tsx"), "utf8")).toMatch(/readonly label: string;?\s+readonly description\?: string/)
     })

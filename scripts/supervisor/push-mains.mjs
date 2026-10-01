@@ -21,7 +21,7 @@
 // (husky: nivo-backend `npm run lint && npm run test:unit`, nivo-fe turbo lint) red for reasons
 // unrelated to the commits being pushed — while one op is mid-edit nivo never pushes (cluster
 // push-hooks-test-inflight-tree, 2026-09-24 15:34Z: 42 unit failures that lived only in uncommitted edits).
-// The scratch gets the live checkout's node_modules (root and every workspace package that has its own) and
+// The scratch installs its own dependencies (npm ci from the cache; never a link to the live node_modules) and gets
 // a relative core.hooksPath by DIRECTORY LINK, so hooks stay ON and judge the commit; it is removed whatever
 // happens, its links first so a forced removal can never walk into the live tree. The rest of the live
 // checkout's git-ignored LOCAL STATE the hook's tests read is mirrored the same way, discovered by
@@ -40,6 +40,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../lib/worktree-registry.mjs';
 import { getBlob, putBlob } from '../lib/artifact-store.mjs';
 import { redactText } from '../lib/redact.mjs';
@@ -317,18 +318,18 @@ const trackedModifications = (repo, run) => run(['status', '--porcelain', '--unt
 
 /* ------------------------------------------------------------ scratch push */
 
-const NODE_MODULES_DEPTH = 4;
-
-/** A directory link (junction on Windows, symlink elsewhere): an install artifact of the live checkout
- *  made visible to the scratch worktree, never copied and never the other way round. */
+/** A directory link (junction on Windows, symlink elsewhere): a git-ignored local-state directory of the live checkout
+ *  made visible to the scratch worktree, never copied and never the other way round. Never a node_modules: the scratch
+ *  installs its own (npm ci), RT_NODE_MODULES_LINK. */
 const linkDir = (target, link) => { fs.mkdirSync(path.dirname(link), { recursive: true }); fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir'); };
 
 /** Unlink a link: the link only, never what it points at (as workers.mjs unlinkNodeModulesLink). */
 const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmdirSync(link); } catch { /* best effort */ } } };
 
-/** Build and tool output a scratch never borrows from the live tree: the hook judges the commit, not a stale
- *  build of the working tree. Matched against every path segment of an ignored entry. */
-export const LOCAL_STATE_EXCLUDED = /^(?:dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
+/** Installed dependencies, build and tool output a scratch never borrows from the live tree: the hook judges the commit,
+ *  not a stale build of the working tree, and the scratch installs its own dependencies. Matched against every path
+ *  segment of an ignored entry. */
+export const LOCAL_STATE_EXCLUDED = /^(?:node_modules|dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
 
 /** A local-state path that is linked in place or not at all, never copied: the stack runtime and every file
  *  the outgoing scan forbids (env files, keys, credentials, .secrets). */
@@ -338,8 +339,8 @@ const neverCopied = (rel) => /(^|\/)\.starcistacks\//i.test(rel) || FORBIDDEN_FI
  * The live checkout's git-ignored local state, as the points to link into a fresh worktree of `repo` at
  * `worktree`: every entry of `git ls-files --others --ignored --exclude-standard --directory` (which reaches
  * inside each workspace package too), mapped to its shallowest path the worktree does not hold — a directory
- * git ignores whole is one link, a file inside a tracked directory is linked by itself. Excluded output and
- * anything the worktree already holds (the node_modules and hooks links made first) are skipped.
+ * git ignores whole is one link, a file inside a tracked directory is linked by itself. Installed dependencies,
+ * excluded output and anything the worktree already holds (its own npm ci install, the hooks link) are skipped.
  * Returns [{rel, dir}], `rel` '/'-separated, one point per subtree.
  */
 export function localStateEntries(repo, worktree, { run = git } = {}) {
@@ -395,27 +396,6 @@ const scratchBaseOf = (repo) => {
 };
 
 /**
- * Every directory of `root` that holds its own node_modules, read from the checkout's layout: its root
- * node_modules plus each workspace package's (nivo-fe's apps/* keep their own; nivo-backend hoists one).
- * A bounded walk that never descends into a node_modules or a hidden directory.
- */
-export function nodeModulesRoots(root, { maxDepth = NODE_MODULES_DEPTH } = {}) {
-  const found = [];
-  const walk = (dir, depth) => {
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      if (entry.name === 'node_modules') { found.push(path.join(dir, entry.name)); continue; }
-      if (depth >= maxDepth || entry.name.startsWith('.')) continue;
-      if (!entry.isDirectory()) continue;
-      walk(path.join(dir, entry.name), depth + 1);
-    }
-  };
-  walk(root, 0);
-  return found;
-}
-
-/**
  * `git push origin main` of `repo` from a scratch detached worktree of committed main — the same ref, a tree
  * the workers cannot dirty — so the repository's pre-push hook judges the commits and nothing else. The
  * worktree is removed whatever happens, its links unlinked first so the removal can never reach the live
@@ -441,10 +421,11 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
     // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed by cleanup().
     const added = createScratchWorktree({ repoRoot: repo, dir: worktree, kind: 'push-scratch', detach: true, base: 'main', git: run });
     if (!added.ok) return unavailable(added.detail || added.reason || 'git worktree add failed');
-    for (const dir of nodeModulesRoots(repo)) {
-      const rel = path.relative(repo, dir);
-      try { const link = path.join(worktree, rel); linkDir(dir, link); links.push(link); }
-      catch (error) { return unavailable(`cannot link ${rel}: ${String(error?.message ?? error)}`); }
+    // The scratch installs its own dependencies from the lockfile (a real npm ci from the cache), never a link to the
+    // live node_modules (RT_NODE_MODULES_LINK).
+    if (fs.existsSync(path.join(worktree, 'package-lock.json'))) {
+      const installed = ci(worktree);
+      if (!installed.ok) return unavailable(`npm ci in the scratch failed (exit ${installed.status ?? 'unknown'}): ${installed.stderr.slice(-400)}`);
     }
     // Husky's core.hooksPath (.husky/_ in every product repo) is a gitignored install artifact: without it
     // the scratch has no pre-push hook at all and the push would be --no-verify in all but name.

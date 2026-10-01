@@ -68,6 +68,7 @@ import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../lib/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
@@ -297,14 +298,13 @@ function makeScratch({ root, base, env }) {
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const added = createScratchWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base, git });
   if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.detail || added.reason || 'git worktree add failed' }; }
-  const nm = path.join(root, 'node_modules');
-  try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps */ }
+  const deps = fs.existsSync(path.join(dir, 'package-lock.json')) ? ci(dir) : { ok: true }; // its own npm ci; never a junction to the live node_modules (RT_NODE_MODULES_LINK)
+  if (!deps.ok) { removeScratch(dir, { root }); return { ok: false, error: `npm ci in the land scratch failed (exit ${deps.status ?? 'unknown'}): ${deps.stderr.slice(-400)}` }; }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(dir, 'config.yaml')); } catch { /* optional */ }
   return { ok: true, dir };
 }
 
 /* ------------------------------------------------------------ checks */
-
 function treeCheck(dir, script) {
   if (!fs.existsSync(path.join(dir, script))) return { ok: true, skipped: true };
   const r = run(process.execPath, [script], { cwd: dir, timeout: 600_000 });
@@ -760,7 +760,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
         git(['cherry-pick', '--abort'], { cwd: scratch.dir });
         // A conflict is unmerged files (or git saying so). Anything else is git failing, and it is reported as that: a
         // broken repo (core.bare) must never read as "rebase your lane" (runs 21 and 22, 2026-09-29).
-        if (!conflicts.length && !/CONFLICT|could not apply|after resolving the conflicts/i.test(said)) {
+        if (!conflicts.length && !/\bCONFLICT\b|could not apply|after resolving the conflicts/i.test(said)) {
           const again = (deps.gitHealth ?? gitHealth)({ root });
           if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
           result.attempts.push({ ...step, reason: 'git-failed' });

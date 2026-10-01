@@ -3246,7 +3246,7 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
 }
 // The admission commit a slice's gate measured against (`gate.mjs ... --base <sha>` in its report's checks).
 const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
-  .map((check) => /--base\s+([0-9a-f]{7,40})/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
+  .map((check) => /--base\s+([0-9a-f]{7,40})\b/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
 function canonSettleFollowUp(ledger, job, payload, envelope) {
   const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
   const manifest = cutManifestOf(db, { workflowId: wf, op, cut: payload.cut, ownJobId: job.job_id });

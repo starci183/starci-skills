@@ -6,8 +6,8 @@
 //      (runtime-rules/slot-allows.mjs)
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
-//      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_GENERATED_DRIFT (the generated copies
-//      against packages/hfs/scripts/sync-runtime.mjs)
+//      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
+//      RT_GENERATED_DRIFT (the generated copies against packages/hfs/scripts/sync-runtime.mjs)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
 //      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
 //   4. the pending ratchet (runtime-rules/pending.mjs): the manifest's `pending` list turns the findings it names into level
@@ -25,7 +25,9 @@ import { GENERATED_DRIFT, driftOfRuntime } from '../../packages/hfs/scripts/sync
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, ruleParams } from '../lib/hfs-slots.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
+import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { externalOwnerFindings } from './runtime-rules/external-owner.mjs';
+import { nodeModulesLinkFindings } from './runtime-rules/node-modules-link.mjs';
 import { applyPending } from './runtime-rules/pending.mjs';
 import { RETIRED_PATHS_FILE, pinnedFindings, retiredFindings } from './runtime-rules/retired.mjs';
 import { sizeFindings } from './runtime-rules/size.mjs';
@@ -80,6 +82,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   const tracked = files ?? trackedFiles(repoRoot);
   const fileSet = new Set(tracked);
   const read = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel), 'utf8'); } catch { return null; } };
+  const readBytes = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel)); } catch { return null; } };
   const sourcePaths = runtimeSources(tracked, params);
   const sources = sourcePaths.map((p) => ({ path: p, text: read(p) ?? '' }));
   const parsedCache = new Map();
@@ -89,7 +92,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   };
   const retiredPaths = (() => { const text = read(RETIRED_PATHS_FILE); try { return text === null ? {} : (parseYaml(text) ?? {}); } catch { return {}; } })();
   const baseRev = base === undefined ? baseRevision(repoRoot) : base;
-  const ctx = { repoRoot, root, manifest: runtimeManifest, resolver, params, files: tracked, fileSet, sources, sourceSet: new Set(sourcePaths), parsed, read, retiredPaths, base: baseRev };
+  const ctx = { repoRoot, root, manifest: runtimeManifest, resolver, params, files: tracked, fileSet, sources, sourceSet: new Set(sourcePaths), parsed, read, readBytes, retiredPaths, base: baseRev };
 
   const findings = [];
   const treeResult = checkRepo({ repoRoot, root, manifest: runtimeManifest, files: tracked, tree });
@@ -105,6 +108,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...retiredFindings(ctx),
     ...pinnedFindings(ctx),
     ...sizeFindings(ctx),
+    ...nodeModulesLinkFindings(ctx),
+    ...controlCharFindings(ctx),
   );
   const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what packages/hfs/scripts/sync-runtime.mjs writes - run it` });

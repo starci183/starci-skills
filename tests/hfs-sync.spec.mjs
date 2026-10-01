@@ -565,7 +565,7 @@ describe('hfs scaffold app: the first tree', () => {
       const text = read(root, spec);
       assert.match(text, /Test\.createTestingModule\(\{[\s\S]*?providers: \[/, `${spec} builds its subject with the testing module`);
       assert.match(text, /moduleRef\.get\(/, spec);
-      assert.doesNotMatch(text, /\bnew [A-Z]\w*Service\(| as [A-Z]\w*|jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
+      assert.doesNotMatch(text, /\bnew [A-Z]\w*Service\(| as [A-Z]\w*\b|jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
     }
     assert.ok(!files.some(file => /composition\.spec|\.controller\.spec|\.handler\.spec|\.module\.spec/.test(file)));
   });

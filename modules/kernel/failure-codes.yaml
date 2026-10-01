@@ -4509,6 +4509,27 @@ RT_PENDING_ADDED:
   owner: supervisor
   kind: check-finding
 
+RT_NODE_MODULES_LINK:
+  title: "node_modules linked instead of installed"
+  title_vi: "node_modules được liên kết thay vì cài đặt"
+  meaning_vi: "Mã runtime tạo một junction hoặc symlink tới một thư mục node_modules (qua fs.symlinkSync, fs.promises.symlink, một hàm bọc chúng, hoặc một lệnh mklink /J, New-Item -ItemType Junction, ln -s được khởi chạy). Mỗi bản checkout phải tự cài phụ thuộc bằng npm ci thật từ bộ nhớ đệm; một liên kết vào node_modules của checkout khác bị lệnh xóa đệ quy hoặc npm đi xuyên qua và làm trống cây thật."
+  causes_vi:
+    - "Dùng chung node_modules của checkout chính cho một worktree tạm để tiết kiệm thời gian cài đặt"
+    - "Giữ lại đoạn mã cũ tạo junction cho land scratch hoặc staging"
+  nextStep_vi: "Người giám sát thay liên kết bằng npm ci thật qua scripts/api/npm/ci.mjs; chỉ giữ mã gỡ hoặc phát hiện liên kết đã có."
+  owner: supervisor
+  kind: check-finding
+
+RT_CONTROL_CHARACTER:
+  title: "Raw control character in source"
+  title_vi: "Ký tự điều khiển thô trong mã nguồn"
+  meaning_vi: "Một tệp văn bản được git theo dõi (mjs, cjs, js, ts, tsx, yaml, md, json) chứa ký tự điều khiển thô (U+0000 đến U+001F trừ tab, LF, CR, và U+007F). NUL thô làm git và grep coi tệp là nhị phân; backspace thô trong biểu thức chính quy không còn nghĩa \\b như khi gõ."
+  causes_vi:
+    - "Một lần sửa bằng script ghi chuỗi \\b hoặc \\0 thành ký tự thật"
+  nextStep_vi: "Người giám sát thay ký tự đó bằng dạng thoát của nó (\\0, \\b, \\u001b) để tệp giữ đúng nghĩa ban đầu."
+  owner: supervisor
+  kind: check-finding
+
 RT_PINNED_PATH_MOVED:
   title: "Pinned path moved"
   title_vi: "Đường dẫn được ghim bị chuyển chỗ"
