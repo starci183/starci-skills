@@ -3,8 +3,8 @@
 // over its threshold is reported, never stopped.
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { killProcessTree } from '../lib/kill-tree.mjs';
-import { listHostProcesses, listHostProcessesAsync } from '../lib/process-list.mjs';
+import { killProcessTree } from '../api/process/kill-tree.mjs';
+import { listHostProcesses, listHostProcessesAsync } from '../api/process/process-list.mjs';
 
 /** Every process on this host: [{pid, ppid, name, exe, cmd, ws, created, cpu}] (cpu: % of one core), or null when unreadable. */
 export function listProcesses({ platform = process.platform, run = spawnSync } = {}) {

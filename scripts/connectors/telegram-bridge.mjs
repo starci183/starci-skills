@@ -60,7 +60,7 @@
 // out, from_ref <id>). Logs go to machine_logs (actor connector, kind
 // telegram-bridge.log). STARCI_TELEGRAM_API_BASE replaces the Bot API
 // host for tests. The token is never printed and is scrubbed from every error.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

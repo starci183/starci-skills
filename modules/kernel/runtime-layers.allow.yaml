@@ -1,0 +1,35 @@
+# runtime-layers.allow.yaml — the one reviewed list of exceptions to modules/kernel/runtime-layers.yaml
+# (scripts/checks/check-layers.mjs). An entry is {path, code, system (RT_LAYER_EXTERNAL_SPAWN only), lane, reason} and
+# covers every finding of that code (and system) in that file. An entry no finding matches is RT_LAYER_ALLOW_STALE.
+#
+#   lane: LAYER-2 | LAYER-3   TEMPORARY. The lane that owns the file moves the call into scripts/api/<system>/ (or
+#                             names the program) and deletes the entry in the same commit (lead C0, 2026-10-01).
+#   lane: reviewed            a permanent exception: the call starts a program its input declares, by design.
+schema: starci/runtime-layers-allow@1
+entries:
+  # ---- reviewed exceptions: runners of a declared command -------------------------------------------------------
+  - {path: scripts/connectors/tunnel.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'starts the cloudflared binary named by STARCI_CLOUDFLARED_COMMAND (default cloudflared); not one of the api systems'}
+  - {path: scripts/example/example-evidence.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'replays the assertion command an example record declares, through the shell'}
+  - {path: scripts/example/example-verify.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'replays the assertion command an example record declares, through the shell'}
+  - {path: scripts/uat/assisted-runner.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'starts the UAT step and driver commands the prepared request declares (scripts/uat/launch.mjs launchFor)'}
+  - {path: scripts/uat/env-health.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'restarts the UAT listener with the command its stack declares (scripts/uat/launch.mjs launchFor)'}
+  - {path: scripts/uat/uat-slots.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: reviewed, reason: 'runs the UAT command the operator passes (scripts/uat/launch.mjs launchFor)'}
+  # ---- LAYER-2: scripts/supervisor/**, scripts/reconciler/** -------------------------------------------------------
+  - {path: scripts/reconciler/start.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-2, reason: 'npm spawn not moved to scripts/api/npm yet'}
+  - {path: scripts/reconciler/ctx.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-2, reason: 'ctx.run spawns its caller''s command; LAYER-2 names it or moves it'}
+  - {path: scripts/reconciler/services.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-2, reason: 'execFile of a service command; LAYER-2 names it or moves it'}
+  - {path: scripts/supervisor/land.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-2, reason: 'land run() of a variable command; LAYER-2 names it or moves it'}
+  - {path: scripts/supervisor/owed.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: git, lane: LAYER-2, reason: 'git spawns not moved to scripts/api/git yet'}
+  - {path: scripts/supervisor/push-git.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-2, reason: 'npm spawn not moved to scripts/api/npm yet'}
+  # ---- LAYER-3: scripts/kernel/**, scripts/work/**, scripts/checks/**, engine/** ---------------------------------
+  - {path: scripts/kernel/api.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-3, reason: 'execFile of a variable command; LAYER-3 names it or moves it'}
+  - {path: scripts/kernel/import-scan.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: git, lane: LAYER-3, reason: 'git spawn not moved to scripts/api/git yet'}
+  - {path: scripts/checks/gate.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-3, reason: 'npm spawn not moved to scripts/api/npm yet'}
+  - {path: scripts/checks/package-clean-test.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-3, reason: 'npm spawn not moved to scripts/api/npm yet'}
+  - {path: scripts/checks/package-clean-test.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-3, reason: 'the same spawn takes a computed program on one branch'}
+  - {path: scripts/checks/proof.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: git, lane: LAYER-3, reason: 'git spawn not moved to scripts/api/git yet'}
+  - {path: scripts/checks/proof.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-3, reason: 'runOne() replays a proof command; LAYER-3 decides whether it is a reviewed exception'}
+  - {path: scripts/checks/release-app-installs.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-3, reason: 'npm/npx spawns not moved to scripts/api/npm yet'}
+  - {path: scripts/checks/sonar-local.mjs, code: RT_LAYER_SPAWN_UNRESOLVED, lane: LAYER-3, reason: 'docker (cfg.docker), sops and the analysis command run from variables; LAYER-3 moves them into scripts/api/docker, scripts/api/sonar and scripts/api/sops'}
+  - {path: scripts/checks/test-world-run.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-3, reason: 'npm spawn not moved to scripts/api/npm yet'}
+  - {path: scripts/checks/unit-run.mjs, code: RT_LAYER_EXTERNAL_SPAWN, system: npm, lane: LAYER-3, reason: 'npm spawn not moved to scripts/api/npm yet'}

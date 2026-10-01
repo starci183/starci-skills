@@ -21,7 +21,7 @@
 //      Kernel seat (scripts/kernel/watchdog.mjs --once --repair, the Host controller's own call);
 //   7. the checklist, re-read until green or --wait seconds (default 120) pass.
 // --check runs only the read-only checklist (steps 1 and 7, one pass). Exit 0 only when every REQUIRED item is green.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

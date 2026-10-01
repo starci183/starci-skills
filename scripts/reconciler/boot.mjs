@@ -16,7 +16,7 @@
 //                                                       print (default) or create the task StarCi-Reconciler: at logon and
 //                                                       every 5 minutes, conhost --headless, IgnoreNew, below-normal. Only
 //                                                       the owner or the coordinator runs --apply.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

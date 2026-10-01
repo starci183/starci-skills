@@ -41,7 +41,7 @@
 // the manager, cloudflared and gateway pids and whether each lives, whether
 // the gateway answers on its port, every `tunnel.mjs run` process on the host
 // (more than one is a leak), `healthy`, and `problems`.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -52,7 +52,7 @@ import { pidAlive, starciLocalRoot, withMachine } from '../../engine/machine-db.
 import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, recordAlive, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
-import { listHostProcesses } from '../lib/process-list.mjs';
+import { listHostProcesses } from '../api/process/process-list.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
 

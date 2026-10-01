@@ -11,7 +11,22 @@ summary: >-
   gc|counts|resume is unchanged). The link-safe rmdir primitive is scripts/api/fs/rmdir-link.mjs. check-worktree-add
   names scripts/api/git/worktree-add.mjs createScratchWorktree as the one `git worktree add`. check-helper-once no longer
   emits RT_RAW_GIT_SPAWN (its catalog entry is removed); where an external tool may be spawned is the layer check's job.
+  The check: scripts/checks/check-layers.mjs (npm run check) reads the rule set modules/kernel/runtime-layers.yaml and
+  every source file with the TypeScript AST (scripts/lib/spawn-calls.mjs, shared with check-host-boundary.mjs, whose
+  agent-CLI reading now uses it and whose orca-spawn text grep is replaced by it for tests/ and packages/). It emits
+  RT_LAYER_EXTERNAL_SPAWN (git, npm/npx, orca, sonar or docker started outside scripts/api/<system>/),
+  RT_LAYER_LIB_CHILD_PROCESS (scripts/lib imports child_process), RT_LAYER_SPAWN_UNRESOLVED (outside scripts/api/, a
+  program the AST cannot name), RT_LAYER_ALLOW_STALE and RT_LAYER_RULES_INVALID. Exceptions are one reviewed file,
+  modules/kernel/runtime-layers.allow.yaml: LAYER-2/LAYER-3 entries are temporary and name their lane; reviewed entries
+  are runners of a declared command. scripts/lib starts nothing: process-list, kill-tree and hide-child-windows moved to
+  scripts/api/process/; the detached node children, the process-name probe and the shell run moved there too
+  (spawn-detached, process-names, run-shell); sops decryption is scripts/api/sops/decrypt.mjs; npm pack --dry-run is
+  scripts/api/npm/pack-dry-run.mjs. node children of the runtime's own scripts are not an external system: domain
+  layers may start them. docs/runtime-layers.md documents the layout.
 reach: new-legs
+adds:
+  checks: [check-layers]
+  codes: [RT_LAYER_EXTERNAL_SPAWN, RT_LAYER_LIB_CHILD_PROCESS, RT_LAYER_SPAWN_UNRESOLVED, RT_LAYER_ALLOW_STALE, RT_LAYER_RULES_INVALID]
 paths:
   - modules/kernel/contract-changes/runtime-api-layers.yaml
   - modules/kernel/failure-codes.yaml
@@ -28,3 +43,20 @@ paths:
   - scripts/lib/worktree-registry.mjs
   - scripts/checks/check-helper-once.mjs
   - scripts/checks/check-worktree-add.mjs
+  - scripts/checks/check-layers.mjs
+  - scripts/checks/check-host-boundary.mjs
+  - scripts/lib/spawn-calls.mjs
+  - modules/kernel/runtime-layers.yaml
+  - modules/kernel/runtime-layers.allow.yaml
+  - modules/kernel/retired-paths.yaml
+  - scripts/api/process/process-list.mjs
+  - scripts/api/process/kill-tree.mjs
+  - scripts/api/process/hide-child-windows.mjs
+  - scripts/api/process/spawn-detached.mjs
+  - scripts/api/process/process-names.mjs
+  - scripts/api/process/run-shell.mjs
+  - scripts/api/sops/decrypt.mjs
+  - scripts/api/npm/pack-dry-run.mjs
+  - docs/runtime-layers.md
+  - package.json
+  - tests/check-layers.spec.mjs

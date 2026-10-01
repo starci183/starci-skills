@@ -1,9 +1,10 @@
 // check-host-boundary.mjs — CONTRIBUTING.md rule 5, executable.
 //
 // Host calls go through scripts/api/orca/. Two ways that breaks, both red here:
-//   code   — a .mjs outside scripts/api/orca/ spawns a process named orca, or
-//            imports the raw runner (ORCA, orcaRun, orcaCall) from the wrapper
-//            lib instead of calling a wrapper.
+//   code   — a .mjs outside scripts/api/orca/ imports the raw runner (ORCA,
+//            orcaRun, orcaCall) from the wrapper lib instead of calling a
+//            wrapper, or (tests/ and packages/ only) spawns orca. A spawn of orca
+//            in runtime code is scripts/checks/check-layers.mjs's finding.
 //   prose  — agent-facing text tells an agent to run `orca <verb>`, to run a
 //            node path that is not a scripts/api/orca/<verb>.mjs wrapper, or to
 //            load/read modules/host/orca/*.
@@ -18,9 +19,10 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {walkFiles} from './common.mjs';
+import {spawnCalls} from '../lib/spawn-calls.mjs';
+import {readRules} from './check-layers.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
 const ALLOW_FILE='scripts/checks/host-boundary.allow';
@@ -70,7 +72,6 @@ export function readAllowList(root){
 const COMMAND_POSITION=/(?:^|[`'"($]|\|\||&&|;|\|)\s*orca\s+([a-z][a-z-]*)/;
 const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
-const SPAWNS_ORCA=/\b(?:spawnSync|spawn|execFileSync|execFile|execSync|exec)\s*\(\s*['"]orca(?:\.exe|\.cmd)?['"]/;
 // (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/contract-changes/
 // launch-through-worker-start.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
 // the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
@@ -92,104 +93,12 @@ export const AGENT_CLI_SPAWN='AGENT_CLI_SPAWN';
 export const AGENT_CLIS=Object.freeze(['codex','claude','cursor-agent','devin','gemini','opencode']);
 const AGENT_SPAWN_ROOTS=['scripts','engine','modules','bin'];
 const AGENT_SPAWN_EXT=/\.(?:mjs|cjs|js|ts)$/;
-const CHILD_PROCESS=new Set(['child_process','node:child_process']);
-const SPAWN_FNS=new Set(['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork']);
-const SHELLS=new Set(['cmd','sh','bash','powershell','pwsh']);
-let typescript=null;
-const ts=()=>(typescript??=createRequire(import.meta.url)('typescript'));
-/** The program a command word names: basename, lower case, without a .cmd/.exe/.bat/.ps1 shim suffix. */
-const programOf=word=>path.posix.basename(String(word??'').replace(/^["']|["']$/g,'').replaceAll('\\','/')).toLowerCase().replace(/\.(?:cmd|exe|bat|ps1)$/,'');
-const firstWord=text=>String(text??'').trim().split(/\s+/)[0]??'';
-
 /** The agent-CLI spawns in one source text: [{line, callee, program}]. Pure. */
 export function agentCliSpawns(text,file='x.mjs'){
-  if(!/child_process/.test(text))return [];
-  const t=ts();
-  const source=t.createSourceFile(file,text,t.ScriptTarget.Latest,true,/\.ts$/.test(file)?t.ScriptKind.TS:t.ScriptKind.JS);
-  const fnBinding=new Map();   // local name -> child_process function name
-  const nsBinding=new Set();   // local names bound to the module itself
-  const consts=new Map();      // const name -> [initializer]
-  const moduleOf=node=>Boolean(node&&t.isStringLiteralLike(node)&&CHILD_PROCESS.has(node.text));
-  const requireOf=node=>{
-    let n=node;
-    if(n&&t.isAwaitExpression(n))n=n.expression;
-    if(!n||!t.isCallExpression(n))return false;
-    const callee=n.expression;
-    const isRequire=t.isIdentifier(callee)&&callee.text==='require';
-    const isImport=callee.kind===t.SyntaxKind.ImportKeyword;
-    return (isRequire||isImport)&&moduleOf(n.arguments[0]);
-  };
-  const bindPattern=pattern=>{
-    for(const el of pattern.elements){
-      const imported=el.propertyName&&t.isIdentifier(el.propertyName)?el.propertyName.text:t.isIdentifier(el.name)?el.name.text:null;
-      if(imported&&SPAWN_FNS.has(imported)&&t.isIdentifier(el.name))fnBinding.set(el.name.text,imported);
-    }
-  };
-  const collect=node=>{
-    if(t.isImportDeclaration(node)&&moduleOf(node.moduleSpecifier)&&node.importClause){
-      const c=node.importClause;
-      if(c.name)nsBinding.add(c.name.text);
-      const b=c.namedBindings;
-      if(b&&t.isNamespaceImport(b))nsBinding.add(b.name.text);
-      if(b&&t.isNamedImports(b))for(const el of b.elements){
-        const imported=(el.propertyName??el.name).text;
-        if(SPAWN_FNS.has(imported))fnBinding.set(el.name.text,imported);
-      }
-    }
-    if(t.isVariableDeclaration(node)&&node.initializer){
-      if(requireOf(node.initializer)){
-        if(t.isIdentifier(node.name))nsBinding.add(node.name.text);
-        else if(t.isObjectBindingPattern(node.name))bindPattern(node.name);
-      }
-      const list=node.parent;
-      if(t.isIdentifier(node.name)&&list&&t.isVariableDeclarationList(list)&&(list.flags&t.NodeFlags.Const))
-        consts.set(node.name.text,[...(consts.get(node.name.text)??[]),node.initializer]);
-    }
-    t.forEachChild(node,collect);
-  };
-  collect(source);
-  if(!fnBinding.size&&!nsBinding.size)return [];
-  // Every string a command expression can be: literals, consts (cycle-safe), both branches of a conditional or a ||/??.
-  const valuesOf=(node,seen=new Set())=>{
-    if(!node)return [];
-    if(t.isParenthesizedExpression(node)||t.isAsExpression(node))return valuesOf(node.expression,seen);
-    if(t.isStringLiteralLike(node))return [node.text];
-    if(t.isTemplateExpression(node))return [node.head.text];
-    if(t.isConditionalExpression(node))return [...valuesOf(node.whenTrue,seen),...valuesOf(node.whenFalse,seen)];
-    if(t.isBinaryExpression(node)&&[t.SyntaxKind.BarBarToken,t.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind))
-      return [...valuesOf(node.left,seen),...valuesOf(node.right,seen)];
-    if(t.isIdentifier(node)&&consts.has(node.text)&&!seen.has(node.text)){
-      seen.add(node.text);
-      return consts.get(node.text).flatMap(init=>valuesOf(init,seen));
-    }
-    return [];
-  };
-  const calleeOf=call=>{
-    const e=call.expression;
-    if(t.isIdentifier(e)&&fnBinding.has(e.text))return fnBinding.get(e.text);
-    if(t.isPropertyAccessExpression(e)&&t.isIdentifier(e.expression)&&nsBinding.has(e.expression.text)&&SPAWN_FNS.has(e.name.text))return e.name.text;
-    return null;
-  };
-  const found=[];
-  const visit=node=>{
-    if(t.isCallExpression(node)){
-      const callee=calleeOf(node);
-      if(callee){
-        const [cmd,args]=node.arguments;
-        const programs=valuesOf(cmd).map(v=>programOf(firstWord(v)));
-        // A shell running the agent: cmd /c codex ..., sh -c 'claude -p', powershell -Command codex.
-        if(programs.some(p=>SHELLS.has(p))&&args&&t.isArrayLiteralExpression(args)){
-          const program=args.elements.flatMap(el=>valuesOf(el).slice(0,1)).find(w=>!/^[-/]/.test(w));
-          if(program!=null)programs.push(programOf(firstWord(program)));
-        }
-        const hit=programs.find(p=>AGENT_CLIS.includes(p));
-        if(hit)found.push({line:source.getLineAndCharacterOfPosition(node.getStart(source)).line+1,callee,program:hit});
-      }
-    }
-    t.forEachChild(node,visit);
-  };
-  visit(source);
-  return found;
+  return spawnCalls(text,file).calls.flatMap(call=>{
+    const program=call.programs.find(p=>AGENT_CLIS.includes(p));
+    return program?[{line:call.line,callee:call.callee,program}]:[];
+  });
 }
 
 const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
@@ -206,15 +115,19 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
     found.push({where:key,rule,...(code?{code}:{}),detail});
   };
 
-  // (a) code: one place spawns orca and one place builds its argv.
+  // (a) code: one place builds orca's argv. Who may spawn orca in runtime code is check-layers.mjs's rule (its scan
+  // roots); the roots it does not scan (tests/, packages/) are read here with the same AST reading.
+  const layerScan=readRules(root).rules.scan??[];
   for(const dir of CODE_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
       const relative=rel(root,file);
       if(relative.startsWith(`${WRAPPER_DIR}/`))continue;
-      const lines=fs.readFileSync(file,'utf8').split(/\r?\n/);
+      const text=fs.readFileSync(file,'utf8');
+      if(!layerScan.some(d=>relative.startsWith(`${d}/`)))
+        for(const call of spawnCalls(text,file).calls)
+          if(call.programs.includes('orca'))flag(file,call.line,'spawns-orca',`spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
+      const lines=text.split(/\r?\n/);
       lines.forEach((line,i)=>{
-        if(SPAWNS_ORCA.test(line))
-          flag(file,i+1,'spawns-orca',`spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
         if(IMPORTS_RUNNER.test(line))
           flag(file,i+1,'imports-runner',`imports the Orca runner outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
       });

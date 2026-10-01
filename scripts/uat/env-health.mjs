@@ -33,7 +33,7 @@
 // The JSON is starci/env-health@1: {ready, class: ready|environment, hardBlock, environments[{id,
 // services[{service, url, expect, state, ready, status?, discovered?, listener?, action?, remedy?}]}],
 // remedies[]}. It is never a product verdict: a red walk on a ready environment is.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import http from 'node:http';
@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { launchFor } from './launch.mjs';
-import { killProcessTree } from '../lib/kill-tree.mjs';
+import { killProcessTree } from '../api/process/kill-tree.mjs';
 
 export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 export const EXIT_READY = 0, EXIT_NOT_READY = 3, EXIT_USAGE = 2;

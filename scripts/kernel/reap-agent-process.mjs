@@ -26,8 +26,8 @@
 // be that agent's. Without that census nothing is stopped.
 import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
-import { killProcessTree } from '../lib/kill-tree.mjs';
-import { listHostProcesses } from '../lib/process-list.mjs';
+import { killProcessTree } from '../api/process/kill-tree.mjs';
+import { listHostProcesses } from '../api/process/process-list.mjs';
 
 export const REAP_WINDOW_MS = allocationMs('reap.windowMs');
 

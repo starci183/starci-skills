@@ -33,7 +33,7 @@
 //   node scripts/reconciler/engine.mjs --once [--controller x] [--key k] [--apply] [--json]
 //        one pass: every non-off controller (or the named one) lists and reconciles its keys once; shadow unless
 //        --apply, which first takes the lead (refused while another leader is live).
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';

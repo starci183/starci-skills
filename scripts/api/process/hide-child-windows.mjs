@@ -1,4 +1,4 @@
-// scripts/lib/hide-child-windows.mjs — every child process this Node process
+// scripts/api/process/hide-child-windows.mjs — every child process this Node process
 // starts gets windowsHide: true unless the call says otherwise.
 //
 // Why: the runtime's background processes (watchdog, ask-gateway, tunnel,

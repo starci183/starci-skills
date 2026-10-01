@@ -47,7 +47,7 @@
 // A draw-review ask (owner ruling 2026-09-26) is accepted the same way unless
 // the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import { writeAskReceipt } from './ask-receipts.mjs';
 import fs from 'node:fs';
 import http from 'node:http';

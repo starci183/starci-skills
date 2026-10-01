@@ -23,7 +23,7 @@
 //
 // ctx is part A's context (its registry, its Orca client) plus optional seams: ctx.worktree (part A's functions),
 // ctx.db (the ledger), ctx.gate, ctx.guard, ctx.verify, ctx.push, ctx.fastForward, ctx.main.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

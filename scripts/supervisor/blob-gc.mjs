@@ -24,7 +24,7 @@
 // verified zip under <archive-root>/blob-retention-<date>/ (entry name = sha256, re-read and re-hashed), then marked
 // archived through the writers, then removed. Every run is one gc_runs row (trigger blob-sweep) with its gc_marks and
 // one gc_items row per blob it archived, removed or refused.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
