@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { waitUntil, withPaymentFake } from "../payment-kit/app-double.test"
+import { waitUntil, withPaymentFake } from "../payment-kit/app-double.spec"
 import { MOMO_CREATE_RESPONSE_FIELDS, MOMO_IPN_FIELDS, MOMO_QUERY_REQUEST_FIELDS, MOMO_REFUND_REQUEST_FIELDS, momoCreateRequest, momoFake, momoSign, momoVerify } from "./index"
 
 type Json = Record<string, unknown>

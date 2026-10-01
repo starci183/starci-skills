@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { withPaymentFake, waitUntil } from "../payment-kit/app-double.test"
+import { withPaymentFake, waitUntil } from "../payment-kit/app-double.spec"
 import { vnpayFake } from "./index"
 import {
     VNPAY_QUERYDR_REQUEST_FIELDS,

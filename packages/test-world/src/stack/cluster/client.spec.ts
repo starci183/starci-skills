@@ -3,7 +3,7 @@ import { describe, it } from "node:test"
 import type { RunCluster } from "../contracts"
 import { createClusterClient, parsePods } from "./client"
 import type { Clock } from "./poll"
-import { scriptedExec } from "./script.test"
+import { scriptedExec } from "./script.spec"
 
 const run: RunCluster = {
     cluster: "starci-abcdef12",

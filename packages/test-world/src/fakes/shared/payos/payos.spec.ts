@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { waitUntil, withPaymentFake } from "../payment-kit/app-double.test"
+import { waitUntil, withPaymentFake } from "../payment-kit/app-double.spec"
 import { payosCreateRequest, payosFake, payosVerifyData } from "./index"
 
 type Json = Record<string, unknown>

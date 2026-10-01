@@ -8,9 +8,10 @@ import assert from 'node:assert/strict';
 // to run this against a backend reference root that has @starci/eslint-canon-be
 // installed. No root spec covers it — this repo carries no eslint.
 const root=path.resolve(process.argv[2]??'..');
-const require=createRequire(path.join(root,'package.json'));
-const {Linter}=require('eslint');
-const parser=require('@typescript-eslint/parser');
+// The linter and parser are the reference root's own install, resolved from that root, never from this repository.
+const fromRoot=createRequire(path.join(root,'package.json'));
+const {Linter}=fromRoot('eslint');
+const parser=fromRoot('@typescript-eslint/parser');
 const {rules}=await import(pathToFileURL(path.join(root,'node_modules/@starci/eslint-canon-be/data-access.mjs')));
 const linter=new Linter();
 const check=(code)=>linter.verify(code,[{files:['**/*.ts'],languageOptions:{parser},plugins:{probe:{rules}},rules:Object.fromEntries(Object.keys(rules).map(k=>['probe/'+k,'error']))}],{filename:'fixture.ts'}).map(m=>m.ruleId);
