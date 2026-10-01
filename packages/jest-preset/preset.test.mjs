@@ -9,6 +9,8 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const preset = require('./index.cjs');
+// The @types folder that holds the jest types this package's own install resolves (a devDependency), never a path above it.
+const jestTypeRoot = () => path.dirname(path.dirname(require.resolve('@types/jest/package.json')));
 
 // The config is read from a repository root (jest runs there): the default one below has a test world, so all four
 // projects exist; `withoutWorld` is a repository whose world is not written yet.
@@ -182,7 +184,7 @@ test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assi
     fs.copyFileSync(path.join(import.meta.dirname, 'mock.d.ts'), path.join(dir, 'mock.d.ts'));
     fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-mock.fixture', import.meta.url), 'utf8'));
     const program = ts.createProgram([path.join(dir, 'probe.ts')], {
-      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [path.resolve(import.meta.dirname, '../../node_modules/@types')],
+      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [jestTypeRoot()],
       module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
     });
     const problems = ts.getPreEmitDiagnostics(program).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
@@ -507,7 +509,7 @@ test('the kit types: mockEntityManager() is assignable to EntityManager with no 
     fs.writeFileSync(path.join(dir, 'node_modules', 'typeorm', 'index.d.ts'), fs.readFileSync(new URL('typeorm-stub.fixture', import.meta.url), 'utf8'));
     fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-kit.fixture', import.meta.url), 'utf8'));
     const program = ts.createProgram([path.join(dir, 'probe.ts')], {
-      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [path.resolve(import.meta.dirname, '../../node_modules/@types')],
+      strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [jestTypeRoot()],
       module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
     });
     const problems = ts.getPreEmitDiagnostics(program).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));

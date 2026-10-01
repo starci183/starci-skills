@@ -22,6 +22,8 @@
 //      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers, check-worktree-add (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
+//      the clean-install proof of every published package the change touches (packageProofCheck:
+//        scripts/checks/package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -463,6 +465,20 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
 }
 
+export const PACKAGE_PROOF = 'scripts/checks/package-clean-test.mjs';
+export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
+/**
+ * The clean-install proof of every published package the land changes: package-clean-test.mjs --base <base> in the scratch
+ * (each changed package copied to a temp dir, installed from its own manifest and lock, its own tests run there). Red (1)
+ * or not run (2) refuses; a land that changes no published package passes it without an install. null when the candidate
+ * has no such script.
+ */
+export function packageProofCheck({ dir, base, runner = run }) {
+  if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
+  const r = runner(process.execPath, [PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
+  return { name: 'package-clean-test', ok: r.ok, output: tail(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
+}
+
 const readSpecs = (dir) => {
   const tests = path.join(dir, 'tests');
   let names = [];
@@ -513,6 +529,8 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   }
   const mirror = mirrorDriftCheck({ dir, changed, baseline });
   if (mirror) checks.push(mirror);
+  const proof = packageProofCheck({ dir, base });
+  if (proof) checks.push(proof);
   let coverage;
   try {
     const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
