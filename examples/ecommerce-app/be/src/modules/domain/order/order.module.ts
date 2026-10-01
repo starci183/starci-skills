@@ -3,6 +3,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { CheckoutService } from "./checkout.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./order.module-definition"
 import { OrderService } from "./order.service"
+import { ReceiptService } from "./receipt.service"
 
 @Module({})
 /** The order capability over the order database; the cart, catalog and payment capabilities it uses are registered by the app. */
@@ -12,8 +13,8 @@ export class OrderModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), OrderService, CheckoutService],
-            exports: [OrderService, CheckoutService],
+            providers: [...(base.providers ?? []), OrderService, CheckoutService, ReceiptService],
+            exports: [OrderService, CheckoutService, ReceiptService],
         }
     }
 }

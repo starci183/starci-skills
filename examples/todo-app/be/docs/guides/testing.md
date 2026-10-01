@@ -12,7 +12,7 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
 (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`). The jest `global-setup.ts` / `global-teardown.ts`
 re-export the library's hooks: the library runs the services `.starcistacks/dev` declares, real and behind toxiproxy (Postgres,
-and Keycloak importing the stack's `realm-todo.json`), runs `apps/migrate`'s exported `bootstrap` once, and serves the
+Keycloak importing the stack's `realm-todo.json`, MinIO with the uploads bucket and the Redis of the rate limiter), runs `apps/migrate`'s exported `bootstrap` once, and serves the
 library's network-edge fakes of the external providers (the mail host and the payment gateway). `use-test-world.ts`
 re-exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager),
 `world.keycloak` (the real realm: `person()`, `events()`, `sessions()`), `world.infra.<service>` (`cut()`, `restore()`,
@@ -111,7 +111,7 @@ npm run test:e2e -- flows/probes
 
 ## Uploads
 
-Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`GraphQL createUploadIntent` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (local filesystem adapter in dev; S3/minio implements the same port) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
+Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`GraphQL createUploadIntent` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (an S3 adapter over the stack's MinIO, signed with AWS Signature Version 4) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
 
 ```bash
 npm run test:e2e -- flows/upload-journey

@@ -6,18 +6,13 @@ import { isRecord } from "@modules/platform/primitives"
 import { IdentityApiError, IdentityApiErrorCode } from "./errors/identity-api.error"
 import { InjectIdentityApiOptions } from "./identity-api.decorators"
 import type { IdentityApiOptions } from "./identity-api.options"
+import type { IdentitySessionLookup } from "./identity-api.contracts"
 
 /** The wire code the identity service answers when no live session matches a token. */
 const SESSION_INVALID_CODE = "SESSION_INVALID"
 
 const VERIFY_SESSION_QUERY =
     "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }"
-
-/** The person behind a live session, as the identity service names them. */
-export interface IdentitySession {
-    /** The person the token authenticates. */
-    readonly personId: string
-}
 
 @Injectable()
 /** The order service view of the identity service: it verifies bearer tokens over the identity GraphQL door and probes its health. */
@@ -31,7 +26,7 @@ export class IdentityApiClient implements Probe {
     ) {}
 
     /** The session behind `sessionToken`, or null when the identity service refuses the token. */
-    async verify(sessionToken: string): Promise<IdentitySession | null> {
+    async verify(sessionToken: string): Promise<IdentitySessionLookup> {
         const answer = await this.ask(sessionToken)
         if (answer === null) throw new IdentityApiError({ code: IdentityApiErrorCode.ContractMismatch })
         if (answer.errorCodes.includes(SESSION_INVALID_CODE)) return null

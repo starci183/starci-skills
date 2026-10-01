@@ -6,5 +6,7 @@ name: ecommerce-app-dev
 include:
   - postgres.yaml
   - redis.yaml
+  - keycloak.yaml
+  - minio.yaml
   - identity.yaml
   - order.yaml

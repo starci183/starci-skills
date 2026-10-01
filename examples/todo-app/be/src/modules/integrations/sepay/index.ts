@@ -1,4 +1,4 @@
-export { SEPAY_ERROR_KINDS } from "./errors/sepay.error"
+export { SEPAY_ERROR_KINDS, SepayErrorCode } from "./errors/sepay.error"
 export { SEPAY_MESSAGES } from "./messages/sepay.messages"
 export type { SepayClient } from "./sepay.client"
 export { parseSepayConfig } from "./sepay.config"

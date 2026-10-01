@@ -1,0 +1,28 @@
+schema: work/functional-requirement@1
+id: fr.checkout.download-receipt
+title: Download the receipt of an order
+state: todo
+actors: [person]
+trigger: The person who placed an order asks for its receipt, from the order confirmation, over the orderReceipt query.
+mainFlow:
+  - The session is verified against the identity service over HTTP.
+  - The receipt the order archived in the private object storage after it committed is signed into a download link that
+    expires (RECEIPTS_LINK_TTL), and the browser downloads the receipt document through it.
+exceptionFlows:
+  - An order the person does not have (unknown, or another buyer's) is refused as not found; no link is signed.
+  - A receipt the archive could not take when the order committed is archived on this request; while the storage is
+    still down the request is refused as not ready and a later request succeeds.
+postconditions:
+  - The receipt names the order, its lines, the total, the currency and the captured payment; nobody without a fresh
+    link reads it.
+composes:
+  - rule: br.checkout.place-order
+    module: be/src/modules/domain/order
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- checkout/checkout-journey
+
+change: {rev: 1, kind: initial, at: 2026-10-01T23:00:00.000Z}

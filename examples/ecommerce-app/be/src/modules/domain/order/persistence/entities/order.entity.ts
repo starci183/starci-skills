@@ -28,6 +28,10 @@ export class OrderEntity {
     @Column({ name: "idempotency_key", type: "text", nullable: true })
     idempotencyKey!: string | null
 
+    /** The object key of the archived receipt (`receipts/<id>.json`); null until the receipt is stored. */
+    @Column({ name: "receipt_key", type: "text", nullable: true })
+    receiptKey!: string | null
+
     /** When the order was confirmed. */
     @Column({ name: "created_at", type: "timestamptz", default: () => "now()" })
     createdAt!: Date

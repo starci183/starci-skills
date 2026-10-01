@@ -23,6 +23,7 @@ import type {
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
+import { ReceiptService } from "./receipt.service"
 import type { OrderCountRow, OrderIdRow } from "./persistence/order.rows"
 import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
@@ -39,6 +40,7 @@ export class OrderService {
         @InjectCartService() private readonly cart: CartService,
         @InjectCatalogService() private readonly catalog: CatalogService,
         @InjectPaymentService() private readonly payments: PaymentService,
+        private readonly receipts: ReceiptService,
     ) {}
 
     /**
@@ -58,6 +60,8 @@ export class OrderService {
         const placed = await this.entityManager.transaction((manager) =>
             this.confirm({ manager, personId, plan: evaluation.value, idempotencyKey }),
         )
+        // The receipt is archived after the commit: the order never waits on, or fails with, the object storage.
+        if (!placed.replayed) await this.receipts.archive(placed.orderId)
         return ok(placed)
     }
 

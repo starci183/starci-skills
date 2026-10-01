@@ -6,7 +6,7 @@ import { ConfigurableModuleClass, OPTIONS_TYPE } from "./upload-storage.module-d
 import { UploadScanClient } from "./upload-storage-scan.client"
 
 @Module({})
-/** Provides the byte plane of the uploads: the local filesystem storage and the content inspection hook. */
+/** Provides the byte plane of the uploads: the S3 storage (MinIO in the stack) and the content inspection hook. */
 export class UploadStorageModule extends ConfigurableModuleClass {
     /** Registers the integration once per app that stores upload bytes. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {

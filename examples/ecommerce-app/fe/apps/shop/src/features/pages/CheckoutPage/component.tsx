@@ -33,6 +33,10 @@ export type CheckoutPageProps = {
         readonly confirmedTitle: string
         readonly confirmedDetail: string
         readonly replayedNote: string
+        readonly receiptLabel: string
+        readonly receiptPendingLabel: string
+        readonly receiptNotReady: string
+        readonly receiptRefused: string
         readonly refusedCartEmpty: string
         readonly refusedStock: string
         readonly refusedUnknownProduct: string
@@ -65,6 +69,10 @@ export const CheckoutPageBase = (props: CheckoutPageProps) => {
             confirmedTitle={props.props.confirmedTitle}
             confirmedDetail={props.props.confirmedDetail}
             replayedNote={props.props.replayedNote}
+            receiptLabel={props.props.receiptLabel}
+            receiptPendingLabel={props.props.receiptPendingLabel}
+            receiptNotReady={props.props.receiptNotReady}
+            receiptRefused={props.props.receiptRefused}
             accountCta={props.props.accountCta}
             accountHref={props.props.accountHref}
             refusedCartEmpty={props.props.refusedCartEmpty}

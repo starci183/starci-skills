@@ -1,0 +1,25 @@
+schema: work/integration@1
+id: integration.identity.keycloak
+title: Keycloak is the member directory the identity service reads profiles from
+state: todo
+provider: keycloak
+boundary: The identity service reads members through the realm's admin API as the service account of the confidential
+  identity-admin client (realm-management view-users), never with a person's credentials; it writes nothing there.
+endpoints:
+  - {name: token, method: POST, path: /realms/ecommerce/protocol/openid-connect/token}
+  - {name: member, method: GET, path: /admin/realms/ecommerce/users/<member id>}
+credential:
+  name: KEYCLOAK_ADMIN_CLIENT_SECRET
+  providedBy: owner
+  custody: identity:keycloak-admin-client-secret
+  # sealed in .starcistacks/dev/secrets/keycloak-env.enc (DEMO-ONLY recipient)
+sandbox: The dev environment runs its own Keycloak on 8149 with the imported ecommerce realm; it is a real Keycloak, not a
+  stub.
+refs: [fr.identity.account]
+
+requiresProof:
+  live:
+    required: true
+    note: A member read through the service account against the real realm, not against a fake.
+
+change: {rev: 1, kind: initial, at: 2026-10-01T23:00:00.000Z}

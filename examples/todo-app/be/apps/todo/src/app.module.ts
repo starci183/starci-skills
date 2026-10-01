@@ -36,6 +36,7 @@ import {
     uploadEntities,
     uploadMigrations,
 } from "@modules/domain/upload"
+import { CACHE_ERROR_KINDS, CACHE_MESSAGES, CacheModule } from "@modules/integrations/cache"
 import { KEYCLOAK_ERROR_KINDS, KEYCLOAK_MESSAGES, KeycloakModule } from "@modules/integrations/keycloak"
 import { NOTIFY_SMTP_ERROR_KINDS, NOTIFY_SMTP_MESSAGES, NotifySmtpModule } from "@modules/integrations/notify-smtp"
 import { SEPAY_ERROR_KINDS, SEPAY_MESSAGES, SepayModule } from "@modules/integrations/sepay"
@@ -100,6 +101,7 @@ export class AppModule {
                         SEPAY_MESSAGES,
                         NOTIFY_SMTP_MESSAGES,
                         UPLOAD_STORAGE_MESSAGES,
+                        CACHE_MESSAGES,
                     ],
                 }),
                 ErrorsModule.register({
@@ -123,10 +125,12 @@ export class AppModule {
                         SEPAY_ERROR_KINDS,
                         NOTIFY_SMTP_ERROR_KINDS,
                         UPLOAD_STORAGE_ERROR_KINDS,
+                        CACHE_ERROR_KINDS,
                     ],
                 }),
                 CqrsModule.register({ isGlobal: true }),
                 HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
+                CacheModule.register({ isGlobal: true, ...options.cache }),
                 DatabaseModule.register({
                     isGlobal: true,
                     connections: [

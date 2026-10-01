@@ -12,6 +12,7 @@ import { orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
 import { OrderService } from "./order.service"
+import { ReceiptService } from "./receipt.service"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
@@ -23,6 +24,7 @@ const build = async (entityManager: MockEntityManager) => {
     const cart = mock<CartService>()
     const catalog = mock<CatalogService>()
     const payments = mock<PaymentService>()
+    const receipts = mock<ReceiptService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             OrderService,
@@ -30,9 +32,10 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: CART_SERVICE, useValue: cart },
             { provide: CATALOG_SERVICE, useValue: catalog },
             { provide: PAYMENT_SERVICE, useValue: payments },
+            { provide: ReceiptService, useValue: receipts },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, payments }
+    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts }
 }
 
 describe("OrderService", () => {
@@ -107,7 +110,7 @@ describe("OrderService", () => {
                     insert: [OrderLineEntity, {}],
                 }),
             )
-            const { orders, cart, catalog, payments } = await build(tx.em)
+            const { orders, cart, catalog, payments, receipts } = await build(tx.em)
             cart.list.mockResolvedValue([
                 { productId: "sku-1", quantity: 2 },
                 { productId: "sku-2", quantity: 1 },
@@ -144,6 +147,7 @@ describe("OrderService", () => {
             })
             expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)
+            expect(receipts.archive).toHaveBeenCalledWith("o-7")
         })
 
         it("places an order without a replay key and claims no key", async () => {
@@ -191,7 +195,7 @@ describe("OrderService", () => {
                     query: [INSERT_ORDER_IF_NEW, []],
                 }),
             )
-            const { orders, cart, catalog, payments } = await build(tx.em)
+            const { orders, cart, catalog, payments, receipts } = await build(tx.em)
             cart.list.mockResolvedValue([{ productId: "sku-1", quantity: 1 }])
             catalog.byIds.mockResolvedValue({ "sku-1": shirt })
             payments.findByOrder.mockResolvedValue({ paymentId: "pay-3", amountMinorUnits: 500 })
@@ -202,6 +206,7 @@ describe("OrderService", () => {
 
             expect(catalog.reserveStock).not.toHaveBeenCalled()
             expect(payments.capture).not.toHaveBeenCalled()
+            expect(receipts.archive).not.toHaveBeenCalled()
         })
 
         it("fails with the placement failed error when the key was claimed but no order explains it", async () => {

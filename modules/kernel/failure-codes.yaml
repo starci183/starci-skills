@@ -12691,6 +12691,16 @@ HFS_PEER_INTEGRATION_MISSING:
   owner: op-retry
   kind: check-finding
 
+BE_INTEGRATION_SPEC_MISSING:
+  title: "Every integration has an integration spec that proves its client through the test world"
+  title_vi: "Tích hợp thiếu spec integration chứng minh client qua test world"
+  meaning_vi: "Thư mục `src/modules/integrations/<provider>/` (có `<provider>.config.ts`) không có `src/tests/integration/<provider>/*.integration-spec.ts` nào vừa gọi `useTestWorld({ modules })` với factory đăng ký module của chính tích hợp đó (`<Provider>Module.register`, import từ thư mục tích hợp), vừa tham chiếu enum ErrorCode của tích hợp, vừa gây một sự cố qua world (`world.infra.<service>`, `world.fake.<name>.failNext`, `world.apps.<peer>.during`, `world.interruptDatabase`)."
+  causes_vi:
+    - "Vi phạm luật R112: client của tích hợp chỉ được kiểm bằng unit spec với double, nên ánh xạ lỗi và đường sự cố của nhà cung cấp thật (hoặc fake ở biên mạng) chưa bao giờ chạy; lỗi phân loại timeout của FetchHttpClient chỉ lộ ra khi spec integration đầu tiên chạy."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm hoặc bổ sung spec integration của đúng thư mục provider cho phần còn thiếu (đăng ký module, enum ErrorCode, sự cố qua world); không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 HFS_PROOF_COMMAND_FILE_MISSING:
   title: "A proof command names only files the repository holds"
   title_vi: "Lệnh chứng minh trỏ tới tệp không tồn tại"

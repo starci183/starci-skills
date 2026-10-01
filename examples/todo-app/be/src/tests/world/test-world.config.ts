@@ -1,7 +1,8 @@
 /**
  * The declaration of the todo test world: selection and overrides only. The service list and the image versions come from
- * the stack definition (`.starcistacks/dev`); the library runs Postgres and Keycloak (with the stack's realm) real behind
- * toxiproxy, the mail host and the payment gateway as fakes at the network edge, and boots the real apps in process.
+ * the stack definition (`.starcistacks/dev`); the library runs Postgres, Keycloak (with the stack's realm), MinIO (the
+ * uploads bucket) and Redis real behind toxiproxy, the mail host and the payment gateway as fakes at the network edge, and
+ * boots the real apps in process.
  */
 import { defineTestWorld } from "@starci/test-world"
 import { sepayFake, smtpFake } from "@starci/test-world/fakes"
@@ -13,7 +14,7 @@ import { AppModule as WorkerApp } from "../../../apps/worker/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
 import { primaryConnectionOf } from "../../../apps/migrate/src/migrate.options"
 import type { SignInData } from "@tests/fixtures/views/e2e-views.contracts"
-import { testOptions } from "./test-apps.options"
+import { UPLOADS_BUCKET, testOptions } from "./test-apps.options"
 import { platformBase } from "./test-capabilities.options"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { TODO_KEYCLOAK_CLIENT } from "./todo-identity.contracts"
@@ -24,6 +25,8 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     stacks: {
         postgresql: { connections: [{ name: "primary" }] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-todo.json", clientId: TODO_KEYCLOAK_CLIENT },
+        minio: { buckets: [UPLOADS_BUCKET] },
+        redis: {},
     },
     fakes: { smtp: smtpFake(), sepay: sepayFake({ webhookPath: "/webhooks/sepay", webhookStyle: "intent" }) },
     apps: {

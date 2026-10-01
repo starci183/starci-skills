@@ -9,16 +9,15 @@ owners:
   - {role: module, path: be/src/modules/domain/catalog}
   - {role: module, path: be/src/modules/domain/payment}
   - {role: module, path: be/src/modules/integrations/identity-api}
+  - {role: module, path: be/src/modules/integrations/receipt-storage}
   - {role: feature, path: be/src/features/checkout}
 proves: [br.checkout.place-order, fr.checkout.place-order, sds.checkout.order-flow, contract.checkout.order-for-identity, contract.identity.internal.sessions, contract.identity.health]
 
 change:
-  rev: 1
+  rev: 2
   kind: clarifying
-  at: 2026-09-19T21:30:00.000Z
+  at: 2026-10-01T23:00:00.000Z
   reason: >-
-    v10-3, first recorded rev: proves now also names
-    contract.identity.internal.sessions and contract.identity.health - this module is the
-    consumer half of both wires (src/modules/integrations/identity/identity.client.ts calls
-    them from features/checkout/transport/graphql/session.guard.ts and
-    features/checkout/transport/http/health.controller.ts).
+    The order module archives each order's receipt in the stack's MinIO after the order commits, through the
+    receipt-storage integration this implementation now owns; fr.checkout.download-receipt (todo) describes the buyer's
+    download.

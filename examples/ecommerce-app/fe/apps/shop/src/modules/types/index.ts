@@ -8,6 +8,12 @@ export type OrderConfirmation = {
     readonly replayed: boolean
 }
 
+/** A time-limited download link of an order's receipt. */
+export type ReceiptLink = {
+    readonly url: string
+    readonly expiresAt: string
+}
+
 /**
  * There is deliberately no order-list type here: the backend's only order read surfaces are the
  * confirmation above and the `hasOrders` flag the identity `account` query joins. An account page

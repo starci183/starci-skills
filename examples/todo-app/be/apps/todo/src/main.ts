@@ -9,6 +9,7 @@ import { parseCommissionConfig } from "@modules/domain/commission"
 import { parsePlanConfig } from "@modules/domain/plan"
 import { parseRecurConfig } from "@modules/domain/recur"
 import { parseUploadConfig } from "@modules/domain/upload"
+import { parseCacheConfig } from "@modules/integrations/cache"
 import { parseKeycloakConfig } from "@modules/integrations/keycloak"
 import { parseNotifySmtpConfig } from "@modules/integrations/notify-smtp"
 import { parseSepayConfig } from "@modules/integrations/sepay"
@@ -24,6 +25,7 @@ async function bootstrap(): Promise<void> {
         port: env.int("PORT"),
         database: parsePrimaryDatabaseConfig(env),
         httpSecurity: parseHttpSecurityConfig(env),
+        cache: parseCacheConfig(env),
         identity: parseIdentityConfig(env),
         keycloak: parseKeycloakConfig(env),
         sepay: parseSepayConfig(env),

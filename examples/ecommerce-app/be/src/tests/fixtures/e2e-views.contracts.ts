@@ -56,6 +56,34 @@ export interface PlaceOrderData {
     placeOrder: PlacedOrderView
 }
 
+/** A download link of an order's receipt. */
+export interface OrderReceiptView {
+    /** The presigned download URL. */
+    url: string
+    /** When the link stops working, ISO 8601. */
+    expiresAt: string
+}
+
+/** The orderReceipt query data. */
+export interface OrderReceiptData {
+    /** The `orderReceipt` field. */
+    orderReceipt: OrderReceiptView
+}
+
+/** The receipt document a download link answers. */
+export interface ReceiptDocumentView {
+    /** The order. */
+    orderId: string
+    /** The buyer. */
+    personId: string
+    /** The bought lines. */
+    lines: Array<{ productId: string; quantity: number; unitPriceMinorUnits: number }>
+    /** The total in minor units. */
+    totalMinorUnits: number
+    /** The captured payment. */
+    paymentId: string
+}
+
 /** The outcome of clearCart. */
 export interface ClearedCartView {
     /** True when the cart was emptied. */

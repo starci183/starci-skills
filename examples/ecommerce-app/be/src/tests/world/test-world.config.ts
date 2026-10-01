@@ -1,8 +1,8 @@
 /**
  * The declaration of the ecommerce test world: selection and overrides only. The service list and the image versions come
  * from the stack definition (`.starcistacks/dev`); the library runs Postgres (one database per connection, seeded with the
- * dev seeds) and the Redis of the cache real behind toxiproxy, and boots the two real apps in process, each wired to the
- * other. The stack calls no third party, so the world declares no fake.
+ * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the two real apps
+ * in process, each wired to the other. The stack calls no third party, so the world declares no fake.
  */
 import { defineTestWorld } from "@starci/test-world"
 import type { IdentityWorld, TestApi } from "@starci/test-world"
@@ -12,7 +12,15 @@ import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
-import { IDENTITY_ENTITIES, ORDER_ENTITIES, identityOptions, orderOptions, platformBase } from "./test-apps.options"
+import {
+    IDENTITY_ENTITIES,
+    KEYCLOAK_ADMIN_CLIENT,
+    ORDER_ENTITIES,
+    RECEIPTS_BUCKET,
+    identityOptions,
+    orderOptions,
+    platformBase,
+} from "./test-apps.options"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 
 /** The identity app of a booted world, whose public doors register and sign persons in. */
@@ -37,6 +45,8 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
             ],
         },
         redis: {},
+        minio: { buckets: [RECEIPTS_BUCKET] },
+        keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_ADMIN_CLIENT },
     },
     apps: {
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },

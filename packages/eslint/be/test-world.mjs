@@ -142,14 +142,18 @@ const plainKey = (property) => {
     return property.key.type === "Identifier" && !property.computed ? property.key.name : null
 }
 
-/** The world an integration spec (`{ modules }`) or an e2e spec (`{ apps }`) asks for; every such spec asks for one; the retired name `useE2eWorld` exists nowhere. */
+/**
+ * The world an integration spec (`{ modules }`, with real peer apps beside them as `apps` when its client calls another app of
+ * ours) or an e2e spec (`{ apps }`, never `modules`) asks for; every such spec asks for one; the retired name `useE2eWorld`
+ * exists nowhere.
+ */
 export const testWorldShape = {
     meta: {
         type: "problem",
-        docs: { description: "An integration spec calls useTestWorld({ modules }); an e2e spec calls useTestWorld({ apps })." },
+        docs: { description: "An integration spec calls useTestWorld({ modules }) (peer apps may join as `apps`); an e2e spec calls useTestWorld({ apps })." },
         schema: [],
         messages: {
-            modules: "An integration spec tests one capability module on the real database with no HTTP: call `useTestWorld({ modules: [...] })`, not `apps`.",
+            modules: "An integration spec tests capability modules with no HTTP door of ours: call `useTestWorld({ modules: [...] })`; real peer apps its client calls may join beside them as `apps`, never instead of them.",
             apps: "An e2e spec boots applications: call `useTestWorld({ apps: {...} })`, not `modules`.",
             literal: "The options of `useTestWorld(...)` must be one object literal with plain keys: a variable, a spread or a computed key hides whether the spec asks for `modules` or `apps`.",
             missing: "This spec never calls `useTestWorld(...)`: integration and e2e specs run inside the one test world.",
@@ -179,7 +183,8 @@ export const testWorldShape = {
                     if (key === null) return context.report({ node: property, messageId: "literal" })
                     keys.push(key)
                 }
-                if (!keys.includes(wants) || keys.includes(wants === "modules" ? "apps" : "modules")) context.report({ node, messageId: wants })
+                const refused = wants === "modules" ? !keys.includes("modules") : !keys.includes("apps") || keys.includes("modules")
+                if (refused) context.report({ node, messageId: wants })
             },
             "Program:exit"(node) {
                 if (!seen) context.report({ node, loc: { line: 1, column: 0 }, messageId: "missing" })

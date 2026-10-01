@@ -14,6 +14,8 @@ export interface OrderRow {
     currency: string
     /** The replay key the confirmation carried, when it had one. */
     idempotencyKey: string | null
+    /** The object key of the archived receipt, when it is stored. */
+    receiptKey: string | null
     /** When the order was confirmed. */
     createdAt: Date
 }
@@ -26,6 +28,7 @@ export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     totalMinorUnits: 1250,
     currency: "USD",
     idempotencyKey: null,
+    receiptKey: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
 })

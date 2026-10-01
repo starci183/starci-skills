@@ -3,6 +3,7 @@ import type { PlanOptions } from "@modules/domain/plan"
 import type { RecurOptions } from "@modules/domain/recur"
 import type { IdentityOptions } from "@modules/domain/identity"
 import type { UploadOptions } from "@modules/domain/upload"
+import type { CacheOptions } from "@modules/integrations/cache"
 import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { NotifySmtpOptions } from "@modules/integrations/notify-smtp"
 import type { SepayOptions } from "@modules/integrations/sepay"
@@ -18,6 +19,8 @@ export interface TodoAppOptions {
     readonly database: DatabaseConnectionConfig
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: HttpSecurityOptions
+    /** The Redis the rate limiter counts in, shared by every replica. */
+    readonly cache: CacheOptions
     /** Session lifetime and the administrator roster. */
     readonly identity: IdentityOptions
     /** The identity provider. */

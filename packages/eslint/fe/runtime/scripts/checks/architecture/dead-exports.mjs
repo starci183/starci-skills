@@ -18,8 +18,12 @@
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with one exception (unit test
  * standard): a `<name>.service.spec.ts` (the only unit spec kind) and a `*.builder.ts` under src/tests/fixtures/builders read from
- * disk count as consumers, because a spec can only provide an Inject*() token or a param type the entry exports. Specs of any
- * other kind, e2e specs and world files still do not count. A consumer inside the owner is skipped like any inside consumer.
+ * disk count as consumers, because a spec can only provide an Inject*() token or a param type the entry exports. An integration
+ * spec (slot be.tests.integration, `src/tests/integration/<capability>/*.integration-spec.ts`) counts as a consumer of exactly one
+ * owner: the integration (slot be.integrations, `src/modules/integrations/<provider>/`) whose provider folder is its capability
+ * folder, because R112 makes that spec register the integration module and reference its ErrorCode enum. Specs of any other kind,
+ * an integration spec importing another owner, e2e specs and world files still do not count. A consumer inside the owner is
+ * skipped like any inside consumer.
  */
 import fs from 'node:fs';
 import { canonical } from './config.mjs';
@@ -168,13 +172,35 @@ function deadFiles(graph, config) {
 }
 
 const TEST_CONSUMER = /^(?:(?:src|apps)\/.+\.service\.spec\.ts|src\/tests\/fixtures\/builders\/.+\.builder\.ts)$/u;
+/** The slot of integration specs and the slot of the integrations they pair with by folder (knowledge/hfs/slots.yaml). */
+const INTEGRATION_SPEC_SLOT = 'be.tests.integration';
+const INTEGRATION_SLOT = 'be.integrations';
 
-/** Pseudo edges from the unit specs of services and the fixture builders (read from disk, outside the production program) to graph files. */
+/** The provider an integration spec pairs with (its `<capability>` folder), or null when `rel` is no integration spec. */
+function integrationSpecProvider(graph, rel) {
+  const classified = graph.resolver.classifyPath(rel);
+  return classified.slot === INTEGRATION_SPEC_SLOT && classified.status !== 'forbidden' ? classified.bindings?.capability ?? null : null;
+}
+
+/** Whether `to` belongs to the integration of `provider` (slot be.integrations, its `<provider>` binding). */
+function inIntegrationOf(graph, to, provider) {
+  const owner = graph.resolver.ownerOf(to);
+  return owner?.slot === INTEGRATION_SLOT && owner.bindings?.provider === provider;
+}
+
+/**
+ * Pseudo edges (read from disk, outside the production program) to graph files: from the unit specs of services and the fixture
+ * builders to anything, and from an integration spec only to the integration of its own provider folder.
+ */
 function testConsumerEdges({ context, graph, config }) {
   const { ts } = context;
   const options = context.projects?.[0]?.options ?? {};
   const edges = [];
-  for (const rel of [...treeOf(config.root).files].filter(file => TEST_CONSUMER.test(file)).sort()) {
+  const consumers = [...treeOf(config.root).files]
+    .map(file => ({ file, provider: TEST_CONSUMER.test(file) ? null : integrationSpecProvider(graph, file) }))
+    .filter(({ file, provider }) => provider !== null || TEST_CONSUMER.test(file))
+    .sort((a, b) => a.file.localeCompare(b.file));
+  for (const { file: rel, provider } of consumers) {
     const abs = path.join(config.root, ...rel.split('/'));
     let text;
     try { text = fs.readFileSync(abs, 'utf8'); } catch { continue; }
@@ -183,7 +209,7 @@ function testConsumerEdges({ context, graph, config }) {
       if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
       const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, abs, options, ts.sys).resolvedModule?.resolvedFileName;
       const to = resolved ? graph.abs(canonical(resolved)) : null;
-      if (to) edges.push({ from: rel, to, edge: { declaration: statement }, reexport: false });
+      if (to && (provider === null || inIntegrationOf(graph, to, provider))) edges.push({ from: rel, to, edge: { declaration: statement }, reexport: false });
     }
   }
   return edges;
@@ -254,7 +280,7 @@ export function checkDeadExports({ context, graph, config }) {
         ruleId: 'HFS_UNUSED_EXPORT',
         path: entry, line, column: 1,
         name, owner: owner.root, slot: owner.slot,
-        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a service unit spec or a fixture builder counts besides production files).`,
+        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a service unit spec, a fixture builder, or an integration spec of this integration's own provider folder counts besides production files).`,
       });
     }
   }

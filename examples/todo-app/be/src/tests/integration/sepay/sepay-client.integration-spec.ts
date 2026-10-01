@@ -1,13 +1,11 @@
 import { randomUUID } from "node:crypto"
-import { SEPAY } from "@modules/integrations/sepay"
+import { SEPAY, SepayErrorCode } from "@modules/integrations/sepay"
 import type { SepayClient } from "@modules/integrations/sepay"
 import { useTestWorld } from "@tests/world/use-test-world"
 import { SEPAY_CAPABILITY_MODULES } from "@tests/world/test-capabilities.options"
 
 const UNAUTHORIZED = 401
 const AMOUNT = 99_000
-/** The code the payment gateway client refuses a call with (`SepayErrorCode.RequestFailed`, internal to the integration). */
-const REQUEST_FAILED = "SEPAY_REQUEST_FAILED"
 
 /**
  * sepay: the real payment gateway client against the SePay fake at the network edge, no HTTP door of ours. An intent created
@@ -19,7 +17,7 @@ const REQUEST_FAILED = "SEPAY_REQUEST_FAILED"
 describe("sepay: payment gateway client (integration)", () => {
     const world = useTestWorld({ modules: SEPAY_CAPABILITY_MODULES })
 
-    const client = (): SepayClient => world.context.get<SepayClient>(SEPAY, { strict: false })
+    const client = (): SepayClient => world.resolve<SepayClient>(SEPAY)
 
     it("creates an intent the gateway records and reads its pending status back", async () => {
         const subscriptionId = randomUUID()
@@ -42,11 +40,11 @@ describe("sepay: payment gateway client (integration)", () => {
         await expect(
             client().createIntent({ subscriptionId: randomUUID(), amount: AMOUNT, currency: "VND" }),
         ).rejects.toMatchObject({
-            code: REQUEST_FAILED,
+            code: SepayErrorCode.RequestFailed,
             params: { operation: "create-intent", reason: `http-${UNAUTHORIZED}`, status: UNAUTHORIZED },
         })
         await expect(client().getTransaction(`missing-${randomUUID()}`)).rejects.toMatchObject({
-            code: REQUEST_FAILED,
+            code: SepayErrorCode.RequestFailed,
             params: { operation: "get-transaction", reason: "http-404" },
         })
     })
@@ -57,7 +55,7 @@ describe("sepay: payment gateway client (integration)", () => {
         await expect(
             client().createIntent({ subscriptionId: randomUUID(), amount: AMOUNT, currency: "VND" }),
         ).rejects.toMatchObject({
-            code: REQUEST_FAILED,
+            code: SepayErrorCode.RequestFailed,
             params: { operation: "create-intent", reason: "timeout" },
         })
 

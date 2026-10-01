@@ -70,7 +70,13 @@
       "confirmed": {
         "title": "Đơn đã xác nhận",
         "detail": "Đơn {orderId} — {status} — {total}. Thanh toán {paymentId}.",
-        "replayedNote": "Xác nhận này đã được gửi — order service trả lại cùng một đơn thay vì ghi đơn thứ hai."
+        "replayedNote": "Xác nhận này đã được gửi — order service trả lại cùng một đơn thay vì ghi đơn thứ hai.",
+        "receipt": {
+          "cta": "Tải hóa đơn",
+          "pending": "Đang chuẩn bị hóa đơn…",
+          "notReady": "Hóa đơn chưa sẵn sàng — hãy thử lại sau giây lát.",
+          "refused": "Không thể tải hóa đơn này với phiên hiện tại. Hãy đăng nhập lại rồi thử lại."
+        }
       },
       "refused": {
         "cartEmpty": "Order service đã từ chối: giỏ hàng trống. Không có đơn nào được đặt và không có gì thay đổi.",

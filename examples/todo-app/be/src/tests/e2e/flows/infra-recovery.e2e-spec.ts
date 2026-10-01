@@ -1,6 +1,6 @@
 import { PUBLIC_TABLES } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { TableRow } from "@tests/fixtures/persistence/e2e-verification.rows"
-import type { ExportMyDataData } from "@tests/fixtures/views/e2e-views.contracts"
+import type { ExportMyDataData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
 
 /**
@@ -9,7 +9,8 @@ import { useTestWorld } from "@tests/world/use-test-world"
  * spec asserts the api stays alive and answers /health with a clean 503 instead of hanging or crashing, the world lets the
  * database accept connections again (same data), and the spec asserts the api recovers to 200, the persisted world is
  * intact, and the worker recovered too: a sign-in made after the outage gets its
- * audit line appended through the outbox and the worker consumer.
+ * audit line appended through the outbox and the worker consumer. A Redis outage (the rate limiter's shared counter) never
+ * takes the api down: the limiter counts in process meanwhile and every door keeps serving.
  */
 describe("resilience: infra recovery", () => {
     const world = useTestWorld({
@@ -55,5 +56,17 @@ describe("resilience: infra recovery", () => {
             (lines) => lines.some((line) => line.action === "login.signed-in"),
             { timeoutMs: 120_000, intervalMs: 1_000 },
         )
+    })
+
+    it("a Redis outage leaves the api serving: the rate limiter counts in process until Redis is back", async () => {
+        const person = await world.signedInPerson("redis-outage")
+
+        await world.infra.redis.during(async () => {
+            const listed = await person.caller.graphql<TasksData>("tasks")
+            expect(listed.errors).toBeNull()
+        })
+
+        const after = await person.caller.graphql<TasksData>("tasks")
+        expect(after.errors).toBeNull()
     })
 })

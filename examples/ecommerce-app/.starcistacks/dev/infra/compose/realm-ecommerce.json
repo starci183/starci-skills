@@ -1,0 +1,38 @@
+{
+  "realm": "ecommerce",
+  "enabled": true,
+  "eventsEnabled": true,
+  "eventsExpiration": 86400,
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR"
+  ],
+  "clients": [
+    {
+      "clientId": "identity-admin",
+      "name": "identity api (member profiles)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KEYCLOAK_ADMIN_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-identity-admin",
+      "enabled": true,
+      "serviceAccountClientId": "identity-admin",
+      "clientRoles": {
+        "realm-management": [
+          "view-users"
+        ]
+      }
+    }
+  ]
+}

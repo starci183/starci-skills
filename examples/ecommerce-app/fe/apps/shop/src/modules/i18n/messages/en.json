@@ -70,7 +70,13 @@
       "confirmed": {
         "title": "Order confirmed",
         "detail": "Order {orderId} is {status} — {total}. Payment {paymentId}.",
-        "replayedNote": "This confirmation was already sent — the order service returned the same order instead of writing a second one."
+        "replayedNote": "This confirmation was already sent — the order service returned the same order instead of writing a second one.",
+        "receipt": {
+          "cta": "Download receipt",
+          "pending": "Preparing your receipt…",
+          "notReady": "Your receipt is not ready yet — try again in a moment.",
+          "refused": "This receipt cannot be downloaded with your session. Sign in on your account, then try again."
+        }
       },
       "refused": {
         "cartEmpty": "The order service refused: your cart is empty. Nothing was placed and nothing changed.",

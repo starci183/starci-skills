@@ -9,5 +9,6 @@ services:
     depends_on:
       - postgres
       - redis
+      - keycloak
     ports:
       - "5070:5070"

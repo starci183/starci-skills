@@ -1210,6 +1210,9 @@ records:
     state: done
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
+    usedBy:
+      refs:
+        - integration.upload.minio
   fr.upload.manage:
     schema: work/functional-requirement@1
     feature: upload
@@ -1642,6 +1645,8 @@ records:
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
     usedBy:
+      refs:
+        - integration.observability.redis
       dependsOn:
         - sds.login.session-store
   integration.login.postgres:
@@ -1683,6 +1688,11 @@ records:
           scripts/live-proof-notify.mjs's dispatch attempt against the configured host fails
           transiently for exactly that reason. No fake run counts as this integration's proof - a
           run against a fake would only prove it against the fake, per the common brief's own rule.
+  integration.observability.redis:
+    schema: work/integration@1
+    feature: observability
+    state: todo
+    effectiveState: todo
   integration.plan.sepay:
     schema: work/integration@1
     feature: plan
@@ -1727,6 +1737,11 @@ records:
       dependsOn:
         - sds.recur.generation-engine
         - sds.recur.occurrence-lifecycle
+  integration.upload.minio:
+    schema: work/integration@1
+    feature: upload
+    state: todo
+    effectiveState: todo
   journey.audit.right-to-be-forgotten:
     schema: work/customer-journey@1
     feature: audit
@@ -2208,10 +2223,10 @@ records:
 tally:
   overall:
     done: 53
-    todo: 27
+    todo: 29
     stale: 121
     blocked: 27
-    total: 228
+    total: 230
   byFeature:
     audit:
       done: 5
@@ -2233,10 +2248,10 @@ tally:
       total: 33
     observability:
       done: 0
-      todo: 0
+      todo: 1
       stale: 5
       blocked: 0
-      total: 5
+      total: 6
     plan:
       done: 8
       todo: 3
@@ -2263,10 +2278,10 @@ tally:
       total: 38
     upload:
       done: 1
-      todo: 0
+      todo: 1
       stale: 8
       blocked: 0
-      total: 9
+      total: 10
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
@@ -2519,6 +2534,9 @@ frontier:
   - id: nfr.notify.delivery.latency
     feature: notify
     title: A digested message goes out promptly after its window closes
+  - id: integration.observability.redis
+    feature: observability
+    title: Redis holds the rate limiter's shared counters
   - id: gap.plan.live-proof
     feature: plan
     title: uat.plan.upgrade-after-cap's gateway leg and the create-refusal feedback surface are unproven
@@ -2562,6 +2580,9 @@ frontier:
   - id: journey.task.first-task
     feature: task
     title: A new person captures their first task
+  - id: integration.upload.minio
+    feature: upload
+    title: MinIO holds the bytes of the uploads
 unclassifiedEdges:
   - from: contract.audit.emitted-events
     field: surface.name

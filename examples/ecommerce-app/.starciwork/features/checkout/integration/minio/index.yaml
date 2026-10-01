@@ -1,0 +1,23 @@
+schema: work/integration@1
+id: integration.checkout.minio
+title: MinIO archives the receipts of placed orders
+state: todo
+provider: minio
+boundary: The receipts bucket is private and belongs to the order service alone; a buyer reads a receipt only through a
+  presigned link that expires, and the order never waits on the archive.
+endpoints:
+  - {name: receipts, method: PUT, path: http://localhost:9069/receipts/receipts/<order id>.json}
+credential:
+  name: RECEIPTS_S3_SECRET_ACCESS_KEY
+  providedBy: owner
+  custody: identity:receipts-s3-secret-access-key
+  # sealed in .starcistacks/dev/secrets/minio-env.enc (DEMO-ONLY recipient)
+sandbox: The dev environment runs MinIO (the Chainguard build, pinned by digest) in Compose on 9069.
+refs: [fr.checkout.download-receipt]
+
+requiresProof:
+  live:
+    required: true
+    note: A receipt stored and downloaded through its presigned link against the real server, not against a fake.
+
+change: {rev: 1, kind: initial, at: 2026-10-01T23:00:00.000Z}

@@ -62,7 +62,7 @@ test("R47: nothing under src/tests overrides a provider", () => {
     })
 })
 
-test("R47: integration asks for { modules }, e2e for { apps }; useE2eWorld does not exist", () => {
+test("R47: integration asks for { modules } (peer apps may join as apps), e2e for { apps }; useE2eWorld does not exist", () => {
     const world = "declare function useTestWorld(options: object): object\n"
     tester.run("test-world-shape", testWorldShape, {
         valid: [
@@ -71,6 +71,8 @@ test("R47: integration asks for { modules }, e2e for { apps }; useE2eWorld does 
             { filename: INTEGRATION, code: `${world}const modules = []
 export const world = useTestWorld({ modules })` },
             { filename: E2E, code: `${world}export const world = useTestWorld({ "apps": { order: {} } })` },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ modules: [], apps: ["order"] })` },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ modules: [], ["apps"]: ["order"] })` },
         ],
         invalid: [
             { filename: INTEGRATION, code: `${world}const spec = { modules: [] }
@@ -79,7 +81,6 @@ export const world = useTestWorld(spec)`, errors: [{ messageId: "literal" }] },
 export const world = useTestWorld({ modules: [], ...extra })`, errors: [{ messageId: "literal" }] },
             { filename: INTEGRATION, code: `${world}declare const apps: string
 export const world = useTestWorld({ modules: [], [apps]: {} })`, errors: [{ messageId: "literal" }] },
-            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ modules: [], ["apps"]: {} })`, errors: [{ messageId: "modules" }] },
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld({})`, errors: [{ messageId: "modules" }] },
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld()`, errors: [{ messageId: "literal" }] },
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ apps: {} })

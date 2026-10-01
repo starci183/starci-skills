@@ -1,0 +1,14 @@
+services:
+  minio:
+    # Resolved shared-port arithmetic: 9000 + offset 69 = 9069 (metadata.json is the projection).
+    # MinIO no longer publishes a community image on Docker Hub; the Chainguard public build is the source,
+    # pinned by the digest its latest tag had on 2026-10-01.
+    image: cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ecommerce
+    # MINIO_ROOT_PASSWORD comes from the decrypted secrets/minio-env.enc.
+    env_file:
+      - ../../runtime/env/minio.env
+    ports:
+      - "9069:9000"

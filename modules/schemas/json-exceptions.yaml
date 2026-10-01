@@ -40,6 +40,10 @@ exceptions:
   - path: examples/ecommerce-app/.starcistacks/dev/environment.json
     reason: >
       starci/rendered-environment output for the ecommerce-app application stack (be side); JSON by the rendering contract.
+  - path: examples/ecommerce-app/.starcistacks/dev/infra/compose/realm-ecommerce.json
+    reason: >
+      Keycloak realm import for the dev Compose stack of the ecommerce-app back end; the
+      Keycloak container's realm-import feature requires a JSON realm file.
   - path: examples/ecommerce-app/.starcistacks/dev/infra/metadata.json
     reason: >
       Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.

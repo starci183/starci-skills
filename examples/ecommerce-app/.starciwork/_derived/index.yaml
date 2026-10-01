@@ -28,6 +28,7 @@ records:
         - sds.checkout.order-flow
         - ui.checkout.stock-refused
       composes:
+        - fr.checkout.download-receipt
         - fr.checkout.place-order
   br.identity.account:
     schema: work/business-rule@1
@@ -118,6 +119,14 @@ records:
     feature: checkout
     state: todo
     effectiveState: todo
+  fr.checkout.download-receipt:
+    schema: work/functional-requirement@1
+    feature: checkout
+    state: todo
+    effectiveState: todo
+    usedBy:
+      refs:
+        - integration.checkout.minio
   fr.checkout.place-order:
     schema: work/functional-requirement@1
     feature: checkout
@@ -140,6 +149,7 @@ records:
     usedBy:
       refs:
         - contract.checkout.order-for-identity
+        - integration.identity.keycloak
   fr.identity.sign-in:
     schema: work/functional-requirement@1
     feature: identity
@@ -193,6 +203,11 @@ records:
     usedBy:
       refs:
         - decision.checkout.ops-doors
+  integration.checkout.minio:
+    schema: work/integration@1
+    feature: checkout
+    state: todo
+    effectiveState: todo
   integration.checkout.postgres:
     schema: work/integration@1
     feature: checkout
@@ -204,6 +219,11 @@ records:
   integration.checkout.redis:
     schema: work/integration@1
     feature: checkout
+    state: todo
+    effectiveState: todo
+  integration.identity.keycloak:
+    schema: work/integration@1
+    feature: identity
     state: todo
     effectiveState: todo
   sds.checkout.order-flow:
@@ -266,23 +286,23 @@ records:
 tally:
   overall:
     done: 3
-    todo: 9
+    todo: 12
     stale: 17
     blocked: 0
-    total: 29
+    total: 32
   byFeature:
     checkout:
       done: 2
-      todo: 7
+      todo: 9
       stale: 10
       blocked: 0
-      total: 19
+      total: 21
     identity:
       done: 1
-      todo: 2
+      todo: 3
       stale: 7
       blocked: 0
-      total: 10
+      total: 11
   gaps:
     - id: gap.checkout.live-proof
       feature: checkout
@@ -315,9 +335,15 @@ frontier:
   - id: fr.checkout.cart.list
     feature: checkout
     title: Read the cart
+  - id: fr.checkout.download-receipt
+    feature: checkout
+    title: Download the receipt of an order
   - id: gap.checkout.second-example-gates
     feature: checkout
     title: No CI job or host port-registry entry exists for this second example yet
+  - id: integration.checkout.minio
+    feature: checkout
+    title: MinIO archives the receipts of placed orders
   - id: integration.checkout.postgres
     feature: checkout
     title: PostgreSQL holds the catalog, cart, order and payment rows
@@ -339,6 +365,9 @@ frontier:
   - id: fr.identity.account
     feature: identity
     title: Read an account
+  - id: integration.identity.keycloak
+    feature: identity
+    title: Keycloak is the member directory the identity service reads profiles from
   - id: ui.identity.sign-in
     feature: identity
     title: Account sign-in direction

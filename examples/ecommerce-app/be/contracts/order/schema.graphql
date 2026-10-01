@@ -32,6 +32,15 @@ type Mutation {
   placeOrder(input: PlaceOrderInput!): PlaceOrderType!
 }
 
+input OrderReceiptInput {
+  orderId: ID!
+}
+
+type OrderReceiptType {
+  expiresAt: String!
+  url: String!
+}
+
 input PlaceOrderInput {
   idempotencyKey: String
 }
@@ -55,4 +64,5 @@ type ProductType {
 type Query {
   buyerStatus: BuyerStatusType!
   cart: CartType!
+  orderReceipt(input: OrderReceiptInput!): OrderReceiptType!
 }

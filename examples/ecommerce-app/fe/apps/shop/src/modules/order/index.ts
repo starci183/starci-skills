@@ -1,5 +1,5 @@
 import { isRecord } from "@ecommerce/api"
-import type { OrderConfirmation } from "../types"
+import type { OrderConfirmation, ReceiptLink } from "../types"
 
 /**
  * The confirmation of a `placeOrder` payload - as the order service answers it and as the shop's own
@@ -21,4 +21,10 @@ export const toOrderConfirmation = (data: unknown): OrderConfirmation | null =>
               paymentId: data.paymentId,
               replayed: data.replayed,
           }
+        : null
+
+/** The receipt link of an `orderReceipt` payload - as the order service answers it and as the shop's own receipt door forwards it - or `null`. */
+export const toReceiptLink = (data: unknown): ReceiptLink | null =>
+    isRecord(data) && typeof data.url === "string" && typeof data.expiresAt === "string"
+        ? { url: data.url, expiresAt: data.expiresAt }
         : null
