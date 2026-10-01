@@ -8486,6 +8486,16 @@ orca-worktree-create-failed:
   nextStep_vi: "Không có cây nào được tạo. Mở Orca, kiểm tra repo đã có trong Orca (scripts/api/orca/repo-add.mjs) rồi khởi động lại workflow."
   owner: runtime-core
   kind: runtime-fault
+staging-install-failed:
+  title: "npm ci failed in the [Worker] staging checkout"
+  title_vi: "npm ci thất bại trong cây staging của [Worker]"
+  meaning_vi: "Orca đã tạo cây staging cho job [Worker] nhưng npm ci (cài đặt thật, không dùng junction) trong cây đó thất bại. Cây staging đã được gỡ lại qua Orca."
+  causes_vi:
+    - "Mạng hoặc npm cache không dùng được"
+    - "package-lock.json của runtime không khớp package.json"
+  nextStep_vi: "Không có cây staging nào được giữ lại. Kiểm tra npm ci chạy được ở checkout chính của runtime rồi chạy lại job."
+  owner: runtime-core
+  kind: runtime-fault
 orca-worktree-rm-failed:
   title: "Orca did not remove the worktree"
   title_vi: "Orca không gỡ được cây làm việc"

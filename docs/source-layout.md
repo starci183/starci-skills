@@ -130,7 +130,7 @@ workflow is `workflow_dispatch` only (`knowledge/patterns/be/test.yaml` BE-TEST-
 └── <environment>/                   # dev/, vps/, ...
     ├── README.md, environment.json
     ├── infra/{compose,k8s,terraform}/
-    ├── runtime/{config,env}/        # runtime/env/KEYS.md lists slug names only
+    ├── runtime/{config,env}/        # its KEYS.md lists slug names only
     ├── secrets/<slug>.enc           # the one sealed-secret location (sops)
     └── seeds/
 ```
