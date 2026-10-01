@@ -9,7 +9,7 @@
 // no_active_sender_terminal. The reconciler has no ORCA_TERMINAL_HANDLE, and the runtime never creates a terminal
 // itself (scripts/checks/check-host-boundary.mjs), so `entryTerminalOf` names one that already exists.
 import path from 'node:path';
-import { SKILL_ROOT } from './home.mjs';
+import { SKILL_ROOT } from '../machine/home.mjs';
 
 /** Every terminal handle sup_events records as a seat session: Set<string>. */
 export function recordedSeatTerminals(m, { limit = 500 } = {}) {
