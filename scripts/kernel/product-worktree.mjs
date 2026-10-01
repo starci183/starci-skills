@@ -7,11 +7,11 @@
 // and 26 importers of the old `@/i18n` path broke where nobody owned them.
 //
 // Layout (scripts/lib/worktree-exclude.mjs; <wf>, <op> are 8-char short ids, branch descriptions hold the full ids):
-//   <repo>/.starciwork/worktrees/<wf>/_wf    WORKFLOW worktree, branch wf/<wf>, following the product's main; dev servers,
-//                                            UAT and drawing run HERE on the port portOf(path) allocates, and the workflow's
-//                                            serial deps unit installs here.
-//   <repo>/.starciwork/worktrees/<wf>/<op>   OP worktree, branch op/<op>, off main's tip at dispatch (a sibling of _wf,
-//                                            never inside it). The op edits, checks and commits only here.
+//   <repo>/.starciwork/worktrees/<wf>/_wf    WORKFLOW integration worktree, branch wf/<wf>, off the product's main at the
+//                                            workflow's first isolated job; dev servers, UAT and drawing run HERE on the
+//                                            port portOf(path) allocates.
+//   <repo>/.starciwork/worktrees/<wf>/<op>   OP worktree, branch op/<op>, off the CURRENT wf/<wf> tip at dispatch (a sibling
+//                                            of _wf, never inside it). The op edits, checks and commits only here.
 // The directory is git-excluded (.git/info/exclude) and core.longpaths is on for the product repo.
 //
 // node_modules: a plain junction to the root's node_modules is WRONG for a monorepo - node_modules/@nivo/ui links to the
@@ -21,20 +21,21 @@
 // worktree's OWN copy. Hundreds of junctions, no copy, no install. Rebuilt when a root lockfile changes (marker hash).
 // Removal unlinks every junction first and never recursive-deletes through one (safe-remove.mjs; nivo-fe inc-c8fbf76aa499).
 //
-// Lifecycle (owner 2026-10-01; job state machine: reported -> settled -> released -> worktree-removed):
-//   dispatch        ensureOpWorktree (creates/reuses; a continuation of a job whose work was preserved starts from
-//                   preserved/<op>); payload.productWorktree records {repoRoot, workflow:{..}, op:{..}, baseSha}
-//   settle pass     landOp under the per-repository main lock: the merge guard, then op/<op> rebased onto main when
-//                   main moved (merge-tree chain; conflict -> refusal with files+hunks), THE GATE (scripts/checks/gate.mjs)
-//                   on the op worktree against main, the op's re-runnable checks and the import check - all before main
-//                   moves - then main fast-forwarded (compare-and-swap + the live checkout's changed paths), pushed, and
-//                   wf/<wf> fast-forwarded to it. A refusal leaves main untouched.
+// Lifecycle (job state machine: reported -> settled -> released -> worktree-removed):
+//   dispatch        ensureOpWorktree (creates/reuses; a continuation of a job whose unlanded commits were archived
+//                   starts from them); payload.productWorktree records {repoRoot, workflow:{..}, op:{..}, baseSha}
+//   settle pass     integrateOp under the per-workflow lock: the land gate first - scripts/checks/gate.mjs on the op
+//                   worktree against its merge-base with wf/<wf>, the same gate the op forced every round (exit 1
+//                   land-gate-red, 2 land-gate-unavailable; wf/<wf> untouched) - then rebase op/<op> onto the latest wf/<wf> (merge-tree chain,
+//                   conflict -> refusal with files+hunks), fast-forward wf/<wf>, post-merge verify ON the workflow branch
+//                   (the op's re-runnable declared checks, paths moved to _wf, + an import check of its changed files);
+//                   red -> wf/<wf> rolled back, refusal product-integrate-red carrying a continuation (not a failure)
 //   released        removeOpWorktree right after the worker is released (api settle spawns `reap`; the settler's
-//                   productWorktreeDuty is the backstop): evidence salvaged and asserted, work that did not land kept on
-//                   preserved/<op> (commits plus uncommitted changes), junctions unlinked, tree removed, `git worktree
-//                   prune`, removal verified, op/<op> deleted. SLA: <= opRemoveSlaMs (1 min) after settle.
-//   workflow end    removeWorkflowWorktree once the workflow is finished/archived (an unlanded wf/<wf> is kept on
-//                   preserved/wf-<wf> first).
+//                   productWorktreeDuty is the backstop): evidence salvaged and asserted, junctions unlinked, tree removed,
+//                   `git worktree prune`, removal verified; branch deleted, or archived (refs/starci/archive/op/<op>) when
+//                   it holds commits the workflow branch lacks. SLA: <= opRemoveSlaMs (1 min) after settle.
+//   workflow end    removeWorkflowWorktree once the workflow is finished/archived AND wf/<wf> landed in main (or the Kernel
+//                   recorded it abandoned). Landing wf/<wf> -> main is scripts/kernel/product-land.mjs (per-repo serial).
 //   leftovers       sweepLeftovers removes what the above missed and logs each one as a bug (product-worktree-leftover).
 //
 //   node scripts/kernel/product-worktree.mjs reap --repo <ledger repo> [--job <id>] [--json]   the duty for one ledger/job
@@ -42,7 +43,6 @@
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { runGit } from '../lib/git.mjs';
@@ -53,8 +53,6 @@ import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { WORKTREES_REL, WORKFLOW_DIR_NAME, WORKTREES_EXCLUDE_LINE, isWorktreesPath } from '../lib/worktree-exclude.mjs';
 import { brokenImports } from './import-scan.mjs';
-import { mergeGuard } from '../checks/gate.mjs';
-import { fastForwardLive } from '../supervisor/land.mjs';
 import { checkVerdictOf } from '../reconcile/check-verdict.mjs';
 import { launchFor } from '../uat/launch.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -65,7 +63,7 @@ export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 export const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
 export const EVENTS = Object.freeze({
   created: 'product-worktree-created',
-  landed: 'product-op-landed',
+  integrated: 'product-integrated',
   integrateRefused: 'product-integrate-refused',
   removed: 'job-worktree-removed',
   removeFailed: 'job-worktree-remove-failed',
@@ -80,19 +78,18 @@ const OVERLAY_MARKER = '.starci-overlay.json';
 /** Written into a workflow worktree's node_modules by its deps unit: a real install, the overlay source of its ops. */
 const INSTALL_MARKER = '.starci-install.json';
 export const installedIn = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'node_modules', INSTALL_MARKER), 'utf8')); } catch { return null; } };
-/** Where a failed op's work is kept (owner 2026-10-01): branch preserved/<op>, the workflow's unlanded branch preserved/wf-<wf>. */
-const PRESERVED_PREFIX = 'refs/heads/preserved';
+const ARCHIVE_PREFIX = 'refs/starci/archive';
 
 /* ------------------------------------------------------------ settings */
 
 const DEFAULTS = Object.freeze({
   defaultIsolation: 'shared',
-  worktrees: { shortIdLength: 8, opRemoveSlaMs: 60_000, commandMs: 300_000,
+  worktrees: { shortIdLength: 8, opRemoveSlaMs: 60_000, archiveTtlMs: 7 * 86_400_000, commandMs: 300_000,
     overlay: { lockfiles: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json'], maxDepth: 3 },
     ports: { base: 43100, span: 800 } },
   integrate: { lockWaitMs: 600_000, gateTimeoutMs: 1_800_000, recheck: 'declared', recheckTimeoutMs: 300_000, importCheck: 'changed-files',
     depsFiles: ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', 'pnpm-workspace.yaml'] },
-  land: { lockWaitMs: 1_800_000, checks: [], push: true, remote: 'origin', maxMainRetries: 3 },
+  land: { lockWaitMs: 1_800_000, checks: [], importScan: true, push: false, syncWorkflowAfterLand: true, maxMainRetries: 3 },
   invariant: { importsCacheMs: 300_000 },
   deps: { installTimeoutMs: 1_200_000,
     install: { 'package-lock.json': ['npm', 'ci'], 'pnpm-lock.yaml': ['pnpm', 'install', '--frozen-lockfile'], 'yarn.lock': ['yarn', 'install', '--frozen-lockfile'] } },
@@ -415,31 +412,14 @@ export function ensureWorkflowWorktree({ repoRoot, workflowId, base = 'main', se
 }
 const summarizeOverlay = (o) => ({ fresh: Boolean(o.fresh), links: o.links ?? null, dirs: o.dirs ?? null, workspace: (o.workspace ?? []).length || null, errors: (o.errors ?? []).slice(0, 5) });
 
-/** The preserved branch of `jobId` (preserved/<op>: the work of a failed op a continuation reuses), or null. */
-export function preservedOpRef(repoRoot, jobId, settings = productSettings()) {
+/** An archived op branch of `jobId` (a partial commit a continuation reuses), or null. */
+export function archivedOpRef(repoRoot, jobId, settings = productSettings()) {
   for (const short of [...new Set([shortIdOf(jobId, settings.worktrees.shortIdLength), hashIdOf(jobId, settings.worktrees.shortIdLength)])]) {
-    const ref = `${PRESERVED_PREFIX}/${short}`;
+    const ref = `${ARCHIVE_PREFIX}/op/${short}`;
     const sha = revParse(repoRoot, ref);
-    if (sha) return { ref, branch: ref.replace(/^refs\/heads\//, ''), sha };
+    if (sha) return { ref, sha };
   }
   return null;
-}
-
-/**
- * One commit holding everything a worktree has: `head` plus every tracked and untracked (not ignored) change, written through
- * a temporary index, so the worktree's own index and files are untouched; `head` itself when nothing is dirty. node_modules
- * (the junction overlay) and the worktrees container are never staged. The commit sha, or null when git refused.
- */
-export function snapshotCommit(worktree, head, message) {
-  if (!git(worktree, ['status', '--porcelain', '--untracked-files=all']).stdout) return head;
-  const index = path.join(os.tmpdir(), `starci-preserve-${process.pid}-${Date.now()}.index`);
-  const env = { GIT_INDEX_FILE: index };
-  try {
-    if (!git(worktree, ['read-tree', head], { env }).ok) return null;
-    if (!git(worktree, ['add', '-A', '--', '.', ':(exclude,glob)**/node_modules/**', `:(exclude)${WORKTREES_REL}`], { env }).ok) return null;
-    const tree = git(worktree, ['write-tree'], { env }).stdout;
-    return (tree && git(worktree, ['commit-tree', tree, '-p', head], { input: message }).stdout) || null;
-  } finally { try { fs.rmSync(index, { force: true }); } catch { /* temp */ } }
 }
 
 /**
@@ -473,9 +453,9 @@ export function syncWorkflowFromMain({ repoRoot, wf, main = 'main' }) {
 const conflictFilesOf = (stdout) => [...new Set(String(stdout).split(/\r?\n\r?\n/)[0].split(/\r?\n/).slice(1).map((l) => l.split('\t')[1]).filter(Boolean))].slice(0, 20);
 
 /**
- * The op's own worktree off main's CURRENT tip (reused when it exists: a requeued attempt of the same job
- * keeps its tree). A continuation (`handFrom`: the job ids it continues) whose predecessor left its work on preserved/<op>
- * starts from it and consumes that branch. Returns {ok, record} - record is what payload.productWorktree keeps.
+ * The op's own worktree off the CURRENT workflow branch (reused when it exists: a requeued attempt of the same job
+ * keeps its tree). A continuation (`handFrom`: the job ids it continues) whose predecessor archived unlanded commits
+ * starts from them and consumes the archive ref. Returns {ok, record} - record is what payload.productWorktree keeps.
  */
 export function ensureOpWorktree({ repoRoot, workflowId, jobId, handFrom = [], settings = productSettings(), onEvent = null }) {
   const wf = ensureWorkflowWorktree({ repoRoot, workflowId, settings });
@@ -483,21 +463,21 @@ export function ensureOpWorktree({ repoRoot, workflowId, jobId, handFrom = [], s
   const lay = layoutOf({ repoRoot, workflowId, jobId, settings });
   let sync = null;
   const locked = withLock(workflowLockName(repoRoot, lay.workflow.short), () => {
-    sync = followMain({ repoRoot, wf: lay.workflow });
+    sync = syncWorkflowFromMain({ repoRoot, wf: lay.workflow });
     if (sync?.overlap && onEvent) onEvent(EVENTS.overlap, { repoRoot, branch: lay.workflow.branch, ...sync.overlap, merged: Boolean(sync.merged) });
-    else if ((sync?.merged || sync?.moved) && onEvent) onEvent(EVENTS.synced, { repoRoot, branch: lay.workflow.branch, head: sync.head });
-    const mainTip = revParse(repoRoot, 'main');
-    let base = mainTip, handed = null;
+    else if (sync?.merged && onEvent) onEvent(EVENTS.synced, { repoRoot, branch: lay.workflow.branch, head: sync.head });
+    const wfTip = revParse(repoRoot, lay.workflow.branch);
+    let base = wfTip, handed = null;
     if (!refExists(repoRoot, `refs/heads/${lay.op.branch}`)) {
       for (const prior of handFrom.filter(Boolean)) {
-        const arch = preservedOpRef(repoRoot, prior, settings);
+        const arch = archivedOpRef(repoRoot, prior, settings);
         if (arch) { base = arch.sha; handed = { from: prior, ref: arch.ref, sha: arch.sha }; break; }
       }
     }
     const added = addWorktree({ repoRoot, dir: lay.op.path, branch: lay.op.branch, base, description: jobId });
     if (!added.ok) return added;
     if (handed && added.created) git(repoRoot, ['update-ref', '-d', handed.ref]);
-    return { ok: true, created: added.created, mainTip, handed };
+    return { ok: true, created: added.created, wfTip, handed };
   }, { waitMs: settings.integrate.lockWaitMs });
   if (!locked.ok) return { ok: false, reason: locked.reason, detail: locked.detail ?? locked.holder };
   const overlay = ensureOverlay({ repoRoot, worktree: lay.op.path, source: installedIn(lay.workflow.path) ? lay.workflow.path : repoRoot, settings });
@@ -506,7 +486,7 @@ export function ensureOpWorktree({ repoRoot, workflowId, jobId, handFrom = [], s
   const record = {
     repoRoot: lay.repoRoot, workflowId, jobId,
     workflow: { ...lay.workflow, port: portOf(lay.workflow.path, settings) },
-    op: { ...lay.op }, baseSha: locked.mainTip, createdAt: Date.now(),
+    op: { ...lay.op }, baseSha: locked.wfTip, createdAt: Date.now(),
     ...(locked.handed ? { handedFrom: locked.handed } : {}),
   };
   if (onEvent && locked.created) onEvent(EVENTS.created, { repoRoot: record.repoRoot, op: record.op, workflow: record.workflow, baseSha: record.baseSha, ...(locked.handed ? { handedFrom: locked.handed } : {}), overlay: summarizeOverlay(overlay), ...(resolution ? { resolution } : {}) });
@@ -559,12 +539,12 @@ export function worktreePromptRules(rec, sideCwd = null) {
   return [
     '',
     '## Your product worktree (DESIGN §16.7)',
-    `- Edit, check and commit ONLY in ${op} (branch ${rec.op.branch}, off main at ${String(rec.baseSha ?? '').slice(0, 12)}). Never edit ${posix(rec.repoRoot)} itself or a sibling worktree.`,
+    `- Edit, check and commit ONLY in ${op} (branch ${rec.op.branch}, off ${rec.workflow.branch} at ${String(rec.baseSha ?? '').slice(0, 12)}). Never edit ${posix(rec.repoRoot)} itself or a sibling worktree.`,
     `- Run role-specific checks and commands from ${cwd}; the app's package.json and .starciwork are at ${op}.`,
     `- Dev servers, UAT and drawing run against the WORKFLOW worktree ${wf} on port ${rec.workflow.port ?? portOf(rec.workflow.path)}; never start one in ${posix(rec.repoRoot)}.`,
     '- node_modules is a junction overlay of the main checkout: never run npm/pnpm install here. A package.json or lockfile change belongs to the workflow\'s serial deps unit.',
     '- Commit everything you produce under .starciwork/ in this worktree before you report; the runtime salvages and then deletes this worktree right after your settle.',
-    `- At settle the Kernel lands your commits straight into main: the merge guard, a rebase onto main when it moved, the same gate.mjs you ran (against main) and your re-runnable checks, then main is fast-forwarded and pushed and this worktree and ${rec.op.branch} are deleted. Never merge main into ${rec.op.branch} taking your side over main's changes: the merge guard refuses it.`,
+    `- Your commits reach ${rec.workflow.branch} at settle (rebased onto its tip and re-checked there); the Kernel lands ${rec.workflow.branch} into main.`,
   ].join('\n');
 }
 
@@ -627,7 +607,7 @@ export const retargetArgv = (argv, from, to) => {
 const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'checks', 'gate.mjs');
 /**
  * The land gate: scripts/checks/gate.mjs over the op worktree's whole delta since `base` (no --changed), the same gate the op
- * forced in its loop, merge guard included. Returns its starci/gate@1 report; a gate that printed none is exit 2 with the reason.
+ * forced in its loop. Returns its starci/gate@1 report; a gate that printed none is exit 2 with the reason.
  */
 export function runLandGate({ root, base, timeoutMs }) {
   if (!root || !fs.existsSync(root)) return { exit: 2, errors: [`the op worktree ${root ?? '(none)'} is gone: nothing to gate`], findings: [], counts: { new: 0 } };
@@ -635,166 +615,78 @@ export function runLandGate({ root, base, timeoutMs }) {
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
 }
 
-/** The per-repository lock every land into main holds (ops and the deps unit alike): one writer of main at a time. */
-export const mainLockName = (repoRoot) => `product-main-${repoKey(repoRoot)}`;
-
-/** One declared land check (product-land.yaml land.checks): argv, no shell, cwd = the op worktree. */
-function runLandCheck(check, cwd, timeoutMs) {
-  const argv = Array.isArray(check.argv) ? check.argv.map(String) : String(check.command ?? '').split(/\s+/).filter(Boolean);
-  if (!argv.length) return { name: check.name ?? '?', exitCode: 2, tail: 'empty check' };
-  const { file, args } = launchFor(argv[0] === 'node' ? [process.execPath, ...argv.slice(1)] : argv);
-  const r = spawnSync(file, args, { cwd, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
-  return { name: check.name ?? argv.join(' ').slice(0, 80), exitCode: r.error ? 127 : r.status, tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-3).join(' / ').slice(0, 400) };
-}
-
-/** Push main to the configured remote (product-land.yaml land.push); {pushed, remote, detail}. A repository with no such remote pushes nothing. */
-export function pushMain(repoRoot, settings = productSettings()) {
-  const remote = settings.land.remote ?? 'origin';
-  if (!settings.land.push) return { pushed: false, remote, detail: 'land.push is off' };
-  if (!git(repoRoot, ['remote', 'get-url', remote]).ok) return { pushed: false, remote, detail: `no remote ${remote}` };
-  const r = git(repoRoot, ['push', remote, 'refs/heads/main:refs/heads/main'], { timeout: settings.worktrees.commandMs });
-  return { pushed: r.ok, remote, detail: r.ok ? null : r.stderr.slice(0, 300) };
-}
-
 /**
- * Move main from `from` to `to` (a descendant): compare-and-swap of refs/heads/main plus the working tree and index of
- * exactly the changed paths of the live checkout when it has main checked out (scripts/supervisor/land.mjs fastForwardLive:
- * refused when it is dirty on those paths); a bare ref update otherwise. {ok, reason?}
+ * Integrate one op into its workflow branch (the settle-pass step): under the per-workflow lock, rebase op/<op>'s
+ * commits up to `head` onto the latest wf/<wf>, fast-forward wf/<wf> (and its _wf tree), then verify ON the workflow
+ * branch. The land gate runs first (runLandGate: the op branch against its merge-base with wf/<wf>), so a branch green in its
+ * op is green here and a red one never touches wf/<wf>. Seams: gate({root, base, timeoutMs}) -> starci/gate@1 report,
+ * recheck(checks, {cwd, from, to}) -> [{name, exitCode, tail}] (default: none), hunksOf.
+ * Returns {ok, already?, before, after, map, changed, gate, verify} or a refusal {ok:false, reason, ...}:
+ *   land-gate-red               the gate reports new findings on the op branch; `gate` carries them; wf/<wf> untouched
+ *   land-gate-unavailable       a gate tool could not run (exit 2): never a land
+ *   product-integrate-conflict  files + hunks; wf/<wf> untouched (the Kernel rebases the slice or re-cuts)
+ *   product-integrate-red       the post-merge verify failed; wf/<wf> rolled back; `continuation` names the new base
+ *   deps-unit-required          the op changes a dependency manifest and is not the workflow's deps unit
  */
-export function fastForwardMain(repoRoot, from, to, { fastForward = fastForwardLive } = {}) {
-  const rows = git(repoRoot, ['diff', '--name-status', '--no-renames', from, to]).stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
-  const onMain = git(repoRoot, ['symbolic-ref', '-q', 'HEAD']).stdout === 'refs/heads/main';
-  if (onMain) return fastForward({ root: repoRoot, base: from, head: to, rows });
-  const cas = git(repoRoot, ['update-ref', '-m', 'starci op land', 'refs/heads/main', to, from]);
-  return cas.ok ? { ok: true, written: rows.length } : { ok: false, reason: 'main-moved', detail: cas.stderr.slice(0, 300) };
-}
-
-/** Fast-forward wf/<wf> (and its checked-out _wf tree) to main, so the workflow worktree serves what landed. */
-export function followMain({ repoRoot, wf }) {
-  const M = revParse(repoRoot, 'main'), W = revParse(repoRoot, wf.branch);
-  if (!M || !W || W === M) return { ok: true, moved: false };
-  if (!isAncestor(repoRoot, W, M)) return syncWorkflowFromMain({ repoRoot, wf });
-  if (fs.existsSync(wf.path)) {
-    if (git(wf.path, ['status', '--porcelain', '--untracked-files=no']).stdout) return { ok: false, reason: 'workflow-worktree-dirty', path: wf.path };
-    const ff = git(wf.path, ['merge', '--ff-only', M]);
-    return ff.ok ? { ok: true, moved: true, head: M } : { ok: false, reason: 'workflow-ff-failed', detail: ff.stderr.slice(0, 300) };
-  }
-  return git(repoRoot, ['update-ref', `refs/heads/${wf.branch}`, M, W]).ok ? { ok: true, moved: true, head: M } : { ok: false, reason: 'workflow-moved' };
-}
-
-/**
- * LAND one green op straight into the product's main (owner 2026-10-01: op green -> gate -> main -> push -> worktree gone).
- * Under the per-repository main lock:
- *   1. the MERGE GUARD over the op's commits (scripts/checks/gate.mjs mergeGuard): a merge that took the lane side over a
- *      main-side change is refused land-merge-dropped-main; main untouched;
- *   2. a dependency manifest the op changes that main does not carry: deps-unit-required (the workflow's serial deps unit);
- *   3. main moved since the op's base: its commits are REBASED onto main (a merge-tree chain, each commit keeping author and
- *      message; a conflict is product-integrate-conflict with files + hunks) and the op worktree is reset onto the rebased
- *      head, so what is gated below is exactly what lands; an op already on top of main fast-forwards as it is;
- *   4. THE GATE on the op worktree against main (runLandGate): exit 1 land-gate-red, 2 land-gate-unavailable;
- *   5. the op's re-runnable declared checks, product-land.yaml land.checks and the import check of its changed files, IN the
- *      op worktree: red is product-integrate-red, a continuation on the new base (never a failure);
- *   6. main fast-forwarded to the op head (fastForwardMain; main moved under the land -> the whole land reruns, up to
- *      land.maxMainRetries), then pushed (pushMain; a failed push is recorded, the land stands), and wf/<wf> follows main.
- * Any refusal after step 3 resets the op worktree back to its own head: main never moves on a refusal. The op worktree and
- * branch are removed right after the settle (reapJobWorktree: junctions first). Seams: gate({root, base, timeoutMs}),
- * recheck(checks, {cwd, from, to, timeoutMs}), hunksOf, fastForward, push(repoRoot), guard(root, {base, head, mainTip}).
- * Returns {ok, already?, before, after, map, changed, gate, verify, push} or a refusal {ok:false, reason, ...}.
- */
-export function landOp({ record, head = null, depsUnit = false, checks = [], recheck = null, hunksOf = conflictHunksOf, gate = runLandGate,
-  guard = mergeGuard, fastForward = fastForwardLive, push = null, settings = productSettings() }) {
+export function integrateOp({ record, head = null, depsUnit = false, checks = [], recheck = null, hunksOf = conflictHunksOf, gate = runLandGate, settings = productSettings() }) {
   const { repoRoot } = record;
-  const op = record.op;
-  return withLock(mainLockName(repoRoot), () => {
-    let last = null;
-    for (let attempt = 1; attempt <= settings.land.maxMainRetries; attempt += 1) {
-      last = landOnce({ record, head, depsUnit, checks, recheck, hunksOf, gate, guard, fastForward, settings });
-      if (last.reason !== 'main-moved') break;
-    }
-    if (!last.ok || last.already) return last;
-    last.push = (push ?? ((root) => pushMain(root, settings)))(repoRoot);
-    // Lock order main -> workflow (nothing takes the workflow lock and then main's).
-    last.workflow = withLock(workflowLockName(repoRoot, record.workflow.short), () => followMain({ repoRoot, wf: record.workflow }), { waitMs: settings.integrate.lockWaitMs });
-    last.branch = op.branch;
-    return last;
-  }, { waitMs: settings.land.lockWaitMs });
-}
-
-function landOnce({ record, head, depsUnit, checks, recheck, hunksOf, gate, guard, fastForward, settings }) {
-  const { repoRoot } = record;
-  const op = record.op;
-  const M = revParse(repoRoot, 'main');
-  if (!M) return { ok: false, reason: 'main-unresolved' };
-  const opTip = revParse(repoRoot, op.branch);
-  const tip = head ? revParse(repoRoot, head) : opTip;
-  if (!tip) return { ok: false, reason: 'head-unresolved', head };
-  if (opTip && tip !== opTip && !isAncestor(repoRoot, tip, opTip)) return { ok: false, reason: 'head-not-on-op-branch', head: tip, branch: op.branch };
-  if (isAncestor(repoRoot, tip, M)) return { ok: true, already: true, before: M, after: M, map: [] };
-  const base = git(repoRoot, ['merge-base', M, tip]).stdout;
-  // 1. the merge guard: judged on the op's own history, before anything is rebased away.
-  const guarded = guard(repoRoot, { base, head: tip, mainTip: M });
-  if (guarded.errors.length) return { ok: false, reason: 'land-gate-unavailable', gate: { exit: 2, base, errors: guarded.errors, findings: [], counts: { new: 0 } },
-    hint: `the merge guard could not recompute a merge of ${op.branch} (${guarded.errors[0]}): fix the environment and settle again` };
-  if (guarded.findings.length) {
-    return { ok: false, reason: 'land-merge-dropped-main', dropped: guarded.findings.slice(0, 40).map((f) => f.path), merges: guarded.checked,
-      hint: `a merge on ${op.branch} kept the lane side over main's change of ${guarded.findings.length} path(s) (${guarded.findings.slice(0, 3).map((f) => f.path).join(', ')}): redo the merge taking main's changes (git merge main in ${posix(op.path)}, resolve each path by hand), commit, report the new head` };
-  }
-  const changed = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean);
-  // 2. a dependency manifest main does not carry yet goes through the deps unit.
-  const deps = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)) && !git(repoRoot, ['diff', '--quiet', M, tip, '--', f]).ok);
-  if (deps.length && !depsUnit) return { ok: false, reason: 'deps-unit-required', files: deps, depsUnit: { workflowId: record.workflowId, fromJob: record.jobId },
-    hint: `a package.json/lockfile change goes through the workflow's serial deps unit: api product-deps --workflow ${record.workflowId} --from-job ${record.jobId} applies ${deps.join(', ')} on main, installs in the workflow's _wf and rebuilds the op overlays; then settle this job again` };
-  // 3. rebase onto main when main moved; the op worktree is put on the rebased head (nothing moves on a conflict).
-  let landHead = tip, map = [];
-  if (!isAncestor(repoRoot, M, tip)) {
-    const commits = git(repoRoot, ['rev-list', '--reverse', '--no-merges', tip, `^${M}`]).stdout.split(/\r?\n/).filter(Boolean);
-    const cherry = cherryOf(repoRoot, M, tip);
-    const chain = rebaseChain(repoRoot, commits.filter((c) => cherry.get(c) !== '-'), M, { hunksOf });
-    if (!chain.ok) return { ok: false, reason: chain.conflicts ? 'product-integrate-conflict' : chain.reason, conflicts: chain.conflicts ?? [], onto: M, detail: chain.detail ?? null,
-      hint: `rebase ${op.branch} onto main (git rebase main in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
-    if (chain.head === M) return { ok: true, already: true, before: M, after: M, map: chain.map, viaPatchId: true };
-    landHead = chain.head; map = chain.map;
-  }
-  const tree = fs.existsSync(op.path) ? op.path : null;
-  if (!tree) return { ok: false, reason: 'land-gate-unavailable', gate: { exit: 2, base: M, errors: [`the op worktree ${posix(op.path)} is gone: nothing to gate`], findings: [], counts: { new: 0 } } };
-  if (git(tree, ['status', '--porcelain', '--untracked-files=no']).stdout) return { ok: false, reason: 'op-worktree-dirty', path: op.path,
-    hint: `commit or discard the tracked changes in ${posix(op.path)}, report the new head, settle again` };
-  const own = revParse(tree, 'HEAD');
-  const restore = () => { if (revParse(tree, 'HEAD') !== own) git(tree, ['reset', '--hard', own]); };
-  if (landHead !== own && !git(tree, ['reset', '--hard', landHead]).ok) return { ok: false, reason: 'op-worktree-reset-failed', path: op.path };
-  try {
-    // 4. the gate, on exactly the tree that lands.
-    const gated = gate({ root: tree, base: M, timeoutMs: settings.integrate.gateTimeoutMs });
-    const gateSummary = { exit: gated.exit, base: M, head: gated.head ?? landHead, counts: gated.counts ?? null, findings: (gated.findings ?? []).slice(0, 40), errors: gated.errors ?? [] };
-    if (gated.exit === 1) { restore(); return { ok: false, reason: 'land-gate-red', gate: gateSummary, hint: `the op branch carries findings main does not have: fix them in ${posix(op.path)} (node scripts/checks/gate.mjs --root ${posix(op.path)} --base main), commit, report the new head` }; }
-    if (gated.exit !== 0) { restore(); return { ok: false, reason: 'land-gate-unavailable', gate: gateSummary, hint: `the land gate could not run a tool (${gateSummary.errors[0] ?? 'no report'}): fix the environment and settle again; a land without its gate never happens` }; }
-    // 5. the op's own re-runnable checks, the configured land checks and the import check, in the op worktree.
-    const verify = { checks: [], imports: null, unavailable: [] };
+  const wf = record.workflow, op = record.op;
+  return withLock(workflowLockName(repoRoot, wf.short), () => {
+    const W = revParse(repoRoot, wf.branch);
+    if (!W) return { ok: false, reason: 'workflow-branch-missing', branch: wf.branch };
+    const opTip = revParse(repoRoot, op.branch);
+    const tip = head ? revParse(repoRoot, head) : opTip;
+    if (!tip) return { ok: false, reason: 'head-unresolved', head };
+    if (opTip && tip !== opTip && !isAncestor(repoRoot, tip, opTip)) return { ok: false, reason: 'head-not-on-op-branch', head: tip, branch: op.branch };
+    if (isAncestor(repoRoot, tip, W)) return { ok: true, already: true, before: W, after: W, map: [] };
+    const commits = git(repoRoot, ['rev-list', '--reverse', '--no-merges', tip, `^${W}`]).stdout.split(/\r?\n/).filter(Boolean);
+    const cherry = cherryOf(repoRoot, wf.branch, tip, W);
+    const pending = commits.filter((c) => cherry.get(c) !== '-');
+    if (!pending.length) return { ok: true, already: true, before: W, after: W, map: [], viaPatchId: true };
+    const base = git(repoRoot, ['merge-base', W, tip]).stdout;
+    const changed = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean);
+    // A dependency manifest the op changes that the workflow branch does not carry yet (its deps unit applies it).
+    const deps = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)) && !git(repoRoot, ['diff', '--quiet', W, tip, '--', f]).ok);
+    if (deps.length && !depsUnit) return { ok: false, reason: 'deps-unit-required', files: deps, depsUnit: { workflowId: record.workflowId, fromJob: record.jobId },
+      hint: `a package.json/lockfile change goes through the workflow's serial deps unit: api product-deps --workflow ${record.workflowId} --from-job ${record.jobId} applies ${deps.join(', ')} on ${wf.branch}, installs in its _wf and rebuilds the op overlays; then settle this job again` };
+    const gated = gate({ root: op.path, base, timeoutMs: settings.integrate.gateTimeoutMs });
+    const gateSummary = { exit: gated.exit, base, head: gated.head ?? null, counts: gated.counts ?? null, findings: (gated.findings ?? []).slice(0, 40), errors: gated.errors ?? [] };
+    if (gated.exit !== 0) return { ok: false, reason: gated.exit === 1 ? 'land-gate-red' : 'land-gate-unavailable', gate: gateSummary,
+      hint: gated.exit === 1 ? `the op branch carries findings its base does not have: fix them in ${posix(op.path)} (node scripts/checks/gate.mjs --root ${posix(op.path)} --base ${base}), commit, report the new head`
+        : `the land gate could not run a tool (${gateSummary.errors[0] ?? 'no report'}): fix the environment and settle again; a land without its gate never happens` };
+    const chain = rebaseChain(repoRoot, pending, W, { hunksOf });
+    if (!chain.ok) return { ok: false, reason: chain.conflicts ? 'product-integrate-conflict' : chain.reason, conflicts: chain.conflicts ?? [], onto: W, detail: chain.detail ?? null,
+      hint: `rebase ${op.branch} onto ${wf.branch} (git rebase ${wf.branch} in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
+    // Fast-forward the workflow branch and its checked-out integration tree.
+    const wfTree = fs.existsSync(wf.path) ? wf.path : null;
+    if (wfTree) {
+      if (git(wfTree, ['status', '--porcelain', '--untracked-files=no']).stdout) return { ok: false, reason: 'workflow-worktree-dirty', path: wf.path };
+      const ff = git(wfTree, ['merge', '--ff-only', chain.head]);
+      if (!ff.ok) return { ok: false, reason: 'workflow-ff-failed', detail: ff.stderr.slice(0, 300) };
+    } else if (!git(repoRoot, ['update-ref', `refs/heads/${wf.branch}`, chain.head, W]).ok) return { ok: false, reason: 'workflow-moved', branch: wf.branch };
+    // Post-merge verify ON the workflow branch: cheap, scoped.
+    const verify = { checks: [], imports: null };
     const failures = [];
-    if (settings.integrate.recheck === 'declared' && recheck && checks.length) verify.checks.push(...recheck(checks, { cwd: tree, from: op.path, to: tree, timeoutMs: settings.integrate.recheckTimeoutMs }));
-    for (const c of settings.land.checks ?? []) verify.checks.push(runLandCheck(c, tree, settings.integrate.recheckTimeoutMs));
-    // H7: only a RED re-run refuses the land; a checker that could not run is tooling (verify.unavailable).
-    const verdictOf = (c) => checkVerdictOf(c).verdict;
-    verify.unavailable = verify.checks.filter((c) => verdictOf(c) === 'unavailable').map((c) => `${c.name}:${c.exitCode ?? '-'}${c.status ? ` ${c.status}` : ''}`);
-    failures.push(...verify.checks.filter((c) => verdictOf(c) === 'red').map((c) => `${c.name}:${c.exitCode} ${c.tail ?? ''}`.trim()));
-    if (settings.integrate.importCheck === 'changed-files') {
-      const present = changed.filter((f) => fs.existsSync(path.join(tree, f)));
-      try { verify.imports = present.length ? brokenImports(tree, { only: present, limit: 20 }) : { count: 0, files: 0, broken: [] }; }
+    if (wfTree && settings.integrate.recheck === 'declared' && recheck && checks.length) {
+      verify.checks = recheck(checks, { cwd: wfTree, from: op.path, to: wfTree, timeoutMs: settings.integrate.recheckTimeoutMs });
+      // H7: only a RED re-run breaks the merge; a checker that could not run is tooling (verify.unavailable), never a rollback.
+      const verdictOf = (c) => checkVerdictOf(c).verdict;
+      verify.unavailable = verify.checks.filter((c) => verdictOf(c) === 'unavailable').map((c) => `${c.name}:${c.exitCode ?? '-'}${c.status ? ` ${c.status}` : ''}`);
+      failures.push(...verify.checks.filter((c) => verdictOf(c) === 'red').map((c) => `${c.name}:${c.exitCode} ${c.tail ?? ''}`.trim()));
+    }
+    if (wfTree && settings.integrate.importCheck === 'changed-files') {
+      const present = changed.filter((f) => fs.existsSync(path.join(wfTree, f)));
+      try { verify.imports = present.length ? brokenImports(wfTree, { only: present, limit: 20 }) : { count: 0, files: 0, broken: [] }; }
       catch (error) { verify.imports = { error: String(error?.message ?? error).slice(0, 200) }; }
       if (verify.imports?.count) failures.push(`IMPORTS_BROKEN_AFTER_MOVE:${verify.imports.count} ${verify.imports.broken.slice(0, 3).map((b) => `${b.from} -> ${b.spec}`).join('; ')}`);
     }
     if (failures.length) {
-      restore();
-      return { ok: false, reason: 'product-integrate-red', failures, verify, gate: gateSummary,
-        continuation: { base: M, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and breaks on main: a continuation on the new base, never a failure' } };
+      if (wfTree) git(wfTree, ['reset', '--hard', W]); else git(repoRoot, ['update-ref', `refs/heads/${wf.branch}`, W, chain.head]);
+      return { ok: false, reason: 'product-integrate-red', failures, verify, rolledBack: W,
+        continuation: { base: W, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and breaks the workflow branch: a continuation on the new base, never a failure' } };
     }
-    // 6. main moves: compare-and-swap, the live checkout's changed paths with it.
-    const moved = fastForwardMain(repoRoot, M, landHead, { fastForward });
-    if (!moved.ok && moved.reason === 'main-moved') { restore(); return { ok: false, reason: 'main-moved', detail: moved.detail ?? null }; }
-    if (!moved.ok) { restore(); return { ok: false, reason: 'land-main-refused', detail: moved.reason ?? moved.detail ?? null, dirty: moved.dirty ?? null, gate: gateSummary,
-      hint: `main could not be fast-forwarded (${moved.reason ?? 'refused'}${moved.dirty ? `: the live checkout is dirty on ${moved.dirty.slice(0, 3).join(', ')}` : ''}): clean the live checkout or put it on main, then settle again` }; }
-    return { ok: true, before: M, after: landHead, map, changed, gate: gateSummary, verify };
-  } catch (error) { restore(); throw error; }
+    return { ok: true, before: W, after: chain.head, map: chain.map, changed, gate: gateSummary, verify };
+  }, { waitMs: settings.integrate.lockWaitMs });
 }
 
 /** `git cherry <upstream> <head> <limit>` as Map<sha, '+'|'-'> ('-': an equivalent patch is already upstream). */
@@ -820,24 +712,20 @@ const runInstall = (argv, cwd, timeoutMs) => {
 
 /**
  * The workflow's SERIAL deps unit (DESIGN §16.7, mitigation 1): an op may not change package.json or a lockfile on its
- * own (landOp refuses deps-unit-required); this brings wf/<wf> to main, applies exactly the dependency manifests
- * `fromJob` changed as one commit in the _wf worktree, replaces _wf's junction overlay with a REAL install
- * (settings.deps.install, e.g. npm ci), marks it (the overlay source of the workflow's ops from now on), LANDS that commit
- * into main (fast-forward, then push) and rebuilds the overlay of every live op worktree of the workflow. Under the
- * per-repository main lock; a failed install or a refused land rolls wf/<wf> back and restores the overlay. The job
- * itself then settles again (its manifests now equal main's). Seams: install(argv, cwd, timeoutMs), push(repoRoot).
- * {ok, commit, files, install, push, rebuilt: [op dir]} | {ok:false, reason}
+ * own (integrateOp refuses deps-unit-required); this applies exactly the dependency manifests `fromJob` changed onto
+ * wf/<wf> as one commit in the _wf worktree, replaces _wf's junction overlay with a REAL install (settings.deps.install,
+ * e.g. npm ci), marks it (the overlay source of the workflow's ops from now on) and rebuilds the overlay of every live op
+ * worktree of the workflow. Under the per-workflow lock; a failed install rolls wf/<wf> back and restores the overlay.
+ * The job itself then settles again (its manifests now equal the workflow branch's). Seam: install(argv, cwd, timeoutMs).
+ * {ok, commit, files, install, rebuilt: [op dir]} | {ok:false, reason}
  */
-export function applyDepsUnit({ record, settings = productSettings(), install = runInstall, push = null }) {
+export function applyDepsUnit({ record, settings = productSettings(), install = runInstall }) {
   const { repoRoot } = record;
   const wf = record.workflow;
-  return withLock(mainLockName(repoRoot), () => withLock(workflowLockName(repoRoot, wf.short), () => {
+  return withLock(workflowLockName(repoRoot, wf.short), () => {
     if (!fs.existsSync(wf.path)) return { ok: false, reason: 'workflow-worktree-missing', path: wf.path };
-    const followed = followMain({ repoRoot, wf });
-    if (!followed.ok) return { ok: false, reason: followed.reason ?? 'workflow-behind-main', detail: followed.detail ?? null };
-    const M = revParse(repoRoot, 'main');
     const W = revParse(repoRoot, wf.branch);
-    const tip = revParse(repoRoot, record.op.branch) ?? preservedOpRef(repoRoot, record.jobId, settings)?.sha ?? null;
+    const tip = revParse(repoRoot, record.op.branch) ?? archivedOpRef(repoRoot, record.jobId, settings)?.sha ?? null;
     if (!W || !tip) return { ok: false, reason: 'ref-unresolved', branch: record.op.branch };
     const base = git(repoRoot, ['merge-base', W, tip]).stdout;
     const files = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean)
@@ -850,7 +738,7 @@ export function applyDepsUnit({ record, settings = productSettings(), install = 
     if (!c.ok) { git(wf.path, ['reset', '--hard', W]); return { ok: false, reason: 'deps-commit-failed', detail: c.stderr.slice(0, 300) }; }
     const commit = revParse(wf.path, 'HEAD');
     const cmd = installCommandOf(wf.path, settings);
-    const out = { ok: true, commit, files, install: null, push: null, rebuilt: [] };
+    const out = { ok: true, commit, files, install: null, rebuilt: [] };
     if (cmd) {
       const rm = removeOverlay(wf.path, { settings });
       if (!rm.ok) { git(wf.path, ['reset', '--hard', W]); return { ok: false, reason: 'overlay-link-stuck', stuck: rm.stuck }; }
@@ -867,12 +755,6 @@ export function applyDepsUnit({ record, settings = productSettings(), install = 
       fs.mkdirSync(path.join(wf.path, 'node_modules'), { recursive: true });
       fs.writeFileSync(path.join(wf.path, 'node_modules', INSTALL_MARKER), JSON.stringify({ lockHash: lockHashOf(wf.path, settings), commit, job: record.jobId, installedAt: new Date().toISOString() }));
     }
-    const landed = fastForwardMain(repoRoot, M, commit);
-    if (!landed.ok) {
-      git(wf.path, ['reset', '--hard', W]);
-      return { ok: false, reason: 'deps-land-refused', detail: landed.reason ?? landed.detail ?? null, files, install: out.install, rolledBack: W };
-    }
-    out.push = (push ?? ((root) => pushMain(root, settings)))(repoRoot);
     let ops = [];
     try { ops = fs.readdirSync(path.dirname(wf.path)).filter((n) => n !== WORKFLOW_DIR_NAME); } catch { ops = []; }
     for (const name of ops) {
@@ -881,7 +763,7 @@ export function applyDepsUnit({ record, settings = productSettings(), install = 
       out.rebuilt.push({ path: dir, ok: r.ok !== false });
     }
     return out;
-  }, { waitMs: settings.integrate.lockWaitMs }), { waitMs: settings.land.lockWaitMs });
+  }, { waitMs: settings.integrate.lockWaitMs });
 }
 
 /* ------------------------------------------------------------ removal */
@@ -965,31 +847,24 @@ export function removeWorktreeVerified({ repoRoot, dir, salvageTo = null, settin
 }
 
 /**
- * Remove a job's op worktree and branch (released -> worktree-removed). A landed op's branch is in main and is deleted. An
- * op whose work did not land (a failed or blocked op, a refused land) keeps it, when keepUnmerged, on preserved/<op>: its
- * commits main lacks plus its uncommitted work (snapshotCommit), written BEFORE the tree goes. Then the worktree is removed
- * (removeWorktreeVerified: junctions unlinked first, never a recursive delete through one) and op/<op> is deleted. The <wf>
- * directory goes too once empty.
+ * Remove a job's op worktree and branch (released -> worktree-removed). The branch is deleted, or - when it holds
+ * commits the workflow branch lacks (a partial commit a continuation reuses) and keepUnmerged - archived as
+ * refs/starci/archive/op/<op> first. The <wf> directory goes too once empty.
  */
 export function removeOpWorktree({ record, salvageTo = null, keepUnmerged = true, settings = productSettings() }) {
   const { repoRoot } = record;
-  const branch = record.op.branch;
-  const tip = revParse(repoRoot, `refs/heads/${branch}`);
-  let preserved = null;
-  if (tip && keepUnmerged) {
-    const snap = fs.existsSync(record.op.path) ? snapshotCommit(record.op.path, tip, `preserve ${branch} (${record.jobId ?? '-'}): the op's work that did not land`) : tip;
-    if (!snap) return { ok: false, path: record.op.path, reason: 'preserve-failed' };
-    const unlanded = [...cherryOf(repoRoot, 'main', snap, record.baseSha ?? null)].filter(([, m]) => m === '+').length;
-    if (unlanded) {
-      const ref = `${PRESERVED_PREFIX}/${record.op.short}`;
-      if (!git(repoRoot, ['update-ref', ref, snap]).ok) return { ok: false, path: record.op.path, reason: 'preserve-failed' };
-      preserved = { branch: ref.replace(/^refs\/heads\//, ''), sha: snap, commits: unlanded, uncommitted: snap !== tip };
-    }
-  }
   const out = removeWorktreeVerified({ repoRoot, dir: record.op.path, salvageTo, settings });
-  if (!out.ok) return { ...out, preserved };
-  out.branch = { name: branch, deleted: false, preserved };
+  if (!out.ok) return out;
+  const branch = record.op.branch;
+  out.branch = { name: branch, deleted: false, archived: null };
+  const tip = revParse(repoRoot, `refs/heads/${branch}`);
   if (tip) {
+    const unmerged = [...cherryOf(repoRoot, record.workflow.branch, tip, record.baseSha ?? null)].filter(([, m]) => m === '+').map(([s]) => s);
+    if (unmerged.length && keepUnmerged) {
+      const ref = `${ARCHIVE_PREFIX}/op/${record.op.short}`;
+      if (git(repoRoot, ['update-ref', ref, tip]).ok) out.branch.archived = { ref, sha: tip, commits: unmerged.length };
+      else return { ...out, ok: false, reason: 'archive-failed' };
+    }
     out.branch.deleted = git(repoRoot, ['branch', '-D', branch]).ok;
     if (!out.branch.deleted) return { ...out, ok: false, reason: 'branch-delete-failed' };
   } else out.branch.deleted = true;
@@ -1008,27 +883,24 @@ export function workflowLanded(repoRoot, wfBranch, main = 'main') {
   return plus.length ? { landed: false, why: 'unlanded-commits', commits: plus.length } : { landed: true, why: 'patch-equivalent' };
 }
 
-/**
- * Remove the workflow's worktree (+ branch) once no op dir is left. Ops land straight into main, so wf/<wf> normally holds
- * nothing main lacks; when it does (a deps commit whose land was refused), the branch is kept on preserved/wf-<wf> first.
- */
-export function removeWorkflowWorktree({ repoRoot, workflowId, salvageTo = null, settings = productSettings() }) {
+/** Remove the workflow's integration worktree (+ branch, archived when unlanded/abandoned) once no op dir is left. */
+export function removeWorkflowWorktree({ repoRoot, workflowId, salvageTo = null, abandoned = false, settings = productSettings() }) {
   const lay = layoutOf({ repoRoot, workflowId, settings });
   let others = [];
   try { others = fs.readdirSync(lay.wfDir).filter((n) => n !== WORKFLOW_DIR_NAME); } catch { /* none */ }
   if (others.length) return { ok: false, reason: 'op-worktrees-remain', ops: others };
   const landed = workflowLanded(repoRoot, lay.workflow.branch);
-  const tip = revParse(repoRoot, `refs/heads/${lay.workflow.branch}`);
-  let preserved = null;
-  if (tip && !landed.landed) {
-    const ref = `${PRESERVED_PREFIX}/wf-${lay.workflow.short}`;
-    if (!git(repoRoot, ['update-ref', ref, tip]).ok) return { ok: false, reason: 'preserve-failed', path: lay.workflow.path };
-    preserved = { branch: ref.replace(/^refs\/heads\//, ''), sha: tip };
-  }
+  if (!landed.landed && !abandoned) return { ok: false, reason: 'workflow-unlanded', landed };
   const out = removeWorktreeVerified({ repoRoot, dir: lay.workflow.path, salvageTo, settings });
-  if (!out.ok) return { ...out, preserved };
-  out.branch = { name: lay.workflow.branch, deleted: !tip, preserved };
+  if (!out.ok) return out;
+  const tip = revParse(repoRoot, `refs/heads/${lay.workflow.branch}`);
+  out.branch = { name: lay.workflow.branch, deleted: !tip, archived: null };
   if (tip) {
+    if (!landed.landed) {
+      const ref = `${ARCHIVE_PREFIX}/wf/${lay.workflow.short}`;
+      if (!git(repoRoot, ['update-ref', ref, tip]).ok) return { ...out, ok: false, reason: 'archive-failed' };
+      out.branch.archived = { ref, sha: tip };
+    }
     out.branch.deleted = git(repoRoot, ['branch', '-D', lay.workflow.branch]).ok;
     git(repoRoot, ['config', '--remove-section', `branch.${lay.workflow.branch}`]);
   }
@@ -1110,7 +982,7 @@ export function isolatedJobs(db, { statuses = null, workflowId = null } = {}) {
 
 /**
  * One pass for a ledger (the settler calls it every allocation.settler.everyMs): reap every released isolated op
- * worktree, remove every finished/archived workflow's worktree (an unlanded branch preserved first), bring main into
+ * worktree, remove every finished/archived workflow's integration worktree once landed (or abandoned), bring main into
  * running workflows' branches (overlap signal), then sweep leftovers (each one logged as a bug).
  */
 export function productWorktreeDuty({ ledger, ledgerRepo, now = Date.now(), settings = productSettings(), sync = true } = {}) {
@@ -1137,9 +1009,10 @@ export function productWorktreeDuty({ ledger, ledgerRepo, now = Date.now(), sett
       if (done && !w.live) {
         if (!fs.existsSync(lay.workflow.path) && !revParse(w.repoRoot, `refs/heads/${lay.workflow.branch}`)) continue;
         if (db.prepare('SELECT 1 FROM events WHERE entity_id=? AND kind=? AND json_extract(payload_json,\'$.repoRoot\')=? LIMIT 1').get(w.workflowId, EVENTS.wfRemoved, w.repoRoot)) continue;
-        const r = removeWorkflowWorktree({ repoRoot: w.repoRoot, workflowId: w.workflowId, salvageTo: salvageDirOf(ledgerRepo, w.workflowId, '_workflow'), settings });
+        const abandoned = Boolean(db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='workflow-branch-abandoned' LIMIT 1").get(w.workflowId));
+        const r = removeWorkflowWorktree({ repoRoot: w.repoRoot, workflowId: w.workflowId, abandoned, salvageTo: salvageDirOf(ledgerRepo, w.workflowId, '_workflow'), settings });
         if (r.ok && !workflowEndOf(db, w.workflowId).refused) ledger.transaction(() => ledger.appendEvent({ workflowId: w.workflowId, entityType: 'workflow', entityId: w.workflowId, kind: EVENTS.wfRemoved,
-          payload: { repoRoot: w.repoRoot, path: lay.workflow.path, branch: r.branch, verified: r.verified, landed: r.landed } }));
+          payload: { repoRoot: w.repoRoot, path: lay.workflow.path, branch: r.branch, verified: r.verified, landed: r.landed, abandoned } }));
         out.workflows.push({ workflowId: w.workflowId, repoRoot: w.repoRoot, removed: r.ok, reason: r.reason ?? null });
       } else if (!done && sync && revParse(w.repoRoot, `refs/heads/${lay.workflow.branch}`)) {
         const held = claimManager(workflowLockName(w.repoRoot, lay.workflow.short));

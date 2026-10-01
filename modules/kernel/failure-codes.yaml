@@ -6183,6 +6183,16 @@ archive-bad-by:
   nextStep_vi: "Lệnh bị từ chối; chạy lại với giá trị --by hợp lệ (mặc định là owner)."
   owner: supervisor
   kind: verb-refusal
+archive-failed:
+  title: "Could not archive the branch"
+  title_vi: "Lưu trữ nhánh không thành công"
+  meaning_vi: "Khi dọn worktree của op, việc lưu nhánh chưa hợp nhất vào tham chiếu lưu trữ bị git từ chối."
+  causes_vi:
+    - "Lệnh git update-ref lỗi"
+    - "Kho git đang bị khóa"
+  nextStep_vi: "Việc dọn dừng và nhánh được giữ nguyên để không mất mã; cần lõi runtime xem lỗi git rồi dọn lại."
+  owner: runtime-core
+  kind: runtime-fault
 archive-job-not-droppable:
   title: "Job cannot be dropped for archive"
   title_vi: "Không thể hủy việc để lưu trữ quy trình"
@@ -8084,6 +8094,15 @@ kind-invalid:
   nextStep_vi: "Lệnh provider-backoff bị từ chối; chọn một loại nằm trong danh sách hiện ra."
   owner: supervisor
   kind: input-invalid
+land-busy:
+  title: "Another land holds the lock"
+  title_vi: "Một lần land khác đang giữ khóa"
+  meaning_vi: "Không giành được khóa để đưa code vào nhánh chính vì một lần land khác đang chạy."
+  causes_vi:
+    - "hai quy trình land cùng lúc"
+  nextStep_vi: "Lần land này thất bại tạm thời; thử lại khi lần kia xong."
+  owner: op-retry
+  kind: runtime-fault
 land-incomplete:
   title: "Land request is incomplete"
   title_vi: "Yêu cầu land thiếu thông tin"
@@ -9162,15 +9181,33 @@ process-tree-lingers:
   owner: runtime-core
   kind: runtime-fault
 product-integrate-red:
-  title: "The op breaks on main"
-  title_vi: "Op hỏng khi đặt lên main"
-  meaning_vi: "Phần việc đã xanh trên nền của nó, nhưng khi rebase lên main mới thì các kiểm tra chạy lại của op hoặc kiểm tra import bị đỏ, nên main không được di chuyển."
+  title: "Integration broke the workflow branch"
+  title_vi: "Tích hợp làm hỏng nhánh của luồng"
+  meaning_vi: "Phần việc đã xanh trên nền của nó, nhưng khi gộp vào nhánh của luồng thì kiểm tra bị đỏ nên phải hoàn lại."
   causes_vi:
-    - "Xung đột ngầm với thay đổi của op khác đã vào main"
-    - "main đã đổi kể từ lúc op bắt đầu"
-  nextStep_vi: "main giữ nguyên; op tiếp tục trên nền main mới (continuation), không tính là thất bại."
+    - "Xung đột ngầm với thay đổi của op khác"
+    - "Nhánh luồng đã đổi kể từ lúc op bắt đầu"
+  nextStep_vi: "Nhánh luồng được đưa về trạng thái trước; op tiếp tục trên nền mới (continuation), không tính là thất bại."
   owner: op-retry
   kind: runtime-fault
+product-land-conflict:
+  title: "Land would conflict with main"
+  title_vi: "Đưa vào main sẽ bị xung đột"
+  meaning_vi: "Nhánh của luồng không gộp sạch được vào main, có file xung đột."
+  causes_vi:
+    - "Main đã thay đổi cùng chỗ với nhánh luồng"
+  nextStep_vi: "Không land gì, main giữ nguyên; thông báo liệt kê từng file xung đột để giải quyết trên nhánh luồng rồi land lại."
+  owner: supervisor
+  kind: blocker
+product-land-red:
+  title: "Checks red while landing"
+  title_vi: "Kiểm tra bị đỏ khi đưa vào main"
+  meaning_vi: "Khi thử áp nhánh luồng lên main, một số kiểm tra của cổng land thất bại."
+  causes_vi:
+    - "Code gộp với main mới nhất bị hỏng build hoặc test"
+  nextStep_vi: "Không land, main giữ nguyên; sửa các check đỏ ghi trong kết quả rồi land lại."
+  owner: supervisor
+  kind: blocker
 product-worktree-unavailable:
   title: "Product worktree could not be made"
   title_vi: "Không tạo được cây làm việc riêng cho op"
@@ -9342,6 +9379,15 @@ reason-missing:
   causes_vi:
     - "Quên --reason"
   nextStep_vi: "Không đổi gì. Gửi lại kèm --reason ghi rõ lý do."
+  owner: supervisor
+  kind: input-invalid
+reason-required:
+  title: "Abandon needs a reason"
+  title_vi: "Bỏ nhánh cần có lý do"
+  meaning_vi: "Lệnh bỏ nhánh sản phẩm bị từ chối vì không ghi lý do."
+  causes_vi:
+    - "Dùng --abandon mà thiếu --reason"
+  nextStep_vi: "Không bỏ gì. Gửi lại kèm --reason."
   owner: supervisor
   kind: input-invalid
 record-change-not-owner:
@@ -10428,6 +10474,15 @@ worker-unavailable:
   nextStep_vi: "Nhắc bị từ chối; xử lý như worker chết (khởi động lại)."
   owner: op-retry
   kind: verb-refusal
+workflow-branch-missing:
+  title: "Workflow branch missing"
+  title_vi: "Thiếu nhánh của workflow"
+  meaning_vi: "Không tìm thấy nhánh git của workflow khi đưa code vào nhánh chính."
+  causes_vi:
+    - "Nhánh bị xoá hoặc chưa tạo"
+  nextStep_vi: "Việc đưa code dừng; cần dựng lại nhánh hoặc kiểm tra workflow."
+  owner: runtime-core
+  kind: runtime-fault
 workflow-ff-failed:
   title: "Workflow fast-forward failed"
   title_vi: "Đưa nhánh workflow lên thất bại"
@@ -10475,6 +10530,16 @@ workflow-unknown:
   nextStep_vi: "Lệnh bị từ chối; dùng đúng mã workflow."
   owner: op-retry
   kind: input-invalid
+workflow-unlanded:
+  title: "Workflow branch not landed"
+  title_vi: "Nhánh workflow chưa được đưa vào"
+  meaning_vi: "Không dọn worktree vì nhánh workflow chưa được đưa vào nhánh chính."
+  causes_vi:
+    - "Chưa land"
+    - "Workflow chưa bị bỏ"
+  nextStep_vi: "Việc dọn dẹp dừng; land nhánh hoặc bỏ workflow rồi dọn."
+  owner: owner
+  kind: runtime-fault
 workflow-worktree-dirty:
   title: "Workflow worktree has changes"
   title_vi: "Worktree workflow đang có thay đổi"
@@ -12093,101 +12158,6 @@ op-read-digest-no-pattern:
   nextStep_vi: "Việc chốt bị từ chối; op chạy lại read-digest.mjs với mọi tệp đã sửa, đọc các tệp pattern còn thiếu, kiểm lại code rồi nộp lại."
   owner: op-retry
   kind: settle-reason
-
-land-gate-red:
-  title: "The land gate reports new findings"
-  title_vi: "Cổng khi land báo lỗi mới"
-  meaning_vi: "Khi Kernel đưa op vào main, gate.mjs chạy trên worktree của op so với main và thấy lỗi mà main không có (lint, tsc, spec). main không được di chuyển."
-  causes_vi:
-    - "Op báo done nhưng nhánh vẫn còn lỗi mới"
-    - "Rebase lên main mới làm phát sinh lỗi kiểu hoặc lint"
-  nextStep_vi: "Việc chốt bị từ chối; op sửa các lỗi trong gate, commit rồi báo head mới."
-  owner: op-retry
-  kind: settle-reason
-
-land-gate-unavailable:
-  title: "The land gate could not run a tool"
-  title_vi: "Cổng khi land không chạy được một công cụ"
-  meaning_vi: "gate.mjs trên worktree của op (hoặc chốt chặn merge) không chạy được một công cụ, nên không có kết quả để land. Không bao giờ land khi cổng không chạy được."
-  causes_vi:
-    - "Worktree của op đã mất"
-    - "hfs lint, tsc hoặc git merge-tree không chạy được"
-  nextStep_vi: "Sửa môi trường công cụ rồi chốt lại; main giữ nguyên."
-  owner: runtime-core
-  kind: settle-reason
-
-land-merge-dropped-main:
-  title: "A merge on the op branch dropped main's changes"
-  title_vi: "Một commit merge trên nhánh op làm mất thay đổi của main"
-  meaning_vi: "Chốt chặn merge tính lại commit merge bằng git merge-tree và thấy có tệp main đã sửa mà bản merge lại giữ phía nhánh op (như merge 9958cce38). main không được di chuyển."
-  causes_vi:
-    - "Giải xung đột bằng cách lấy toàn bộ phía nhánh"
-    - "Merge main vào nhánh với chiến lược ours"
-  nextStep_vi: "Làm lại merge, giữ thay đổi của main ở từng tệp được liệt kê, commit rồi báo head mới."
-  owner: op-retry
-  kind: settle-reason
-
-land-main-refused:
-  title: "main could not be fast-forwarded"
-  title_vi: "Không fast-forward được main"
-  meaning_vi: "Op đã qua cổng nhưng main không di chuyển được: bản checkout đang dùng không ở main hoặc đang sửa dở đúng các tệp mà lần land này ghi."
-  causes_vi:
-    - "Bản checkout chính có thay đổi chưa commit trên các tệp đó"
-    - "Bản checkout chính không ở nhánh main"
-  nextStep_vi: "Làm sạch bản checkout chính hoặc chuyển nó về main rồi chốt lại; main giữ nguyên."
-  owner: supervisor
-  kind: settle-reason
-
-op-worktree-dirty:
-  title: "The op worktree has uncommitted changes"
-  title_vi: "Worktree của op còn thay đổi chưa commit"
-  meaning_vi: "Kernel chỉ land đúng những gì đã commit; worktree của op còn thay đổi tệp đã theo dõi chưa commit nên không rebase và land được."
-  causes_vi:
-    - "Op quên commit trước khi báo cáo"
-  nextStep_vi: "Op commit hoặc bỏ các thay đổi đó, báo head mới rồi chốt lại."
-  owner: op-retry
-  kind: settle-reason
-
-op-worktree-reset-failed:
-  title: "The op worktree could not be put on the rebased head"
-  title_vi: "Không đặt được worktree của op lên head đã rebase"
-  meaning_vi: "Để cổng chạy đúng trên cây sẽ land, worktree của op được reset lên head đã rebase lên main; git từ chối bước đó."
-  causes_vi:
-    - "Tệp trong worktree đang bị khóa"
-  nextStep_vi: "Giải phóng tệp bị khóa rồi chốt lại; main giữ nguyên."
-  owner: runtime-core
-  kind: runtime-fault
-
-main-unresolved:
-  title: "The product repository has no main"
-  title_vi: "Kho sản phẩm không có nhánh main"
-  meaning_vi: "Op land thẳng vào main, nhưng kho sản phẩm không có refs/heads/main."
-  causes_vi:
-    - "Kho dùng tên nhánh chính khác"
-  nextStep_vi: "Tạo nhánh main cho kho sản phẩm rồi chốt lại."
-  owner: owner
-  kind: runtime-fault
-
-preserve-failed:
-  title: "The op's unlanded work could not be preserved"
-  title_vi: "Không giữ lại được phần việc chưa land của op"
-  meaning_vi: "Trước khi xóa worktree, phần việc chưa vào main (commit và thay đổi chưa commit) được ghi vào nhánh preserved/<op>; git từ chối, nên worktree được giữ lại."
-  causes_vi:
-    - "git add hoặc commit-tree bị lỗi trên worktree"
-  nextStep_vi: "Worktree không bị xóa; sửa lỗi git rồi để duty dọn lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-deps-land-refused:
-  title: "The deps commit could not land into main"
-  title_vi: "Commit phụ thuộc không land được vào main"
-  meaning_vi: "Đơn vị deps đã commit và cài đặt, nhưng không fast-forward được main tới commit đó; nhánh luồng được hoàn lại, main giữ nguyên."
-  causes_vi:
-    - "main đã di chuyển trong lúc cài đặt"
-    - "Bản checkout chính đang sửa dở tệp manifest"
-  nextStep_vi: "Chạy lại api product-deps cho job đó."
-  owner: supervisor
-  kind: verb-refusal
 
 GATE_BASE_UNKNOWN:
   title: "The gate has no base to compare with"

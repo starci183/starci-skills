@@ -83,7 +83,7 @@ import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
-import { landOp, retargetArgv, isolatedJobs as productIsolatedJobs } from './product-worktree.mjs';
+import { integrateOp, retargetArgv, isolatedJobs as productIsolatedJobs } from './product-worktree.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
@@ -4047,13 +4047,13 @@ const ownProductWorktreeOf = (job) => {
   const rec = jobPayloadOf(job)?.productWorktree;
   return rec?.op?.path && rec?.workflow?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
 };
-// The op's declared checks re-run in the op worktree on the tree that lands (rebased onto main): only the runtime checks
-// the settler itself can re-run (job-settle.mjs classifyCheck).
+// The op's declared checks re-run ON the workflow branch after the merge: only the runtime checks the settler itself
+// can re-run (job-settle.mjs classifyCheck), their paths moved from the op worktree to the workflow worktree.
 const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
-function landForSettle(job, rec, envelope) {
-  // Only a check the op itself declared GREEN on its own base is re-run: the pre-land verify asks whether the REBASE onto
-  // main broke something. A check already red on the op's base (a canon slice's accepted residue, a non-final cut's inventory)
-  // was judged by the settle that got here and is never re-blamed on main.
+function integrateForSettle(job, rec, envelope) {
+  // Only a check the op itself declared GREEN on its own base is re-run: the post-merge verify asks whether the MERGE
+  // broke something. A check already red on the op's base (a canon slice's accepted residue, a non-final cut's inventory)
+  // was judged by the settle that got here and is never re-blamed on the workflow branch.
   const declared = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')) && c?.exitCode === 0);
   const recheck = (checks, { cwd, from, to, timeoutMs }) => checks.flatMap((c) => {
     const cls = settlerClassifyCheck(c, { skillRoot });
@@ -4061,7 +4061,7 @@ function landForSettle(job, rec, envelope) {
     const r = settlerRerunCheck({ ...cls, argv: retargetArgv(cls.argv, from, to) }, { repo: cwd, timeoutMs });
     return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, status: r.output?.slice?.status ?? r.output?.status ?? null, tail: r.tail, ms: r.ms }];
   });
-  return landOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
+  return integrateOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
 }
 function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
@@ -4075,8 +4075,8 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   if (envelope?.outcome !== 'done') return null;
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
-  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then the Kernel lands it straight into main
-  // below (landOp: merge guard, rebase, gate, fast-forward, push); the op itself never pushes.
+  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then lands it in its workflow branch
+  // below; pushing is product-land's (wf/<wf> -> main), never the op's.
   const productRec = ownProductWorktreeOf(job);
   const foreign = foreignPathCheckOf(db, job, acceptForeign);
   if (foreign?.unproven) {
@@ -4101,20 +4101,18 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
     return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
   }
   if (productRec) {
-    // Settle passes only once the op's commits are IN main: the merge guard, a rebase onto main when it moved (conflict ->
-    // files + hunks), THE GATE and the op's re-runnable checks on the tree that lands, then main fast-forwarded and pushed
-    // (product-worktree.mjs landOp). A refusal leaves main untouched.
-    const integration = landForSettle(job, productRec, envelope);
+    // Settle passes only once the op's commits are IN its workflow branch: rebased onto wf/<wf>'s tip (conflict ->
+    // files + hunks), wf/<wf> fast-forwarded, then re-verified ON the workflow branch (product-worktree.mjs integrateOp).
+    const integration = integrateForSettle(job, productRec, envelope);
     if (!integration.ok) {
       return { checked: true, ok: false, reason: integration.reason, detail: { ...proof.detail, integration }, op, status: job.status, pushes,
         hint: integration.reason === 'product-integrate-red'
-          ? `the op is green on its own base but breaks on main (${(integration.failures ?? []).join('; ').slice(0, 300)}): main was not moved; continue the op on the new base (a continuation from ${String(integration.continuation?.resumeFrom ?? '').slice(0, 12)}, never a failure)`
-          : integration.hint ?? `the op's commits do not land into main` };
+          ? `the op is green on its own base but breaks ${productRec.workflow.branch} (${(integration.failures ?? []).join('; ').slice(0, 300)}): the workflow branch was rolled back; continue the op on the new base (a continuation from ${String(integration.continuation?.resumeFrom ?? '').slice(0, 12)}, never a failure)`
+          : integration.hint ?? `the op's commits do not integrate into ${productRec.workflow.branch}` };
     }
-    const inBranch = integratedProof({ root: productRec.repoRoot, head: envelope.head ?? integration.after, branch: 'main', base: productRec.baseSha ?? null });
+    const inBranch = integratedProof({ root: productRec.repoRoot, head: envelope.head ?? integration.after, branch: productRec.workflow.branch, base: productRec.baseSha ?? null });
     if (!inBranch.ok) return { checked: true, ok: false, reason: inBranch.reason, detail: { ...proof.detail, integration: { ...integration, inBranch } }, op, status: job.status, pushes };
-    return { ...proof, detail: { ...proof.detail, integration: { branch: 'main', repoRoot: productRec.repoRoot, inBranch: inBranch.via, before: integration.before, after: integration.after, already: Boolean(integration.already),
-      pushed: integration.push?.pushed ?? null, gate: integration.gate ? { exit: integration.gate.exit, counts: integration.gate.counts } : null,
+    return { ...proof, detail: { ...proof.detail, integration: { branch: productRec.workflow.branch, inBranch: inBranch.via, before: integration.before, after: integration.after, already: Boolean(integration.already),
       commits: (integration.map ?? []).length, verify: integration.verify ? { checks: (integration.verify.checks ?? []).length, importsBroken: integration.verify.imports?.count ?? 0 } : null } }, op, status: job.status, pushes };
   }
   const gate = settlePushGate(db, job, proof.detail, envelope, pushes);

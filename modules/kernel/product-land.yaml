@@ -1,8 +1,6 @@
-# Product worktrees and the op land (DESIGN §16.7, FMEA #20; owner rulings 2026-09-28: one worktree per workflow, one
-# per op; worktrees at <product repo>/.starciwork/worktrees/<wf>/{_wf,<op>}; removed as soon as they are not needed;
-# owner 2026-10-01: a green op lands straight into main - gate, fast-forward or rebase then fast-forward, push - and its
-# worktree and branch go right after; a failed op's work is kept on preserved/<op>).
-# Read by scripts/kernel/product-worktree.mjs productSettings() (landOp, applyDepsUnit) and
+# Product worktrees and product-land (DESIGN §16.7, FMEA #20; owner rulings 2026-09-28: one worktree per workflow, one
+# per op; worktrees at <product repo>/.starciwork/worktrees/<wf>/{_wf,<op>}; removed as soon as they are not needed).
+# Read by scripts/kernel/product-worktree.mjs productSettings(), scripts/kernel/product-land.mjs, api product-land and
 # scripts/kernel/api-status/imports.mjs. Every value has the same default in code.
 
 # The isolation of an op whose brief sets no policy.isolation (owner 2026-09-28 "one worktree per op": one model for
@@ -25,26 +23,27 @@ defaultIsolation: worktree
 worktrees:
   shortIdLength: 8              # <wf> and <op> directory / branch ids (Windows path length)
   opRemoveSlaMs: 60000          # an op worktree outliving its job's settle by more than this is an SLA miss (logged)
+  archiveTtlMs: 604800000       # an archived op branch (refs/starci/archive/op/<op>) no continuation took, kept 7 days
   commandMs: 300000
   overlay:                      # the node_modules junction overlay of every worktree
     lockfiles: [package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json]   # a change rebuilds the overlay
     maxDepth: 3                 # how deep workspace dirs holding a node_modules are looked for
   ports: {base: 43100, span: 800}   # the dev-server/UAT port of a workflow worktree: base + hash(path) % span
 
-integrate:                      # what an op's land checks on the tree that lands, before main moves
-  lockWaitMs: 600000            # the per-workflow lock (dispatch, following main)
-  gateTimeoutMs: 1800000        # scripts/checks/gate.mjs on the op worktree against main
-  recheck: declared             # declared = re-run the op's re-runnable declared checks in the op worktree; none
+integrate:                      # an op's green settle into its workflow branch (per-workflow lock)
+  lockWaitMs: 600000
+  recheck: declared             # declared = re-run the op's re-runnable declared checks on the workflow branch; none
   recheckTimeoutMs: 300000
-  importCheck: changed-files    # the op's changed files must import only existing paths on the rebased tree
+  importCheck: changed-files    # the op's changed files must import only existing paths after the merge
   depsFiles: [package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json, pnpm-workspace.yaml]
 
-land:                           # op/<op> -> the product's main (per-repository main lock; landOp)
+land:                           # wf/<wf> -> the product's main (per-repository serial queue)
   lockWaitMs: 1800000
-  checks: []                    # [{name, argv: [..]}] run in the op worktree before main moves (no shell); none by default
-  push: true                    # push main after every land (owner 2026-10-01); a failed push is recorded, the land stands
-  remote: origin                # the remote main is pushed to; a repository without it pushes nothing
-  maxMainRetries: 3             # main moved under the land: the whole land reruns
+  checks: []                    # [{name, argv: [..]}] run in the land scratch (no shell); none by default
+  importScan: true              # red when the merged result has more broken imports than main had
+  push: false                   # push main after a land (api product-land --push asks for one land)
+  syncWorkflowAfterLand: true   # fast-forward wf/<wf> to the new main
+  maxMainRetries: 3
 
 deps:                           # the workflow's serial deps unit (api product-deps; product-worktree.mjs applyDepsUnit)
   installTimeoutMs: 1200000
