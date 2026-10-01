@@ -16,9 +16,9 @@
 // An answer binds to the work unit it answers (H4; scripts/kernel/units.mjs): every ask report of an
 // earlier try of the SAME unit that holds an `ask-answered` event is an answer - never one of another
 // unit, however the retry chain was spelled. Ledger reads plus the answer receipt file; never writes.
-import { HANDOVER_OP } from './handover.mjs';
+import { KERNEL_ONLY_OPS } from './reported-jobs.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
-import { JOB_ROW } from './verbs/shared/rows.mjs';
+import { JOB_ROW } from './job-row.mjs';
 
 const parse = parseJsonOr;
 const labelOf = (option) => (typeof option === 'string' ? option : option?.label ?? option?.id ?? '');
@@ -93,11 +93,12 @@ const norm = (text) => String(text ?? '').normalize('NFKC').toLowerCase().replac
 /**
  * The answered ask `question` repeats, or null. It repeats one when its text is the same (case,
  * spacing and trailing punctuation aside) or when it offers the same two or more options. A
- * handover.review ask never repeats: each round asks the owner to approve a new package with the
- * same three options (handover.mjs), so its earlier answers ride in the packet only.
+ * handover.review ask (reported-jobs.mjs KERNEL_ONLY_OPS) never repeats: each round asks the owner
+ * to approve a new package with the same three options (handover.mjs), so its earlier answers ride
+ * in the packet only.
  */
 export function repeatedAnswerOf(question, answers, { op = null } = {}) {
-  if (!question || !Array.isArray(answers) || !answers.length || op === HANDOVER_OP) return null;
+  if (!question || !Array.isArray(answers) || !answers.length || KERNEL_ONLY_OPS.includes(op)) return null;
   const text = norm(question.text);
   // A draw review always offers the same two options (accept, redraw) and names the part digests in its text:
   // a redrawn drawing is a new question, so only the same text repeats one (scripts/work/draw-review.mjs).

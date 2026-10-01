@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {endLaunchGrace,notGraceSeed} from '../helpers/launch-grace.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
-import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../../scripts/lib/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-delivery.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 

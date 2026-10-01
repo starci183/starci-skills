@@ -378,7 +378,7 @@ layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
 policy:
   # explicitAsk: this op runs only when the goal asks for it (phraseSets.integrationIntent in modules/goal/archetypes.yaml)
-  # or the owner forces it (api run-deferred-tests); otherwise the kernel settles its leg deferred, never dispatched (scripts/kernel/spec-deferral.mjs).
+  # or the owner forces it (api run-deferred-tests); otherwise the kernel settles its leg deferred, never dispatched (scripts/route/spec-deferral.mjs).
   explicitAsk: integration
   integrationPolicy:
     proofSurface: real-provider

@@ -19,7 +19,7 @@ import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIE
 import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-feedback.mjs';
 import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../../machine/contract-version.mjs';
 import { ownerAskConflict } from '../../gates/starcistacks.mjs';
-import { repeatedAnswerOf, ownerAnswersOf } from '../owner-answers.mjs';
+import { repeatedAnswerOf, ownerAnswersOf } from '../../machine/owner-answers.mjs';
 import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../settle/job-settle.mjs';
 import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit } from '../../../engine/db/ledger.mjs';
@@ -133,7 +133,7 @@ export default {
     try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`api report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
     if (declared) throw Object.assign(new Error(`ask-declared-in-stack: ${declared.message} File done|partial|failed|blocked using the declared custody instead; a custody or server gap is repaired in the stack, never asked of the owner.`), { code: 'ask-declared-in-stack', declared });
   }
-  // An ask the job's retry lineage already had answered is never filed again (scripts/kernel/owner-answers.mjs):
+  // An ask the job's retry lineage already had answered is never filed again (scripts/machine/owner-answers.mjs):
   // the answer rides in the packet as context.owner_answers. The one way past is a declared re-ask,
   // question.reasks {dispatchId: <the answered ask>, reason}, for an answer that could not take effect.
   let reask = null;

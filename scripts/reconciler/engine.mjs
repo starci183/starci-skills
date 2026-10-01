@@ -12,7 +12,7 @@
 //     start_reason, exit_reason, heartbeat age at the end; MB-04, G1); its log lines are machine_logs actor
 //     'reconciler'. Its ONE machine.sqlite connection is the WAL checkpointer (openMachine checkpointer, checkpoint()
 //     every CHECKPOINT_MS);
-//   - self-reload (scripts/reconciler/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
+//   - self-reload (scripts/machine/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
 //     changed engine file, re-execs the engine and hands the lock and the leader row over. While it drains for the
 //     reload, a timer keeps renewing the lease and the heartbeat says `draining`, so boot.mjs ensure leaves it alone
 //     and the engine's own actions are never fenced by its own lease (MB-04);
@@ -41,8 +41,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/db/machine.mjs';
-import { claimOrTakeOver } from '../connectors/lib.mjs';
-import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from './self-reload.mjs';
+import { claimOrTakeOver, lockHolder, reassertManager } from '../connectors/lib.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../machine/self-reload.mjs';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { crashLoopPlan, crashLoopRecord } from './boot.mjs';
 import { DEFAULT_STALL_MAX_MS, startHeartbeatWorker } from './heartbeat-worker.mjs';
@@ -554,7 +554,7 @@ export class Engine {
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
 export const reloadWatchedFiles = (root = SKILL_ROOT) => [
   'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
-  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/reconciler/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
+  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/machine/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
 /**
@@ -562,7 +562,7 @@ export const reloadWatchedFiles = (root = SKILL_ROOT) => [
  * a new runtime HEAD reloads the engine only when it changed a file under these (MB-01: every land of docs or ops
  * contracts re-exec'd the engine about every 6 minutes). Children (cli.mjs, push-mains.mjs, ...) start fresh anyway.
  */
-export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
+export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/machine/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
   'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
 
 /**
@@ -640,7 +640,7 @@ async function main(argv = process.argv.slice(2)) {
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
   const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, headPaths: RELOAD_HEAD_PATHS });
   // --safe is not inherited: the new process re-evaluates the crash-loop plan itself (safeForStart).
-  const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' } });
+  const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' }, holder: lockHolder, reclaim: reassertManager });
   const r = await engine.run({ watch, reload });
   endRun({ exitCode: r.exitCode ?? 0, exitReason: r.reloaded ? 'reload-handover' : r.lost ? 'lost-lease' : stopSignal ? 'stopped' : 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
   engine.close({ releaseLead: !r.reloaded && !r.lost, reason: 'stop' });

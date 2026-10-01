@@ -46,8 +46,8 @@ function fixture(t, { source, contract = lifecycleContract(), extra = {}, versio
       ...(contract === null ? {} : { dataLifecycle: contract }) } } },
   };
   const files = {
-    '../../package.json': `${JSON.stringify(manifest, null, 2)}\n`,
-    '../../hfs.json': appDeclarationText('fe', { apps: [{ name: 'web', kind: 'next' }] }),
+    '../package.json': `${JSON.stringify(manifest, null, 2)}\n`,
+    '../hfs.json': appDeclarationText('fe', { apps: [{ name: 'web', kind: 'next' }] }),
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
       jsx: 'react-jsx', skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
     '../node_modules/swr/package.json': JSON.stringify({ name: 'swr', version, types: './index.d.ts', exports: {

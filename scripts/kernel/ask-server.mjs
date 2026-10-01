@@ -38,7 +38,7 @@
 //
 // Auto-accept (config.yaml asks.autoAcceptRecommended, engine/config.mjs
 // askAutoAcceptPolicy): an ask that carries a recommended option
-// (scripts/kernel/ask-recommendation.mjs) and falls in no excluded class is
+// (scripts/machine/ask-recommendation.mjs) and falls in no excluded class is
 // never served. autoAcceptAsk records the recommendation as the answer: the
 // same starci/ask-answer@1 receipt and `ask-answered` event a submission
 // writes, with answeredBy auto-recommended, plus an `ask-auto-accepted` audit
@@ -63,7 +63,7 @@ import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/tele
 import { parseJson } from '../lib/json.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
-import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
+import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from '../machine/ask-recommendation.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';

@@ -44,7 +44,7 @@
 // stays the owner's; a delegate never accepts.
 // An acceptance names the part digests it saw; a part redrawn since makes the drawing unaccepted again
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
-import { opContextOf } from '../kernel/op-context.mjs';
+import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
@@ -54,8 +54,8 @@ import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
 import { dataStatusOf, recipeRenderedOf } from './ui/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
-import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
-import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
+import { AUTO_ACCEPTED_BY } from '../machine/ask-recommendation.mjs';
+import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';

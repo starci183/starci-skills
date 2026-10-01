@@ -6,7 +6,7 @@ import { setInboxStatusByKey, updateGoalJson } from '../../../engine/db/ledger.m
 import { getWorkflow, goalJsonOf, latestGoal } from './shared/rows.mjs';
 import { HANDOVER_OP } from '../handover.mjs';
 import { planGraphOf } from '../../route/plan-edges.mjs';
-import { deferredTestsOf, ownerSpecs, planLegDeferral, specsOff } from '../spec-deferral.mjs';
+import { deferredTestsOf, ownerSpecs, planLegDeferral, specsOff } from '../../route/spec-deferral.mjs';
 
 export default {
   verb: 'plan',

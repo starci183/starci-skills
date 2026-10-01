@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {openLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {openMachine} from '../../engine/db/machine.mjs';
-import {writeProviderCircuit} from '../../scripts/kernel/provider-circuit.mjs';
+import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -194,7 +194,7 @@ test('claude-agent launches claude-opus-5-5 at the default difficulty and every 
 });
 
 test('an explicit --model naming a removed catalog id fails closed as unknown',()=>{
-  const DISPATCH=path.join(ROOT,'scripts','route','dispatch-op.mjs');
+  const DISPATCH=path.join(ROOT,'scripts','kernel','dispatch-op.mjs');
   const dispatch=model=>spawnSync(process.execPath,[DISPATCH,'--op','code.refactor','--model',model,'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
   for(const removed of ['gpt-5.6-sol','claude-fable']){

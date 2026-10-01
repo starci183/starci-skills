@@ -28,7 +28,7 @@ import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { jobResultSql } from './verbs/shared/rows.mjs';
+import { jobResultSql } from '../machine/job-row.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 

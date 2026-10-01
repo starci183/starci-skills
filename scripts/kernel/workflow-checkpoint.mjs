@@ -34,7 +34,7 @@ import { runGit } from '../api/git/lib.mjs';
 import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
-import { fastForwardLive } from '../supervisor/land.mjs';
+import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';

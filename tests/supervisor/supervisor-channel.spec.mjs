@@ -5,7 +5,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendInbox, readInbox, registerSupervisor, takeInbox } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { appendInbox, readInbox, takeInbox } from '../../scripts/machine/sup-messages.mjs';
 import { replyToOwner, splitText, waitForInbox, waitLine, drainRefusal, WAIT_TIMEOUT_EXIT } from '../../scripts/supervisor/channel.mjs';
 import { withSupervisor, writeSeat } from '../../scripts/machine/home.mjs';
 

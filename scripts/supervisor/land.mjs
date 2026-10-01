@@ -79,6 +79,8 @@ import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-cha
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
+import { fastForwardLive } from '../machine/live-fast-forward.mjs';
+import { withoutGitLocalEnv } from '../lib/git.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
@@ -240,16 +242,6 @@ const run = (cmd, args, { cwd, timeout = 1_200_000, env = process.env } = {}) =>
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null };
 };
-// git's repository-local variables (git rev-parse --local-env-vars). A hook or alias run in a linked worktree exports
-// GIT_DIR=<main>/.git/worktrees/<wt>; a spec inheriting it pointed every fixture git at the LIVE .claude repo and re-inited
-// it core.bare=true (2026-09-29, a6f60352c). tests/setup/isolated-registry.mjs drops the same list.
-export const GIT_LOCAL_ENV_VARS = ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE'];
-/** `parent` without git's repository-local variables (GIT_CONFIG_KEY_n/VALUE_n go with GIT_CONFIG_COUNT). */
-export function withoutGitLocalEnv(parent = process.env) {
-  const env = { ...parent };
-  for (const key of Object.keys(env)) if (GIT_LOCAL_ENV_VARS.includes(key) || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(key)) delete env[key];
-  return env;
-}
 /** The env the gate's spec run gets: no test-runner channel, no git repository-local variables. */
 export function specRunEnv(parent = process.env) {
   const env = withoutGitLocalEnv(parent);
@@ -605,90 +597,6 @@ function spawnGateStability({ runner, base, head, family }) {
   const r = run(process.execPath, [runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
   if (!r.ok) return { error: tail(r.stderr || r.stdout, 6) };
   try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
-}
-
-/* ------------------------------------------------------------ fast-forward */
-
-// Windows limits a spawned command line to about 32K characters. A repository move can change hundreds
-// of paths, so every live-tree Git operation (including rollback) uses the same bounded argument batches.
-const LIVE_PATH_BATCH_CHARS = 8_000;
-function livePathBatches(paths) {
-  const batches = [];
-  let batch = [], chars = 0;
-  for (const file of paths) {
-    const cost = file.length + 3; // argv quoting/separator allowance; command prefix is far below the cap.
-    if (batch.length && chars + cost > LIVE_PATH_BATCH_CHARS) { batches.push(batch); batch = []; chars = 0; }
-    batch.push(file);
-    chars += cost;
-  }
-  if (batch.length) batches.push(batch);
-  return batches;
-}
-
-function livePathGit(root, args, paths) {
-  const output = [];
-  for (const batch of livePathBatches(paths)) {
-    const result = git(['--literal-pathspecs', ...args, '--', ...batch], { cwd: root });
-    if (!result.ok) return { ...result, stdout: output.concat(result.stdout).filter(Boolean).join('\n') };
-    if (result.stdout) output.push(result.stdout);
-  }
-  return { ok: true, stdout: output.join('\n'), stderr: '' };
-}
-
-/**
- * Move live main from `base` to `head` and update the working tree and index of exactly `rows`
- * (name-status rows of base..head). Refuses when main moved, HEAD is not main, or a path is dirty.
- * Returns {ok, reason?, dirty?, moved?}.
- */
-export function fastForwardLive({ root, base, head, rows }) {
-  // A live repo flipped to core.bare=true fails the status/checkout below with a generic error; name it and the fix.
-  const bare = git(['config', '--get', 'core.bare'], { cwd: root, env: withoutGitLocalEnv() }).stdout.toLowerCase();
-  if (bare === 'true') return { ok: false, reason: 'live-repo-bare', detail: `${root} has core.bare=true (a git fixture reached the live repo through a leaked GIT_DIR?) - find the writer, then run: git -C "${root}" config core.bare false` };
-  const branch = git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout;
-  if (branch !== 'refs/heads/main') return { ok: false, reason: 'live-not-on-main', detail: branch || 'detached' };
-  const live = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
-  if (live !== base) return { ok: false, reason: 'main-moved', moved: live };
-  const paths = [...new Set(rows.flatMap((r) => r.slice(1)).map(normPath))];
-  // No paths, nothing to be dirty: `git status --` with an empty pathspec lists the whole tree.
-  const status = livePathGit(root, ['status', '--porcelain', '--untracked-files=all'], paths);
-  if (!status.ok) return { ok: false, reason: 'live-path-status-failed', detail: status.stderr || status.error || 'git status failed' };
-  const dirty = status.stdout.split(/\r?\n/).filter(Boolean);
-  if (dirty.length) return { ok: false, reason: 'live-paths-dirty', dirty };
-  const cas = git(['update-ref', '-m', 'supervisor land gate', 'refs/heads/main', head, base], { cwd: root });
-  if (!cas.ok) return { ok: false, reason: 'main-moved', detail: cas.stderr };
-  const deleted = rows.filter((r) => r[0].startsWith('D')).map((r) => normPath(r[1]));
-  const renamedFrom = rows.filter((r) => r[0].startsWith('R')).map((r) => normPath(r[1]));
-  const written = rows.filter((r) => !r[0].startsWith('D')).map((r) => normPath(r[r.length - 1]));
-  const gone = [...deleted, ...renamedFrom];
-  try {
-    if (written.length) { const co = livePathGit(root, ['checkout', head], written); if (!co.ok) throw Error(co.stderr || co.error || 'checkout failed'); }
-    if (gone.length) {
-      const rm = livePathGit(root, ['rm', '--cached', '--quiet', '--ignore-unmatch'], gone);
-      if (!rm.ok) throw Error(rm.stderr || rm.error || 'git rm --cached failed');
-      for (const f of gone) { try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* already gone */ } }
-    }
-    return { ok: true, written, removed: gone };
-  } catch (error) {
-    // Roll back: the ref first (compare-and-swap on our own head), then the paths to base.
-    const rollbackErrors = [];
-    const restoreRef = git(['update-ref', '-m', 'supervisor land gate rollback', 'refs/heads/main', base, head], { cwd: root });
-    if (!restoreRef.ok) rollbackErrors.push(restoreRef.stderr || restoreRef.error || 'ref rollback failed');
-    const back = rows.flatMap((r) => (r[0].startsWith('A') ? [] : [normPath(r[1])]));
-    if (back.length) {
-      const restorePaths = livePathGit(root, ['checkout', base], back);
-      if (!restorePaths.ok) rollbackErrors.push(restorePaths.stderr || restorePaths.error || 'path rollback failed');
-    }
-    const added = rows.filter((x) => x[0].startsWith('A') || x[0].startsWith('R')).map((r) => normPath(r[r.length - 1]));
-    if (added.length) {
-      const removeAdded = livePathGit(root, ['rm', '--cached', '--quiet', '--ignore-unmatch'], added);
-      if (!removeAdded.ok) rollbackErrors.push(removeAdded.stderr || removeAdded.error || 'added-path rollback failed');
-    }
-    for (const f of added) {
-      try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* best effort */ }
-    }
-    return { ok: false, reason: 'tree-update-failed', detail: String(error?.message ?? error), rolledBack: rollbackErrors.length === 0,
-      ...(rollbackErrors.length ? { rollbackErrors } : {}) };
-  }
 }
 
 /** Refresh untracked dist only after main has advanced. Knowledge snapshots are tracked contract files, so drift is owed to a lane. */

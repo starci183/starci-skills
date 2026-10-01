@@ -21,19 +21,19 @@ function fixture(t,files){
   const written=new Set();
   const write=(relative,value)=>{written.add(relative);const target=path.join(root,...relative.split('/'));fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,value);};
   // HFS: the fe side of an app; the app root holds the root entries, and all source lives under fe/apps/web/src.
-  write('../../.gitattributes','* text=auto eol=lf\n');
+  write('../.gitattributes','* text=auto eol=lf\n');
   write('../.github/workflows/check.yml','name: check\n');
-  write('../../.gitignore','node_modules/\n');
+  write('../.gitignore','node_modules/\n');
   write('../.husky/pre-commit','exit 0\n');
-  write('../../README.md',hfsReadme(app));
+  write('../README.md',hfsReadme(app));
   write('eslint.config.mjs','export default [];\n');
-  write('../../package-lock.json','{}\n');
+  write('../package-lock.json','{}\n');
   write('../sonar-project.properties','sonar.projectKey=fixture\n');
-  write('../../package.json','{"private":true}\n');
+  write('../package.json','{"private":true}\n');
   write('apps/web/next.config.ts','export default {};\n');
   write('apps/web/postcss.config.mjs','export default {};\n');
   write('apps/web/tsconfig.json',JSON.stringify({extends:'../../tsconfig.json',include:['src/**/*']}));
-  write('../../hfs.json',appDeclarationText('fe',{apps:[{name:'web',kind:'next'}]}));
+  write('../hfs.json',appDeclarationText('fe',{apps:[{name:'web',kind:'next'}]}));
   write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',jsx:'preserve',baseUrl:'.',paths:{'@/*':['apps/web/src/*']},noEmit:true},include:['apps/web/src/**/*']},null,2));
   for(const [relative,value] of Object.entries(files))write(relative,value);
   execFileSync('git',['init','-q'],{cwd:app});

@@ -12,7 +12,7 @@ import {ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {GATE_WAITS_ON_JOB,legOrderExemption} from '../../scripts/kernel/leg-order.mjs';
-import {TASK_SPEC_MAX_CHARS,packetFileOf,taskSpecOf} from '../../scripts/kernel/task-spec.mjs';
+import {TASK_SPEC_MAX_CHARS,packetFileOf,taskSpecOf} from '../../scripts/machine/task-spec.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');

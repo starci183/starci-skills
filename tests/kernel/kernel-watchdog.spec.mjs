@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyAgentScreen } from '../../scripts/kernel/terminal-liveness.mjs';
+import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
 import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs';
 
 test('provider input prompt is turn-idle even when it carries an Orca message',()=>{

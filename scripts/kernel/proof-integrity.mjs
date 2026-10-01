@@ -282,7 +282,7 @@ export function scopeOf(db, workflowId) {
  * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/work/ui/ui-proof-brief.mjs
  * buildBrief); it is injected so a caller that cannot load the knowledge still reports FRs and shapes.
  */
-// notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/kernel/spec-deferral.mjs):
+// notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/route/spec-deferral.mjs):
 // an FR's requiresProof demand of that kind is not counted, so it makes no must-have on its own (listed as `notCounted`).
 export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }), notCounted = [] } = {}) {
   const scope = scopeOf(db, workflowId);

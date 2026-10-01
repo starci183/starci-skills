@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {JOB_ROW} from '../../scripts/kernel/verbs/shared/rows.mjs';
+import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 
 // On 2026-09-23 twenty-nine op workers died or went quiet without a report (codex and claude
 // exited to a bare PowerShell prompt, Mia Mia workers sat nudged and silent), and each became a

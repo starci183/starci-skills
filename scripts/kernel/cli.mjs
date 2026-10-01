@@ -72,7 +72,7 @@ import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
 import { ownedPathEffects } from './settle-landed.mjs';
-import { lineageJobsOf } from './owner-answers.mjs';
+import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
@@ -84,11 +84,11 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
-// The reads and guards the split-out verbs share with what stays here (lane slim-api):
-// one definition per helper, in scripts/kernel/verbs/shared/, imported back under the same names.
+// The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
 import {
-  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestReportOf, latestAttemptOf, operationTaskOf, operationDispatchOf,
+  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, latestAttemptOf, operationTaskOf, operationDispatchOf,
 } from './verbs/shared/rows.mjs';
+import { JOB_ROW, jobResultSql } from '../machine/job-row.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
 import { foundationDutyFor } from './verbs/shared/foundation-duty.mjs';
@@ -96,7 +96,7 @@ import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatc
 import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './verbs/shared/hierarchy.mjs';
 import { WORKER_QUESTION } from './verbs/shared/messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peers.mjs';
-import { OP_ROLE, callerOf, refuseOpCaller } from './verbs/shared/caller.mjs';
+import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { closeSelfSafe } from '../machine/close-verify.mjs';
@@ -114,7 +114,7 @@ import {
 import {
   classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, collapse,
   clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN,
-} from './terminal-liveness.mjs';
+} from '../lib/terminal-liveness.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
@@ -126,13 +126,13 @@ import {
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, providerCircuitOf, defaultOperationTarget } from '../agent/models.mjs';
-import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from './provider-circuit.mjs';
+import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from '../machine/provider-circuit.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
 import { kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
-import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from './spec-deferral.mjs';
+import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from '../route/spec-deferral.mjs';
 import { HANDOVER_OP } from './handover.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
 import {
@@ -178,7 +178,7 @@ import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
 import { judgeJobLoop, judgeJobProofs, OP_GATE_CHANGE, OP_PROOF_CHANGE } from './gate-settle.mjs';
 import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
-import { taskSpecOf } from './task-spec.mjs';
+import { taskSpecOf } from '../machine/task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
@@ -1690,7 +1690,7 @@ async function mapConcurrent(items, limit, fn) {
 // bounds agentsAchievable.
 /* --------------------------------------------------------------- enqueue */
 /* ---------------------------------------------------------- deferred tests */
-// The owner's config.yaml `specs` switches (scripts/kernel/spec-deferral.mjs): a queued leg whose op only tests a
+// The owner's config.yaml `specs` switches (scripts/route/spec-deferral.mjs): a queued leg whose op only tests a
 // class that is off is never routed or dispatched - route and dispatch settle it deferred (status succeeded,
 // result verdict deferred, no attempt spent) and say so. Returns true when it did.
 function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
@@ -1830,7 +1830,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     ...(extra ?? {}),
     ...(opens ? { recover: failureKind === QUOTA_FAILURE_KIND ? providerQuotaProbeCommand(key) : providerRecoverCommand(key) } : {}),
   };
-  // The circuit is a machine.sqlite provider_health row (scripts/kernel/provider-circuit.mjs), fleet-wide.
+  // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), fleet-wide.
   storeProviderCircuit(key, { value, expiresAt });
   return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
@@ -1982,7 +1982,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     ...(payload.cut ? { cut: payload.cut } : {}),
     ...(payload.title ? { title: payload.title } : {}),
     ...(payload.risk ? { risk: payload.risk } : {}),
-    // The asks this job's retry lineage already had answered (scripts/kernel/owner-answers.mjs):
+    // The asks this job's retry lineage already had answered (scripts/machine/owner-answers.mjs):
     // binding input for this attempt, never a question to file again.
     ...(ownerAnswers.length ? { owner_answers: ownerAnswers } : {}),
     // The owner asked for this deferred test leg to run anyway (api run-deferred-tests): its specs switch no longer applies.

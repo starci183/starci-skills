@@ -24,7 +24,7 @@ const WINDOWS = {
   'scripts/kernel/clear-draft.mjs': [['CLEAR_DRAFT_INTERVAL_MS', 'draft.intervalMs']],
   'scripts/supervisor/workers.mjs': [['WORKER_LEASE_TTL_MS', 'workerJobs.leaseTtlMs']],
   'scripts/supervisor/supervisor-watchdog.mjs': [['WORKER_REPORT_WINDOW_MS', 'workerJobs.reportWindowMs']],
-  'scripts/reconciler/self-reload.mjs': [['RELOAD_MIN_INTERVAL_MS', 'selfReload.minIntervalMs'], ['HANDOVER_WAIT_MS', 'selfReload.handoverMs']],
+  'scripts/machine/self-reload.mjs': [['RELOAD_MIN_INTERVAL_MS', 'selfReload.minIntervalMs'], ['HANDOVER_WAIT_MS', 'selfReload.handoverMs']],
   'scripts/guards/footprint-scan.mjs': [['FOOTPRINT_EVERY_MS', 'footprint.everyMs'], ['FOOTPRINT_LOCK_STALE_MS', 'footprint.lockStaleMs']],
   'scripts/guards/hook-install.mjs': [['JOB_GUARD_TTL_MS', 'jobGuard.ttlMs']],
 };
@@ -107,7 +107,7 @@ test('no source file keeps a second literal of a moved window', () => {
     'scripts/kernel/clear-draft.mjs': [/CLEAR_DRAFT_INTERVAL_MS = 300/],
     'scripts/supervisor/workers.mjs': [/7 \* 24 \* 3600_000/],
     'scripts/supervisor/supervisor-watchdog.mjs': [/7 \* 86_400_000/],
-    'scripts/reconciler/self-reload.mjs': [/5 \* 60_000/, /30_000/],
+    'scripts/machine/self-reload.mjs': [/5 \* 60_000/, /30_000/],
     'scripts/guards/footprint-scan.mjs': [/10 \* 60_000/, /> 60_000/],
     'scripts/guards/hook-install.mjs': [/7 \* 24/],
   };

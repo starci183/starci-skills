@@ -17,7 +17,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot.mjs';
 import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
-import { repeatedAnswerOf } from '../../scripts/kernel/owner-answers.mjs';
+import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
 import { layoutTreeMain } from '../../scripts/work/layout-tree.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';

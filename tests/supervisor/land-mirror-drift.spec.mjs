@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runChecks, mirrorDriftCheck, mirroredFiles, mirrorRun, withoutGitLocalEnv, MIRROR_CHECK, MIRROR_FIX } from '../../scripts/supervisor/land.mjs';
+import { runChecks, mirrorDriftCheck, mirroredFiles, mirrorRun, MIRROR_CHECK, MIRROR_FIX } from '../../scripts/supervisor/land.mjs';
+import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -33,7 +34,7 @@ if (process.argv.includes('--check')) {
 }
 `;
 
-const env = withoutGitLocalEnv();
+const env = withoutGitLocalEnv(process.env);
 const git = (dir, ...args) => {
   const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env, windowsHide: true });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);

@@ -32,10 +32,10 @@ test('parseArgs: dry-run is the default, --apply mutates, --only names known are
   assert.match(parseArgs(['--force']).error, /unknown flag/);
 });
 
-test('every declared area maps to a lib module and a named sweep export', () => {
+test('every declared area maps to a housekeeping module and a named sweep export', () => {
   assert.deepEqual(AREA_NAMES, ['tmp', 'sessions', 'claude', 'devin', 'logs', 'lanes', 'gitlocks', 'ledgers', 'orphanledgers']);
   for (const [name, area] of Object.entries(AREAS)) {
-    assert.match(area.module, /^\.\.\/lib\/hk-.+\.mjs$/, name);
+    assert.match(area.module, /^\.\/hk-.+\.mjs$/, name);
     assert.match(area.sweep, /^sweep[A-Z]/, name);
   }
 });

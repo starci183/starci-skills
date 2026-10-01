@@ -20,8 +20,8 @@ import { attemptCauseOf, lineageRouteAdjust } from '../../scripts/kernel/lineage
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { openMachineReader } from '../../engine/db/machine.mjs';
-import { readProviderCircuit } from '../../scripts/kernel/provider-circuit.mjs';
-import { JOB_ROW } from '../../scripts/kernel/verbs/shared/rows.mjs';
+import { readProviderCircuit } from '../../scripts/machine/provider-circuit.mjs';
+import { JOB_ROW } from '../../scripts/machine/job-row.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');

@@ -526,7 +526,7 @@ export async function turnProbe({ terminal = null, supervisor = false } = {}) {
   }
   if (!handle) return { ok: false, error: 'no seat terminal' };
   const [{ terminalRead }, { terminalList }, { agentOfTerminal }, { classifyAgentScreen }] = await Promise.all([
-    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-list.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/terminal-liveness.mjs')]);
+    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-list.mjs'), import('../kernel/quit-agent.mjs'), import('../lib/terminal-liveness.mjs')]);
   const listed = terminalList();
   const entry = (listed.terminals ?? []).find((t) => t.handle === handle) ?? null;
   if (!listed.ok || !entry) return { ok: false, terminal: handle, error: listed.ok ? 'terminal not listed' : 'orca unavailable' };

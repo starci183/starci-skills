@@ -11,7 +11,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { fastForwardLive, specRunEnv, GIT_LOCAL_ENV_VARS } from '../../scripts/supervisor/land.mjs';
+import { specRunEnv } from '../../scripts/supervisor/land.mjs';
+import { fastForwardLive } from '../../scripts/machine/live-fast-forward.mjs';
+import { GIT_LOCAL_ENV_VARS } from '../../scripts/lib/git.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LEAKED = { GIT_DIR: 'C:/live/.git/worktrees/wt', GIT_WORK_TREE: 'C:/live', GIT_INDEX_FILE: 'C:/live/.git/index', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.bare', GIT_CONFIG_VALUE_0: 'true' };

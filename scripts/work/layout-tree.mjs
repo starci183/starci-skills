@@ -24,7 +24,7 @@
 // looked up in every catalog, and each route is resolved against the scanned pages. A destination with no
 // route, a route no page answers, a label a catalog lacks and a top-level route no destination reaches are
 // each written into the layout's nav.findings - reported, never papered over.
-import { opContextOf } from '../kernel/op-context.mjs';
+import { opContextOf } from '../guards/op-context.mjs';
 import { loadSlotManifest, readRepoDeclaration } from '../hfs/slots.mjs';
 import fs from 'node:fs';
 import path from 'node:path';

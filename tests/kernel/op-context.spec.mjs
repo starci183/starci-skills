@@ -1,4 +1,4 @@
-// scripts/kernel/op-context.mjs: an op's job, scratch and provider come from the Orca terminal it runs in - the guard
+// scripts/guards/op-context.mjs: an op's job, scratch and provider come from the Orca terminal it runs in - the guard
 // bound to that terminal names the ledger, and the ledger's own binding names the job. worker-start owns the op's
 // environment, so no env marker (STARCI_OP_JOB, STARCI_JOB_SCRATCH, STARCI_OP_PROVIDER) names anything any more.
 import test from 'node:test';
@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { writeJobGuard, bindGuardTerminal } from '../../scripts/guards/hook-install.mjs';
-import { opContextOf } from '../../scripts/kernel/op-context.mjs';
+import { opContextOf } from '../../scripts/guards/op-context.mjs';
 
 const WF = 'wf-op-context';
 

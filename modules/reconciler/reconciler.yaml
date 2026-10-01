@@ -25,7 +25,7 @@ engine:
   task: StarCi-Reconciler (at logon + every 5 min, conhost --headless, IgnoreNew, below-normal); created only by `boot.mjs --install-task --apply`, run by the owner or the coordinator
 
 leader:
-  lock: claimManager('reconciler') (scripts/connectors/lib.mjs), handed over on self-reload (scripts/reconciler/self-reload.mjs)
+  lock: claimManager('reconciler') (scripts/connectors/lib.mjs), handed over on self-reload (scripts/machine/self-reload.mjs)
   row: machine.sqlite engine_leader, epoch + 1 on every takeover (a leader_history row with how it was acquired and why it was released); renewed every renewMs, lost at leaseMs
   standby: a second engine waits read-only and takes over once the row expires
   fence: every mutation (ctx.api, ctx.run, ctx.openDecision in active) runs only while the engine's epoch is the leader's; a leader that loses the row stops and exits (DESIGN §7.5, §12.3)

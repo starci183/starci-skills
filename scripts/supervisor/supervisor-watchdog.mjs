@@ -29,7 +29,8 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
-import { readInbox, getSupervisor, heartbeatSupervisor } from './telegram-bridge.mjs';
+import { getSupervisor, heartbeatSupervisor } from './telegram-bridge.mjs';
+import { readInbox } from '../machine/sup-messages.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SEAT_ID, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, seatOf, enabledOf, supervisorEvent, supervisorSettings,
   supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
@@ -163,7 +164,7 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
 
 async function hostDeps() {
   const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config, { workerShow }, { workerStop }, { workerRelease }] = await Promise.all([
-    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../kernel/terminal-liveness.mjs'),
+    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../lib/terminal-liveness.mjs'),
     import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('../../engine/config.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };

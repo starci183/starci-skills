@@ -8,17 +8,7 @@ const ADAPTERS=path.join(ROOT,'modules','models','agents');
 // Agent differences are data. Every agent card must parse and start the one way, orchestration
 // worker-start (Orca composes the command). The card is the
 // Orca adapter card at top level plus an optional `capabilities:` key.
-//
-// The yaml parser is canonical at engine/yaml.mjs post-flip (core/ is doomed);
-// resolve whichever exists so this spec runs before and after the move.
-const YAML_MODULE=await (async()=>{
-  for(const p of ['../../engine/yaml.mjs','../core/yaml.mjs']){
-    if(!fs.existsSync(path.join(ROOT,p.slice(3))))continue;
-    try{return await import(p);}catch{/* landed but not yet wired — fall back */}
-  }
-  throw new Error('no importable yaml module at engine/ or core/');
-})();
-const {parseYaml}=YAML_MODULE;
+import {parseYaml} from '../../engine/yaml.mjs';
 
 const cards=fs.readdirSync(ADAPTERS).filter(f=>f.endsWith('.yaml')).sort();
 assert.ok(cards.length>0,'modules/models/agents holds no cards');

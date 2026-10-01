@@ -13,7 +13,7 @@ const rootFindings = side => checkHfsWithoutConfig(path.dirname(side)).violation
 const manifest = packageManager => JSON.stringify({ name: 'fixture', private: true, ...(packageManager ? { packageManager } : {}) });
 
 test('HFS_PACKAGE_MANAGER_MIXED: a packageManager other than npm in the app package.json is a finding at package.json', t => {
-  const root = archFixture(t, { files: { '../../package.json': manifest('pnpm@9.0.0') } });
+  const root = archFixture(t, { files: { '../package.json': manifest('pnpm@9.0.0') } });
   const hits = rootFindings(root);
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'package.json');
@@ -26,7 +26,7 @@ test('HFS_PACKAGE_MANAGER_MIXED: another manager\'s lock file at the root is a f
 
 test('HFS_PACKAGE_MANAGER_MIXED: npm as packageManager, or none, raises nothing', t => {
   for (const value of ['npm@10.8.2', undefined]) {
-    const root = archFixture(t, { files: { '../../package.json': manifest(value) } });
+    const root = archFixture(t, { files: { '../package.json': manifest(value) } });
     assert.deepEqual(rootFindings(root), [], String(value));
   }
 });

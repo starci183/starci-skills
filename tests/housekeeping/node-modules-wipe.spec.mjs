@@ -69,15 +69,16 @@ test('the land gate refuses to run specs when the live node_modules is empty (li
   assert.equal(liveDepsState(root).declared, 0);
 });
 
-test('a land scratch with a node_modules junction to the live one is removed without touching the live deps', (t) => {
+test('a land scratch carries no link to the live node_modules; links a check makes in it are removed without touching the live deps', (t) => {
   const { root, env } = liveRuntime(t);
   const main = git(root, 'rev-parse', 'main');
   let scratch = null;
   const r = landCommits({ commits: [sideCommit(root)], root, env, push: false, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
     scratch = dir;
     const nm = path.join(dir, 'node_modules');
-    assert.ok(fs.lstatSync(nm).isSymbolicLink(), 'the scratch reaches the live deps through a junction');
-    // A nested link too: the removal must not follow either.
+    assert.equal(fs.existsSync(nm), false, 'the scratch gets its own npm ci, never a link to the live deps (RT_NODE_MODULES_LINK)');
+    // A check that links the live deps in anyway, top-level and nested: the removal must follow neither.
+    fs.symlinkSync(path.join(root, 'node_modules'), nm, LINK);
     fs.mkdirSync(path.join(dir, 'packages', 'x'), { recursive: true });
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(dir, 'packages', 'x', 'node_modules'), LINK);
     return { ok: false, checks: [{ name: 'spec', ok: false }] };
@@ -91,12 +92,13 @@ test('a land scratch with a node_modules junction to the live one is removed wit
   assert.equal(git(root, 'rev-parse', 'main'), main);
 });
 
-test('checks that emptied the live node_modules through the junction refuse the land (live-deps-missing), never land it', (t) => {
+test('checks that emptied the live node_modules through a link refuse the land (live-deps-missing), never land it', (t) => {
   const { root, env } = liveRuntime(t);
   const main = git(root, 'rev-parse', 'main');
   const r = landCommits({ commits: [sideCommit(root)], root, env, push: false, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
-    // What an npm reify (or any delete) through the scratch junction does: the children go, the directory stays.
+    // What an npm reify (or any delete) through a link to the live deps does: the children go, the directory stays.
     const nm = path.join(dir, 'node_modules');
+    fs.symlinkSync(path.join(root, 'node_modules'), nm, LINK);
     for (const dep of fs.readdirSync(nm)) fs.rmSync(path.join(nm, dep), { recursive: true, force: true });
     return { ok: true, checks: [], rows: [['A', 'change.txt']], changed: ['change.txt'] };
   } } });

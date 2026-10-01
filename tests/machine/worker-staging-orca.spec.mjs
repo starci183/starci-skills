@@ -73,7 +73,22 @@ test('createStaging asks Orca and records the path, branch, base and id Orca rep
   assert.ok(!path.resolve(s.path).startsWith(path.resolve(root)), 'Orca places it under its own workspace root');
   const row = rowOf(env, s.orcaId);
   assert.deepEqual([row?.kind, row?.lane, row?.branch, row?.removed_at, path.resolve(row?.path ?? '')], [STAGING_KIND, 'fix-a-1', s.branch, null, s.path]);
-  assert.ok(fs.lstatSync(path.join(s.path, 'node_modules')).isSymbolicLink(), 'the node_modules junction to the live runtime');
+  assert.equal(fs.existsSync(path.join(s.path, 'node_modules')), false, 'no node_modules link to the live runtime (RT_NODE_MODULES_LINK); no lockfile, no install');
+});
+
+test('a staging checkout with a package-lock gets its own npm ci (the install seam), never a linked node_modules; a failed ci removes it', (t) => {
+  const { root, env, orca } = fixture(t);
+  fs.writeFileSync(path.join(root, 'package-lock.json'), '{}\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'lock');
+  const installs = [];
+  const s = createStaging({ jobId: 'fix-ci-1', root, env, orca, install: (dir) => { installs.push(path.resolve(dir)); return { ok: true, status: 0, stderr: '' }; } });
+  assert.ok(s.ok, s.error);
+  assert.deepEqual(installs, [path.resolve(s.path)], 'npm ci runs once, in the staging checkout');
+  assert.equal(fs.existsSync(path.join(s.path, 'node_modules')), false, 'never a link to the live node_modules');
+  const failed = createStaging({ jobId: 'fix-ci-2', root, env, orca, install: () => ({ ok: false, status: 1, stderr: 'npm ERR! boom' }) });
+  assert.deepEqual([failed.ok, failed.reason, failed.code], [false, 'staging-install-failed', 'WORKER_STAGING_CREATE_FAILED']);
+  assert.match(failed.error, /npm ci in the staging checkout failed \(exit 1\)/);
 });
 
 test('removeStaging is the link-safe Orca removal: links first, orca rm, row closed; a branch with work is kept, a landed one deleted', (t) => {

@@ -12,10 +12,10 @@ import { layoutTreeMain, lockupSourceOf, layoutSettlement, loadUiRecords, nodeBy
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { drawingAcceptance, partAssetsOf, reviewPartsOf } from '../../scripts/work/direction-part.mjs';
 import { applyDrawReview, drawReviewMain, drawReviewQuestion, drawReviewStatus, drawReviewsOwed } from '../../scripts/work/draw-review.mjs';
-import { autoAcceptDecision } from '../../scripts/kernel/ask-recommendation.mjs';
+import { autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { autoAcceptAsk } from '../../scripts/kernel/ask-server.mjs';
 import { validateConfig } from '../../engine/config.mjs';
-import { repeatedAnswerOf } from '../../scripts/kernel/owner-answers.mjs';
+import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 

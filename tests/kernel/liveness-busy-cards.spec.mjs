@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/lib/terminal-liveness.mjs';
 
 // "job xong/treo cũng không ai nhắn" (owner, 2026-09-25). Four defects, one spec each:
 //  A. busy frames read turn-idle: a wrapped Devin spinner block, Claude's effort row under its spinner

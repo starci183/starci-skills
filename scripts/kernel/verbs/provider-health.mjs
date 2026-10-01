@@ -1,6 +1,6 @@
 // api provider-health: inspect and recover provider circuits, including quota probes.
 import { parseJson } from '../../lib/json.mjs';
-import { readProviderCircuit, writeProviderCircuit } from '../provider-circuit.mjs';
+import { readProviderCircuit, writeProviderCircuit } from '../../machine/provider-circuit.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';
 import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
 
@@ -88,7 +88,7 @@ export default {
   if (args['quota-probe']) return quotaProbe(ledger, args, emit, internals);
   const db = ledger.db, key = normalizeProviderId(args.provider), now = Date.now();
   if (!key) throw Object.assign(new Error('provider-health needs a provider id'), { code: 'provider-unknown' });
-  // The circuit is machine.sqlite provider_health (scripts/kernel/provider-circuit.mjs), fleet-wide.
+  // The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs), fleet-wide.
   const stored = readProviderCircuit(key);
   const raw = stored ? { at: stored.at, expires_at: stored.expiresAt } : null;
   const value = stored ? stored.value : null;

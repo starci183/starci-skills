@@ -592,7 +592,7 @@ sections:
         unit covers the back end's unit tests (*.service.spec.ts; jest and its per-file coverage threshold, and the
         services' coverage Sonar judges; the front end has no tests); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
-      - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):
+      - "What an op does when a class is off is its brief's policy.specsToggle (scripts/route/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the
         legs behind it proceed. skip - the op runs without writing or running that class of test and demands
         no coverage of it; Sonar still runs (sonar-local reads specs.unit and reports coverage NOT MEASURED in owner mode, never green), so

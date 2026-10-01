@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { classifyAgentScreen } from '../../scripts/kernel/terminal-liveness.mjs';
+import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 // The busy frames status still read turn-idle after 0856299e6, so the frontier asked for a nudge

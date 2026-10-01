@@ -196,7 +196,7 @@ or the owner asks for it ("full unit", or its Vietnamese phrase for running the 
 e2e (e2e.verify, Playwright and `*.e2e-spec.*` specs): it runs only when the goal or the owner asks, and `e2e.verify`
 then runs the full e2e suite. `false` for either family switches that class off for the workflow. uat.verify is neither:
 it is owner-deferred separately until credentials. The switches are read per call
-(`scripts/kernel/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next wake with
+(`scripts/route/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next wake with
 no restart.
 
 What an op does when a class is off is its brief's `policy.specsToggle.<class>`:

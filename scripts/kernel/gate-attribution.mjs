@@ -42,7 +42,7 @@ import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { resolveIntroducer } from './introducer.mjs';
-import { lineageJobsOf } from './owner-answers.mjs';
+import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 export const ATTRIBUTION_CLASSES = Object.freeze(['own', 'peer', 'foreign', 'unknown']);

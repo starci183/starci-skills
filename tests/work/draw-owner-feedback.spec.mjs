@@ -22,7 +22,7 @@ import {
 import { rubricFor } from '../../scripts/work/draw-critic.mjs';
 import { applyDirectionReview, directionReviewQuestion, promoteGolden } from '../../scripts/work/brand-direction.mjs';
 import { checkDirection } from '../../scripts/work/brand/brand.mjs';
-import { autoAcceptDecision } from '../../scripts/kernel/ask-recommendation.mjs';
+import { autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { answerDrawReviewByReply, autoAcceptAsk, drawReplyDecision } from '../../scripts/kernel/ask-server.mjs';
 import { loadWorkSchemaValidators } from '../../scripts/work/validate/check-work-schemas.mjs';
 

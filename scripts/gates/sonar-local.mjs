@@ -825,7 +825,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
  * Before a slice scan: the services the slice touched (changed files of the coverage scope) get a fresh lcov at
  * sonar.javascript.lcov.reportPaths, written by the be unit run over their related specs (cfg.coverageRunner, default
  * runSliceCoverage), so Sonar imports this slice's coverage and never a stale report. With the owner's specs.unit off
- * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
+ * (config.yaml `specs`, scripts/route/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
  * runs and the slice's coverage is not judged (`judged` false). Returns {judged, targets, lcov, exitCode?, written?, error?, note?}.
  */
 /** What a slice summary says while the owner's specs.unit is off: its coverage is not measured, never read as green. */

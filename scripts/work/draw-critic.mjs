@@ -13,7 +13,7 @@
 //
 // The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27 draw-devin-brand-claude: Devin draws,
 // Codex critiques). criticFor picks it: allocation.drawLoop.critic, unless the drawer (draw-loop.mjs round --drawer,
-// else the provider of the op running it, scripts/kernel/op-context.mjs) is that critic's provider - Codex drawing as the draw order's fallback -
+// else the provider of the op running it, scripts/guards/op-context.mjs) is that critic's provider - Codex drawing as the draw order's fallback -
 // then allocation.drawLoop.criticWhenDrawer.<drawer> (a Claude worker); with none configured the round has no
 // independent critic (an error, no beauty), never the drawer judging itself.
 //
@@ -29,7 +29,7 @@ import {sha256} from '../../engine/digest.mjs';
 import crypto from 'node:crypto';
 import { gitResult } from '../api/git/lib.mjs';
 import { createOrcaWorktree, removeOrcaWorktree } from '../machine/worktree-orca.mjs';
-import { opContextOf } from '../kernel/op-context.mjs';
+import { opContextOf } from '../guards/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';

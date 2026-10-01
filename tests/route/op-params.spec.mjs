@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { resolveOpParams } from '../../scripts/route/dispatch-op.mjs';
+import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -240,7 +240,7 @@ test('brand.decide takes the owner ruling and the reference sources it names fro
 });
 
 test('a kernel param a planner leg names is the kernel default, split off the owner params', async () => {
-  const { splitGoalLegParams } = await import('../../scripts/route/dispatch-op.mjs');
+  const { splitGoalLegParams } = await import('../../scripts/kernel/dispatch-op.mjs');
   const kernelSet = opWithParams((def) => def.setBy === 'kernel');
   const value = kernelSet.def.default;
   for (const leg of [{ kernelParams: { [kernelSet.name]: value } }, { params: { [kernelSet.name]: value } }]) {

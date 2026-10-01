@@ -2,7 +2,8 @@
 import { changeWorkflowPhase, getUnit, recordJobResult, resolveIncident, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateIncident, updateJob } from '../../../engine/db/ledger.mjs';
 import { recordWhy } from '../why-record.mjs';
 import { parseJson } from '../../lib/json.mjs';
-import { ARCHIVED_BY, JOB_ROW, getWorkflow, jobOpOf, jobPayloadOf, latestAttemptOf } from './shared/rows.mjs';
+import { JOB_ROW } from '../../machine/job-row.mjs';
+import { ARCHIVED_BY, getWorkflow, jobOpOf, jobPayloadOf, latestAttemptOf } from './shared/rows.mjs';
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { openAskDispatchesOf, retireAsk } from './shared/asks.mjs';
 import { closeHeldTasks, closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';

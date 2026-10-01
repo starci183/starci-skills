@@ -221,7 +221,7 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 /** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps). */
 export async function workerSweepDeps() {
   const [{ terminalRead }, host, liveness, closeMod, quitMod] = await Promise.all([
-    import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../kernel/terminal-liveness.mjs'),
+    import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../lib/terminal-liveness.mjs'),
     import('../../kernel/close-op-terminal.mjs'), import('../../kernel/quit-agent.mjs')]);
   return {
     verdict: (h) => host.kernelTerminalVerdict(h),

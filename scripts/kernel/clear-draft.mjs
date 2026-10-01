@@ -23,7 +23,7 @@
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
-import { collapse } from './terminal-liveness.mjs';
+import { collapse } from '../lib/terminal-liveness.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 export const CTRL_U = '\u0015';

@@ -4,7 +4,7 @@ import { jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake-delivery.mjs';
 import { answerAllowlistedGate } from '../../agent/lib.mjs';
 import { probeDraft } from '../clear-draft.mjs';
-import { draftOwnership } from '../terminal-liveness.mjs';
+import { draftOwnership } from '../../lib/terminal-liveness.mjs';
 
 export default {
   verb: 'nudge',

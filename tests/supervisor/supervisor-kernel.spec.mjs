@@ -22,7 +22,8 @@ import { scanDiff, defaultPushRepos, boundRepos } from '../../scripts/supervisor
 import { directCommits, gateLandedShas } from '../../scripts/supervisor/direct-commits.mjs';
 import { tell, replies, sinceMs } from '../../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../../scripts/supervisor/channel.mjs';
-import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { registerSupervisor, createBridge } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { appendInbox, readInbox, readOutbox } from '../../scripts/machine/sup-messages.mjs';
 import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../scripts/supervisor/orca-tree.mjs';
 import { withLedger } from '../helpers/ledger-fixture.mjs';

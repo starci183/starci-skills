@@ -11,6 +11,7 @@ import { stageBlob, putArtifact } from '../../machine/evidence-store.mjs';
 import path from 'node:path';
 import { PROPOSAL_KIND, csv, newId, recordKernel, refuse } from '../kernel-authority.mjs';
 import { parseJsonOr } from '../../lib/json.mjs';
+import { appendInbox } from '../../machine/sup-messages.mjs';
 
 export default {
   verb: 'kernel-proposal',
@@ -50,7 +51,6 @@ export default {
       markdown: `Kernel proposal **${id}** (${tier.tier})\n\n${args.title}\n\nEvidence: ${args.evidence}\n\nFiles: ${files.join(', ') || '-'}${patchFile ? `\n\nPatch: ${patchFile}` : ''}` });
     let inbox = null;
     try {
-      const { appendInbox } = await import('../../supervisor/telegram-bridge.mjs');
       inbox = appendInbox('main', { chatId: null, messageId: null, from: `kernel:${wf}`,
         text: `KERNEL-PROPOSAL ${id} (${tier.tier}) from ${wf}: ${args.title}\nEvidence: ${String(args.evidence).slice(0, 800)}${patchFile ? `\nPatch: ${patchFile}` : ''}${files.length ? `\nFiles: ${files.join(', ')}` : ''}\n(supervise.yaml kernelProposals: land AUTO through a lane, forward IMPORTANT to the owner)` })?.id ?? null;
     } catch { inbox = null; }

@@ -439,7 +439,7 @@ export function inspectOwnerConfig(root=configRoot){
  *             the /push-git flow (scripts/supervisor/push-git.mjs), which needs no key. true = `--specs all` may run;
  *   unit    - product unit specs in workflows. Default on: a code-writing op writes/updates the unit specs of the source it
  *             adds or changes and runs only those; the full unit suite is unit.verify's or /push-git's. false = the ops'
- *             policy.specsToggle deferral path (scripts/kernel/spec-deferral.mjs);
+ *             policy.specsToggle deferral path (scripts/route/spec-deferral.mjs);
  *   e2e     - product e2e in workflows. Default OFF: e2e runs only when the goal or the owner explicitly asks (set true,
  *             or `api run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
  * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.

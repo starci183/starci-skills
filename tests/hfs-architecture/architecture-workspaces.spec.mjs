@@ -16,8 +16,8 @@ const tree = (t, workspaces, extra = () => {}) => {
   t.after(() => fs.rmSync(app, { recursive: true, force: true }));
   const root = path.join(app, 'fe');
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-  write('../../hfs.json', JSON.stringify(appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }], optionalSlots: ['fe.package.ui'] }, 'ws')));
-  write('../../package.json', JSON.stringify({ name: 'ws', private: true, workspaces }));
+  write('../hfs.json', JSON.stringify(appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }], optionalSlots: ['fe.package.ui'] }, 'ws')));
+  write('../package.json', JSON.stringify({ name: 'ws', private: true, workspaces }));
   write('tsconfig.json', '{"compilerOptions":{"strict":true},"include":[]}');
   write('apps/web/tsconfig.json', '{"compilerOptions":{"strict":true},"include":["src"]}');
   write('apps/web/src/app/[locale]/page.tsx', 'export default function Page() { return null }\n');

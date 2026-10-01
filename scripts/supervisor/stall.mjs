@@ -56,7 +56,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../lib/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { conditionLabel, evaluateCondition, lineageHeadById, typedIncidents } from '../kernel/gate-conditions.mjs';
 import { parseJsonOr } from '../lib/json.mjs';

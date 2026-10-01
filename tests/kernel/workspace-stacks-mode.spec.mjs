@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { resolveOpParams } from '../../scripts/route/dispatch-op.mjs';
+import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const read = rel => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));

@@ -92,7 +92,7 @@ fields:
       what the kernel chose. The packet holds the merged result, so the agent
       reads a value rather than inferring a number from the brief's prose.
     enforcedBy: >-
-      scripts/route/dispatch-op.mjs resolveOpParams — the one resolver.
+      scripts/kernel/dispatch-op.mjs resolveOpParams — the one resolver.
       `api enqueue` runs it over the goal leg and the flag and refuses
       `params-invalid` (modules/kernel/api.yaml enqueue) before a jobs row
       exists; `api dispatch` re-runs it over the brief's defaults and lays the
@@ -163,7 +163,7 @@ fields:
       this attempt; the op applies it and records the decision with its
       answeredBy source, and never asks it again.
     enforcedBy: >-
-      scripts/kernel/owner-answers.mjs ownerAnswersOf, read by `api dispatch`
+      scripts/machine/owner-answers.mjs ownerAnswersOf, read by `api dispatch`
       into buildPacket; buildPrompt renders an `owner_answers:` block at the
       top of the prompt saying each question is ANSWERED and must not be
       re-asked. `api report` refuses an `ask` whose question repeats one of

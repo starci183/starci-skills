@@ -18,7 +18,8 @@
 // Reads only; every write stays in cli.mjs.
 import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
-import { jobResultSql, latestReportOf } from './verbs/shared/rows.mjs';
+import { jobResultSql } from '../machine/job-row.mjs';
+import { latestReportOf } from './verbs/shared/rows.mjs';
 
 export const HANDOVER_OP = 'handover.review';
 export const HANDOVER_DECISIONS = Object.freeze(['approve', 'feedback', 'question']);

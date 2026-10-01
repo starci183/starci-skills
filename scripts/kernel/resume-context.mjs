@@ -10,7 +10,7 @@
 // commits), and the tail of its typed op log (the rows it wrote through api log).
 // resumePromptLines renders it. Ledger reads only.
 import { parseJsonOr } from '../lib/json.mjs';
-import { jobResultSql } from './verbs/shared/rows.mjs';
+import { jobResultSql } from '../machine/job-row.mjs';
 
 const EVIDENCE_MAX = 25;
 const LOG_TAIL = 12;

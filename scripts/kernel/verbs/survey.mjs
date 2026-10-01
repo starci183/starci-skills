@@ -1,11 +1,12 @@
 // api survey: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
-import { JOB_ROW, getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './shared/rows.mjs';
+import { JOB_ROW } from '../../machine/job-row.mjs';
+import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './shared/rows.mjs';
 import { deliveriesOf } from '../handover.mjs';
 import { autopilotBundle, autopilotOn } from '../autopilot.mjs';
 import { workflowDisplayName } from '../../lib/display-names.mjs';
 import { staleOperationsOf, sourceDriftSummaryOf, peerDriftSummaryOf } from '../input-digests.mjs';
-import { providerCircuits } from '../provider-circuit.mjs';
+import { providerCircuits } from '../../machine/provider-circuit.mjs';
 
 export default {
   verb: 'survey',
@@ -26,7 +27,7 @@ export default {
       `SELECT scope,key,holder_pid,token,value_json,at,expires_at FROM signals
        WHERE (scope=? OR key=?) AND (expires_at IS NULL OR expires_at>?) ORDER BY scope,key`
     ).all(workflowId, workflowId, now).map((r) => ({ ...r, value: parseJson(r.value_json) }))
-      // Provider circuits are machine rows now (scripts/kernel/provider-circuit.mjs), shown in the same list.
+      // Provider circuits are machine rows now (scripts/machine/provider-circuit.mjs), shown in the same list.
       .concat(providerCircuits().filter((c) => c.expiresAt == null || c.expiresAt > now)
         .map((c) => ({ scope: 'provider-health', key: c.provider, value: c.value, at: c.at, expires_at: c.expiresAt })));
     const events = db.prepare('SELECT seq,event_id,generation,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 10')

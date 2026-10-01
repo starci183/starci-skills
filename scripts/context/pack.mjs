@@ -10,7 +10,7 @@
 // Consumed two ways:
 //   - CLI (this file's main): materializes a packet on demand; tests/repo/context-pack.spec.mjs
 //     drives it as a process.
-//   - Library: scripts/route/dispatch-op.mjs imports buildContext/renderPromptReads
+//   - Library: scripts/kernel/dispatch-op.mjs imports buildContext/renderPromptReads
 //     so the [Op] prompt carries the resolved MANDATORY READS list, not just
 //     "read CONTEXT.md".
 //

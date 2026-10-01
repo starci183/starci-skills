@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {allocationMs} from '../../engine/config.mjs';
-import {classifyAgentScreen,staleAwareState} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,staleAwareState} from '../../scripts/lib/terminal-liveness.mjs';
 
 // 2026-09-24: both starci-next Kernels printed nothing for ~3.7 hours; their screens ended with a
 // finished answer at the prompt, but older spinner rows stayed in the last lines, so the watchdog

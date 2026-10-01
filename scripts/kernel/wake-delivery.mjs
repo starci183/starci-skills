@@ -52,15 +52,13 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
-  collapse, clipDraft, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+  collapse, clipDraft, DEFAULT_STAGED_PATTERN, WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { kernelRevWakeLine } from './runtime-rev.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
-export const WAKE_PROOF_READS = 3;
-export const WAKE_PROOF_INTERVAL_MS = 1000;
 export const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
 
 const sendCodeOf = (sent) => sent?.errorCode ?? sent?.enterRetry?.after ?? null;

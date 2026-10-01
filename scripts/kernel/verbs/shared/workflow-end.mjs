@@ -6,7 +6,8 @@
 import { JOB_STATUSES, clearSignal, recordJobResult, releaseLeases, setJobStatus, updateJob } from '../../../../engine/db/ledger.mjs';
 import { retainLedgerDb } from '../../../housekeeping/hk-ledger.mjs';
 import { closeSelfSafe } from '../../../machine/close-verify.mjs';
-import { JOB_ROW, jobPayloadOf, operationTaskOf } from './rows.mjs';
+import { JOB_ROW } from '../../../machine/job-row.mjs';
+import { jobPayloadOf, operationTaskOf } from './rows.mjs';
 
 /**
  * Move a job to `to` along the shortest job_transitions path from its current status (inside the caller's

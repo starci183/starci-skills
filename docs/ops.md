@@ -115,7 +115,7 @@ the agent         reads `params.<name>` from its packet, never a number from pro
 `setBy: owner` means only the approved goal leg may carry it — `--params` can
 relay it at enqueue, but only when the leg already names it. `setBy: kernel`
 means the kernel sets it and a goal leg cannot. One resolver does all of it:
-`resolveOpParams` in `scripts/route/dispatch-op.mjs`.
+`resolveOpParams` in `scripts/kernel/dispatch-op.mjs`.
 
 ## What the check refuses
 

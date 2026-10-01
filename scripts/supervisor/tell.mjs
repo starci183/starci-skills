@@ -13,7 +13,8 @@
 // the verified owner Telegram chat or from the Supervisor's own Orca terminal.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appendInbox, getSupervisor, readInbox, readOutbox, supervisorOnline } from './telegram-bridge.mjs';
+import { getSupervisor, supervisorOnline } from './telegram-bridge.mjs';
+import { appendInbox, readInbox, readOutbox } from '../machine/sup-messages.mjs';
 import { SUPERVISOR_ID } from '../machine/home.mjs';
 import { sleep } from '../lib/sleep.mjs';
 

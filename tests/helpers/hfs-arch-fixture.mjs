@@ -64,8 +64,8 @@ export function archFixture(t, { profile = 'be', files = {}, declaration = {}, a
   const root = path.join(appRoot, profile);
   const app = apps[0].name;
   const baseline = {
-    '../../hfs.json': `${JSON.stringify(appDeclaration(profile, { apps, ...declaration }), null, 2)}\n`,
-    '../../package.json': JSON.stringify({ name: 'fixture', private: true }),
+    '../hfs.json': `${JSON.stringify(appDeclaration(profile, { apps, ...declaration }), null, 2)}\n`,
+    '../package.json': JSON.stringify({ name: 'fixture', private: true }),
     'tsconfig.json': `${JSON.stringify({
       compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true, experimentalDecorators: true },
       include: ['src/**/*', 'apps/**/*'],

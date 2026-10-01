@@ -8,7 +8,7 @@
 //
 //   log --workflow <id> [--job <job_id>] --kind <kind> --msg <text> [--data '<json>'] [--refs <csv>] [--level info|warn|error] [--node <id>] [--actor kernel|runtime|check|land]
 import { getWorkflow } from './shared/rows.mjs';
-import { OP_ROLE, refuseOpCaller } from './shared/caller.mjs';
+import { OP_ROLE, refuseOpCaller } from '../../guards/op-caller.mjs';
 import { appendLog, openLogs } from '../typed-logs.mjs';
 
 export default {

@@ -172,7 +172,7 @@ readiness"). It starts no-op agents through the runtime's own launchers and chec
 
 | Path | Chain (depth) | Child launcher |
 |---|---|---|
-| `supervisor-worker` | entry (0) -> `[Supervisor]` (1) -> `[Worker]` (2) | `workers.mjs startWorkerAgent`, from the Supervisor's terminal |
+| `supervisor-worker` | entry (0) -> `[Supervisor]` (1) -> `[Worker]` (2) | `agent/start-worker.mjs startWorkerAgent`, from the Supervisor's terminal |
 | `op-critic` | entry (0) -> `[Kernel]` (1) -> `[Op]` (2) -> critic (3) | `startAgent` from the Kernel's terminal; `draw-critic.mjs launchCriticWorker` from the Op's |
 | `workflow-worktree` | entry (0) -> `[Kernel]` (1) -> be `[Op]`, fe `[Op]`, failing be `[Op]` (2) | `ensureWorkflowWorktree` first (Orca's `worktree create`), then the Kernel with `--worktree <its path>`; each op with `opWorktreeArgs`, from the Kernel's terminal |
 

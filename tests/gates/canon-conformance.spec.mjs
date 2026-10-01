@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadConformance, planSlices, seamPaths, unitOf } from '../../scripts/gates/canon-scan.mjs';
-import { resolveOpParams } from '../../scripts/route/dispatch-op.mjs';
+import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

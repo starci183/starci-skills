@@ -36,7 +36,7 @@ import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { resolveIncident } from '../../engine/db/ledger.mjs';
-import { jobResultSql } from './verbs/shared/rows.mjs';
+import { jobResultSql } from '../machine/job-row.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 const repoMatches = (repoRoot, want) => {
@@ -51,7 +51,7 @@ const JOB_WANTS = ['settled', 'succeeded'];
 // A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
 const SETTLED = ['succeeded', 'failed'];
 const MAX_LINEAGE_HOPS = 32;
-// A job row: `attempt` = its try number (per unit), `result_json` = its settle result (api-lib/rows.mjs jobResultSql).
+// A job row: `attempt` = its try number (per unit), `result_json` = its settle result (machine/job-row.mjs jobResultSql).
 const JOB_COLS = `job_id,workflow_id,op_id,unit_id,try_no,try_no AS attempt,retry_of,resume_of,status,payload_json,${jobResultSql('jobs')} AS result_json,worker_id,created_at,updated_at`;
 const cutOfRow = (row) => parseJson(row?.payload_json, {})?.cut ?? null;
 /** `row` with the lineage columns (retry_of, resume_of, unit_id, created_at): itself, or re-read by id. */

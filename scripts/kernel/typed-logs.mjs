@@ -38,7 +38,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
-import { jobResultSql } from './verbs/shared/rows.mjs';
+import { jobResultSql } from '../machine/job-row.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { logWriterFor } from '../machine/log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';

@@ -100,7 +100,7 @@ dispatch:
     packet context.owner_answers (dispatch.yaml fields context.owner_answers):
     every ask an earlier attempt of the job's retry lineage filed that holds an
     `ask-answered` event, with the question, options, chosen {index, label},
-    answeredBy, answeredAt and receipt path (scripts/kernel/owner-answers.mjs
+    answeredBy, answeredAt and receipt path (scripts/machine/owner-answers.mjs
     ownerAnswersOf; the lineage is payload.retry.retryOf|resumeOf, so a cut
     ordinal reads only its own ordinal). The prompt opens with an
     `owner_answers:` block saying each question is ALREADY ANSWERED, binding,

@@ -6,7 +6,7 @@
 // longer biases a route (api route refuses --prefer/--avoid as unknown options); the ROUTER decides, from ledger facts:
 //   - a pool whose provider-health circuit is open is rejected by capacity (unchanged);
 //   - this module: when the job is a retry, each earlier attempt of its retry lineage
-//     (jobs.retry_of|resume_of; scripts/kernel/owner-answers.mjs lineageJobsOf) that FAILED on
+//     (jobs.retry_of|resume_of; scripts/machine/owner-answers.mjs lineageJobsOf) that FAILED on
 //     pool X for a pool-attributable cause demotes X for this retry (taken only when no other pool of the
 //     order is eligible); two such failures in the lineage exclude X for it.
 // Pool-attributable causes (the agent, not the work):
@@ -28,7 +28,7 @@
 // red check to a peer's change), a failed report or a first red check, a dispatch refused before any
 // provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
-import { lineageJobsOf } from './owner-answers.mjs';
+import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { AWAITING_OWNER_STATUS, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';

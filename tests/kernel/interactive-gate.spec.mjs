@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {classifyAgentScreen} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen} from '../../scripts/lib/terminal-liveness.mjs';
 
 // A provider screen that waits for a human answer (Codex directory trust, Claude Code first-run setup) is the
 // liveness classifier's interactive-gate with the gate's name (a live worker's screen; the launch itself is

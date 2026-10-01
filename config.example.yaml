@@ -185,7 +185,7 @@ reconciler:
   profile: operational
   controllers: {}
 # specs.unit / specs.e2e in workflows (the `specs` map near the top; owner 2026-09-28 "speed up development;
-# test later when asked"; scripts/kernel/spec-deferral.mjs). Each op brief's policy.specsToggle says what it does:
+# test later when asked"; scripts/route/spec-deferral.mjs). Each op brief's policy.specsToggle says what it does:
 #   unit: false - backend.implement, interface.implement and code.refactor run no jest/vitest/test:ci/coverage
 #     and demand no changed-line coverage (Sonar still runs: bugs, smells, security gate);
 #     test.author legs are never dispatched; review/handover gates do not count unit tests or coverage.

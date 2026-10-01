@@ -68,8 +68,8 @@ test('the runtime resolver: slots, tiers, owners, the forbidden current paths an
   assert.equal(r.classifyPath('scripts/api/orca/worker-start.mjs').bindings.system, 'orca');
   assert.equal(r.tierOf('scripts/kernel/verbs/settle.mjs'), 'kernel', 'a verb inherits the kernel owner');
   assert.equal(r.tierOf('scripts/lib/clip.mjs'), 'base');
-  assert.equal(r.classifyPath('scripts/housekeeping/hk-claude.mjs').status, 'forbidden', 'a retired lib name is spelled out, so it beats <name>.mjs');
-  assert.equal(r.classifyPath('scripts/kernel/settle/job-settle.mjs').status, 'forbidden');
+  assert.equal(r.classifyPath('scripts/lib/hk-claude.mjs').status, 'forbidden', 'a retired lib name is spelled out, so it beats <name>.mjs');
+  assert.equal(r.classifyPath('scripts/reconcile/job-settle.mjs').status, 'forbidden');
   assert.equal(r.classifyPath('packages/hfs/runtime/scripts/lib/glob.mjs').tracking, 'generated');
   assert.equal(r.classifyPath('stray/file.txt').status, 'no-slot');
   assert.deepEqual(r.importAllowed('scripts/kernel/a.mjs', 'scripts/agent/lib.mjs'), { allowed: true, reason: 'allowed', fromTier: 'kernel', toTier: 'domain' });

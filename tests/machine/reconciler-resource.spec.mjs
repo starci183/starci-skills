@@ -128,7 +128,7 @@ test('cap-starved: the reserve workflow short of its slots for 15 min opens one 
 });
 
 test('quota: probe every 5 min while a quota circuit is open; quota-exhausted when every pool of a waiting kind is out', async () => {
-  // The circuits are machine.sqlite provider_health rows (scripts/kernel/provider-circuit.mjs providerCircuits).
+  // The circuits are machine.sqlite provider_health rows (scripts/machine/provider-circuit.mjs providerCircuits).
   const circuits = [{ provider: 'devin', value: { provider: 'devin', status: 'unavailable', failureKind: 'quota' }, expiresAt: T + 3_600_000 }];
   const jobs = [{ op: 'interface.draw', status: 'queued', pool: 'devin-agent' }, { op: 'interface.draw', status: 'queued', pool: 'devin-agent' }, { op: 'code.refactor', status: 'queued', pool: 'codex-agent' }];
   const read = (id, fn) => fn({ prepare: () => ({ all: () => jobs }) });

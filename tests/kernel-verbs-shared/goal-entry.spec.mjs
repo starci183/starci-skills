@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {JOB_ROW} from '../../scripts/kernel/verbs/shared/rows.mjs';
+import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');

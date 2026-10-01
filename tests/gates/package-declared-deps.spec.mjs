@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { aliasMatches, boundSpecifiers, isDeclared, needsDeclaration, packageName, tsconfigAliases } from '../helpers/declared-deps.mjs';
 import { gitTrackedUnder, publishSet } from '../../scripts/gates/package-clean-test.mjs';
-import { withoutGitLocalEnv } from '../../scripts/supervisor/land.mjs';
+import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 import { TEMPLATES_DIR } from '../../packages/hfs/sync/index.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
@@ -90,7 +90,7 @@ test('every declared data root exists and no scanned source of its package impor
   }
 });
 
-const gitIn = (dir, ...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: withoutGitLocalEnv(), windowsHide: true }); assert.equal(r.status, 0, r.stderr); };
+const gitIn = (dir, ...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: withoutGitLocalEnv(process.env), windowsHide: true }); assert.equal(r.status, 0, r.stderr); };
 /** A git work tree package from `files` (all tracked); `untracked` files are written but not added. */
 function fixturePackage(t, files, untracked = {}) {
   const dir = mkdtemp(t, 'starci-pkg-deps-');

@@ -1,12 +1,11 @@
-// Shared terminal-frame classifier for Kernel and Op supervision.  Orca's
-// connected/writable flags prove that a terminal can receive input; they do
-// not prove that an LLM turn is still running.  Provider TUIs also keep their
-// input row visible while active, so current activity wins over readyPrompt.
+// Shared terminal-frame classifier for Kernel and Op supervision. Orca's connected/writable flags prove that a terminal
+// can receive input; they do not prove that an LLM turn is still running. Provider TUIs also keep their input row
+// visible while active, so current activity wins over readyPrompt.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
+import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from './input-glyph.mjs';
 
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
@@ -100,7 +99,6 @@ const INTERACTIVE_GATES = [
 ];
 
 const FRAMED_GATE_ROWS = 24;
-
 /** The one-time action that clears `gate`, with <cwd> filled in, or null. */
 export function gateRemedy(gate, { cwd = null } = {}) {
   const remedy = INTERACTIVE_GATES.find((g) => g.gate === gate)?.remedy;
@@ -483,6 +481,8 @@ export function staleAwareState(state, outputAgeMs, activeStaleMs) {
 export const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
 // The wake is found by its opening words; a TUI wraps and indents the rest.
 const WAKE_PROBE_CHARS = 60;
+export const WAKE_PROOF_READS = 3; // a delivery proof reads the screen this many times,
+export const WAKE_PROOF_INTERVAL_MS = 1000; // this far apart (the kernel wake and the agent prompt alike)
 const screenProse = (screen) => collapse(String(screen ?? '').split(/\r?\n/)
   .map((row) => row.replace(/^[\s│┃┆┊>›❯❭⎿↳●•]*/u, '')).join(' '));
 const occurrences = (haystack, needle) => {

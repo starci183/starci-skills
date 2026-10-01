@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {endLaunchGrace,notGraceSeed} from '../helpers/launch-grace.mjs';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../../engine/db/ledger.mjs';
-import {wakeDeliveryOf} from '../../scripts/kernel/terminal-liveness.mjs';
+import {wakeDeliveryOf} from '../../scripts/lib/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-delivery.mjs';
 
 // inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f (part 2): `api nudge` returned ok:false

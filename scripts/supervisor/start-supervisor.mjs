@@ -102,7 +102,7 @@ export const SEAT_DENIED_TOOLS = Object.freeze({ claude: Object.freeze(['Agent',
 async function orcaDeps() {
   const [{ terminalList }, { terminalRead }, liveness, closeMod, quitMod, agentLib, dedupe, workerMod, workerStopMod, workerReleaseMod, guards] = await Promise.all([
     import('../api/orca/terminal-list.mjs'), import('../api/orca/terminal-read.mjs'),
-    import('../kernel/terminal-liveness.mjs'), import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'),
+    import('../lib/terminal-liveness.mjs'), import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'),
     import('../agent/lib.mjs'), import('../kernel/terminal-dedupe.mjs'), import('../api/orca/worker-show.mjs'),
     import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs'), import('../guards/hook-install.mjs')]);
   return {

@@ -19,7 +19,8 @@
 import { JOB_STATUSES, postInbox, setInboxStatusByKey } from '../../../../engine/db/ledger.mjs';
 import { parseJson } from '../../../lib/json.mjs';
 import { orchCheck } from '../../../api/orca/orch-check.mjs';
-import { JOB_ROW, contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
+import { JOB_ROW } from '../../../machine/job-row.mjs';
+import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
 
 export const WORKER_QUESTION = 'worker-question';
 export const ORCHESTRATION_MESSAGE = 'orchestration-message';

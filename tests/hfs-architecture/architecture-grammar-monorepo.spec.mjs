@@ -31,8 +31,8 @@ const monorepo = (t) => {
   t.after(() => fs.rmSync(app, { recursive: true, force: true }));
   const root = path.join(app, 'fe');
   const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
-  put('../../package.json', JSON.stringify({ private: true, workspaces: ['fe/packages/*'], dependencies: { '@starci/grammar': '0.4.11', ...PEERS } }));
-  put('../../hfs.json', JSON.stringify({ hfs: 2, kind: 'app', project: 'fixture', sides: {
+  put('../package.json', JSON.stringify({ private: true, workspaces: ['fe/packages/*'], dependencies: { '@starci/grammar': '0.4.11', ...PEERS } }));
+  put('../hfs.json', JSON.stringify({ hfs: 2, kind: 'app', project: 'fixture', sides: {
     be: { apps: [{ name: 'core', kind: 'api' }] },
     fe: { apps: [{ name: 'app', kind: 'next' }, { name: 'landing', kind: 'next' }], optionalSlots: ['fe.package.ui'] },
   } }));

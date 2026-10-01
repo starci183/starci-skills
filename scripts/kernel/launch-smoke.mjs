@@ -4,7 +4,7 @@
 // one Kernel workflow runs in ONE workflow worktree (contract change workflow-worktree).
 //
 //   supervisor-worker  entry (0) -> [Supervisor] (1) -> [Worker] (2)
-//                      the [Worker] is started by scripts/supervisor/workers.mjs startWorkerAgent from the
+//                      the [Worker] is started by scripts/agent/start-worker.mjs startWorkerAgent from the
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
 //   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
 //                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
@@ -118,13 +118,13 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() }
  * the context those two modules take; `git` runs one git command ({ok, stdout, error}).
  */
 export async function defaultClient() {
-  const [lib, workers, critic, show, read, stop, release, update, list, wt, cp, tree] = await Promise.all([
-    import('../agent/lib.mjs'), import('../supervisor/workers.mjs'), import('../work/draw-critic.mjs'),
+  const [lib, startWorker, critic, show, read, stop, release, update, list, wt, cp, tree] = await Promise.all([
+    import('../agent/lib.mjs'), import('../agent/start-worker.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
     import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'),
     import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs'), import('../machine/workflow-tree.mjs')]);
   return {
-    startAgent: lib.startAgent, startWorkerAgent: workers.startWorkerAgent,
+    startAgent: lib.startAgent, startWorkerAgent: startWorker.startWorkerAgent,
     criticWorkspace: critic.criticWorkspace, removeCriticWorkspace: critic.removeCriticWorkspace, launchCriticWorker: critic.launchCriticWorker,
     workerShow: show.workerShow, workerRead: read.workerRead, workerStop: stop.workerStop, workerRelease: release.workerRelease,
     taskUpdate: update.taskUpdate, worktreeList: list.worktreeList,

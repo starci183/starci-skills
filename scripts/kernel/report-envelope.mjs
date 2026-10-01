@@ -148,7 +148,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
   if (value.outcome === 'ask' && (!value.question || !text(value.question.text))) fail("outcome 'ask' requires question.text");
   // question.recommended: the 0-based index of the option the op recommends, with
   // question.recommendedReason saying why (config.yaml asks.autoAcceptRecommended
-  // may answer the ask with it; scripts/kernel/ask-recommendation.mjs).
+  // may answer the ask with it; scripts/machine/ask-recommendation.mjs).
   if (value.question && typeof value.question === 'object') {
     const q = value.question, count = Array.isArray(q.options) ? q.options.length : 0;
     if (q.recommended !== undefined && q.recommended !== null

@@ -28,7 +28,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
-import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';

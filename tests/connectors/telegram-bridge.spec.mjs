@@ -5,9 +5,9 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, readInbox, chatRoute,
-  bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, ONLINE_MS,
+  createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, chatRoute, bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, ONLINE_MS,
 } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { readInbox } from '../../scripts/machine/sup-messages.mjs';
 import { claimManager, writeConnectorState } from '../../scripts/connectors/lib.mjs';
 import { askKeyOf, readSentStore } from '../../scripts/connectors/telegram.mjs';
 import { ledgerResolver } from '../../scripts/connectors/ask-gateway.mjs';

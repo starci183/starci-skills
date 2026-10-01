@@ -350,7 +350,7 @@ placeholders:
 layoutPolicy:
   checks: [starci-validate]
 policy:
-  # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/kernel/spec-deferral.mjs):
+  # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/route/spec-deferral.mjs):
   # defer-leg = never dispatched, settled deferred; skip = runs without that class of test or coverage; not-counted = the gate does not demand it.
   specsToggle: {unit: skip, e2e: skip}
   qualityPolicy:

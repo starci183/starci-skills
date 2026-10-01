@@ -10,7 +10,7 @@ export const callerOf = (db, env = process.env) => {
       OR json_extract(payload_json,'$.managed.agentTerminalHandle')=? OR json_extract(payload_json,'$.orca.agentTerminalHandle')=?
       OR json_extract(payload_json,'$.hierarchy.runtime.terminalHandle')=?) ORDER BY updated_at DESC LIMIT 1`).get(handle, handle, handle, handle) : null;
   // The ledger's own binding decides: worker-start owns an op's environment, so the Orca terminal it runs in is the one
-  // identity it carries (scripts/kernel/op-context.mjs reads the same binding).
+  // identity it carries (scripts/guards/op-context.mjs reads the same binding).
   if (byHandle) return { role: OP_ROLE, jobId: byHandle.job_id, via: 'terminal-handle', handle };
   return { role: 'kernel', jobId: null, via: null, handle };
 };

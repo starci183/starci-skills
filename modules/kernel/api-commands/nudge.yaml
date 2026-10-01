@@ -66,7 +66,7 @@ nudge:
     in the input row, then Enter-only, proven again - and the result and
     event carry splitRetried:true with splitOutcome delivered-after-split, or
     unstaged/unsubmitted on a terminal-send-failed. A worker whose agent
-    exited is never woken (scripts/kernel/terminal-liveness.mjs
+    exited is never woken (scripts/lib/terminal-liveness.mjs
     exitedAgentPromptRow: the frame ends in a bare shell prompt, or in a
     prompt row drawn under the agent's own input row/footer, as when
     PowerShell's prompt overwrites a dead Codex's footer without clearing

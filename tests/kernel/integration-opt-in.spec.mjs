@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { deferralOf, planLegDeferral, explicitAsksOf, opExplicitAskKind, deferReasonOf } from '../../scripts/kernel/spec-deferral.mjs';
+import { deferralOf, planLegDeferral, explicitAsksOf, opExplicitAskKind, deferReasonOf } from '../../scripts/route/spec-deferral.mjs';
 import { explicitAsk } from '../../scripts/route/explicit-ask.mjs';
 
 const skillRoot = path.resolve(import.meta.dirname, '..', '..');

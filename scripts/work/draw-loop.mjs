@@ -46,7 +46,7 @@
 // decision evidence (DRAW_RATIONALE_MISSING, scripts/work/draw/draw-rationale.mjs: the rationale.json beside the source,
 // data-why on every element and region, every measured value covered, every rule id resolvable, a redline per part).
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
-import { opContextOf } from '../kernel/op-context.mjs';
+import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
 import { putBundle } from '../../engine/db/blob.mjs';
 import os from 'node:os';

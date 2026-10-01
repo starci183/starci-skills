@@ -1,5 +1,5 @@
 // api cut-seam: split from cli.mjs.
-import { OP_ROLE } from './shared/caller.mjs';
+import { OP_ROLE } from '../../guards/op-caller.mjs';
 import { csvList, getWorkflow, jobOpOf, jobPayloadOf } from './shared/rows.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, digestInterfaceFiles, isSeamCut, seamStateOf } from '../cut-seam.mjs';

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { CHECK_IDS, DIRECTION_REVIEW_KIND, DIRECTION_REVIEW_SCHEMA, checkDirection, grammarComponentNames, runBrandChecks } from '../../scripts/work/brand/brand.mjs';
 import { applyDirectionReview, directionReviewQuestion, directionStatus } from '../../scripts/work/brand-direction.mjs';
-import { AUTO_ACCEPTED_BY, autoAcceptDecision } from '../../scripts/kernel/ask-recommendation.mjs';
+import { AUTO_ACCEPTED_BY, autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { loadWorkSchemaValidators } from '../../scripts/work/validate/check-work-schemas.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

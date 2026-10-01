@@ -107,7 +107,7 @@ conventions:
     (2) Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, so a caller whose handle is the
     bound terminal of an op job (worker_id, payload managed/orca agentTerminalHandle, hierarchy runtime
     terminalHandle) is that op - every op is a worker-start agent whose env StarCi cannot set, so that
-    binding is the op's one identity (scripts/kernel/op-context.mjs resolves its job, scratch and provider
+    binding is the op's one identity (scripts/guards/op-context.mjs resolves its job, scratch and provider
     from it for the scripts an op runs); (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, messages, reply, peers, notify, inbox,
     settle, check, consume-report, serve-ask, retire-ask, incident, provider-health, finish, archive) refuses `op-context-refused` before it runs, and `report`

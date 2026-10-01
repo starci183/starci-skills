@@ -16,7 +16,7 @@ import { openMachine, TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { providerCircuitOf } from '../../scripts/agent/models.mjs';
 import { credentialFingerprintOf, fingerprintOf } from '../../scripts/agent/credential-fingerprint.mjs';
-import { writeProviderCircuit } from '../../scripts/kernel/provider-circuit.mjs';
+import { writeProviderCircuit } from '../../scripts/machine/provider-circuit.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 
@@ -34,7 +34,7 @@ const tmp = (t, prefix) => {
 };
 const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
-// The provider-health circuit is a machine.sqlite provider_health row now (scripts/kernel/provider-circuit.mjs):
+// The provider-health circuit is a machine.sqlite provider_health row now (scripts/machine/provider-circuit.mjs):
 // the runtime signals table only takes kernel|stop|launch|decision-doorbell. The kernel-facing value rides in
 // detail_json and the cooldown in circuit_open_until; the spec pins one file through STARCI_TEST_MACHINE_FILE so
 // seeding, the api subprocess and the spec's reads all share it.

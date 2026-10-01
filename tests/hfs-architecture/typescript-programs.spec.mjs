@@ -59,8 +59,8 @@ test('a run shares programs across async work and another run never sees them',a
 
 test('a run builds the architecture context once and hands every caller its own error list',t=>{
   const {root,write}=project(t);
-  write('../../package.json',{private:true});
-  write('../../hfs.json', appDeclaration('fe', { apps: [{name:'web',kind:'next'}] }));
+  write('../package.json',{private:true});
+  write('../hfs.json', appDeclaration('fe', { apps: [{name:'web',kind:'next'}] }));
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['src/**/*.ts']});
   write('src/a.ts',"import {b} from './missing'; export const a=b;");
   const config=loadArchitectureConfig(root);

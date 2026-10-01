@@ -52,7 +52,7 @@ const signalKernel=(ledger,workflowId)=>ledger.db.prepare("INSERT OR REPLACE INT
 /* --------------------------------------------------------------- units */
 
 test('a long wake queued behind a Claude turn is queued, not staged, once the spinner scrolls out of the window',async()=>{
-  const {classifyAgentScreen,wakeDeliveryOf}=await import('../../scripts/kernel/terminal-liveness.mjs');
+  const {classifyAgentScreen,wakeDeliveryOf}=await import('../../scripts/lib/terminal-liveness.mjs');
   // The shape of buildWakePrompt (scripts/kernel/kernel-watchdog.mjs), ~850 chars.
   const wake=['Watchdog liveness wake for wf-long.','The approved workflow is still phase=running, but the prior model turn returned to the terminal input prompt.',
     'Re-read canonical api status and survey now and continue the exact durable frontier.',

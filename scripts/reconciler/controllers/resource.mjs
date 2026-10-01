@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { providerCircuits } from '../../kernel/provider-circuit.mjs';
+import { providerCircuits } from '../../machine/provider-circuit.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { readSupervisor, withSupervisor } from '../../machine/home.mjs';
 

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,markReportConsumed,recordJobResult,appendEvent} from '../../engine/db/ledger.mjs';
-import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/kernel/owner-answers.mjs';
+import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/machine/owner-answers.mjs';
 
 // starci-next wf-starci-next-work-and-stacks-mud4qamv: ordinal 1 of business.decide asked the owner
 // (ctx_3074731253e3), config.yaml asks.autoAcceptRecommended answered it (answeredBy auto-recommended),

@@ -12,7 +12,7 @@
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { exitedAgentPromptRow, clipDraft } from './terminal-liveness.mjs';
+import { exitedAgentPromptRow, clipDraft } from '../lib/terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';

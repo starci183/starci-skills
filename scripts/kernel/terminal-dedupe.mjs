@@ -28,7 +28,7 @@ import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
 import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';

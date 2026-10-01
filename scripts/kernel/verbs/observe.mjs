@@ -9,7 +9,7 @@ import { terminalRead } from '../../api/orca/terminal-read.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { workerRead } from '../../api/orca/worker-read.mjs';
 import { jobPayloadOf, jobRowOf, operationTerminalHandleOf, operationDispatchOf } from './shared/rows.mjs';
-import { outputAgeOf, exitedAgentPromptRow, classifyAgentScreen, staleAwareState } from '../terminal-liveness.mjs';
+import { outputAgeOf, exitedAgentPromptRow, classifyAgentScreen, staleAwareState } from '../../lib/terminal-liveness.mjs';
 import { sessionIdentityOf } from '../op-session.mjs';
 
 const OBSERVE_OUTPUT_LINES = 80;

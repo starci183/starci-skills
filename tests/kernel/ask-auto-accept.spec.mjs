@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow,awaitExit} from '../helpers/ledger-fixture.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
-import {recommendationOf,textRecommendation,askExclusionOf,autoAcceptDecision,AUTO_ACCEPTED_BY} from '../../scripts/kernel/ask-recommendation.mjs';
+import {recommendationOf,textRecommendation,askExclusionOf,autoAcceptDecision,AUTO_ACCEPTED_BY} from '../../scripts/machine/ask-recommendation.mjs';
 import {validateConfig,askAutoAcceptPolicy,ASKS_DEFAULTS} from '../../engine/config.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {autoAcceptAsk,wakeAskAnswered} from '../../scripts/kernel/ask-server.mjs';

@@ -38,7 +38,7 @@ import { asList, routeFields } from './route-fields.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
 } from '../example/example-ownership.mjs';
-import { ownerSpecs, planLegDeferral } from '../kernel/spec-deferral.mjs';
+import { ownerSpecs, planLegDeferral } from './spec-deferral.mjs';
 import { normalizeText, phraseHits } from './phrase-match.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');

@@ -30,7 +30,7 @@ submission:
 # inc-e24bf11bb76c, inc-4c84210fc979). Its timer covers the whole turn, not one phase.
 liveness:
   activeStaleMs: 3600000
-  # Rows that prove a running turn (scripts/kernel/terminal-liveness.mjs cardLivenessPatterns): above
+  # Rows that prove a running turn (scripts/lib/terminal-liveness.mjs cardLivenessPatterns): above
   # the input row with only chrome between, the frame reads active whatever the input row shows.
   # Devin wraps a long spinner row by words, so the braille row may carry no digit and the last row
   # of the block may be its hint alone. Captured 2026-09-25 on nivo term_a51fe9e2 (op-interface.

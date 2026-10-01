@@ -1,5 +1,5 @@
 // op-prompt.mjs — the one [Op] prompt builder for every dispatch path (OPS-07).
-// cli.mjs dispatch and scripts/route/dispatch-op.mjs's dry-run/spawn preview render the same
+// cli.mjs dispatch and scripts/kernel/dispatch-op.mjs's dry-run/spawn preview render the same
 // contract text from the same packet shape, so the preview can never drift from the prompt a real
 // worker receives (shared-checkout rules, report filing and questions used to exist
 // only in cli.mjs's private copy).
@@ -12,12 +12,12 @@ import { sha256 } from '../../engine/digest.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
-import { ownerAnswerLine } from './owner-answers.mjs';
+import { ownerAnswerLine } from '../machine/owner-answers.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
-import { specsBriefLines, specsOf, verificationScopeLines } from './spec-deferral.mjs';
+import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 

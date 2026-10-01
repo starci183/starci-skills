@@ -13,7 +13,7 @@
 // getUpdates (message + callback_query) and persists the update offset BEFORE
 // handling an update, so a restart never delivers the same message twice.
 // Between poll rounds it reloads itself when the runtime changes
-// (scripts/reconciler/self-reload.mjs, as the watchdogs do): the replacement takes the
+// (scripts/machine/self-reload.mjs, as the watchdogs do): the replacement takes the
 // lock over and resumes from the persisted offset.
 //
 // Hard auth: an update is accepted only when its chat id AND its sender id both
@@ -61,16 +61,16 @@
 // telegram-bridge.log). STARCI_TELEGRAM_API_BASE replaces the Bot API
 // host for tests. The token is never printed and is scrubbed from every error.
 import '../api/process/hide-child-windows.mjs';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
-import { pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
+import { pidAlive, readMachine } from '../../engine/db/machine.mjs';
+import { appendInbox, needSupervisorId, validSupervisorId } from '../machine/sup-messages.mjs';
 import {
   argsOf, askRepos, askState, claimManager, claimOrTakeOver, connectorLog, connectorState, connectorStates, lockHolder, notifiedRepos, openAskList, ownerConfig,
-  recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
+  reassertManager, recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
 } from '../connectors/lib.mjs';
 import {
   ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
@@ -79,7 +79,7 @@ import {
 import { ensureAskConnectors, publicBase } from '../connectors/tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from './progress-report.mjs';
 import { answerDrawReviewByReply, askClassOf } from '../kernel/ask-server.mjs';
-import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../reconciler/self-reload.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../machine/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
@@ -92,7 +92,6 @@ export const ONLINE_MS = 30 * 60 * 1000;
 export const POLL_TIMEOUT_S = 50;
 export const ALLOWED_UPDATES = ['message', 'callback_query'];
 const MAX_PENDING = 20;
-const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within callback_data's 64 bytes
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
 export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
 
@@ -169,9 +168,7 @@ export const bridgeState = (env = process.env) => {
 };
 const ROUTE_ROW = 'telegram-route';
 const CHANNEL_PREFIX = 'supervisor-channel:';
-export const validSupervisorId = (id) => typeof id === 'string' && ID.test(id);
-const needId = (id) => { if (!validSupervisorId(id)) throw Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`); return id; };
-const channelRow = (id) => `${CHANNEL_PREFIX}${needId(id)}`;
+const channelRow = (id) => `${CHANNEL_PREFIX}${needSupervisorId(id)}`;
 
 /** A live bridge: its connectors row names a live process of this boot, or a bridge holds the lock. */
 export const bridgeAlive = (env = process.env) => {
@@ -196,7 +193,7 @@ const writeChannel = (record, env) => writeConnectorState(channelRow(record.id),
 
 /** Register (or re-register) one supervisor; its heartbeat is now. */
 export function registerSupervisor({ id, label, repos = [], terminal = null, session = null }, { env = process.env, now = Date.now() } = {}) {
-  needId(id);
+  needSupervisorId(id);
   const at = new Date(now).toISOString();
   const record = {
     schema: 'starci/supervisor-channel@1', id, label: String(label ?? '').trim() || id,
@@ -232,64 +229,6 @@ export function listSupervisors({ env = process.env, now = Date.now(), onlineMs 
     .filter(Boolean)
     .map((sup) => ({ ...sup, online: supervisorOnline(sup, { now, env, onlineMs }) }))
     .sort((a, b) => Number(b.online) - Number(a.online) || String(a.label).localeCompare(String(b.label)) || a.id.localeCompare(b.id));
-}
-
-/* ------------------------------------------------------------ inbox and outbox (machine.sqlite sup_messages) */
-
-// The newest rows a read returns (the history before them stays in the table).
-const READ_LIMIT = 1000;
-const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
-const msOf = (at) => { const ms = typeof at === 'number' ? at : Date.parse(at ?? ''); return Number.isFinite(ms) ? ms : Date.now(); };
-const idText = (v) => (v == null || v === '' ? null : String(v));
-const idValue = (v) => (v == null ? null : /^-?\d{1,15}$/.test(v) ? Number(v) : v);
-const inboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), chatId: row.chat_id ?? null, messageId: idValue(row.message_id), text: row.text, read: row.read_at != null,
-  ...(row.read_at != null ? { readAt: iso(row.read_at) } : {}), ...(row.from_ref ? { from: row.from_ref } : {}) });
-const outboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), to: row.to_ref ?? null, via: row.via ?? null, ok: row.ok !== 0, text: row.text });
-const newest = (m, direction, refColumn, id) => m.db.prepare(`SELECT * FROM (SELECT rowid AS rid, * FROM sup_messages WHERE direction=? AND ${refColumn}=? ORDER BY rowid DESC LIMIT ?) ORDER BY rid`)
-  .all(direction, id, READ_LIMIT);
-
-/** One supervisor's inbox, oldest first: [{id, at, chatId, messageId, text, read, readAt?, from?}]. */
-export const readInbox = (id, env = process.env) => readMachine((m) => newest(m, 'in', 'to_ref', needId(id)).map(inboxItem), [], { env });
-
-/**
- * File one message in a supervisor's inbox: {id, at, chatId, messageId, text, read:false, from?}. `from` names a
- * non-Telegram source: 'desktop' (scripts/supervisor/tell.mjs - the reply stays local), 'stall-alert', 'land-gate',
- * 'kernel:<wf>'; such a message is channel 'tell', a Telegram one channel 'telegram'.
- */
-export function appendInbox(id, { chatId, messageId, text, from = null, at = new Date().toISOString() }, { env = process.env } = {}) {
-  needId(id);
-  const msgId = crypto.randomUUID(), atMs = msOf(at);
-  withMachine((m) => m.recordSupMessage({ msgId, direction: 'in', channel: from ? 'tell' : 'telegram', chatId: idText(chatId), messageId: idText(messageId),
-    from: from ?? null, to: id, text: String(text ?? ''), at: atMs }), { env });
-  return { id: msgId, at: iso(atMs), chatId: chatId ?? null, messageId: messageId ?? null, text: String(text ?? ''), read: false, ...(from ? { from } : {}) };
-}
-
-/** Record one reply: {id, at, to, text, via:'telegram'|'desktop'|'local'|'none', ok}. */
-export function appendOutbox(id, { to = null, text, via, ok = true, at = new Date().toISOString() }, { env = process.env } = {}) {
-  needId(id);
-  const msgId = crypto.randomUUID(), atMs = msOf(at);
-  withMachine((m) => m.recordSupMessage({ msgId, direction: 'out', channel: via === 'telegram' ? 'telegram' : 'tell', from: id, to: to ?? null, via: via ?? null,
-    text: String(text ?? ''), ok: ok !== false, at: atMs }), { env });
-  return { id: msgId, at: iso(atMs), to, via, ok: ok !== false, text: String(text ?? '') };
-}
-/** One supervisor's replies, oldest first. */
-export const readOutbox = (id, env = process.env) => readMachine((m) => newest(m, 'out', 'from_ref', needId(id)).map(outboxItem), [], { env });
-
-/**
- * The unread inbox items of one supervisor; unless `peek`, they (or only those named in `ids`) are
- * marked read in the same transaction, so two readers never both take one message.
- */
-export function takeInbox(id, { env = process.env, peek = false, ids = null, now = Date.now() } = {}) {
-  needId(id);
-  const wanted = ids ? new Set(ids) : null;
-  const unreadOf = (m) => m.db.prepare("SELECT * FROM sup_messages WHERE direction='in' AND to_ref=? AND read_at IS NULL ORDER BY rowid").all(id)
-    .filter((row) => !wanted || wanted.has(row.msg_id));
-  if (peek) return readMachine((m) => unreadOf(m).map(inboxItem), [], { env });
-  return withMachine((m) => m.transaction(() => {
-    const rows = unreadOf(m);
-    for (const row of rows) m.update('sup_messages', { read_at: now }, { msg_id: row.msg_id, read_at: null });
-    return rows.map(inboxItem);
-  }), { env });
 }
 
 /* ------------------------------------------------------------ routes */
@@ -771,7 +710,7 @@ export const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/
 /** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
 export const bridgeReloadFiles = (root = configRoot) => [
   'scripts/supervisor/telegram-bridge.mjs', 'scripts/connectors/telegram.mjs', 'scripts/connectors/lib.mjs', 'scripts/connectors/tunnel.mjs',
-  'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'scripts/reconciler/self-reload.mjs', 'engine/config.mjs',
+  'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'scripts/machine/self-reload.mjs', 'scripts/machine/sup-messages.mjs', 'engine/config.mjs',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
 // The bridge log: machine_logs (actor connector, kind telegram-bridge.log); echoed to a terminal when there is one.
@@ -808,7 +747,8 @@ async function runMain() {
     const check = watch.check();
     if (!check.reload) return null;
     watch.markAttempt();
-    const handed = await reexecSelf({ script: BRIDGE_FILE, args: ['run'], lockName: BRIDGE_NAME, env, cwd: configRoot, actor: 'connector' });
+    const handed = await reexecSelf({ script: BRIDGE_FILE, args: ['run'], lockName: BRIDGE_NAME, env, cwd: configRoot, actor: 'connector',
+      holder: (name) => lockHolder(name, env), reclaim: (name) => reassertManager(name, { env }) });
     log(handed.ok ? `bridge ${process.pid} reloading (${check.reason})` : `bridge ${process.pid} reload failed: ${handed.error}`);
     return handed.ok ? handed.pid : null;
   };

@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {openMachine} from '../../engine/db/machine.mjs';
-import {writeProviderCircuit} from '../../scripts/kernel/provider-circuit.mjs';
+import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps

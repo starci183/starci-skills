@@ -60,6 +60,7 @@ import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
+import { startWorkerAgent } from '../agent/start-worker.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -209,7 +210,7 @@ export const stagingNameOf = (jobId) => `sup-${jobId}`;
  * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), its own npm ci (never a node_modules junction, RT_NODE_MODULES_LINK) and a copy of the
  * owner config so specs run there as they do live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
  */
-export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient }) {
+export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient, install = ci }) {
   const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', owner: { lane: jobId }, env, orca });
   if (!made.ok) return { ok: false, reason: made.reason, code: 'WORKER_STAGING_CREATE_FAILED', error: `${made.reason}: ${made.detail ?? ''}`.trim() };
   if (!made.branch || !made.head) {
@@ -217,7 +218,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'orca-worktree-create-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `orca worktree create reported no ${made.branch ? 'head' : 'branch'} for ${made.path}` };
   }
-  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? ci(made.path) : { ok: true };
+  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? install(made.path) : { ok: true };
   if (!deps.ok) {
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'staging-install-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `npm ci in the staging checkout failed (exit ${deps.status ?? 'unknown'}): ${deps.stderr.slice(-400)}` };
@@ -340,17 +341,6 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
     .replaceAll('{branch}', staging.branch).replaceAll('{base}', String(staging.base).slice(0, 12)).replaceAll('{staging}', staging.path)
     .replaceAll('{files}', (p.files ?? []).join(', ')).replaceAll('{specs}', (p.specs ?? []).join(', ') || '(name the spec you add)')
     .replaceAll('{brief}', String(p.brief ?? '').trim() || '(see the incidents)').replaceAll('{skillRoot}', skillRoot);
-}
-
-/**
- * Start one [Worker] agent: a worker of its own Run, which the Supervisor's terminal `entry` creates and coordinates
- * (scripts/agent/lib.mjs startAgent: run-create --from entry, task-create, worker-start --agent --model --effort,
- * worker-show attestation). `route` {agent, model, effort} from routeWorker; `worktree` its placement (a staging
- * checkout); `start` replaces startAgent (specs). The startAgent receipt.
- */
-export async function startWorkerAgent({ route, worktree, title, prompt, specFile = null, objective, entry = null, onCreated = null, start = null }) {
-  const launch = start ?? (await import('../agent/lib.mjs')).startAgent;
-  return launch({ provider: route.agent, model: route.model, effort: route.effort, worktree, title, prompt, specFile, objective, entry, onCreated });
 }
 
 /**

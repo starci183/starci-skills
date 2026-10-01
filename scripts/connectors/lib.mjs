@@ -101,7 +101,7 @@ export function claimManager(name, { current = null, env = process.env } = {}) {
 }
 
 /**
- * Claim a manager lock that may be handed over (scripts/reconciler/self-reload.mjs): a loop that re-execs itself
+ * Claim a manager lock that may be handed over (scripts/machine/self-reload.mjs): a loop that re-execs itself
  * spawns its replacement with `from` = its own pid and waits, still holding the lock, until the lock names
  * the replacement. The replacement takes the row over only while it still names `from`, in one transaction,
  * so there is no moment the lock is free for a third claimant. Without `from`, or when the lock no longer

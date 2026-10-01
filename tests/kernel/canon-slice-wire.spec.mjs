@@ -13,7 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { resolveOpParams } from '../../scripts/route/dispatch-op.mjs';
+import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
 import { canonCutPlanOf, canonRedispatchOf, canonSettleFollowUpOf, relocationOf, canonConformancePolicy } from '../../scripts/kernel/cut-seam.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 

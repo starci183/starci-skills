@@ -6,7 +6,7 @@ purpose: >-
   the rate limit still persisted. The same circuit api route and api dispatch already refuse on; it clears by expiry,
   the quota probe (quota) or the Kernel's provider-health --recover. Idempotent: an open circuit is left as it is.
 args: --provider <p> --open-circuit [--kind quota|rate-limited] --reason <text> --by <actor> [--json]
-writes: ['machine.sqlite provider_health row of <provider> + one provider_health_events row (scripts/kernel/provider-circuit.mjs); the answer reads back the pools'' pool_backoff rows']
+writes: ['machine.sqlite provider_health row of <provider> + one provider_health_events row (scripts/machine/provider-circuit.mjs); the answer reads back the pools'' pool_backoff rows']
 refusals:
   provider-missing: --provider names no provider
   action-missing: --open-circuit is absent

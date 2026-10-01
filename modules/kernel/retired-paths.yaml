@@ -916,6 +916,16 @@ moved:
   - {from: scripts/lib/repo-identity.mjs, to: scripts/hfs/repo-identity.mjs, movedIn: C5, quiesced: false}
   - {from: scripts/lib/runtime-host.mjs, to: scripts/gates/runtime-host.mjs, movedIn: C5, quiesced: false}
   - {from: scripts/lib/recorded-lines.mjs, to: scripts/api/git/recorded-lines.mjs + scripts/lib/line-count.mjs, movedIn: C5, quiesced: false}
+  - {from: scripts/reconciler/self-reload.mjs, to: scripts/machine/self-reload.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/terminal-liveness.mjs, to: scripts/lib/terminal-liveness.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/task-spec.mjs, to: scripts/machine/task-spec.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/provider-circuit.mjs, to: scripts/machine/provider-circuit.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/route/dispatch-op.mjs, to: scripts/kernel/dispatch-op.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/spec-deferral.mjs, to: scripts/route/spec-deferral.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/op-context.mjs, to: scripts/guards/op-context.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/verbs/shared/caller.mjs, to: scripts/guards/op-caller.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/ask-recommendation.mjs, to: scripts/machine/ask-recommendation.mjs, movedIn: C8, quiesced: false}
+  - {from: scripts/kernel/owner-answers.mjs, to: scripts/machine/owner-answers.mjs, movedIn: C8, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
 # staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
 # deletes the symbol.

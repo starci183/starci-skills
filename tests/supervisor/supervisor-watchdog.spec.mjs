@@ -12,7 +12,8 @@ import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor } from '../../scripts/supervisor/start-supervisor.mjs';
 import { readSupervisor, supervisorSettings, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
-import { appendInbox, registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs';
+import { appendInbox } from '../../scripts/machine/sup-messages.mjs';
 import { watchdogPass, busyScreen, busySignature, frozenBusyFrame, SUBAGENT_INPUT } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 
 const tmp = (t, prefix) => {

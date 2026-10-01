@@ -1527,7 +1527,7 @@ failureHandling:
       shows activity while nothing moves.
     detection-output-staleness: >-
       The api classifies each worker from its screen and output age
-      (scripts/kernel/terminal-liveness.mjs; api.yaml status workers[].liveness):
+      (scripts/lib/terminal-liveness.mjs; api.yaml status workers[].liveness):
       an `active` frame that printed nothing for
       modules/models/runtimes.yaml allocation.liveness.activeStaleMs reads
       turn-idle (stale-active), and one shell command silent past

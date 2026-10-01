@@ -18,7 +18,7 @@ import {
   badgesOf, commandsFrom, controlCountOf, drawQualityFindings, internalCopyOf, statusBandOf, visibleTextOf, DRAW_LOOP_MISSING,
 } from '../../scripts/work/draw/draw-quality.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from '../../scripts/work/draw/draw-dna.mjs';
-import { autoAcceptDecision } from '../../scripts/kernel/ask-recommendation.mjs';
+import { autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
 
 const BG = [255, 255, 255, 255], INK = [20, 30, 60, 255], BANNER = [240, 200, 0, 255];

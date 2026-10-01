@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { PROOF_CODES, PROOF_EXIT, cleanEnv, installUnits, packagesChanged, provePackages, publishSet } from '../../scripts/gates/package-clean-test.mjs';
 import { loadPins } from '../../scripts/gates/canon-pins.mjs';
 import { spawnSync } from 'node:child_process';
-import { withoutGitLocalEnv } from '../../scripts/supervisor/land.mjs';
+import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 // scripts/gates/package-clean-test.mjs: a published package proves itself from a clean install. The fixture packages
@@ -43,7 +43,7 @@ test('the clean environment drops what an enclosing npm run, NODE_PATH or a test
   assert.deepEqual(env, { PATH: 'p', npm_config_cache: 'c' });
 });
 
-const gitIn = (dir, ...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: withoutGitLocalEnv(), windowsHide: true }); assert.equal(r.status, 0, r.stderr); };
+const gitIn = (dir, ...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: withoutGitLocalEnv(process.env), windowsHide: true }); assert.equal(r.status, 0, r.stderr); };
 
 /**
  * A git work tree holding a dependency package and a consumer whose test imports it; `declare` adds it to the consumer's

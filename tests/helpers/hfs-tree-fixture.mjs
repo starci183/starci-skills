@@ -6,11 +6,11 @@ import { execFileSync } from 'node:child_process';
 // the aggregate: the fixture root is the side folder (be/ or fe/), and the app-root entries are written one level up. Entries a spec
 // already wrote are left untouched.
 const APP_ROOT = {
-  '../../.gitattributes': '* text=auto eol=lf\n',
+  '../.gitattributes': '* text=auto eol=lf\n',
   '../.github/workflows/check.yml': 'name: check\n',
-  '../../.gitignore': 'node_modules/\n',
+  '../.gitignore': 'node_modules/\n',
   '../.husky/pre-commit': 'exit 0\n',
-  '../../package-lock.json': '{}\n',
+  '../package-lock.json': '{}\n',
   '../sonar-project.properties': 'sonar.projectKey=fixture\n',
   '../.starciwork/.gitignore': 'runtime.sqlite\n',
   '../.sops.yaml': 'creation_rules: []\n',
@@ -63,7 +63,7 @@ Work is tracked in the backend .starciwork tree.
 
 /** Write the missing app-root entries, side entries and app shell for `kind` ('backend' | 'frontend'); `root` is the side folder. */
 export function writeHfsTree(root, kind, app = kind === 'backend' ? 'api' : 'web') {
-  const files = { '../../README.md': hfsReadme(path.dirname(root)), ...APP_ROOT, ...SIDE, ...(kind === 'backend' ? {
+  const files = { '../README.md': hfsReadme(path.dirname(root)), ...APP_ROOT, ...SIDE, ...(kind === 'backend' ? {
     ...BACKEND,
     [`apps/${app}/src/main.ts`]: 'void 0;\n',
     [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1;\n',

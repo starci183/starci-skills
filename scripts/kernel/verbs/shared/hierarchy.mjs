@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../../../engine/yaml.mjs';
 import { AWAITING_OWNER } from '../../../../engine/admission.mjs';
-import { jobPayloadOf, getWorkflow, jobResultOf, JOB_ROW } from './rows.mjs';
+import { JOB_ROW } from '../../../machine/job-row.mjs';
+import { jobPayloadOf, getWorkflow, jobResultOf } from './rows.mjs';
 import { workflowDisplayName } from '../../../lib/display-names.mjs';
 import { isAwaitingOwner } from '../../failure-steps.mjs';
 

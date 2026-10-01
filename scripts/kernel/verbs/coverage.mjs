@@ -4,7 +4,7 @@
 // usage() (usageInCore).
 //
 //   coverage --workflow <id>
-import { ownerSpecs, specsOff } from '../spec-deferral.mjs';
+import { ownerSpecs, specsOff } from '../../route/spec-deferral.mjs';
 import { coverageLines, coverageOf } from '../proof-integrity.mjs';
 
 export default {

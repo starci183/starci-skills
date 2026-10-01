@@ -1,4 +1,4 @@
-// scripts/reconciler/self-reload.mjs — a long-lived runtime loop re-execs itself when the runtime it runs from changes.
+// scripts/machine/self-reload.mjs — a long-lived runtime loop (the reconciler engine, the Telegram bridge) re-execs itself when the runtime it runs from changes.
 //
 // Why: a watchdog loop imports its modules once. Every runtime fix to what the loop itself runs (its own file,
 // the liveness classifier, the cards, the api helpers) needed a manual restart of every watchdog; on 2026-09-25
@@ -21,9 +21,9 @@
 // connectors/lib.mjs claimOrTakeOver) and RELOADED_AT (the guard's clock across the re-exec).
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { revParse } from '../api/git/rev-parse.mjs';
+import { diffNames } from '../api/git/diff-names.mjs';
 import { spawnDetachedSilent } from '../api/process/spawn-detached.mjs';
-import { lockHolder, reassertManager } from '../connectors/lib.mjs';
 import { machineLog } from '../../engine/db/machine.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleep as sleepAsync } from '../lib/sleep.mjs';
@@ -32,12 +32,11 @@ export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
 export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
 export const RELOAD_ENV = Object.freeze({ handoverFrom: 'STARCI_RELOAD_HANDOVER_FROM', reloadedAt: 'STARCI_RELOADED_AT' });
 
-/** The runtime checkout's HEAD commit, or null when git does not answer. */
-export function runtimeHead({ root, run = gitSpawn } = {}) {
+/** The runtime checkout's HEAD commit, or null when git does not answer. git: a runner for the specs (api/git gitRunner shape). */
+export function runtimeHead({ root, git = null } = {}) {
   try {
-    const r = run('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
-    const sha = String(r?.stdout ?? '').trim();
-    return r?.status === 0 && /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
+    const sha = revParse(root, 'HEAD', { git });
+    return sha && /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
   } catch { return null; }
 }
 
@@ -45,12 +44,8 @@ export function runtimeHead({ root, run = gitSpawn } = {}) {
  * The files `from..to` changed under `paths` (git diff --name-only), [] when none, or null when git does not answer
  * (the caller then counts the HEAD change as relevant).
  */
-export function changedPaths({ root, from, to, paths = [], run = gitSpawn } = {}) {
-  try {
-    const r = run('git', ['-C', root, 'diff', '--name-only', `${from}..${to}`, '--', ...paths], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
-    if (r?.status !== 0) return null;
-    return String(r.stdout ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  } catch { return null; }
+export function changedPaths({ root, from, to, paths = [], git = null } = {}) {
+  try { return diffNames(root, from, to, { paths, git }); } catch { return null; }
 }
 
 /** {file: mtimeMs | null} for each watched file (null: missing or unreadable). */
@@ -107,11 +102,13 @@ export function createReloadWatch({ root = null, files = [], head = () => runtim
  * Waits up to waitMs for the lock to name the replacement. Returns {ok:true, pid} (the caller exits now, without
  * releasing the lock) or {ok:false, pid, error} (the replacement was stopped; the lock is this process's again). The
  * outcome is one machine_logs row (actor `actor`, kind self-reload.handover). Every host effect is a seam for the specs.
+ * The caller owns the host lock: `holder(name)` reads it ({pid} or null) and `reclaim(name)` takes it back
+ * (scripts/connectors/lib.mjs lockHolder and reassertManager).
  */
 export async function reexecSelf({ script, args = [], lockName, env = process.env, cwd = process.cwd(), now = Date.now,
   waitMs = HANDOVER_WAIT_MS, pollMs = 200, sleep = sleepAsync, actor = 'runtime',
-  holder = (name) => lockHolder(name, env), spawnChild = spawnDetachedSilent,
-  kill = (pid) => { try { process.kill(pid); } catch { /* gone */ } }, reclaim = (name) => reassertManager(name, { env }), selfPid = process.pid,
+  holder, spawnChild = spawnDetachedSilent,
+  kill = (pid) => { try { process.kill(pid); } catch { /* gone */ } }, reclaim, selfPid = process.pid,
   log = (row) => machineLog(row, { env }) } = {}) {
   const handOver = async () => {
     const childEnv = { ...env, [RELOAD_ENV.handoverFrom]: String(selfPid), [RELOAD_ENV.reloadedAt]: String(now()) };

@@ -179,7 +179,7 @@ test('terminal-send reissues an ambiguous prompt failure once with its --retry-r
 // as 0, aged the output from the epoch (outputAgeMs ~1.79e12), and every spinning worker read
 // turn-idle stale-active and nudge-ready. An unknown output time is never an age.
 test('outputAgeOf: an unknown, empty or zero lastOutputAt is no age; a real one is',async()=>{
-  const {outputAgeOf}=await import('../../scripts/kernel/terminal-liveness.mjs');
+  const {outputAgeOf}=await import('../../scripts/lib/terminal-liveness.mjs');
   const now=1_790_360_052_592;
   for(const raw of [null,undefined,'',0,'0',-5,'not-a-time',NaN])
     assert.deepEqual(outputAgeOf(raw,now),{lastOutputAt:null,outputAgeMs:null},String(raw));

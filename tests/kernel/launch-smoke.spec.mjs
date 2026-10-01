@@ -9,12 +9,12 @@ import { ROLES, CHILDREN, SMOKE_SCHEMA, noopAgent, noopSpec, runSmoke, runStage,
   ownedFileOf, ownedTextOf, feAppOf, worktreeParamsOf, mainManifest, manifestDiff } from '../../scripts/kernel/launch-smoke.mjs';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
-import { startWorkerAgent } from '../../scripts/supervisor/workers.mjs';
+import { startWorkerAgent } from '../../scripts/agent/start-worker.mjs';
 import { launchCriticWorker } from '../../scripts/work/draw-critic.mjs';
 import { gitResult } from '../../scripts/api/git/lib.mjs';
 
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) drives the runtime's own
-// launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), workers.mjs startWorkerAgent ([Worker])
+// launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
 // and draw-critic.mjs launchCriticWorker (the critic on its criticWorkspace placement) - against a fake Orca at the
 // wrapper level: Runs, Tasks, worker-start, dispatch-show, worker-show (depth and creator Dispatch, the way Orca
 // reports them), worker-read, worker-stop, worker-release, task-update and worktree list. Each fake agent does

@@ -154,7 +154,7 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
   const groups = new Map();
   for (const file of trackedFilesUnder(workRoot)) {
     const rel = path.relative(resolveRoot, file).replaceAll('\\', '/');
-    if (!rel || rel.startsWith('../../') || isProductPath(rel)) continue;
+    if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
     const category = agentDataCategory(rel);
     const parts = rel.split('/');
     // Group a directory of agent data under its first denied segment (runs/<id>, evidence, assets, draw-loop, operations/<name>).

@@ -9,7 +9,7 @@ import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { buildOpPrompt, renderOwnedPath, ensureJobScratch, jobScratchDirOf } from '../op-prompt.mjs';
 import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../machine/lessons-file.mjs';
-import { ownerAnswersOf } from '../owner-answers.mjs';
+import { ownerAnswersOf } from '../../machine/owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
@@ -26,7 +26,7 @@ import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } fro
 import { deferredQueueCause } from '../autopilot.mjs';
 import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
-import { resolveOpParams } from '../../route/dispatch-op.mjs';
+import { resolveOpParams } from '../dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
 import { opInputPaths, recordInputs, workInputPaths } from '../input-digests.mjs';
@@ -36,7 +36,7 @@ import { productLocaleFor } from '../product-locale.mjs';
 import { isSeamCut, seamStubForDispatch, cutManifestOf } from '../cut-seam.mjs';
 import { kernelOverrideFor, refuseSettleBacklog } from '../kernel-authority.mjs';
 import { jobDirOf } from '../job-artifacts.mjs';
-import { packetFileOf } from '../task-spec.mjs';
+import { packetFileOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
@@ -237,7 +237,7 @@ export default {
     } catch { return []; }
   })();
   // The asks this job's retry lineage already had answered ride in the packet, so an owner-answer
-  // retry applies the answer instead of asking again (scripts/kernel/owner-answers.mjs).
+  // retry applies the answer instead of asking again (scripts/machine/owner-answers.mjs).
   const ownerAnswers = (() => { try { return ownerAnswersOf(db, job); } catch { return []; } })();
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;

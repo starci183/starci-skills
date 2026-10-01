@@ -51,7 +51,7 @@ const orcaWorld=t=>{
 /* ------------------------------------------------------------------ units */
 
 test('the classifier reads the draft in the input row: the runtime\'s own text is staged input, anyone else\'s is not',async()=>{
-  const {classifyAgentScreen,frameWithDraft,draftOwnership}=await import('../../scripts/kernel/terminal-liveness.mjs');
+  const {classifyAgentScreen,frameWithDraft,draftOwnership}=await import('../../scripts/lib/terminal-liveness.mjs');
   assert.equal(classifyAgentScreen(IDLE,{sentText:WAKE}).state,'turn-idle','the frame alone shows an empty prompt');
   assert.equal(classifyAgentScreen(IDLE,{sentText:WAKE,draft:WAKE}).state,'staged-input');
   assert.equal(classifyAgentScreen(IDLE,{sentText:WAKE,draft:'please look at the lint first'}).state,'turn-idle');
@@ -70,7 +70,7 @@ test('the classifier reads the draft in the input row: the runtime\'s own text i
 // wedge. The supervisor's notice and watchdog wake were missing, and one left in a Kernel's box refused
 // every later wake to that Kernel.
 test('a leftover draft of any runtime wake or notice is runtime text',async()=>{
-  const {draftOwnership}=await import('../../scripts/kernel/terminal-liveness.mjs');
+  const {draftOwnership}=await import('../../scripts/lib/terminal-liveness.mjs');
   const {buildWakePrompt}=await import('../../scripts/kernel/kernel-watchdog.mjs');
   const {transitionWakeText}=await import('../../scripts/kernel/wake-delivery.mjs');
   const {noticeText}=await import('../../scripts/supervisor/notify.mjs');

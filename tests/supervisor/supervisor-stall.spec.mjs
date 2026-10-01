@@ -5,7 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {stallFindings,judgeGate,ownerGates,namedPaths,kernelTurnState,GATE_GRACE_MS} from '../../scripts/supervisor/stall.mjs';
-import {readInbox} from '../../scripts/supervisor/telegram-bridge.mjs';
+import { readInbox } from '../../scripts/machine/sup-messages.mjs';
 import {wakeKernel} from '../../scripts/kernel/wake-delivery.mjs';
 
 // Incident 2026-09-24: nivo Collab sat idle ~2 h behind owner-gate inc-48bc556d89a6 ("resolve when

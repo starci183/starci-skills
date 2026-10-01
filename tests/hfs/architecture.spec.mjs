@@ -43,7 +43,7 @@ function appShaped(side, files) {
     manifest.workspaces = manifest.workspaces.filter(pattern => !pattern.startsWith('apps/')).map(pattern => `${side}/${pattern}`);
     if (!manifest.workspaces.length) delete manifest.workspaces;
   }
-  out['../../package.json'] = JSON.stringify(manifest);
+  out['../package.json'] = JSON.stringify(manifest);
   return out;
 }
 
@@ -73,16 +73,16 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
     include: ['src/**/*', 'apps/**/*'],
   }, null, 2)}\n`;
   const baseline = {
-    '../../.gitattributes': '* text=auto eol=lf\n',
+    '../.gitattributes': '* text=auto eol=lf\n',
     '../.github/workflows/check.yml': 'name: check\n',
-    '../../.gitignore': 'node_modules/\n',
+    '../.gitignore': 'node_modules/\n',
     '../.husky/pre-commit': 'exit 0\n',
-    '../../README.md': hfsReadme(appRoot),
+    '../README.md': hfsReadme(appRoot),
     'eslint.config.mjs': 'export default [];\n',
-    '../../package-lock.json': '{}\n',
+    '../package-lock.json': '{}\n',
     'package.json': JSON.stringify({ private: true }),
     '../sonar-project.properties': 'sonar.projectKey=fixture\n',
-    '../../hfs.json': `${JSON.stringify(declaration, null, 2)}
+    '../hfs.json': `${JSON.stringify(declaration, null, 2)}
 `,
     'tsconfig.json': tsconfig,
     ...(kind === 'backend' ? {

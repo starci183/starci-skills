@@ -12,7 +12,7 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { JOB_ROW } from '../../scripts/kernel/verbs/shared/rows.mjs';
+import { JOB_ROW } from '../../scripts/machine/job-row.mjs';
 import { independentChecksOf } from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
 import { attemptCauseOf } from '../../scripts/kernel/lineage-route.mjs';
 import { attributeRedGate, failingFromText, failingPath, peerRouteOf } from '../../scripts/kernel/gate-attribution.mjs';

@@ -12,8 +12,9 @@
 // The exclusion classes (config.yaml asks.excludes):
 //   credential  — an ask with secret fields (custody files, env vars) or of
 //                 kind credential, account, access or consent;
-//   handover    — any handover.review ask; always excluded, whatever the list
-//                 says (the handover approval is the owner's own answer);
+//   handover    — any ask of a kernel-only op (reported-jobs.mjs KERNEL_ONLY_OPS:
+//                 handover.review); always excluded, whatever the list says (the
+//                 handover approval is the owner's own answer);
 //   draw-review — a question of kind draw-review (scripts/work/draw-review.mjs),
 //                 when listed: the opt-out. Owner ruling 2026-09-26: a drawing
 //                 the owner did not ask to review is accepted without the
@@ -22,7 +23,7 @@
 //                 ledger by serve-ask.mjs drawOwnerRequestOf) stays the owner's;
 //   <ask kind>  — question.kind equal to it ('decision' reads as
 //                 business-decision).
-import { HANDOVER_OP } from './handover.mjs';
+import { KERNEL_ONLY_OPS } from './reported-jobs.mjs';
 
 export const AUTO_ACCEPTED_BY = 'auto-recommended';
 export const AUTO_ACCEPT_CONFIG_KEY = 'asks.autoAcceptRecommended';
@@ -74,7 +75,7 @@ export function askKindOf(question) {
  * ({files, vars}); `excludes` the policy's list — 'handover' applies whether or not it is listed.
  */
 export function askExclusionOf({ question, opId, secretFields, excludes = [] }) {
-  if (opId === HANDOVER_OP) return 'handover';
+  if (KERNEL_ONLY_OPS.includes(opId)) return 'handover';
   const kind = askKindOf(question);
   const secret = (secretFields?.files?.length ?? 0) + (secretFields?.vars?.length ?? 0) > 0;
   if (excludes.includes('credential') && (secret || CREDENTIAL_ASK_KINDS.includes(kind))) return 'credential';

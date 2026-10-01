@@ -22,7 +22,7 @@ report:
   returns: '{ok:true, jobId, workflowId, dispatchId, attemptId, outcome, reportId, attachments, artifacts:[{id, name, sha256}], audit?:{auditId, verdict}, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}} | {ok:true, replayed:true, jobId, workflowId, dispatchId, outcome, reportId} when the same report was already filed'
   answeredAsks: >-
     an `ask` report is checked against the answered asks of the job's retry
-    lineage (dispatch ownerAnswers, scripts/kernel/owner-answers.mjs
+    lineage (dispatch ownerAnswers, scripts/machine/owner-answers.mjs
     repeatedAnswerOf): a question with the same text (case, spacing and
     trailing punctuation aside) or the same two or more option labels
     repeats that ask and is refused ask-already-answered. handover.review is

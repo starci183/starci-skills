@@ -25,8 +25,8 @@ function writeFiles(root, files) {
 function fixture(t, files, { owners = true } = {}) {
   const root = tempSide(t, 'starci-architecture-contracts-');
   writeFiles(root, {
-    '../../hfs.json': appDeclarationText('be', { apps: [{ name: 'core', kind: 'api' }] }),
-    '../../package.json': '{"private":true}',
+    '../hfs.json': appDeclarationText('be', { apps: [{ name: 'core', kind: 'api' }] }),
+    '../package.json': '{"private":true}',
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
       experimentalDecorators: true, strict: true, skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
     'node_modules/@nestjs/common/package.json': '{"name":"@nestjs/common","types":"index.d.ts"}',

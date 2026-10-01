@@ -35,7 +35,7 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { hhmmss } from '../lib/time.mjs';
-import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen } from '../lib/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding, ledgerRuns } from './orca-tree.mjs';
 import { workerListAll } from '../api/orca/worker-list.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';

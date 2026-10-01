@@ -73,7 +73,7 @@ signalMatching:
     joins a chain only when the prompt asks for it (phraseSets.integrationIntent, unless phraseSets.integrationNegation
     also hits). Without that ask an external-integration prompt ends at impl.X done (backend) and no provision.ask
     custody leg precedes it; the kernel defers an already-approved integration.verify leg the goal did not ask for
-    (scripts/kernel/spec-deferral.mjs). "Integrate X" asks to build the integration, not to prove it live.
+    (scripts/route/spec-deferral.mjs). "Integrate X" asks to build the integration, not to prove it live.
   phraseSetReference: >-
     A phrase written "$name" in phrases, requires or excludes stands for every
     phrase of phraseSets.name.

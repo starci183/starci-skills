@@ -21,7 +21,7 @@
 // The preview's orca commands are the launch api dispatch issues: task-create, then
 //   orca orchestration worker-start --task <task> --worktree <sel> --agent <provider> [--model <id> --effort <level>]
 // CLI:
-//   node scripts/route/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
+//   node scripts/kernel/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
 //       [--params '<json>'] [--model <target>] [--budget <n>] [--lease <token>]
 //       [--worktree <sel>] [--json]
 
@@ -32,7 +32,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
-import { buildOpPrompt } from '../kernel/op-prompt.mjs';
+import { buildOpPrompt } from './op-prompt.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -124,7 +124,7 @@ export const splitGoalLegParams = (brief, leg) => {
 };
 
 function usage(code) {
-  console.error(`use: node scripts/route/dispatch-op.mjs --op <id>
+  console.error(`use: node scripts/kernel/dispatch-op.mjs --op <id>
     [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]
     [--budget <n>] [--lease <token>] [--worktree <selector>] [--json]`);
   process.exit(code);

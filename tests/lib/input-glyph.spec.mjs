@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS, INPUT_GLYPH_ROW } from '../../scripts/lib/input-glyph.mjs';
-import { stagedInputRegion, frameWithDraft, classifyAgentScreen } from '../../scripts/kernel/terminal-liveness.mjs';
+import { stagedInputRegion, frameWithDraft, classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
 
 // Five call sites grew five spellings of "the glyph an agent CLI draws at the head of its input
 // row" ([>›❯❭], [>›❯❭»], [>›❯❭], [›❯❭], [>❯❭]). scripts/lib/input-glyph.mjs is the one source;
@@ -43,7 +43,7 @@ test('a prompt row still classifies turn-idle across the glyph set', () => {
 
 test('the five former copies are gone from the runtime scripts', () => {
   const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
-  assert.doesNotMatch(read('../../scripts/kernel/terminal-liveness.mjs'), /\[>›❯❭\]|\[›❯❭\](?!\])/);
+  assert.doesNotMatch(read('../../scripts/lib/terminal-liveness.mjs'), /\[>›❯❭\]|\[›❯❭\](?!\])/);
   assert.doesNotMatch(read('../../scripts/agent/lib.mjs'), /\[>❯❭\]|\[›❯❭\](?!\])/);
   assert.doesNotMatch(read('../../scripts/supervisor/supervisor-watchdog.mjs'), /\[>›❯❭\](?!\])/);
   // cli.mjs is reserved for the w2-api lanes: its INPUT_ROW_GLYPH copy stays until they adopt it.

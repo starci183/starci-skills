@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/lib/terminal-liveness.mjs';
 
 // sn-learn-content Kernel term_2cd5a276, 2026-09-25: Claude Code drew its auto-update notice between a live
 // spinner and the ❯ input box, the notice read as a finished answer, and the running Kernel read turn-idle.

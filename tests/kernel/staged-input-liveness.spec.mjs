@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../../scripts/lib/terminal-liveness.mjs';
 
 // Incident inc-06aeecf432f1 (starci-next base-repos, backend.scaffold cut ordinal 5): a Devin
 // command-terminal worker sat 13+ minutes with its pasted contract text still in the input row and no

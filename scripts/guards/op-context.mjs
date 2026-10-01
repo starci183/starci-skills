@@ -8,9 +8,9 @@
 // is bound to (the Kernel's, the owner's, a [Worker]'s) has none.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { boundGuard } from '../guards/command-guard.mjs';
+import { boundGuard } from './command-guard.mjs';
 import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
-import { callerOf, OP_ROLE } from './verbs/shared/caller.mjs';
+import { callerOf, OP_ROLE } from './op-caller.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cache = new Map();

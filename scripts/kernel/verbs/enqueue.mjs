@@ -5,7 +5,7 @@ import { newToken } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { getWorkflow, latestGoal, jobPayloadOf, ownedPathsOf } from './shared/rows.mjs';
 import { peerOverlapHeadsUp } from './shared/peers.mjs';
-import { splitGoalLegParams, resolveOpParams } from '../../route/dispatch-op.mjs';
+import { splitGoalLegParams, resolveOpParams } from '../dispatch-op.mjs';
 import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot.mjs';
 import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
@@ -18,7 +18,7 @@ import { admitUnit, writeUnitTry } from '../units.mjs';
 import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
 import { requirePhase, ACCEPTS_WORK } from './shared/lifecycle.mjs';
 import { seamPriorityOf } from '../cut-seam.mjs';
-import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../spec-deferral.mjs';
+import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../../route/spec-deferral.mjs';
 
 export default {
   verb: 'enqueue',
@@ -230,7 +230,7 @@ export default {
     job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
     unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
-    // spent, and the legs behind it proceed (scripts/kernel/spec-deferral.mjs; api run-deferred-tests runs it later).
+    // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; api run-deferred-tests runs it later).
     // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
     const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
     if (deferral) {

@@ -36,8 +36,9 @@ import { fileURLToPath } from 'node:url';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import {
-  appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, readInbox, registerSupervisor, takeInbox, validSupervisorId,
+  ensureTelegramBridge, getSupervisor, heartbeatSupervisor, registerSupervisor,
 } from './telegram-bridge.mjs';
+import { appendOutbox, readInbox, takeInbox, validSupervisorId } from '../machine/sup-messages.mjs';
 import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from '../machine/home.mjs';
 
 export const WAIT_TIMEOUT_EXIT = 124;

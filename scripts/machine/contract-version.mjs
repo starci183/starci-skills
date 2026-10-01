@@ -50,7 +50,7 @@ export const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
 export const CONTRACT_RELEASE_EVENT = 'contract-release';
 const ABSENT = 'absent';
 const ALWAYS_CITED = ['modules/ops/_common.yaml', 'modules/kernel/verdict-contract.yaml'];
-const CITE_RX = /(?:modules\/schemas|scripts\/checks)\/[A-Za-z0-9._/-]+\.(?:ya?ml|mjs|json)/g;
+const CITE_RX = /(?:modules\/schemas|scripts\/(?:checks|gates|hfs|work))\/[A-Za-z0-9._/-]+\.(?:ya?ml|mjs|json)/g;
 const ID_RX = /^[a-z0-9][a-z0-9.-]{1,79}$/;
 
 const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
