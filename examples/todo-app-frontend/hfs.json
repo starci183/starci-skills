@@ -1,6 +1,0 @@
-{
-  "hfs": 1,
-  "profile": "fe",
-  "project": "todo-app-frontend",
-  "apps": [{ "name": "web", "kind": "next" }]
-}

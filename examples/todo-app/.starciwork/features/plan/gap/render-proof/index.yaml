@@ -1,0 +1,34 @@
+schema: work/gap@1
+id: gap.plan.render-proof
+title: The usage captures fail the canonical render checks - impl.plan.fe.usage cannot claim done
+state: done
+statement: "impl.plan.fe.usage keeps real captures - the running page across
+  under-cap, at-cap and upgrade states at desktop and mobile, produced from the served build.
+  The artifacts are real; the proof is not. Run through checks/render.mjs, entity-list-in-card
+  fails on running-page-desktop, running-page-mobile and running-page-under-cap: 3-7 repeated
+  `starci-core-text` items sit in a `div` inside `starci-core-surface` - a list of entities is a
+  page section with a heading; a card is one item. running-page-at-cap additionally fails
+  palette-off-brand on #2a52b4 (6% of saturated pixels, nearest --starci-core-accent at deltaE
+  12.92). Both findings are properties of the shipped markup and paint in the fe side,
+  outside the .starciwork record scope, so the done claim is unproven and the record is held at
+  todo, blockedBy this gap. Repro: node scripts/example-render-proof.mjs --work
+  examples/todo-app/.starciwork --record impl.plan.fe.usage"
+closedBy: impl.plan.fe.usage
+verificationSource: authored-claim
+because: "closedBy names impl.plan.fe.usage, itself done again with a fresh
+  evidence.yaml whose render-proof assertion reruns the canonical
+  scripts/example-render-proof.mjs and now holds for every capture: lane w10 removed the
+  undeclared #2a52b4 (HeroUI's accent-soft-foreground) from secondary button labels in
+  globals.css and re-captured all states with the shared convention; entity-list-in-card and
+  palette-off-brand pass on the fresh markup and bytes. The gap's closure is a derived fact
+  about that record's own evidence, not a separate command."
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-19T22:45:00.000Z
+  reason: "Closed by lane w10: the #2a52b4 bucket was HeroUI's --accent-soft-foreground used as
+    visible label ink on secondary buttons - globals.css now keeps secondary labels on the
+    declared dark neutral treatment, and the re-captured markup satisfies entity-list-in-card.
+    The rev-1 opening narrative below stands verbatim. Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+    palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
+    captures can close this - the rendered page itself violates the design system's laws."

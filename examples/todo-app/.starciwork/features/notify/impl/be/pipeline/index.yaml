@@ -1,0 +1,17 @@
+schema: work/implementation@1
+id: impl.notify.be.pipeline
+title: The notify pipeline module
+state: done
+repository: be
+owners:
+  - {role: module, path: src/modules/domain/notify}
+  - {role: module, path: src/modules/integrations/notify-smtp}
+  - {role: module, path: src/modules/integrations/notify-queue}
+  - {role: module, path: src/modules/integrations/notify-smtp/errors}
+  - {role: module, path: src/modules/integrations/notify-queue/errors}
+  - {role: module, path: src/features/todo/transport/graphql/mutations/notify}
+  - {role: module, path: src/features/todo/transport/graphql/queries/notify}
+proves: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified,
+  br.notify.unsubscribe.honored, sds.notify.delivery-lifecycle]
+
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "The shared NestJS scaffold this record deferred to now exists on this branch (apps/todo/src/app.module.ts, modules/{platform,integrations,domain/{session,task}}, features/todo/graphql/**) - built by an earlier lane's work on this same commit, not five lanes each inventing one. This lane (be-notify) built the notify capability module against it: NotifyModule (src/modules/domain/notify/notify.module.ts) registers DedupeService, DigestService, PreferencesService, DeliveryService, NotifyService, NotifyScheduler (the real wall-clock timer) and NotifyEventSubscriber (the PlatformEventBus subscription to TaskCompletedEvent and SignedInEvent); NotifySmtpModule and NotifyQueueModule (src/modules/integrations/notify-{smtp,queue}) provide the two integration ports with real clients and in-process fakes; two new exceptions under shared/exceptions/errors/notify; the notificationPreferences query and updateNotificationPreferences/unsubscribe mutations under features/todo/graphql/{queries,mutations}/notify. `willProve` renamed to `proves` (this repository's own field name for work/implementation@1; willProve does not exist in schemas/work-layout.yaml). Every owners[] path exists on disk and every proves[] target has reached done with its own evidence.yaml (PROVES_TARGET_NOT_DONE). gap.notify.unbuilt-module's blocker is resolved - see that gap's own closure."}

@@ -1,0 +1,57 @@
+schema: work/implementation@1
+id: impl.plan.fe.usage
+title: The usage screen and its upgrade action
+state: done
+repository: fe
+# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
+# under the [lang] locale segment (locales en|vi); src/app/plan never existed, so the rev-3 reason's
+# claim "Owners are the real directories now" was false for this entry. The route dir still covers
+# both plan/page.tsx and plan/usage/page.tsx, so the claimed extent is unchanged. Quoted because
+# core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
+owners:
+  - {role: route, path: "apps/web/src/app/[lang]/plan"}
+  - {role: module, path: apps/web/src/components/blocks/plan-usage}
+proves: [ui.plan.usage]
+change:
+  rev: 5
+  kind: editorial
+  at: 2026-09-19T22:40:00.000Z
+  reason: "w10: state restored todo -> done - the #2a52b4 off-brand pixels were
+    HeroUI's --accent-soft-foreground on secondary button labels; globals.css
+    now keeps secondary labels on the declared dark neutral ink, and the list
+    markup passed entity-list-in-card on the re-capture. All states were
+    re-captured with the shared convention against a fresh production build and
+    scripts/example-render-proof.mjs holds for every capture;
+    gap.plan.render-proof is closed. Prior narrative kept verbatim: v7-13:
+    state rescinded done -> todo - the fresh captures v7-9 produced fail
+    entity-list-in-card and palette-off-brand, so the done claim is unproven and the record is
+    held by gap.plan.render-proof. The rev-3 build description below stands as the record of
+    what was built. Built and rendered-proofed ui.plan.usage against the live dev stack. Owners are the real
+    directories now - the earlier app/plan/usage-screen.tsx and app/plan/upgrade-button.tsx paths were
+    authored intentions, never built; the lane's write ceiling (src/app/plan/**, src/components/plan/**)
+    is narrower than the app's feature/hooks/modules layering, so the route adapter mounts
+    src/components/plan/usage-screen (the connected owner folding feature-entry + block) and the
+    planUsage/upgradePlan transport lives beside it in src/components/plan/api.ts. Those ceiling-forced
+    placements are the whole deviation set in the architecture check's findings; the pure view itself
+    satisfies the connected/pure render boundary, Grammar exports, session-token threading and the
+    routed-action link rule. Rendered captures for all six states at desktop and mobile are under
+    assets/ with CAPTURES.md's full provenance; evidence.yaml carries replayable gate assertions."
+# Captures, their markup and the scripts that produced them are agent output in the blob store,
+# cited by sha256 (alpha.3; they were kept under assets/ before).
+assets:
+  - {name: captures/capture.mjs, role: script, sha256: 6fade66f493e5d05a0e16a4f061f6535f537650cdc17a5c85e5035750391d90c}
+  - {name: captures/CAPTURES.md, role: file, sha256: c882f6f103df0ce14955269329c9a5f75c9b4861527eab7f07a08f6aac62c4eb}
+  - {name: captures/running-page-at-cap.html, role: markup, sha256: 9972bcafbc7a792c20b366a26463cfba4f86fa6d431e6d6ffd7bdfcd707e68d3}
+  - {name: captures/running-page-at-cap.png, role: capture, sha256: 2db126043006f9b433dd03498f47eefc4f62efeb3c96142bcc631bd653646f1f}
+  - {name: captures/running-page-desktop.html, role: markup, sha256: 4abbd856572af6e0ecb86d66ddff243ac15bce0b6a8a77c985d5458fd266f6ef}
+  - {name: captures/running-page-desktop.png, role: capture, sha256: 409e6f992148faa8bd15b7b2f350ef9b3e430bd52ad50beb7f213b4d13bbbf5c}
+  - {name: captures/running-page-loading.html, role: markup, sha256: dbb7a945d1016f871efa72dcc527aadaabe166b12acccb3edb0ace42fa2b0f6e}
+  - {name: captures/running-page-loading.png, role: capture, sha256: f1bcc5e27f4ac24ea847f0aa9d0c46db59bf02044f6bcb89888d30150eb430cb}
+  - {name: captures/running-page-mobile.html, role: markup, sha256: e27e7b80b0e9473ad5ea6ee9493ae4c7d2b4ce5359e4974284aa408e4b82961c}
+  - {name: captures/running-page-mobile.png, role: capture, sha256: 37e35af3bd2ca592206f7af1c0ae73c86b67f9080d07712128ab7ccdf31cbdc3}
+  - {name: captures/running-page-paid-unlimited.html, role: markup, sha256: 3f37913dc2de66c2cc650e140817e30c7842f2925470cd30025c76b7ee6c7493}
+  - {name: captures/running-page-paid-unlimited.png, role: capture, sha256: fb465923ed7d1af852610d1c19f07c9e9ca667090dafdd004f032620d2d35093}
+  - {name: captures/running-page-refused.html, role: markup, sha256: 52882dd6f6346dc79276589c80620b87575f54cd50e93a1a4ab4eb8603843d06}
+  - {name: captures/running-page-refused.png, role: capture, sha256: 6dbcad5e343f207621c79f4cf9741e4c096d76ce1475b04c94a20828e5e39826}
+  - {name: captures/running-page-under-cap.html, role: markup, sha256: 580452cb248a7c12f85eb58386e56a58b3a02a3d5e30d9adc10f6b7b7c5256c5}
+  - {name: captures/running-page-under-cap.png, role: capture, sha256: 02b57edf02cd6bbb4336742f9d1923b259284ff35ff5470d8aca8042dc324f43}
