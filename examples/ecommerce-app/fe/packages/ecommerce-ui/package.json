@@ -16,7 +16,7 @@
   "dependencies": {
     "@ecommerce/i18n": "0.1.0",
     "@heroui/react": "3.2.6",
-    "@starci/grammar": "0.8.0",
+    "@starci/grammar": "0.8.1",
     "next": "16.1.6",
     "next-intl": "4.13.6",
     "react": "19.2.3",
