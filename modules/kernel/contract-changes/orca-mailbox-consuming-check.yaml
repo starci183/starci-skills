@@ -2,7 +2,7 @@ id: orca-mailbox-consuming-check
 effectiveAt: '2026-10-02T20:00:00+07:00'
 summary: >-
   WORKER QUESTIONS THROUGH A CONSUMING ORCHESTRATION CHECK WITH --ACK (lane MAILC under C0; deep map REPLACE #7 M1).
-  The non-consuming host inbox read is deleted: scripts/api/orca/orch-inbox.mjs, its calls.yaml `inbox` entry, the
+  The non-consuming host inbox read is deleted: the wrapper orch-inbox.mjs, its calls.yaml `inbox` entry, the
   INBOX_NOISE_TYPES heartbeat filter, ORCHESTRATION_INBOX_LIMIT and the inbox prefetch of api status. The new wrapper
   scripts/api/orca/orch-check.mjs issues calls.yaml `check` (orchestration check --run <run> --terminal <handle>
   [--ack <delivery>]): Orca's FIFO Delivery of up to 50 messages of every type, replayed until acknowledged.
