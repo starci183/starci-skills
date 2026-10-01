@@ -14,14 +14,15 @@
 //   coverage  Orca's page covers the hosts in hostScope; an omitted host or a truncated page proves nothing about a
 //             tree it does not list (psCoverage).
 
+import { ORCA_KINDS } from './worktree-registry.mjs';
+
 /** The stamp's prefix: the runtime's mark in Orca's worktree comment. */
 export const RUNTIME_STAMP_PREFIX = 'starci';
 /**
- * The kinds the runtime stamps: the Orca kinds (scripts/lib/worktree-registry.mjs ORCA_KINDS) and the [Worker] staging
- * checkout (supervisor-staging, owned by a Supervisor job: its `sup` field), which lane WSTAGE moves to Orca.
+ * The kinds the runtime stamps are exactly the Orca kinds, whose one home is scripts/lib/worktree-registry.mjs ORCA_KINDS
+ * (workflow, critic, and the [Worker] staging checkout supervisor-staging, owned by a Supervisor job: its `sup` field).
  */
-export const STAMPED_KINDS = Object.freeze(['workflow', 'critic', 'supervisor-staging']);
-const STAMPED = new Set(STAMPED_KINDS);
+const STAMPED = new Set(ORCA_KINDS);
 const OWNER_FIELDS = Object.freeze([['wf', 'workflowId'], ['job', 'jobId'], ['ledger', 'ledgerId'], ['sup', 'supJobId']]);
 
 const enc = (v) => encodeURIComponent(String(v));
@@ -29,7 +30,7 @@ const dec = (v) => { try { return decodeURIComponent(v); } catch { return null; 
 
 /**
  * The ownership comment of a runtime Orca worktree: `starci:<kind>:<slot>[;wf=..][;job=..][;ledger=..][;sup=..]`.
- * kind: one of STAMPED_KINDS; slot: the owner's slot key (a workflow id, a critic name, a staging job); owner:
+ * kind: one of ORCA_KINDS; slot: the owner's slot key (a workflow id, a critic name, a staging job); owner:
  * {workflowId, jobId, ledgerId, supJobId}.
  */
 export function runtimeStampOf({ kind, slot, owner = {} }) {
@@ -39,12 +40,12 @@ export function runtimeStampOf({ kind, slot, owner = {} }) {
   return `${RUNTIME_STAMP_PREFIX}:${kind}:${enc(slot)}${fields.join('')}`;
 }
 
-const STAMP = /^starci:(workflow|critic|supervisor-staging):([^;\s]+)((?:;[a-z]+=[^;\s]*)*)$/;
+const STAMP = /^starci:([a-z-]+):([^;\s]+)((?:;[a-z]+=[^;\s]*)*)$/;
 
 /** {kind, slot, workflowId, jobId, ledgerId, supJobId} of a runtime stamp, or null for any other comment (a foreign tree). */
 export function parseRuntimeStamp(comment) {
   const m = STAMP.exec(String(comment ?? '').trim());
-  if (!m) return null;
+  if (!m || !STAMPED.has(m[1])) return null;
   const slot = dec(m[2]);
   if (!slot) return null;
   const out = { kind: m[1], slot, workflowId: null, jobId: null, ledgerId: null, supJobId: null };

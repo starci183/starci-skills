@@ -1,6 +1,6 @@
 // worker-staging-orca.spec.mjs — the [Worker] staging checkout is an Orca worktree (lane WSTAGE, deep map WT2). createStaging
 // asks Orca (scripts/lib/worktrees.mjs createOrcaWorktree: `orca worktree create --name sup-<job> --base-branch main
-// --comment starci:supervisor-staging:<job>`), records the path, branch, base and Orca id Orca reported, and registers the
+// --comment starci:supervisor-staging:sup-<job>;sup=<job>`, the stamp createOrcaWorktree builds), records the path, branch, base and Orca id Orca reported, and registers the
 // row kind supervisor-staging keyed by Orca's id. removeStaging is the link-safe Orca removal (links unlinked, `orca
 // worktree rm`, the row closed, the branch deleted or kept). The git staging path is gone: createScratchWorktree refuses the
 // kind and check-worktree-add fails a call that asks it. A fake Orca client (tests/helpers/fake-orca-worktrees.mjs) stands
@@ -12,11 +12,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withMachine, openMachine } from '../engine/machine-db.mjs';
-import { createStaging, removeStaging, stagingNameOf, stagingStampOf, createJob, jobOf, spawnWorkers, STAGING_KIND } from '../scripts/supervisor/workers.mjs';
+import { createStaging, removeStaging, stagingNameOf, createJob, jobOf, spawnWorkers, STAGING_KIND } from '../scripts/supervisor/workers.mjs';
 import { gcWorktrees } from '../scripts/lib/worktrees.mjs';
 import { ORCA_KINDS, SCRATCH_KINDS } from '../scripts/lib/worktree-registry.mjs';
 import { createScratchWorktree } from '../scripts/api/git/worktree-add.mjs';
 import { strayLines } from '../scripts/checks/check-worktree-add.mjs';
+import { parseRuntimeStamp, runtimeStampOf } from '../scripts/lib/orca-orphans.mjs';
 import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
@@ -54,7 +55,6 @@ test('the staging kind is an Orca kind, never a git scratch kind', () => {
   assert.ok(ORCA_KINDS.includes(STAGING_KIND));
   assert.ok(!SCRATCH_KINDS.includes(STAGING_KIND));
   assert.equal(stagingNameOf('fix-a-1'), 'sup-fix-a-1');
-  assert.equal(stagingStampOf('fix-a-1'), 'starci:supervisor-staging:fix-a-1');
 });
 
 test('createStaging asks Orca and records the path, branch, base and id Orca reported; the row is keyed by Orca\'s id', (t) => {
@@ -63,7 +63,9 @@ test('createStaging asks Orca and records the path, branch, base and id Orca rep
   assert.ok(s.ok, s.error);
   const [verb, args] = orca.calls.find((c) => c[0] === 'create');
   assert.equal(verb, 'create');
-  assert.deepEqual([args.name, args.baseBranch, args.setup, args.comment], ['sup-fix-a-1', 'main', 'skip', 'starci:supervisor-staging:fix-a-1']);
+  assert.deepEqual([args.name, args.baseBranch, args.setup, args.comment], ['sup-fix-a-1', 'main', 'skip', 'starci:supervisor-staging:sup-fix-a-1;sup=fix-a-1']);
+  assert.equal(args.comment, runtimeStampOf({ kind: STAGING_KIND, slot: 'sup-fix-a-1', owner: { supJobId: 'fix-a-1' } }), 'the one stamp helper builds it');
+  assert.deepEqual([parseRuntimeStamp(args.comment)?.kind, parseRuntimeStamp(args.comment)?.supJobId], [STAGING_KIND, 'fix-a-1'], 'the orphan scan reads the owning Supervisor job back');
   assert.equal(args.repo, `path:${root.replace(/\\/g, '/')}`);
   const tree = [...orca.trees.values()][0];
   assert.deepEqual([s.path, s.branch, s.orcaId], [path.resolve(tree.path), tree.branch, tree.id], 'what Orca reported, never a name built here');
