@@ -155,7 +155,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, saga, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -580,6 +580,15 @@ slots:
     tests: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: be.contract.events
+    profiles: [be]
+    path: "contracts/<app>/events.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the literal `EVENTS` table of `apps/<app>/src/events.ts`; the consumers of its events are judged against it (R131 HFS_EVENT_CONTRACT)
+    rules: [HFS_EVENT_CONTRACT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   - id: be.app.api
@@ -592,7 +601,7 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts, events.ts, consumes.ts]   # events.ts: the events this service publishes (R131); consumes.ts: what it reads of its siblings (R131)
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
@@ -605,7 +614,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", events.ts, consumes.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate
@@ -653,7 +662,7 @@ slots:
     presence: required
     tracked: tracked
     tier: feature
-    allows: ["<action>.{command,query,handler,contracts}.ts"]
+    allows: ["<action>.{command,query,handler,contracts,saga}.ts"]
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]

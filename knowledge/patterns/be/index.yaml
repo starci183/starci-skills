@@ -129,6 +129,11 @@ topics:
     path: idempotency.yaml
     decides: A webhook or consumer claims the event through InjectInbox before it acts, detected by receiver type, the inbox_claims table
     rules: BE-IDEMPOTENCY-1, BE-IDEMPOTENCY-2
+  - id: be.services
+    title: Services of one product
+    path: services.yaml
+    decides: A service only at be/apps/<service> with its own Dockerfile and image, pinned images in a multi-service stack, the vendored event contract and consumer tables, e2e specs for every consumer and saga
+    rules: BE-SERVICES-1 … BE-SERVICES-4
   - id: be.resilience
     title: Retry through the shared helper
     path: resilience.yaml

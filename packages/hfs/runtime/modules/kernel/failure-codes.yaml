@@ -252,6 +252,16 @@ BE_APP_COMPOSITION_ONLY:
   owner: op-retry
   kind: check-finding
 
+BE_ASYNC_SPEC_MISSING:
+  title: "Every message consumer and saga has an e2e spec"
+  title_vi: "Consumer hoặc saga chưa có spec e2e"
+  meaning_vi: "Một `transport/message/<event>.consumer.ts` hoặc một saga (`@Saga()` của `@nestjs/cqrs`) không có `be/src/tests/e2e/<area>/<stem>.e2e-spec.ts`, spec đó không gọi `useTestWorld`, hoặc spec của consumer không nêu sự kiện mà consumer xử lý."
+  causes_vi:
+    - "Vi phạm luật R132: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, và thử giao lại."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e `<stem>.e2e-spec.ts` khởi động world, phát sự kiện thật và đọc kết quả (và trạng thái bù trừ cho saga)."
+  owner: op-retry
+  kind: check-finding
+
 BE_BACKGROUND_UNOWNED:
   title: "Every sweep, outbox or retry has a job or consumer run by a worker app"
   title_vi: "Việc nền không có ai chạy"
@@ -1100,6 +1110,17 @@ HFS_EMPTY_DIR:
   owner: op-retry
   kind: check-finding
 
+HFS_EVENT_CONTRACT:
+  title: "The async contract between services is vendored and consumers match it"
+  title_vi: "Hợp đồng sự kiện giữa các dịch vụ không khớp"
+  meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, hoặc một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác."
+  causes_vi:
+    - "Vi phạm luật R131: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
+    - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `npm run contract:emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
+  owner: op-retry
+  kind: check-finding
+
 HFS_FORBIDDEN_PRESENT:
   title: "Tracked path in a forbidden slot"
   title_vi: "Có tệp bị cấm trong cây mã nguồn"
@@ -1160,6 +1181,16 @@ HFS_HOOKS_PATH_REDIRECTED:
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
   nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_IMAGE_UNPINNED:
+  title: "Every image of a multi-service stack is pinned"
+  title_vi: "Image của stack nhiều dịch vụ chưa được ghim phiên bản"
+  meaning_vi: "Trong `.starcistacks/application-stacks.yaml` của một sản phẩm có từ hai dịch vụ trở lên, một `components.<name>.image` không có tag, dùng `latest`, một từ nhánh hoặc tag chỉ gồm major/minor (ví dụ `postgres:16`), nên image trôi theo thời gian."
+  causes_vi:
+    - "Vi phạm luật R129: image được ghim bằng digest (`@sha256:...`) hoặc phiên bản chính xác `x.y.z`; image của dịch vụ trong repo là `<repo>/<service>:<x.y.z>`, dịch vụ bên thứ ba cũng là image đã ghim."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: ghi tag chính xác hoặc digest vào `image` của thành phần; không dùng tag trôi."
   owner: op-retry
   kind: check-finding
 
@@ -1441,6 +1472,27 @@ HFS_RULE_OFF_WITHOUT_REPLACEMENT:
   causes_vi:
     - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SERVICE_PLACEMENT:
+  title: "A back-end service lives only at be/apps/<service>"
+  title_vi: "Dịch vụ back end nằm ngoài be/apps/<service>"
+  meaning_vi: "Một thư mục có Dockerfile hoặc package.json riêng nằm ngoài `be/apps/<service>/` (và không phải Dockerfile của front end hay package workspace của `fe/packages`), nên nó trở thành một gốc dịch vụ thứ hai bên cạnh `be/` và `fe/`."
+  causes_vi:
+    - "Vi phạm luật R128: mỗi dịch vụ back end là một ứng dụng Nest tại `be/apps/<service>/` dùng chung thư viện `be/src` và một `package.json` duy nhất của app; image của nó được build từ `be/apps/<service>/Dockerfile`."
+    - "Op đã tạo thư mục dịch vụ riêng (ví dụ `services/<name>/` hoặc `be/<name>/`) thay vì thêm ứng dụng dưới `be/apps/`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển dịch vụ vào `be/apps/<service>/` (main.ts, app.module.ts, Dockerfile) và xoá thư mục cũ; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SERVICE_STACK_DECLARATION:
+  title: "Each service app is a service component of the stack"
+  title_vi: "Ứng dụng dịch vụ chưa được khai báo trong stack"
+  meaning_vi: "Một ứng dụng api hoặc worker dưới `be/apps/<service>/` của sản phẩm nhiều dịch vụ không có thành phần `role: service` cùng tên trong `.starcistacks/application-stacks.yaml`."
+  causes_vi:
+    - "Vi phạm luật R130: mọi dịch vụ của sản phẩm nhiều dịch vụ là một thành phần `role: service` của stack (image riêng `<repo>/<service>:<x.y.z>`, build từ Dockerfile của app)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm thành phần cùng tên app (role service, image đã ghim, file compose và cổng của môi trường)."
   owner: op-retry
   kind: check-finding
 

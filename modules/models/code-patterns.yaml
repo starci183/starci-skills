@@ -10,8 +10,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: aab0215cb6384f0b8e34e2e06d66908437c89f8fbef757a8f67fbe8e893cf2af
-        files: 135
+        value: 3c923748bf08f6f3262d276570608ccbdee840b6c720ad31001131e7986c55d4
+        files: 136
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -70,6 +70,10 @@ profiles:
       - BE-PERSISTENCE-6
       - BE-PERSISTENCE-7
       - BE-RESILIENCE-1
+      - BE-SERVICES-1
+      - BE-SERVICES-2
+      - BE-SERVICES-3
+      - BE-SERVICES-4
       - BE-TEMPORAL-1
       - BE-TEST-1
       - BE-TEST-2
@@ -548,6 +552,24 @@ profiles:
         sourceRuleIds: [BE-IDEMPOTENCY-2]
         rationale: A lint rule cannot see a migration's column types, whether the unique constraint actually exists on (source, event_id), or whether an adapter claims by insert-and-catch rather than a racy check-then-insert; this is reviewed against the actual migration and adapter.
         guidance: knowledge/patterns/be/idempotency.yaml
+      - id: NEST-SERVICE-ISOLATION
+        sourceRuleIds: [BE-SERVICES-1]
+        applicability: { include: ['apps/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: A service app (`apps/<service>/`) imports no file of a sibling service app; services share only the `src` libraries.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/service-isolation]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/services.yaml
+          review: Confirm shared code a service needs lives in `src` and that a call to a sibling goes through its API client or its vendored contract, not through a copied file.
+        status: implemented
+      - id: NEST-SERVICE-STACK-AND-CONTRACT-OBSERVATION
+        sourceRuleIds: [BE-SERVICES-2, BE-SERVICES-3, BE-SERVICES-4]
+        rationale: These are tree checks of `hfs check` (HFS_IMAGE_UNPINNED, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING), not lint rules; whether a spec asserts the right behaviour, whether a version bump is compatible and whether a saga compensates every failure is reviewed against the accepted design.
+        guidance: knowledge/patterns/be/services.yaml
 
   next:
     title: StarCi Next.js code pattern
@@ -559,7 +581,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: b290dd7f76aaf33827c6b74256d5e91bff7c32ebc27d4d8b380543a9fe72007a
+        value: a6160bbc42493ba15147735b88dba7ac9fdf14502e23bee27d20d1e72e331156
         files: 148
     sourceRuleRoots:
       - knowledge/patterns/fe

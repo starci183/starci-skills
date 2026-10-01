@@ -1,5 +1,6 @@
 /**
- * `hfs emit-contracts`: writes `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
+ * `hfs emit-contracts`: writes `contracts/<app>/events.json` for every api or worker app that declares `apps/<app>/src/events.ts`
+ * (events.mjs: the async contract, R131), `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
  * `contracts/<app>/openapi.json` for every api app whose `apps/<app>/src/operations.ts` exports the typed operation table
  * `OPERATIONS` (operations.mjs: OpenAPI 3.1 read from the TypeScript checker; nothing is executed).
  *
@@ -20,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { emitEvents, eventsSnapshotPath } from './events.mjs';
 import { openapiPath } from './operations.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
@@ -45,6 +47,9 @@ export function aliasTarget(aliases, specifier) {
   const alias = aliases.find((item) => specifier.startsWith(item.prefix));
   return alias ? path.join(alias.targets[0], specifier.slice(alias.prefix.length)) : null;
 }
+
+/** The apps of a declaration that are services (they may publish events): kind `api` or `worker`. Pure. */
+export const serviceApps = (declaration) => (declaration.apps ?? []).filter((app) => app.kind === 'api' || app.kind === 'worker').map((app) => app.name);
 
 /** The api apps of a declaration that can serve GraphQL: kind `api`. Pure. */
 export const apiApps = (declaration) => (declaration.apps ?? []).filter((app) => app.kind === 'api').map((app) => app.name);
@@ -92,6 +97,17 @@ export function emitContracts({ repoRoot, declaration, outDir = repoRoot }) {
       written.push(relative);
     }
     if (emitted.standIns.length) standIns[app] = emitted.standIns;
+  }
+  for (const app of serviceApps(declaration)) {
+    const events = emitEvents({ repoRoot, app });
+    if (events === null) continue;
+    const relative = eventsSnapshotPath(app);
+    const target = path.join(outDir, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, events);
+    written.push(relative);
+    const at = skipped.indexOf(app);
+    if (at >= 0) skipped.splice(at, 1);
   }
   return { written, skipped, standIns };
 }

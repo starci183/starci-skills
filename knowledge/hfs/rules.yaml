@@ -1272,3 +1272,51 @@ rules:
     failureCodes: ["RT_CONTROL_CHARACTER"]
     enforcers:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
+  - id: R128
+    code: "HFS_SERVICE_PLACEMENT"
+    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app's own and a `fe/packages/<pkg>` workspace's, outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_SERVICE_PLACEMENT"]
+    enforcers:
+      - {kind: hfs, id: services-placement, at: scripts/hfs/rules/services.mjs}
+  - id: R129
+    code: "HFS_IMAGE_UNPINNED"
+    law: "In a product with more than one service (two or more be apps of kind api or worker) every component `image` of `.starcistacks/application-stacks.yaml` is pinned: a digest (`@sha256:<64 hex>`) or an exact version tag (`x.y.z`, optionally with a suffix); no tag, `latest`, a branch word or a major or minor-only tag is a finding. An own service image is `<repo>/<service>:<x.y.z>`, built from `be/apps/<service>/Dockerfile`; a service the product does not own stays a pinned third-party image."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_IMAGE_UNPINNED"]
+    enforcers:
+      - {kind: hfs, id: services-image-pins, at: scripts/hfs/rules/services.mjs}
+  - id: R130
+    code: "HFS_SERVICE_STACK_DECLARATION"
+    law: "Every api or worker app `be/apps/<service>` of a product with more than one service is a component of the same name with `role: service` in `.starcistacks/application-stacks.yaml`."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_SERVICE_STACK_DECLARATION"]
+    enforcers:
+      - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
+  - id: R131
+    code: "HFS_EVENT_CONTRACT"
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version) and every entry must exist in the provider's vendored snapshot at the same version; a missing or stale snapshot, an unknown event or a version mismatch is a finding."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["HFS_EVENT_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
+  - id: R132
+    code: "BE_ASYNC_SPEC_MISSING"
+    law: "Every message consumer (`transport/message/<stem>.consumer.ts`) and every saga (a class with a method decorated `@Saga()` imported from `@nestjs/cqrs`) has an e2e spec `be/src/tests/e2e/<area>/<stem>.e2e-spec.ts` that boots the apps through `useTestWorld`; the spec of a consumer also names the event the consumer handles (publishes it and reads the effect back, redelivery included), and the spec of a saga drives the failure and reads the compensated state back."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_ASYNC_SPEC_MISSING"]
+    enforcers:
+      - {kind: hfs, id: services-async-specs, at: scripts/hfs/rules/services.mjs}
+  - id: R133
+    code: "BE_SERVICE_ISOLATION"
+    law: "A service app (`be/apps/<service>/`) imports no file of a sibling service app: the app that owns the importing file and the app that owns the file a specifier resolves to (a relative path or an alias of the program's own `compilerOptions.paths`) are read from the HFS slot view, and two different apps is a finding; services share only the `be/src` libraries and meet through the wire (a client of the sibling's API, or the events of its vendored contract under `be/contracts/<service>/`)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SERVICE_ISOLATION"]
+    enforcers:
+      - {kind: eslint-be, id: service-isolation}
