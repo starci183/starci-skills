@@ -39,10 +39,10 @@ export const greenReleaseProof = () => ({ schema: RELEASE_PROOF_SCHEMA, at: at()
   steps: RELEASE_STEPS.map((id) => ({ id, command: id, exit: 0, status: 'pass', detail: '' })) });
 
 /** The file names writeGreenProofs writes, in order. */
-export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json', 'doc-gate.json', 'test-world-run.json', 'test-world-integration.json', 'unit-run.json', 'lint.json', 'security-findings.json', 'review-defects.json', 'release-proof.json']);
+export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json', 'doc-gate.json', 'test-world-run.json', 'test-world-integration.json', 'test-world-contract.json', 'unit-run.json', 'lint.json', 'security-findings.json', 'review-defects.json', 'release-proof.json']);
 /** Write every green proof into <dir>; their absolute paths, ready for a report's `files`. */
 export const writeGreenProofs = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
-  const docs = [greenSonarScan(), greenGate(), greenReadDigest(), greenDocGate(), greenTestWorldRun('e2e'), greenTestWorldRun('integration'), greenUnitRun(), greenLint(), greenSecurityFindings(), greenReviewDefects(), greenReleaseProof()];
+  const docs = [greenSonarScan(), greenGate(), greenReadDigest(), greenDocGate(), greenTestWorldRun('e2e'), greenTestWorldRun('integration'), greenTestWorldRun('contract'), greenUnitRun(), greenLint(), greenSecurityFindings(), greenReviewDefects(), greenReleaseProof()];
   return GREEN_PROOF_FILES.map((name, i) => { const file = path.join(dir, name); fs.writeFileSync(file, JSON.stringify(docs[i])); return file; });
 };

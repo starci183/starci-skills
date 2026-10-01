@@ -4137,11 +4137,14 @@ async function settleOpGate(db, jobId, repo) {
 // the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
 // gate and defect classes, the release proof. The runtime re-reads each attached document itself. Read-only here - api settle
 // records the judgment. A leg admitted before the op-mechanism-proofs change settles on its old contract. Null when the op owes
-// no proof for its mode.
+// no proof for its mode, and for a commit-only repair leg.
 async function settleOpProofs(db, jobId, repo) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
+  // A commit-only repair leg (payload.commitOnly, reconcile --work-debt) only commits Work an earlier leg wrote: it decides and
+  // authors nothing, so it owes no mechanism proof of its own.
+  if (jobPayloadOf(job).commitOnly) return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), OP_PROOF_CHANGE);
   if (admittedBeforeChange(admitted, change)) return null;

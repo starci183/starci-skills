@@ -52,6 +52,7 @@ test('op-gate.yaml: every op named in opProofs exists, every proof is defined, a
 test('proofsOf: a moded proof is owed only by its modes; select and an unknown mode owe every proof', () => {
   assert.deepEqual(proofsOf('review.verify', { mode: 'delivery' }), ['review-gate', 'review-defects']);
   assert.deepEqual(proofsOf('review.verify', { mode: 'visual' }), ['review-defects']);
+  assert.deepEqual(proofsOf('review.verify', { mode: 'lint' }), [], 'a lint measurement owes neither review proof');
   assert.deepEqual(proofsOf('review.verify', { mode: 'select' }), ['review-gate', 'review-defects']);
   assert.deepEqual(proofsOf('release.deliver', { mode: 'migrate' }), []);
   assert.deepEqual(proofsOf('release.deliver', { mode: 'publish' }), ['release']);

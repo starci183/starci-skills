@@ -8,6 +8,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {WORK_COMMIT_CHANGE,admittedCommitPolicy,commitPolicyOf,ownedPathsDirty,policyCommits,specBatches} from '../scripts/kernel/settle-landed.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
 
@@ -85,7 +86,9 @@ const seedJob=(repo,{op='scope.define',jobId='op-work-1',wf='wf-work',admittedAt
       const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
       ledger.write.updateAttempt({attemptId,scratchDir:scratchFor(repo,jobId)});
       ledger.write.writeContract({attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
-      if(report)ledger.write.fileReport({attemptId,outcome:'done',report,createdAt:admittedAt});
+      // The deciding and authoring ops owe their READ digest (and work.author its document gate) at settle (knowledge/op-gate.yaml
+      // opProofs): the green ones ride beside the report, in the job scratch.
+      if(report)ledger.write.fileReport({attemptId,outcome:'done',report:{...report,files:[...(report.files??[]),...writeGreenProofs(scratchFor(repo,jobId))]},createdAt:admittedAt});
       ledger.write.recordCheckRun({attemptId,name:'starci-validate',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:admittedAt});
     }
   }finally{ledger.close();}

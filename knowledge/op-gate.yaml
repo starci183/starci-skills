@@ -113,7 +113,8 @@ kinds:
 # itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and
 # opProofs owes the code loop AND its proofs. A proof listed with `modes` is owed only by a dispatch whose params.mode is one of
 # them (`select` included, since the request may pick any mode). A test-world proof lists the `projects` whose summary must be
-# attached; every test-world summary attached (a contract run beside an integration run) must be green as well.
+# attached; every test-world summary attached (a contract run beside an integration run) must be green as well. review.verify's
+# lint mode owes neither review proof: its findings are its measured result, every one of them caught by the lint itself.
 proofs:
   read-knowledge:
     schema: starci/read-digest@1
@@ -196,8 +197,8 @@ opProofs:
   unit.verify: [unit-kit]
   security.verify: [security-lint]
   review.verify:
-    - {proof: review-gate, modes: [select, delivery, workflow, api, lint]}
-    - review-defects
+    - {proof: review-gate, modes: [select, delivery, workflow, api]}
+    - {proof: review-defects, modes: [select, delivery, business, workflow, visual, api]}
   release.deliver:
     - {proof: release, modes: [select, publish, deploy]}
   docs.author: [read-knowledge, doc-gate]

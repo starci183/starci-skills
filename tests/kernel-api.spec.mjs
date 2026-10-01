@@ -8,6 +8,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../engine/machine-db.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
@@ -85,9 +86,9 @@ const seedOp=(ledger,wf,{jobId,opId,status='queued',payload={},tryNo=1,unitId=jo
   if(!['queued','ready','cancelled'].includes(status))setPhase(ledger,wf,'running');
   seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId,kind:'op',unitId,tryNo,retryOf,status,payload,workerId,dispatchId,createdAt,result}]});
 };
-const fileFixtureReport=(ledger,jobId,{outcome='ask',summary='fixture report',question=null,consumed=false}={})=>{
+const fileFixtureReport=(ledger,jobId,{outcome='ask',summary='fixture report',question=null,consumed=false,files=null}={})=>{
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
-  const row=ledger.write.fileReport({attemptId,outcome,report:{outcome,summary,...(question?{question}:{})}});
+  const row=ledger.write.fileReport({attemptId,outcome,report:{outcome,summary,...(question?{question}:{}),...(files?{files}:{})}});
   if(consumed)ledger.write.markReportConsumed({attemptId});
   return row;
 };
@@ -842,7 +843,8 @@ test('cut pass requires the cut-aware green check names before settlement',t=>{
       payload:{opId:'docs.author',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
         orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'}}});
     const attemptId=writeFixtureContract(ledger,jobId,'# cut contract');
-    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done'});
+    // docs.author owes its READ digest and document gate at settle (knowledge/op-gate.yaml opProofs): the green ones ride along.
+    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(path.join(path.dirname(repo),'proofs-k7-cut'))});
     ledger.write.recordCheckRun({attemptId,name:'generic-green',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
   });
   const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
