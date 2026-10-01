@@ -37,6 +37,21 @@ export function appDeclaration(side, fields, project = 'fixture') {
 }
 
 /**
+ * The `side` folder of a fresh temp app (removed after the test): the root a spec writes a side's files under and runs the
+ * machine on. The app root (its parent) holds nothing yet; write `../hfs.json` (appDeclarationText) and `../package.json`.
+ */
+export function tempSide(t, prefix, side = 'be') {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  t.after(() => fs.rmSync(app, { recursive: true, force: true }));
+  const root = path.join(app, side);
+  fs.mkdirSync(root, { recursive: true });
+  return root;
+}
+
+/** appDeclaration as the text of an hfs.json file. */
+export const appDeclarationText = (side, fields, project = 'fixture') => `${JSON.stringify(appDeclaration(side, fields, project), null, 2)}\n`;
+
+/**
  * A hermetic app whose `profile` side the machine judges: the app root holds hfs.json and the one package.json, the side folder
  * (`<app>/<profile>`, the returned root) a permissive tsconfig.json and (be) apps/core/src/{main.ts,app.module.ts} or (fe) a Next
  * app shell. `files` maps side-relative paths to content (null removes a default file); a path that starts with `../` is written

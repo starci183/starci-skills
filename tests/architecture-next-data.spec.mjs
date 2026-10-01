@@ -8,6 +8,7 @@ import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mj
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
 import { checkFrontendDataLifecycle, SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID } from '../scripts/checks/architecture/next-data.mjs';
 import { buildTypeScriptContext } from '../scripts/checks/architecture/typescript.mjs';
+import { appDeclarationText, tempSide } from './_hfs-arch-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -37,8 +38,7 @@ function lifecycleContract(overrides = {}) {
 }
 
 function fixture(t, { source, contract = lifecycleContract(), extra = {}, version = '2.3.8' } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-data-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = tempSide(t, 'starci-next-data-', 'fe');
   const manifest = {
     private: true,
     dependencies: { swr: `^${version}` },
@@ -46,28 +46,27 @@ function fixture(t, { source, contract = lifecycleContract(), extra = {}, versio
       ...(contract === null ? {} : { dataLifecycle: contract }) } } },
   };
   const files = {
-    'package.json': `${JSON.stringify(manifest, null, 2)}\n`,
-    'hfs.json': `${JSON.stringify({ hfs: 1, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] }, null, 2)}
-`,
+    '../package.json': `${JSON.stringify(manifest, null, 2)}\n`,
+    '../hfs.json': appDeclarationText('fe', { apps: [{ name: 'web', kind: 'next' }] }),
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
       jsx: 'react-jsx', skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
-    'node_modules/swr/package.json': JSON.stringify({ name: 'swr', version, types: './index.d.ts', exports: {
+    '../node_modules/swr/package.json': JSON.stringify({ name: 'swr', version, types: './index.d.ts', exports: {
       '.': { types: './index.d.ts', default: './index.js' },
       './immutable': { types: './immutable.d.ts', default: './immutable.js' },
       './mutation': { types: './mutation.d.ts', default: './mutation.js' },
       './package.json': './package.json',
     } }),
-    'node_modules/swr/index.d.ts': `
+    '../node_modules/swr/index.d.ts': `
 declare function useSWR<T=unknown>(key:unknown,fetcher?:unknown):{data:T,error?:unknown,mutate:(data?:T)=>Promise<T|undefined>};
 export default useSWR;
 export declare function mutate(key:unknown,data?:unknown,options?:unknown):Promise<unknown>;
 export declare function useSWRConfig():{mutate:typeof mutate};
 `,
-    'node_modules/swr/immutable.d.ts': 'import useSWR from "./index"; export default useSWR;\n',
-    'node_modules/swr/mutation.d.ts': 'export default function useSWRMutation<T=unknown>(key:unknown,fetcher?:unknown):{data:T,trigger:(arg?:unknown)=>Promise<T>};\n',
-    'node_modules/swr/index.js': 'export default function useSWR(){}; export const mutate=()=>{}; export const useSWRConfig=()=>({mutate});\n',
-    'node_modules/swr/immutable.js': 'export {default} from "./index.js";\n',
-    'node_modules/swr/mutation.js': 'export default function useSWRMutation(){}\n',
+    '../node_modules/swr/immutable.d.ts': 'import useSWR from "./index"; export default useSWR;\n',
+    '../node_modules/swr/mutation.d.ts': 'export default function useSWRMutation<T=unknown>(key:unknown,fetcher?:unknown):{data:T,trigger:(arg?:unknown)=>Promise<T>};\n',
+    '../node_modules/swr/index.js': 'export default function useSWR(){}; export const mutate=()=>{}; export const useSWRConfig=()=>({mutate});\n',
+    '../node_modules/swr/immutable.js': 'export {default} from "./index.js";\n',
+    '../node_modules/swr/mutation.js': 'export default function useSWRMutation(){}\n',
     'src/shared/cache.ts': 'export {default as cache} from "swr"; export {default as mutateCache} from "swr/mutation";\n',
     'src/features/course/use-course.ts': source ?? `
 import {cache,mutateCache} from '../../shared/cache';
@@ -243,7 +242,7 @@ test('rejects source declarations below a symbolic-link or junction ancestor', t
 });
 
 test('does not accept an SWR export symbol without a concrete installed declaration', t => {
-  const root = fixture(t, { extra: { 'node_modules/swr/index.d.ts': `
+  const root = fixture(t, { extra: { '../node_modules/swr/index.d.ts': `
 export {default} from './missing';
 export declare function mutate(key:unknown,data?:unknown):Promise<unknown>;
 export declare function useSWRConfig():{mutate:typeof mutate};
@@ -259,8 +258,8 @@ test('resolves calls through actual installed SWR 2 declarations', t => {
   const manifest = JSON.parse(fs.readFileSync(installedManifest, 'utf8'));
   assert.equal(Number.parseInt(manifest.version.split('.')[0], 10), 2, `Expected installed SWR 2, received ${manifest.version}.`);
   const root = fixture(t, { version: manifest.version });
-  const target = path.resolve(root, 'node_modules', 'swr');
-  assert.ok(target.startsWith(`${path.resolve(root)}${path.sep}`) && path.basename(target) === 'swr', `Unsafe fixture target: ${target}`);
+  const target = path.resolve(root, '..', 'node_modules', 'swr');
+  assert.ok(target.startsWith(`${path.resolve(root, '..')}${path.sep}`) && path.basename(target) === 'swr', `Unsafe fixture target: ${target}`);
   fs.rmSync(target, { recursive: true, force: true });
   fs.symlinkSync(installed, target, process.platform === 'win32' ? 'junction' : 'dir');
   const result = check(root);

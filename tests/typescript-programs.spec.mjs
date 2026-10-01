@@ -9,17 +9,26 @@ import {execFileSync} from 'node:child_process';
 import {createTypeScriptProgram,typeScriptProgramRun} from '../scripts/checks/typescript-programs.mjs';
 import {loadArchitectureConfig} from '../scripts/checks/architecture/config.mjs';
 import {buildTypeScriptContext} from '../scripts/checks/architecture/typescript.mjs';
+import { appDeclaration } from './_hfs-arch-fixture.mjs';
+
+/** The side folder of a fresh temp app: the root a side's code-pattern checks run on; the app root holds package.json and hfs.json. */
+function sideFolder(prefix, side) {
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), prefix)), side);
+  fs.mkdirSync(root, { recursive: true });
+  return root;
+}
+
 
 const require=createRequire(import.meta.url);
 const ts=require('typescript');
 const digest='a'.repeat(64);
 
 function project(t){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ts-programs-'));
+  const root = sideFolder('starci-ts-programs-', 'fe');
   t.after(()=>{
-    assert.equal(path.dirname(path.resolve(root)),path.resolve(os.tmpdir()));
-    assert.ok(path.basename(root).startsWith('starci-ts-programs-'));
-    fs.rmSync(root,{recursive:true,force:true});
+    assert.equal(path.dirname(path.dirname(path.resolve(root))),path.resolve(os.tmpdir()));
+    assert.ok(path.basename(path.dirname(root)).startsWith('starci-ts-programs-'));
+    fs.rmSync(path.dirname(root), { recursive: true, force: true });
   });
   const write=(relative,value)=>{const target=path.join(root,relative);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,typeof value==='string'?value:JSON.stringify(value));};
@@ -50,8 +59,8 @@ test('a run shares programs across async work and another run never sees them',a
 
 test('a run builds the architecture context once and hands every caller its own error list',t=>{
   const {root,write}=project(t);
-  write('package.json',{private:true});
-  write('hfs.json',{hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
+  write('../package.json',{private:true});
+  write('../hfs.json', appDeclaration('fe', { apps: [{name:'web',kind:'next'}] }));
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['src/**/*.ts']});
   write('src/a.ts',"import {b} from './missing'; export const a=b;");
   const config=loadArchitectureConfig(root);

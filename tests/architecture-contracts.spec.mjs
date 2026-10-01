@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
 import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
 import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from '../scripts/checks/architecture/contracts.mjs';
 import { buildTypeScriptContext } from '../scripts/checks/architecture/typescript.mjs';
+import { appDeclarationText, tempSide } from './_hfs-arch-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -23,12 +23,10 @@ function writeFiles(root, files) {
 
 // Owners are derived: src/features/orders is an owner exactly when it has an index.ts entry. `owners: false` leaves the entry out.
 function fixture(t, files, { owners = true } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-contracts-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = tempSide(t, 'starci-architecture-contracts-');
   writeFiles(root, {
-    'hfs.json': `${JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] }, null, 2)}
-`,
-    'package.json': '{"private":true}',
+    '../hfs.json': appDeclarationText('be', { apps: [{ name: 'core', kind: 'api' }] }),
+    '../package.json': '{"private":true}',
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
       experimentalDecorators: true, strict: true, skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
     'node_modules/@nestjs/common/package.json': '{"name":"@nestjs/common","types":"index.d.ts"}',

@@ -37,7 +37,8 @@ function relativeSource(repository, value, label) {
 }
 
 function parseContract(config) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(config.root, 'package.json'), 'utf8'));
+  // The contract is declared in the app's one package.json (the app root; config.root is the fe side folder).
+  const manifest = JSON.parse(fs.readFileSync(path.join(config.packageRoot ?? config.root, 'package.json'), 'utf8'));
   const next = manifest?.starci?.codePatterns?.next;
   const value = next?.dataLifecycle;
   if (value === undefined) return null;
@@ -711,7 +712,7 @@ export function checkFrontendDataLifecycle(config, context) {
     details: ['package.json#starci.codePatterns.next.dataLifecycle is required when production source selects SWR', ...references.unsupported] } };
   reasons.push(...references.unsupported);
   let installed;
-  try { installed = installedSWR(config.root); } catch (error) {
+  try { installed = installedSWR(config.packageRoot ?? config.root); } catch (error) {
     return { violations, coverage: { status: 'unavailable', ruleIds, details: [String(error.message ?? error)] } };
   }
   if (installed.major !== contract.swr.major) reasons.push(`installed swr ${installed.version} does not match declared major ${contract.swr.major}`);

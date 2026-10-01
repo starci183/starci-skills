@@ -17,14 +17,14 @@ export const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.outpu
 export function isGeneratedPath(root, fileName) {
   return slash(path.relative(root, fileName)).split('/').slice(0, -1).some(segment => GENERATED_SEGMENTS.has(segment));
 }
-// A `<tool>.config.*` or `<tool>.setup.*` module beside a package manifest (next.config.ts,
-// postcss.config.mjs) is build tooling a broad `**/*.ts` include pulls in; a `*.config.ts` inside a source tree
-// (src/config/database.config.ts) has no manifest beside it and stays source. The architecture program still
-// reads tooling modules (a profile may declare one as source); the lint (hfs lint) judges one only through the
-// repository's own eslint.config.
+// A `<tool>.config.*` or `<tool>.setup.*` module at the root of a project (beside a package manifest or a tsconfig.json:
+// next.config.ts and postcss.config.mjs of an app, which has no package.json of its own) is build tooling a broad `**/*.ts`
+// include pulls in; a `*.config.ts` inside a source tree (src/config/database.config.ts) has neither beside it and stays source.
+// The architecture program still reads tooling modules (a profile may declare one as source); the lint (hfs lint) judges one only
+// through the repository's own eslint.config.
 const TOOLING_MODULE = /^[^/]+\.(?:config|setup)\.[cm]?[jt]sx?$/i;
 export function isToolingModule(fileName) {
-  return TOOLING_MODULE.test(path.basename(fileName)) && fs.existsSync(path.join(path.dirname(fileName), 'package.json'));
+  return TOOLING_MODULE.test(path.basename(fileName)) && ['package.json', 'tsconfig.json'].some((manifest) => fs.existsSync(path.join(path.dirname(fileName), manifest)));
 }
 
 function diagnosticMessage(ts, diagnostic) {

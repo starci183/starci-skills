@@ -8,11 +8,16 @@ import path from 'node:path';
 
 export const RUNTIME = path.resolve(import.meta.dirname, '..');
 
-/** The installs inside the runtime a spec may borrow packages from: its own, the packages', every example's. */
+/**
+ * The installs a spec may borrow packages from: the runtime's own, the packages', every example's, then the node_modules folders
+ * STARCI_APP_INSTALLS lists (path-delimiter separated: a product app's install, where the runtime holds no copy of a framework the
+ * skeleton imports). A spec that finds a package in none of them skips and names it.
+ */
 export function runtimeInstalls() {
   const examples = path.join(RUNTIME, 'examples');
   const nested = fs.existsSync(examples) ? fs.readdirSync(examples, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(examples, entry.name, 'node_modules')) : [];
-  return [path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
+  const extra = (process.env.STARCI_APP_INSTALLS ?? '').split(path.delimiter).filter(Boolean).map((dir) => path.resolve(dir));
+  return [path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested, ...extra].filter((dir) => fs.existsSync(dir));
 }
 
 /** The @starci packages an app installs, from the runtime's own source: package name -> folder under packages/. */
@@ -30,7 +35,8 @@ export const LINT_DEPENDENCIES = Object.freeze([
   'eslint', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals', 'typescript',
   'prettier', 'stylelint', 'postcss-value-parser',
   '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/testing', '@types/express', '@types/jest', '@types/node',
-  'next', 'next-intl', 'react', 'react-dom', '@types/react',
+  'next', 'next-intl', 'react', 'react-dom', '@types/react', 'server-only', '@starci/grammar', '@heroui/react', '@heroui/styles',
+  'tailwindcss', '@tailwindcss/postcss',
 ]);
 
 const has = (dir, name) => fs.existsSync(path.join(dir, ...name.split('/'), 'package.json'));

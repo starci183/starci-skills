@@ -6,8 +6,9 @@ import path from 'node:path';
 import { checkRepo } from '../scripts/lib/hfs-check.mjs';
 import { feNoTestsFindings, isFeTestPath } from '../scripts/lib/hfs-rules/fe-no-tests.mjs';
 
-// FE_NO_TESTS (R97): a front-end repository has no tests by standard, and no exception.
-const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }] };
+// FE_NO_TESTS (R97): the front end (the fe side of an app) has no tests by standard, and no exception. feNoTestsFindings judges
+// side-relative paths; hfs check runs it over the fe side of the app and reports app-relative paths.
+const APP = { hfs: 2, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
 
 const tree = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-fe-no-tests-'));
@@ -56,18 +57,17 @@ test('FE_NO_TESTS: a package.json with only build and lint scripts and no test d
   assert.deepEqual(feNoTestsFindings({ repoRoot: tree(t, { 'package.json': manifest }), files: ['package.json'] }), []);
 });
 
-test('hfs check of a front end reports a test file once, as FE_NO_TESTS, and not as an undeclared slot', (t) => {
-  const files = ['apps/web/src/components/leaves/Text/index.spec.tsx', 'e2e/flows/sign-in.e2e-spec.ts', 'vitest.config.ts', 'scripts/a.spec.mjs'];
-  const result = checkRepo({ repoRoot: tree(t, {}), declaration: FE, files, tree: false });
+test('hfs check of an app reports a test file of the fe side once, as FE_NO_TESTS, and not as an undeclared slot', (t) => {
+  const files = ['fe/apps/web/src/components/leaves/Text/index.spec.tsx', 'fe/e2e/flows/sign-in.e2e-spec.ts', 'fe/vitest.config.ts', 'fe/scripts/a.spec.mjs'];
+  const result = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files, tree: false });
   const forTests = result.findings.filter((finding) => files.includes(finding.path));
   assert.deepEqual(forTests.map((finding) => finding.code), ['FE_NO_TESTS', 'FE_NO_TESTS', 'FE_NO_TESTS', 'FE_NO_TESTS']);
   assert.equal(result.findings.find((finding) => finding.code === 'FE_NO_TESTS').titleVi.length > 0, true, 'the finding carries its Vietnamese why');
 });
 
-test('hfs check of a front end without a test file has no FE_NO_TESTS finding, and a back end is not judged by it', (t) => {
-  const clean = checkRepo({ repoRoot: tree(t, {}), declaration: FE, files: ['apps/web/src/app/[locale]/page.tsx', 'scripts/check-quality.mjs'], tree: false });
+test('hfs check of an fe side without a test file has no FE_NO_TESTS finding, and the be side and the root are not judged by it', (t) => {
+  const clean = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files: ['fe/apps/web/src/app/[locale]/page.tsx', 'scripts/check-quality.mjs'], tree: false });
   assert.equal(clean.findings.some((finding) => finding.code === 'FE_NO_TESTS'), false);
-  const backend = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
-  const be = checkRepo({ repoRoot: tree(t, {}), declaration: backend, files: ['src/features/orders/application/place-order.service.spec.ts', 'jest.config.js'], tree: false });
+  const be = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files: ['be/src/features/orders/application/place-order.service.spec.ts', 'be/jest.config.js', 'package.json'], tree: false });
   assert.equal(be.findings.some((finding) => finding.code === 'FE_NO_TESTS'), false);
 });

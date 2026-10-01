@@ -130,8 +130,9 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
       for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
         if (typeof value !== 'string' || !value.startsWith('file:')) continue;
         const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
-        // The app's one package.json also lists the other side's file dependencies: only those inside this side are its own.
-        if (sideRoot && !isInside(root, absolute)) continue;
+        // The app's one package.json also lists the other side's file dependencies (inside the app, outside this side): not this
+        // side's. A path that leaves the app is judged like any other: a package of the same repository, or refused.
+        if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) continue;
         const label = `${section}.${name} file dependency`;
         if (isInside(root, absolute)) { admit(absolute, label, true); continue; }
         // A sibling package of the same repository: this project consumes it, so the path is real and
@@ -293,7 +294,7 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   const appDirs = apps.map(app => `apps/${app.name}`);
   const inferred = inferredLayout(root, [...new Set([...workspaces, ...appDirs])].sort());
   const kinds = [profile === 'be' ? 'backend' : 'frontend'];
-  const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])]);
+  const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])].sort());
   if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
   const backend = {
     modules: ['src/modules'],

@@ -2,22 +2,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-// Minimal HFS repository tree (knowledge/hfs/README.md sections 4 to 6) for fixtures that run the
-// architecture check through the aggregate. Entries a spec already wrote are left untouched.
-const COMMON = {
-  '.gitattributes': '* text=auto eol=lf\n',
-  '.github/workflows/check.yml': 'name: check\n',
-  '.gitignore': 'node_modules/\n',
-  '.husky/pre-commit': 'exit 0\n',
+// Minimal HFS app tree (knowledge/hfs/README.md sections 4 to 6) for fixtures that run the architecture check of one side through
+// the aggregate: the fixture root is the side folder (be/ or fe/), and the app-root entries are written one level up. Entries a spec
+// already wrote are left untouched.
+const APP_ROOT = {
+  '../.gitattributes': '* text=auto eol=lf\n',
+  '../.github/workflows/check.yml': 'name: check\n',
+  '../.gitignore': 'node_modules/\n',
+  '../.husky/pre-commit': 'exit 0\n',
+  '../package-lock.json': '{}\n',
+  '../sonar-project.properties': 'sonar.projectKey=fixture\n',
+  '../.starciwork/.gitignore': 'runtime.sqlite\n',
+};
+const SIDE = {
   'eslint.config.mjs': 'export default [];\n',
-  'package-lock.json': '{}\n',
-  'sonar-project.properties': 'sonar.projectKey=fixture\n',
 };
 const BACKEND = {
-  'codecov.yml': 'coverage: {}\n',
   '.sops.yaml': 'creation_rules: []\n',
   '.starcistacks/application-stacks.yaml': 'environments: []\n',
-  '.starciwork/.gitignore': 'runtime.sqlite\n',
   'jest.config.js': 'module.exports = {};\n',
   'nest-cli.json': '{}\n',
 };
@@ -59,14 +61,13 @@ Work is tracked in the backend .starciwork tree.
 `;
 }
 
-/** Write the missing HFS root entries and app shell for `kind` ('backend' | 'frontend'). */
+/** Write the missing app-root entries, side entries and app shell for `kind` ('backend' | 'frontend'); `root` is the side folder. */
 export function writeHfsTree(root, kind, app = kind === 'backend' ? 'api' : 'web') {
-  const files = { 'README.md': hfsReadme(root), ...COMMON, ...(kind === 'backend' ? {
+  const files = { '../README.md': hfsReadme(path.dirname(root)), ...APP_ROOT, ...SIDE, ...(kind === 'backend' ? {
     ...BACKEND,
     [`apps/${app}/src/main.ts`]: 'void 0;\n',
     [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1;\n',
   } : {
-    [`apps/${app}/package.json`]: '{"name":"@fixture/web","private":true}\n',
     [`apps/${app}/next.config.ts`]: 'export default {};\n',
     [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
     [`apps/${app}/tsconfig.json`]: '{"extends":"../../tsconfig.json","include":["src/**/*"]}\n',
@@ -79,8 +80,9 @@ export function writeHfsTree(root, kind, app = kind === 'backend' ? 'api' : 'web
   }
 }
 
-/** The architecture check judges the tracked tree: stage everything except the ignored node_modules. */
+/** The architecture check judges the tracked tree: stage the whole app (the side folder's parent) except the ignored node_modules. */
 export function trackHfsTree(root) {
-  if (!fs.existsSync(path.join(root, '.git'))) execFileSync('git', ['init', '-q'], { cwd: root });
-  execFileSync('git', ['add', '-A'], { cwd: root });
+  const app = path.dirname(root);
+  if (!fs.existsSync(path.join(app, '.git'))) execFileSync('git', ['init', '-q'], { cwd: app });
+  execFileSync('git', ['add', '-A'], { cwd: app });
 }

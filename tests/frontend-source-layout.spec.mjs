@@ -9,34 +9,35 @@ import {checkArchitecture} from '../scripts/checks/architecture.mjs';
 import {FRAMEWORK_PINNED_KNOWLEDGE,frameworkPinnedRootFiles} from '../scripts/checks/architecture/frontend.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {hfsReadme} from './_hfs-tree-fixture.mjs';
+import {appDeclarationText} from './_hfs-arch-fixture.mjs';
 
 const require=createRequire(import.meta.url);
 const ts=require('typescript');
 
 function fixture(t,files){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-frontend-layout-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const app=fs.mkdtempSync(path.join(os.tmpdir(),'starci-frontend-layout-'));
+  t.after(()=>fs.rmSync(app,{recursive:true,force:true}));
+  const root=path.join(app,'fe');
   const written=new Set();
   const write=(relative,value)=>{written.add(relative);const target=path.join(root,...relative.split('/'));fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,value);};
-  // HFS: a frontend repository is an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
-  write('.gitattributes','* text=auto eol=lf\n');
-  write('.github/workflows/check.yml','name: check\n');
-  write('.gitignore','node_modules/\n');
-  write('.husky/pre-commit','exit 0\n');
-  write('README.md',hfsReadme(root));
+  // HFS: the fe side of an app; the app root holds the root entries, and all source lives under fe/apps/web/src.
+  write('../.gitattributes','* text=auto eol=lf\n');
+  write('../.github/workflows/check.yml','name: check\n');
+  write('../.gitignore','node_modules/\n');
+  write('../.husky/pre-commit','exit 0\n');
+  write('../README.md',hfsReadme(app));
   write('eslint.config.mjs','export default [];\n');
-  write('package-lock.json','{}\n');
-  write('sonar-project.properties','sonar.projectKey=fixture\n');
-  write('package.json','{"private":true,"workspaces":["apps/*"]}\n');
-  write('apps/web/package.json','{"name":"@fixture/web","private":true}\n');
+  write('../package-lock.json','{}\n');
+  write('../sonar-project.properties','sonar.projectKey=fixture\n');
+  write('../package.json','{"private":true}\n');
   write('apps/web/next.config.ts','export default {};\n');
   write('apps/web/postcss.config.mjs','export default {};\n');
   write('apps/web/tsconfig.json',JSON.stringify({extends:'../../tsconfig.json',include:['src/**/*']}));
-  write('hfs.json',JSON.stringify({hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]},null,2));
+  write('../hfs.json',appDeclarationText('fe',{apps:[{name:'web',kind:'next'}]}));
   write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',jsx:'preserve',baseUrl:'.',paths:{'@/*':['apps/web/src/*']},noEmit:true},include:['apps/web/src/**/*']},null,2));
   for(const [relative,value] of Object.entries(files))write(relative,value);
-  execFileSync('git',['init','-q'],{cwd:root});
-  execFileSync('git',['add','--',...written],{cwd:root});
+  execFileSync('git',['init','-q'],{cwd:app});
+  execFileSync('git',['add','--',...[...written].map(relative=>path.posix.normalize(`fe/${relative}`))],{cwd:app});
   return {root,check:()=>checkArchitecture({repositoryRoot:root,injectedTypeScript:ts})};
 }
 

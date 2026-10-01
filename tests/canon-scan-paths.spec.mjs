@@ -6,24 +6,24 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { checkArchitecture } from '../scripts/checks/architecture/index.mjs';
+import { appDeclaration, appDeclarationText } from './_hfs-arch-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
 test('scoped architecture matches full findings while building only selected projects and dependencies', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-paths-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-paths-')), 'be');
+  t.after(() => fs.rmSync(path.dirname(root), { recursive: true, force: true }));
   const put = (relative, content) => {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, content);
   };
-  // TypeScript projects are derived: the root tsconfig.json (src/**) and the tsconfig of every workspace (apps/b).
+  // TypeScript projects are derived: the side's tsconfig.json (src/**) and the tsconfig of every app (apps/b) and workspace package.
   const compilerOptions = { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true };
-  put('package.json', JSON.stringify({ private: true, workspaces: ['apps/*'] }));
-  put('hfs.json', JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'b', kind: 'api' }] }));
+  put('../package.json', JSON.stringify({ private: true }));
+  put('../hfs.json', appDeclarationText('be', { apps: [{ name: 'b', kind: 'api' }] }));
   put('tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
-  put('apps/b/package.json', JSON.stringify({ name: '@fixture/b', private: true }));
   put('apps/b/tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
   put('src/modules/domain/order/index.ts', 'import { feature } from "../../../features/thing"; export const order = feature;\n');
   put('src/features/thing/index.ts', 'export const feature = 1;\n');
@@ -38,8 +38,8 @@ test('scoped architecture matches full findings while building only selected pro
   assert.deepEqual(scoped.errors, selected(full.errors));
   assert.deepEqual(scoped.compiler.projects, ['tsconfig.json']);
   assert.deepEqual(scoped.coverage.sourceFiles, ['src/features/thing/index.ts', orderFile]);
-  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
-  fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
+  fs.mkdirSync(path.join(root, '..', 'node_modules'), { recursive: true });
+  fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, '..', 'node_modules/typescript'), 'junction');
   const cli = path.resolve(import.meta.dirname, '../scripts/checks/canon-scan.mjs');
   const run = paths => {
     const args = [cli, '--root', root, '--profile', 'nest', '--machines', 'architecture', '--json', ...(paths ? ['--paths', paths] : [])];
@@ -54,17 +54,17 @@ test('scoped architecture matches full findings while building only selected pro
 });
 
 test('scoped architecture includes referenced TypeScript projects but skips unrelated projects', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-references-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-references-')), 'be');
+  t.after(() => fs.rmSync(path.dirname(root), { recursive: true, force: true }));
   const put = (relative, value) => {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value));
   };
-  // Every workspace tsconfig is a derived project; apps/a additionally references packages/shared.
-  put('package.json', { private: true, workspaces: ['apps/*', 'packages/*'] });
-  put('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }, { name: 'b', kind: 'api' }] });
-  for (const workspace of ['apps/a', 'apps/b', 'packages/shared']) put(`${workspace}/package.json`, { name: `@fixture/${workspace.split('/')[1]}`, private: true });
+  // Every app and workspace tsconfig is a derived project; apps/a additionally references packages/shared.
+  put('../package.json', { private: true, workspaces: ['be/packages/*'] });
+  put('../hfs.json', appDeclaration('be', { apps: [{ name: 'a', kind: 'api' }, { name: 'b', kind: 'api' }] }));
+  put('packages/shared/package.json', { name: '@fixture/shared', private: true });
   put('apps/a/tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true }, include: ['src/**/*.ts'], references: [{ path: '../../packages/shared' }] });
   put('apps/b/tsconfig.json', { compilerOptions: { target: 'ES2022', noEmit: true }, include: ['src/**/*.ts'] });
   put('packages/shared/tsconfig.json', { compilerOptions: { target: 'ES2022', composite: true }, include: ['src/**/*.ts'] });
@@ -78,16 +78,16 @@ test('scoped architecture includes referenced TypeScript projects but skips unre
 });
 
 test('a selected project with a missing tsconfig still fails closed', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-config-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-config-')), 'be');
+  t.after(() => fs.rmSync(path.dirname(root), { recursive: true, force: true }));
   const put = (relative, text) => {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
   };
   // A project list can no longer be authored, so the missing tsconfig is a project reference of the root tsconfig.
-  put('package.json', '{"private":true}');
-  put('hfs.json', JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }] }));
+  put('../package.json', '{"private":true}');
+  put('../hfs.json', appDeclarationText('be', { apps: [{ name: 'a', kind: 'api' }] }));
   put('tsconfig.json', JSON.stringify({ files: [], references: [{ path: 'apps/a/tsconfig.json' }] }));
   put('apps/a/src/main.ts', 'export const main = 1;');
   const result = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts, paths: ['apps/a/src/main.ts'] });

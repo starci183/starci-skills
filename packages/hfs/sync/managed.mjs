@@ -26,7 +26,7 @@
 //   HFS_TS_STRICT (R22)           the root tsconfig.json drift (either profile), named by flag (ts-strict.mjs) instead of by hash.
 import fs from 'node:fs';
 import path from 'node:path';
-import { STACKS_SIDE, SyncError, checkTargets, renderRepo } from './index.mjs';
+import { SyncError, checkTargets, renderRepo } from './index.mjs';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
 import { readDeclaredSonarGate } from './sonar-key.mjs';
 import { TS_STRICT_FILE, tsStrictFindings } from './ts-strict.mjs';
@@ -90,7 +90,7 @@ function driftFindings(repoRoot, targets) {
 
 /** R11: the quality gate the be side's stack declaration names is the one gate of the bundled knowledge/sonar-gate.yaml. */
 function sonarGateFindings(repoRoot, parseYaml) {
-  const declared = readDeclaredSonarGate(repoRoot, { parseYaml, stacks: STACKS_SIDE });
+  const declared = readDeclaredSonarGate(repoRoot, { parseYaml });
   if (declared === null) return [];
   const gate = (parseYaml ?? bundledParseYaml)(fs.readFileSync(SONAR_GATE_FILE, 'utf8'))?.gate?.name;
   if (declared.qualityGate === gate) return [];

@@ -4,15 +4,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { main } from '../packages/hfs/bin/hfs.mjs';
-import { BE, FE, cleanup, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, cleanup, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 // `hfs new service | spec` (unit test standard): a service and its spec skeleton, the skeleton built from the constructor with the
-// kit double the slot manifest names for each token. The specs generate into a temporary repository and read the files back.
+// kit double the slot manifest names for each token. The specs generate into a temporary app (hfs new runs at the app root and writes
+// under be/) and read the files back.
 const ts = createRequire(import.meta.url)('typescript');
 const made = [];
 test.after(() => cleanup(made));
 
-const repo = (declaration = BE) => {
+const repo = (declaration = APP) => {
   const dir = installTypeScript(writeCleanRepo(declaration));
   made.push(dir);
   return dir;
@@ -32,7 +33,7 @@ const put = (dir, relative, text) => {
 /** The file parses: no syntax diagnostic. */
 const parses = (text) => ts.transpileModule(text, { reportDiagnostics: true, compilerOptions: { experimentalDecorators: true } }).diagnostics.length === 0;
 
-const DIR = 'src/modules/domain/commission';
+const DIR = 'be/src/modules/domain/commission';
 
 test('a new service is written with a spec whose providers are exactly its constructor dependencies, each double from the kit table', async () => {
   const dir = repo();
@@ -217,10 +218,10 @@ test('a service without dependencies gets a providers list of the service alone'
 
 test('nothing is written outside a slot, over an existing file, for a bad name, for a front end or for a non-service file', async () => {
   const dir = repo();
-  const stray = await cli(['new', 'service', 'src/stray', 'thing', '--repo', dir]);
+  const stray = await cli(['new', 'service', 'be/src/stray', 'thing', '--repo', dir]);
   assert.equal(stray.code, 2);
   assert.match(stray.err, /^HFS_NEW_NO_SLOT: src\/stray\/thing\.service\.ts is owned by no slot/);
-  assert.equal(fs.existsSync(path.join(dir, 'src/stray')), false);
+  assert.equal(fs.existsSync(path.join(dir, 'be/src/stray')), false);
 
   assert.equal((await cli(['new', 'service', DIR, 'commission', '--repo', dir])).code, 0);
   const again = await cli(['new', 'service', DIR, 'commission', '--repo', dir]);
@@ -236,9 +237,10 @@ test('nothing is written outside a slot, over an existing file, for a bad name, 
   const missing = await cli(['new', 'spec', `${DIR}/nothing.service.ts`, '--repo', dir]);
   assert.match(missing.err, /^HFS_NEW_NO_SERVICE/);
 
-  const front = repo(FE);
-  const fe = await cli(['new', 'service', 'apps/web/src/modules/x', 'x', '--repo', front]);
+  const fe = await cli(['new', 'service', 'fe/apps/web/src/modules/x', 'x', '--repo', dir]);
   assert.match(fe.err, /^HFS_NEW_BACKEND_ONLY/);
+  const root = await cli(['new', 'service', 'src/modules/domain/x', 'x', '--repo', dir]);
+  assert.match(root.err, /^HFS_NEW_BACKEND_ONLY/, 'a path outside be/ is refused, even one shaped like a back-end path');
 });
 
 test('a dependency the spec cannot provide is named, and usage errors exit 2', async () => {

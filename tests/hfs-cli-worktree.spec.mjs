@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BE, cleanup, gitAdd, installPresets, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, cleanup, gitAdd, installPresets, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 import { isMain } from '../scripts/checks/common.mjs';
 
 const made = [];
@@ -30,7 +30,7 @@ test('isMain compares real paths: an entry reached through a junction or symlink
 });
 
 test('hfs check inside a git worktree with a junctioned node_modules is never silent: a report or a loud refusal', () => {
-  const repo = gitAdd(installPresets(writeCleanRepo(BE)));
+  const repo = gitAdd(installPresets(writeCleanRepo(APP)));
   made.push(repo);
   execFileSync('git', ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { stdio: 'ignore' });
   const worktree = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-wt-'));

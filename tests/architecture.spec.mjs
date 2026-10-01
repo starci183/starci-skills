@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
 import { HFS_MACHINE_RULE_IDS as MACHINE_RULE_IDS } from '../scripts/checks/architecture/index.mjs';
 import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
+import { appDeclaration } from './_hfs-arch-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -24,11 +25,35 @@ function scoped(report) {
   return { ...report, violations, ok: report.errors.length === 0 && violations.length === 0 };
 }
 
+/**
+ * The files of a side written in the app shape: `package.json` is the app's one manifest at the app root, its workspaces the
+ * side's packages (`packages/*` becomes `<side>/packages/*`; the apps are no workspaces and have no package.json), and the
+ * dependencies an app package.json of the test declared move into it.
+ */
+function appShaped(side, files) {
+  const out = { ...files };
+  const manifest = JSON.parse(out['package.json'] ?? '{"private":true}');
+  delete out['package.json'];
+  for (const key of Object.keys(out).filter(key => /^apps\/[^/]+\/package\.json$/.test(key))) {
+    const appManifest = JSON.parse(out[key]);
+    for (const section of ['dependencies', 'devDependencies']) if (appManifest[section]) manifest[section] = { ...manifest[section], ...appManifest[section] };
+    delete out[key];
+  }
+  if (Array.isArray(manifest.workspaces)) {
+    manifest.workspaces = manifest.workspaces.filter(pattern => !pattern.startsWith('apps/')).map(pattern => `${side}/${pattern}`);
+    if (!manifest.workspaces.length) delete manifest.workspaces;
+  }
+  out['../package.json'] = JSON.stringify(manifest);
+  return out;
+}
+
 function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core', kind: 'api' }] : [{ name: 'web', kind: 'next' }]) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
+  t.after(() => fs.rmSync(appRoot, { recursive: true, force: true }));
+  const side = kind === 'backend' ? 'be' : 'fe';
+  const root = path.join(appRoot, side);
   const app = apps[0].name;
-  const declaration = { hfs: 1, profile: kind === 'backend' ? 'be' : 'fe', project: 'fixture', apps };
+  const declaration = appDeclaration(side, { apps });
   const tsconfig = `${JSON.stringify({
     compilerOptions: {
       target: 'ES2022',
@@ -49,31 +74,28 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
   }, null, 2)}
 `;
   const baseline = {
-    '.gitattributes': '* text=auto eol=lf\n',
-    '.github/workflows/check.yml': 'name: check\n',
-    '.gitignore': 'node_modules/\n',
-    '.husky/pre-commit': 'exit 0\n',
-    'README.md': hfsReadme(root),
+    '../.gitattributes': '* text=auto eol=lf\n',
+    '../.github/workflows/check.yml': 'name: check\n',
+    '../.gitignore': 'node_modules/\n',
+    '../.husky/pre-commit': 'exit 0\n',
+    '../README.md': hfsReadme(appRoot),
     'eslint.config.mjs': 'export default [];\n',
-    'package-lock.json': '{}\n',
-    'package.json': JSON.stringify(kind === 'frontend' ? { private: true, workspaces: ['apps/*'] } : { private: true }),
-    'sonar-project.properties': 'sonar.projectKey=fixture\n',
-    'hfs.json': `${JSON.stringify(declaration, null, 2)}
+    '../package-lock.json': '{}\n',
+    'package.json': JSON.stringify({ private: true }),
+    '../sonar-project.properties': 'sonar.projectKey=fixture\n',
+    '../hfs.json': `${JSON.stringify(declaration, null, 2)}
 `,
     'tsconfig.json': tsconfig,
     ...(kind === 'backend' ? {
       '.sops.yaml': 'creation_rules: []\n',
       '.starcistacks/application-stacks.yaml': 'environments: []\n',
-      '.starciwork/.gitignore': 'runtime.sqlite\n',
+      '../.starciwork/.gitignore': 'runtime.sqlite\n',
       'jest.config.js': 'module.exports = {};\n',
       'nest-cli.json': '{}\n',
       'src/tests/fixtures/.keep': '',
-      [`apps/${app}/package.json`]: JSON.stringify({ name: '@fixture/core', private: true }),
       [`apps/${app}/src/main.ts`]: 'void 0\n',
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
     } : {
-      ...Object.fromEntries(apps.slice(1).map(other => [`apps/${other.name}/package.json`, JSON.stringify({ name: `@fixture/${other.name}`, private: true })])),
-      [`apps/${app}/package.json`]: JSON.stringify({ name: '@fixture/web', private: true }),
       [`apps/${app}/next.config.ts`]: 'export default {};\n',
       [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
       [`apps/${app}/tsconfig.json`]: JSON.stringify({ extends: '../../tsconfig.json', include: ['src/**/*'] }),
@@ -81,10 +103,10 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
     }),
   };
   // A null entry removes a baseline file (a test that needs the tree without it).
-  const fixtureFiles = Object.fromEntries(Object.entries({ ...baseline, ...files }).filter(([, content]) => content !== null));
+  const fixtureFiles = appShaped(side, Object.fromEntries(Object.entries({ ...baseline, ...files }).filter(([, content]) => content !== null)));
   writeFiles(root, fixtureFiles);
-  execFileSync('git', ['init', '-q'], { cwd: root });
-  execFileSync('git', ['add', '--', ...Object.keys(fixtureFiles)], { cwd: root });
+  execFileSync('git', ['init', '-q'], { cwd: appRoot });
+  execFileSync('git', ['add', '-A'], { cwd: appRoot });
   return root;
 }
 
@@ -322,7 +344,7 @@ test('hfs.json has no waiver or baseline field: an unknown key is refused as an 
     'apps/web/src/app/home/page.tsx': 'const Route=()=>null; export default Route\n',
     'apps/web/src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
   });
-  const file = path.join(root, 'hfs.json');
+  const file = path.join(root, '..', 'hfs.json');
   const declaration = JSON.parse(fs.readFileSync(file, 'utf8'));
   declaration.waivers = ['apps/web/src/app/home/page.tsx'];
   fs.writeFileSync(file, JSON.stringify(declaration));
@@ -394,8 +416,8 @@ test('single-app file dependencies participate in package export and package-to-
     'packages/ui/tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@fixture/app/*': ['apps/web/src/*'] }, noEmit: true }, include: ['src/**/*'] }),
     'packages/ui/src/public/index.tsx': 'export const Public=()=> <span/>\n',
   });
-  const packageFile = path.join(root, 'package.json');
-  fs.writeFileSync(packageFile, JSON.stringify({ name: '@fixture/app', private: true, dependencies: { '@fixture/ui': 'file:packages/ui' } }));
+  const packageFile = path.join(root, '..', 'package.json');
+  fs.writeFileSync(packageFile, JSON.stringify({ name: '@fixture/app', private: true, dependencies: { '@fixture/ui': 'file:fe/packages/ui' } }));
   const tsconfigFile = path.join(root, 'tsconfig.json'), config = JSON.parse(fs.readFileSync(tsconfigFile, 'utf8'));
   Object.assign(config.compilerOptions.paths, { '@fixture/ui/*': ['packages/ui/src/*'], '@fixture/app/*': ['apps/web/src/*'] });
   fs.writeFileSync(tsconfigFile, JSON.stringify(config));
@@ -891,8 +913,8 @@ test('workspace discovery supports exact and bounded entries and rejects unsuppo
   });
   let result = check(root);
   assert.equal(result.errors.some(item => item.ruleId.startsWith('ARCH_PACKAGE_')), false, JSON.stringify(result, null, 2));
-  const packageFile = path.join(root, 'package.json'), pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
-  pkg.workspaces = ['packages/**'];
+  const packageFile = path.join(root, '..', 'package.json'), pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
+  pkg.workspaces = ['fe/packages/**'];
   fs.writeFileSync(packageFile, JSON.stringify(pkg));
   result = check(root);
   assert.equal(result.errors[0]?.ruleId, 'ARCH_CONFIG_INVALID', JSON.stringify(result, null, 2));

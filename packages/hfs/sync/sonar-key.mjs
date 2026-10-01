@@ -1,13 +1,16 @@
-// The Sonar project key of a repository: read from its stack declaration (.starcistacks/application-stacks.yaml,
-// services.sonar.projects[]) when one exists, so there is one source of the key. Only when no declaration names this
-// repository does sync derive `<project>-backend` / `<project>-fe`.
+// The Sonar project key of an app: read from its stack declaration (be/.starcistacks/application-stacks.yaml,
+// services.sonar.projects[]) when one names the app, so there is one source of the key. Only when no declaration names the app
+// does sync derive the key from the project name.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
 
-export const DECLARATION = path.join('.starcistacks', 'application-stacks.yaml');
+/** The side folder that holds an app's stack declaration. */
+export const STACKS_SIDE = 'be';
+/** The stack declaration, app-relative. */
+export const DECLARATION = path.join(STACKS_SIDE, '.starcistacks', 'application-stacks.yaml');
 
-/** The repository name the declaration lists its projects under: package.json name, else the folder name. */
+/** The repository name the declaration lists its projects under: the app package.json name, else the folder name. */
 export function repositoryName(root) {
   try {
     const name = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name;
@@ -26,31 +29,26 @@ export function declaredSonarKeys(declaration, repository) {
 }
 
 /**
- * The declared key, or null when the repository has no declaration or the declaration names none for it.
- * `stacks` is hfs.json's optional path to the sibling repository that owns the declaration (a front-end repository has
- * none of its own); the key is still looked up under THIS repository's name. A `stacks` path with no declaration behind it
- * is refused, because the key would silently fall back to a derived one.
- * `parseYaml(text)` is injected; the default is the YAML parser bundled in this package (the package installs with no node_modules).
+ * The declared key of the app at `root`, or null when the app has no stack declaration or the declaration names none for it.
+ * Two keys for one app are refused through `fail`. `parseYaml(text)` is injected; the default is the YAML parser bundled in this
+ * package (the package installs with no node_modules).
  */
-export async function readDeclaredSonarKey(root, { parseYaml, fail, stacks }) {
-  const file = path.join(stacks === undefined ? root : path.resolve(root, stacks), DECLARATION);
-  if (!fs.existsSync(file)) {
-    if (stacks !== undefined) fail(`hfs.json stacks points at ${stacks}, which has no ${DECLARATION}`);
-    return null;
-  }
+export async function readDeclaredSonarKey(root, { parseYaml, fail }) {
+  const file = path.join(root, DECLARATION);
+  if (!fs.existsSync(file)) return null;
   const parse = parseYaml ?? bundledParseYaml;
   const keys = declaredSonarKeys(parse(fs.readFileSync(file, 'utf8')), repositoryName(root));
-  if (keys.length > 1) fail(`${DECLARATION} declares ${keys.length} Sonar projects for ${repositoryName(root)} (${keys.join(', ')}); one repository has one key`);
+  if (keys.length > 1) fail(`${DECLARATION.split(path.sep).join('/')} declares ${keys.length} Sonar projects for ${repositoryName(root)} (${keys.join(', ')}); one app has one key`);
   return keys[0] ?? null;
 }
 
 /**
- * The quality gate the declaration names for Sonar: `{ file, qualityGate }`, or null when there is no declaration, Sonar is
- * disabled in it, or it declares no Sonar service. The one gate is knowledge/sonar-gate.yaml; a repository names it and
- * never states thresholds of its own.
+ * The quality gate the declaration names for Sonar: `{ file, qualityGate }` (file app-relative), or null when there is no
+ * declaration, Sonar is disabled in it, or it declares no Sonar service. The one gate is knowledge/sonar-gate.yaml; an app names it
+ * and never states thresholds of its own.
  */
-export function readDeclaredSonarGate(root, { parseYaml, stacks } = {}) {
-  const file = path.join(stacks === undefined ? root : path.resolve(root, stacks), DECLARATION);
+export function readDeclaredSonarGate(root, { parseYaml } = {}) {
+  const file = path.join(root, DECLARATION);
   if (!fs.existsSync(file)) return null;
   const sonar = (parseYaml ?? bundledParseYaml)(fs.readFileSync(file, 'utf8'))?.services?.sonar;
   if (!sonar || sonar.mode === 'disabled') return null;
