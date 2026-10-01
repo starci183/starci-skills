@@ -8,16 +8,24 @@ purpose: |
   conditions and selects it for the project, and (2) judges an op's slice - the lines it changed - against
   the same numbers. Code-writing ops cannot settle done while the slice is red
   (scripts/kernel/sonar-settle.mjs). Changing a number here changes every repository on the next scan.
-  The gate has two parts: `newCode` (the recent work: duplication, blocker/critical issues, hotspots) and
-  `overall` (the whole code: no imported HFS, ESLint or stylelint finding, no duplicated-lines excess, no cognitive-
-  complexity issue). The one Sonar mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
+  The gate has two parts: `newCode` (the recent work: coverage, duplication, blocker/critical issues, hotspots) and
+  `overall` (the whole code: coverage, no imported HFS, ESLint or stylelint finding, no bug, code smell or
+  vulnerability, every hotspot reviewed, no duplicated-lines excess, no cognitive-complexity issue). The one Sonar
+  mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
 gate:
   name: starci-new-code
   # A project with no new-code baseline judges the whole project as new code (nivo inc-f92febebbb64); a fixed
   # window keeps "new code" the recent work on main, so the server gate is passable on a healthy main.
   newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
 newCode:
-  # Sonar holds NO coverage condition: unit coverage is the runner's job (jest per-file 100 on `*.service.ts`), never an lcov import.
+  # Coverage of the services only. The be unit run writes coverage/lcov.info (@starci/jest-preset coverageReporters lcov) and the
+  # managed sonar-project.properties imports it (sonar.javascript.lcov.reportPaths=be/coverage/lcov.info) with
+  # sonar.coverage.inclusions=be/src/**/*.service.ts, the one scope rendered by hfs sync from the preset's COVERAGE_SOURCES (codecov.yml
+  # is rendered from the same constant). A handler, resolver, controller, module, config file or test is not a coverage target and
+  # fe/ is outside coverage entirely, so coverage on these conditions is the services' coverage alone.
+  coverage:
+    metric: new_coverage
+    minPercent: 100
   # SonarQube's ignoreSmallChanges: fewer changed lines than this are not held to duplication.
   ignoreBelowChangedLines: 20
   duplication:
@@ -49,6 +57,19 @@ overall:
     metric: violations
     max: 0
     engines: [starci-hfs, eslint, stylelint]
+    # The dashboard counts (`sonar-local dashboard`): each type of open issue, each held at `max`.
+    types: {bugs: BUG, code_smells: CODE_SMELL, vulnerabilities: VULNERABILITY}
+  # Every security hotspot of the whole code is reviewed (the dashboard's "hotspots reviewed").
+  hotspots:
+    metric: security_hotspots_reviewed
+    minReviewedPercent: 100
+  # The services' coverage (see newCode.coverage), overall and per file: with the inclusions in place each `*.service.ts` is its
+  # own measure, so one service below 100 fails the slice verdict (sonar-local evaluateSlice) and the dashboard verdict
+  # (sonar-local dashboard) although the project average may round to 100. A file outside the inclusions is never read.
+  coverage:
+    metric: coverage
+    minPercent: 100
+    perFile: true
   # HFS_DUPLICATE_CODE (R21): duplicated lines density of the whole project, the Sonar enforcer of the machine's clone check.
   # SonarJS runs its own token-based detection (sonar.cpd.* minimums are not read for TypeScript), so ruleParams.<profile>.duplicateBlock
   # is enforced by the machine and imported as starci-hfs issues, and this density is the Sonar-side backstop.
@@ -70,8 +91,10 @@ enforcedOps: [backend.implement, interface.implement, code.refactor]
 reasoning: |
   Chosen against the four projects the local server holds on 2026-09-29 (whole-project duplicated lines
   1.6 / 2.1 / 1.7 / 0.0 percent), so new code that meets them is at or below what main already carries.
-  no coverage condition: the unit project fails below its per-file 100 threshold on `*.service.ts`, so Sonar never
-  imports an lcov report and never judges coverage.
+  coverage 100 on services, overall and new code (owner 2026-10-01): the unit project already fails below its per-file
+  100 threshold on `*.service.ts`; Sonar imports the same run's lcov with the same scope, so the dashboard, the slice
+  verdict and the server gate show the number the runner enforces, file by file. Only services count: business logic
+  lives there, the thin layers are covered through them, and the front end has no unit tests.
   duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
   passes ordinary work.
   blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds

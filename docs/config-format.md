@@ -188,8 +188,8 @@ windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
 Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default on)
-covers the back end's unit tests in workflows (jest and its per-file coverage threshold; the front end has no tests and
-Sonar takes no coverage): while on, an op that writes code also writes or updates the specs of that code and runs only
+covers the back end's unit tests in workflows (jest and its per-file coverage threshold, and the services' coverage Sonar
+judges; the front end has no tests): while on, an op that writes code also writes or updates the specs of that code and runs only
 those - the specs of the changed or added source and the specs that import it - through the op gate (`gate.mjs --tests`),
 never the app's whole unit suite; `unit.verify` is the op that runs the whole unit suite (`npm test`), dispatched only when the goal
 or the owner asks for it ("full unit", or its Vietnamese phrase for running the whole unit suite), never by default. `specs.e2e` (default off) covers product
@@ -208,8 +208,9 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
   skip it, and a deferred queued job is a dispatch nextAction whatever held it.
 - `skip` (backend.implement, interface.implement, code.refactor) - the op runs; the dispatch prompt's `specs:`
   line tells it to run and write no such tests and to demand no changed-line coverage. Sonar still runs, with
-  `sonar-local.mjs scan` (Sonar holds no coverage condition anywhere), so bugs, smells and
-  security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
+  `sonar-local.mjs scan`, which reads `specs.unit`: while it is off the scan runs no unit test, reports the slice's
+  coverage as NOT MEASURED with an owner-mode note in the scan JSON (never green), and settle accepts that note only
+  while the owner switch is really off; bugs, smells and security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
 - `not-counted` (review.verify, handover.review) - the gate does not count those tests or that coverage; `api
   coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).
 

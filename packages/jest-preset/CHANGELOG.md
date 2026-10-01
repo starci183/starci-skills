@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2 - 2026-10-01
+
+- Changed: the coverage reporters are `text-summary`, `text` and `lcov`. The unit run writes `coverage/lcov.info`, which Sonar (`sonar.javascript.lcov.reportPaths`) and Codecov import with the scope `hfs sync` renders from `COVERAGE_SOURCES` (services only). Coverage is still collected from `src/**/*.service.ts` only, with the per-file threshold of 100. Contract change `sonar-services-coverage`.
+
 ## 2.2.1 - 2026-10-01
 
 - Changed: declares its test toolchain as devDependencies and @jest/globals as an optional peer, with a lockfile (lane PKGT clean proof); no preset change. The published package.json differs from 2.2.0, so the version moves.

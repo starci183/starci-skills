@@ -41,7 +41,7 @@ The unit standard has eight rules:
    `recordingOutbox`, `FakeClock`, `fakeIds`, `mock<T>()`, `builder`, and the matchers `toBeRefused` and `toSucceedWith`. No casts, no
    `Date.now()`, no `jest.mock`, no `process.env`.
 5. `collectCoverageFrom` is `src/**/*.service.ts` only and every file must reach 100 percent lines, branches, functions and statements.
-6. Sonar does not depend on coverage; CI uploads no coverage.
+6. The unit run writes `be/coverage/lcov.info`; Sonar and Codecov import it with the services as the only coverage scope, each held at 100.
 7. Doors are thin: a handler calls exactly one method of one injected service and returns its result; a resolver, controller, consumer or
    job dispatches exactly one bus message. Everything that decides lives in a service.
 8. Pure helpers and decide functions have no spec of their own; a service spec covers them.
@@ -53,8 +53,8 @@ database call. Example: `src/modules/domain/commission/commission.service.spec.t
 ## Coverage
 
 `npm test` runs `jest --selectProjects unit --coverage`. Coverage is collected from `src/**/*.service.ts` and each file has a
-threshold of 100 for lines, branches, functions and statements, so the run fails below it. There is no lcov upload and no codecov
-flag: Sonar imports issues only.
+threshold of 100 for lines, branches, functions and statements, so the run fails below it. The run writes `be/coverage/lcov.info`:
+Sonar imports it (`sonar.coverage.inclusions=be/src/**/*.service.ts`) and CI uploads it to Codecov (`codecov.yml`, the same paths).
 
 ## Integration, e2e and contract tests
 

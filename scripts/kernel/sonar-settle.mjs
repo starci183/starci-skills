@@ -15,6 +15,7 @@ import path from 'node:path';
 import { openIncident, resolveIncident } from '../../engine/ledger-db.mjs';
 import { recordCheck } from './evidence-store.mjs';
 import { judgeSummary, loadSonarGate, SCAN_SCHEMA_PREFIX } from '../checks/sonar-gate.mjs';
+import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 
 export const SONAR_ENFORCE_CHANGE = 'sonar-enforce';
 export const SONAR_CHECK = 'sonar-gate';
@@ -46,10 +47,11 @@ export function readSonarSummary(files) {
 export const enforcesOp = (op, gate = loadSonarGate()) => gate.enforcedOps.includes(op);
 
 /** The judgment of a job's files: {op, judged, file, summary} - judged is judgeSummary's answer. */
-export function judgeJob({ op, files, gate = loadSonarGate() }) {
+export function judgeJob({ op, files, gate = loadSonarGate(), specs = specsSettings(inspectOwnerConfig().config) }) {
   if (!enforcesOp(op, gate)) return null;
   const found = readSonarSummary(files);
-  return { op, judged: judgeSummary(found?.summary ?? null, gate), file: found?.file ?? null, summary: found?.summary ?? null };
+  // The owner switches are read here, never taken from the summary: an owner-mode claim stands only while specs.unit is off.
+  return { op, judged: judgeSummary(found?.summary ?? null, gate, { specs }), file: found?.file ?? null, summary: found?.summary ?? null };
 }
 
 const oneLine = (text, n = 380) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, n);

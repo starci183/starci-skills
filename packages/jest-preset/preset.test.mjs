@@ -168,10 +168,15 @@ test('coverage is measured on *.service.ts only, with a per-file threshold of 10
   assert.deepEqual(coverageThreshold['./src/**/*.service.ts'], { lines: 100, branches: 100, functions: 100, statements: 100 });
 });
 
-test('Sonar does not depend on coverage: the preset renders no coverage exclusion and reports no lcov', () => {
+test('the unit run writes the lcov Sonar imports, keeps the text summary, and renders no coverage exclusion', () => {
   assert.equal(preset.sonarCoverageExclusions, undefined);
   assert.equal(preset.sonarExclusions(), '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**');
-  assert.ok(!preset.starciJestConfig().coverageReporters.includes('lcov'));
+  const config = preset.starciJestConfig();
+  assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
+  assert.ok(config.coverageReporters.includes('text-summary'));
+  assert.equal(config.coverageDirectory, 'coverage');
+  // The Sonar scope is rendered from COVERAGE_SOURCES (hfs sync prefixes the be side), so it is services only, like jest's.
+  assert.deepEqual(preset.COVERAGE_SOURCES, ['src/**/*.service.ts']);
 });
 
 test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assignable to T, wrong stubs rejected', async () => {

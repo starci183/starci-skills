@@ -39,8 +39,8 @@ branches:
   - id: sonar-gate
     title: Sonar quality gate
     path: sonar-gate.yaml
-    use: The one place the Sonar thresholds live (new code - duplication, blocker/critical issues, unreviewed hotspots, no
-      coverage condition - and the overall part), the ops that must pass them and the why codes; an app only names the gate
+    use: The one place the Sonar thresholds live (new code - services' coverage 100, duplication, blocker/critical issues,
+      unreviewed hotspots - and the overall part - coverage 100 per service, no open issue, every hotspot reviewed), the ops that must pass them and the why codes; an app only names the gate
       in the app root's .starcistacks.
   - id: code-examples
     title: Code examples

@@ -8,7 +8,8 @@
 // side (be, fe) for a side slot, whose files land under that side's folder. Two targets are not whole files of a managedBy slot
 // and are listed in this module: the marked block of the root .gitignore, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
-// exclusions, the jest preset the app installs for its be side. `--check` compares the sha256 of the rendered content with the
+// exclusions and the one coverage scope (sonar.coverage.inclusions and codecov.yml alike), the jest preset the app installs for
+// its be side. `--check` compares the sha256 of the rendered content with the
 // file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
 // only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, npm workspaces of fe/packages/*) is the app's.
@@ -98,7 +99,10 @@ export function render(text, vars, readTemplate = readBundled) {
   });
 }
 
-/** The Sonar exclusions from the jest preset the app installs for its be side: { sonarExclusions }. */
+/**
+ * What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions and the coverage sources
+ * (`COVERAGE_SOURCES`, the globs jest collects coverage from): { sonarExclusions, coverageSources }.
+ */
 export async function loadPresets(root) {
   const name = '@starci/jest-preset';
   const require = createRequire(path.join(root, 'package.json'));
@@ -109,7 +113,21 @@ export async function loadPresets(root) {
     throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
   const preset = require(resolved);
-  return { sonarExclusions: preset.sonarExclusions() };
+  return { sonarExclusions: preset.sonarExclusions(), coverageSources: [...preset.COVERAGE_SOURCES] };
+}
+
+/** Where the be unit run writes the lcov report (jest `coverageDirectory` coverage under be/, reporter lcov), from the app root. */
+export const LCOV_REPORT = 'be/coverage/lcov.info';
+
+/**
+ * THE coverage scope of an app, from the app root: the preset's coverage sources on the be side (`be/src/**` + `/*.service.ts`).
+ * It is the one source of sonar.coverage.inclusions and of the codecov.yml status paths, so the two can never drift; fe/ is
+ * outside it (a front end has no tests).
+ */
+export function coverageScope(presets) {
+  const sources = presets?.coverageSources;
+  if (!Array.isArray(sources) || !sources.length) throw new SyncError('HFS_SYNC_PRESET_MISSING', '@starci/jest-preset gives no COVERAGE_SOURCES: the coverage scope cannot be rendered');
+  return sources.map(glob => `be/${glob}`);
 }
 
 /**
@@ -156,6 +174,9 @@ export function variables(app, scope, presets, sonarKey) {
     sonarKey: sonarKey ?? app.project,
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**'].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
+    lcovReport: LCOV_REPORT,
+    coverageInclusions: scope === APP_SCOPE ? coverageScope(presets).join(',') : '',
+    codecovPaths: scope === APP_SCOPE ? coverageScope(presets).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
     tsconfigPaths: ['be/tsconfig.json', ...feTsconfigs].join(','),
     styleGlob: STYLE_GLOB,
   };

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (alpha.4, bumped in C0's batch)
+
+- Changed (contract change `sonar-services-coverage`): Sonar and Codecov judge the services' coverage. The managed `sonar-project.properties` adds `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and `sonar.coverage.inclusions=be/src/**/*.service.ts`; a new managed `codecov.yml` (slot `app.quality-config`, now `{sonar-project.properties,codecov.yml}`) holds the same paths at 100 on the project and the patch and ignores `fe/**`; the managed CI workflow uploads the be lcov with `codecov/codecov-action@v5` and the `CODECOV_TOKEN` secret after the unit run. Both files are rendered from one scope, `coverageScope(presets)`: the installed jest preset's `COVERAGE_SOURCES` on the be side (`loadPresets` now returns `coverageSources`). An app re-renders with `hfs sync --write`.
+- Changed: the bundled runtime copies of `knowledge/sonar-gate.yaml` (coverage 100 overall and on new code, per file; every hotspot reviewed), `knowledge/hfs/slots.yaml` (the quality-config slot) and `modules/kernel/failure-codes.yaml` (the R11 law and HFS_SONAR_CONFIG text).
+
 ## 4.0.4 - 2026-10-01
 
 - Changed: the bundled runtime copy of knowledge/hfs/canon-pins.yaml pins @starci/test-world 1.0.3. No rule or command changed.

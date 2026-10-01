@@ -10,8 +10,8 @@ import { parseYaml } from '../engine/yaml.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
 const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
-/** The Sonar exclusions `hfs sync` would load from the jest preset an app installs for its be side. */
-export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
+/** What `hfs sync` would load from the jest preset an app installs for its be side: the Sonar exclusions and the coverage sources. */
+export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
 
 /** An app declaration: the be side of `be` and the fe side of `fe` (hfs.json sides.<side>). */
 export const appOf = ({ be = { apps: [{ name: 'core', kind: 'api' }] }, fe = { apps: [{ name: 'web', kind: 'next' }] }, project = 'demo' } = {}) => ({ hfs: 2, kind: 'app', project, sides: { be, fe } });

@@ -246,7 +246,7 @@ slots:
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: app.quality-config
     profiles: [app]
-    path: sonar-project.properties
+    path: "{sonar-project.properties,codecov.yml}"
     presence: required
     tracked: tracked
     tier: none
@@ -387,12 +387,12 @@ slots:
   # ----- side root (both sides): what the old standalone repository root held, less the app-root files ----------
   - id: repo.side-root-forbidden
     profiles: [be, fe]
-    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,.sops.yaml,sonar-project.properties,.prettierrc,.prettierignore,scripts/}"
+    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,.sops.yaml,sonar-project.properties,codecov.yml,.prettierrc,.prettierignore,scripts/}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar configuration, scripts/, .starciwork, .starcistacks and .sops.yaml per app"
+    goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar and Codecov configuration, scripts/, .starciwork, .starcistacks and .sops.yaml per app"
   - id: be.tool-config
     profiles: [be]
     # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is

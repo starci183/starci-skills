@@ -10,12 +10,15 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
 import {repositoryName,repositoryHome} from '../lib/repo-identity.mjs';
+import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from '../lib/runtime-host.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
-import {loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {coverageInclusionsOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
+import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
+import {createRequire} from 'node:module';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -39,6 +42,9 @@ import {text} from '../lib/stack-declaration.mjs';
  *        [--project-gate]                    (inside --paths), not the whole project
  *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
  *        [--isolate]
+ *   dashboard --cwd REPO [--key K]           the project's dashboard numbers from its last analysis (bugs, code
+ *                                            smells, vulnerabilities, hotspots reviewed, coverage and the coverage
+ *                                            of every file inside sonar.coverage.inclusions), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
@@ -57,8 +63,9 @@ import {text} from '../lib/stack-declaration.mjs';
  * there and nowhere else; the summary copies them as `gate`): it passes when the slice introduces no open
  * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
  * on a file it added), its duplicated share of the changed source lines is within the duplication
- * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it).
- * Sonar holds no coverage condition and reads no lcov report. Lesser issues are
+ * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it),
+ * and every service it touched (a changed file inside the repository's sonar.coverage.inclusions) is at the coverage
+ * threshold on its own Sonar measure, imported from the be unit run's lcov. Lesser issues are
  * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
  * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
  * gate is recorded as `projectGate`, a note that never blocks; --project-gate makes it the verdict.
@@ -104,9 +111,9 @@ export function scrub(text){
 
 // ---- configuration ----------------------------------------------------------------------------------------
 
-/** The source host's dev stack - the stack this runtime tree's own repository runs: <source>/.starcistacks/dev. */
+/** The source host's dev stack - the stack the repository hosting this runtime runs: <host>/.starcistacks/dev. */
 export function sourceHostStackDir(){
-  return path.join(path.resolve(skillRoot,'..'),'.starcistacks','dev');
+  return path.join(runtimeHostRoot(),'.starcistacks','dev');
 }
 
 const DECLARATION='application-stacks.yaml';
@@ -157,8 +164,9 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const doc=parseYaml(fs.readFileSync(file,'utf8'));
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
-  const sourceRoot=path.resolve(skillRoot,'..');
-  const repoDir=name=>!name||name===repositoryName(repoRoot)?repoRoot:name===path.basename(sourceRoot)?sourceRoot:path.join(path.dirname(repositoryHome(repoRoot)),name);
+  // A named repository resolves by identity (scripts/lib/runtime-host.mjs): the declaring repository, the runtime host or a
+  // sibling checkout; one not checked out here is named where its sibling checkout would be, so its custody reads as missing.
+  const repoDir=name=>!name?repoRoot:resolveDeclaredRepository(name,{fromRepo:repoRoot})??path.join(path.dirname(repositoryHome(repoRoot)),name);
   let stackDir=null,composeFile=null,container=null;
   if(plain(sonar.stack)){
     const stack=sonar.stack;
@@ -179,7 +187,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
     :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
   const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),
-    file:text(c.custody?.path)?path.join(repoDir(text(c.custody?.repository)),c.custody.path):null})).filter(c=>c.file);
+    file:resolveCustodyFile(repoDir(text(c.custody?.repository)),text(c.custody?.path))})).filter(c=>c.file);
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
   const analysis=credentials.filter(c=>!isAdmin(c)&&(!c.env||c.env==='SONAR_TOKEN'));
   const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??null;
@@ -233,6 +241,10 @@ export function resolveConfig(options={},env=process.env){
     declaredTokenRef:project?.tokenRef??null,
     disabled:decl?.mode==='disabled'?(decl.reason??'the stack declaration disables Sonar'):null,
     declaration:decl?{file:decl.file,provider:decl.provider,mode:decl.mode,projects:decl.projects.map(p=>p.key),ci:decl.ci?.wiring??null,ownerAction:decl.ownerAction}:(declarationError?{error:declarationError}:null),
+    // specs: the owner's product-test switches ({unit}); null reads config.yaml `specs` per scan. coverageRunner: the
+    // function that writes the slice's lcov (runSliceCoverage); a spec passes its own.
+    specs:options.specs??null,
+    coverageRunner:options.coverageRunner??null,
     timeoutMs:Number(options.timeoutMs??8000),
     pollMs:Number(options.pollMs??3000),
     fetch:options.fetch??globalThis.fetch,
@@ -274,11 +286,12 @@ const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...
 export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
   // resolved from its repository root) must still sit inside a custody tree - a repository's
-  // .starcistacks or the runtime's .claude/ext/<service> extension.
+  // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
+  // lane worktree, where a host custody path resolves - scripts/lib/runtime-host.mjs resolveCustodyFile).
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)
+    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
     :plainFile.startsWith(cfg.stackDir+path.sep);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
@@ -813,11 +826,66 @@ export function duplicatedLinesOf(doc,fileKey){
 }
 
 /**
+ * The be unit run over the slice's services alone, writing the lcov Sonar imports: jest from the directory two levels above
+ * the lcov report (`be/coverage/lcov.info` -> be/, the preset's coverageDirectory under its rootDir), the unit project, the
+ * specs related to `files` and coverage collected from `files` only, so the per-file threshold and the report name exactly
+ * the services the slice touched. Returns {exitCode, error}.
+ */
+export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
+  let bin;
+  try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
+  catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
+  const collect=files.flatMap(file=>['--collectCoverageFrom',file]);
+  const run=spawnSync(process.execPath,[bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:64*1024*1024});
+  return {exitCode:run.status,error:run.error?String(run.error.message):null};
+}
+
+/**
+ * Before a slice scan: the services the slice touched (changed files inside sonar.coverage.inclusions) get a fresh lcov at
+ * sonar.javascript.lcov.reportPaths, written by the be unit run over their related specs (cfg.coverageRunner, default
+ * runSliceCoverage), so Sonar imports this slice's coverage and never a stale report. With the owner's specs.unit off
+ * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
+ * runs and the slice's coverage is not judged (`judged` false). Returns {judged, targets, lcov, exitCode?, written?, error?, note?}.
+ */
+/** What a slice summary says while the owner's specs.unit is off: its coverage is not measured, never read as green. */
+export const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
+
+export function prepareSliceCoverage(cfg,{cwd,props,slice}){
+  const inclusions=coverageInclusionsOf(props);
+  if(!inclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.inclusions'};
+  const specs=cfg.specs??specsSettings(inspectOwnerConfig().config);
+  if(specs.unit===false)return {judged:false,targets:[],ownerMode:'specs.unit=false',note:OWNER_MODE_NOTE};
+  const isTarget=coverageTargetOf(inclusions);
+  const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
+  if(!targets.length)return {judged:true,targets};
+  const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).filter(Boolean)[0];
+  if(!lcov)return {judged:true,targets,error:'sonar-project.properties names no sonar.javascript.lcov.reportPaths: the coverage of the slice\'s services cannot be imported'};
+  const jestCwd=path.resolve(cwd,path.dirname(path.dirname(lcov)));
+  const lcovFile=path.resolve(cwd,lcov);
+  fs.rmSync(lcovFile,{force:true});
+  const relative=targets.map(file=>posixPath(path.relative(jestCwd,path.join(cwd,file))));
+  const ran=(cfg.coverageRunner??runSliceCoverage)({jestCwd,files:relative});
+  const written=fs.existsSync(lcovFile);
+  return {judged:true,targets,lcov,exitCode:ran.exitCode??null,written,
+    ...(ran.error||!written?{error:ran.error??`the unit run (exit ${ran.exitCode}) wrote no ${lcov}`}:{})};
+}
+
+/** The Sonar `coverage` measure of one file, a number or null when Sonar holds none; {error} when the server cannot answer. */
+async function fileCoverage(cfg,tokens,fileKey){
+  const got=await read(cfg,tokens,`/api/measures/component?component=${encodeURIComponent(fileKey)}&metricKeys=coverage`);
+  if(got.status===404)return {coverage:null};
+  if(!got.reachable||got.status!==200)return {error:got.error??`HTTP ${got.status}`};
+  return {coverage:(got.json?.component?.measures??[]).find(m=>m.metric==='coverage')?.value??null};
+}
+
+/**
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
- * it added), and the duplicated share of its changed source lines. A changed file the server does not know (excluded, not source) is listed as not analyzed.
+ * it added), the duplicated share of its changed source lines, and the coverage of every service it touched
+ * (a changed file inside sonar.coverage.inclusions of `props`; any other file is not a coverage target).
+ * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate())}){
+export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate()),coverageRun=null}){
   const qualifierOf=fileQualifier(props,pkg);
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
@@ -881,12 +949,30 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
   const lesser=issues.filter(i=>!gate.blockingSeverities.includes(i.severity));
   if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
   if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
+  // Coverage: each service the slice touched, on its own measure (one service below the threshold fails the slice).
+  const inclusions=coverageInclusionsOf(props);
+  const isTarget=coverageTargetOf(inclusions);
+  const measured=[];
+  for(const fileKey of coverageRun?.judged===false?[]:keys){
+    const file=analyzed.get(fileKey);
+    if(qualifierOf(file.path)!=='FIL'||!isTarget(file.path))continue;
+    const got=await fileCoverage(cfg,tokens,fileKey);
+    if(got.error)return {error:`coverage of ${file.path} could not be read: ${got.error}`};
+    measured.push({path:file.path,coverage:got.coverage});
+  }
+  const coverage=coverageRun?.judged===false
+    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
+    :judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+  if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
+  if(!coverage.status)coverage.status=!coverage.applied?'no-scope':coverage.failures.length?'red':coverage.files.length?'green':'no-target';
+  failures.push(...coverage.failures);
   return {error:null,result:{
     analyzedFiles:keys.length,notAnalyzed,
     newIssues:{total:issues.length,blocking:blocking.length,notBlocking:lesser.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
       items:[...blocking,...lesser].slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message,blocking:gate.blockingSeverities.includes(i.severity)}))},
     newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
     duplication,
+    coverage,
     verdict:failures.length?'fail':'pass',
     failures,
   }};
@@ -1015,6 +1101,11 @@ export async function scan(cfg,options={}){
       }
     }
   }
+  // The slice's services get their own fresh lcov before the scanner reads it (a project-gate scan imports the report the
+  // last `npm test` wrote).
+  const coverageRun=slice?prepareSliceCoverage(cfg,{cwd,props,slice}):null;
+  if(coverageRun)summary.coverageRun=coverageRun;
+  if(coverageRun?.judged===false)summary.ownerMode={specs:{unit:false},coverage:'not-measured',note:coverageRun.note};
   const analysisToken=token.value;
   const childEnv={...process.env,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
 
@@ -1064,7 +1155,7 @@ export async function scan(cfg,options={}){
     if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
     const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
     if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
-    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc`);
+    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc,coverage`);
     if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
     // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
     // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
@@ -1078,7 +1169,7 @@ export async function scan(cfg,options={}){
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate,coverageRun});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
@@ -1095,6 +1186,47 @@ export async function scan(cfg,options={}){
   }
 }
 
+/** The dashboard metrics of a project: the issue types, the hotspots and the coverage of knowledge/sonar-gate.yaml `overall`. */
+export const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'security_hotspots',gate.overall.hotspots.metric,gate.overall.coverage.metric];
+
+/**
+ * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and
+ * vulnerabilities 0, every hotspot reviewed, coverage at the threshold on every file inside the repository's
+ * sonar.coverage.inclusions (the services) and overall. It reads, it never scans: run `scan --project-gate --wait`
+ * first. Exit 0 pass, 1 fail, 2 blocked (server down, no token, no analysis).
+ */
+export async function dashboard(cfg,options={}){
+  const cwd=path.resolve(options.cwd??process.cwd());
+  const props=readProperties(path.join(cwd,'sonar-project.properties'));
+  const key=options.key??cfg.declaredKey??props['sonar.projectKey']??null;
+  const gate=loadSonarGate();
+  const inclusions=coverageInclusionsOf(props);
+  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageInclusions:inclusions};
+  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{})});
+  if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
+  if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
+  const server=await call(cfg,'GET','/api/system/status');
+  if(!(server.reachable&&server.json?.status==='UP'))return finish('blocked',server.reachable?`SonarQube at ${cfg.host} reports ${server.json?.status??`HTTP ${server.status}`}`:downMessage(cfg,server,containerState(cfg)));
+  const admin=readCustody(cfg,cfg.adminToken);
+  const token=await projectToken(cfg,{key,admin,tokenRef:options.tokenRef,mint:false});
+  const tokens=[...(token.present?[token.value]:[]),...(admin.present?[admin.value]:[])];
+  if(!tokens.length)return finish('blocked',`no token can read ${key} (${token.reason}); repair the source stack custody - never ask the owner for it.`);
+  const component=encodeURIComponent(key);
+  const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}`);
+  if(project.status===404)return finish('blocked',`${key} has no analysis on ${cfg.host}: run scan --project-gate --wait first`);
+  if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??`HTTP ${project.status}`}`);
+  const measures=Object.fromEntries((project.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
+  const tree=await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components');
+  if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
+  const files=tree.items.map(item=>({path:item.path,coverage:(item.measures??[]).find(m=>m.metric===gate.overall.coverage.metric)?.value??null}));
+  const judged=judgeDashboard({measures,files,inclusions},gate);
+  summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}`;
+  summary.numbers=judged.numbers;
+  summary.coverage=judged.coverage;
+  summary.failures=judged.failures;
+  return finish(judged.verdict,judged.failures.length?`the dashboard fails: ${judged.failures.join('; ')}`:null);
+}
+
 // ---- CLI ------------------------------------------------------------------------------------------------
 
 const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
@@ -1109,6 +1241,9 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--project-gate]                 (default base HEAD); --project-gate judges the whole-project gate instead
        [--out FILE.json | --blob] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
+  dashboard --cwd REPO [--key K]          the dashboard numbers of the project's last analysis: bugs, code smells,
+                                          vulnerabilities, hotspots reviewed, coverage and the coverage of every
+                                          file inside sonar.coverage.inclusions; fails unless all are at the gate
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
@@ -1168,6 +1303,9 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
       base:args.base,paths:args.paths,projectGate:args.projectGate,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
+    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
+  }else if(command==='dashboard'){
+    report=await dashboard(cfg,{cwd:args.cwd,key:args.key,tokenRef:args.tokenRef});
     if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   const safeReport=JSON.parse(scrub(JSON.stringify(report)));

@@ -16,8 +16,8 @@ them to test. The apps only compose; the e2e world proves they boot.
 ## Unit suite
 
 `npm test` is `jest --selectProjects unit --coverage`. Coverage is collected from `src/**/*.service.ts` only and every file
-must reach 100 percent lines, branches, functions and statements; jest exits non-zero below that. Sonar does not read
-coverage and the quality gate has no coverage condition.
+must reach 100 percent lines, branches, functions and statements; jest exits non-zero below that. The run writes
+`be/coverage/lcov.info`; Sonar and Codecov import it with the services as the only coverage scope and hold each at 100.
 
 A service spec builds its subject from a testing module that provides exactly the constructor dependencies and nothing else:
 

@@ -22,7 +22,7 @@ gates:
   settle: the op gate scripts/checks/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
   ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
-  sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication and cognitive complexity; no coverage condition
+  sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the services' coverage at 100
 enforcerKinds:
   eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
   eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
@@ -121,7 +121,7 @@ rules:
       - {kind: hfs, id: stacks-shape, at: scripts/lib/hfs-rules/stacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
-    law: "Sonar config is generated, with no host URL and no coverage import."
+    law: "Sonar config is generated, with no host URL, importing the be lcov with the services as the only coverage scope."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_SONAR_CONFIG"]

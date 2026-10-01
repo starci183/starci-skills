@@ -70,7 +70,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `FE_I18N_KEYS` | error | a literal key read through `next-intl` that a locale lacks, or a catalog key no source reads (R106; the architecture machine) |
 | `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R97; `scripts/lib/hfs-rules/fe-no-tests.mjs`) |
 | `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
-| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the `sonar.exclusions` of the installed jest preset, no coverage import (R11; `sync/managed.mjs`) |
+| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the `sonar.exclusions` of the installed jest preset, the be lcov import with the services as the only coverage scope (R11; `sync/managed.mjs`) |
 | `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
 | `HFS_FORMAT_TOOL_MISSING` | refusal (exit 2) | prettier is not installed in the repository; the format check is never skipped |
 
@@ -114,12 +114,14 @@ The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths`
 reaches Sonar while the job stays failed. There is no `continue-on-error`. CI runs `npm run lint -- --sonar reports/lint.sonar.json` once at the app root, before the scan. The duplicate-block threshold (`ruleParams.<side>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
-The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (duplication, blocker and critical issues, hotspots; no coverage condition) and an `overall` part (0 open issues on the whole code,
-duplicated lines density, cognitive complexity through the S3776 rule). A SonarQube gate condition cannot filter by engine, so the condition counts every
+The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (coverage 100, duplication, blocker and critical issues, hotspots) and an `overall` part (coverage 100, 0 open issues on the whole code,
+every hotspot reviewed, duplicated lines density, cognitive complexity through the S3776 rule). A SonarQube gate condition cannot filter by engine, so the condition counts every
 open issue, imported or native; that is stricter than the three imports alone and is intended. `hfs check` reports `HFS_SONAR_CONFIG` (R11) when the
 properties file is not its render or the stack declaration names another gate. R20 and R21 have their Sonar enforcers as conditions of that file.
 
-Sonar does not depend on coverage: the managed properties file has no `sonar.*.lcov.reportPaths` and no `sonar.coverage.*`, the gate has no coverage condition, and the managed CI workflow uploads no coverage anywhere (no Codecov). The back end's unit coverage is the runner's: the managed `test` script is `jest --selectProjects unit --coverage`, which fails below the per-file 100 threshold on `src/**/*.service.ts`.
+Coverage is the services' alone, from one scope. The managed `test` script is `jest --selectProjects unit --coverage`: it fails below the per-file 100 threshold on `src/**/*.service.ts` and writes `be/coverage/lcov.info` (the jest preset's lcov reporter). The managed `sonar-project.properties` imports that report (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) with `sonar.coverage.inclusions=be/src/**/*.service.ts` and no other coverage key, so a handler, resolver, controller, module, config file or test is not a coverage target and `fe/` is outside coverage. The managed `codecov.yml` holds the same paths at 100 on the project and the patch and ignores `fe/**`; the managed CI workflow uploads the lcov with `codecov/codecov-action` after the unit run. `hfs sync` renders the scope into both files from the installed jest preset's `COVERAGE_SOURCES` (`coverageScope` in `sync/index.mjs`), so they can never drift. The runtime judges the coverage per file: `sonar-local.mjs scan` holds every service a slice touched at 100, and `sonar-local.mjs dashboard` fails a project unless every service is at 100.
+
+The upload needs the repository secret `CODECOV_TOKEN` (the owner adds it once per repository: Codecov, the repository's settings, then GitHub Settings > Secrets and variables > Actions > New repository secret `CODECOV_TOKEN`). Without it the step is skipped like the Sonar steps without `SONAR_TOKEN`.
 
 ## Maintaining the bundle
 
