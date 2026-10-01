@@ -50,6 +50,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';
 import { guardsRoot } from './guards-root.mjs';
+import { launchVerdict } from './launch-verdict.mjs';
+import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -377,49 +379,6 @@ export function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
     remedy: 'leave your changes in the working tree and report: the runtime checkpoints your work at settle (a failed op\'s work is preserved and reset by the runtime)' };
 }
 
-// An agent launch outside Orca is invisible to it: no liveness, no stop, no release, and a dead worker sits unnoticed
-// (owner rule 2026-10-01). Every agent and every worker terminal starts through `orca orchestration worker-start`.
-const WORKER_START = '`orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec "<task>" --task-title "<title>"`, supervised with worker-show / worker-read / worker-stop / worker-release';
-// The first non-flag word of `args`, skipping the values of `valued` flags.
-const subcommandOf = (args, valued) => {
-  for (let i = 0; i < args.length; i += 1) {
-    const a = args[i];
-    if (a === '--') return args[i + 1] ?? null;
-    if (/^-/.test(a)) { if (valued.test(a)) i += 1; continue; }
-    return a;
-  }
-  return null;
-};
-const CODEX_VALUED = /^(?:-m|--model|-c|--config|-C|--cd|-s|--sandbox|-a|--ask-for-approval|-p|--profile|-i|--image|--enable|--disable|--add-dir|--local-provider)$/;
-const printFlag = (args, flags) => {
-  const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
-  return options.find((a) => flags.includes(a)) ?? null;
-};
-const launchRefusal = (program, args, how) => ({ command: [program, ...args].join(' ').slice(0, 200),
-  reason: `${how} outside Orca's supervision: no liveness, no stop or release, and a dead worker goes unnoticed (owner rule 2026-10-01)`,
-  remedy: `launch every agent and worker through ${WORKER_START}` });
-const launchVerdict = (program, args) => {
-  if (program === 'orca') {
-    const words = args.filter((a) => !/^-/.test(a));
-    if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'a raw terminal create starts a terminal outside worker-start') };
-    return null;
-  }
-  let how = null;
-  if (program === 'codex') {
-    const sub = subcommandOf(args, CODEX_VALUED);
-    if (sub === 'exec' || sub === 'e') how = `codex ${sub} runs a headless Codex agent`;
-  } else if (program === 'claude' || program === 'cursor-agent' || program === 'devin') {
-    const flag = printFlag(args, ['-p', '--print']);
-    if (flag) how = `${program} ${flag} runs a headless agent`;
-  } else if (program === 'gemini') {
-    const flag = printFlag(args, ['-p', '--prompt']);
-    if (flag) how = `gemini ${flag} runs a headless agent`;
-  } else if (program === 'opencode') {
-    if (subcommandOf(args, /^(?:-m|--model|--agent|--log-level)$/) === 'run') how = 'opencode run runs a headless agent';
-  }
-  return how ? { code: 'AGENT_HEADLESS_LAUNCH', ...launchRefusal(program, args, how) } : null;
-};
-
 // git reads an App Router segment ([locale], [...slug]) in a pathspec as a character class. The policy scopes it as the
 // literal path admission granted, so the command is refused only when git's glob reading reaches a path the literal
 // reading does not (a sibling like src/app/l/ another workflow owns; nivo-fe inc-21f76abb6d10): the files each reading
@@ -472,34 +431,6 @@ async function gitVerdict({ args, cwd, env, guard, deps }) {
   return null;
 }
 
-/** The install-through-link refusal of one npm/pnpm/yarn command (no guard needed), or null. `npm`: deps-guard.mjs. */
-export function installLinkVerdict({ program, args, cwd, npm }) {
-  if (npm.classifyInstall(program, args).kind === 'pass') return null;
-  const linked = npm.linkedNodeModulesOf(program, args, cwd);
-  if (!linked) return null;
-  return { tool: program, code: 'DEPS_THROUGH_LINK', command: `${program} ${args.join(' ')}`.slice(0, 200),
-    reason: `${linked.nodeModules} is a link to ${linked.target ?? 'another tree'}: ${program} would empty that live node_modules`,
-    remedy: 'node_modules here is a link to another checkout: unlink it first (cmd /c rmdir) and install for real' };
-}
-
-async function installVerdict({ program, args, cwd, guard, deps }) {
-  const { classifyInstall, peerLeasedJobs } = deps.npm;
-  const kind = classifyInstall(program, args).kind;
-  if (kind === 'pass') return null;
-  const command = `${program} ${args.join(' ')}`.slice(0, 200);
-  const linked = installLinkVerdict({ program, args, cwd, npm: deps.npm });
-  if (linked) return linked;
-  if (kind !== 'clean-install' || !guard?.ledgerRepo) return null;
-  let peers;
-  try { peers = await peerLeasedJobs({ ledgerRepo: guard.ledgerRepo, workflowId: guard.workflowId }); }
-  catch (e) { deps.say(`starci guard: could not read peer leases (${e?.message ?? e})`); return null; }
-  if (!peers.jobs.length) return null;
-  const names = peers.jobs.slice(0, 5).map((j) => `${j.jobId} (${j.workflowId})`).join(', ');
-  return { tool: 'npm', code: 'DEPS_DELETE_WHILE_PEER_LEASED', command,
-    reason: `${command} deletes node_modules while other workflows' jobs run checks from it: ${names}`,
-    remedy: 'use `npm install`, or report blocked environment naming the missing dependency' };
-}
-
 const loadDeps = async () => {
   const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../lib/git-index-lock.mjs')]);
   return { policy, npm, git, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
@@ -541,19 +472,6 @@ export async function unguardedVerdict({ command, cwd, env = process.env, dialec
     if (v) return v;
   }
   return null;
-}
-
-// The Kernel never reads Orca's mailbox itself: `orchestration check --ack` consumes deliveries before the ledger records
-// them, so it reads through `api messages` / `api questions` and the runtime's api drains (lane MAILC). Ops and
-// [Worker]s keep `check`: Orca's worker protocol has them read their own Run's deliveries (modules/host/orca/api.yaml
-// operationAgent), and no ledger record depends on those.
-export function kernelMailboxVerdict(program, args, guard) {
-  if (program !== 'orca' || guard?.role !== 'kernel') return null;
-  const words = args.filter((a) => !/^-/.test(a));
-  if (words[0] !== 'orchestration' || words[1] !== 'check') return null;
-  return { code: 'KERNEL_ORCA_CHECK', command: ['orca', ...args].join(' ').slice(0, 200),
-    reason: 'the Kernel never runs orca orchestration check: its --ack consumes deliveries before the ledger records them',
-    remedy: 'read messages with `node <api> messages --repo <repo> --workflow <id>` and questions with `api questions`; the runtime drains the mailbox' };
 }
 
 /** The shell text of one hook input: Claude's Bash/PowerShell, Codex's Bash and Devin's exec all carry `command`. */

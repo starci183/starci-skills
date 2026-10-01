@@ -3,7 +3,7 @@
 // Orca nests every worker under the Dispatch that started it: the owner's chat is depth 0, a Kernel or the [Supervisor]
 // 1, an op or a [Worker] 2, the draw critic 3. A worker-start deeper than the Orca app's depth setting is refused with
 // nested_worker_depth_exceeded, and Orca exposes no read of that setting. The owner declares it as config.yaml
-// orca.maxWorkerDepth (engine/config.mjs orcaSettings); scripts/agent/lib.mjs spawnAgent refuses a launch deeper than it
+// orca.maxWorkerDepth (engine/orca-config.mjs orcaSettings); scripts/agent/lib.mjs spawnAgent refuses a launch deeper than it
 // before worker-start, and `start --check` compares it with a measured probe (scripts/agent/depth-probe.mjs).
 
 import { terminalHandleOf } from './worker-accounting.mjs';

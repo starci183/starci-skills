@@ -323,7 +323,7 @@ const trackedModifications = (repo, run) => run(['status', '--porcelain', '--unt
  *  installs its own (npm ci), RT_NODE_MODULES_LINK. */
 const linkDir = (target, link) => { fs.mkdirSync(path.dirname(link), { recursive: true }); fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir'); };
 
-/** Unlink a link: the link only, never what it points at (as workers.mjs unlinkNodeModulesLink). */
+/** Unlink a link: the link only, never what it points at (as safe-remove.mjs unlinkNodeModulesLink). */
 const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmdirSync(link); } catch { /* best effort */ } } };
 
 /** Installed dependencies, build and tool output a scratch never borrows from the live tree: the hook judges the commit,

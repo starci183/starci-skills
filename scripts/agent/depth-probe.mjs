@@ -9,7 +9,7 @@ import { startAgent } from './lib.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { isOrcaDepthRefusal } from '../lib/worker-depth.mjs';
-import { MAX_WORKER_DEPTH_CEILING } from '../../engine/config.mjs';
+import { MAX_WORKER_DEPTH_CEILING } from '../../engine/orca-config.mjs';
 
 export const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no command, edit no file, start no worker. Wait to be released.';
 

@@ -28,10 +28,9 @@ import { runCreate } from '../api/orca/run-create.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
 import { taskSpecOf } from '../kernel/task-spec.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { orcaSettings } from '../../engine/config.mjs';
-import { dispatchDepthOf, launchDepth, depthVerdict, dispatchOfTerminal } from '../lib/worker-depth.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { dispatchDepthOf } from '../lib/worker-depth.mjs';
+import { bestEffortCall } from './best-effort-call.mjs';
+import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -360,18 +359,6 @@ function sendPrompt(handle, text, adapter, io) {
   }
 }
 
-// Remove a file-reference delivery artifact. Transient artifacts take their
-// private tmpdir with them; a card-declared directory is only emptied of the
-// file itself. Best-effort — a leftover temp file never fails the caller.
-export function cleanupDeliveryArtifact(artifact) {
-  if (!artifact?.file) return { ok: true, removed: false };
-  try { fs.rmSync(artifact.file, { force: true }); } catch { /* best-effort */ }
-  if (artifact.transient && artifact.dir) {
-    try { safeRemoveTree(artifact.dir); } catch { /* best-effort */ }
-  }
-  return { ok: true, removed: true };
-}
-
 
 // ---- the one agent launch --------------------------------------------------
 // Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
@@ -465,37 +452,6 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
     depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(trust ? { trust } : {}) };
 }
 
-/**
- * The depth preflight of one launch: {depth, limit, refusal|null}. `show` reads the parent's Dispatch (worker-show).
- * refusal is the typed step-'depth' receipt (effectState none) when the new worker would nest past the limit.
- */
-export function depthPreflight({ parentDispatch = null, maxDepth = null, show = workerShow } = {}) {
-  const limit = Number.isInteger(maxDepth) ? maxDepth : configuredMaxDepth();
-  const parentDepth = parentDispatch ? dispatchDepthOf(bestEffortCall(() => show({ dispatch: parentDispatch }))) : null;
-  const depth = launchDepth({ parentDispatch, parentDepth });
-  const tooDeep = depthVerdict({ depth, maxDepth: limit });
-  return { depth, limit, refusal: tooDeep ? { ok: false, step: 'depth', error: tooDeep.error, errorCode: tooDeep.code, code: 'worker-depth-exceeded',
-    effectState: 'none', depth, maxDepth: limit, parentDispatch } : null };
-}
-
-/**
- * The Dispatch of the worker the entry terminal is, read from Orca's active workers (worker-list, every page), or null.
- * A Kernel, the [Supervisor] or a [Worker] started from a worker's terminal nests under that worker; started from the
- * owner's chat or a plain shell (no row), it is chat-rooted. A failed listing proves nothing (null).
- */
-export function entryDispatchOf(entry, { list = () => workerListAll({ terminalState: 'active' }) } = {}) {
-  if (!entry) return null;
-  try {
-    const listed = list();
-    return listed?.ok ? dispatchOfTerminal(listed.workers, entry) : null;
-  } catch { return null; }
-}
-
-// config.yaml orca.maxWorkerDepth; an unreadable or invalid owner config falls back to the default (start --check
-// reports the config itself).
-const configuredMaxDepth = () => { try { return orcaSettings().maxWorkerDepth; } catch { return orcaSettings({}).maxWorkerDepth; } };
-
-const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
 // An agent that is not an operation - the Kernel, the [Supervisor], a [Worker] - is a worker of its own Run: the
 // entry terminal (the owner's chat, the Supervisor, whoever ran the launcher; `entry`, Orca's ORCA_TERMINAL_HANDLE)

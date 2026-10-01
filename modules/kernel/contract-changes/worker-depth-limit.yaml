@@ -4,7 +4,7 @@ summary: >-
   THE RUNTIME KNOWS ORCA'S WORKER DEPTH LIMIT (lane C0-KDEPTH, deep map F9/O4). Orca nests every worker under the Dispatch
   that started it (the owner's chat 0, a Kernel or the [Supervisor] 1, an op or a [Worker] 2, the draw critic 3) and
   refuses a deeper worker-start with nested_worker_depth_exceeded; it exposes no read of that setting. config.yaml gains
-  `orca: {maxWorkerDepth}` (engine/config.mjs orcaSettings, validated integer 1..16, default 4 = the owner's Orca app
+  `orca: {maxWorkerDepth}` (engine/orca-config.mjs orcaSettings, validated integer 1..16, default 4 = the owner's Orca app
   setting), which MUST equal the Orca app setting. scripts/lib/worker-depth.mjs holds the pure depth logic. scripts/agent/lib.mjs
   depthPreflight reads the parent Dispatch's depth (worker-show, the existing wrapper) and refuses a launch at parent
   depth + 1 > orca.maxWorkerDepth with the new code worker-depth-exceeded, effectState none, before anything is trusted

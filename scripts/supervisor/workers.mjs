@@ -253,19 +253,6 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
 export const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
- * Unlink `<dir>/node_modules` when it is a link (one an older runtime made; no runtime code makes one, RT_NODE_MODULES_LINK).
- * true when no link is left there; a real directory is left alone (true: it is the checkout's own).
- */
-export function unlinkNodeModulesLink(dir) {
-  const nm = path.join(dir, 'node_modules');
-  let st;
-  try { st = fs.lstatSync(nm); } catch { return true; }
-  if (!st.isSymbolicLink()) return true;
-  try { fs.unlinkSync(nm); } catch { try { fs.rmdirSync(nm); } catch { /* checked below */ } }
-  try { fs.lstatSync(nm); return false; } catch { return true; }
-}
-
-/**
  * Remove a job's staging checkout (`staging`: its payload.staging record) through Orca: removeOrcaWorktree unlinks every
  * link (the node_modules junction included) and asserts none is left, runs `orca worktree rm`, asserts the main checkout
  * untouched and closes the registry row. Its recorded branch goes too when its work landed (`landed`: `git branch -D`)

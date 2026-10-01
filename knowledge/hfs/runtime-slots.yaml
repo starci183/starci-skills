@@ -263,7 +263,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,yaml,plain-object,canonical-json,constants,digest,admission}.mjs"
+    path: "engine/{runtime-root,config,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission}.mjs"
     presence: required
     tracked: tracked
     tier: base

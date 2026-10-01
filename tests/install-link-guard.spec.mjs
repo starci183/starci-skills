@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { classifyInstall, linkedNodeModulesOf, packageRootOf } from '../scripts/guards/deps-guard.mjs';
-import { hookDecision, kernelMailboxVerdict } from '../scripts/guards/command-guard.mjs';
+import { hookDecision } from '../scripts/guards/command-guard.mjs';
+import { kernelMailboxVerdict } from '../scripts/guards/install-verdict.mjs';
 import { bindGuardTerminal, writeJobGuard } from '../scripts/guards/install.mjs';
 
 // Contract change install-through-link: an install-family command of npm, pnpm or yarn whose node_modules is a junction
