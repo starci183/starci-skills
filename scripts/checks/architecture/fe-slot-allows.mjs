@@ -1,14 +1,17 @@
 import { treeOf } from './required-files.mjs';
 import { allowsFile } from '../../lib/hfs-allows.mjs';
+import { isFeTestPath } from '../../lib/hfs-rules/fe-no-tests.mjs';
 
 /**
  * R94 `fe-slot-allows` (FE_SLOT_FILE_ROLE). A front-end slot that owns a whole directory (`fe.route`, `fe.feature`,
  * `fe.components`, `fe.hooks`, `fe.modules.api`) also says what its instances hold (`allows` in knowledge/hfs/slots.yaml).
  * Every tracked file of such a slot is matched against the `requires` and `allows` entries of its slot; a file no entry names is a
- * finding - `page.tsx` in a hooks domain, a `[lang]` segment under `app/`, a `.test.tsx` beside a component, a stray file at
- * a feature root. A file that sits where the slot expects a folder (`hooks/useX.ts`, so the "domain" is a file name) is one too.
+ * finding - `page.tsx` in a hooks domain, a `[lang]` segment under `app/`, a stray file beside a component or at a feature
+ * root. A file that sits where the slot expects a folder (`hooks/useX.ts`, so the "domain" is a file name) is one too.
  * Files no slot owns are HFS_PATH_NO_SLOT's (`hfs check`), so together every front-end file is placed by exactly one slot and
- * named by it.
+ * named by it. A test path (a `.spec.tsx` or `.test.tsx` beside a component, a test directory or test tooling) is FE_NO_TESTS's
+ * (R97, contract-change fe-no-tests): that rule is the one finding of such a file, so this check leaves it alone, as
+ * HFS_PATH_NO_SLOT does (scripts/lib/hfs-path-findings.mjs).
  */
 export const FE_SLOT_ALLOWS_RULE_IDS = ['FE_SLOT_FILE_ROLE'];
 
@@ -21,6 +24,7 @@ export function checkFeSlotAllows({ config, graph }) {
   let files = 0;
   const report = (file, message, extra = {}) => violations.push({ ruleId: RULE, path: file, line: 1, column: 1, message, ...extra });
   for (const file of [...tree.files].sort()) {
+    if (isFeTestPath(file)) continue;   // FE_NO_TESTS's, the one finding of that file
     const classified = resolver.classifyPath(file);
     if (classified.status !== 'owned') continue;
     const slot = resolver.slot(classified.slot);
