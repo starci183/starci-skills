@@ -13,10 +13,18 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { main } from '../packages/hfs/bin/hfs.mjs';
-import { installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app-install.mjs';
+import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+import { LINT_DEPENDENCIES, installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app-install.mjs';
 
-const PRESETS = { sonarExclusions: '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**' };
+const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
+/** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+/** The one coverage scope of an app: the services of the be side, nothing else. */
+const COVERAGE_SCOPE = ['be/src/**/*.service.ts'];
+const LCOV = 'be/coverage/lcov.info';
 const installs = runtimeInstalls();
 const missing = missingFrom(installs);
 const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
@@ -97,12 +105,56 @@ const freePort = () => new Promise((resolve, reject) => {
   server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => resolve(port)); });
 });
 
+/** A .properties text as a map (key=value lines; comments and blank lines left out). */
+const propertiesOf = (text) => Object.fromEntries(text.split(/\r?\n/).filter((line) => line && !line.startsWith('#')).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+
+/**
+ * The coverage contract of a scaffolded app: sonar-project.properties imports the be lcov with exactly the services as its coverage
+ * scope (no other coverage key), codecov.yml holds the same scope at 100 on the project and the patch with fe/ ignored, and the
+ * managed CI uploads the same lcov with the CODECOV_TOKEN secret after the unit run.
+ */
+function assertCoverageContract(app) {
+  const sonar = propertiesOf(fs.readFileSync(path.join(app, 'sonar-project.properties'), 'utf8'));
+  const coverageKeys = Object.keys(sonar).filter((key) => /coverage|lcov/i.test(key)).sort();
+  assert.deepEqual(coverageKeys, ['sonar.coverage.inclusions', 'sonar.javascript.lcov.reportPaths'], 'exactly the lcov import and the inclusions: no exclusion, no other report');
+  assert.equal(sonar['sonar.javascript.lcov.reportPaths'], LCOV);
+  assert.deepEqual(sonar['sonar.coverage.inclusions'].split(','), COVERAGE_SCOPE);
+  const codecov = parseYaml(fs.readFileSync(path.join(app, 'codecov.yml'), 'utf8'));
+  for (const kind of ['project', 'patch']) {
+    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the services at 100`);
+  }
+  assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
+  assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
+  const workflow = parseYaml(fs.readFileSync(path.join(app, '.github', 'workflows', 'ci.yml'), 'utf8'));
+  const steps = workflow.jobs.ci.steps;
+  const unit = steps.findIndex((step) => step.name === 'unit');
+  const upload = steps.findIndex((step) => String(step.uses ?? '').startsWith('codecov/codecov-action@'));
+  assert.ok(unit >= 0 && upload > unit, 'the coverage upload follows the unit run');
+  assert.equal(steps[upload].with.files, LCOV, 'the upload sends the lcov Sonar imports');
+  assert.equal(steps[upload].with.token, '${{ env.CODECOV_TOKEN }}');
+  assert.equal(workflow.jobs.ci.env.CODECOV_TOKEN, '${{ secrets.CODECOV_TOKEN }}');
+}
+
 const edit = (app, file, from, to) => {
   const target = path.join(app, ...file.split('/'));
   const text = fs.readFileSync(target, 'utf8');
   assert.ok(text.includes(from), `${file} holds ${from}`);
   fs.writeFileSync(target, text.replace(from, to));
 };
+
+test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly the services as the coverage scope', (t) => {
+  // No install and no registry: the lockfile step is the only part that needs npm, and it is not what this proves.
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-coverage-'));
+  t.after(() => fs.rmSync(into, { recursive: true, force: true }));
+  const { root, files } = scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: () => ({ ok: true }) });
+  for (const file of ['sonar-project.properties', 'codecov.yml', '.github/workflows/ci.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
+  assertCoverageContract(root);
+  // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
+  assert.match(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), /require\("@starci\/jest-preset"\)\.starciJestConfig\(\)/);
+  const config = jestPreset.starciJestConfig();
+  assert.ok(config.coverageReporters.includes('lcov'));
+  assert.equal(`be/${config.coverageDirectory}/lcov.info`, LCOV);
+});
 
 test('hfs scaffold app writes the app shape and hfs lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
   if (lintGate.required) assert.fail(lintGate.required);
@@ -122,6 +174,7 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
   for (const side of ['be', 'fe']) {
     for (const file of ['package.json', 'package-lock.json']) assert.ok(!fs.existsSync(path.join(app, side, file)), `${side}/ holds no ${file}: the app root holds the one`);
   }
+  assertCoverageContract(app);
   const scripts = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts;
   for (const name of ['dev:be', 'dev:fe', 'build:be', 'build:fe', 'start:api', 'lint', 'lint:fix', 'test', 'test:integration', 'test:e2e', 'test:contract', 'test:stack', 'codegen', 'contract:emit', 'typecheck']) {
     assert.ok(scripts[name], `the root package.json has the ${name} script`);
@@ -233,4 +286,30 @@ test('the scaffolded be api builds with build:be and boots with start:api from t
   assert.match(output, /"event":"server\.started"/, 'the api logged its start');
   child.kill();
   await exited;
+});
+
+/** What the be unit run loads besides the lint set: the runner, its TypeScript transform and the decorator helpers. */
+const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib']);
+const unitGate = gate('scaffold be unit run', missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+
+test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming services only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
+  if (unitGate.required) assert.fail(unitGate.required);
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-unit-'));
+  const app = path.join(into, 'demo');
+  let links = [];
+  t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
+  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  assertCoverageContract(app);
+  links = installInto(app, installs);
+  // The root `test` script, as npm runs it: `cd be && jest --selectProjects unit --coverage` (plus --ci, like the managed CI).
+  const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts.test;
+  assert.equal(script, 'cd be && jest --selectProjects unit --coverage');
+  const jest = path.join(app, 'node_modules', 'jest', 'bin', 'jest.js');
+  const unit = spawnSync(process.execPath, [jest, '--selectProjects', 'unit', '--coverage', '--ci'], { cwd: path.join(app, 'be'), encoding: 'utf8', timeout: 540_000 });
+  assert.equal(unit.status, 0, `the scaffold's unit run passes at per-file 100 on its services: ${unit.stdout}${unit.stderr}`);
+  const lcov = path.join(app, ...LCOV.split('/'));
+  assert.ok(fs.existsSync(lcov), `${LCOV} is written by the unit run`);
+  const files = fs.readFileSync(lcov, 'utf8').split(/\r?\n/).filter((line) => line.startsWith('SF:')).map((line) => line.slice(3).replace(/\\/g, '/'));
+  assert.ok(files.length > 0, 'the lcov names the services it measured');
+  for (const file of files) assert.match(file, /\/src\/.*\.service\.ts$/, `${file}: only services are measured`);
 });
