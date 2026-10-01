@@ -16,6 +16,7 @@ import { checkGrantParents } from '../grant-parents.mjs';
 import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent } from '../../agent/lib.mjs';
+import { DISPATCHES, requirePhase } from '../api-lib/lifecycle.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
 import { markRunning, runningOrAbandon } from '../api-lib/dispatch-running.mjs';
 import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from '../api-lib/rows.mjs';

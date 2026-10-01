@@ -32,7 +32,7 @@ import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../lib/hk-orphan-ledgers.mjs';
 import { quickCheck } from './ledger-health.mjs';
 import { loadConfig } from '../../engine/config.mjs';
-import { item, green, red, warn } from './checklist-items.mjs';
+import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
