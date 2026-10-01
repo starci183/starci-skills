@@ -374,7 +374,9 @@ grammarRelease:
     4. Land through the gate (land.mjs --commit <sha> --lane <name> --specs <csv>); dist/ is not tracked,
        so rebuild packages/grammar/dist on live main after the land until grammar-dist.mjs is fresh there.
     5. From live packages/grammar run `npm pack --dry-run` and check the file list: dist, README.md,
-       LICENSE, package.json only - no secrets, .env, stories, specs or tests.
+       LICENSE, package.json only - no secrets, .env, stories, specs or tests; and
+       `node scripts/checks/package-clean-test.mjs` is green for every package of the publish set (each installed
+       clean in a temp dir from its own manifest and lock, its own tests run there).
     6. `npm publish --access public`, then verify with `npm view @starci/grammar version`.
     7. Tell the owner afterwards, and tell the consumer Kernels whose pinned range does not cover the new
        version (a caret pin of the same minor, or of the same major above 0.x, picks it up on its next install).

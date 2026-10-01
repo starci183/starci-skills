@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.3 - 2026-10-01
+
+- Changed: the bundled canon-pins copy pins @starci/stylelint-canon 2.0.2, @starci/eslint-canon-be 3.0.3 and @starci/eslint-canon-fe 8.0.3, so `hfs scaffold app` writes those pins.
+- Added: `npm test` (bin/hfs.test.mjs, not published): the CLI loads with no installed dependency, the clean-install proof of the package (scripts/checks/package-clean-test.mjs).
+
 ## 4.0.2 - 2026-10-01
 
 - Changed (owner correction): `.starcistacks/` and `.sops.yaml` live at the app root, beside `be/`, `fe/` and `.starciwork`. The slots `be.starcistacks` and `be.sops` are replaced by `app.starcistacks` and `app.sops` (profile app, required); `repo.side-root-forbidden` now lists `.starcistacks/` and `.sops.yaml`, so a side holding either is `HFS_FORBIDDEN_PRESENT`, and the architecture machine reports a `.starcistacks` in either side as `HFS_STACKS_IN_SIDE` (it replaces `HFS_STACKS_IN_FE`). R10 `HFS_STACKS_SHAPE` judges the app root's tree.

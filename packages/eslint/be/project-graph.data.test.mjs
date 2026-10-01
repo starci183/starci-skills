@@ -12,6 +12,7 @@ const EXPORT = "export const value = 1;\n"
 // ---------------------------------------------------------------------------------------------------------------------
 // test-world-files (BE_TEST_TOPOLOGY)
 // ---------------------------------------------------------------------------------------------------------------------
+/** The app-root stack declaration (`.starcistacks/` lives at the app root, beside hfs.json): projectFixture rootFiles. */
 const stack = (services) => ({
     ".starcistacks/application-stacks.yaml": [
         "schema: starci/application-stacks@1",
@@ -46,7 +47,6 @@ test("test-world-files: the test world holds its fixed files, fakes/, kit/ and r
         "src/tests/world/utils/clock.client.ts": EXPORT,
         "src/tests/world/setup.ts": EXPORT,
         // the stack runs these real: a fake of one (by name, image repository or alias) is refused
-        ...stack({ postgres: "postgres:16", redis: "redis:7", keycloak: "quay.io/keycloak/keycloak:26.0", inference: "ghcr.io/acme/vllm-proxy:1.0", mailpit: "axllent/mailpit:v1.20" }),
         ...fake("keycloak"),
         ...fake("smtp"),
         // an external SaaS the stack does not declare stays legal; stateless GPU compute is faked when the config declares it with a reason
@@ -56,7 +56,8 @@ test("test-world-files: the test world holds its fixed files, fakes/, kit/ and r
         // a stacks entry faking a stateful service, or a service the stack does not declare, is refused on the declaration
         "src/tests/world/test-world.config.ts": "export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/dev', stacks: { inference: { fakedBy: 'inference', reason: 'Serves a GPU model; the fake speaks the same protocol.' }, postgres: { fakedBy: 'postgres', reason: 'Slow.' }, ghost: { fakedBy: 'postgres', reason: 'GPU.' } } });\n",
     }
-    const f = projectFixture({ files, declaration: { optionalSlots: [] } })
+    const rootFiles = stack({ postgres: "postgres:16", redis: "redis:7", keycloak: "quay.io/keycloak/keycloak:26.0", inference: "ghcr.io/acme/vllm-proxy:1.0", mailpit: "axllent/mailpit:v1.20" })
+    const f = projectFixture({ files, rootFiles, declaration: { optionalSlots: [] } })
     t.after(f.cleanup)
     f.tester.run("test-world-files", rules["test-world-files"], {
         valid: valid(f, files, [
@@ -89,12 +90,11 @@ test("test-world-files: the test world holds its fixed files, fakes/, kit/ and r
 test("test-world-files: without a mail host in the stack the smtp fake stays legal, and a cache fake is refused when the stack runs redis", (t) => {
     const files = {
         "src/tests/world/global-setup.ts": EXPORT,
-        ...stack({ postgres: "postgres:16", redis: "redis:7" }),
         ...fake("smtp"),
         ...fake("cache"),
         "src/tests/world/test-world.config.ts": "export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/dev', stacks: { redis: {} } });\n",
     }
-    const f = projectFixture({ files, declaration: { optionalSlots: [] } })
+    const f = projectFixture({ files, rootFiles: stack({ postgres: "postgres:16", redis: "redis:7" }), declaration: { optionalSlots: [] } })
     t.after(f.cleanup)
     f.tester.run("test-world-files", rules["test-world-files"], {
         valid: valid(f, files, ["src/tests/world/fakes/smtp/server.ts", "src/tests/world/test-world.config.ts"]),

@@ -1,0 +1,8 @@
+id: stylelint-canon-2-0-2-class-selector
+effectiveAt: '2026-10-01T20:00:00+07:00'
+summary: "@starci/stylelint-canon 2.0.2: starci/no-class-selector refuses a compound class selector (div.card, button.primary:hover); the 2.0.1 pattern skipped any dot after a word character, so only a leading class was caught. Found by the clean-install proof (scripts/checks/package-clean-test.mjs): the package's own tests had never run. The pin moves to 2.0.2, and the canon-pins copies bundled in @starci/eslint-canon-be, @starci/eslint-canon-fe and @starci/hfs change with it, so those move to 3.0.3, 8.0.3 and 4.0.3 (no rule or verb changed) and the nest and next profiles are rebound to the new canon versions and digests."
+reach: new-legs
+paths:
+  - knowledge/hfs/canon-pins.yaml
+  - modules/models/code-patterns.yaml
+  - modules/kernel/contract-changes/stylelint-canon-2-0-2-class-selector.yaml
