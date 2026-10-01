@@ -33,10 +33,6 @@ exceptions:
   - path: .claude/settings.json
     reason: >
       Claude Code project settings for the runtime checkout (the PreToolUse seat-tools guard hook); Claude Code reads JSON.
-  - path: hfs.json
-    reason: >
-      HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
-      reads hfs.json as JSON in every repository it judges, so the runtime's own declaration keeps the same form.
   - path: engine/yaml-license.json
     reason: >
       License metadata for the bundled yaml runtime in engine/yaml.mjs;
@@ -151,6 +147,10 @@ exceptions:
     reason: npm lockfile for the todo-app example ; package managers require JSON filename and syntax.
   - path: examples/todo-app/package.json
     reason: npm package manifest for the todo-app example ; Node/npm require JSON filename and syntax.
+  - path: hfs.json
+    reason: >
+      HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
+      reads hfs.json as JSON in every repository it judges, so the runtime's own declaration keeps the same form.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception; all other authored knowledge JSON
