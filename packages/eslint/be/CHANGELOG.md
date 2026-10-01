@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.5 - 2026-10-01
+
+- Changed: bundled slots.yaml (workflow worktree), sonar-gate.yaml (service coverage) and canon-pins.
+
 ## 3.0.4 - 2026-10-01
 
 - Changed: the bundled runtime copy of knowledge/hfs/canon-pins.yaml pins @starci/test-world 1.0.3. No rule or command changed.

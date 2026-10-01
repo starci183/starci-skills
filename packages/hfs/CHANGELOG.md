@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.5 - 2026-10-01
+
+- Changed: workflow worktree runtime copies, the services coverage scope for Sonar and codecov.yml, sonar-gate, canon-pins.
+
 ## Unreleased (alpha.4, bumped in C0's batch)
 
 - Changed (contract change `sonar-services-coverage`): Sonar and Codecov judge the services' coverage. The managed `sonar-project.properties` adds `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and `sonar.coverage.inclusions=be/src/**/*.service.ts`; a new managed `codecov.yml` (slot `app.quality-config`, now `{sonar-project.properties,codecov.yml}`) holds the same paths at 100 on the project and the patch and ignores `fe/**`; the managed CI workflow uploads the be lcov with `codecov/codecov-action@v5` and the `CODECOV_TOKEN` secret after the unit run. Both files are rendered from one scope, `coverageScope(presets)`: the installed jest preset's `COVERAGE_SOURCES` on the be side (`loadPresets` now returns `coverageSources`). An app re-renders with `hfs sync --write`.
