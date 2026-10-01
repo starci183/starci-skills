@@ -12,9 +12,9 @@ summary: >-
   remedy "node_modules here is a link to another checkout: unlink it first (cmd /c rmdir) and install for real".
   scripts/guards/command-guard.mjs applies this one rule with no guard file too (unguardedVerdict; hookDecision returns
   guard null), wherever the hook is registered, through cmd, PowerShell, bash, npx and corepack wrappers (cmd's
-  `cd /d <dir>` now moves the cwd). A real node_modules, or none yet, passes. (2) `orca orchestration check` from a
+  `cd /d <dir>` now moves the cwd). A real node_modules, or none yet, passes. (2) a raw mailbox check (the calls.yaml check call) from a
   guard of role kernel is refused KERNEL_ORCA_CHECK: its --ack consumes deliveries before the ledger records them; the
-  Kernel reads through api messages / api questions and the runtime drains. Ops and [Worker]s keep `check`
+  Kernel reads through api messages / api questions and the runtime drains. Ops and [Worker]s keep that check
   (modules/host/orca/api.yaml operationAgent): they read their own Run's deliveries, which no ledger record depends on.
 adds:
   codes:
