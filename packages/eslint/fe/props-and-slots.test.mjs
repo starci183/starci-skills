@@ -8,6 +8,7 @@ import {
   noPerPartClassNameProp,
   noPublicClassNameProp,
   noPublicFrameCssProps,
+  propsFieldsReadonly,
   publicComponentSignature,
   rules,
 } from "./props-and-slots.mjs"
@@ -92,5 +93,32 @@ test("styling ownership rules keep internal CSS doors closed", () => {
       { filename: COMPONENT, code: "type Props = Pick<Base, 'tone'>" },
     ],
     invalid: [{ filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "type Props = Omit<Base, 'style'>", errors: [{ messageId: "utility" }] }, { filename: COMPONENT, code: "type Props = Omit<Base, 'className'>", errors: [{ messageId: "utility" }] }],
+  })
+})
+
+test("props are readonly all the way down: fields, index signatures, nested objects and collections (R110, FE-TYPING-2)", () => {
+  tester.run("props-fields-readonly", propsFieldsReadonly, {
+    valid: [
+      { filename: COMPONENT, code: "interface SurfaceCardProps { readonly title: string; readonly tags: readonly string[]; readonly pair: readonly [string, number]; readonly rows: ReadonlyArray<{ readonly id: string }>; readonly onSelect: () => void; readonly [key: string]: unknown }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.title}</div>" },
+      // an inherited local shape is judged too, and passes when readonly
+      { filename: COMPONENT, code: "interface Base { readonly id: string }\nexport interface SurfaceCardProps extends Base { readonly title: string }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.title}</div>" },
+      // Readonly<T> makes the top level readonly
+      { filename: COMPONENT, code: "type SurfaceCardProps = Readonly<{ title: string; tags: readonly string[] }>\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.title}</div>" },
+      // a method signature is not a field; an imported shape is judged in the file that declares it
+      { filename: COMPONENT, code: "import type { Row } from './row'\ninterface SurfaceCardProps { readonly row: Row; select(): void }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.row}</div>" },
+      // a function that renders nothing is not a component; an un-exported helper is local
+      { filename: COMPONENT, code: "interface Input { title: string }\nexport const label = (input: Input) => input.title" },
+      { filename: COMPONENT, code: "interface Cell { title: string }\nconst renderCell = (cell: Cell) => <li>{cell.title}</li>\nexport const SurfaceCard = (props: { readonly titles: readonly string[] }) => <ul>{props.titles.map((title) => renderCell({ title }))}</ul>" },
+      // outside product source the rule does not apply
+      { filename: at("scripts/build.tsx"), code: "interface P { title: string }\nexport const X = (props: P) => <div>{props.title}</div>" },
+    ],
+    invalid: [
+      { filename: COMPONENT, code: "interface SurfaceCardProps { title: string }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.title}</div>", errors: [{ messageId: "field" }] },
+      { filename: COMPONENT, code: "interface SurfaceCardProps { readonly tags: string[]; readonly pair: [string, number]; readonly rows: Array<string> }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.tags}</div>", errors: [{ messageId: "collection" }, { messageId: "collection" }, { messageId: "collection" }] },
+      { filename: COMPONENT, code: "interface SurfaceCardProps { readonly meta: { label: string }; [key: string]: unknown }\nexport const SurfaceCard = (props: SurfaceCardProps) => <div>{props.meta.label}</div>", errors: [{ messageId: "field" }, { messageId: "index" }] },
+      // an inherited mutable field and a nested element shape are found at their declaration
+      { filename: COMPONENT, code: "interface Base { id: string }\ninterface Item { name: string }\ninterface SurfaceCardProps extends Base { readonly items: readonly Item[] }\nexport function SurfaceCard(props: SurfaceCardProps) { return <div>{props.id}</div> }", errors: [{ messageId: "field" }, { messageId: "field" }] },
+      { filename: COMPONENT, code: "type SurfaceCardProps = { readonly title: string } & { open: boolean }\nexport default function SurfaceCard(props: SurfaceCardProps) { return <div>{props.title}</div> }", errors: [{ messageId: "field" }] },
+    ],
   })
 })

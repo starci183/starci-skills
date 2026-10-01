@@ -8,7 +8,7 @@
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { catchMustAccount, errorFamilyShape, errorHome, throwDomainError } from "./error-handling.mjs"
+import { catchMustAccount, errorFamilyShape, errorHome, replacementThrowCarriesCause, throwDomainError } from "./error-handling.mjs"
 
 const tester = typedTester()
 const SERVICE = at("src/modules/domain/plan/plan.service.ts")
@@ -186,6 +186,47 @@ test("errors/<c>.error.ts holds one code enum, one Record<Code, ErrorKind> table
             { filename: PURCHASE_ERROR, code: `${FAMILY}export class OtherError extends DomainError<PurchaseErrorCode> {}\n`, errors: [{ messageId: "extra" }] },
             // an unrelated base
             { filename: PURCHASE_ERROR, code: FAMILY.replace("extends DomainError<PurchaseErrorCode>", "extends Error"), errors: [{ messageId: "classShape" }] },
+        ],
+    })
+})
+
+test("a throw that escapes a catch rethrows the caught value or carries it as cause (R108, BE-ERROR-4)", () => {
+    const DECLS = `declare class PlanError extends Error { constructor(input: { code: string; cause?: unknown }) }
+declare function a(): void
+declare function wrap(e: unknown): Error
+declare const p: Promise<void>
+declare const READY: Error
+`
+    tester.run("replacement-throw-carries-cause", replacementThrowCarriesCause, {
+        valid: [
+            // a rethrow of the same caught value
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw error }` },
+            // the replacement carries the exact caught value as cause
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw new PlanError({ code: "PLAN_FAILED", cause: error }) }` },
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (cause) { throw new PlanError({ code: "PLAN_FAILED", cause }) }` },
+            // a const alias built from the caught value carries it
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { const failure = new PlanError({ code: "PLAN_FAILED", cause: error }); throw failure }` },
+            // a call handed the caught value may keep it; the rule never guesses it does not
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw wrap(error) }` },
+            // a branch maps a known failure and rethrows the rest
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { if (error instanceof PlanError) throw new PlanError({ code: "PLAN_AGAIN", cause: error }); throw error }` },
+            // a throw inside a nested function belongs to that function, a nested handler judges its own throws
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { const f = () => { throw READY }; throw error }` },
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { try { a() } catch (again) { throw again } throw error }` },
+            // a catch with no throw is catch-must-account's question, not this rule's
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { return null }` },
+            { filename: SERVICE, code: `${DECLS}p.catch((error) => { throw new PlanError({ code: "PLAN_FAILED", cause: error }) })` },
+        ],
+        invalid: [
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw new PlanError({ code: "PLAN_FAILED" }) }`, errors: [{ messageId: "dropped" }] },
+            // reading only the message drops the cause
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw new PlanError({ code: (error as Error).message }) }`, errors: [{ messageId: "dropped" }] },
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { throw READY }`, errors: [{ messageId: "dropped" }] },
+            { filename: SERVICE, code: `${DECLS}try { a() } catch { throw new PlanError({ code: "PLAN_FAILED" }) }`, errors: [{ messageId: "unbound" }] },
+            // a throw in the finalizer of a nested try still escapes the outer catch
+            { filename: SERVICE, code: `${DECLS}try { a() } catch (error) { try { a() } finally { throw new PlanError({ code: "PLAN_FAILED" }) } }`, errors: [{ messageId: "dropped" }] },
+            { filename: SERVICE, code: `${DECLS}p.catch((error) => { throw new PlanError({ code: "PLAN_FAILED" }) })`, errors: [{ messageId: "dropped" }] },
+            { filename: SERVICE, code: `${DECLS}p.catch(() => { throw new PlanError({ code: "PLAN_FAILED" }) })`, errors: [{ messageId: "unbound" }] },
         ],
     })
 })

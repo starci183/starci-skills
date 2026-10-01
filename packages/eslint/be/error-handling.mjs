@@ -1,11 +1,16 @@
 /**
- * The rules that hold HFS errors and their handling (catalog R38 `BE_ERROR_HOME`, R40 `BE_LOGGER_REQUIRED`).
+ * The rules that hold HFS errors and their handling (catalog R38 `BE_ERROR_HOME`, R40 `BE_LOGGER_REQUIRED`, R108
+ * `BE_ERROR_CAUSE_DROPPED`).
  *
  * One habit: a failure is either named where its owner lives, or it is visible. Every question is answered by TYPE and by
  * the owner that declares the type (BE-CONVENTION 1.8, 3.1): no rule here matches a class, receiver or file by its name.
  *
  *   - `catch-must-account` refuses a `catch` (and a promise `.catch`) that swallows. A handler passes when it rethrows,
  *     returns an outcome carrying the caught error, or calls a method on a receiver typed `Logger` from `platform/logging`.
+ *   - `replacement-throw-carries-cause` (R108 `BE_ERROR_CAUSE_DROPPED`) refuses a `throw` that escapes a `catch` (or a
+ *     promise `.catch` handler) and neither rethrows the caught value nor carries it: the replacement capability error
+ *     takes the exact caught value as `cause` (BE-ERROR-4). A value the rule cannot see through (a parameter, a call that
+ *     is handed the caught value) counts as carrying, so a kept cause is never reported.
  *   - `error-home` keeps every error class where its owner is: a class that derives from `DomainError` is declared only in
  *     `errors/<capability>.error.ts` of its own owner, and a class that derives from the built-in `Error` some other way
  *     (`AbstractException`, a framework `HttpException` subclass, a bare `extends Error`) is refused.
@@ -93,6 +98,105 @@ export const catchMustAccount = {
                 } else if (!isLoggerCall(handler.body) && !carriesCaught(handler.body, paramName(handler))) {
                     context.report({ node: handler, messageId: "swallowed" })
                 }
+            },
+        }
+    },
+}
+
+/** The statements of a catch body that escape it: nested functions, nested handlers and guarded `try` blocks are not. */
+const escapingThrows = (body) => {
+    const found = []
+    const visit = (node) => {
+        if (!node || typeof node !== "object" || typeof node.type !== "string") return
+        if (node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") return
+        if (node.type === "CatchClause") return
+        if (node.type === "ThrowStatement") found.push(node)
+        if (node.type === "TryStatement") {
+            // a throw of the guarded block lands in the nested handler, which is judged on its own
+            if (!node.handler) visit(node.block)
+            visit(node.finalizer)
+            return
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (key === "parent" || key === "loc" || key === "range") continue
+            if (Array.isArray(value)) value.forEach(visit)
+            else visit(value)
+        }
+    }
+    body.body.forEach(visit)
+    return found
+}
+
+/** The variable `identifier` names at its position, or null. */
+const variableOf = (sourceCode, identifier) => {
+    for (let scope = sourceCode.getScope(identifier); scope; scope = scope.upper) {
+        const variable = scope.set.get(identifier.name)
+        if (variable) return variable
+    }
+    return null
+}
+
+/**
+ * True when the thrown value carries the caught one: it is the caught binding, it uses it as a value, or it is a variable
+ * whose initializer or an assignment uses it. Anything the rule cannot see through is taken as carrying, so it never
+ * reports a throw that might keep the cause.
+ */
+const throwCarriesCaught = (sourceCode, argument, caught) => {
+    if (carriesCaught(argument, caught)) return true
+    let value = argument
+    while (value.type === "TSAsExpression" || value.type === "TSNonNullExpression" || value.type === "TSTypeAssertion") value = value.expression
+    if (value.type === "Identifier") {
+        const variable = variableOf(sourceCode, value)
+        // an unresolved global or an import cannot carry this catch's value, but a parameter may hold anything
+        if (!variable) return false
+        if (variable.defs.some((def) => def.type === "Parameter")) return true
+        if (variable.defs.some((def) => def.node.type === "VariableDeclarator" && def.node.init && carriesCaught(def.node.init, caught))) return true
+        return variable.references.some((reference) => reference.isWrite() && reference.writeExpr && carriesCaught(reference.writeExpr, caught))
+    }
+    return false
+}
+
+/** A catch that replaces the caught failure passes the caught value on as the replacement's `cause` (BE-ERROR-4). */
+export const replacementThrowCarriesCause = {
+    meta: {
+        type: "problem",
+        docs: { description: "A throw that escapes a catch rethrows the caught value or carries it (as `cause`) in the replacement." },
+        schema: [],
+        messages: {
+            dropped:
+                "This `throw` replaces the caught failure without carrying it, so the stack and the original error are lost. Pass the exact caught value as `cause` of the capability error (`new <C>Error({ code, cause: {{name}} })`) or rethrow it.",
+            unbound:
+                "This `throw` replaces a failure its `catch` never bound, so the original error is lost. Bind it (`catch (error)`) and pass it as `cause` of the capability error, or rethrow it.",
+        },
+    },
+    create(context) {
+        const sourceCode = context.sourceCode || context.getSourceCode()
+        const check = (body, param) => {
+            const caught = param?.type === "Identifier" ? param.name : null
+            for (const statement of escapingThrows(body)) {
+                const argument = statement.argument
+                if (caught === null) {
+                    context.report({ node: statement, messageId: "unbound" })
+                    continue
+                }
+                if (throwCarriesCaught(sourceCode, argument, caught)) continue
+                context.report({ node: statement, messageId: "dropped", data: { name: caught } })
+            }
+        }
+        return {
+            CatchClause(node) {
+                // a destructured binding names parts of the failure, not the failure itself; the rule cannot tell which part is kept
+                if (node.param && node.param.type !== "Identifier") return
+                check(node.body, node.param)
+            },
+            CallExpression(node) {
+                if (node.callee.type !== "MemberExpression" || node.callee.computed) return
+                if (node.callee.property.type !== "Identifier" || node.callee.property.name !== "catch") return
+                const handler = node.arguments[0]
+                if (!handler || (handler.type !== "ArrowFunctionExpression" && handler.type !== "FunctionExpression")) return
+                if (handler.body.type !== "BlockStatement") return
+                if (handler.params[0] && handler.params[0].type !== "Identifier") return
+                check(handler.body, handler.params[0])
             },
         }
     },
@@ -319,6 +423,7 @@ export const errorFamilyShape = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "catch-must-account": catchMustAccount,
+    "replacement-throw-carries-cause": replacementThrowCarriesCause,
     "error-home": errorHome,
     "throw-domain-error": throwDomainError,
     "error-family-shape": errorFamilyShape,
@@ -327,6 +432,7 @@ export const rules = {
 /** All start at error: HFS has no baseline, and the migration lanes clear the debt before a repository adopts them. */
 export const recommended = {
     "starci-be/catch-must-account": "error",
+    "starci-be/replacement-throw-carries-cause": "error",
     "starci-be/error-home": "error",
     "starci-be/throw-domain-error": "error",
     "starci-be/error-family-shape": "error",

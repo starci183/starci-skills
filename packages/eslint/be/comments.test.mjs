@@ -18,6 +18,7 @@ import {
   noRestatedNameJsdoc,
   requireEnumMemberJsdoc,
   requireExportJsdoc,
+  requirePublicMemberJsdoc,
   rules,
 } from "./comments.mjs"
 
@@ -56,6 +57,41 @@ test("COMMENT-1: an export with a surface needs a doc; a data constant does not"
       { code: "export const readUser = () => null", errors: [{ messageId: "jsdoc" }] },
       { code: "export interface User { id: string }", errors: [{ messageId: "jsdoc" }] },
       { code: "export class UserService {}", errors: [{ messageId: "jsdoc" }] },
+    ],
+  })
+})
+
+test("COMMENT-3 (R109): every public member of an exported class, interface or object type carries a doc", () => {
+  tester.run("require-public-member-jsdoc", requirePublicMemberJsdoc, {
+    valid: [
+      "/** x */\nexport class PlanService {\n  /** Starts the plan and reserves its seats. */\n  start(): void {}\n  /** The seats still open. */\n  readonly open = 3\n  /** The plan's display title. */\n  get title(): string { return \"\" }\n}",
+      // private, protected, # members and the constructor are not public surface
+      "/** x */\nexport class PlanService {\n  constructor(private readonly seats: number) {}\n  private load(): void {}\n  protected size = 1\n  #cache = 0\n}",
+      // a doc above the decorators documents the decorated member
+      "declare const Get: () => MethodDecorator\n/** x */\nexport class PlanController {\n  /** Lists the plans the caller may see. */\n  @Get()\n  list(): void {}\n}",
+      // overload signatures share one doc
+      "/** x */\nexport class Reader {\n  /** Reads one row or all of them. */\n  read(id: string): string\n  read(): string[]\n  read(id?: string): string | string[] { return id ?? [] }\n}",
+      "/** x */\nexport interface PlanRow {\n  /** The plan's stable id. */\n  readonly id: string\n  /** Starts the plan. */\n  start(): void\n  [key: string]: unknown\n}",
+      "/** x */\nexport type PlanInput = {\n  /** The plan to start. */\n  readonly planId: string\n}",
+      // a type alias that is a union names no members
+      "/** x */\nexport type Verdict = \"pass\" | \"fail\"",
+      // an un-exported class is local to its file
+      "class Local {\n  run(): void {}\n}",
+      // a property set to a literal or a named constant is a data constant, as COMMENT-1 has it (a migration's `name`, a consumer's `queue`)
+      "declare const PLAN_QUEUE: string\n/** x */\nexport class CreatePlans1758 {\n  name = \"CreatePlans1758\"\n  readonly queue = PLAN_QUEUE\n  readonly label = `plans`\n}",
+      // the test tiers document their spec-read shapes at the type
+      { filename: at("src/tests/fixtures/plan.views.ts"), code: "/** One plan as the query answers it. */\nexport interface PlanView {\n  id: string\n}" },
+      { filename: at("src/tests/world/kit/e2e-http-client.ts"), code: "/** x */\nexport class E2eHttpClient {\n  get(): void {}\n}" },
+    ],
+    invalid: [
+      { code: "/** x */\nexport class PlanService {\n  start(): void {}\n  readonly open: number\n}", errors: [{ messageId: "jsdoc" }, { messageId: "jsdoc" }] },
+      { code: "/** x */\nexport class PlanService {\n  static create(): PlanService { return new PlanService() }\n}", errors: [{ messageId: "jsdoc" }] },
+      // product source is judged; a property computed by a call is not a data constant
+      { filename: SRC, code: "declare function load(): number\n/** x */\nexport class UserService {\n  readonly seats = load()\n}", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** x */\nexport interface PlanRow {\n  readonly id: string\n}", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** x */\nexport type PlanInput = { readonly planId: string } & { readonly seats: number }", errors: [{ messageId: "jsdoc" }, { messageId: "jsdoc" }] },
+      // a line comment is not a doc block
+      { code: "/** x */\nexport class PlanService {\n  // starts it\n  start(): void {}\n}", errors: [{ messageId: "jsdoc" }] },
     ],
   })
 })

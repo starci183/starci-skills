@@ -1,11 +1,15 @@
 /**
  * The rules that hold `comments.md`.
  *
- * Five rules, and each is careful about a different false positive:
+ * Six rules, and each is careful about a different false positive:
  *
  *   - `require-export-jsdoc` skips plain data constants. `export const MAX_ATTEMPTS = 3` is already
  *     fully described by its own name, and demanding a sentence there produces sentences that
  *     restate the name - which COMMENT-3 forbids. Only declarations with a surface get the check.
+ *   - `require-public-member-jsdoc` (R109) judges only what a caller reaches: a private, protected or `#` member, the
+ *     constructor and an index signature are not surface, overload signatures of one name share one doc, and a property
+ *     set to a literal or a named constant is a data constant (COMMENT-1's reason). Product source only: the test tiers
+ *     (`e2e`, `fixtures` of the slot manifest) document their spec-read shapes at the type.
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
  *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
@@ -20,6 +24,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
+import { normalizePath } from "./lib/path.mjs"
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
 
 /** The slots of the per-owner message catalogs: the only source files that may hold Vietnamese. */
@@ -128,6 +133,102 @@ export const requireExportJsdoc = {
         messageId: "jsdoc",
         data: { name: nameOf(declaration) },
       })
+    }
+    return {
+      ExportNamedDeclaration: check,
+      ExportDefaultDeclaration: check,
+    }
+  },
+}
+
+// -- COMMENT-3 (R109) -----------------------------------------------------------------------------
+
+/** Class members a caller reaches: everything but the constructor, static blocks and index signatures. */
+const CLASS_MEMBER_KINDS = new Set([
+  "MethodDefinition",
+  "PropertyDefinition",
+  "AccessorProperty",
+  "TSAbstractMethodDefinition",
+  "TSAbstractPropertyDefinition",
+  "TSAbstractAccessorProperty",
+])
+
+/** Interface and type-literal members a caller reaches; call, construct and index signatures have no name to document. */
+const SIGNATURE_MEMBER_KINDS = new Set(["TSPropertySignature", "TSMethodSignature"])
+
+/**
+ * A property set to a literal or a named constant (`name = "CreatePlans1758"`, `readonly queue = PLAN_QUEUE`) is already
+ * described by its own name and value, the same reason COMMENT-1 leaves a data constant alone.
+ */
+const isDataProperty = (member) => {
+  if (member.type !== "PropertyDefinition" || !member.value) return false
+  const value = member.value
+  if (value.type === "Literal" || value.type === "Identifier") return true
+  if (value.type === "TemplateLiteral") return value.expressions.length === 0
+  return value.type === "MemberExpression" && !value.computed && value.object.type === "Identifier"
+}
+
+/** The test tiers of the slot manifest: spec-read shapes there are documented at the type, not field by field. */
+const TEST_TIERS = new Set(["e2e", "fixtures"])
+
+/** The members of an exported class, interface or object type alias that are its public surface. */
+const publicMembersOf = (declaration) => {
+  if (declaration.type === "ClassDeclaration") {
+    return declaration.body.body.filter((member) =>
+      CLASS_MEMBER_KINDS.has(member.type)
+      && member.kind !== "constructor"
+      && !isDataProperty(member)
+      && member.key?.type !== "PrivateIdentifier"
+      && member.accessibility !== "private"
+      && member.accessibility !== "protected")
+  }
+  if (declaration.type === "TSInterfaceDeclaration") return declaration.body.body.filter((member) => SIGNATURE_MEMBER_KINDS.has(member.type))
+  if (declaration.type === "TSTypeAliasDeclaration") {
+    const type = declaration.typeAnnotation
+    const literals = type.type === "TSTypeLiteral" ? [type]
+      : type.type === "TSIntersectionType" ? type.types.filter((part) => part.type === "TSTypeLiteral") : []
+    return literals.flatMap((literal) => literal.members.filter((member) => SIGNATURE_MEMBER_KINDS.has(member.type)))
+  }
+  return []
+}
+
+/** The name a member is reached by, with its static side kept apart; null for a computed key the rule cannot name. */
+const memberKey = (member) => {
+  if (member.computed) return null
+  const key = member.key
+  const name = key?.type === "Identifier" ? key.name : key?.type === "Literal" ? String(key.value) : null
+  return name === null ? null : `${member.static ? "static " : ""}${name}`
+}
+
+/** Every public member of an exported class, interface or object type opens with a doc block (BE-COMMENT-3). */
+export const requirePublicMemberJsdoc = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "Every public member of an exported class, interface or object type alias opens with JSDoc." },
+    schema: [],
+    messages: {
+      jsdoc:
+        "`{{owner}}.{{name}}` is public surface with no doc block. A caller reaches the member, not the type's doc: say what it is for, what calling or reading it causes, or what it holds.",
+    },
+  },
+  create(context) {
+    const sourceCode = context.sourceCode || context.getSourceCode()
+    if (TEST_TIERS.has(hfsOf(context).tierOf(normalizePath(context.filename)))) return {}
+    const check = (node) => {
+      const declaration = node.declaration
+      if (!declaration || !declaration.id) return
+      // overload signatures share one name; a doc on any of them documents the member
+      const groups = new Map()
+      for (const member of publicMembersOf(declaration)) {
+        const key = memberKey(member)
+        if (key === null) continue
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(member)
+      }
+      for (const [key, members] of groups) {
+        if (members.some((member) => hasJsdocBefore(sourceCode, member))) continue
+        context.report({ node: members[0].key, messageId: "jsdoc", data: { owner: declaration.id.name, name: key.replace(/^static /, "") } })
+      }
     }
     return {
       ExportNamedDeclaration: check,
@@ -305,6 +406,7 @@ export const noRestatedNameJsdoc = {
 export const rules = {
   "require-export-jsdoc": requireExportJsdoc,
   "require-enum-member-jsdoc": requireEnumMemberJsdoc,
+  "require-public-member-jsdoc": requirePublicMemberJsdoc,
   "no-non-ascii-source": noNonAsciiSource,
   "no-restated-name-jsdoc": noRestatedNameJsdoc,
 }
@@ -320,6 +422,7 @@ export const rules = {
 export const recommended = {
   "starci-be/require-export-jsdoc": "error",
   "starci-be/require-enum-member-jsdoc": "error",
+  "starci-be/require-public-member-jsdoc": "error",
   "starci-be/no-non-ascii-source": "error",
   "starci-be/no-restated-name-jsdoc": "error",
 }

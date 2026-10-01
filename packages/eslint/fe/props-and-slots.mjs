@@ -142,8 +142,128 @@ export const noCssDoorTypeLaundering = {
   },
 }
 
+/** The top-level declaration of a type name in this file (`interface X` or `type X = ...`), or null. */
+const localTypeDeclaration = (program, name) => {
+  for (const statement of program.body) {
+    const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement
+    if ((declaration?.type === "TSInterfaceDeclaration" || declaration?.type === "TSTypeAliasDeclaration") && declaration.id.name === name) return declaration
+  }
+  return null
+}
+
+/** The type the first parameter of a function declares, or null. */
+const firstParameterType = (fn) => {
+  const param = fn.params?.[0]
+  const annotated = param?.type === "AssignmentPattern" ? param.left : param
+  return annotated?.typeAnnotation?.typeAnnotation ?? null
+}
+
+/** The exported functions of a file that render (contain JSX): a component, whatever it is called. */
+const exportedRenderers = (program) => program.body.flatMap((statement) => {
+  const declaration = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration : null
+  if (!declaration) return []
+  const functions = declaration.type === "VariableDeclaration"
+    ? declaration.declarations.map((item) => item.init).filter((init) => init?.type === "ArrowFunctionExpression" || init?.type === "FunctionExpression")
+    : declaration.type === "FunctionDeclaration" || declaration.type === "ArrowFunctionExpression" || declaration.type === "FunctionExpression" ? [declaration] : []
+  return functions.filter((fn) => fn.params.length === 1 && containsJsx(fn.body))
+})
+
+/** Props are readonly all the way down: every field, index signature, nested object and collection (FE-TYPING-2). */
+export const propsFieldsReadonly = {
+  meta: {
+    type: "problem",
+    docs: { description: "Every field of a component's props type, nested objects and collections included, is readonly." },
+    schema: [],
+    messages: {
+      field: "Props field `{{name}}` is not readonly. A component reads its props and never writes them: mark it `readonly` so a write is a type error.",
+      index: "This props index signature is not readonly. Mark it `readonly [key: ...]` so no entry can be written through props.",
+      collection: "This props collection is mutable. Write `readonly T[]`, `readonly [A, B]` or `ReadonlyArray<T>` so the component cannot change what it was given.",
+    },
+  },
+  create(context) {
+    if (!isProductSource(context)) return {}
+    const sourceCode = context.sourceCode || context.getSourceCode()
+    return {
+      "Program:exit"(program) {
+        const seen = new Set()
+        /** Checks one type: object members, collections and the local declarations it names. */
+        const checkType = (type) => {
+          if (!type || seen.has(type)) return
+          seen.add(type)
+          if (type.type === "TSTypeOperator" && type.operator === "readonly") {
+            checkElements(type.typeAnnotation)
+            return
+          }
+          if (type.type === "TSArrayType" || type.type === "TSTupleType") {
+            context.report({ node: type, messageId: "collection" })
+            checkElements(type)
+            return
+          }
+          if (type.type === "TSUnionType" || type.type === "TSIntersectionType") {
+            for (const part of type.types) checkType(part)
+            return
+          }
+          if (type.type === "TSTypeLiteral") {
+            checkMembers(type.members)
+            return
+          }
+          if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return
+          const name = type.typeName.name
+          const args = type.typeArguments?.params ?? type.typeParameters?.params ?? []
+          // `Readonly<T>` makes the top level readonly; what T nests is still judged
+          if (name === "Readonly" && args.length === 1 && !isShadowed(type.typeName)) {
+            checkNested(args[0])
+            return
+          }
+          if (name === "Array" && !isShadowed(type.typeName)) context.report({ node: type, messageId: "collection" })
+          if ((name === "Array" || name === "ReadonlyArray") && !isShadowed(type.typeName)) {
+            for (const arg of args) checkType(arg)
+            return
+          }
+          const declaration = localTypeDeclaration(program, name)
+          if (!declaration || seen.has(declaration)) return
+          seen.add(declaration)
+          if (declaration.type === "TSTypeAliasDeclaration") checkType(declaration.typeAnnotation)
+          else {
+            checkMembers(declaration.body.body)
+            for (const heritage of declaration.extends ?? []) {
+              if (heritage.expression.type === "Identifier") checkType({ type: "TSTypeReference", typeName: heritage.expression, typeArguments: heritage.typeArguments })
+            }
+          }
+        }
+        /** The element types of a collection, judged like any other props type. */
+        const checkElements = (collection) => {
+          if (collection?.type === "TSArrayType") checkType(collection.elementType)
+          else if (collection?.type === "TSTupleType") for (const element of collection.elementTypes) checkType(element.type === "TSNamedTupleMember" ? element.elementType : element)
+          else checkType(collection)
+        }
+        /** A `Readonly<T>` argument: its own fields are readonly, its nested values are judged. */
+        const checkNested = (type) => {
+          if (type?.type === "TSTypeLiteral") for (const member of type.members) checkType(member.typeAnnotation?.typeAnnotation)
+          else checkType(type)
+        }
+        const checkMembers = (members) => {
+          for (const member of members) {
+            if (member.type === "TSPropertySignature") {
+              if (!member.readonly) context.report({ node: member, messageId: "field", data: { name: sourceCode.getText(member.key) } })
+              checkType(member.typeAnnotation?.typeAnnotation)
+            } else if (member.type === "TSIndexSignature") {
+              if (!member.readonly) context.report({ node: member, messageId: "index" })
+              checkType(member.typeAnnotation?.typeAnnotation)
+            }
+          }
+        }
+        /** True when a built-in name is redeclared in this file, so it is not the built-in. */
+        const isShadowed = (identifier) => localTypeDeclaration(program, identifier.name) !== null
+        for (const fn of exportedRenderers(program)) checkType(firstParameterType(fn))
+      },
+    }
+  },
+}
+
 export const rules = {
   "no-inline-parameter-type": noInlineParameterType,
+  "props-fields-readonly": propsFieldsReadonly,
   "public-component-signature": publicComponentSignature,
   "no-per-part-classname-prop": noPerPartClassNameProp,
   "no-public-classname-prop": noPublicClassNameProp,
