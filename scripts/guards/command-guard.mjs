@@ -21,6 +21,11 @@
 //  - processes: a kill by image name or pattern (taskkill /IM or /FI, pkill, killall, Stop-Process -Name, wmic process
 //    where name=...), which also ends Orca and every other agent's processes of that name (a lane's taskkill of node.exe
 //    restarted Orca, 2026-10-01); an agent ends only the PIDs it started.
+//  - deletes: a recursive delete (rm -r, rmdir|rd /s, del /s, robocopy /MIR|/PURGE, Remove-Item -Recurse and its
+//    aliases), which follows a junction into the live tree (inc-c8fbf76aa499); trees go through safeRemoveTree.
+//  - launches: `orca terminal create` and a headless agent CLI (codex exec, claude|cursor-agent|devin -p/--print,
+//    gemini -p, opencode run) - an agent Orca does not supervise; every agent starts through orca orchestration
+//    worker-start. A heredoc body, an echo or a commit message that only mentions a command runs nothing and passes.
 // Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/lib/git-index-lock.mjs).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
@@ -42,6 +47,16 @@ export function boundGuard(handle, { root = skillRoot } = {}) {
 
 const SEPARATORS = new Set([';', '&', '|', '(', ')', '{', '}', '\n']);
 
+/** The index of the ')' closing the '(' just before `from` in `text` (text.length when none does). */
+function closingParenIn(text, from) {
+  let depth = 1;
+  for (let j = from; j < text.length; j += 1) {
+    if (text[j] === '(') depth += 1;
+    else if (text[j] === ')' && --depth === 0) return j;
+  }
+  return text.length;
+}
+
 /**
  * The simple commands of one command line, in order: [[word, ...], ...]. Quotes group, separators (; & | && || ( ) { }
  * newline) split, redirections and comments drop, and a command substitution $(...) is a command of its own. Bash
@@ -57,18 +72,14 @@ export function simpleCommands(text, { dialect = 'bash', env = process.env } = {
   const endCommand = () => { endWord(); if (words.length) out.push(words); words = []; };
   const expand = (name) => env?.[name] ?? env?.[Object.keys(env ?? {}).find((k) => k.toLowerCase() === name.toLowerCase())] ?? '';
   const s = String(text ?? '');
-  const closingParen = (from) => {
-    let depth = 1;
-    for (let j = from; j < s.length; j += 1) {
-      if (s[j] === '(') depth += 1;
-      else if (s[j] === ')' && --depth === 0) return j;
-    }
-    return s.length;
-  };
+  const closingParen = (from) => closingParenIn(s, from);
+  const heredocs = [];
   // $NAME, ${NAME}, $env:NAME at s[i] ('$'); returns [value, next index] or null for a lone '$'.
   const variable = (i) => {
     const m = /^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|env:([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*))/i.exec(s.slice(i));
     if (!m) return null;
+    // PowerShell's $true, $false and $null are literals, never environment variables.
+    if (dialect === 'powershell' && m[3] && /^(?:true|false|null)$/i.test(m[3])) return [m[0], i + m[0].length];
     return [expand(m[1] ?? m[2] ?? m[3]), i + m[0].length];
   };
   for (let i = 0; i < s.length; i += 1) {
@@ -109,6 +120,31 @@ export function simpleCommands(text, { dialect = 'bash', env = process.env } = {
       continue;
     }
     if (c === '#' && word == null) { const nl = s.indexOf('\n', i); i = nl < 0 ? s.length : nl - 1; continue; }
+    // A bash heredoc (<<WORD, <<-WORD, <<'WORD') is the command's stdin, not commands: its body is skipped at the next
+    // newline. An unquoted body still runs its $(...) substitutions.
+    const heredoc = dialect !== 'powershell' && c === '<' && s[i + 1] === '<' && s[i + 2] !== '<'
+      ? /^<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\?([^\s;&|()<>'"]+))/.exec(s.slice(i)) : null;
+    if (heredoc) {
+      endWord();
+      heredocs.push({ strip: heredoc[1] === '-', delimiter: heredoc[2] ?? heredoc[3] ?? heredoc[4], expands: heredoc[4] != null && !heredoc[0].includes('\\') });
+      i += heredoc[0].length - 1;
+      continue;
+    }
+    if (c === '\n' && heredocs.length) {
+      endCommand();
+      let at = i + 1;
+      for (const doc of heredocs.splice(0)) {
+        while (at < s.length) {
+          const nl = s.indexOf('\n', at);
+          const line = s.slice(at, nl < 0 ? s.length : nl).replace(/\r$/, '');
+          at = nl < 0 ? s.length : nl + 1;
+          if ((doc.strip ? line.replace(/^\t+/, '') : line) === doc.delimiter) break;
+          if (doc.expands) for (const m of line.matchAll(/\$\(/g)) nested.push(line.slice(m.index + 2, closingParenIn(line, m.index + 2)));
+        }
+      }
+      i = at - 1;
+      continue;
+    }
     if (c === '>' || c === '<') {
       // A redirection and its target are not arguments: `2>&1`, `>> log`, `*> $null`, `< in`.
       if (word != null && /^(?:\d|\*)$/.test(word)) word = null;
@@ -142,8 +178,8 @@ const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash']);
 const POWERSHELLS = new Set(['powershell', 'pwsh']);
 
 /**
- * The commands one agent shell call runs, flattened: [{program, args, cwd, env}] with wrappers opened (bash -c,
- * powershell -Command/-EncodedCommand/-File, cmd /c, env, xargs, command/exec/...), leading VAR=value and
+ * The commands one agent shell call runs, flattened: [{program, args, cwd, env, word, dialect}] with wrappers opened
+ * (bash -c, powershell -Command/-EncodedCommand/-File, cmd /c, env, xargs, npx/bunx, command/exec/...), leading VAR=value and
  * export/$env: assignments applied to the commands after them, and cd/Set-Location/pushd moving the cwd.
  */
 export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', depth = 0 } = {}) {
@@ -167,6 +203,10 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
       } else if (program === 'xargs') {
         w = w.slice(1);
         while (w.length && /^-/.test(w[0])) { const takesValue = /^-(?:[IdEnLPs]|-(?:replace|delimiter|eof|max-args|max-lines|max-procs|max-chars|arg-file))$/.test(w[0]); w.shift(); if (takesValue) w.shift(); }
+      } else if (program === 'npx' || program === 'bunx') {
+        // npx [-y] [--package <pkg>] <bin> args: the package's bin is the program (@openai/codex -> codex).
+        w = w.slice(1);
+        while (w.length && /^-/.test(w[0])) { const takesValue = /^(?:-p|--package)$/.test(w[0]); w.shift(); if (takesValue) w.shift(); }
       } else break;
       if (!w.length) break;
       program = programOf(w[0]);
@@ -204,7 +244,7 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
       const at = args.findIndex((a) => /^\/\/?[ck]$/i.test(a));
       if (at >= 0) { nestedOf(args.slice(at + 1).join(' '), 'cmd'); continue; }
     }
-    out.push({ program, args, cwd: dir, env: cmdEnv, word: w[0] });
+    out.push({ program, args, cwd: dir, env: cmdEnv, word: w[0], dialect });
   }
   return out;
 }
@@ -240,6 +280,78 @@ const killVerdict = (program, args) => {
   return { code: 'PROCESS_KILL_BY_NAME', command: [program, ...args].join(' ').slice(0, 200),
     reason: `${how} ends every process of that name on the machine, including Orca and other agents' workers (a lane's taskkill of node.exe restarted Orca, 2026-10-01)`,
     remedy: 'end only a PID you started yourself (taskkill /PID <pid>, kill <pid>, Stop-Process -Id <pid>); a process you did not start is reported, never killed' };
+};
+
+// A recursive delete follows a junction or symlink inside the tree and empties the live tree it points at (Git for
+// Windows' worktree removal deleted 674 live nivo-fe files through node_modules junctions, inc-c8fbf76aa499; the
+// 2026-09-30 incident emptied main's node_modules the same way). The runtime's safeRemoveTree removes every link as a
+// link first. One junction is removed on its own with `cmd /c rmdir <path>` (no /s), which removes the link only.
+const REMOVE_ITEM = new Set(['remove-item', 'ri', 'rm', 'del', 'erase', 'rd', 'rmdir']);
+const POWERSHELL_RECURSE = /^-r(?:e(?:c(?:u(?:r(?:se?)?)?)?)?)?(?::(?!\$?false$).*)?$/i;
+const cmdSwitches = (arg) => (/^\/\/?[a-z](?:\/[a-z])*$/i.test(arg) ? arg.toLowerCase().split('/').filter(Boolean) : []);
+const hasCmdSwitch = (args, letter) => args.some((a) => cmdSwitches(a).includes(letter));
+const recursiveDeleteVerdict = (program, args, dialect) => {
+  const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
+  let how = null;
+  if (dialect === 'powershell' && REMOVE_ITEM.has(program)) {
+    if (options.some((a) => POWERSHELL_RECURSE.test(a) || /^-(?:rf|fr)$/i.test(a))) how = `${program} -Recurse`;
+  } else if (program === 'remove-item' || program === 'ri') {
+    if (options.some((a) => POWERSHELL_RECURSE.test(a))) how = `${program} -Recurse`;
+  } else if (program === 'rm') {
+    if (options.some((a) => a === '--recursive' || (/^-[A-Za-z]+$/.test(a) && /r/i.test(a)))) how = 'rm -r';
+  } else if (['rmdir', 'rd', 'del', 'erase'].includes(program)) {
+    if (hasCmdSwitch(options, 's')) how = `${program} /s`;
+  } else if (program === 'robocopy') {
+    const flag = options.find((a) => /^(?:\/\/?|-)(?:mir|purge)$/i.test(a));
+    if (flag) how = `robocopy ${flag.replace(/^\/\/|^-/, '/').toUpperCase()}`;
+  }
+  if (!how) return null;
+  return { code: 'RECURSIVE_DELETE', command: [program, ...args].join(' ').slice(0, 200),
+    reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live nivo-fe files, inc-c8fbf76aa499)`,
+    remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/lib/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
+};
+
+// An agent launch outside Orca is invisible to it: no liveness, no stop, no release, and a dead worker sits unnoticed
+// (owner rule 2026-10-01). Every agent and every worker terminal starts through `orca orchestration worker-start`.
+const WORKER_START = '`orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec "<task>" --task-title "<title>"`, supervised with worker-show / worker-read / worker-stop / worker-release';
+// The first non-flag word of `args`, skipping the values of `valued` flags.
+const subcommandOf = (args, valued) => {
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--') return args[i + 1] ?? null;
+    if (/^-/.test(a)) { if (valued.test(a)) i += 1; continue; }
+    return a;
+  }
+  return null;
+};
+const CODEX_VALUED = /^(?:-m|--model|-c|--config|-C|--cd|-s|--sandbox|-a|--ask-for-approval|-p|--profile|-i|--image|--enable|--disable|--add-dir|--local-provider)$/;
+const printFlag = (args, flags) => {
+  const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
+  return options.find((a) => flags.includes(a)) ?? null;
+};
+const launchRefusal = (program, args, how) => ({ command: [program, ...args].join(' ').slice(0, 200),
+  reason: `${how} outside Orca's supervision: no liveness, no stop or release, and a dead worker goes unnoticed (owner rule 2026-10-01)`,
+  remedy: `launch every agent and worker through ${WORKER_START}` });
+const launchVerdict = (program, args) => {
+  if (program === 'orca') {
+    const words = args.filter((a) => !/^-/.test(a));
+    if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'orca terminal create starts a raw terminal') };
+    return null;
+  }
+  let how = null;
+  if (program === 'codex') {
+    const sub = subcommandOf(args, CODEX_VALUED);
+    if (sub === 'exec' || sub === 'e') how = `codex ${sub} runs a headless Codex agent`;
+  } else if (program === 'claude' || program === 'cursor-agent' || program === 'devin') {
+    const flag = printFlag(args, ['-p', '--print']);
+    if (flag) how = `${program} ${flag} runs a headless agent`;
+  } else if (program === 'gemini') {
+    const flag = printFlag(args, ['-p', '--prompt']);
+    if (flag) how = `gemini ${flag} runs a headless agent`;
+  } else if (program === 'opencode') {
+    if (subcommandOf(args, /^(?:-m|--model|--agent|--log-level)$/) === 'run') how = 'opencode run runs a headless agent';
+  }
+  return how ? { code: 'AGENT_HEADLESS_LAUNCH', ...launchRefusal(program, args, how) } : null;
 };
 
 // git reads an App Router segment ([locale], [...slug]) in a pathspec as a character class. The policy scopes it as the
@@ -330,6 +442,10 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
     if (link) return { tool: c.program, ...link };
     const kill = killVerdict(c.program, c.args);
     if (kill) return { tool: c.program, ...kill };
+    const del = recursiveDeleteVerdict(c.program, c.args, c.dialect);
+    if (del) return { tool: c.program, ...del };
+    const launch = launchVerdict(c.program, c.args);
+    if (launch) return { tool: c.program, ...launch };
     if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }
     if (c.program === 'npm') { const v = await npmVerdict({ args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
   }

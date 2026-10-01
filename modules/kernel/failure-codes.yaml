@@ -63,6 +63,17 @@ AC_UNREMAPPED_REF:
   owner: op-retry
   kind: check-finding
 
+AGENT_HEADLESS_LAUNCH:
+  title: "Headless agent launch refused"
+  title_vi: "Không được tự chạy agent ở chế độ không giao diện"
+  meaning_vi: "Lệnh bị chặn vì nó tự khởi động một agent ngoài sự giám sát của Orca (codex exec, claude -p hoặc --print, cursor-agent -p, devin -p, gemini -p, opencode run), nên Orca không thấy agent đó sống hay chết và không dừng hay giải phóng được nó."
+  causes_vi:
+    - "Gọi codex exec hoặc claude -p để giao một việc phụ cho agent khác"
+    - "Chạy một agent qua npx hoặc qua lệnh bọc cmd, PowerShell, bash"
+  nextStep_vi: "Lệnh không được chạy; mọi agent và worker phải khởi động bằng orca orchestration worker-start --agent <provider> và được theo dõi bằng worker-show, worker-read, worker-stop, worker-release."
+  owner: op-retry
+  kind: verb-refusal
+
 ALIAS_PROPS:
   title: "YAML alias carries properties"
   title_vi: "Bí danh YAML mang thêm thuộc tính"
@@ -4011,6 +4022,17 @@ RAM_CRITICAL:
   owner: supervisor
   kind: runtime-fault
 
+RAW_TERMINAL_CREATE:
+  title: "Raw Orca terminal refused"
+  title_vi: "Không được tạo terminal Orca thô"
+  meaning_vi: "Lệnh orca terminal create bị chặn vì nó mở một terminal mà Orca không giám sát như một agent, nên worker chết hay treo trong đó sẽ không ai thấy."
+  causes_vi:
+    - "Dùng orca terminal create --command để chạy một agent hoặc một worker"
+    - "Cố mở terminal riêng thay vì nhờ Orca khởi động worker"
+  nextStep_vi: "Lệnh không được chạy; khởi động worker bằng orca orchestration worker-start --agent <provider> rồi theo dõi bằng worker-show, worker-read, worker-stop, worker-release."
+  owner: op-retry
+  kind: verb-refusal
+
 READY_UNDISPATCHED:
   title: "Ready job not dispatched"
   title_vi: "Việc sẵn sàng nhưng chưa được giao"
@@ -4064,6 +4086,17 @@ RECORD_UNREADABLE:
   nextStep_vi: "Bộ kiểm tra báo lỗi; sửa hoặc khôi phục bản ghi."
   owner: other-op:work.author
   kind: check-finding
+
+RECURSIVE_DELETE:
+  title: "Recursive delete refused"
+  title_vi: "Không được xóa đệ quy cả cây thư mục"
+  meaning_vi: "Lệnh xóa đệ quy (rm -r, rmdir hoặc rd /s, del /s, robocopy /MIR hoặc /PURGE, Remove-Item -Recurse) bị chặn vì nó đi theo junction hoặc symlink bên trong cây và xóa luôn cây thật mà liên kết trỏ tới."
+  causes_vi:
+    - "Dùng rm -rf hoặc Remove-Item -Recurse để dọn node_modules, worktree hay thư mục tạm"
+    - "Dùng robocopy /MIR với thư mục rỗng để xóa nhanh một cây"
+  nextStep_vi: "Lệnh không được chạy; xóa cây thư mục chỉ qua safeRemoveTree của runtime (scripts/lib/safe-remove.mjs), hàm này gỡ mọi liên kết trước; gỡ một junction đơn lẻ bằng cmd /c rmdir <đường dẫn> (không có /s), xóa một tệp bằng rm <tệp>."
+  owner: op-retry
+  kind: verb-refusal
 
 REF_MALFORMED:
   title: "Malformed parent#criterion ref"
@@ -5863,7 +5896,7 @@ WORKTREE_NOT_OPS:
   causes_vi:
     - "Worker muốn dựng bản sao mã ở nơi khác để đo hoặc build"
     - "Worker nhầm mình được quản lý thư mục làm việc"
-  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao, cần bản khác thì báo là một nhu cầu (report blocked environment)."
+  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao. Worktree chỉ được tạo và gỡ qua API worktree của runtime (scripts/lib/worktrees.mjs, safeRemoveWorktree, vòng đời worktree của op); cần bản khác thì báo là một nhu cầu (report blocked environment)."
   owner: op-retry
   kind: dispatch-refusal
 
