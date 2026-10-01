@@ -124,13 +124,18 @@ test('main-checkout integrity: a deleted tracked file and an empty node_modules 
   } finally { fs.rmSync(main, { recursive: true, force: true }); }
 });
 
-test('worktrees: over the configured limit or with a vanished directory is an alert; owner asks and config route to the owner', () => {
-  const porcelain = ['worktree D:/r', 'branch refs/heads/main', '', 'worktree D:/lanes/a', 'branch refs/heads/lane/a', '',
-    'worktree D:/lanes/b', 'branch refs/heads/lane/b', 'prunable gitdir file points to non-existent location', ''].join('\n');
-  const facts = worktreeFacts(['D:/r'], { worktreeLimit: 2, git: () => ({ ok: true, stdout: porcelain, error: '' }), exists: () => true });
-  assert.equal(facts.get('worktrees:r'), '3 worktrees (limit 2); 1 orphan (directory gone): D:/lanes/b');
-  const one = worktreeFacts(['D:/r'], { worktreeLimit: 5, git: () => ({ ok: true, stdout: 'worktree D:/r\nbranch refs/heads/main\n', error: '' }), exists: () => true });
-  assert.equal(one.get('worktrees:r'), null);
+test('worktrees (Orca worktree ps): over the limit, a vanished directory or an unregistered stamped tree is an alert; owner asks and config route to the owner', () => {
+  const row = (id, p, o = {}) => ({ id: `r1::${p}`, repoId: 'r1', hostId: 'local', path: p, branch: id, comment: '', isMainWorktree: false, liveTerminalCount: 0, ...o });
+  const page = { ok: true, truncated: false, omittedHostIds: [], worktrees: [row('main', 'D:/r', { isMainWorktree: true }), row('lane/a', 'D:/lanes/a'), row('lane/b', 'D:/lanes/b'),
+    row('wf-x', 'D:/orca/wf-x', { comment: 'starci:workflow:wf-x;wf=x' }), row('wf-y', 'D:/orca/wf-y', { comment: 'starci:workflow:wf-y;wf=y' }),
+    { ...row('other', 'D:/q/other'), repoId: 'r2' }] };
+  const facts = worktreeFacts(['D:/r'], { worktreeLimit: 2, ps: () => page, registered: () => new Set(['r1::D:/orca/wf-y']), exists: (p) => p !== 'D:/lanes/b' });
+  assert.equal(facts.get('worktrees:r'), '5 worktrees (limit 2); 1 orphan (directory gone): D:/lanes/b; 1 runtime-stamped tree(s) with no registry row: D:/orca/wf-x');
+  assert.equal(facts.get('worktrees:orca'), null);
+  const one = worktreeFacts(['D:/r', 'D:/unknown'], { worktreeLimit: 5, ps: () => ({ ...page, worktrees: page.worktrees.slice(0, 2) }), registered: () => new Set(), exists: () => true });
+  assert.deepEqual([one.get('worktrees:r'), one.get('worktrees:unknown')], [null, null], 'an unstamped lane is no orphan; a repository Orca does not know has nothing to judge');
+  const down = worktreeFacts(['D:/r'], { ps: () => ({ ok: false, error: 'orca runtime not reachable' }), registered: () => new Set() });
+  assert.equal(down.get('worktrees:orca'), 'orca worktree ps failed: orca runtime not reachable');
   assert.equal(fixOwnerOf('wf:nivo:auth:owner'), 'owner');
   assert.equal(fixOwnerOf('config:claudeDebug'), 'owner');
   assert.equal(fixOwnerOf('integrity:node_modules'), 'core');

@@ -70,8 +70,10 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
 - `tokens`: input+output tokens in the window above the spike limit, from `machine.sqlite` `llm_usage` (there is no
   `api usage` verb).
 - `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
-- `worktrees:<repo>`: for the runtime and every active ledger's repo, more registered worktrees than
-  `claudeDebug.worktreeLimit`, or a registered worktree whose directory is gone (prunable). A product repository's
+- `worktrees:<repo>`: for the runtime and every active ledger's repo, read from Orca's `worktree ps`: more worktrees than
+  `claudeDebug.worktreeLimit`, a tree whose directory is gone, or a tree carrying the runtime's ownership stamp
+  (`starci:<kind>:<slot>`) with no registry row, which the worktree GC adopts or removes. `worktrees:orca`: the ps read
+  itself failed. A product repository's
   registered worktrees are workflow worktrees (kind `workflow`, one per Kernel workflow, keyed by Orca's worktree id,
   created by Orca with a real `npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
   pass.

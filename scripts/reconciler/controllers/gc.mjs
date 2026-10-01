@@ -16,8 +16,9 @@
 //   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/lib/worktrees.mjs
 //      gcWorktrees. ALWAYS ACTIVE, whatever the controller's mode (owner order lane WT: 600+ orphan worktrees piled up
 //      while the GC ran shadow): a worktree whose branch is merged, whose owner op settled, or whose owner process has
-//      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed. Every item
-//      is a gc_items row.
+//      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed; a tree
+//      stamped as the runtime's in Orca's worktree ps with no registry row is adopted (recorded keep) or preserved
+//      and removed. Every item is a gc_items row.
 //
 // Shadow: every actuator goes through ctx.run (the engine records a reconciler.would row and runs nothing) or, for an
 // in-process one (the sweep, a staging removal), a reconciler.would row written here; the sweep runs gc.mjs as a dry
