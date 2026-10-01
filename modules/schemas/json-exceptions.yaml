@@ -26,6 +26,9 @@ directories:
   - path: examples/todo-app/be/src/tests/world/fakes/sepay/payloads
     reason: >
       Recorded SePay API responses and webhook deliveries the todo-app back end's test-world fake serves at the network edge; JSON is SePay's wire format, and a new payload needs no new line here.
+  - path: packages/test-world
+    reason: >
+      The @starci/test-world package: its package.json, package-lock.json and tsconfig.json are toolchain config npm and tsc read as JSON.
   - path: packages/tsconfig
     reason: >
       The @starci/tsconfig package: its package.json and the shared presets (base, be, build, e2e, next) that product tsconfig files extend; tsc reads JSON, and a new preset needs no new line here.
