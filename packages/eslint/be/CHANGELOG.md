@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.4 - 2026-10-01
+
+- Changed: the bundled runtime copy of knowledge/hfs/canon-pins.yaml pins @starci/test-world 1.0.3. No rule or command changed.
+
 ## 3.0.3 - 2026-10-01
 
 - Changed: the bundled canon-pins copy pins @starci/stylelint-canon 2.0.2, @starci/eslint-canon-fe 8.0.3 and @starci/hfs 4.0.3. No rule changed.
