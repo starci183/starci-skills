@@ -146,6 +146,20 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a command whose files exist, flags, globs,
   assert.deepEqual(only(result, 'HFS_PROOF_COMMAND_FILE_MISSING'), []);
 });
 
+test('HFS_PROOF_COMMAND_FILE_MISSING: a record of the be or fe side is judged against the app root, where its proof command runs', () => {
+  const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
+    put(dir, 'be/src/tests/e2e/login/kept.e2e-spec.ts');
+    put(dir, '.starciwork/features/login/impl/demo/gate/index.yaml', RECORD({ e2e: 'npm run test:e2e -- be/src/tests/e2e/login/gate.e2e-spec.ts' }, 'be'));
+    put(dir, '.starciwork/features/login/impl/demo/kept/index.yaml', RECORD({ e2e: 'npm run test:e2e -- be/src/tests/e2e/login/kept.e2e-spec.ts' }, 'be'));
+    put(dir, '.starciwork/features/login/impl/demo/page/index.yaml', RECORD({ typecheck: 'tsc -p fe/apps/gone/tsconfig.json --noEmit' }, 'fe'));
+  }) });
+  const found = only(result, 'HFS_PROOF_COMMAND_FILE_MISSING');
+  assert.deepEqual(found.map((f) => [f.path, f.missing]).sort(), [
+    ['.starciwork/features/login/impl/demo/gate/index.yaml', 'be/src/tests/e2e/login/gate.e2e-spec.ts'],
+    ['.starciwork/features/login/impl/demo/page/index.yaml', 'fe/apps/gone/tsconfig.json'],
+  ]);
+});
+
 test('HFS_PROOF_COMMAND_FILE_MISSING: a record of an implementation in another repository is not judged, its commands run there', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
     put(dir, '.starciwork/features/login/impl/other/gate/index.yaml', RECORD({ unit: 'npx vitest run apps/app/src/login.spec.ts' }, 'other-repo'));
