@@ -50,7 +50,7 @@ reads:
     purpose:
       en: Intent governs what the skeleton proves.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve the actual repository resource, checkout root, HEAD and dirty state. The target path may
         be empty or absent — that is the greenfield case.
@@ -89,7 +89,7 @@ writes:
         feature's toolchain nfr record, which business.decide writes before the scaffold
         settles - never a parent implementation record standing in for a requirement.
   - id: source
-    path: repository:<repo-id>/<declared-source-root>/**
+    path: <app>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, skeleton, harness]
     content:
       en: "The new tree only: package manifest, toolchain configs (lint/typecheck/test/build), the
@@ -248,7 +248,7 @@ placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
   repository: Implementation repository segment under impl/
   name: Implementation record folder
-  repo-id: Observed selected repository identity; use an existing resource ID only when actually bound
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected relevant source read set
   declared-source-root: The exact path the record/design declares for the new tree
 layoutPolicy:

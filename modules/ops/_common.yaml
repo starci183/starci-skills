@@ -561,7 +561,7 @@ sections:
       - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
         runs ONLY those - the specs of the changed or added source plus the specs that import it - together with
         typecheck, lint, canon-scan and the build scoped as usual. It never runs the repository's whole unit suite:
-        unit.verify runs it (npm run test:unit), dispatched only when the goal or the owner explicitly asks for the full
+        unit.verify runs it (npm test), dispatched only when the goal or the owner explicitly asks for the full
         unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime
         itself follows config.yaml specs.harness (default false = touching-only): changed harness code gets its own

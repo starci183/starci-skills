@@ -118,49 +118,64 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
 test('trust concept 8: a done implementation is refused when its ui direction is not done yet (IMPL_BEFORE_DIRECTION)', () => {
   // proves a ui-screen directly, by id, that is not done
   const provesTodoUi = refusalsFor({
-    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
-    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: be}, {role: fe, name: fe}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: fe\nowners: [{role: block, path: fe/src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/ui/screen/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.screen\ntitle: t\nstate: todo\n',
   });
   assert.ok(provesTodoUi.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), provesTodoUi.join('\n'));
 
   // frontend repository, proves nothing by id - falls back to every ui-screen the feature owns
   const frontendNoProves = refusalsFor({
-    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
-    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: be}, {role: fe, name: fe}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: fe\nowners: [{role: block, path: fe/src/f}]\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/ui/screen/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.screen\ntitle: t\nstate: todo\n',
   });
   assert.ok(frontendNoProves.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), frontendNoProves.join('\n'));
 
   // the ui-screen is done - accepted
   const uiDone = refusalsFor({
-    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
-    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: be}, {role: fe, name: fe}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: done\nrepository: fe\nowners: [{role: block, path: fe/src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/ui/screen/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.screen\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
   });
   assert.equal(uiDone.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, uiDone.join('\n'));
 
   // a backend implementation with no ui in its proves is untouched by this rule
   const backendUntouched = refusalsFor({
-    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
-    'features/f/impl/y/index.yaml': 'schema: work/implementation@1\nid: impl.f.y\ntitle: t\nstate: done\nrepository: app\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: be}, {role: fe, name: fe}]\n',
+    'features/f/impl/y/index.yaml': 'schema: work/implementation@1\nid: impl.f.y\ntitle: t\nstate: done\nrepository: be\nowners: [{role: module, path: be/src/f}]\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/ui/screen/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.screen\ntitle: t\nstate: todo\n',
   });
   assert.equal(backendUntouched.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, backendUntouched.join('\n'));
 });
 
-test('owner/module paths resolve across bound repositories via the repository:<name>/ prefix (OWNER_PATH_MISSING)', () => {
+test('owner/module paths are app-relative: be/… and fe/… resolve under the app root (OWNER_PATH_MISSING when absent)', () => {
   const workRoot = tree({
-    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: fixture-fe}]\n',
-    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\nmodule: repository:fixture-fe/apps/landing\n',
-    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\nmodule: repository:fixture-fe/apps/ghost\n',
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: be}, {role: fe, name: fe}]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\nmodule: fe/apps/landing\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\nmodule: fe/apps/ghost\n',
   });
-  const siblingRepo = path.join(path.dirname(path.dirname(workRoot)), 'fixture-fe');
-  fs.mkdirSync(path.join(siblingRepo, 'apps', 'landing'), { recursive: true });
+  fs.mkdirSync(path.join(path.dirname(workRoot), 'fe', 'apps', 'landing'), { recursive: true });
   const problems = []; const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
   assert.equal(warnings.filter(w => w.includes('br/a') && w.includes('OWNER_PATH_MISSING')).length, 0, warnings.join('\n'));
   assert.ok(warnings.some(w => w.includes('br/b') && w.includes('OWNER_PATH_MISSING')), warnings.join('\n'));
+  assert.equal(problems.filter(p => p.includes('OWNER_PATH_NOT_APP_RELATIVE')).length, 0, problems.join('\n'));
+});
+
+test('an owner path in the old repository:<id>/ or side-relative form is refused as OWNER_PATH_NOT_APP_RELATIVE', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\nmodule: repository:fe/apps/landing\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\nmodule: apps/landing\n',
+    'features/f/impl/c/index.yaml': 'schema: work/implementation@1\nid: impl.f.c\ntitle: t\nstate: todo\nrepository: fe\nowners: [{role: route, path: be/src/c}]\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot), 'fe', 'apps', 'landing'), { recursive: true });
+  const problems = []; const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  const refused = problems.filter(p => p.includes('[OWNER_PATH_NOT_APP_RELATIVE]'));
+  assert.ok(refused.some(p => p.includes('br/a') && p.includes('names a repository')), problems.join('\n'));
+  assert.ok(refused.some(p => p.includes('br/b') && p.includes('it means fe/apps/landing')), problems.join('\n'));
+  assert.equal(refused.filter(p => p.includes('impl/c')).length, 0, 'be/src/c is app-relative, built or not');
 });
 
 test('trust concept 5: a blockedBy cycle is refused (BLOCKER_CYCLE), and a chain rooted in a gap or an open decision is accepted', () => {
@@ -871,15 +886,22 @@ const flowFor = (role) => ({
 });
 
 test('an identity whose custody.sealed is not identity-<slug>.enc is refused as HFS_IDENTITY_CUSTODY', () => {
-  const bad = refusalsFor(identityFor('.starcistacks/dev/secrets/uat.enc'));
+  const bad = refusalsFor(identityFor('be/.starcistacks/dev/secrets/uat.enc'));
   assert.ok(bad.some(p => p.includes('identity-demo.enc') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
-  const good = refusalsFor(identityFor('.starcistacks/dev/secrets/identity-demo.enc'));
+  const good = refusalsFor(identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'));
   assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
 });
 
+test('an identity custody.sealed is app-relative: a side-relative .starcistacks/... without the be/ prefix is refused as HFS_IDENTITY_CUSTODY', () => {
+  for (const sealed of ['.starcistacks/dev/secrets/identity-demo.enc', 'fe/.starcistacks/dev/secrets/identity-demo.enc']) {
+    const bad = refusalsFor(identityFor(sealed));
+    assert.ok(bad.some(p => p.includes(sealed) && p.includes('be/.starcistacks/<env>/secrets/identity-demo.enc') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
+  }
+});
+
 test('a UAT flow that selects a role its identity does not present is refused as HFS_IDENTITY_CUSTODY', () => {
-  const bad = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('admin') });
+  const bad = refusalsFor({ ...identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('admin') });
   assert.ok(bad.some(p => p.includes('role admin') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
-  const good = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
+  const good = refusalsFor({ ...identityFor('be/.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
   assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
 });

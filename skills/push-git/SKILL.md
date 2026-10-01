@@ -27,9 +27,9 @@ nothing is ahead.
    only counted). If it is dirty, the run reports the dirty paths and stops for that repository.
 2. The full suite, every step to a log file:
    - `.claude`: `npm test` and `npm run check`.
-   - product repository: `npm run typecheck`, `npm run lint`, `npm run test:unit` (unit only - e2e is manual-only
-     and never run), `npm run build` where the script exists, and `canon-scan`. A script the repository lacks is
-     reported `absent`.
+   - app: its managed scripts `npm run typecheck`, `npm run lint`, `npm test` (the be unit project only - e2e is
+     manual-only and never run), every `npm run build:<side>` it declares (`build:be`, `build:fe`), and `canon-scan`.
+     A managed script the app lacks is reported `absent`.
 3. Red: the run prints the failures grouped by spec file (typecheck, lint and canon by file), exits 1 and STOPS - no
    push, no later repository.
 4. Green: `push-mains.mjs` in its promised order - dry run (secret scan), pre-push hooks alone, then the push - and

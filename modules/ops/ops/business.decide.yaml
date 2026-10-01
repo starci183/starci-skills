@@ -28,7 +28,7 @@ reads:
       en: Read the current feature record and its flat spec records, refs, dependencies, proof demands and
         validator freshness. Preserve unaffected accepted content.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
         state; read applicable instructions, manifests, owning code, callers and relevant tests.
@@ -276,7 +276,7 @@ blockers:
         run predecessors or weaken dependsOn/refs to proceed.
 placeholders:
   feature: Selected feature slug
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
 layoutPolicy:
   checks: [starci-validate]

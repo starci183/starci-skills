@@ -20,7 +20,7 @@ reads:
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
         state; read applicable instructions, manifests, owning code, callers and relevant tests.
@@ -51,7 +51,7 @@ writes:
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields: [source files, tests, migration/assets/config only when selected]
     content:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
@@ -127,7 +127,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
 layoutPolicy:

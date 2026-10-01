@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // layout-tree.mjs — the product's layout tree, scanned out of the frontend's Next.js `app/` directory.
 //
-//   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>]... [--write] [--json]   (every app workspace.yaml declares)
+//   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>]... [--write] [--json]   (every fe app hfs.json declares)
 //   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--app <name>] [--repo-root <dir>] [--json]
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
@@ -13,8 +13,8 @@
 // The source of truth for what wraps a screen is the App Router's own file convention, not a sentence in a
 // prompt and not a hand-kept list: one node per segment directory under app/ with its special files
 // (layout, template, page, loading, error, not-found, default, route) and their digests, route groups
-// (x), parallel slots @x and intercepting routes (.)x as nodes of their own. The frontend repository is
-// only ever READ; `--write` writes the one record .starciwork/shell/index.yaml (work/layout-tree@1) and,
+// (x), parallel slots @x and intercepting routes (.)x as nodes of their own. The app's fe side is
+// only ever READ, and every path the record holds is app-relative (fe/apps/<name>/src/app/...); `--write` writes the one record .starciwork/shell/index.yaml (work/layout-tree@1) and,
 // for `capture`, the capture bytes under .starciwork/shell/assets/. A re-scan keeps what the owning op
 // decided (chrome, captures, personas, lockups, planned nodes) and marks a layout whose file changed as
 // needing a re-capture, so the record is regenerated rather than hand-maintained.
@@ -25,6 +25,7 @@
 // route, a route no page answers, a label a catalog lacks and a top-level route no destination reaches are
 // each written into the layout's nav.findings - reported, never papered over.
 import { opContextOf } from '../kernel/op-context.mjs';
+import { loadSlotManifest, readRepoDeclaration } from '../lib/hfs-slots.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -306,10 +307,10 @@ export function resolveNavRoute(nodes, route, localeParam) {
 
 /**
  * Scan one app's app/ directory. Returns {app, source, i18n, productLocale, nodes} - the record's scanned half.
- * `repoRoot` is the repository the paths are recorded relative to; `appRoot` the application directory
+ * `repoRoot` is the root the paths are recorded relative to (the app root); `appRoot` the application directory
  * (where tsconfig.json and the i18n catalogs live), defaulting to the parent of src/ or of app/.
  */
-export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository = null, name = null } = {}) {
+export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = null } = {}) {
   const dirAbs = path.resolve(appDir);
   if (!fs.existsSync(dirAbs) || !fs.statSync(dirAbs).isDirectory()) throw new Error(`${appDir}: not an app/ directory`);
   const rootAbs = path.resolve(appRoot ?? (path.basename(path.dirname(dirAbs)) === 'src' ? path.dirname(path.dirname(dirAbs)) : path.dirname(dirAbs)));
@@ -415,7 +416,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   const revision = gitRevision(repoAbs);
   const catalogFiles = catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: sha256File(f) })));
   const scan = {
-    app: { name: name ?? appNameOf(rel(rootAbs) || '.', repository), ...(repository ? { repository } : {}), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
+    app: { name: name ?? appNameOf(rel(rootAbs) || '.'), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
     source: { scanner: SCANNER, ...(revision ? { revision } : {}), digest: digestOfParts(digests) },
     i18n: catalogs.length ? { catalogs: catalogFiles, used: keyedI18n(catalogs, usedI18nKeys({ nodes })) } : undefined,
     productLocale,
@@ -426,10 +427,10 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   return scan;
 }
 
-/** The app's name when nothing declares one: the last segment of its root (apps/landing -> landing), else the repository. */
-export const appNameOf = (root, repository = null) => {
+/** The app's name when nothing declares one: the last segment of its root (fe/apps/landing -> landing). */
+export const appNameOf = (root) => {
   const last = String(root ?? '').split('/').filter((p) => p && p !== '.').pop();
-  return (last ?? repository ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
+  return (last ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
 };
 
 const digestOfParts = (parts) => sha256Of([...parts].sort((a, b) => a[0].localeCompare(b[0])).map(([p, s]) => `${p}\0${s}`).join('\n'));
@@ -556,7 +557,7 @@ export const isLayoutTree = (record) => record?.schema === TREE_SCHEMA;
 // Apps: one tree per app of the frontend (a monorepo may hold several - apps/app, apps/landing)
 // ---------------------------------------------------------------------------------------------------------
 //
-// The record holds `apps[]`: {name, repository?, root, appDir, framework, localeParam?, source, i18n?, nodes}. A node
+// The record holds `apps[]`: {name, root, appDir, framework, localeParam?, source, i18n?, nodes}. A node
 // id is a route within its app, so the same id (`/`) may exist in two apps. Everything below that reads nodes -
 // nodeById, chainOf, baseLayoutFor, layoutSettlement, sourceDrift - works on ONE app's tree: `treeOf(record, name)`,
 // a live view whose app/source/i18n/nodes are that app's and whose other fields (brand, personas, themes, rev...)
@@ -865,58 +866,32 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
 // Writing: merge a scan into the record, add captures and planned nodes
 // ---------------------------------------------------------------------------------------------------------
 
-/** The frontend repository a Work tree binds: {fe (its workspace.yaml entry), repository (name), repoRoot}. */
+/**
+ * The fe side of the app a Work tree belongs to: .starciwork sits at the app root beside hfs.json, whose `sides.fe.apps`
+ * names the front-end apps (fe/apps/<name>). {appRoot, repoRoot (the app root every recorded path is relative to),
+ * feRoot (the fe side folder), apps: [{name, root (app-relative, fe/apps/<name>)}], error?}.
+ */
 export function frontendOf(workRoot) {
-  const workspace = readYamlOrNull(path.join(workRoot, 'workspace.yaml'));
-  const fe = list(workspace?.repositories).find((r) => r?.role === 'fe') ?? null;
-  const backendRoot = path.dirname(workRoot);
-  return { fe, repository: fe?.name ?? null, repoRoot: fe?.name ? path.join(path.dirname(backendRoot), fe.name) : backendRoot };
+  const appRoot = path.dirname(path.resolve(workRoot));
+  const feRoot = path.join(appRoot, 'fe');
+  let declaration;
+  try { declaration = readRepoDeclaration(loadSlotManifest(), appRoot); } catch (error) { return { appRoot, repoRoot: appRoot, feRoot, apps: [], error: `${slash(appRoot)} has no readable app declaration (${error.message})` }; }
+  return { appRoot, repoRoot: appRoot, feRoot, apps: declaration.sides.fe.apps.map((app) => ({ name: app.name, root: `fe/apps/${app.name}` })) };
 }
 
 /**
- * Where the frontend's app/ directories are for a Work tree: [{name, root, appDir (absolute)}] under `repoRoot`.
- * The workspace declares them - `repositories[role fe].apps: [{name, root}]`, root relative to the repository, the
- * App Router directory being <root>/src/app or <root>/app - and nothing else names them: a frontend that declares
- * none must hold exactly one app/ directory, and one that holds several must declare which are its apps
- * (`error` says so). `explicit` (--app-dir, repeatable) names directories for a scan of a repository outside a
- * workspace declaration.
+ * Where the fe side's App Router directories are for a Work tree: [{name, root, appDir (absolute)}], root app-relative.
+ * hfs.json declares them (sides.fe.apps, each at fe/apps/<name>, its App Router directory <root>/src/app or <root>/app) and
+ * nothing else names them. `explicit` (--app-dir, repeatable) names directories for a scan outside the declaration.
  */
 export function locateApps(workRoot, explicit = []) {
-  const { fe, repository: name, repoRoot } = frontendOf(workRoot);
-  const appDirOf = (root) => [path.join(repoRoot, root, 'src', 'app'), path.join(repoRoot, root, 'app')].find((d) => fs.existsSync(d) && fs.statSync(d).isDirectory()) ?? null;
+  const located = frontendOf(workRoot);
+  const { repoRoot } = located;
   const rootOfAppDir = (d) => { const abs = path.resolve(d); return path.basename(path.dirname(abs)) === 'src' ? path.dirname(path.dirname(abs)) : path.dirname(abs); };
-  if (list(explicit).length) return { repository: name, repoRoot, apps: list(explicit).map((d) => ({ name: appNameOf(slash(path.relative(repoRoot, rootOfAppDir(d))), name), root: slash(path.relative(repoRoot, rootOfAppDir(d))) || '.', appDir: path.resolve(d) })) };
-  if (list(fe?.apps).length) {
-    const seen = new Set();
-    const apps = [];
-    for (const declared of list(fe.apps)) {
-      if (seen.has(declared?.name)) return { repository: name, repoRoot, apps: [], error: `workspace.yaml declares app ${declared.name} twice` };
-      seen.add(declared?.name);
-      const root = slash(String(declared?.root ?? ''));
-      apps.push({ name: declared?.name, root, appDir: appDirOf(root) });
-    }
-    return { repository: name, repoRoot, apps };
-  }
-  const found = findAppDirs(repoRoot);
-  if (found.length > 1) return { repository: name, repoRoot, apps: [], error: `${slash(repoRoot)} holds ${found.length} app/ directories (${found.map((d) => slash(path.relative(repoRoot, d))).join(', ')}) - declare the frontend's apps in workspace.yaml (repositories[role fe].apps: [{name, root}])` };
-  return { repository: name, repoRoot, apps: found.map((d) => { const dir = path.basename(path.dirname(d)) === 'src' ? path.dirname(path.dirname(d)) : path.dirname(d); return { name: appNameOf(slash(path.relative(repoRoot, dir)) || '.', name), root: slash(path.relative(repoRoot, dir)) || '.', appDir: d }; }) };
-}
-
-function findAppDirs(repoRoot) {
-  const out = [];
-  const walk = (dir, depth) => {
-    if (depth > 4) return;
-    let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (!e.isDirectory() || SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
-      const full = path.join(dir, e.name);
-      if (e.name === 'app' && fs.readdirSync(full).some((n) => /^layout\.[jt]sx?$/.test(n) || fs.existsSync(path.join(full, n)) && fs.statSync(path.join(full, n)).isDirectory() && fs.readdirSync(path.join(full, n)).some((m) => /^layout\.[jt]sx?$/.test(m)))) out.push(full);
-      else walk(full, depth + 1);
-    }
-  };
-  walk(repoRoot, 0);
-  return out;
+  if (list(explicit).length) return { repoRoot, apps: list(explicit).map((d) => { const root = slash(path.relative(repoRoot, rootOfAppDir(d))) || '.'; return { name: appNameOf(root), root, appDir: path.resolve(d) }; }) };
+  if (located.error) return { repoRoot, apps: [], error: located.error };
+  const appDirOf = (root) => [path.join(repoRoot, root, 'src', 'app'), path.join(repoRoot, root, 'app')].find((d) => fs.existsSync(d) && fs.statSync(d).isDirectory()) ?? null;
+  return { repoRoot, apps: located.apps.map((app) => ({ ...app, appDir: appDirOf(app.root) })) };
 }
 
 const carryLayout = (scanned, previous, notes) => {
@@ -979,7 +954,6 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
     notes.push(...appNotes.map((t) => said(name, t)));
     const entry = {
       ...scan.app,
-      ...(before?.repository && !scan.app.repository ? { repository: before.repository } : {}),
       source: { ...scan.source, scannedAt: at },
       ...(scan.i18n ? { i18n: scan.i18n } : {}),
       nodes: orderNodes(nodes),
@@ -1324,10 +1298,10 @@ export function layoutTreeMain(argv = []) {
 ` };
     const located = locateApps(workRoot, flags(args, '--app-dir'));
     if (located.error) return { exitCode: 1, text: `layout-tree: ${located.error}\n` };
-    if (!located.apps.length) return { exitCode: 1, text: `no app/ directory found for ${slash(workRoot)} (repository ${located.repository ?? '(none)'}) - pass --app-dir\n` };
+    if (!located.apps.length) return { exitCode: 1, text: `no fe app is declared for ${slash(workRoot)} - hfs.json sides.fe.apps names them, or pass --app-dir\n` };
     const unreadable = located.apps.filter((a) => !a.appDir);
     if (unreadable.length) return { exitCode: 1, text: `layout-tree: app ${unreadable.map((a) => `${a.name} (${a.root})`).join(', ')} has no app/ or src/app/ directory under ${slash(located.repoRoot)}\n` };
-    const scans = located.apps.map((a) => scanAppDir(a.appDir, { repoRoot: located.repoRoot, repository: located.repository, name: a.name }));
+    const scans = located.apps.map((a) => scanAppDir(a.appDir, { repoRoot: located.repoRoot, name: a.name }));
     const { record, notes } = mergeScan(existing, scans);
     if (write) save(record);
     return out({ ok: true, written: write, notes, record }, `${summarize(record)}\n${notes.map((n) => `- ${n}`).join('\n')}\n${write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)'}`);

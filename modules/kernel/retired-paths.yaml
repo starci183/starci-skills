@@ -141,3 +141,7 @@ retired:
   - {path: tests/next-error-context.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
   - {path: tests/next-error-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
   - {path: tests/next-framework-pinned-names.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/next.mjs'}
+  - {path: docs/fable.md, retiredAt: 2026-10-01, removedIn: c0-close, replacedBy: '.experiments/fable.md: the dated drift journal is history, kept outside docs/ so no doc check reads it as current knowledge'}
+  - {path: packages/hfs/sync/skeleton.mjs, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/scaffold/app.mjs: the app scaffold writes the skeleton (the per-app Next tsconfig from code)'}
+  - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/ci.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
+  - {path: packages/hfs/templates/be/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}

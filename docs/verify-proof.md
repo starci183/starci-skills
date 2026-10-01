@@ -15,7 +15,7 @@ An operation that writes or changes code writes or updates the unit specs of tha
 specs plus the specs that import the changed source, with typecheck, lint, canon-scan and the build scoped as usual. No
 operation, kernel, supervisor lane, land or `.claude` upgrade runs the whole suite (`config.yaml specs.harness`, default
 false = touching-only: the land gate runs `--specs touching` and refuses `--specs all`). The whole unit suite belongs to two
-places: `unit.verify` (`npm run test:unit`, dispatched only when the goal or the owner asks for the full unit run) and the
+places: `unit.verify` (`npm test`, dispatched only when the goal or the owner asks for the full unit run) and the
 `/push-git` flow (`scripts/supervisor/push-git.mjs`: the `.claude` suite and the product repositories' full unit,
 typecheck, lint, build and canon-scan, then the push). e2e runs only when the goal or the owner asks, and `e2e.verify` then
 runs the full e2e suite. The contrast proof below judges the specs an operation added.

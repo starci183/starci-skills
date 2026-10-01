@@ -123,7 +123,6 @@ rules:
     rationale: |
       Skeletons make mandatory shape executable and reviewable across repositories.
     relatedExamples:
-      - transactional-service
       - connected-block
 
   - id: ENF-PROP-P1-BE
@@ -136,8 +135,7 @@ rules:
       concurrency tests, because AST checks cannot prove transaction semantics.
     rationale: |
       Checkers miss isolation-level overloads and custom facade architectures.
-    relatedExamples:
-      - transactional-service
+    relatedExamples: []
 
   - id: ENF-PROP-P1-FE
     title: Broader FE split and Grammar checks

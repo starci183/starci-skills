@@ -62,7 +62,7 @@ How agents operate is part of the product — the standard a public demo must sh
 
 ## Current known gaps
 
-The open drift list lives in `fable.md` at the repository root — every finding,
+The open drift list lives in `.experiments/fable.md` (history, outside docs/) — every finding,
 its file:line and the lane that owns it. Read it there rather than keeping a
 second copy here.
 

@@ -3446,6 +3446,18 @@ OWNER_DEVIATION_DECISION_REQUIRED:
   owner: owner
   kind: settle-reason
 
+OWNER_PATH_NOT_APP_RELATIVE:
+  title: "Owner path is not app-relative"
+  title_vi: "Đường dẫn sở hữu không tính từ gốc app"
+  meaning_vi: "Đường dẫn owners[].path, module hoặc composes[].module của bản ghi phải tính từ gốc app: be/..., fe/... hoặc một thư mục ở gốc app."
+  causes_vi:
+    - "Dùng tiền tố repository:<id>/ kiểu cũ"
+    - "Thiếu tiền tố be/ hay fe/ (đường dẫn tính từ một phía)"
+    - "Đường dẫn tuyệt đối hoặc có ../"
+  nextStep_vi: "Bị từ chối; op ghi lại bản ghi sửa đường dẫn thành dạng tính từ gốc app (ví dụ be/src/... thay cho src/...)."
+  owner: other-op:work.author
+  kind: check-finding
+
 OWNER_PATH_MISSING:
   title: "Owner directory not on disk"
   title_vi: "Thư mục của bên sở hữu không có trên đĩa"
@@ -8629,24 +8641,14 @@ path-outside-roots:
   nextStep_vi: "Bị từ chối. Gửi lại đường dẫn tương đối so với kho."
   owner: supervisor
   kind: input-invalid
-path-repository-ambiguous:
-  title: "Owned paths span several repositories"
-  title_vi: "Đường dẫn giao thuộc nhiều kho khác nhau"
-  meaning_vi: "Các đường dẫn giao không quy về một kho duy nhất nên không biết cây làm việc nào để dùng."
+path-not-app-relative:
+  title: "An owned path of a bound app is not app-relative"
+  title_vi: "Đường dẫn giao không tính từ gốc app"
+  meaning_vi: "Trong một app đã gắn, mọi đường dẫn giao tính từ gốc app: be/..., fe/..., .starciwork/... hoặc một đường dẫn ở gốc app."
   causes_vi:
-    - "Các lát cắt cùng cụm gắn với nhiều kho"
-    - "Đường dẫn không có tiền tố kho rõ ràng"
-  nextStep_vi: "Job không được dựng cây làm việc riêng; Kernel chia lại phạm vi để mỗi job chỉ thuộc một kho."
-  owner: supervisor
-  kind: dispatch-refusal
-path-repository-missing:
-  title: "An owned path is in no bound repository"
-  title_vi: "Đường dẫn giao không thuộc kho nào đã gắn"
-  meaning_vi: "Một đường dẫn giao không có trong kho nào mà dự án đã gắn nên không biết dựng cây làm việc ở đâu."
-  causes_vi:
-    - "Đường dẫn bị gõ sai hoặc thiếu tiền tố be/ hay fe/"
-    - "Tệp chưa tồn tại và không ghi rõ kho"
-  nextStep_vi: "Kernel ghi rõ kho hoặc phía (be/ hay fe/) cho đường dẫn rồi giao lại job."
+    - "Thiếu tiền tố be/ hay fe/ (đường dẫn tính từ một phía)"
+    - "Dùng tiền tố repository:<id>/, đường dẫn tuyệt đối hoặc ../"
+  nextStep_vi: "Job không được xếp. Kernel ghi lại đường dẫn tính từ gốc app (ví dụ be/src/... thay cho src/...) rồi xếp lại."
   owner: supervisor
   kind: dispatch-refusal
 path-repository-unknown:
@@ -10585,6 +10587,27 @@ STARCI_LEDGER_MIGRATE_FAILED:
   nextStep_vi: "Ledger giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
   owner: runtime-core
   kind: runtime-fault
+STARCI_MACHINE_MIGRATE_REFUSED:
+  title: "machine.sqlite migration refused"
+  title_vi: "Từ chối nâng cấp cấu trúc machine.sqlite"
+  meaning_vi: "File machine.sqlite cũ không qua kiểm tra toàn vẹn nên runtime không nâng cấp nó lên cấu trúc mới."
+  causes_vi:
+    - "File machine.sqlite bị hỏng"
+    - "Ổ đĩa lỗi hoặc file bị ghi dở"
+  nextStep_vi: "Runtime không mở machine.sqlite; Supervisor kiểm tra PRAGMA integrity_check và khôi phục từ bản .bak nếu cần."
+  owner: supervisor
+  kind: runtime-fault
+
+STARCI_MACHINE_MIGRATE_FAILED:
+  title: "machine.sqlite migration failed"
+  title_vi: "Nâng cấp cấu trúc machine.sqlite thất bại"
+  meaning_vi: "Bước nâng cấp để lại lỗi khóa ngoại hoặc không qua quick_check nên đã được hoàn tác."
+  causes_vi:
+    - "Dữ liệu cũ vi phạm ràng buộc mới"
+    - "Lỗi trong tệp migration"
+  nextStep_vi: "machine.sqlite giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
+  owner: runtime-core
+  kind: runtime-fault
 git-unusable:
   title: "Git unusable while landing"
   title_vi: "Git không dùng được khi land"
@@ -10607,25 +10630,25 @@ git-failed:
   kind: verb-refusal
 
 SEALED_CUSTODY_LOCATION:
-  title: "Sealed secret path is not under .starcistacks"
+  title: "Sealed secret path is not under be/.starcistacks"
   title_vi: "Đường dẫn bí mật đã mã hoá không nằm dưới .starcistacks"
-  meaning_vi: "Trường custody.sealed của bản ghi danh tính hoặc tài nguyên không trỏ tới .starcistacks/<môi-trường>/secrets/<slug>.enc, nơi duy nhất được phép giữ bí mật đã mã hoá."
+  meaning_vi: "Trường custody.sealed của bản ghi danh tính hoặc tài nguyên không trỏ tới be/.starcistacks/<môi-trường>/secrets/<slug>.enc, nơi duy nhất được phép giữ bí mật đã mã hoá."
   causes_vi:
     - "Đường dẫn trỏ vào .starciwork, ví dụ .starciwork/_resources/identities/<id>/secrets.enc.yaml"
     - "Đường dẫn dùng thư mục con hoặc đuôi khác thay vì <slug>.enc"
     - "Ghi 'none' hoặc để trống thay vì nêu đường dẫn sẽ được mã hoá"
-  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify sửa custody.sealed thành .starcistacks/<môi-trường>/secrets/<slug>.enc và chuyển tệp mã hoá (nếu có) tới đó bằng git mv, không đọc nội dung."
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify sửa custody.sealed thành be/.starcistacks/<môi-trường>/secrets/<slug>.enc và chuyển tệp mã hoá (nếu có) tới đó bằng git mv, không đọc nội dung."
   owner: other-op:work.author
   kind: check-finding
 
 SEALED_FILE_IN_WORK:
   title: "Sealed secret file kept inside .starciwork"
   title_vi: "Tệp bí mật đã mã hoá nằm trong .starciwork"
-  meaning_vi: "Cây Work chứa một tệp mã hoá (.enc); cây Work chỉ được giữ bản ghi danh tính hoặc tài nguyên, còn tệp bí mật phải nằm ở .starcistacks/<môi-trường>/secrets/<slug>.enc."
+  meaning_vi: "Cây Work chứa một tệp mã hoá (.enc); cây Work chỉ được giữ bản ghi danh tính hoặc tài nguyên, còn tệp bí mật phải nằm ở be/.starcistacks/<môi-trường>/secrets/<slug>.enc."
   causes_vi:
     - "Tệp secrets.enc.yaml được đặt cạnh resource.yaml của danh tính"
     - "Tệp mã hoá được sao vào cây Work để tiện đọc"
-  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới .starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới be/.starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
   owner: other-op:work.author
   kind: check-finding
 
@@ -10739,9 +10762,9 @@ HFS_WORK_NODE_RETIRED:
 HFS_IDENTITY_CUSTODY:
   title: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role"
   title_vi: "Bí mật của identity sai chỗ"
-  meaning_vi: "Identity `<id>` trỏ bí mật tới `<path>`; chỉ `.starcistacks/<env>/secrets/*.enc` hợp lệ. UAT chọn tài khoản theo role."
+  meaning_vi: "Identity `<id>` trỏ bí mật tới `<path>`; chỉ `be/.starcistacks/<env>/secrets/identity-<slug>.enc` hợp lệ. UAT chọn tài khoản theo role."
   causes_vi:
-    - "Vi phạm luật R09: Identity record (`_resources/identities/<slug>/resource.yaml`) trỏ `custody.secret` tới `.starcistacks/<env>/secrets/identity-<slug>.enc`; UAT `accounts.yaml` chọn identity theo role, không theo flow."
+    - "Vi phạm luật R09: Identity record (`_resources/identities/<slug>/resource.yaml`) trỏ `custody.sealed` tới `be/.starcistacks/<env>/secrets/identity-<slug>.enc`; UAT `accounts.yaml` chọn identity theo role, không theo flow."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

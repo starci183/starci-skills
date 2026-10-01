@@ -226,8 +226,8 @@ export function resolveRootOwner({ repo, rootCause, kinds, failing = [], reporte
         kind = family === 'impl' ? ROLE_BUILD[role] ?? null : FAMILY_KIND[family] ?? null;
         via = `record ${node}${repository ? ` (repository ${repository}, role ${role ?? '?'})` : ''}`;
       }
-      const prefix = repository && role && !/^(be|backend)$/.test(role) ? `repository:${repository}/` : '';
-      for (const owner of Array.isArray(doc.owners) ? doc.owners : []) if (typeof owner?.path === 'string') ownedPaths.push(`${prefix}${posix(owner.path)}`);
+      // Owner paths are app-relative (be/..., fe/...): the job's owned paths take them as written.
+      for (const owner of Array.isArray(doc.owners) ? doc.owners : []) if (typeof owner?.path === 'string') ownedPaths.push(posix(owner.path));
       ownedPaths.push(record);
     }
   }
@@ -238,7 +238,7 @@ export function resolveRootOwner({ repo, rootCause, kinds, failing = [], reporte
     const beSide = /backend|^be$/.test(role ?? '') || kind === 'backend.implement';
     const own = (reporterPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)
       .filter((p) => !/^\.starciwork\//.test(p))
-      .filter((p) => (beSide ? !/^repository:/.test(p) : kind === 'interface.implement' ? /^repository:/.test(p) : true));
+      .filter((p) => (beSide ? p.startsWith('be/') : kind === 'interface.implement' ? p.startsWith('fe/') : true));
     ownedPaths.push(...own, ...failing.filter((f) => /[\\/]/.test(f)));
   }
   const unique = [...new Set(ownedPaths.map(posix))];

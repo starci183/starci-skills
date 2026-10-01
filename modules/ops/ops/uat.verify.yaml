@@ -33,7 +33,7 @@ reads:
         a needed missing input is a reported graph/scope gap, not a new dependency silently added
         here.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
         state; read applicable instructions, manifests, owning code, callers and relevant tests.
@@ -57,7 +57,7 @@ reads:
         expectations are resolved before mutation, not guessed from current behavior.
   - id: accounts
     path: .starciwork/_resources/identities/<identity>/resource.yaml + selected account requirements and
-      sealed custody (custody.sealed, always .starcistacks/<env>/secrets/<slug>.enc)
+      sealed custody (custody.sealed, always be/.starcistacks/<env>/secrets/<slug>.enc, app-relative)
     purpose:
       en: Resolve an existing suitable test account, role, membership and credential custody; otherwise
         create a scoped test account through the actual supported identity owner when the UAT
@@ -71,7 +71,7 @@ reads:
         database/environment identity and the run-owned namespace; do not guess SQL tables or use
         broad table deletion.
   - id: scripts
-    path: repository:<repo-id>/<write-ceiling> + actual database/provider/identity clients
+    path: <app>/<write-ceiling> + actual database/provider/identity clients
     purpose:
       en: Inspect reusable seed SQL, cleanup SQL and resource-management scripts and the real APIs they
         call. Create missing scripts inside the selected automation source scope from the actual
@@ -110,7 +110,7 @@ writes:
         prose. Missing refs/dependencies/acceptance require a reported gap or separately selected
         scope update; never add/remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields: [seed SQL, delete SQL, resource-management scripts, automation tests and usage instructions]
     content:
       en: Reuse or create scripts for account setup where needed, idempotent prerequisite seed, run-owned
@@ -230,7 +230,7 @@ steps:
         provider/script; verify actual login, role and membership. Resolve credentials at use time
         and isolate browser sessions for distinct actors while retaining the session continuity each
         sequential flow requires. Track disposable account ownership separately from reused
-        identities. A sealed identity secret is written to exactly one place, .starcistacks/<env>/secrets/<identity-slug>.enc (sops age, created with the repo's stack-secret set command), and the identity record's custody.sealed names that path; never a sealed file, a secrets.enc.yaml or a plaintext value under .starciwork (the validator refuses it with SEALED_CUSTODY_LOCATION or SEALED_FILE_IN_WORK). Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
+        identities. A sealed identity secret is written to exactly one place, be/.starcistacks/<env>/secrets/<identity-slug>.enc (sops age, created with the repo's stack-secret set command), and the identity record's custody.sealed names that path; never a sealed file, a secrets.enc.yaml or a plaintext value under .starciwork (the validator refuses it with SEALED_CUSTODY_LOCATION or SEALED_FILE_IN_WORK). Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the app keeps every credential - be/.starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
   - reads:
       - fixtures
       - scripts
@@ -395,7 +395,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Selected feature slug
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
   environment: Resolved environment label

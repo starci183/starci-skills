@@ -32,7 +32,7 @@ reads:
       en: Every FR, XBase#state shape and applicable proof case of the workflow's scope with the indexed evidence
         that proves it and its status - proven, stale (its code changed since) or missing.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: The delivered source at the commits the reports name - README, package scripts, env examples,
         .starcistacks manifests and the run and test commands the repository itself declares.
@@ -158,7 +158,7 @@ blockers:
 placeholders:
   workflow: The running workflow id the handover bundle is keyed by
   attempt: This handover.review job's attempt number
-  repo-id: Resolved repository resource ID of a delivery
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   id: An evidence bundle id of a delivered record
 layoutPolicy:

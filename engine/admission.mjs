@@ -72,9 +72,9 @@ const leasePath=resourceKey=>String(resourceKey??'').startsWith(PATH_LEASE_PREFI
  * The spelling two lease paths are compared in. The same file must compare equal however a workflow
  * spelled it (nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: `apps/app/src/messages/vi.json` bare for
  * the fe repository vs `nivo-fe/apps/app/src/messages` repository-prefixed never overlapped). `canonicalOf`
- * (scripts/kernel/lease-canon.mjs) resolves a path to its repository-qualified form
- * `repository:<role>/<path>` — for a held row through its holder job, so a lease taken before
- * canonical keys existed still conflicts; paths on Windows compare case-insensitively, as its file
+ * (scripts/kernel/lease-canon.mjs) resolves a path to its app-relative form in a bound app
+ * (be/<path>, fe/<path>) — for a held row through its holder job, so every spelling of one file
+ * compares as one key; paths on Windows compare case-insensitively, as its file
  * systems do.
  */
 export const leaseCompareForm=(leasePathValue,{canonicalOf=null,row=null,platform=process.platform}={})=>{

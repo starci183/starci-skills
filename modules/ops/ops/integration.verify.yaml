@@ -23,7 +23,7 @@ sideEffects:
     scope
   - scenario-owned data created in that sandbox account and disposed by the same run
   - reading the owner-provided credential through sops from the declared identity custody
-    (.starcistacks/<env>/secrets/<slug>.enc), inside the checking process only,
+    (be/.starcistacks/<env>/secrets/<slug>.enc, app-relative), inside the checking process only,
     never writing its value
 graphPolicy:
   mode: read-only
@@ -70,14 +70,14 @@ reads:
       en: Where the design is silent about the observable effect, report the gap instead of inventing an
         expectation.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve the repository resource, actual checkout/root/HEAD and dirty state, and read the
         delivered client of this integration - its entry point, its configuration and the variable
         it actually reads the credential from. The proof binds the exact tested tree, so a claim
         without a resolved repository and a named client is not a proof.
   - id: credential
-    path: .starciwork/_resources/identities/<slug>/resource.yaml + .starcistacks/<env>/secrets/<slug>.enc (the one sealed location; the record's custody.sealed names it), read with the runtime's sops-exec-env helper (format stated with --input-type) at the moment of use
+    path: .starciwork/_resources/identities/<slug>/resource.yaml + be/.starcistacks/<env>/secrets/<slug>.enc (the one sealed location, app-relative; the record's custody.sealed names it), read with the runtime's sops-exec-env helper (format stated with --input-type) at the moment of use
     purpose:
       en: Resolve the identity alias, variable names and selected environment from the backend Stack
         declaration and readable resource metadata. The encrypted value authenticates the live call
@@ -189,7 +189,7 @@ steps:
     writes: [evidence]
     action:
       en: "Run everything that needs the credential inside `node <Source>/.claude/scripts/lib/sops-exec-env.mjs
-        --input-type yaml .starcistacks/<env>/secrets/<slug>.enc '<command>'` (the sealed file is
+        --input-type yaml be/.starcistacks/<env>/secrets/<slug>.enc '<command>'` from the app root (the sealed file is
         `<slug>.enc` and the helper states its format to sops; plain `sops exec-env` cannot read it),
         so the value is
         resolved from exactly that variable in exactly that process and nowhere else. If sops is not
@@ -358,7 +358,7 @@ placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
   env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
   slug: Identity custody slug the integration declaration names (custody identity:<slug>)
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set covering the delivered client of this integration
 layoutPolicy:
   checks: [starci-validate, starci-stacks-check]

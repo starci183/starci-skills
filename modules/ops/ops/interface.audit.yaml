@@ -90,7 +90,7 @@ reads:
         slot-measured captures per breakpoint and theme, productLocale and the demo personas - the
         structure every accepted direction is composited into and every delivered route is compared with."
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Read the exact delivered frontend source, dependency graph, routes, component ownership, styles
         and asset imports to attribute a measured delta. Repository access is read-only and
@@ -126,7 +126,7 @@ reads:
       en: Read the kernel-assigned audit round and attempt lineage. The kernel owns scheduling and the
         round ceiling.
   - id: runner
-    path: docs/browser-testing.md with repository:<repo-id>/<playwright-manifest-and-lockfile>
+    path: docs/browser-testing.md with <app>/<playwright-manifest-and-lockfile>
     purpose:
       en: The project's locked Playwright dependency, local runner and browser installation — the same
         runner uat.assisted.prepare's contract binds.
@@ -516,7 +516,7 @@ blockers:
 placeholders:
   feature: Selected feature slug
   audit: Stable selected audit slug
-  repo-id: Resolved repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected product source read set
   environment: Resolved environment resource slug
   identity: Selected actor resource slug

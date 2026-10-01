@@ -95,7 +95,7 @@ blockers:
     condition:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   environment: Resolved environment label
   resource: Selected owned asset name
@@ -137,7 +137,7 @@ policy:
               target is a scope/graph gap: report it and propose a separately selected scope op; do
               not create a target or invent its acceptance/graph here."
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
               state; read applicable instructions, manifests, owning code, callers and relevant
@@ -228,7 +228,7 @@ policy:
               Report node/resource IDs and propose a separately selected graph update when needed;
               never run predecessors or weaken dependsOn/refs/required to proceed.
       placeholders:
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         resource: Selected owned resource slug
@@ -257,7 +257,7 @@ policy:
           purpose:
             en: This consumer op requires its target node to exist.
         - id: repo
-          path: repository:<repo-id>/<bound-paths>
+          path: <app>/<bound-paths>
           purpose:
             en: Source implementation still needs an actual selected writable repository.
         - id: runtime
@@ -356,7 +356,7 @@ policy:
           condition:
             en: Required start/reset/merge/configuration change exceeds selected action.
       placeholders:
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         resource: Selected owned resource slug
@@ -455,7 +455,7 @@ policy:
           condition:
             en: Service target or effect is outside verified ownership/scope.
       placeholders:
-        repo-id: Resolved repository resource ID
+        app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
         bound-paths: Inspected source read set
         environment: Resolved environment resource slug
         resource: Selected owned resource slug

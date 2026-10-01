@@ -61,7 +61,7 @@ test('destination captures are recorded per key, with the nav target as the defa
   assert.throws(() => addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'settings', breakpoint: 'desktop', theme: 'light', file: capturePng(p, 's', 'desktop', PHOTOS_CHROME) }), /name the node ids it is active for/);
   assert.throws(() => addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'settings', routes: ['/[locale]/(auth)/sign-in'], breakpoint: 'desktop', theme: 'light', file: capturePng(p, 's', 'desktop', PHOTOS_CHROME) }), /not a node at or below/);
   // A re-scan keeps the destinations the owner captured.
-  const rescanned = mergeScan(p.record, [scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' })], { at: '2026-09-24T01:00:00Z' }).record;
+  const rescanned = mergeScan(p.record, [scanAppDir(p.appDir, { repoRoot: p.app })], { at: '2026-09-24T01:00:00Z' }).record;
   assert.deepEqual(nodeById(treeOf(rescanned, 'app'), CONSOLE).layout.destinations, node.layout.destinations);
 });
 

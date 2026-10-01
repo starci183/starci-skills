@@ -102,8 +102,7 @@ observations:
     automated:
       - BE_UNNAMED_DATA_ACCESS
       - BE_TRANSACTION_EXTERNAL_CALL
-    relatedExamples:
-      - transactional-service
+    relatedExamples: []
   - id: fe-units
     lane: frontend
     kind: observation

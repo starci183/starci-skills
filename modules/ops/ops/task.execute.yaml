@@ -28,7 +28,7 @@ reads:
       en: Start without presumed business, architecture or product context. Identify the intended result,
         concrete inputs, permitted effects and observable completion criteria from the request.
   - id: repo
-    path: repository:<repo-id>/<bound-paths> when source is relevant
+    path: <app>/<bound-paths> when source is relevant
     purpose:
       en: Discover the actual selected repository/root/HEAD and dirty changes, then read applicable
         instructions, owning source, callers, scripts and relevant tests. If there is no source
@@ -192,7 +192,7 @@ blockers:
     condition:
       en: A necessary effect exceeds current authorization or conflicts with retained user work.
 placeholders:
-  repo-id: Observed selected repository identity; use an existing resource ID only when actually bound
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected relevant source read set
 layoutPolicy:
   checks: [starci-validate]

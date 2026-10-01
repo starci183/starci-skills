@@ -71,9 +71,9 @@ properties:
           description: What kind of unit this path is - module, route, entry, block.
         path:
           $ref: "#/$defs/prose"
-          description: The module-root directory, relative to the repository the record's own repository
-            names, or prefixed `repository:<repo-name>/` to pin a sibling repository. It is a directory a
-            reader would call the module's root, never an individual file.
+          description: The module-root directory, app-relative (be/<path>, fe/<path> or a directory of the app
+            root; anything else is refused OWNER_PATH_NOT_APP_RELATIVE). It is a directory a reader would call
+            the module's root, never an individual file.
   refs:
     type: array
     minItems: 1
@@ -751,4 +751,4 @@ $defs:
                     custody:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
+                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is be/.starcistacks/<env>/secrets/<slug>.enc (app-relative), outside the Work tree."

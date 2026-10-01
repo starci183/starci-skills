@@ -106,10 +106,12 @@ const seedJob=(repo,{op,owned,head,repository,jobId='op-target-1',wf='wf-target'
 const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;}finally{l.close();}};
 const repoEntry=(detail,root)=>detail.repos.find(r=>real(r.repo)===root);
 
-test('a frontend op\'s bare owned path lands in fe/: clean app checkout settles pass',t=>{
+// Every owned path of a bound app is app-relative (be/…, fe/…, .starciwork/…): the landed proof checks it in the app
+// checkout, under the same spelling gate.mjs and every finding use.
+test('an fe/ owned path lands in the app checkout: clean, it settles pass',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['apps/app/src','.starciwork/features/shop/impl'],head});
+  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src','.starciwork/features/shop/impl'],head});
   const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.equal(body.ok,true);
@@ -120,12 +122,12 @@ test('a frontend op\'s bare owned path lands in fe/: clean app checkout settles 
   assert.equal(statusOf(be.repo,jobId),'succeeded');
 });
 
-test('a dirty file in fe/ refuses not-landed naming the app checkout',t=>{
+test('a dirty file under an fe/ owned path refuses not-landed naming the app checkout',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
   fs.writeFileSync(path.join(fe.repo,'apps','app','src','extra.tsx'),'export const Extra = 1;\n');
   fs.mkdirSync(path.join(be.side,'apps','app','src'),{recursive:true});
-  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['apps/app/src'],head});
+  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src'],head});
   const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(r.status,1,r.stderr||r.stdout);
   assert.equal(body.reason,'not-landed');
@@ -136,48 +138,29 @@ test('a dirty file in fe/ refuses not-landed naming the app checkout',t=>{
   assert.equal(statusOf(be.repo,jobId),'running','a refused settle writes nothing');
 });
 
-test('a backend op\'s bare owned path resolves to be/',t=>{
+test('a be/ owned path is the backend side only: fe noise under the same relative path is outside the grant',t=>{
   const {be,fe,api}=project(t);
   const head=be.commit('src/a.ts','export const a = 2;\n');
   fs.mkdirSync(path.join(fe.repo,'src'));
   fs.writeFileSync(path.join(fe.repo,'src','noise.ts'),'export const n = 1;\n');
-  const clean=seedJob(be.repo,{op:'backend.implement',owned:['src/'],head});
+  const clean=seedJob(be.repo,{op:'backend.implement',owned:['be/src/'],head});
   const ok=api('settle','--repo',be.repo,'--job',clean,'--verdict','pass','--json');
   assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);
-  assert.deepEqual(ok.body.landed.repos.map(e=>real(e.repo)),[be.repo],'fe noise under src/ is outside the backend grant');
-
-  fs.writeFileSync(path.join(be.side,'src','b.ts'),'export const b = 1;\n');
-  const dirty=seedJob(be.repo,{op:'backend.implement',owned:['src/'],head,jobId:'op-target-2',wf:'wf-target-2'});
-  const refused=api('settle','--repo',be.repo,'--job',dirty,'--verdict','pass','--json');
-  assert.equal(refused.r.status,1,refused.r.stdout);
-  assert.equal(refused.body.reason,'not-landed');
-  assert.equal(real(refused.body.detail.repo),be.repo);
-  assert.deepEqual(refused.body.detail.dirty,['be/src/b.ts']);
+  assert.deepEqual(ok.body.landed.repos.map(e=>real(e.repo)),[be.repo]);
+  assert.deepEqual(repoEntry(ok.body.landed,be.repo).paths,['be/src']);
 });
 
-test('a path that names its side is honoured: fe/… and payload.repository',t=>{
+test('a job whose owned path is not app-relative is unverifiable, never proven at a guessed root',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  const edited=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src'],head});
-  const a=api('settle','--repo',be.repo,'--job',edited,'--verdict','pass','--json');
-  assert.equal(a.r.status,0,a.r.stderr||a.r.stdout);
-  assert.equal(repoEntry(a.body.landed,be.repo).role,'fe');
-
-  fs.writeFileSync(path.join(fe.repo,'apps','app','src','page.tsx'),'export const Page = 3;\n');
-  const pinned=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'fe',jobId:'op-target-3',wf:'wf-target-3'});
-  const b=api('settle','--repo',be.repo,'--job',pinned,'--verdict','pass','--json');
-  assert.equal(b.r.status,1,b.r.stdout);
-  assert.equal(b.body.reason,'not-landed');
-  assert.deepEqual(repoEntry(b.body.detail,be.repo).dirty,['fe/apps/app/src/page.tsx']);
-
-  const unbound=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'mobile',jobId:'op-target-4',wf:'wf-target-4'});
-  const c=api('settle','--repo',be.repo,'--job',unbound,'--verdict','pass','--json');
+  const sideRelative=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'fe'});
+  const c=api('settle','--repo',be.repo,'--job',sideRelative,'--verdict','pass','--json');
   assert.equal(c.r.status,1,c.r.stdout);
   assert.equal(c.body.reason,'landed-unverifiable');
   assert.equal(c.body.detail.step,'repository');
 });
 
-test('api enqueue records the resolved target repository; an unbound repository is refused',t=>{
+test('api enqueue records the side the app-relative paths name; any other spelling is refused path-not-app-relative',t=>{
   const {be,api}=project(t);
   const ledger=openLedger({file:ledgerFileFor(be.repo)});
   try{ledger.transaction(db=>{
@@ -187,42 +170,36 @@ test('api enqueue records the resolved target repository; an unbound repository 
   const enqueue=(...extra)=>api('enqueue','--repo',be.repo,'--workflow','wf-enq','--json',...extra);
   const payloadOf=jobId=>{const l=inspectLedger({file:ledgerFileFor(be.repo)});try{return JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);}finally{l.close();}};
 
-  const fe=enqueue('--op','interface.implement','--paths','apps/app/src');
+  const fe=enqueue('--op','interface.implement','--paths','fe/apps/app/src');
   assert.equal(fe.r.status,0,fe.r.stderr||fe.r.stdout);
   assert.equal(fe.body.repository,'fe');
   assert.equal(payloadOf(fe.body.job_id).repository,'fe');
 
-  const beJob=enqueue('--op','backend.implement','--paths','src/');
+  const beJob=enqueue('--op','backend.implement','--paths','be/src/');
   assert.equal(beJob.r.status,0,beJob.r.stderr||beJob.r.stdout);
-  // An unqualified path binds the one side it exists in (enqueue-unqualified-path-binding): src/ exists only in
-  // be/, so the job records be explicitly instead of falling back to the dispatch placement.
-  assert.equal(payloadOf(beJob.body.job_id).repository,'be','a bare path binds the repository it exists in');
+  assert.equal(payloadOf(beJob.body.job_id).repository,'be','the first segment names the side');
 
-  const named=enqueue('--op','code.refactor','--paths','apps/app/src','--repository','fe');
-  assert.equal(named.r.status,0,named.r.stderr||named.r.stdout);
-  assert.equal(payloadOf(named.body.job_id).repository,'fe','a side name resolves to its binding role');
-
-  const unknown=enqueue('--op','code.refactor','--paths','src/','--repository','mobile');
+  for(const paths of ['src/','repository:mobile/src','repository:fe/apps/app/src']){
+    const refused=enqueue('--op','code.refactor','--paths',paths);
+    assert.equal(refused.r.status,1,refused.r.stdout);
+    assert.equal(refused.body.reason,'path-not-app-relative',paths);
+  }
+  const unknown=enqueue('--op','code.refactor','--paths','.starciwork/features/x','--repository','mobile');
   assert.equal(unknown.r.status,1,unknown.r.stdout);
   assert.equal(unknown.body.reason,'repository-unknown');
-  const prefixed=enqueue('--op','code.refactor','--paths','repository:mobile/src');
-  assert.equal(prefixed.r.status,1,prefixed.r.stdout);
-  assert.equal(prefixed.body.reason,'path-repository-unknown');
 });
 
-test('ownedPathPlacements: a contract worktree of the target repo is its checkout; no binding keeps the placement',async t=>{
+test('ownedPathPlacements: a contract worktree of the app is its checkout; no binding keeps the placement',async t=>{
   const {ownedPathPlacements}=await import('../scripts/kernel/target-repo.mjs');
-  const {be,fe}=project(t);
+  const {be}=project(t);
   const child=path.join(path.dirname(be.repo),'shop-child');
   git(be.repo,'worktree','add','--quiet','-b','child',child);
   const prior=process.env.STARCI_SOURCE_ROOT;
   t.after(()=>{if(prior===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=prior;});
   process.env.STARCI_SOURCE_ROOT=path.join(path.dirname(be.repo),'source');
-  const [src,work]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['apps/app/src','.starciwork/x'],repo:be.repo,worktree:child,timeoutMs:30000});
-  assert.equal(src.base,path.join(child,'fe'));
-  assert.equal(src.via,'op-side');
-  assert.equal(work.base,child);
-  assert.equal(work.via,'work-owner');
+  const [src,work]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['fe/apps/app/src','.starciwork/x'],repo:be.repo,worktree:child,timeoutMs:30000});
+  assert.deepEqual([real(src.base),src.path,src.role,src.via],[real(child),'fe/apps/app/src','fe','app-relative']);
+  assert.deepEqual([real(work.base),work.via],[real(child),'work-owner']);
   process.env.STARCI_SOURCE_ROOT=path.join(path.dirname(be.repo),'nowhere');
   const [plain]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['apps/app/src'],repo:be.repo,worktree:child,timeoutMs:30000});
   assert.equal(plain.base,child);

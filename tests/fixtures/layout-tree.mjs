@@ -1,5 +1,5 @@
-// A two-repository product for the layout-tree specs: tmp/backend/.starciwork beside tmp/web, whose
-// apps/app/src/app is a small Next.js App Router tree with every construct the scanner reads - a locale
+// The app for the layout-tree specs: tmp/app with hfs.json, .starciwork and the fe side, whose
+// fe/apps/app/src/app is a small Next.js App Router tree with every construct the scanner reads - a locale
 // segment, a route group without a layout, a route group with the console layout, a nested layout, loading and
 // error files, a parallel @modal slot with an intercepting (.)photos/[id] route beside the full page, and a
 // navigation registry whose labels live in two message catalogs.
@@ -9,6 +9,7 @@ import path from 'node:path';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { putBlob } from '../../scripts/lib/artifact-store.mjs';
+import { loadSlotManifest } from '../../scripts/lib/hfs-slots.mjs';
 
 export const APP_FILES = {
   'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@/*': ['./src/*'] } } }, null, 2),
@@ -59,7 +60,7 @@ export const pngBytes = (image) => encodePng(image);
 export async function settledProduct(t, { photosVisible = false } = {}) {
   const { mergeScan, scanAppDir, addCapture, nodeById, recordOf, treeOf } = await import('../../scripts/work/layout-tree.mjs');
   const p = buildProduct(t);
-  const record = mergeScan(null, [scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' })], { at: '2026-09-24T00:00:00Z' }).record;
+  const record = mergeScan(null, [scanAppDir(p.appDir, { repoRoot: p.app })], { at: '2026-09-24T00:00:00Z' }).record;
   // `tree` is the live view of the product's one app (nodes, source, i18n are the app's, the rest the record's).
   const tree = treeOf(record, 'app');
   tree.breakpoints = [{ name: 'desktop', width: 40, height: 30 }, { name: 'mobile', width: 20, height: 30 }];
@@ -124,13 +125,26 @@ export const uiSkeleton = (id, over = {}) => ({
   ui: { status: 'proposed', intent: 'fixture' }, ...over,
 });
 
-/** Build the product under a fresh temp directory; returns helpers. `t` is the node:test context. `apps` is the frontend's workspace.yaml apps declaration. */
-export function buildProduct(t, { files = APP_FILES, apps = null } = {}) {
+/** The hfs.json text of an app whose fe side declares `feApps` (names) and whose be side is one api. */
+export const appDeclarationText = (feApps = ['app']) => `${JSON.stringify({
+  hfs: loadSlotManifest().major, kind: 'app', project: 'photo',
+  sides: { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: feApps.map((name) => ({ name, kind: 'next' })) } },
+}, null, 2)}
+`;
+
+/**
+ * Build the product under a fresh temp directory; returns helpers. `t` is the node:test context. The product is one app:
+ * tmp/app/hfs.json declares the fe apps (`apps`, default the one app `app`), tmp/app/.starciwork is its Work tree and
+ * `files` (relative to the fe side) land under tmp/app/fe. `app` is the app root every recorded path is relative to.
+ */
+export function buildProduct(t, { files = APP_FILES, apps = ['app'] } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-layout-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const work = path.join(base, 'backend', '.starciwork');
+  const app = path.join(base, 'app');
+  const work = path.join(app, '.starciwork');
   const put = (rel, body) => { const file = path.join(base, rel); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); return file; };
-  put('backend/.starciwork/workspace.yaml', stringifyYaml({ schema: 'work/workspace@1', id: 'photo', repositories: [{ role: 'be', name: 'backend' }, { role: 'fe', name: 'web', ...(apps ? { apps } : {}) }] }));
-  for (const [rel, body] of Object.entries(files)) put(`web/${rel}`, body);
-  return { base, work, web: path.join(base, 'web'), appDir: path.join(base, 'web', 'apps', 'app', 'src', 'app'), put };
+  put('app/hfs.json', appDeclarationText(apps));
+  put('app/.starciwork/workspace.yaml', stringifyYaml({ schema: 'work/workspace@1', id: 'photo', repositories: [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }] }));
+  for (const [rel, body] of Object.entries(files)) put(`app/fe/${rel}`, body);
+  return { base, app, fe: path.join(app, 'fe'), work, appDir: path.join(app, 'fe', 'apps', 'app', 'src', 'app'), put };
 }

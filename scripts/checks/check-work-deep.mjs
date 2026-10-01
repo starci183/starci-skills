@@ -225,8 +225,8 @@ function checkTree(workRoot, out, baseline) {
     // COMPOSES_PATH_DANGLING: composes[].module is a path field the base gate never checks
     for (const c of Array.isArray(data.composes) ? data.composes : []) {
       if (!c || typeof c !== 'object' || !c.module) continue;
-      const repoRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
-      const abs = path.join(repoRoot, moduleRootOf(c.module));
+      // composes[].module is an owner path: app-relative, under the app root (OWNER_PATH_NOT_APP_RELATIVE otherwise).
+      const abs = path.join(path.dirname(path.resolve(workRoot)), moduleRootOf(c.module));
       if (!fs.existsSync(abs)) {
         const msg = `${id} composes[].module names ${c.module}, which does not exist on disk`;
         if (data.state === 'done') refuse(indexFile, 'COMPOSES_PATH_DANGLING', msg); else suspect(indexFile, 'COMPOSES_PATH_DANGLING', msg);

@@ -26,7 +26,7 @@ reads:
       en: Read the decided requirement, design, decision and goal records the document describes - the
         settled intent.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the code,
         manifests, public entry points and existing docs the document describes. Every behavior,
@@ -154,7 +154,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Selected feature slug
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   docs-dir: Tree directory that owns the selected documents
   doc: Stable document slug inside that directory

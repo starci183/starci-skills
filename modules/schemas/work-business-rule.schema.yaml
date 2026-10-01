@@ -101,7 +101,8 @@ properties:
     description: "The module-root directory or directories that enforce this rule. It is a plain string for
       the ordinary one-module case and a list where the rule genuinely spans more than one path; either way
       each entry is the directory a reader would call the module's root, never an individual file, so a file
-      moving inside it during a refactor is not by itself a broken reference."
+      moving inside it during a refactor is not by itself a broken reference. Every entry is app-relative
+      (be/<path>, fe/<path>; OWNER_PATH_NOT_APP_RELATIVE otherwise)."
   appliesTo:
     $ref: "#/$defs/appliesTo"
   refs:
@@ -767,4 +768,4 @@ $defs:
                     custody:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
+                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is be/.starcistacks/<env>/secrets/<slug>.enc (app-relative), outside the Work tree."

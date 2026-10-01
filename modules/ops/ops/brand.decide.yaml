@@ -74,14 +74,14 @@ reads:
         scaffolded yet has no manifest; then the family the owner ruled is read from the grammar
         package itself and recorded as the family the scaffold installs.
   - id: sources
-    path: repository:<repo-id>/<bound-paths> + params.referenceSources
+    path: <app>/<bound-paths> + params.referenceSources
     purpose:
       en: Read the real token and style files of the frontend repository - the app's global CSS, the
         family root, the theme and token files the owner named or that this repository actually
         contains - and record each file path with the exact declaration every token value comes
         from.
   - id: assets
-    path: .starciwork/brand/assets/* + repository:<repo-id>/<bound-paths>
+    path: .starciwork/brand/assets/* + <app>/<bound-paths>
     purpose:
       en: Read the mascot, logo and icon-set assets that already exist - beside the record and in the
         frontend repository - with their formats, dimensions and provenance. Reuse an existing
@@ -93,7 +93,7 @@ reads:
       en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
         (cited blobs, scripts/lib/blob-lookup.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: "The frontend's App Router directory (app/: layout, template, page, loading, error, not-found and
         default files, route groups, @slots and (.)intercepts), the chrome components its layouts render,
@@ -516,7 +516,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   asset: Actual selected source asset filename/format
 layoutPolicy:

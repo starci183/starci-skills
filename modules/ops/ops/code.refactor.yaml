@@ -80,14 +80,14 @@ reads:
       en: A refactor that needs a different contract or boundary is a design change, not a refactor -
         report the gap instead of stretching this op.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable
         instructions, manifests, the owning code, every caller and the existing tests. The
         restructure binds the exact inspected tree; a proposed change to a file that was not opened
         is not a refactor plan.
   - id: coverage
-    path: repository:<repo-id>/<manifest-paths> + the slice's existing regression suite and its real
+    path: <app>/<manifest-paths> + the slice's existing regression suite and its real
       runner
     purpose:
       en: Establish before any edit which declared check actually exercises the slice's observable
@@ -139,7 +139,7 @@ writes:
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields: [restructured source files only]
     content:
       en: Only exact owned paths in the approved code-scope, restructured without observable behavior
@@ -443,7 +443,7 @@ blockers:
         predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   manifest-paths: Manifest and script files defining the declared regression check
   write-ceiling: Explicit owned source paths

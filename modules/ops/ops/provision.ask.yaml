@@ -42,16 +42,16 @@ reads:
         provision (credential, account, dataset, authority, irreversible) - before anything is
         printed.
   - id: environment
-    path: repository:<repo-id>/<bound-paths> + .starciwork/_resources/identities/<slug>/resource.yaml
+    path: <app>/<bound-paths> + .starciwork/_resources/identities/<slug>/resource.yaml
     purpose:
       en: For a credential, read where the code reads the value - the exact variable name - and which
         identity:<slug> alias in the selected backend Stack environment
-        (.starcistacks/<env>/secrets/<slug>.enc) will hold it. The resource metadata names the custody and variable.
+        (be/.starcistacks/<env>/secrets/<slug>.enc, app-relative) will hold it. The resource metadata names the custody and variable.
   - id: stacks
-    path: repository:<repo-id>/.starcistacks/application-stacks.yaml services (the source host's for a shared server)
+    path: <app>/.starcistacks/application-stacks.yaml services (the source host's for a shared server)
     purpose:
       en: Before any credential, host, account or CI secret/variable is named, read the stack declaration's
-        services block with starci-starcistacks-check <repo-id>. What it declares ownerAction none with
+        services block with starci-starcistacks-check <app>. What it declares ownerAction none with
         custody present is the runtime's, not a provision - the asking operation uses the declared custody
         and api report refuses the ask (ask-declared-in-stack).
 writes:
@@ -69,7 +69,7 @@ steps:
     action:
       en: "Name the provision exactly: a credential names the variable the code reads, the outside system
         it belongs to and the selected Stack environment custody where identity:<slug> resolves
-        (.starcistacks/<env>/secrets/<slug>.enc); an account, a dataset or an
+        (be/.starcistacks/<env>/secrets/<slug>.enc); an account, a dataset or an
         authority names what and for which system. Never invent, stub, default or skip it. Never the
         value itself. A quality-service credential is never a provision: a SonarQube token or host,
         a Sonar project, and the GitHub secret or variable that would carry them into CI are
@@ -182,7 +182,7 @@ blockers:
         uat.assisted.{prepare,verify}; the asking operation is sent back to re-plan through that
         lane.
 placeholders:
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
   slug: Stable identity custody slug

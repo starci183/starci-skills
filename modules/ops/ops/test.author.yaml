@@ -49,13 +49,13 @@ reads:
         is silent about an observable effect, report the gap instead of writing a test that invents
         an expectation.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered
         slice, its public entry points and the test conventions its neighbors follow. The authored
         tests bind the exact inspected tree.
   - id: suite
-    path: repository:<repo-id>/<suite-paths>
+    path: <app>/<suite-paths>
     purpose:
       en: Inspect the existing test harness - its runner, naming convention, fixtures, helpers, lifecycle
         hooks and the tests it already owns.
@@ -89,7 +89,7 @@ writes:
         Missing refs/dependsOn/proof demands require a reported gap; never add/remove them to obtain
         pass.
   - id: source
-    path: repository:<repo-id>/<test-ceiling>
+    path: <app>/<test-ceiling>
     fields: [test files, test fixtures and helpers inside the declared test paths]
     content:
       en: Only test files inside the explicit test-paths allowlist - specs, cases, fixtures and helpers
@@ -256,7 +256,7 @@ placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
   family: Flat family folder of the selected target record
   name: Record folder inside its family
-  repo-id: Resolved direct repository name or path
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   suite-paths: Existing test harness, fixture and helper paths
   test-ceiling: Explicit owned test paths

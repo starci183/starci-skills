@@ -85,19 +85,19 @@ enqueue:
     (1 on first enqueue), generation, kind:'op', status:'queued',
     payload_json:{goal_binding:{revision,identity},records:[--records],
     owned_paths:[--paths],repository?:<repo-id>,params?:{<name>:<value>},cut?:{id,ordinal,total}}} + events 'job-enqueued'.
-    `repository` is the repository the job's bare owned paths land in
-    (scripts/kernel/target-repo.mjs): --repository resolved through the
-    project binding whose Work owner is --repo (a binding role, repository
-    name or root path; stored as its role), else `fe` for an op every
-    modules/models/kinds.yaml lane delivers on the frontend side
-    (interface.implement, interface.audit, uat.verify) when the binding
-    declares fe, else absent — the job targets where dispatch places it.
-    An owned path may name its repository itself: `repository:<id>/<path>`,
-    an absolute path, `../<repo>/<path>` resolving from --repo into a
-    bound repository, or `<repo-name>/<path>` whose first segment is a
-    bound repository's name (the owner's own name included); the rest is
-    relative to that repository's root. A `.starciwork/` path always lands
-    in the Work owner.
+    In a bound app (scripts/kernel/target-repo.mjs) every owned path is
+    app-relative - be/<path>, fe/<path>, .starciwork/<path> or a path of
+    the app root - the one form gate.mjs, the knowledge and every finding
+    use; a repository:<id>/ prefix, an absolute or ../ path, the app's name
+    as a prefix and a side-relative path (src/x where be/src/x exists) are
+    refused path-not-app-relative. `repository` records the side the
+    paths name by their first segment (one side is its role, several or a
+    path of the app root is app); Work paths alone take --repository
+    (resolved through the binding, stored as its role), else `fe` for an
+    op every modules/models/kinds.yaml lane delivers on the frontend side
+    (interface.implement, interface.audit, uat.verify), else absent.
+    Unbound, --repository (an existing directory) or absent - the job
+    targets where dispatch places it.
     `cut` marks one bounded execution slice of the SAME approved semantic op;
     all three cut flags are atomic, ordinal is 1-based and total is at least
     two. The goal binding is
@@ -144,7 +144,8 @@ enqueue:
     - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
     - 'owned-paths-outside-writes (field `reason`): an authoring op whose manifest writes only .starciwork/features/<feature>/<family> records (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs) is given an owned path of another family, the feature overview it may not write, or a path outside .starciwork; prints {ok:false, workflowId, op, reason, violations[{path, family, why}], families, owners{family:[op]}, detail} and exits 1, no job written. The detail routes each family to the ops that write it. A commit-only attempt (--commit-only-of, --commit-only-work-debt) is exempt'
     - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
-    - path-repository-unknown: 'an owned path repository:<id>/… names a repository the project binding does not bind'
+    - path-not-app-relative: 'in a bound app, an owned path is not app-relative (a repository:<id>/ prefix, an absolute or ../ path, the app name as a prefix, or a side-relative path); the detail names the app-relative spelling when a side holds it'
+    - path-repository-unknown: 'unbound, an owned path repository:<id>/… names a repository no project binding resolves'
     - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
     - after-unknown: '--after names a job that is not a job of this workflow'
     - after-settled: '--after names a job that already settled failed or cancelled; a settled row never succeeds, so the dependant could never run. A retry of that job (an answered ask included) chains through its retry lineage: enqueue the same op and cut ordinal without --after'

@@ -52,7 +52,7 @@ reads:
         family, idioms, playbook), every frontend pattern and every UI composition, presentation and
         proof rule - plus the brand record the product is drawn inside.
   - id: repo
-    path: repository:<repo-id>/<bound-paths>
+    path: <app>/<bound-paths>
     purpose:
       en: Resolve the bound grammar repository, its actual checkout, root, HEAD and dirty state, and read
         its own conventions - how a contract component is declared, how slots and states are typed,
@@ -60,7 +60,7 @@ reads:
         published. The grammar is a separate repository with its own rules; this operation follows
         them instead of importing another repository's habits.
   - id: consumer
-    path: repository:<consumer-id>/<consumer-manifest>
+    path: <consumer-app>/fe/<consumer-manifest>
     purpose:
       en: Read the consuming frontend repository's declared dependency on the grammar package - the exact
         package name and the version it currently resolves - so the published version can actually
@@ -89,7 +89,7 @@ writes:
         prose. Missing refs/dependencies/acceptance require a reported gap or separately selected
         scope update; never add/remove them to obtain pass.
   - id: source
-    path: repository:<repo-id>/<write-ceiling>
+    path: <app>/<write-ceiling>
     fields:
       - grammar package source for the one new unit
       - its stories and tests
@@ -263,10 +263,10 @@ blockers:
         depends on is missing or not effectively done. Report node/resource IDs; never author the
         missing record or run a predecessor here.
 placeholders:
-  repo-id: Resolved direct repository name or path of the bound grammar repository
+  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths of the grammar repository and the canon
-  consumer-id: Resolved repository name or path of the consuming frontend
+  consumer-app: The bound checkout of the consuming app (its root); the manifest lives on its fe side
   consumer-manifest: Declared dependency manifest and lockfile of the consumer
 layoutPolicy:
   checks: [starci-validate]

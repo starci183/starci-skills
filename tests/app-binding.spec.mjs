@@ -46,17 +46,17 @@ test('one app binding resolves both roles, app-root Work and one op worktree', (
   assert.deepEqual(boundRepos(app, { sourceRoot: source }), [app]);
   assert.equal(defaultPushRepos({ repos: ['../app'] }, { sourceRoot: source }).filter((r) => r === app).length, 1);
   assert.deepEqual(workspaceBoundRepoRoots({ env: { STARCI_SOURCE_ROOT: source } }), [app.replace(/\\/g, '/')]);
-  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['src/main.ts'], repo: app }), { ok: true, repository: 'be' });
-  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['src/page.tsx'], repo: app }), { ok: true, repository: 'fe' });
-  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['src/main.ts', 'src/page.tsx'], repo: app }), { ok: true, repository: 'app' });
+  // Every owned path is app-relative: its first segment names its side.
+  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['be/src/main.ts'], repo: app }), { ok: true, repository: 'be' });
+  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['fe/src/page.tsx'], repo: app }), { ok: true, repository: 'fe' });
+  assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['be/src/main.ts', 'fe/src/page.tsx'], repo: app }), { ok: true, repository: 'app' });
   assert.deepEqual(enqueueRepository({ op: 'code.refactor', repository: null, ownedPaths: ['package.json'], repo: app }), { ok: true, repository: 'app' });
-  const both = ownedPathPlacements({ op: 'code.refactor', payload: { repository: 'app' }, ownedPaths: ['src/main.ts', 'src/page.tsx'], repo: app });
-  assert.deepEqual(both.map((p) => p.role), ['be', 'fe']);
-  const grants = ownedPathPlacements({ op: 'code.refactor', payload: {}, ownedPaths: ['be/src/main.ts', 'fe/src/page.tsx', '.starciwork/features/a'], repo: app });
-  assert.deepEqual(grants.map((p) => [p.role, p.base, p.path]), [
-    ['be', path.join(app, 'be'), 'src/main.ts'],
-    ['fe', path.join(app, 'fe'), 'src/page.tsx'],
-    [null, app, '.starciwork/features/a'],
+  const grants = ownedPathPlacements({ op: 'code.refactor', payload: {}, ownedPaths: ['be/src/main.ts', 'fe/src/page.tsx', '.starciwork/features/a', 'package.json'], repo: app });
+  assert.deepEqual(grants.map((p) => [p.role, p.base, p.path, p.via]), [
+    ['be', app, 'be/src/main.ts', 'app-relative'],
+    ['fe', app, 'fe/src/page.tsx', 'app-relative'],
+    [null, app, '.starciwork/features/a', 'work-owner'],
+    ['app', app, 'package.json', 'app-relative'],
   ]);
   const isolation = planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: grants, binding });
   assert.equal(isolation.isolate, true);
@@ -67,7 +67,7 @@ test('one app binding resolves both roles, app-root Work and one op worktree', (
   assert.ok(fs.existsSync(path.join(wt, 'be', 'src', 'main.ts')));
   assert.ok(fs.existsSync(path.join(wt, 'fe', 'src', 'page.tsx')));
   const mapped = ownedPathPlacements({ op: 'code.refactor', payload: {}, ownedPaths: ['be/src/main.ts', 'fe/src/page.tsx', '.starciwork/features/a'], repo: app, worktree: wt });
-  assert.deepEqual(mapped.map((p) => [p.role, p.base]), [['be', path.join(wt, 'be')], ['fe', path.join(wt, 'fe')], [null, wt]]);
+  assert.deepEqual(mapped.map((p) => [p.role, path.resolve(p.base), p.path]), [['be', path.resolve(wt), 'be/src/main.ts'], ['fe', path.resolve(wt), 'fe/src/page.tsx'], [null, path.resolve(wt), '.starciwork/features/a']]);
 
   fs.writeFileSync(path.join(source, '.workspaces', 'projects', 'sample', 'work.json'), JSON.stringify({
     schema: 'starci/workspace-binding@1', project: 'sample',

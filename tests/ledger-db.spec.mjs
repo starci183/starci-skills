@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {LEDGER_SCHEMA,LEDGER_VERSION,ensureWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,openLedger,releaseTwoPhase,reserveTwoPhase} from '../engine/ledger-db.mjs';
-import {MACHINE_SCHEMA,machineFileFor,openMachine} from '../engine/machine-db.mjs';
+import {MACHINE_SCHEMA,MACHINE_VERSION,machineFileFor,openMachine} from '../engine/machine-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 
 /**
@@ -118,11 +118,11 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   ledger.close();
 });
 
-test('the machine schema carries ledgers, host leases and budgets at version 1',t=>{
+test('the machine schema carries ledgers, host leases and budgets at MACHINE_VERSION',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const machine=openMachine({file:path.join(dir,'machine.sqlite')});
   assert.equal(machine.schema,MACHINE_SCHEMA);
-  assert.equal(Number(machine.db.prepare('PRAGMA user_version').get().user_version),1);
+  assert.equal(Number(machine.db.prepare('PRAGMA user_version').get().user_version),MACHINE_VERSION);
   const names=machine.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name);
   for(const table of ['ledgers','host_resources','host_leases','budgets','budget_reservations'])assert.ok(names.includes(table),`missing table ${table}`);
   assert.equal(machine.db.prepare('PRAGMA journal_mode').get().journal_mode,'wal');

@@ -180,10 +180,9 @@ function ownedIndex(dirs) {
   return index;
 }
 
-/** The repository root an owner directory sits in: its absolute path with its own declared tail removed.
- * `resolveOwnedDirs` already joined the two, and keeps the `repository:<name>/` pin in `rel`. */
+/** The root an owner directory sits in (the app root): its absolute path with its app-relative `rel` removed. */
 function repoRootBehind(dir) {
-  const tail = slash(dir.rel).replace(/^repository:[^/]+\//, '');
+  const tail = slash(dir.rel);
   const abs = slash(dir.abs);
   return abs.endsWith(`/${tail}`) ? abs.slice(0, abs.length - tail.length - 1) : abs;
 }
