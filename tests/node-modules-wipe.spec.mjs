@@ -12,7 +12,7 @@ import { landCommits, removeScratch, liveDepsState } from '../scripts/supervisor
 import { runHousekeeping, describe as describeHousekeeping } from '../scripts/supervisor/housekeeping.mjs';
 
 const LINK = process.platform === 'win32' ? 'junction' : 'dir';
-const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'nm-wipe-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
+const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-nm-wipe-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
 const git = (cwd, ...args) => {
   const r = spawnSync('git', ['-c', 'user.name=spec', '-c', 'user.email=spec@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);

@@ -10,7 +10,7 @@ import { emittedCodes } from '../scripts/checks/failure-codes.mjs';
 
 // Each fixture is removed when its test ends: under the suite's isolated-temp preload a leftover temp dir fails the spec file.
 function fixture(t, source) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'failure-codes-scan-'));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-failure-codes-scan-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
   write('scripts/checks/failure-codes.not-codes', '# none\n');

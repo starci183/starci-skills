@@ -25,7 +25,7 @@ test.after(() => {
 
 /** Packs `packages/<dir>` and extracts it as `<repo>/node_modules/@starci/<name>`, with its dependencies linked from the runtime's install. */
 function installPacked(repo, dir, name) {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'canon-pack-'));
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-pack-'));
   made.push(out);
   const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', out], { cwd: path.join(RUNTIME, 'packages', ...dir.split('/')), encoding: 'utf8', shell: process.platform === 'win32' }).trim().split(/\r?\n/).at(-1);
   const target = path.join(repo, 'node_modules', '@starci', name);

@@ -97,7 +97,7 @@ test('a cleared alert closes its fix; an unclaimed reservation past the TTL is d
 });
 
 test('main-checkout integrity: a deleted tracked file and an empty node_modules are diagnosed and dispatched once to a core lane', () => {
-  const main = fs.mkdtempSync(path.join(os.tmpdir(), 'debug-integrity-'));
+  const main = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-debug-integrity-'));
   const git = (...args) => execFileSync('git', args, { cwd: main, encoding: 'utf8', windowsHide: true });
   try {
     git('init', '-q');
@@ -137,7 +137,7 @@ test('worktrees: over the configured limit or with a vanished directory is an al
 });
 
 test('CLI: pass twice over the recorded snapshot dispatches once, in a temp state root', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'debug-pass-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-debug-pass-'));
   const env = { ...process.env, STARCI_LOCAL_ROOT: root };
   const run = (...args) => JSON.parse(execFileSync(process.execPath, ['scripts/supervisor/debug-pass.mjs', ...args], { cwd: ROOT, env, encoding: 'utf8' }));
   try {

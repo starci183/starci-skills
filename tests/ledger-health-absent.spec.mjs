@@ -16,7 +16,7 @@ import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 const S = hostSettings();
 const T0 = Date.UTC(2026, 8, 30, 22, 30, 0);
 
-function tempDir() { return fs.mkdtempSync(path.join(os.tmpdir(), 'ledger-absent-')); }
+function tempDir() { return fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ledger-absent-')); }
 
 // The real quickCheck (no quickCheck seam): the defect sits in what it answers for an absent file.
 function controller(over = {}) {

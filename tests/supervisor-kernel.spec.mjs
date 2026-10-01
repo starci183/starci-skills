@@ -741,7 +741,7 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
   const out = await launch(env, host);
   assert.deepEqual(host.calls.bind, [out.terminal], 'the seat guard is bound to the seat terminal');
   assert.equal(host.calls.start[0].command, undefined, 'no command is composed for a worker-start seat');
-  const root = tmp(t, 'seat-guard-');
+  const root = tmp(t, 'starci-seat-guard-');
   const guard = path.join(root, 'runtime', 'guards', 'seats');
   fs.mkdirSync(guard, { recursive: true });
   fs.writeFileSync(path.join(guard, 'term_seat.json'), JSON.stringify({ role: 'supervisor', deniedTools: ['Agent', 'Task'] }));
