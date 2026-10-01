@@ -5,7 +5,7 @@ state: done
 repository: be
 owners:
   - {role: feature, path: be/src/modules/domain/task}
-  - {role: module, path: be/src/features/todo/transport/graphql/mutations/task/delete-task}
+  - {role: module, path: be/src/features/todo/transport/graphql}
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # Done: br.task.delete.final is proven at rev 1 (delete-task.handler.spec.ts's named stays-gone test
 # - TASK_NOT_FOUND on read-back and absence from the owner's own list - plus the live scripts/

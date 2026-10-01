@@ -9,7 +9,7 @@ repository: fe
 # both plan/page.tsx and plan/usage/page.tsx, so the claimed extent is unchanged. Quoted because
 # core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "fe/apps/web/src/app/[lang]/plan"}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/plan"}
   - {role: module, path: fe/apps/web/src/components/blocks/plan-usage}
 proves: [ui.plan.usage]
 change:

@@ -10,8 +10,7 @@ repository: fe
 # en|vi), so the route ownership is now both directories: the page and its media handler. A path
 # that exists but is not the implementation is invisible to an existence check; that is the hazard.
 owners:
-  - {role: route, path: "fe/apps/web/src/app/[lang]/sign-in"}
-  - {role: route, path: fe/apps/web/src/app/sign-in}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/sign-in"}
   - {role: block, path: fe/apps/web/src/components/blocks/sign-in-screen}
 revision: b104d71744a67bd6c231e374292c12d78fa7ca9a
 proves: [ui.login.sign-in]

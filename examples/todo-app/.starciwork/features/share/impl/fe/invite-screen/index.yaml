@@ -8,12 +8,11 @@ repository: fe
 # than authored: src/app/[lang]/tasks/[taskId]/share. src/app/tasks never existed. The rev-1 reason's
 # served-route claim /tasks/<id>/share is the locale-prefixed URL beneath that segment.
 owners:
-  - {role: route, path: "fe/apps/web/src/app/[lang]/tasks/[taskId]/share"}
-  - {role: feature, path: fe/apps/web/src/features/pages/share}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/tasks/[taskId]/share"}
+  - {role: feature, path: fe/apps/web/src/features/pages/TaskSharePage}
   - {role: block, path: fe/apps/web/src/components/blocks/share-invite}
   - {role: hooks, path: fe/apps/web/src/hooks/share}
   - {role: api, path: fe/apps/web/src/modules/api}
-  - {role: leaf, path: fe/apps/web/src/modules/ui/Link}
   - {role: hooks, path: fe/apps/web/src/hooks/auth}
 proves: [ui.share.invite]
 change:

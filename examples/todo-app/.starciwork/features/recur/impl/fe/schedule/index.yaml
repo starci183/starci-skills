@@ -10,7 +10,7 @@ repository: fe
 # route now lives is stale for the same reason. Quoted because core/yaml.mjs rejects a bracketed
 # plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "fe/apps/web/src/app/[lang]/recur"}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/recur"}
   - {role: block, path: fe/apps/web/src/components/blocks/recur}
 proves: [ui.recur.schedule]
 # gap.recur.render-proof closed at rev 4 (w10): the mobile palette failures were antialiased

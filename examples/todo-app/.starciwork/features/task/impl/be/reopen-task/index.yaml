@@ -5,7 +5,7 @@ state: done
 repository: be
 owners:
   - {role: feature, path: be/src/modules/domain/task}
-  - {role: module, path: be/src/features/todo/transport/graphql/mutations/task/reopen-task}
+  - {role: module, path: be/src/features/todo/transport/graphql}
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # Done: this handler is the implementation of br.task.complete.once's reversible statement (owner
 # reopens, task reads incomplete, completedAt cleared - ac.task.complete.once.is-reversible in

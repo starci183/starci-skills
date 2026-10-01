@@ -2156,7 +2156,8 @@ records:
     schema: work/ui-screen@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   ui.login.sign-in:
     schema: work/ui-screen@1
     feature: login
@@ -2206,16 +2207,16 @@ records:
     effectiveState: null
 tally:
   overall:
-    done: 54
+    done: 53
     todo: 27
-    stale: 120
+    stale: 121
     blocked: 27
     total: 228
   byFeature:
     audit:
-      done: 6
+      done: 5
       todo: 3
-      stale: 21
+      stale: 22
       blocked: 2
       total: 32
     login:

@@ -9,8 +9,8 @@ repository: fe
 # scalar inside a flow mapping. Historical prose elsewhere in this record keeps its original paths.
 owners:
   - {role: block, path: fe/apps/web/src/components/blocks/task-list}
-  - {role: feature, path: fe/apps/web/src/features/pages/tasks}
-  - {role: route, path: "fe/apps/web/src/app/[lang]/tasks"}
+  - {role: feature, path: fe/apps/web/src/features/pages/TasksPage}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/tasks"}
 revision: 5ff83e1986186965c1272290830323ef2bc2db2d
 proves: [ui.task.list]
 verification:

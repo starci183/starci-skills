@@ -27,8 +27,8 @@ acceptance:
       - The confirmation is refused for that product by name, the cart keeps its lines, and no stock moved.
 module:
   - be/src/modules/domain/order
-  - be/src/modules/integrations/identity
-  - be/src/modules/integrations/order
+  - be/src/modules/integrations/identity-api
+  - be/src/modules/integrations/order-api
 change:
   rev: 2
   kind: breaking

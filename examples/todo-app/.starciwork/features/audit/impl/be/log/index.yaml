@@ -5,7 +5,7 @@ state: done
 repository: be
 owners:
   - {role: module, path: be/src/modules/domain/audit}
-  - {role: module, path: be/src/features/todo/transport/graphql/queries/audit/export-my-data}
+  - {role: module, path: be/src/features/todo/transport/graphql}
 proves: [br.audit.append-only, br.audit.retention, sds.audit.log-chain]
 
 change:

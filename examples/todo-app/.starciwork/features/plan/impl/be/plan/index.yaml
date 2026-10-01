@@ -6,9 +6,8 @@ repository: be
 owners:
   - {role: module, path: be/src/modules/domain/plan}
   - {role: module, path: be/src/modules/integrations/sepay}
-  - {role: module, path: be/src/features/todo/transport/http/webhooks/sepay}
-  - {role: module, path: be/src/features/todo/transport/graphql/mutations/plan}
-  - {role: module, path: be/src/features/todo/transport/graphql/queries/plan}
+  - {role: module, path: be/src/features/todo/transport/http}
+  - {role: module, path: be/src/features/todo/transport/graphql}
 proves: [br.plan.caps.limit, br.plan.active-scope, br.plan.downgrade.freeze, br.plan.payment.idempotent,
   br.plan.lapse.reverts-on-read, sds.plan.subscription-lifecycle, sds.plan.cap-guard,
   contract.plan.create-precondition]

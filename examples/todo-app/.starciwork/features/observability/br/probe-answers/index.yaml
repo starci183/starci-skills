@@ -20,4 +20,4 @@ acceptance:
     when: GET /ready arrives
     then:
       - It answers the postgres-unavailable refusal, mapped to 503.
-module: [be/src/modules/platform/observability, be/src/features/todo/transport/http/health]
+module: [be/src/modules/platform/observability, be/src/features/health/transport/http]

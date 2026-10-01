@@ -5,8 +5,7 @@ state: done
 repository: be
 owners:
   - {role: module, path: be/src/modules/domain/recur}
-  - {role: feature, path: be/src/features/todo/transport/graphql/mutations/recur}
-  - {role: feature, path: be/src/features/todo/transport/graphql/queries/recur}
+  - {role: feature, path: be/src/features/todo/transport/graphql}
 proves: [br.recur.generation.once, br.recur.impossible-date.skips, br.recur.occurrence.owned-by-rule-owner,
   br.recur.ending.preserves-history, br.recur.timezone.owner-local-time, sds.recur.occurrence-lifecycle,
   sds.recur.generation-engine]

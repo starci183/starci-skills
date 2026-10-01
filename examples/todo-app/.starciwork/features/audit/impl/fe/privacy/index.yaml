@@ -9,7 +9,7 @@ repository: fe
 # privacy/, so the served route is still /<lang>/audit/privacy as that narrative says. Quoted because
 # core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "fe/apps/web/src/app/[lang]/audit"}
+  - {role: route, path: "fe/apps/web/src/app/[locale]/audit"}
   - {role: block, path: fe/apps/web/src/components/blocks/privacy}
 proves: [ui.audit.privacy]
 

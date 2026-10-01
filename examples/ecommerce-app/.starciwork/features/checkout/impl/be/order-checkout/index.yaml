@@ -8,7 +8,7 @@ owners:
   - {role: module, path: be/src/modules/domain/cart}
   - {role: module, path: be/src/modules/domain/catalog}
   - {role: module, path: be/src/modules/domain/payment}
-  - {role: module, path: be/src/modules/integrations/identity}
+  - {role: module, path: be/src/modules/integrations/identity-api}
   - {role: feature, path: be/src/features/checkout}
 proves: [br.checkout.place-order, fr.checkout.place-order, sds.checkout.order-flow, contract.checkout.order-for-identity, contract.identity.internal.sessions, contract.identity.health]
 

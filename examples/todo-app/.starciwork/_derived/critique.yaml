@@ -62,29 +62,17 @@ findings:
       - ui.recur.schedule
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 54 other record(s) back to todo, would
-      stale 38 evidence file(s), and touches 32 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit,
-      be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/mutations/session,
-      be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/mutations/task/reopen-task,
-      be/src/features/todo/transport/graphql/queries/audit/export-my-data,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/graphql/queries/recur,
-      be/src/features/todo/transport/graphql/queries/share,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/audit,
-      be/src/modules/domain/plan, be/src/modules/domain/recur, be/src/modules/domain/session,
-      be/src/modules/domain/share, be/src/modules/domain/task, be/src/modules/integrations/keycloak,
-      be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/recur,
-      fe/apps/web/src/app/[lang]/sign-in, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/app/sign-in, fe/apps/web/src/components/blocks/plan-usage,
+      stale 38 evidence file(s), and touches 20 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/audit, be/src/modules/domain/identity, be/src/modules/domain/plan,
+      be/src/modules/domain/recur, be/src/modules/domain/share, be/src/modules/domain/task,
+      be/src/modules/integrations/keycloak, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/app/[locale]/sign-in,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
       fe/apps/web/src/components/blocks/recur, fe/apps/web/src/components/blocks/sign-in-screen,
-      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/tasks) - this is
-      the number a reviewer wants before approving the change.
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.password.sign-in
     kind: blast-radius
     severity: critical
@@ -141,27 +129,17 @@ findings:
       - ui.recur.schedule
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 50 other record(s) back to todo, would
-      stale 36 evidence file(s), and touches 29 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/mutations/session,
-      be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/mutations/task/reopen-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/graphql/queries/recur,
-      be/src/features/todo/transport/graphql/queries/share,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/recur, be/src/modules/domain/session, be/src/modules/domain/share,
-      be/src/modules/domain/task, be/src/modules/integrations/keycloak,
-      be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/recur,
-      fe/apps/web/src/app/[lang]/sign-in, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/app/sign-in, fe/apps/web/src/components/blocks/plan-usage,
-      fe/apps/web/src/components/blocks/recur, fe/apps/web/src/components/blocks/sign-in-screen,
-      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/tasks) - this is
-      the number a reviewer wants before approving the change.
+      stale 36 evidence file(s), and touches 19 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/identity, be/src/modules/domain/plan, be/src/modules/domain/recur,
+      be/src/modules/domain/share, be/src/modules/domain/task, be/src/modules/integrations/keycloak,
+      be/src/modules/integrations/sepay, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/plan, fe/apps/web/src/app/[locale]/recur,
+      fe/apps/web/src/app/[locale]/sign-in, fe/apps/web/src/app/[locale]/tasks,
+      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/recur,
+      fe/apps/web/src/components/blocks/sign-in-screen, fe/apps/web/src/components/blocks/task-list,
+      fe/apps/web/src/features/pages/TasksPage) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -210,26 +188,16 @@ findings:
       - ui.recur.schedule
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 42 other record(s) back to todo,
-      would stale 30 evidence file(s), and touches 26 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/mutations/session,
-      be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/mutations/task/reopen-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/graphql/queries/recur,
-      be/src/features/todo/transport/graphql/queries/share,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/recur, be/src/modules/domain/session, be/src/modules/domain/share,
-      be/src/modules/domain/task, be/src/modules/integrations/keycloak,
-      be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/recur,
-      fe/apps/web/src/app/[lang]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      would stale 30 evidence file(s), and touches 17 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/identity, be/src/modules/domain/plan, be/src/modules/domain/recur,
+      be/src/modules/domain/share, be/src/modules/domain/task, be/src/modules/integrations/keycloak,
+      be/src/modules/integrations/sepay, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/plan, fe/apps/web/src/app/[locale]/recur,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
       fe/apps/web/src/components/blocks/recur, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      fe/apps/web/src/features/pages/TasksPage) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.task.single-owner
     kind: blast-radius
     severity: critical
@@ -265,22 +233,14 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 29 other record(s) back to todo, would
-      stale 24 evidence file(s), and touches 21 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit,
-      be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/mutations/task/delete-task,
-      be/src/features/todo/transport/graphql/queries/audit/export-my-data,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/health, be/src/features/todo/transport/http/upload,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/audit,
-      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
-      be/src/modules/integrations/upload, be/src/modules/integrations/upload/errors,
-      be/src/modules/platform/databases/postgresql/primary, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/tasks, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      stale 24 evidence file(s), and touches 14 code path(s) (be/src/features/health/transport/http,
+      be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/audit, be/src/modules/domain/plan, be/src/modules/domain/task,
+      be/src/modules/domain/upload, be/src/modules/integrations/sepay,
+      be/src/modules/integrations/upload-storage, be/src/modules/platform/database,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/tasks,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.caps.limit
     kind: blast-radius
     severity: critical
@@ -314,16 +274,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.plan.caps.limit sends 27 other record(s) back to todo, would stale
-      17 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
+      17 evidence file(s), and touches 11 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/features/todo/transport/http, be/src/modules/domain/plan, be/src/modules/domain/task,
+      be/src/modules/integrations/sepay, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/plan, fe/apps/web/src/app/[locale]/tasks,
       fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      fe/apps/web/src/features/pages/TasksPage) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.plan.downgrade.freeze
     kind: blast-radius
     severity: critical
@@ -354,16 +311,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.plan.downgrade.freeze sends 24 other record(s) back to todo, would
-      stale 16 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      stale 16 evidence file(s), and touches 11 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.lapse.reverts-on-read
     kind: blast-radius
     severity: critical
@@ -393,16 +347,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.plan.lapse.reverts-on-read sends 23 other record(s) back to todo,
-      would stale 15 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      would stale 15 evidence file(s), and touches 11 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.payment.idempotent
     kind: blast-radius
     severity: critical
@@ -432,16 +383,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.plan.payment.idempotent sends 23 other record(s) back to todo,
-      would stale 15 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      would stale 15 evidence file(s), and touches 11 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.list.owned
     kind: blast-radius
     severity: critical
@@ -467,18 +415,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.task.list.owned sends 19 other record(s) back to todo, would stale
-      14 evidence file(s), and touches 15 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/graphql/queries/task/list-tasks,
-      be/src/features/todo/transport/graphql/queries/task/task-counts,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
+      14 evidence file(s), and touches 11 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/features/todo/transport/http, be/src/modules/domain/plan, be/src/modules/domain/task,
+      be/src/modules/integrations/sepay, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/plan, fe/apps/web/src/app/[locale]/tasks,
       fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      fe/apps/web/src/features/pages/TasksPage) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.task.delete.final
     kind: blast-radius
     severity: critical
@@ -503,17 +446,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.task.delete.final sends 18 other record(s) back to todo, would
-      stale 15 evidence file(s), and touches 14 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/mutations/task/delete-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      stale 15 evidence file(s), and touches 11 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
@@ -537,16 +476,13 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.revoke.on-read sends 17 other record(s) back to todo, would
-      stale 13 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/queries/share, be/src/modules/domain/share,
-      be/src/modules/domain/task, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/tasks/[taskId]/share,
-      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/share,
-      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api,
-      fe/apps/web/src/modules/ui/Link) - this is the number a reviewer wants before approving the
-      change.
+      stale 13 evidence file(s), and touches 10 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/share,
+      be/src/modules/domain/task, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/tasks/[taskId]/share,
+      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/TaskSharePage,
+      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.role.permissions
     kind: blast-radius
     severity: critical
@@ -570,16 +506,13 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.role.permissions sends 17 other record(s) back to todo, would
-      stale 14 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/queries/share, be/src/modules/domain/share,
-      be/src/modules/domain/task, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/tasks/[taskId]/share,
-      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/share,
-      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api,
-      fe/apps/web/src/modules/ui/Link) - this is the number a reviewer wants before approving the
-      change.
+      stale 14 evidence file(s), and touches 10 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/share,
+      be/src/modules/domain/task, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/tasks/[taskId]/share,
+      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/TaskSharePage,
+      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.retention
     kind: blast-radius
     severity: critical
@@ -600,10 +533,8 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.retention sends 14 other record(s) back to todo, would stale
-      11 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit,
-      be/src/features/todo/transport/graphql/queries/audit/export-my-data,
-      be/src/modules/domain/audit, fe/apps/web/src/app/[lang]/audit,
+      12 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/audit, fe/apps/web/src/app/[locale]/audit,
       fe/apps/web/src/components/blocks/privacy) - this is the number a reviewer wants before
       approving the change.
   - id: blast-radius:br.plan.active-scope
@@ -626,16 +557,13 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.plan.active-scope sends 14 other record(s) back to todo, would
-      stale 12 evidence file(s), and touches 13 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/plan, fe/apps/web/src/app/[lang]/tasks,
-      fe/apps/web/src/components/blocks/plan-usage, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      stale 12 evidence file(s), and touches 11 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/features/todo/transport/http,
+      be/src/modules/domain/plan, be/src/modules/domain/task, be/src/modules/integrations/sepay,
+      be/src/modules/platform/outbox, fe/apps/web/src/app/[locale]/plan,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/plan-usage,
+      fe/apps/web/src/components/blocks/task-list, fe/apps/web/src/features/pages/TasksPage) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.complete.once
     kind: blast-radius
     severity: critical
@@ -656,12 +584,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.task.complete.once sends 14 other record(s) back to todo, would
-      stale 10 evidence file(s), and touches 8 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/features/todo/transport/graphql/mutations/task/reopen-task,
-      be/src/features/todo/transport/http/health, be/src/modules/domain/task,
-      be/src/modules/platform/databases/postgresql/primary, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
+      stale 10 evidence file(s), and touches 7 code path(s) (be/src/features/health/transport/http,
+      be/src/features/todo/transport/graphql, be/src/modules/domain/task,
+      be/src/modules/platform/database, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/components/blocks/recur) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.append-only
     kind: blast-radius
@@ -682,11 +608,8 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.append-only sends 13 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 6 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit,
-      be/src/features/todo/transport/graphql/queries/audit/audit-log,
-      be/src/features/todo/transport/graphql/queries/audit/export-my-data,
-      be/src/modules/domain/audit, fe/apps/web/src/app/[lang]/audit,
+      stale 12 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/audit, fe/apps/web/src/app/[locale]/audit,
       fe/apps/web/src/components/blocks/privacy) - this is the number a reviewer wants before
       approving the change.
   - id: blast-radius:br.recur.impossible-date.skips
@@ -708,10 +631,9 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.impossible-date.skips sends 13 other record(s) back to todo,
-      would stale 6 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/queries/recur, be/src/modules/domain/recur,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
+      would stale 6 evidence file(s), and touches 4 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/recur,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/components/blocks/recur) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.recur.timezone.owner-local-time
     kind: blast-radius
@@ -732,10 +654,9 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.timezone.owner-local-time sends 13 other record(s) back to
-      todo, would stale 6 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/queries/recur, be/src/modules/domain/recur,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
+      todo, would stale 6 evidence file(s), and touches 4 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/recur,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/components/blocks/recur) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.digest.window
     kind: blast-radius
@@ -754,13 +675,12 @@ findings:
       - sds.notify.delivery-lifecycle
       - uat.notify.digest-and-unsubscribe
     because: A breaking change to br.notify.digest.window sends 11 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 8 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/notify,
-      be/src/features/todo/transport/graphql/queries/notify, be/src/modules/domain/notify,
-      be/src/modules/integrations/notify-queue, be/src/modules/integrations/notify-queue/errors,
+      stale 6 evidence file(s), and touches 6 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/notify,
+      be/src/modules/domain/notify/persistence/entities/notification.entity.ts,
       be/src/modules/integrations/notify-smtp, be/src/modules/integrations/notify-smtp/errors,
-      be/src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts) - this
-      is the number a reviewer wants before approving the change.
+      be/src/modules/platform/messaging) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.recur.ending.preserves-history
     kind: blast-radius
     severity: critical
@@ -778,10 +698,9 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.ending.preserves-history sends 11 other record(s) back to
-      todo, would stale 4 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/queries/recur, be/src/modules/domain/recur,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
+      todo, would stale 4 evidence file(s), and touches 4 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/recur,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/components/blocks/recur) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.task.title.required
     kind: blast-radius
@@ -800,15 +719,12 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 10 evidence file(s), and touches 11 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/plan,
-      be/src/features/todo/transport/graphql/mutations/task/create-task,
-      be/src/features/todo/transport/graphql/queries/plan,
-      be/src/features/todo/transport/http/webhooks/sepay, be/src/modules/domain/plan,
-      be/src/modules/domain/task, be/src/modules/integrations/sepay, be/src/modules/platform/events,
-      fe/apps/web/src/app/[lang]/tasks, fe/apps/web/src/components/blocks/task-list,
-      fe/apps/web/src/features/pages/tasks) - this is the number a reviewer wants before approving
-      the change.
+      stale 10 evidence file(s), and touches 9 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/features/todo/transport/http, be/src/modules/domain/plan, be/src/modules/domain/task,
+      be/src/modules/integrations/sepay, be/src/modules/platform/outbox,
+      fe/apps/web/src/app/[locale]/tasks, fe/apps/web/src/components/blocks/task-list,
+      fe/apps/web/src/features/pages/TasksPage) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.notify.delivery.once
     kind: blast-radius
     severity: critical
@@ -825,13 +741,12 @@ findings:
       - nfr.notify.delivery.guarantee
       - sds.notify.delivery-lifecycle
     because: A breaking change to br.notify.delivery.once sends 10 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 8 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/notify,
-      be/src/features/todo/transport/graphql/queries/notify, be/src/modules/domain/notify,
-      be/src/modules/integrations/notify-queue, be/src/modules/integrations/notify-queue/errors,
+      stale 4 evidence file(s), and touches 6 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/notify,
+      be/src/modules/domain/notify/persistence/entities/notification.entity.ts,
       be/src/modules/integrations/notify-smtp, be/src/modules/integrations/notify-smtp/errors,
-      be/src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts) - this
-      is the number a reviewer wants before approving the change.
+      be/src/modules/platform/messaging) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.share.invite.expiry
     kind: blast-radius
     severity: critical
@@ -848,14 +763,11 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.invite.expiry sends 10 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 10 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/share,
-      be/src/features/todo/transport/graphql/queries/share, be/src/modules/domain/share,
-      fe/apps/web/src/app/[lang]/tasks/[taskId]/share,
-      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/share,
-      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api,
-      fe/apps/web/src/modules/ui/Link) - this is the number a reviewer wants before approving the
-      change.
+      stale 8 evidence file(s), and touches 8 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/share, fe/apps/web/src/app/[locale]/tasks/[taskId]/share,
+      fe/apps/web/src/components/blocks/share-invite, fe/apps/web/src/features/pages/TaskSharePage,
+      fe/apps/web/src/hooks/auth, fe/apps/web/src/hooks/share, fe/apps/web/src/modules/api) - this
+      is the number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.erasure.right
     kind: blast-radius
     severity: warn
@@ -871,10 +783,10 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.right sends 9 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 4 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit, be/src/modules/domain/audit,
-      fe/apps/web/src/app/[lang]/audit, fe/apps/web/src/components/blocks/privacy) - this is the
-      number a reviewer wants before approving the change.
+      stale 7 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/audit, fe/apps/web/src/app/[locale]/audit,
+      fe/apps/web/src/components/blocks/privacy) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.notify.unsubscribe.honored
     kind: blast-radius
     severity: warn
@@ -890,14 +802,13 @@ findings:
       - uat.notify.digest-and-unsubscribe
       - ui.notify.preferences
     because: A breaking change to br.notify.unsubscribe.honored sends 9 other record(s) back to todo,
-      would stale 7 evidence file(s), and touches 12 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/notify,
-      be/src/features/todo/transport/graphql/queries/notify, be/src/modules/domain/notify,
-      be/src/modules/integrations/notify-queue, be/src/modules/integrations/notify-queue/errors,
+      would stale 7 evidence file(s), and touches 10 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/notify,
+      be/src/modules/domain/notify/persistence/entities/delivery-attempt.entity.ts,
+      be/src/modules/domain/notify/persistence/entities/preference.entity.ts,
       be/src/modules/integrations/notify-smtp, be/src/modules/integrations/notify-smtp/errors,
-      be/src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts,
-      be/src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts,
-      fe/apps/web/src/app/[lang]/notify, fe/apps/web/src/components/blocks/notify-preferences,
+      be/src/modules/platform/messaging, fe/apps/web/src/app/[locale]/notify,
+      fe/apps/web/src/components/blocks/notify-preferences,
       fe/apps/web/src/components/blocks/notify-unsubscribe) - this is the number a reviewer wants
       before approving the change.
   - id: blast-radius:br.audit.erasure.logged
@@ -914,10 +825,10 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.logged sends 8 other record(s) back to todo, would
-      stale 5 evidence file(s), and touches 4 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/audit, be/src/modules/domain/audit,
-      fe/apps/web/src/app/[lang]/audit, fe/apps/web/src/components/blocks/privacy) - this is the
-      number a reviewer wants before approving the change.
+      stale 6 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/audit, fe/apps/web/src/app/[locale]/audit,
+      fe/apps/web/src/components/blocks/privacy) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.recur.generation.once
     kind: blast-radius
     severity: warn
@@ -932,11 +843,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.generation.once sends 8 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/queries/recur, be/src/modules/domain/recur,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
-      number a reviewer wants before approving the change.
+      stale 4 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/recur, fe/apps/web/src/app/[locale]/recur,
+      fe/apps/web/src/components/blocks/recur) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.recur.occurrence.owned-by-rule-owner
     kind: blast-radius
     severity: warn
@@ -951,10 +861,9 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.occurrence.owned-by-rule-owner sends 8 other record(s) back
-      to todo, would stale 4 evidence file(s), and touches 5 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/recur,
-      be/src/features/todo/transport/graphql/queries/recur, be/src/modules/domain/recur,
-      fe/apps/web/src/app/[lang]/recur, fe/apps/web/src/components/blocks/recur) - this is the
+      to todo, would stale 4 evidence file(s), and touches 4 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/recur,
+      fe/apps/web/src/app/[locale]/recur, fe/apps/web/src/components/blocks/recur) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.share.editor.no-delete
     kind: blast-radius
@@ -970,9 +879,8 @@ findings:
       - impl.task.be.platform-events
       - sds.task.ownership-guard
     because: A breaking change to br.share.editor.no-delete sends 8 other record(s) back to todo, would
-      stale 7 evidence file(s), and touches 4 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/task/complete-task,
-      be/src/modules/domain/share, be/src/modules/domain/task, be/src/modules/platform/events) -
+      stale 7 evidence file(s), and touches 4 code path(s) (be/src/features/todo/transport/graphql,
+      be/src/modules/domain/share, be/src/modules/domain/task, be/src/modules/platform/outbox) -
       this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.failure.classified
     kind: blast-radius
@@ -985,13 +893,12 @@ findings:
       - integration.notify.smtp
       - sds.notify.delivery-lifecycle
     because: A breaking change to br.notify.failure.classified sends 5 other record(s) back to todo,
-      would stale 3 evidence file(s), and touches 8 code path(s)
-      (be/src/features/todo/transport/graphql/mutations/notify,
-      be/src/features/todo/transport/graphql/queries/notify, be/src/modules/domain/notify,
-      be/src/modules/integrations/notify-queue, be/src/modules/integrations/notify-queue/errors,
+      would stale 3 evidence file(s), and touches 6 code path(s)
+      (be/src/features/todo/transport/graphql, be/src/modules/domain/notify,
+      be/src/modules/domain/notify/persistence/entities/delivery-attempt.entity.ts,
       be/src/modules/integrations/notify-smtp, be/src/modules/integrations/notify-smtp/errors,
-      be/src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts)
-      - this is the number a reviewer wants before approving the change.
+      be/src/modules/platform/messaging) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.upload.lifecycle
     kind: blast-radius
     severity: warn
@@ -1003,9 +910,9 @@ findings:
       - fr.upload.manage
       - impl.upload.be.upload
     because: A breaking change to br.upload.lifecycle sends 5 other record(s) back to todo, would stale
-      4 evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http/upload,
-      be/src/modules/integrations/upload, be/src/modules/integrations/upload/errors) - this is the
-      number a reviewer wants before approving the change.
+      4 evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http,
+      be/src/modules/domain/upload, be/src/modules/integrations/upload-storage) - this is the number
+      a reviewer wants before approving the change.
   - id: blast-radius:br.upload.owned
     kind: blast-radius
     severity: warn
@@ -1017,9 +924,9 @@ findings:
       - fr.upload.manage
       - impl.upload.be.upload
     because: A breaking change to br.upload.owned sends 5 other record(s) back to todo, would stale 4
-      evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http/upload,
-      be/src/modules/integrations/upload, be/src/modules/integrations/upload/errors) - this is the
-      number a reviewer wants before approving the change.
+      evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http,
+      be/src/modules/domain/upload, be/src/modules/integrations/upload-storage) - this is the number
+      a reviewer wants before approving the change.
   - id: blast-radius:br.observability.access-log-shape
     kind: blast-radius
     severity: info
@@ -1029,8 +936,8 @@ findings:
       - impl.observability.be.observability
     because: A breaking change to br.observability.access-log-shape sends 2 other record(s) back to
       todo, would stale 2 evidence file(s), and touches 2 code path(s)
-      (be/src/features/todo/transport/http/health/probes, be/src/modules/platform/observability) -
-      this is the number a reviewer wants before approving the change.
+      (be/src/features/health/transport/http, be/src/modules/platform/observability) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.observability.probe-answers
     kind: blast-radius
     severity: info
@@ -1039,10 +946,9 @@ findings:
       - fr.observability.probes
       - impl.observability.be.observability
     because: A breaking change to br.observability.probe-answers sends 2 other record(s) back to todo,
-      would stale 2 evidence file(s), and touches 3 code path(s)
-      (be/src/features/todo/transport/http/health,
-      be/src/features/todo/transport/http/health/probes, be/src/modules/platform/observability) -
-      this is the number a reviewer wants before approving the change.
+      would stale 2 evidence file(s), and touches 2 code path(s)
+      (be/src/features/health/transport/http, be/src/modules/platform/observability) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.upload.intake
     kind: blast-radius
     severity: info
@@ -1051,9 +957,9 @@ findings:
       - fr.upload.intake
       - impl.upload.be.upload
     because: A breaking change to br.upload.intake sends 2 other record(s) back to todo, would stale 2
-      evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http/upload,
-      be/src/modules/integrations/upload, be/src/modules/integrations/upload/errors) - this is the
-      number a reviewer wants before approving the change.
+      evidence file(s), and touches 3 code path(s) (be/src/features/todo/transport/http,
+      be/src/modules/domain/upload, be/src/modules/integrations/upload-storage) - this is the number
+      a reviewer wants before approving the change.
   - id: fan-in-hotspot:br.task.single-owner
     kind: fan-in-hotspot
     severity: warn
@@ -1157,167 +1063,32 @@ findings:
     because: integration.login.postgres is used 6 time(s) (top decile of fan-in); it is owned by login
       and read by 4 other feature(s) (plan, recur, share, task), so a change here is cross-feature
       coupling, not a local edit.
-  - id: done-without-anchor:br.login.password.sign-in
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.login.password.sign-in
-    because: "br.login.password.sign-in is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/modules/domain/session (module) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:br.login.session.restores
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.login.session.restores
-    because: "br.login.session.restores is state: done but 1 of its 1 anchor path(s) do not exist on
-      disk: be/src/modules/domain/session (module) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:br.observability.probe-answers
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.observability.probe-answers
-    because: "br.observability.probe-answers is state: done but 1 of its 2 anchor path(s) do not exist
-      on disk: be/src/features/todo/transport/http/health (module) - the record claims proof over
-      code that is not there to have been proven."
-  - id: done-without-anchor:br.upload.intake
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.upload.intake
-    because: "br.upload.intake is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      be/src/modules/integrations/upload (module) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:br.upload.lifecycle
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.upload.lifecycle
-    because: "br.upload.lifecycle is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      be/src/modules/integrations/upload (module) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:br.upload.owned
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.upload.owned
-    because: "br.upload.owned is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      be/src/modules/integrations/upload (module) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:data.notify.delivery-attempt
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - data.notify.delivery-attempt
-    because: "data.notify.delivery-attempt is state: done but 1 of its 1 anchor path(s) do not exist on
-      disk:
-      be/src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.\
-      ts (module) - the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:data.notify.notification
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - data.notify.notification
-    because: "data.notify.notification is state: done but 1 of its 1 anchor path(s) do not exist on
-      disk: be/src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
-      (module) - the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:data.notify.preference
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - data.notify.preference
-    because: "data.notify.preference is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      be/src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts
-      (module) - the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.audit.be.erasure
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.audit.be.erasure
-    because: "impl.audit.be.erasure is state: done but 1 of its 2 anchor path(s) do not exist on disk:
-      be/src/features/todo/transport/graphql/mutations/audit (owners) - the record claims proof over
-      code that is not there to have been proven."
-  - id: done-without-anchor:impl.audit.be.log
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.audit.be.log
-    because: "impl.audit.be.log is state: done but 1 of its 2 anchor path(s) do not exist on disk:
-      be/src/features/todo/transport/graphql/queries/audit/export-my-data (owners) - the record
-      claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.audit.be.operator-read
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.audit.be.operator-read
-    because: "impl.audit.be.operator-read is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/queries/audit/audit-log (owners) - the record
-      claims proof over code that is not there to have been proven."
   - id: done-without-anchor:impl.audit.fe.privacy
     kind: done-without-anchor
     severity: critical
     records:
       - impl.audit.fe.privacy
     because: "impl.audit.fe.privacy is state: done but 2 of its 2 anchor path(s) do not exist on disk:
-      fe/apps/web/src/app/[lang]/audit (owners), fe/apps/web/src/components/blocks/privacy (owners)
-      - the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.login.be.auth
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.login.be.auth
-    because: "impl.login.be.auth is state: done but 2 of its 3 anchor path(s) do not exist on disk:
-      be/src/modules/domain/session (owners),
-      be/src/features/todo/transport/graphql/mutations/session (owners) - the record claims proof
-      over code that is not there to have been proven."
+      fe/apps/web/src/app/[locale]/audit (owners), fe/apps/web/src/components/blocks/privacy
+      (owners) - the record claims proof over code that is not there to have been proven."
   - id: done-without-anchor:impl.login.fe.sign-in
     kind: done-without-anchor
     severity: critical
     records:
       - impl.login.fe.sign-in
-    because: "impl.login.fe.sign-in is state: done but 3 of its 3 anchor path(s) do not exist on disk:
-      fe/apps/web/src/app/[lang]/sign-in (owners), fe/apps/web/src/app/sign-in (owners),
+    because: "impl.login.fe.sign-in is state: done but 2 of its 2 anchor path(s) do not exist on disk:
+      fe/apps/web/src/app/[locale]/sign-in (owners),
       fe/apps/web/src/components/blocks/sign-in-screen (owners) - the record claims proof over code
       that is not there to have been proven."
-  - id: done-without-anchor:impl.notify.be.pipeline
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.notify.be.pipeline
-    because: "impl.notify.be.pipeline is state: done but 4 of its 7 anchor path(s) do not exist on disk:
-      be/src/modules/integrations/notify-queue (owners),
-      be/src/modules/integrations/notify-queue/errors (owners),
-      be/src/features/todo/transport/graphql/mutations/notify (owners),
-      be/src/features/todo/transport/graphql/queries/notify (owners) - the record claims proof over
-      code that is not there to have been proven."
   - id: done-without-anchor:impl.notify.fe.preferences
     kind: done-without-anchor
     severity: critical
     records:
       - impl.notify.fe.preferences
     because: "impl.notify.fe.preferences is state: done but 3 of its 3 anchor path(s) do not exist on
-      disk: fe/apps/web/src/app/[lang]/notify (owners),
+      disk: fe/apps/web/src/app/[locale]/notify (owners),
       fe/apps/web/src/components/blocks/notify-preferences (owners),
       fe/apps/web/src/components/blocks/notify-unsubscribe (owners) - the record claims proof over
-      code that is not there to have been proven."
-  - id: done-without-anchor:impl.observability.be.observability
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.observability.be.observability
-    because: "impl.observability.be.observability is state: done but 1 of its 2 anchor path(s) do not
-      exist on disk: be/src/features/todo/transport/http/health/probes (owners) - the record claims
-      proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.plan.be.plan
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.plan.be.plan
-    because: "impl.plan.be.plan is state: done but 3 of its 5 anchor path(s) do not exist on disk:
-      be/src/features/todo/transport/http/webhooks/sepay (owners),
-      be/src/features/todo/transport/graphql/mutations/plan (owners),
-      be/src/features/todo/transport/graphql/queries/plan (owners) - the record claims proof over
       code that is not there to have been proven."
   - id: done-without-anchor:impl.plan.fe.usage
     kind: done-without-anchor
@@ -1325,144 +1096,36 @@ findings:
     records:
       - impl.plan.fe.usage
     because: "impl.plan.fe.usage is state: done but 2 of its 2 anchor path(s) do not exist on disk:
-      fe/apps/web/src/app/[lang]/plan (owners), fe/apps/web/src/components/blocks/plan-usage
+      fe/apps/web/src/app/[locale]/plan (owners), fe/apps/web/src/components/blocks/plan-usage
       (owners) - the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.recur.be.engine
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.recur.be.engine
-    because: "impl.recur.be.engine is state: done but 2 of its 3 anchor path(s) do not exist on disk:
-      be/src/features/todo/transport/graphql/mutations/recur (owners),
-      be/src/features/todo/transport/graphql/queries/recur (owners) - the record claims proof over
-      code that is not there to have been proven."
   - id: done-without-anchor:impl.recur.fe.schedule
     kind: done-without-anchor
     severity: critical
     records:
       - impl.recur.fe.schedule
     because: "impl.recur.fe.schedule is state: done but 2 of its 2 anchor path(s) do not exist on disk:
-      fe/apps/web/src/app/[lang]/recur (owners), fe/apps/web/src/components/blocks/recur (owners) -
-      the record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.share.be.invitations
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.share.be.invitations
-    because: "impl.share.be.invitations is state: done but 2 of its 3 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/mutations/share (owners),
-      be/src/features/todo/transport/graphql/queries/share (owners) - the record claims proof over
-      code that is not there to have been proven."
+      fe/apps/web/src/app/[locale]/recur (owners), fe/apps/web/src/components/blocks/recur (owners)
+      - the record claims proof over code that is not there to have been proven."
   - id: done-without-anchor:impl.share.fe.invite-screen
     kind: done-without-anchor
     severity: critical
     records:
       - impl.share.fe.invite-screen
-    because: "impl.share.fe.invite-screen is state: done but 7 of its 7 anchor path(s) do not exist on
-      disk: fe/apps/web/src/app/[lang]/tasks/[taskId]/share (owners),
-      fe/apps/web/src/features/pages/share (owners), fe/apps/web/src/components/blocks/share-invite
-      (owners), fe/apps/web/src/hooks/share (owners), fe/apps/web/src/modules/api (owners),
-      fe/apps/web/src/modules/ui/Link (owners), fe/apps/web/src/hooks/auth (owners) - the record
-      claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.complete-task
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.complete-task
-    because: "impl.task.be.complete-task is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/mutations/task/complete-task (owners) - the
-      record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.create-task
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.create-task
-    because: "impl.task.be.create-task is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/mutations/task/create-task (owners) - the record
-      claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.delete-task
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.delete-task
-    because: "impl.task.be.delete-task is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/mutations/task/delete-task (owners) - the record
-      claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.list
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.list
-    because: "impl.task.be.list is state: done but 2 of its 3 anchor path(s) do not exist on disk:
-      be/src/features/todo/transport/graphql/queries/task/list-tasks (owners),
-      be/src/features/todo/transport/graphql/queries/task/task-counts (owners) - the record claims
+    because: "impl.share.fe.invite-screen is state: done but 6 of its 6 anchor path(s) do not exist on
+      disk: fe/apps/web/src/app/[locale]/tasks/[taskId]/share (owners),
+      fe/apps/web/src/features/pages/TaskSharePage (owners),
+      fe/apps/web/src/components/blocks/share-invite (owners), fe/apps/web/src/hooks/share (owners),
+      fe/apps/web/src/modules/api (owners), fe/apps/web/src/hooks/auth (owners) - the record claims
       proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.platform-database
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.platform-database
-    because: "impl.task.be.platform-database is state: done but 2 of its 2 anchor path(s) do not exist
-      on disk: be/src/modules/platform/databases/postgresql/primary (owners),
-      be/src/features/todo/transport/http/health (owners) - the record claims proof over code that
-      is not there to have been proven."
-  - id: done-without-anchor:impl.task.be.platform-events
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.platform-events
-    because: "impl.task.be.platform-events is state: done but 1 of its 1 anchor path(s) do not exist on
-      disk: be/src/modules/platform/events (owners) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:impl.task.be.reopen-task
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.be.reopen-task
-    because: "impl.task.be.reopen-task is state: done but 1 of its 2 anchor path(s) do not exist on
-      disk: be/src/features/todo/transport/graphql/mutations/task/reopen-task (owners) - the record
-      claims proof over code that is not there to have been proven."
   - id: done-without-anchor:impl.task.fe.task-list
     kind: done-without-anchor
     severity: critical
     records:
       - impl.task.fe.task-list
     because: "impl.task.fe.task-list is state: done but 3 of its 3 anchor path(s) do not exist on disk:
-      fe/apps/web/src/components/blocks/task-list (owners), fe/apps/web/src/features/pages/tasks
-      (owners), fe/apps/web/src/app/[lang]/tasks (owners) - the record claims proof over code that
+      fe/apps/web/src/components/blocks/task-list (owners), fe/apps/web/src/features/pages/TasksPage
+      (owners), fe/apps/web/src/app/[locale]/tasks (owners) - the record claims proof over code that
       is not there to have been proven."
-  - id: done-without-anchor:impl.upload.be.upload
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.upload.be.upload
-    because: "impl.upload.be.upload is state: done but 3 of its 3 anchor path(s) do not exist on disk:
-      be/src/modules/integrations/upload (owners), be/src/features/todo/transport/http/upload
-      (owners), be/src/modules/integrations/upload/errors (owners) - the record claims proof over
-      code that is not there to have been proven."
-  - id: done-without-anchor:integration.notify.queue
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - integration.notify.queue
-    because: "integration.notify.queue is state: done but 1 of its 1 anchor path(s) do not exist on
-      disk: be/src/modules/integrations/notify-queue (module) - the record claims proof over code
-      that is not there to have been proven."
-  - id: done-without-anchor:sds.login.session-store
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - sds.login.session-store
-    because: "sds.login.session-store is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      be/src/modules/domain/session (owners) - the record claims proof over code that is not there
-      to have been proven."
-  - id: unbound-sds:sds.login.session-store
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.login.session-store
-    because: sds.login.session-store authors owners, but none resolve to a real module directory - it is
-      bound in name only.
   - id: designed-todo:br.login.session.single-device
     kind: designed-todo
     severity: info
@@ -2643,6 +2306,14 @@ findings:
     because: uat.task.create's evidence is stale with no staleSince at all - a bare digest mismatch with
       nothing recorded about why, even where the record's own staleReason prose describes a real
       revision (bulk-edit-after-capture territory either way).
+  - id: stale-evidence-bulk-edit:ui.audit.privacy
+    kind: stale-evidence-bulk-edit
+    severity: warn
+    records:
+      - ui.audit.privacy
+    because: ui.audit.privacy's evidence is stale with no staleSince at all - a bare digest mismatch
+      with nothing recorded about why, even where the record's own staleReason prose describes a
+      real revision (bulk-edit-after-capture territory either way).
   - id: stale-evidence-bulk-edit:ui.login.sign-in
     kind: stale-evidence-bulk-edit
     severity: warn
