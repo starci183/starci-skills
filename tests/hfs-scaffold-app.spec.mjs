@@ -19,7 +19,18 @@ import { installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app
 const PRESETS = { sonarExclusions: '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**' };
 const installs = runtimeInstalls();
 const missing = missingFrom(installs);
-const skip = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
+const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
+// A skip must never pass silently. Locally it prints one SKIPPED line. The release verification and CI set
+// STARCI_REQUIRE_APP_INSTALLS=1 (scripts/install/fresh-app-installs.mjs provides fresh registry installs), and then a
+// missing install fails the test instead of skipping it.
+export const REQUIRE_APP_INSTALLS = process.env.STARCI_REQUIRE_APP_INSTALLS === '1';
+function gate(name, reason) {
+  if (!reason) return { skip: false, required: null };
+  if (REQUIRE_APP_INSTALLS) return { skip: false, required: `REQUIRED (STARCI_REQUIRE_APP_INSTALLS=1) but ${reason}` };
+  console.log(`SKIPPED: no installs - ${name}: ${reason}`);
+  return { skip: reason, required: null };
+}
+const lintGate = gate('scaffold lint', skipReason);
 
 async function run(argv) {
   let out = '';
@@ -55,7 +66,7 @@ function typecheck(app) {
 
 /** What the boot smoke runs besides the lint set: the be build (`build:be`: tsc, tsc-alias) and the HTTP platform the api serves on. */
 const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express', 'express', 'rxjs', 'reflect-metadata']);
-const bootSkip = missing.length ? skip : (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+const bootGate = gate('scaffold api boot', skipReason || (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false));
 
 /** The bin script of an installed package (`tsc` of typescript, `tsc-alias`), read from its package.json. */
 function binOf(app, pkg, name) {
@@ -93,7 +104,8 @@ const edit = (app, file, from, to) => {
   fs.writeFileSync(target, text.replace(from, to));
 };
 
-test('hfs scaffold app writes the app shape and hfs lint at its root finds nothing, each side judged by its own canon', { skip, timeout: 600_000 }, async (t) => {
+test('hfs scaffold app writes the app shape and hfs lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
+  if (lintGate.required) assert.fail(lintGate.required);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');
   let links = [];
@@ -165,7 +177,8 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
   }
 });
 
-test('the scaffolded be api builds with build:be and boots with start:api from the linked installs, then stops', { skip: bootSkip, timeout: 600_000 }, async (t) => {
+test('the scaffolded be api builds with build:be and boots with start:api from the linked installs, then stops', { skip: bootGate.skip, timeout: 600_000 }, async (t) => {
+  if (bootGate.required) assert.fail(bootGate.required);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-boot-'));
   const app = path.join(into, 'demo');
   let links = [];

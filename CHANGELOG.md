@@ -7,6 +7,10 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- A scaffold proof never passes by skipping. `tests/hfs-scaffold-app.spec.mjs` prints `SKIPPED: no installs - <proof>: <reason>` when it has no installs. With `STARCI_REQUIRE_APP_INSTALLS=1` a missing install fails the test instead. `scripts/checks/release-app-installs.mjs` does the following, and CI runs it as its own step:
+  1. scaffolds `release-app`;
+  2. installs it from the npm registry;
+  3. runs the spec with installs required, so the lint, typecheck and api boot proofs run against fresh published packages.
 - Lane SHAPE: gaps the merged examples exposed are closed, each with a violating and a passing spec.
   - New rule R111 `HFS_PEER_INTEGRATION_MISSING`: the app root package.json declares the runtime peer of every driver integration pair of the data catalog `knowledge/hfs/peer-integrations.yaml` (`@nestjs/apollo` on `@nestjs/platform-express` 11 requires `@as-integrations/express5`); the scaffold spec builds the scaffolded be api with `build:be` and boots it with `start:api`.
   - `BE_SOURCE_FORM` admits `be/src/tests/world/fakes/<provider>/server.ts` through the slot manifest (be.tests.world allows the literal entry), the path `test-world-files` already accepted.

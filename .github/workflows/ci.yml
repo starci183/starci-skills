@@ -43,3 +43,8 @@ jobs:
 
       - name: Test suite
         run: npm test
+
+      # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
+      # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
+      - name: Scaffold app against registry installs
+        run: node scripts/checks/release-app-installs.mjs
