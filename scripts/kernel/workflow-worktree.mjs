@@ -16,9 +16,12 @@
 //              different sides may run together; an op touching both sides (or the app root) runs alone
 //              (canDispatchConcurrently, enforced by api dispatch as the typed wait workflow-side-busy).
 //   checkpoint part B commits each green op on wf/<id> and calls setCheckpoint; the registry row keeps the sha.
-//   release    releaseWorkflowWorktree, part B's finish step 6 and the GC's: every link removed as a link and zero asserted,
-//              `orca worktree rm`, the main checkout asserted untouched, the registry row closed. `git branch -d` is
-//              the caller's (Orca deletes a branch it can prove merged, so the caller checks the branch still exists).
+//   release    never from inside the worktree (coordinator ruling): part B's finish marks the row release-pending
+//              (markReleasePending); the host-side GC (scripts/lib/worktrees.mjs gcWorktrees, the reconciler GC
+//              controller) removes it only once the Kernel's and every op's terminal is released, through
+//              releaseWorkflowWorktree: every link removed as a link and zero asserted, `orca worktree rm`, the main
+//              checkout asserted untouched, the registry row closed, then `git branch -d` of the workflow branch (Orca
+//              deletes a branch it can prove merged itself; -d runs only when the branch is still there).
 //
 // ctx: {env, orca, git} - env selects machine.sqlite (the registry), orca the Orca worktree client
 // (scripts/lib/worktrees.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
@@ -27,13 +30,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../lib/git.mjs';
 import { withMachine } from '../../engine/machine-db.mjs';
-import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, mainRootOf, orcaWorktreeClient } from '../lib/worktrees.mjs';
+import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, mainRootOf, orcaWorktreeClient, TERMINAL_JOB_STATUSES } from '../lib/worktrees.mjs';
 import { projectBinding } from './target-repo.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
-/** Job statuses whose op still works in the workflow worktree (runtime 0001-init jobs.status). */
-export const OCCUPYING_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
 export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
 const SIDES = Object.freeze(['be', 'fe']);
@@ -68,7 +69,8 @@ export function workflowAppRepo(repo, { binding = undefined } = {}) {
 }
 
 const recordOf = (row) => (row ? { workflowId: row.workflow_id, orcaWorktreeId: row.orca_id, path: path.resolve(row.path), branch: row.branch ?? null,
-  checkpoint: row.checkpoint_sha ?? null, repoRoot: row.repo_root, ledgerId: row.ledger_id ?? null, createdAt: row.created_at } : null);
+  checkpoint: row.checkpoint_sha ?? null, repoRoot: row.repo_root, ledgerId: row.ledger_id ?? null, createdAt: row.created_at,
+  releasePending: row.release_pending_at != null } : null);
 
 /** The live workflow worktree of `workflowId`: {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}, or null. */
 export function workflowWorktreeOf(ctx, workflowId) {
@@ -168,8 +170,8 @@ export function canDispatchConcurrently(running, next) {
  * op's jobs row and `payload` its payload. {reason: 'workflow-side-busy', side, busy: [{jobId, op, side}], detail}
  */
 export function workflowSideWait(db, job, payload) {
-  const rows = db.prepare(`SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${OCCUPYING_JOB_STATUSES.map(() => '?').join(',')})`)
-    .all(job.workflow_id, job.job_id, ...OCCUPYING_JOB_STATUSES);
+  const rows = db.prepare(`SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${TERMINAL_JOB_STATUSES.map(() => '?').join(',')})`)
+    .all(job.workflow_id, job.job_id, ...TERMINAL_JOB_STATUSES);
   if (canDispatchConcurrently(rows, payload)) return null;
   const side = sideOf(payload);
   const busy = rows.map((r) => ({ jobId: r.job_id, op: r.op_id, side: sideOf(r) })).filter((r) => r.side && (r.side === 'both' || side === 'both' || r.side === side));
@@ -184,23 +186,34 @@ export function workflowWorktreePromptRules(rec) {
   return [
     '',
     '## Your workflow worktree',
-    `- Edit, check and commit ONLY in ${wt} (branch ${rec.branch ?? 'the workflow branch'}): the one worktree of this workflow, shared with the ops of the other side. Never edit ${posix(rec.repoRoot)} itself.`,
+    `- Edit and check ONLY in ${wt} (branch ${rec.branch ?? 'the workflow branch'}): the one worktree of this workflow, shared with the ops of the other side. Never edit ${posix(rec.repoRoot)} itself.`,
     `- Run checks and commands from ${wt}, the app root: every owned path is app-relative (be/..., fe/..., .starciwork/...).`,
     '- Write only your owned paths: an op of the other side may be working in this tree at the same time.',
     "- node_modules here is the worktree's own install (its setup ran npm ci): never run npm/pnpm install, never create a junction or symlink.",
-    '- You never merge, push, rebase or reset: the runtime checkpoints your green work on the workflow branch and lands the branch on main when the workflow finishes.',
+    '- Never commit, merge, push, rebase or reset: leave your changes in the tree. Only the runtime commits - a checkpoint of your green work on the workflow branch - and it lands the branch on main when the workflow finishes.',
   ].join('\n');
 }
 
 /**
- * Release the workflow's worktree: every link removed as a link and zero asserted, `orca worktree rm`, the main checkout
- * asserted untouched, the registry row closed (scripts/lib/worktrees.mjs removeOrcaWorktree). The branch is left to the
- * caller (`git branch -d` after the merge). {ok, released, path?, links?} | {ok:false, reason, fatal?, ...}
+ * Mark the workflow's worktree for release (part B's finish, after the merge): the host-side GC removes it once no agent
+ * of the workflow holds a terminal. true when a live row took the mark.
  */
-export function releaseWorkflowWorktree(ctx, workflowId) {
+export function markReleasePending(ctx, workflowId, { at = Date.now() } = {}) {
+  const { env } = ctxOf(ctx);
+  return withMachine((m) => m.db.prepare("UPDATE worktrees SET release_pending_at=COALESCE(release_pending_at, ?) WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(at, workflowId).changes > 0, { env });
+}
+
+/**
+ * Release the workflow's worktree, from the host (the GC; never from inside the worktree: refused release-from-inside):
+ * every link removed as a link and zero asserted, `orca worktree rm`, the main checkout asserted untouched, the registry
+ * row closed (scripts/lib/worktrees.mjs removeOrcaWorktree), then `git branch -d` of the workflow branch when Orca kept it.
+ * {ok, released, path?, links?, branch?} | {ok:false, reason, fatal?, ...}
+ */
+export function releaseWorkflowWorktree(ctx, workflowId, { cwd = process.cwd() } = {}) {
   const { env, orca, git } = ctxOf(ctx);
   const rec = workflowWorktreeOf({ env }, workflowId);
-  if (!rec) return { ok: true, released: false, reason: 'no-workflow-worktree' };
-  const r = removeOrcaWorktree({ repoRoot: rec.repoRoot, orcaId: rec.orcaWorktreeId, dir: rec.path, env, git, orca });
-  return r.ok ? { ok: true, released: true, path: rec.path, orcaWorktreeId: rec.orcaWorktreeId, links: r.links, branch: rec.branch } : { ...r, released: false };
+  if (!rec) return { ok: true, released: false, note: 'the workflow has no worktree' };
+  if (insidePath(cwd, rec.path)) return { ok: false, released: false, reason: 'release-from-inside', path: rec.path };
+  const r = removeOrcaWorktree({ repoRoot: rec.repoRoot, orcaId: rec.orcaWorktreeId, dir: rec.path, branch: rec.branch, deleteBranch: rec.branch ? 'merged' : null, env, git, orca });
+  return r.ok ? { ok: true, released: true, path: rec.path, orcaWorktreeId: rec.orcaWorktreeId, links: r.links, branch: r.branch } : { ...r, released: false };
 }

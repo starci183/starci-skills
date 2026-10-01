@@ -13,9 +13,9 @@ import { createRequire } from 'node:module';
 import { withMachine } from '../engine/machine-db.mjs';
 import {
   workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, workflowWorktreeOf, setCheckpoint, opWorktreeArgs, sideOf,
-  canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY,
+  canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY,
 } from '../scripts/kernel/workflow-worktree.mjs';
-import { createScratchWorktree, createOrcaWorktree, isPendingRow } from '../scripts/lib/worktrees.mjs';
+import { createScratchWorktree, createOrcaWorktree, isPendingRow, gcWorktrees } from '../scripts/lib/worktrees.mjs';
 import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 
 const require = createRequire(import.meta.url);
@@ -161,7 +161,7 @@ test('release: every link removed as a link first, then orca worktree rm; the ma
   assert.equal(git(app, 'status', '--porcelain', '--untracked-files=no'), '');
   assert.equal(workflowWorktreeOf(ctx, 'wf-rel'), null, 'the registry row is closed');
   assert.ok(rows(env).find((x) => x.orca_id === rec.orcaWorktreeId).removed_at != null);
-  assert.deepEqual(releaseWorkflowWorktree(ctx, 'wf-rel'), { ok: true, released: false, reason: 'no-workflow-worktree' }, 'idempotent');
+  assert.deepEqual(releaseWorkflowWorktree(ctx, 'wf-rel'), { ok: true, released: false, note: 'the workflow has no worktree' }, 'idempotent');
 });
 
 test('a refused orca worktree rm keeps the row live with its error; a removal that changes main is fatal', (t) => {
@@ -223,4 +223,30 @@ test('only a bound app checkout other than the runtime repo gets a workflow work
   assert.equal(workflowAppRepo(app, { binding: { appRoot: path.join(app, 'missing') } }), null, 'not a git checkout');
   const runtime = path.resolve(import.meta.dirname, '..');
   assert.equal(workflowAppRepo(runtime, { binding: { appRoot: runtime } }), null, 'the runtime repo changes only through its own land gate');
+});
+
+test('release is host-side: a release-pending worktree with live terminals stays; once they are released the GC removes it, then branch -d', (t) => {
+  const { app, env, orca, ctx } = fixture(t);
+  const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-fin', appRepo: app }).record;
+  // Part B's finish: the branch merged into main, the row marked release-pending.
+  git(app, 'merge', '-q', '--ff-only', rec.branch);
+  assert.equal(markReleasePending(ctx, 'wf-fin'), true);
+  assert.equal(workflowWorktreeOf(ctx, 'wf-fin').releasePending, true);
+  assert.equal(markReleasePending(ctx, 'wf-none'), false);
+  let live = 2; // the Kernel and one op still hold a terminal
+  const lookup = Object.assign(() => null, { workflowPhase: () => 'finished', workflowTerminalsLive: () => live });
+  const held = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca });
+  assert.equal(held.find((i) => i.path && path.resolve(i.path) === rec.path), undefined, 'never removed while an agent works in it');
+  assert.ok(fs.existsSync(rec.path));
+  assert.ok(!orca.names().includes('remove'));
+  // Never from inside itself either.
+  assert.deepEqual([releaseWorkflowWorktree(ctx, 'wf-fin', { cwd: path.join(rec.path, 'be') }).reason], ['release-from-inside']);
+  assert.ok(fs.existsSync(rec.path));
+  live = 0; // the Kernel's and the ops' terminals are released
+  const items = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca });
+  const item = items.find((i) => i.path && path.resolve(i.path) === rec.path);
+  assert.deepEqual([item?.reason, item?.home, item?.ok], ['release-pending', 'orca', true], JSON.stringify(items));
+  assert.ok(!fs.existsSync(rec.path));
+  assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`], { cwd: app }).status, 1, 'the merged workflow branch is deleted (branch -d)');
+  assert.equal(workflowWorktreeOf(ctx, 'wf-fin'), null);
 });

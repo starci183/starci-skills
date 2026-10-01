@@ -1,0 +1,48 @@
+id: wfwt-a-orca-workflow-worktree
+effectiveAt: '2026-10-01T23:00:00+07:00'
+summary: >-
+  ONE ORCA-OWNED WORKTREE PER KERNEL WORKFLOW (owner decision WFWT, final; part A - creation, registry, launches, side
+  concurrency, release). Before the Kernel starts, scripts/kernel/workflow-worktree.mjs ensureWorkflowWorktree asks Orca
+  to create the workflow's worktree (`orca worktree create --repo path:<app> --name wf-<workflowId> --base-branch main
+  --setup run --no-parent`: the repository setup hook runs a real npm ci, no node_modules junctions), renames Orca's
+  branch to wf/<workflowId>, and the Kernel and every op of the workflow start with `orchestration worker-start
+  --worktree <that path>` (an existing worktree takes launch trust before the agent starts; a new-child start could not).
+  The per-op worktree CREATION is deleted with no fallback: ensureOpWorktree, its layout, the node_modules junction
+  overlay, the isolation policy (policy.isolation, product-land.yaml defaultIsolation, shortIdLength, overlay) and the
+  dispatch path that made payload.productWorktree; part B deletes the per-op land. machine.sqlite 0003 drops the per-op
+  registry kind `op`, adds `workflow` and `critic`, keys an Orca row by Orca's worktree id (orca_id, unique) and records
+  the workflow checkpoint (checkpoint_sha). The per-repo cap (worktrees.capPerRepo) is taken as a pending slot BEFORE Orca
+  is asked: a full repository fails the Kernel start worktree-cap and Orca creates nothing. Ops of one side (be/ or fe/,
+  from their app-relative owned paths) run one at a time in the workflow worktree, across sides together, an op writing
+  both sides or the app root alone: api dispatch answers the typed wait workflow-side-busy. releaseWorkflowWorktree (part
+  B's finish, the GC) removes every link as a link and asserts zero, then `orca worktree rm --force`, asserts the main
+  checkout untouched (main-checkout-damaged stops the GC) and closes the row; Orca deletes a branch it proves merged, so
+  the caller's `git branch -d` checks the branch first. Measured with the real CLI (tests/orca-worktree-rm-live.spec.mjs,
+  STARCI_REQUIRE_ORCA_LIVE=1 makes it required): `orca worktree rm` with node_modules and packages/node_modules junctions
+  into a fake main left it byte-identical. The draw critic's placement is an Orca worktree too (kind critic). A
+  runtime-internal scratch tree no agent works in (land/push scratch, the verify-proof base tree, the revert lane, the
+  [Worker] staging checkout) is still made by git, only in scripts/lib/worktrees.mjs createScratchWorktree:
+  check-worktree-add now fails a `git worktree add` anywhere else, the worktree API outside that function included. The
+  GC removes each tree through the home that made it (orca_id: Orca; none: git) and returns a slot never bound
+  (slot-never-bound). Adds the codes orca-worktree-create-failed, orca-worktree-rm-failed, slot-never-bound and
+  workflow-side-busy; retires base-unresolved, no-project-binding, work-only, overlay-link-stuck, plan-error,
+  product-worktree-unavailable, repo-not-a-checkout and resolution-outside-worktree.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/wfwt-a-orca-workflow-worktree.yaml
+  - modules/kernel/product-land.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/host/orca/calls.yaml
+  - engine/machine-db.mjs
+  - engine/migrations/machine/0003-worktrees-workflow-orca.sql
+  - scripts/lib/worktrees.mjs
+  - scripts/lib/safe-remove.mjs
+  - scripts/checks/check-worktree-add.mjs
+  - scripts/kernel/workflow-worktree.mjs
+  - scripts/kernel/start-workflow.mjs
+  - scripts/kernel/product-worktree.mjs
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - scripts/work/draw-critic.mjs
+  - scripts/api/orca/worktree-create.mjs
+  - scripts/api/orca/worktree-rm.mjs
+  - scripts/api/orca/worktree-list.mjs

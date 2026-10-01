@@ -213,6 +213,21 @@ export function mainCheckoutDamage(before, after) {
 }
 
 /**
+ * The link step of every worktree removal (git's here, Orca's in scripts/lib/worktrees.mjs removeOrcaWorktree): every link
+ * under `target` found WITHOUT following one (linksUnder), each removed as a link (removeLink: `cmd /c rmdir <link>`, never
+ * /s), outermost first, then a re-scan that must find ZERO. {ok, links, errors: [{path, code, message}]}; ok false: a link
+ * is stuck and the caller removes nothing.
+ */
+export function removeLinksUnder(target) {
+  const out = { ok: false, links: 0, errors: [] };
+  if (!fs.existsSync(target)) { out.ok = true; return out; }
+  for (const link of linksUnder(target)) { if (removeLink(link)) out.links += 1; else out.errors.push({ path: link, code: 'LINK_STUCK', message: 'a link could not be removed' }); }
+  for (const l of linksUnder(target)) if (!out.errors.some((e) => e.path === l)) out.errors.push({ path: l, code: 'LINK_STUCK', message: 'a link is still there after removal' });
+  out.ok = out.errors.length === 0;
+  return out;
+}
+
+/**
  * Remove a git worktree (the one algorithm; the 490-file .claude incident and nivo-fe inc-c8fbf76aa499):
  *   1. enumerate every link in it WITHOUT following one (linksUnder);
  *   2. remove each as a link (removeLink: `cmd /c rmdir <link>`, never /s), outermost first;
@@ -236,13 +251,9 @@ export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } =
   if (refused) { out.errors.push({ path: target, code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
   const before = mainRoot ? mainCheckoutGuard(mainRoot, { git: run }) : null;
   if (fs.existsSync(target)) {
-    for (const link of linksUnder(target)) { if (removeLink(link)) out.links += 1; else out.errors.push({ path: link, code: 'LINK_STUCK', message: 'a link could not be removed' }); }
-    const left = linksUnder(target);
-    if (left.length) {
-      for (const l of left) if (!out.errors.some((e) => e.path === l)) out.errors.push({ path: l, code: 'LINK_STUCK', message: 'a link is still there after removal' });
-      out.reason = 'link-stuck';
-      return out;
-    }
+    const unlinked = removeLinksUnder(target);
+    out.links = unlinked.links;
+    if (!unlinked.ok) { out.errors.push(...unlinked.errors); out.reason = 'link-stuck'; return out; }
     out.removed.links = out.links;
     const registered = trees.some((t) => same(t, target));
     if (registered && repo) run(['worktree', 'remove', '--force', target], { cwd: repo });

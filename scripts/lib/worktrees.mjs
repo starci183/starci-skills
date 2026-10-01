@@ -471,13 +471,19 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
 
 /* ------------------------------------------------------------ gc */
 
-/** The default owner lookups over every registered ledger, read-only, cached for one pass: a job's status, a workflow's phase. */
+/** Op job statuses whose worker still holds a terminal (runtime 0001-init jobs.status). */
+export const TERMINAL_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
+
+/**
+ * The default owner lookups over every registered ledger, read-only, cached for one pass: a job's status, a workflow's
+ * phase, how many of a workflow's agents still hold a terminal.
+ */
 function ledgerLookup(env) {
   const cache = new Map();
   let ledgers = null;
   const readers = new Map();
-  const ask = (ledgerId, k, sql, arg) => {
-    const ck = `${k}\0${ledgerId ?? '*'}\0${arg}`;
+  const ask = (ledgerId, k, sql, ...args) => {
+    const ck = `${k}\0${ledgerId ?? '*'}\0${args.join('\0')}`;
     if (cache.has(ck)) return cache.get(ck);
     let value = null;
     try {
@@ -485,7 +491,7 @@ function ledgerLookup(env) {
       for (const l of ledgers.filter((x) => !ledgerId || x.ledgerId === ledgerId)) {
         if (!l.file || !fs.existsSync(l.file)) continue;
         if (!readers.has(l.file)) { try { readers.set(l.file, openLedgerReader(l.file)); } catch { readers.set(l.file, null); } }
-        const row = readers.get(l.file)?.db?.prepare(sql).get(arg);
+        const row = readers.get(l.file)?.db?.prepare(sql).get(...args);
         if (row) { value = Object.values(row)[0] ?? null; break; }
       }
     } catch { value = null; }
@@ -494,6 +500,11 @@ function ledgerLookup(env) {
   };
   const jobStatus = (ledgerId, jobId) => ask(ledgerId, 'job', 'SELECT status FROM jobs WHERE job_id=?', jobId);
   jobStatus.workflowPhase = (ledgerId, workflowId) => ask(ledgerId, 'wf', 'SELECT phase FROM workflows WHERE workflow_id=?', workflowId);
+  // The workflow's agents still holding a terminal: its Kernel job running, or an op holding a worker. A row only when
+  // the ledger has the workflow, so another ledger never answers 0 for it.
+  jobStatus.workflowTerminalsLive = (ledgerId, workflowId) => ask(ledgerId, 'terms',
+    `SELECT (SELECT COUNT(*) FROM jobs WHERE workflow_id=? AND ((kind='kernel' AND status='running') OR (kind='op' AND status IN (${TERMINAL_JOB_STATUSES.map((s) => `'${s}'`).join(',')})))) AS live FROM workflows WHERE workflow_id=?`,
+    workflowId, workflowId);
   jobStatus.close = () => { for (const h of readers.values()) { try { h?.close?.(); } catch { /* closed */ } } };
   return jobStatus;
 }
@@ -504,18 +515,22 @@ const ageOf = (p, now) => { try { return now - fs.statSync(p).mtimeMs; } catch {
 
 /**
  * Why a live registry row is collectable, or null (keep). Pure over its inputs.
- *   owner-settled   a workflow row: its workflow phase ended; any other row with an owner job: that job settled (a
- *                   supervisor staging: its [Worker] sup job)
+ *   release-pending a workflow row its finish marked for release, once no agent of the workflow holds a terminal
+ *   owner-settled   a workflow row: its workflow phase ended and no agent of it holds a terminal; any other row with an
+ *                   owner job: that job settled (a supervisor staging: its [Worker] sup job)
  *   owner-unknown   its owner is in no ledger and the row is older than ownerGoneMs
  *   branch-merged   (no owner) its branch moved past its base and is in main
  *   owner-gone      (no owner) its creating process is gone and the row is older than ownerGoneMs
  */
-export function collectReason({ row, jobStatus = null, workflowPhase = null, merged = false, ownerAlive = true, now = Date.now(), ownerGoneMs = DEFAULTS.ownerGoneMs }) {
+export function collectReason({ row, jobStatus = null, workflowPhase = null, terminalsLive = 0, merged = false, ownerAlive = true, now = Date.now(), ownerGoneMs = DEFAULTS.ownerGoneMs }) {
   const age = now - Number(row.created_at ?? now);
   if (row.kind === 'workflow') {
+    // Never removed while the Kernel or an op still works in it (a removal from inside itself is never made).
+    if (Number(terminalsLive) > 0) return null;
+    if (row.release_pending_at != null) return 'release-pending';
     if (workflowPhase && ENDED.has(workflowPhase)) return 'owner-settled';
     if (!workflowPhase && age > ownerGoneMs) return 'owner-unknown';
-    return null; // a live workflow keeps its tree whatever its branch (finishWorkflow releases it)
+    return null; // a live workflow keeps its tree whatever its branch
   }
   if (row.job_id || (row.kind === 'supervisor-staging' && row.lane)) {
     if (jobStatus && SETTLED.has(jobStatus)) return 'owner-settled';
@@ -530,14 +545,18 @@ export function collectReason({ row, jobStatus = null, workflowPhase = null, mer
 const supLookup = (jobId, env) => { try { return withRegistry((m) => m.supJob(jobId)?.status ?? null, env); } catch { return null; } };
 
 /**
- * One GC pass over every worktree the runtime owns. Seams: jobStatusOf(ledgerId, jobId) -> status | null (its
- * .workflowPhase(ledgerId, workflowId) -> phase | null), supStatusOf(supJobId), ownerAlive(pid) -> bool, now, orca (the
- * Orca client of removeOrcaWorktree). apply false: the plan only. [{path, repoRoot, reason, action, ok, preserved, error}]
+ * One GC pass over every worktree the runtime owns, run on the host (the reconciler GC controller). Seams:
+ * jobStatusOf(ledgerId, jobId) -> status | null (its .workflowPhase(ledgerId, workflowId) -> phase | null and
+ * .workflowTerminalsLive(ledgerId, workflowId) -> count), supStatusOf(supJobId), ownerAlive(pid) -> bool, now, orca (the
+ * Orca client of removeOrcaWorktree). A workflow worktree goes: links unlinked, `orca worktree rm`, the row closed, then
+ * `git branch -d` of its branch (a release-pending one is merged; an abandoned one is preserved first and `-D`).
+ * apply false: the plan only. [{path, repoRoot, reason, action, ok, preserved, error}]
  */
 export function gcWorktrees({ env = process.env, now = Date.now(), apply = true, jobStatusOf = null, supStatusOf = null, ownerAlive = pidAlive, settings = worktreeSettings(), repos = [], git = null,
   budgetMs = settings.gcBudgetMs, clock = Date.now, orca = orcaWorktreeClient } = {}) {
   const lookup = jobStatusOf ?? ledgerLookup(env);
   const phaseOf = lookup.workflowPhase ?? (() => null);
+  const terminalsOf = lookup.workflowTerminalsLive ?? (() => 0);
   const items = [];
   const started = clock();
   // A removal that ever changed a main checkout stops the worktree GC until an operator clears it (worktrees.mjs resume).
@@ -577,9 +596,10 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       let pid = null;
       if (row.claim_id != null) { try { pid = withRegistry((m) => m.db.prepare('SELECT owner_pid FROM claims WHERE claim_id=?').get(row.claim_id)?.owner_pid ?? null, env); } catch { pid = null; } }
       const workflowPhase = row.kind === 'workflow' && row.workflow_id ? phaseOf(row.ledger_id, row.workflow_id) : null;
+      const terminalsLive = row.kind === 'workflow' && row.workflow_id ? Number(terminalsOf(row.ledger_id, row.workflow_id) ?? 0) : 0;
       const ownerStatus = row.kind === 'workflow' ? null : row.job_id ? lookup(row.ledger_id, row.job_id)
         : row.kind === 'supervisor-staging' && row.lane ? (supStatusOf ?? supLookup)(row.lane, env) : null;
-      const reason = collectReason({ row, jobStatus: ownerStatus, workflowPhase, merged, ownerAlive: pid == null ? false : ownerAlive(Number(pid)), now, ownerGoneMs: settings.ownerGoneMs });
+      const reason = collectReason({ row, jobStatus: ownerStatus, workflowPhase, terminalsLive, merged, ownerAlive: pid == null ? false : ownerAlive(Number(pid)), now, ownerGoneMs: settings.ownerGoneMs });
       if (!reason) continue;
       if (halt()) return items;
       items.push(collect({ row, repoRoot, dir: row.path, branch: row.branch, name: row.workflow_id && row.kind === 'workflow' ? `${row.workflow_id}/gc` : row.job_id ?? row.lane ?? `${row.kind}-${hashOf(row.path)}`,
@@ -621,7 +641,7 @@ function removeEmptyDirs(root) {
 /** Remove one collectable tree through the home that made it: Orca (the row has an orca_id) or git. */
 function collect({ row, repoRoot, dir, branch, name, reason, merged, apply, env, git, orca }) {
   if (!apply) return { path: dir, repoRoot, reason, action: 'would-remove', ok: null, home: row?.orca_id ? 'orca' : 'git' };
-  const deleteBranch = branch ? (merged ? 'merged' : 'force') : null;
+  const deleteBranch = branch ? (merged || row?.release_pending_at != null ? 'merged' : 'force') : null;
   const r = row?.orca_id
     ? removeOrcaWorktree({ repoRoot, orcaId: row.orca_id, dir, branch, deleteBranch, preserve: { name }, env, git, orca })
     : removeScratchWorktree({ repoRoot, dir, branch, deleteBranch, preserve: { name }, env, git });
