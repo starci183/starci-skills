@@ -26,8 +26,8 @@ properties:
     type: string
     pattern: ^impl(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){3,}$
     description: "The module's stable id, a lowercase dot-path under the impl family:
-      impl.<feature>.<repository>.<module...>; example impl.task.todo-app-backend.ownership. The repository
-      is part of the id because the same feature is implemented in more than one repository, and two
+      impl.<feature>.<repository>.<module...>; example impl.task.be.ownership (<repository> is the app side, be
+      or fe). The repository is part of the id because the same feature is implemented on more than one side, and two
       modules that differ only by which side of the product they are on must not collide."
   title:
     $ref: "#/$defs/prose"

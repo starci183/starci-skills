@@ -153,8 +153,7 @@ writes:
         Preserve expected flows and business assertions; keep per-flow outcomes, yes/no UX
         observations, original failures and cleanup results in evidence. Done requires the selected
         journeys and required cleanup to pass. The run folder holds exactly manifest.yaml,
-        result.md, screens/ and videos/ — the shape examples/todo-app-frontend/e2e/lib/run-writer.ts
-        writes; the run ledger, script review, seed, flows, UX checks, walk, read-back, runtime,
+        result.md, screens/ and videos/; the run ledger, script review, seed, flows, UX checks, walk, read-back, runtime,
         cleanup and cost payloads fold into manifest.yaml under `files:`, keyed by name."
 steps:
   - reads:

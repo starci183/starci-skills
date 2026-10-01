@@ -69,7 +69,7 @@ It does not invoke Docker or host processes, execute a runbook, authenticate the
 
 ## Reference pattern
 
-The `examples/todo-app-backend/.starcistacks` kit demonstrates the manifest, distinct dev and VPS runtimes, secret custody, and static checker input without making production-readiness claims. Application-specific audit evidence belongs in that application's reports.
+The `examples/todo-app/be/.starcistacks` kit demonstrates the manifest, distinct dev and VPS runtimes, secret custody, and static checker input without making production-readiness claims. Application-specific audit evidence belongs in that application's reports.
 
 ## Primary references
 

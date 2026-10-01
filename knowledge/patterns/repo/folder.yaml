@@ -197,7 +197,5 @@ rules:
         - Confirm every badge's target currently reports a live external service.
         - Review GitHub description and topics against the repository's current purpose.
     relatedExamples:
-      - examples/todo-app-backend/README.md
-      - examples/todo-app-frontend/README.md
-      - examples/ecommerce-app-be/README.md
-      - examples/ecommerce-app-fe/README.md
+      - examples/todo-app/README.md
+      - examples/ecommerce-app/README.md

@@ -40,7 +40,7 @@ const OPS_ROUTE_RE = /^\/(health|healthz|ready|readyz|live|livez|metrics|favicon
 // ---------- concept 1: source files, per bound repository ----------
 
 /** Every src/ root a repository can have: the plain one plus one per app in an npm-workspaces
- * monorepo (ecommerce-app-be's apps/{identity,order}, ecommerce-app-fe's apps/{landing,shop}). */
+ * monorepo (examples/ecommerce-app's be/apps/{identity,order} and fe/apps/{landing,shop}). */
 function srcRootsOf(repoRoot) {
   const roots = [];
   const plain = path.join(repoRoot, 'src');

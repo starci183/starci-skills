@@ -1,8 +1,8 @@
 name: todo-app-live-e2e
 
 # e2e runs MANUALLY only (owner ruling 2026-09-29): this workflow has no push / pull_request trigger and
-# feeds no coverage. Start it from the Actions tab. It proves the todo-app example (examples/todo-app-backend
-# + examples/todo-app-frontend) against its real dev stack; the front end has no tests, so it is built, started and curled.
+# feeds no coverage. Start it from the Actions tab. It proves the todo-app example (examples/todo-app, its back end
+# in be/ and its front end in fe/) against its real dev stack; the front end has no tests, so it is built, started and curled.
 
 on:
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: examples/todo-app-backend
+        working-directory: examples/todo-app/be
     steps:
       - uses: actions/checkout@v4
 
@@ -93,10 +93,11 @@ jobs:
           echo "Keycloak did not become ready in time." >&2
           exit 1
 
-      - name: Install backend dependencies and build
+      - name: Install the app's dependencies and build the back end
+        working-directory: examples/todo-app
         run: |
           npm ci
-          npm run build
+          npm run build:be
 
       - name: Start the API in the background (PORT=3001)
         run: |
@@ -223,13 +224,12 @@ jobs:
           echo "session token and task B both survived an API process restart: Postgres-backed persistence proven."
 
       - name: Build and start the frontend against the live API
-        working-directory: examples/todo-app-frontend
+        working-directory: examples/todo-app
         run: |
           set -eu
-          npm ci
-          node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
-          npx next build
-          npx next start -p 3000 > web.log 2>&1 &
+          node ../../packages/fe-kit/scripts/link-peers.mjs todo-app
+          npm run build:fe
+          npm run start:web -- -p 3000 > web.log 2>&1 &
           echo $! > web.pid
           for attempt in $(seq 1 30); do
             status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/sign-in || echo 000)
@@ -253,9 +253,9 @@ jobs:
         with:
           name: todo-app-live-logs
           path: |
-            examples/todo-app-backend/api.log
-            examples/todo-app-backend/api-restarted.log
-            examples/todo-app-frontend/web.log
+            examples/todo-app/be/api.log
+            examples/todo-app/be/api-restarted.log
+            examples/todo-app/web.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -268,13 +268,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: todo-app-compose-logs
-          path: examples/todo-app-backend/compose.log
+          path: examples/todo-app/be/compose.log
           if-no-files-found: ignore
           retention-days: 7
 
       - name: Stop background processes and tear down the stack
         if: always()
         run: |
-          kill "$(cat ../todo-app-frontend/web.pid 2>/dev/null)" 2>/dev/null || true
+          kill "$(cat ../web.pid 2>/dev/null)" 2>/dev/null || true
           kill "$(cat api.pid 2>/dev/null)" 2>/dev/null || true
           docker compose -f .starcistacks/dev/infra/compose/compose.yaml down -v || true

@@ -145,3 +145,9 @@ retired:
   - {path: packages/hfs/sync/skeleton.mjs, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/scaffold/app.mjs: the app scaffold writes the skeleton (the per-app Next tsconfig from code)'}
   - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/ci.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
   - {path: packages/hfs/templates/be/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
+  - {path: examples/todo-app-backend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/README.md (the todo app examples merged into one hfs 4 app: be/ and fe/ under one root)'}
+  - {path: examples/todo-app-backend/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/be/docs/guides/testing.md'}
+  - {path: examples/todo-app-frontend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/README.md (the todo app examples merged into one hfs 4 app: be/ and fe/ under one root)'}
+  - {path: examples/ecommerce-app-be/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}
+  - {path: examples/ecommerce-app-be/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/be/docs/guides/testing.md'}
+  - {path: examples/ecommerce-app-fe/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}

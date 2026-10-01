@@ -114,12 +114,12 @@ function parseArgs(argv) {
   return out;
 }
 
-// `docs/` and `examples/` ship only authored reference files. An `examples/<name>/` stack kit (its
-// `.starcistacks/` tree plus sibling `scripts/`, `gateway/`
+// `docs/` and `examples/` ship only authored reference files. An `examples/<app>/` stack kit (the back end's
+// `be/.starcistacks/` tree plus the app's `scripts/`, `gateway/`
 // and `.gitignore` support files) additionally ships shell/config/Dockerfile inputs — but never
 // materialized runtime or generated output, never a plaintext secret beside its sealed `.enc`
 // counterpart, and never a `.mjs` automation source.
-const stackKitPath = (relative) => /^examples\/[^/]+\/(\.starcistacks(\/|$)|scripts\/|gateway\/|\.gitignore$)/.test(relative);
+const stackKitPath = (relative) => /^examples\/[^/]+\/(be\/\.starcistacks(\/|$)|scripts\/|gateway\/|\.gitignore$)/.test(relative);
 const payloadDocAllowed = (root, relative) => {
   if (stackKitPath(relative)) {
     if (/\/(runtime|generated|\.runtime|node_modules|\.scannerwork)(\/|$)/.test(relative)) return false;

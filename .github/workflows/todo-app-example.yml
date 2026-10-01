@@ -1,13 +1,13 @@
 name: todo-app-example
 
-# Proves the todo-app example (examples/todo-app-backend + examples/todo-app-frontend): record layout,
+# Proves the todo-app example (examples/todo-app, its back end in be/ and its front end in fe/): record layout,
 # type-check, unit tests, lint and build, on a declared GitHub-hosted runner, so the runtime's own gates
 # (record layout, hfs lint) stay green for the example at all times. See
-# examples/todo-app-backend/README.md#continuous-verification for the job-by-job summary. The live stack and
+# examples/todo-app/README.md#continuous-verification for the job-by-job summary. The live stack and
 # Playwright UAT job is e2e and runs MANUALLY only (owner ruling 2026-09-29): see todo-app-live-e2e.yml.
 #
-# Both example apps compile sources out of packages/ (`@fe-kit/*`), so a change there is a
-# change to what these jobs check.
+# The front end compiles sources out of packages/ (`@fe-kit/*`), so a change there is a change to what
+# these jobs check.
 
 on:
   push:
@@ -58,16 +58,16 @@ jobs:
       - name: Run the example Work-gate fixture suite
         run: node --test tests/example-work-gate.spec.mjs
 
-  # 2) todo-app-backend: unit tests plus hfs lint, both read-only and requiring nothing but
-  #    the backend's own installed dependencies (the checker loads TypeScript through the checked
-  #    repository's own node_modules, never the runtime's).
-  backend:
-    name: backend
+  # 2) The app: one install at its root for both sides, then the type-check of both sides, the back end's unit
+  #    tests, the front end's production build and hfs lint (the checker loads TypeScript through the app's own
+  #    node_modules, never the runtime's). A front end has no tests.
+  app:
+    name: app
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
-        working-directory: examples/todo-app-backend
+        working-directory: examples/todo-app
     steps:
       - uses: actions/checkout@v4
 
@@ -79,62 +79,29 @@ jobs:
         working-directory: .
         run: npm ci
 
-      - name: Install backend dependencies
-        run: npm ci
-
-      - name: Type-check (no emit)
-        run: npx tsc --noEmit
-
-      - name: Unit tests
-        run: npx jest --selectProjects unit
-
-      # THE lint of this repository (the ESLint canon plus `hfs check`, which carries the architecture check,
-      # docs/architecture-check.md); the layout is derived from `hfs.json` inside `--repo`. The process exit
-      # code is the verdict - 0 no finding, 1 findings, 2 a tool could not run.
-      - name: hfs lint
-        working-directory: .
-        run: node packages/hfs/bin/hfs.mjs lint --repo examples/todo-app-backend
-
-  # 3) todo-app-frontend: type-check, lint, production build and hfs lint (a front end has no tests).
-  frontend:
-    name: frontend
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: examples/todo-app-frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install runtime dependencies (repo root)
-        working-directory: .
-        run: npm ci
-
-      - name: Install frontend dependencies
+      - name: Install app dependencies
         run: npm ci
 
       # packages/fe-kit ships as source behind the `@fe-kit/*` alias, and nothing resolves its peers
       # (react, next, next-intl, @starci/grammar and their types) from packages/fe-kit upward. This
-      # junctions them onto this app's installed copies, which is what tsc, eslint and next read.
-      - name: Link fe-kit peers to this app's install
+      # junctions them onto the app's installed copies, which is what tsc, eslint and next read.
+      - name: Link fe-kit peers to the app's install
         working-directory: .
-        run: node packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
+        run: node packages/fe-kit/scripts/link-peers.mjs todo-app
 
-      - name: Type-check (no emit)
-        run: npx tsc --noEmit
+      - name: Type-check both sides (no emit)
+        run: npm run typecheck
 
-      - name: Lint
-        run: npx eslint .
+      - name: Unit tests (back end)
+        run: npm test
 
-      - name: Production build
-        run: npx next build
+      - name: Production build (front end)
+        run: npm run build:fe
 
-      # Same lint as the backend's; the exit code is the verdict (0 no finding, 1 findings, 2 a tool could not
-      # run). The command is run unpiped so the runner sees that exit code rather than `tee`'s.
+      # THE lint of the app: ESLint over be/ with the BE canon and over fe/ with the FE canon, stylelint over fe/ and
+      # `hfs check` (which carries the architecture check); the layout is derived from the hfs.json of `--repo`. The
+      # process exit code is the verdict - 0 no finding, 1 findings, 2 a tool could not run - and the command is run
+      # unpiped so the runner sees it.
       - name: hfs lint
         working-directory: .
-        run: node packages/hfs/bin/hfs.mjs lint --repo examples/todo-app-frontend
+        run: node packages/hfs/bin/hfs.mjs lint --repo examples/todo-app

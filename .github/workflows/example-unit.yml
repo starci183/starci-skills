@@ -1,8 +1,8 @@
 name: example-unit
 
-# Runs the unit suite of the example apps that have one. A back end example's `npm test` runs the unit project with
-# --coverage and fails below the per-file 100 threshold on its `*.service.ts` files; nothing is uploaded anywhere and
-# Sonar reads no coverage. ecommerce-app-fe is intentionally absent: it has no unit suite today.
+# Runs the unit suite of each example app. An app's `npm test` runs its back end's unit project with --coverage and
+# fails below the per-file 100 threshold on its `*.service.ts` files; nothing is uploaded anywhere and Sonar reads no
+# coverage. A front end has no tests.
 
 on:
   push:
@@ -31,15 +31,10 @@ jobs:
       fail-fast: false
       matrix:
         app:
-          - dir: examples/todo-app-backend
-            flag: todo-be
-            run: npm test
-          - dir: examples/ecommerce-app-be
-            flag: ecommerce-be
-            run: npm test
-          - dir: examples/todo-app-frontend
-            flag: todo-fe
-            run: npx vitest run
+          - dir: examples/todo-app
+            flag: todo-app
+          - dir: examples/ecommerce-app
+            flag: ecommerce-app
     defaults:
       run:
         working-directory: ${{ matrix.app.dir }}
@@ -54,4 +49,4 @@ jobs:
         run: npm ci
 
       - name: Unit tests
-        run: ${{ matrix.app.run }}
+        run: npm test

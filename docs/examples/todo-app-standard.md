@@ -1,31 +1,25 @@
 # The todo-app standard
 
-`examples/todo-app-backend` and `examples/todo-app-frontend` are the reference pair the owner will hand to
+`examples/todo-app` is the reference app the owner will hand to
 outsourced developers and to the next refactor of every StarCi skill. This document reads them as they are
 on disk today, not as any spec says they should be. Every claim below names a real path or a real record id.
 Section 9 lists what the example deliberately leaves open.
 
 ## 1. What this example is
 
-Two repositories make one product. `examples/todo-app-backend` owns the canonical `.starciwork` (the Work
-tree: business rules, flows, design, implementation records, UAT) and the canonical `.starcistacks` (the
-deployment declaration and its environments). `examples/todo-app-frontend` owns none of either. Its own
-`README.md` says this directly: "It owns no `.starciwork`: the Work records of this product live in
-`todo-app-backend/.starciwork`, and the records that describe these screens name this repository by name
-(`impl.task.todo-app-frontend.task-list`, `ui.task.list`)."
+One app is one product. `examples/todo-app` holds the back end in `be/` and the front end in `fe/`, one
+`package.json` and lockfile at its root, and the root `hfs.json` of kind `app` that declares both sides. The app
+root owns the canonical `.starciwork` (the Work tree: business rules, flows, design, implementation records,
+UAT); the back end owns the canonical `be/.starcistacks` (the deployment declaration and its environments). The
+records that describe a screen name the side its code lives in (`impl.task.fe.task-list`, `ui.task.list`).
 
-This pairing is one of two topologies `modules/schemas/work-layout.yaml` recognizes. In a multi-repository
-product (this example), `.starciwork` lives in the bound backend repository, and
-`.workspaces/projects/<project>/{be,fe}.json` at the host routes each side to its own repository and its own
-`hfs.json` apps. In a monorepo, `.starciwork` lives at the repository root instead, and
-`hfs.json` names its `apps/<app>` entries rather than a second repository. Both topologies
-host the identical `features/<feature>/{...}` tree; only where `.starciwork` sits and how its roots are
-declared differ. A project runs one shape or the other for one product, never both at once.
+This is the one topology `modules/schemas/work-layout.yaml` recognizes: `.starciwork` lives at the app root,
+`.workspaces/projects/<project>/work.json` at the host binds the app repository and resolves `be` and `fe` to
+their side folders, and every feature record lives under the flat `features/<feature>/{...}` tree.
 
-The backend is a NestJS domain-first application (`package.json` calls it "NestJS domain-first example for
-the runtime's architecture checks"); the frontend is a Next.js app consuming an internal `@todo-app/grammar`
-package. Both are checked by the same `node scripts/checks/architecture.mjs` gate against their own
-`hfs.json`, and both are walked by the same `.starciwork` catalog for UAT and evidence.
+The back end is a NestJS domain-first application; the front end is a Next.js app drawn with `@starci/grammar`.
+Both sides are checked by the same `hfs lint` at the app root against the one `hfs.json` (the BE canon over
+`be/`, the FE canon over `fe/`), and both are walked by the same `.starciwork` catalog for UAT and evidence.
 
 ## 2. How to read a feature
 
@@ -83,7 +77,7 @@ gap.audit.emitted-events` because nothing in the code emits it yet.
 **`gap`** is a named absence, not restated prose. `gap.task.no-load-harness`'s `statement` names the exact
 missing thing — no k6 run has ever been captured for `nfr.task.list.latency` — and `closedBy` names the
 record that will close it. A closed gap stays in the tree as history: `gap.share.unbuilt-module` is
-`state: done`, closed by `[impl.share.todo-app-backend.access, impl.share.todo-app-backend.invitations]`,
+`state: done`, closed by `[impl.share.be.access, impl.share.be.invitations]`,
 its `because` recording which half remains another lane's `todo` record.
 
 **`ui`** names screen states and the brand revision it was built against. `ui.task.list`'s `states` are
@@ -91,7 +85,7 @@ its `because` recording which half remains another lane's `todo` record.
 {rev: 3}`.
 
 **`impl` (owners)** names real files by role, plural, because one screen or flow can span more than one
-artifact. `impl.task.todo-app-backend.ownership`'s `owners: [{role: module, path:
+artifact. `impl.task.be.ownership`'s `owners: [{role: module, path:
 src/modules/domain/task}]`, a `revision` (a git commit), and `proves: [sds.task.ownership-guard]` — it
 deliberately does not prove `br.task.single-owner` while that rule is still `todo`, because the gate refuses
 a `done` record whose `proves` target is not done.
@@ -106,8 +100,8 @@ requires both `fr.login.sign-in` and `fr.task.create`.
 
 ## 3. The three states and what each proves
 
-**`done`, proven with evidence.** `impl.task.todo-app-backend.list` is `state: done` and `proves:
-[br.task.list.owned]`. Its sibling `features/task/impl/todo-app-backend/list/evidence.yaml` is generated, not
+**`done`, proven with evidence.** `impl.task.be.list` is `state: done` and `proves:
+[br.task.list.owned]`. Its sibling `features/task/impl/be/list/evidence.yaml` is generated, not
 authored by hand: `scripts/example/example-evidence.mjs` writes it by actually running the assertion
 commands below against `--cwd`, and stamps that in its header. It carries a `recordDigest` (a sha256 of the record's own `index.yaml` bytes),
 a `codeDigest` (per-file sha256 over the record's `owners` paths), an `outcome`, per-assertion
@@ -164,7 +158,7 @@ named by `gap.task.no-load-harness`.
 | What breaks if I change X? | `X`'s inbound edges: other records' `refs`, `dependsOn`, `blockedBy`, `appliesTo`, `subscribes`, `composes` naming X, each carrying the digest of the slice it bound |
 | Which rules conflict? | `conflictsWith` (pairwise) or a `work/policy-decision@1`'s `tension.records` (three or more, jointly unsatisfiable) |
 | Which decisions are still open? | `work/policy-decision@1` records with `outcome: open` |
-| What does the frontend need to build for this feature? | `impl.<feature>.todo-app-frontend.<name>` records and the `ui.<feature>.<screen>` they `prove` |
+| What does the frontend need to build for this feature? | `impl.<feature>.fe.<name>` records and the `ui.<feature>.<screen>` they `prove` |
 | What real files implement a rule? | The `br`'s `module` field, and the `impl` record whose `proves` names that rule, whose `owners[].path` names the files |
 | What external systems does this feature depend on? | `extensions.work3.integrations` on the owning SRS/SDS record, resolved to one `integration.<feature>.<id>` node each |
 | Has this feature's UAT ever actually been walked? | `uat.<feature>.<flow>`'s `state` and its `evidence.yaml`; `state: todo` with no evidence means never |
@@ -179,7 +173,7 @@ flow spans — never a single `directory`/`files` pair, which `scripts/checks/ch
 ("work/implementation@1 carries directory/files/targetFiles; use owners: [{role, path}] instead").
 
 **Test names quote acceptance criteria and business rules verbatim.** In
-`examples/todo-app-backend/src/modules/domain/task/create-task.handler.spec.ts`:
+`examples/todo-app/be/src/modules/domain/task/create-task.handler.spec.ts`:
 
 ```ts
 it('fr.task.create: the task is created, owned by the submitter, not complete', async () => { ... });
@@ -204,27 +198,22 @@ generated design from real capture and naming the actual capture environment —
 
 ## 6. Running it
 
-Backend (`examples/todo-app-backend/package.json`):
+The app root (`examples/todo-app/package.json`, the scripts `hfs sync` manages):
 
 ```sh
-npm run build        # tsc -p tsconfig.build.json
-npm run start         # node dist/main.js
-npm run start:dev     # ts-node-dev --respawn --transpile-only src/main.ts
-npm test              # jest, rootDir src, testRegex *.spec.ts
+npm run build:be     # cd be && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json
+npm run start:todo   # node be/dist/apps/todo/src/main.js
+npm run dev:be       # cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/todo/src/main.ts
+npm test             # cd be && jest --selectProjects unit --coverage
+npm run dev:fe       # codegen, then cd fe && next dev apps/web
+npm run build:fe     # codegen, then cd fe && next build apps/web
+npm run typecheck    # codegen, then tsc over be/ and fe/apps/web
 ```
 
-Frontend (`examples/todo-app-frontend/package.json`):
-
-```sh
-npm run dev        # delegates to apps/web: next dev
-npm run build      # delegates to apps/web: next build
-npm run typecheck  # delegates to apps/web: tsc --noEmit
-```
-
-Infra (`.starcistacks/dev/README.md`): one Compose project,
-`.starcistacks/dev/infra/compose/compose.yaml`, one file per component. `api` and `web` are declared with
+Infra (`be/.starcistacks/dev/README.md`): one Compose project,
+`be/.starcistacks/dev/infra/compose/compose.yaml`, one file per component. `api` and `web` are declared with
 placeholder images behind the `app` Compose profile; this example instead runs both processes on the host —
-`npm run build && npm run start` in `todo-app-backend`, `npm run dev` in `todo-app-frontend` —
+`npm run build:be && npm run start:todo` and `npm run dev:fe` at the app root —
 against the infra the compose file brings up:
 
 | command | effect |
@@ -311,6 +300,6 @@ rather than papered over:
   absence directly; the NFR stays `todo` on `requiresProof.measurement`.
 
 - **Record bodies keep authored historical notes.** Some records carry comments naming earlier path or
-  revision states (for example `impl.task.todo-app-frontend.task-list` explains why its `owners` paths are
+  revision states (for example `impl.task.fe.task-list` explains why its `owners` paths are
   written the way they are). These are provenance inside the record, not live claims about the current
   tree — `owners[].path` and `evidence.yaml` are the fields the gates check, and both name current paths.
