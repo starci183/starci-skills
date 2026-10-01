@@ -1,0 +1,43 @@
+schema: starci/schema@1
+id: starci/hfs-peer-integrations@1
+title: HFS driver integration peers
+description: >-
+  The catalog of runtime peers a driver integration needs: when an app depends on every package of `when` (at the named
+  major, when one is named) it must declare `requires` in the dependencies of its app root package.json. The document is
+  data read by scripts/lib/hfs-rules/peer-integrations.mjs (R111 HFS_PEER_INTEGRATION_MISSING); it installs nothing.
+type: object
+additionalProperties: false
+required: [schema, purpose, pairs]
+properties:
+  schema:
+    const: starci/hfs-peer-integrations@1
+  purpose:
+    type: string
+    minLength: 1
+  pairs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, when, requires, why]
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+        when:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [package]
+            properties:
+              package: {type: string, minLength: 1}
+              major: {type: integer, minimum: 0}
+        requires:
+          type: string
+          minLength: 1
+        why:
+          type: string
+          minLength: 1

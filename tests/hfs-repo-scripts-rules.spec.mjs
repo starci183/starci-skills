@@ -1,5 +1,5 @@
 // The repository-hygiene tree checks of `hfs check` (scripts/lib/hfs-rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
-// R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, and the slot app.scripts that holds the app root `scripts/` folder.
+// R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, R111 HFS_PEER_INTEGRATION_MISSING, and the slot app.scripts that holds the app root `scripts/` folder.
 // Each has a violating and a passing tree; the clean app of tests/_hfs-cli-fixture.mjs is the passing base, checked at its root.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -165,4 +165,46 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a record of an implementation in another r
     put(dir, '.starciwork/features/login/impl/other/gate/index.yaml', RECORD({ unit: 'npx vitest run apps/app/src/login.spec.ts' }, 'other-repo'));
   }) });
   assert.deepEqual(only(result, 'HFS_PROOF_COMMAND_FILE_MISSING'), []);
+});
+
+// ------------------------------------------------------------------------------------------------ R111 HFS_PEER_INTEGRATION_MISSING
+
+const withDependencies = (dependencies, devDependencies = {}) => (dir) => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  put(dir, 'package.json', json({ ...pkg, dependencies: { ...(pkg.dependencies ?? {}), ...dependencies }, devDependencies: { ...(pkg.devDependencies ?? {}), ...devDependencies } }));
+};
+const APOLLO_ON_EXPRESS5 = { '@nestjs/apollo': '^13.4.5', '@nestjs/platform-express': '11.2.5' };
+
+test('HFS_PEER_INTEGRATION_MISSING: @nestjs/apollo on @nestjs/platform-express 11 without @as-integrations/express5 is refused, and a devDependency does not count', () => {
+  const missing = only(checkRepo({ repoRoot: repoOf(APP, withDependencies(APOLLO_ON_EXPRESS5)) }), 'HFS_PEER_INTEGRATION_MISSING');
+  assert.deepEqual(missing.map((f) => [f.path, f.pair, f.requires]), [['package.json', 'nestjs-apollo-express5', '@as-integrations/express5']]);
+  assert.match(missing[0].message, /@nestjs\/apollo \^13\.4\.5 with @nestjs\/platform-express 11\.2\.5/);
+  const devOnly = only(checkRepo({ repoRoot: repoOf(APP, withDependencies(APOLLO_ON_EXPRESS5, { '@as-integrations/express5': '^1.1.2' })) }), 'HFS_PEER_INTEGRATION_MISSING');
+  assert.equal(devOnly.length, 1);
+  assert.match(devOnly[0].message, /only a devDependency/);
+});
+
+test('HFS_PEER_INTEGRATION_MISSING: the declared peer, another major of the driver, and an app without the integration are clean', () => {
+  for (const dependencies of [
+    { ...APOLLO_ON_EXPRESS5, '@as-integrations/express5': '^1.1.2' },
+    { '@nestjs/apollo': '^12.0.0', '@nestjs/platform-express': '^10.4.0' },
+    { '@nestjs/platform-express': '11.2.5' },
+  ]) {
+    assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, withDependencies(dependencies)) }), 'HFS_PEER_INTEGRATION_MISSING'), [], JSON.stringify(dependencies));
+  }
+});
+
+test('HFS_PEER_INTEGRATION_MISSING: the pair catalog is a starci/hfs-peer-integrations@1 document', async () => {
+  const { createRequire } = await import('node:module');
+  const { parseYaml } = await import('../engine/yaml.mjs');
+  const root = path.resolve(import.meta.dirname, '..');
+  const loaded = createRequire(path.join(root, 'package.json'))('ajv/dist/2020.js');
+  const Ajv2020 = loaded?.default ?? loaded;
+  // A starci/schema@1 document stamps its own kind and id beside the JSON Schema body.
+  const { schema: kind, id, ...body } = parseYaml(fs.readFileSync(path.join(root, 'modules/schemas/hfs-peer-integrations.schema.yaml'), 'utf8'));
+  assert.deepEqual([kind, id], ['starci/schema@1', 'starci/hfs-peer-integrations@1']);
+  const validate = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(body);
+  const catalog = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/peer-integrations.yaml'), 'utf8'));
+  assert.equal(validate(catalog), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...catalog, pairs: [{ id: 'x', when: [], requires: 'y', why: 'z' }] }), false, 'a pair with no condition is refused');
 });

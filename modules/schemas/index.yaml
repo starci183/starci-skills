@@ -702,6 +702,19 @@ schemas:
       whenNot: Framework substitution is not licensed by a profile existing; mono/single-source mappings keep Nest/Next roles.
       selectedBy: canon-scan --profile and the check-hfs-rules parity gate.
 
+  - id: starci/hfs-peer-integrations@1
+    file: modules/schemas/hfs-peer-integrations.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The runtime peers a driver integration needs and npm does not install for it: when an app depends on every package of a pair (at the named major), its app root package.json declares the pair's peer in its dependencies."
+    binds: knowledge/hfs/peer-integrations.yaml
+    usedBy: [scripts/lib/hfs-rules/peer-integrations.mjs]
+    business:
+      question: "Which runtime peer must an app declare for a driver integration it uses?"
+      whenNeeded: Judging an app root package.json in hfs check (R111), or adding a pair after a boot failure of the same kind.
+      whenNot: Not a pin list and not a statement that an app boots; it names the peer, hfs check proves the declaration.
+      selectedBy: hfs check reads it through scripts/lib/hfs-rules/peer-integrations.mjs.
+
   - id: starci/canon-pins@1
     file: modules/schemas/canon-pins.schema.yaml
     dialect: json-schema
@@ -830,6 +843,7 @@ moduleLocalDocumentKinds:
       - modules/schemas/agent-hierarchy.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/canon-pins.schema.yaml
+      - modules/schemas/hfs-peer-integrations.schema.yaml
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml
 

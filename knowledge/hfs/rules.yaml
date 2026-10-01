@@ -1135,3 +1135,11 @@ rules:
     failureCodes: ["FE_PROPS_MUTABLE"]
     enforcers:
       - {kind: eslint-fe, id: props-fields-readonly}
+  - id: R111
+    code: "HFS_PEER_INTEGRATION_MISSING"
+    law: "An app declares the runtime peer every driver integration it uses needs: when the app root package.json depends on every package of a pair of knowledge/hfs/peer-integrations.yaml (at the named major), it declares the pair's `requires` in its dependencies (`@nestjs/apollo` on `@nestjs/platform-express` 11, Express 5, needs `@as-integrations/express5`)."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_PEER_INTEGRATION_MISSING"]
+    enforcers:
+      - {kind: hfs, id: peer-integrations, at: scripts/lib/hfs-rules/peer-integrations.mjs}
