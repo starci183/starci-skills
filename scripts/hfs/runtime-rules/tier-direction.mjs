@@ -1,4 +1,4 @@
-// tiers.mjs - RT_TIER_DIRECTION and ARCH_OWNER_CYCLE over the runtime (knowledge/hfs/rules.yaml, gate runtime): every
+// tier-direction.mjs - RT_TIER_DIRECTION and ARCH_OWNER_CYCLE over the runtime (knowledge/hfs/rules.yaml, gate runtime): every
 // relative import between two runtime owners goes from a tier to a tier its mayImport lists (tiers.runtime of
 // knowledge/hfs/runtime-slots.yaml), and the owner graph has no cycle. The judge is the product one,
 // scripts/checks/architecture/tiers.mjs checkTiers, fed the runtime's import graph: the relative specifiers of every

@@ -1,4 +1,4 @@
-// spec-placement.mjs - RT_SPEC_PLACEMENT (knowledge/hfs/rules.yaml, gate runtime): one test layout for the runtime.
+// test-layout.mjs - RT_SPEC_PLACEMENT (knowledge/hfs/rules.yaml, gate runtime): one test layout for the runtime.
 //   tests/<area>/<module>[.<topic>].spec.mjs   a runtime spec; <area> is the source area with / as - (api-orca, kernel-verbs)
 //   tests/helpers/<name>.mjs                   shared spec code (no _ prefix)
 //   tests/setup/<name>.mjs                     --import preloads

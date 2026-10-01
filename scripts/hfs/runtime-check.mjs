@@ -34,8 +34,8 @@ import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
 import { sourceNameFindings } from './runtime-rules/source-name.mjs';
-import { specPlacementFindings } from './runtime-rules/spec-placement.mjs';
-import { tierFindings } from './runtime-rules/tiers.mjs';
+import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
+import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
 /** The tree codes checkRepo reports for a runtime repository (rules R01, R02, R03). */
 export const TREE_CODES = Object.freeze(['HFS_SLOT_UNDECLARED', 'HFS_SLOT_AMBIGUOUS', 'HFS_SLOT_NOT_ENABLED', 'HFS_FORBIDDEN_PRESENT', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY']);

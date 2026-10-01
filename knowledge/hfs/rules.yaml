@@ -284,7 +284,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: owner-cycle}
       - {kind: eslint-fe, id: owner-cycle}
-      - {kind: runtime, id: runtime-cycles, at: scripts/hfs/runtime-rules/tiers.mjs}
+      - {kind: runtime, id: runtime-cycles, at: scripts/hfs/runtime-rules/tier-direction.mjs}
   - id: R28
     code: "BE_FEATURE_IMPORTS_FEATURE"
     law: "A feature never imports a feature."
@@ -1175,7 +1175,7 @@ rules:
     gates: [land, runtime]
     failureCodes: ["RT_TIER_DIRECTION"]
     enforcers:
-      - {kind: runtime, id: runtime-tiers, at: scripts/hfs/runtime-rules/tiers.mjs}
+      - {kind: runtime, id: runtime-tiers, at: scripts/hfs/runtime-rules/tier-direction.mjs}
   - id: R116
     code: "RT_BASE_IMPURE"
     law: "The runtime base tier (the engine foundation and scripts/lib) never writes the filesystem and reads process.env only in a declared seam of ruleParams.runtime.baseEnvSeams."
@@ -1199,7 +1199,7 @@ rules:
     gates: [land, runtime]
     failureCodes: ["RT_SPEC_PLACEMENT"]
     enforcers:
-      - {kind: runtime, id: spec-placement, at: scripts/hfs/runtime-rules/spec-placement.mjs}
+      - {kind: runtime, id: spec-placement, at: scripts/hfs/runtime-rules/test-layout.mjs}
   - id: R119
     code: "RT_SOURCE_NAME"
     law: "A runtime source file is named <kebab-name>.mjs, never a one-off of ruleParams.runtime.oneOffNames (_*, tmp-*, fix-*, *-backfill, migrate-*, *-old, *.bak*), and its basename is unique inside its tier except lib.mjs and index.mjs."
