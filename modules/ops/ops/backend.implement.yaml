@@ -109,8 +109,8 @@ writes:
         op loop's gate.json (the gate step below): findings the base already has are repository debt owed to
         code.refactor and measured by review.verify's whole-repository hfs lint, never an open item of this slice. Unit coverage is the
         runner's: the unit project (`npm test`, jest with `--coverage`) fails below its per-file 100
-        threshold on `*.service.ts`; Sonar imports no coverage. The repository's full
-        test:ci is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the source it adds or changes and runs only those and the specs that import it; the whole unit suite is unit.verify's or /push-git's
+        threshold on `*.service.ts`; Sonar imports no coverage. The app's full
+        unit suite (`npm test`) is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the source it adds or changes and runs only those and the specs that import it; the whole unit suite is unit.verify's or /push-git's
         (CONTEXT.md useful verification). Run Sonar only through
         `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository root>
         --wait --isolate --base <source commit recorded before

@@ -1,115 +1,117 @@
-# Backend/frontend source layout
+# App source layout
 
-StarCi binds one explicit host to a selected project's backend and frontend
-repositories. The host owns the `.claude/CONTEXT.md` runtime identity, the
-`.workspaces` project/route registry and the bootstrap files written from the
-single `init/AGENTS.md` template. The selected backend owns the project's only
-`.starciwork` and `.starcistacks`; the frontend consumes the same records and
-does not copy them.
-A host may also be the selected backend only when the binding explicitly
-resolves both roles to that same real directory.
+StarCi binds one explicit host to a selected project's **app**: one Git repository that holds the
+project's back end in `be/` and its front end in `fe/`. The host owns the `.claude/CONTEXT.md`
+runtime identity, the `.workspaces` project/route registry and the bootstrap files written from the
+single `init/AGENTS.md` template. The binding (`.workspaces/projects/<project>/work.json`, schema
+`starci/workspace-binding@2`, `modules/schemas/workspace-routing.yaml`) names the one app checkout
+and its remote, the side folders (`sides: {be: be, fe: fe}`) and the Work root at the app root
+(`.starciwork`). Both sides share that one Work tree and one runtime ledger. No additional
+runtime, Work tree or Git repository is created inside a side or a package.
 
-Backend and frontend may explicitly resolve to the **same combined
-repository**. That repository has one `.starciwork` owned through its backend
-role; frontend source packages consume it. The host can be external or that
-same explicitly bound owner repository. No additional runtime, Work tree or
-Git repository is created inside an app/package. Separate FE/BE repositories
-keep their existing bindings. This does not infer a backend owner for a
-frontend-only project.
+## One app tree (HFS)
 
-## One repository tree (HFS)
-
-Every repository has the same contract, backend and frontend alike. The
-canonical statement is [knowledge/hfs/README.md](../knowledge/hfs/README.md);
-the machine form is `knowledge/hfs/slots.yaml` (every kind of content allowed
-to exist, with its path, presence, tracking, tier, required files and budget);
-`knowledge/patterns/repo/folder.yaml` (REPO-FOLDER-1..6) states the law and the
-checks report violations as `HFS_*` codes. A repository declares itself in
-`hfs.json` (`hfs` major, `profile`, `project`, `apps` with kinds,
-`optionalSlots`, `connections`) and carries no owner list, allowlist or local
-rule. npm (`package.json` + `package-lock.json`) is the only package manager.
+Every app has the same contract. The canonical statement is
+[knowledge/hfs/README.md](../knowledge/hfs/README.md); the machine form is
+`knowledge/hfs/slots.yaml` (every kind of content allowed to exist, with its path, presence,
+tracking, tier, required files and budget, plus the two sides and the only cross-side read);
+`knowledge/patterns/repo/folder.yaml` (REPO-FOLDER-1..6) states the law and the checks report
+violations as `HFS_*` codes. An app declares itself in one root `hfs.json` (`hfs` major,
+`kind: app`, `project`, and per side `apps` with kinds, `optionalSlots`, `reads`, and for `be` the
+`connections`) and carries no owner list, allowlist or local rule. npm (one root `package.json` +
+`package-lock.json`, one `node_modules`) is the only package manager. `hfs scaffold app <name>`
+writes a new app; `hfs lint`, `hfs sync` and every npm script run at the app root.
 
 The root `README.md` follows the [repository presentation checklist](repo-presentation.md):
-name, one-line description, Overview, Stack, Repository layout, Development, and a Work
-pointer when `.starciwork` exists. The HFS architecture machine checks that structure,
-root Markdown drafts, package-manager drift and README links to private hosts. Run
-`node scripts/checks/repo-presentation.mjs --root <repo>` directly for a tree-only gate.
+name, one-line description, Overview, Stack, Repository layout, Development, and a Work pointer to
+`.starciwork`. The HFS architecture machine checks that structure, root Markdown drafts,
+package-manager drift and README links to private hosts. Run
+`node scripts/checks/repo-presentation.mjs --root <app>` directly for a tree-only gate.
 
 ```text
-<repository>/                        # one repository, backend or frontend
+<app>/                               # the one repository of a product
 ├── .git/
-├── hfs.json                         # required: the repository declaration
+├── hfs.json                         # required: the app declaration (kind app, sides.be, sides.fe)
+├── README.md                        # required; other loose *.md live in a side's docs/ or .starciwork records
+├── package.json, package-lock.json  # required: the ONE manifest and lockfile (scripts block managed by hfs sync)
 ├── .gitignore, .gitattributes       # required; .gitignore carries a managed block (hfs sync)
-├── README.md                        # required; other loose *.md live in docs/ or .starciwork records
-├── package.json, package-lock.json  # required; "workspaces": ["apps/*","packages/*"] when more than one package
-├── tsconfig.json, eslint.config.mjs # required; thin calls into canon packages (extends / starciBeConfig)
-├── .editorconfig, .nvmrc, .prettierignore   # required
-├── sonar-project.properties                 # required; generated by hfs sync
-├── .husky/, .github/workflows/ci.yml        # required; generated by hfs sync
-├── apps/<app>/                      # REQUIRED on both profiles, even with one app
-├── packages/<pkg>/                  # optional: built to dist with explicit exports
-├── scripts/                         # optional: lasting repository tooling (*.mjs)
-├── docs/{adr,runbooks,guides}/      # optional: human documentation
-└── .npmrc, .dockerignore, .github/{CODEOWNERS,...}   # optional
+├── .editorconfig, .nvmrc            # required
+├── .prettierrc, .prettierignore     # required; generated by hfs sync
+├── sonar-project.properties         # required; generated by hfs sync
+├── .husky/, .github/workflows/ci.yml   # required; generated by hfs sync
+├── .starciwork/                     # required: product records for both sides
+├── scripts/                         # optional: operational scripts (codegen.mjs), no check, no spec
+├── be/                              # the back end
+└── fe/                              # the front end
 ```
 
-A **backend** repository additionally requires `src/` (the shared feature and
-module source roots, see [backend source pattern](backend-source-pattern.md)),
-`nest-cli.json`, `jest.config.js`, `.starciwork/`, `.starcistacks/` and
-`.sops.yaml`, and has no root `e2e/`. A **frontend** repository allows
-`turbo.json`, has no test configuration at all (a front end has no tests, R97), forbids a root `src/` (all product source lives under
-`apps/<app>/src`; see `knowledge/patterns/fe/folder.yaml`), and forbids
-`.starciwork/`, `.starcistacks/` and `.sops.yaml`.
+A side holds everything a standalone back-end or front-end repository root used to hold, except
+the files the root owns: a `package.json`, lockfile, `hfs.json`, `README.md`, git, CI, hook,
+formatter or Sonar file, `scripts/` or `.starciwork/` inside `be/` or `fe/` is forbidden
+(`repo.side-root-forbidden`), and the app root holds no `tsconfig.json`, ESLint, stylelint or jest
+configuration (`app.tool-config-local`).
 
-**Tests: unit automatic, the rest by hand.** Unit specs (a backend has only `<name>.service.spec.ts` beside each
-`*.service.ts`; a frontend has no tests) are the only tests any automatic gate runs. A backend also has
-integration (`src/tests/integration/<capability>/*.integration-spec.ts`), e2e
-(`src/tests/e2e/<area>/*.e2e-spec.ts`) and contract
-(`src/tests/contract/<provider>/*.contract-spec.ts`) specs, with the only test
-infrastructure in `src/tests/world/`. A frontend has no tests. They never
-join husky, coverage or an automatic CI trigger: the backend root `tsconfig.json`
-excludes the world, integration, e2e and contract trees, `src/tests/tsconfig.json`
-backs `typecheck:tests`, and `test:integration`, `test:e2e` and `test:contract`
-run it first. `test:ci` collects coverage from unit runs only, and a kept e2e
+```text
+be/
+├── tsconfig.json, tsconfig.build.json, eslint.config.mjs, jest.config.js   # managed by hfs sync
+├── nest-cli.json
+├── apps/<app>/src/                  # composition only (kind api | worker | migrate | cli)
+│   ├── main.ts                      # reads EnvSource once, parses options, bootstraps
+│   ├── app.module.ts                # AppModule.register(options): transport and capability modules
+│   └── <app>.options.ts             # optional options type
+├── src/
+│   ├── features/<feature>/          # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule,...}/
+│   ├── modules/
+│   │   ├── domain/<capability>/     # business invariants, owned state, errors/, persistence/
+│   │   ├── platform/<capability>/   # config, logging, errors, primitives (required), database, scheduling, messaging, ...
+│   │   └── integrations/<provider>/ # external protocol clients, failure translation, <provider>.config.ts
+│   └── tests/{world,fixtures,integration,e2e,contract}/   # src/tests/tsconfig.json is managed too
+├── contracts/<app>/                 # opt-in: schema.graphql / openapi.json, written by hfs emit-contracts
+├── packages/<pkg>/                  # opt-in: built to dist, an npm workspace of the root
+├── docs/{adr,runbooks,guides}/      # opt-in: human documentation
+├── .starcistacks/                   # required: deployment declarations
+└── .sops.yaml                       # required: the sops custody rule
+
+fe/
+├── tsconfig.json, eslint.config.mjs, stylelint.config.mjs   # managed by hfs sync
+├── turbo.json                       # optional: the front end's own task graph
+├── apps/<app>/                      # one Next app per audience, no package.json of its own
+│   ├── next.config.ts, tsconfig.json, postcss.config.mjs
+│   └── src/
+│       ├── app/                     # App Router adapters: global-error.tsx, [locale]/{layout,error,not-found,loading}.tsx
+│       ├── proxy.ts | instrumentation*.ts   # framework-pinned root files (middleware.ts is refused on Next 16)
+│       ├── features/{pages,layouts,overlays}/<Name>/
+│       ├── components/{blocks,composites,branches,leaves}/<Name>/
+│       ├── hooks/<domain>/          # use<Name>.ts and one <domain>.shared.ts
+│       └── modules/                 # api, config, i18n, routes (required); brand/brand.css; other capabilities
+├── packages/<family>-{ui,api,i18n}/, packages/<pkg>/   # opt-in, built to dist, npm workspaces of the root
+└── docs/{adr,runbooks,guides}/      # opt-in
+```
+
+The only cross-side reach is the front end reading `be/contracts/` (declared in `hfs.json`
+`sides.fe.reads`): the root `codegen` script generates the front end's ignored `__generated__/`
+from it. A side imports nothing else of the app outside itself (`ARCH_INTERNAL_IMPORT_OUTSIDE`).
+
+Only the three back-end module tiers exist: `domain` (business rules), `platform` (technical
+runtime), `integrations` (provider/protocol clients). Any other tier name is forbidden. Imports
+follow one matrix: feature to domain, platform and integrations; domain to domain, platform and
+integrations; integrations to platform; platform to platform; a feature never imports a feature;
+no cycles, `import type` included.
+
+**Tests: unit automatic, the rest by hand.** The back end's unit specs (only
+`<name>.service.spec.ts` beside each `*.service.ts`) are the only tests an automatic gate runs; the
+front end has no tests at all (R97). The back end also has integration
+(`be/src/tests/integration/<capability>/*.integration-spec.ts`), e2e
+(`be/src/tests/e2e/<area>/*.e2e-spec.ts`) and contract
+(`be/src/tests/contract/<provider>/*.contract-spec.ts`) specs, with the only test infrastructure in
+`be/src/tests/world/`. They never join husky, coverage or an automatic CI trigger:
+`be/tsconfig.json` excludes the world, integration, e2e and contract trees,
+`be/src/tests/tsconfig.json` backs the root `typecheck:tests`, and `test:integration`, `test:e2e`
+and `test:contract` run it first. `test` collects coverage from unit runs only, and a kept e2e
 workflow is `workflow_dispatch` only (`knowledge/patterns/be/test.yaml` BE-TEST-1).
 
 ```text
-apps/<app>/                          # backend: composition only (kind api | worker | migrate | cli)
-└── src/
-    ├── main.ts                      # reads EnvSource once, parses options, bootstraps
-    ├── app.module.ts                # AppModule.register(options): transport and capability modules
-    ├── <app>.options.ts             # optional options type
-
-apps/<app>/                          # frontend: one workspace package
-├── package.json, next.config.ts, tsconfig.json, postcss.config.mjs
-└── src/
-    ├── app/                         # App Router adapters: global-error.tsx, [locale]/{layout,error,not-found}.tsx
-    ├── proxy.ts | instrumentation*.ts   # framework-pinned root files (middleware.ts is not used on Next 16)
-    ├── features/{pages,layouts,overlays}/<Name>/
-    ├── components/{blocks,composites,branches,leaves}/<Name>/
-    ├── hooks/<domain>/              # use<Name>.ts and one <domain>.shared.ts
-    └── modules/                     # api, config, i18n, routes (required); brand/brand.css; other capabilities
-```
-
-```text
-<backend>/src/                       # backend shared source roots
-├── features/<feature>/              # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule}/
-├── modules/
-│   ├── domain/<capability>/         # business invariants, owned state, errors/, persistence/
-│   ├── platform/<capability>/       # config, logging, errors, primitives (required), database, scheduling, messaging, ...
-│   └── integrations/<provider>/     # external protocol clients, failure translation, <provider>.config.ts
-└── tests/{world,fixtures,integration,e2e,contract}/   # world/ (only infrastructure), integration/<capability>/, e2e/<area>/, contract/<provider>/
-```
-
-Only the three module tiers exist: `domain` (business rules), `platform`
-(technical runtime), `integrations` (provider/protocol clients). Any other tier
-name is forbidden. Imports follow one matrix: feature to domain, platform and
-integrations; domain to domain, platform and integrations; integrations to
-platform; platform to platform; a feature never imports a feature; no cycles,
-`import type` included.
-
-```text
-<backend>/.starciwork/               # product records only, backend repository only
+<app>/.starciwork/                   # product records only, at the app root, for both sides
 ├── .gitignore                       # exactly starciworkGitignoreText()
 ├── workspace.yaml
 ├── features/
@@ -123,7 +125,7 @@ platform; platform to platform; a feature never imports a feature; no cycles,
 ```
 
 ```text
-<backend>/.starcistacks/             # deployment declarations, backend repository only
+<app>/be/.starcistacks/              # deployment declarations, the back end's
 ├── application-stacks.yaml
 └── <environment>/                   # dev/, vps/, ...
     ├── README.md, environment.json
@@ -133,59 +135,48 @@ platform; platform to platform; a feature never imports a feature; no cycles,
     └── seeds/
 ```
 
-Storage states. Ignored (may exist, must be gitignored): `node_modules/`,
-`dist/`, `.next/`, `coverage/`, `test-results/`,
-`next-env.d.ts`, `*.tsbuildinfo`, and generated code (`__generated__/`, Nest
-`schema.gql`). External (must not exist in the working tree): tool caches
-(redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon
-presets), worktrees (`D:/starci-lanes/<project>/<lane>/`), agent output
-(reports, logs, `nul`, `.artifacts`, draw rounds, UAT captures: the
-scratchpad or the blob store, cited by `{name, sha256}`) and plaintext secrets
-(`.env*`, `.secrets/`, `*.pem`, `runtime/files/*`). Anything else at the root
-moves to its owner: infrastructure, compose, docker and env templates plus
-seeds and database init to `.starcistacks/<environment>/`; migrations to the
-owning capability's `persistence/`; product docs and workflow notes to
-`.starciwork` records or `docs/`; code generators to `scripts/` or a real
-`packages/<pkg>`.
+Storage states. Ignored (may exist, must be gitignored): `node_modules/`, `dist/`, `.next/`,
+`coverage/`, `reports/`, `test-results/`, `next-env.d.ts`, `*.tsbuildinfo`, and generated code
+(`__generated__/`, Nest `schema.gql`). External (must not exist in the working tree): tool caches
+(redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon presets), lane worktrees
+(`D:/starci-lanes/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
+rounds, UAT captures: the scratchpad or the blob store, cited by `{name, sha256}`) and plaintext
+secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). The runtime's op worktrees live
+under `.starciwork/worktrees/<op>`, git-excluded, and are removed when their op settles
+([workflow kernel](workflow-kernel.md#op-worktrees-and-the-landing)). Anything else moves to its
+owner: infrastructure, compose, docker and env templates plus seeds and database init to
+`be/.starcistacks/<environment>/`; migrations to the owning capability's `persistence/`; product
+docs and workflow notes to `.starciwork` records or a side's `docs/`; code generators to the root
+`scripts/` or a real `be/packages/<pkg>` or `fe/packages/<pkg>`.
 
-The host bootstrap files must route to `.claude/CONTEXT.md`. The runtime directory
-is named `.claude`; no other runtime directory name is valid. A routed source duplicates host
-identity only when it carries a `.claude/CONTEXT.md` runtime marker or a
-`.workspaces/projects` / `.workspaces/local/routes` registry marker. Routed
-backends also forbid other Work roots such as `.work`, `.starci` and
-`.starcitemp`.
-
-In a separate frontend repository, `.starciwork`, `.starcistacks` and every
-other runtime or Work name are forbidden, and the same runtime/registry
-identity markers are rejected. In an explicitly combined repository, the one
-backend-owned `.starciwork`/`.starcistacks` and the explicitly bound host
-identity are shared, not duplicated. A repository-local `.claude` or
-`.workspaces` directory containing other project metadata is not a second
-runtime or registry merely by name. Shared host services (SonarQube first) are
-declared by the backend's `.starcistacks` as host extensions under
-`.claude/ext/<service>/`, never copied into a project repository.
+The host bootstrap files must route to `.claude/CONTEXT.md`. The runtime directory is named
+`.claude`; no other runtime directory name is valid. A routed app duplicates host identity only when
+it carries a `.claude/CONTEXT.md` runtime marker or a `.workspaces/projects` /
+`.workspaces/local/routes` registry marker. Routed apps also forbid other Work roots such as
+`.work`, `.starci` and `.starcitemp`, and `fe/` holds no `.starciwork`, `.starcistacks` or
+`.sops.yaml` (`HFS_WORK_IN_FE`, `HFS_STACKS_IN_FE`). Shared host services (SonarQube first) are
+declared by `be/.starcistacks` as host extensions under `.claude/ext/<service>/`, never copied into
+an app.
 
 For application deployment work, load `knowledge/application-stacks.yaml` and
-[application stacks](application-stacks.md). One application manifest accounts
-for its backend, frontend and dependencies even when their source repositories
-differ. Repository placement does not establish service ownership or an
-independent recovery failure domain. The application-stack check and real
-lifecycle evidence assess deployment completeness separately.
+[application stacks](application-stacks.md). One application manifest accounts for the app's back
+end, front end and dependencies. Repository placement does not establish service ownership or an
+independent recovery failure domain. The application-stack check and real lifecycle evidence
+assess deployment completeness separately.
 
 ## Validation
 
 Source-layout conformance is part of `hfs lint` (its `hfs check` half), not a separate command:
 
 ```sh
-hfs lint --repo <repo-root> --format json
+hfs lint --repo <app> --format json
 ```
 
-The HFS tree law itself is reported by the slot check and the architecture machine
-(`scripts/checks/architecture.mjs`, run by `canon-scan.mjs`) as the `HFS_*`
-finding codes named in `knowledge/patterns/repo/folder.yaml` and the rule catalog in
-`knowledge/hfs/README.md`.
+The HFS tree law itself is reported by `hfs check` (the root slots once, each side's slots under
+its folder) and the architecture machine (`scripts/checks/architecture.mjs`, run per side) as the
+`HFS_*` finding codes named in `knowledge/patterns/repo/folder.yaml` and the rule catalog in
+`knowledge/hfs/README.md`; every finding path is app-relative.
 
-The kernel lifecycle performs the same validation whenever repository bindings
-contain `be` or `fe`. A valid result proves the filesystem shape and explicit
-ownership routing. It does not prove application behavior, builds, tests,
-deployment readiness or feature completeness.
+The kernel lifecycle validates the bound app checkout and both side folders before workflow
+effects. A valid result proves the filesystem shape and explicit ownership routing. It does not
+prove application behavior, builds, tests, deployment readiness or feature completeness.

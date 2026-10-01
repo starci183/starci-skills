@@ -36,10 +36,10 @@ reads:
   - id: baseline
     path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `hfs sync` generates) + packages/ (the shared presets)
     purpose:
-      en: The Next.js stack every project uses and the toolchain a new frontend repository carries from
-        its first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, canon
+      en: The Next.js stack every project uses and the toolchain the front end (`fe/`) of a new app carries from
+        its first commit (`hfs scaffold app` writes the root, `be/` and `fe/` at once) — configs that are thin calls into the @starci presets (tsconfig, prettier, canon
         lint), and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci
-        workflow, .gitignore and sonar-project.properties. A frontend has no tests, so no test config or runner.
+        workflow, .gitignore and sonar-project.properties. The front end has no tests, so no test config or runner under `fe/`.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:

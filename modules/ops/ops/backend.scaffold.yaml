@@ -36,8 +36,8 @@ reads:
   - id: baseline
     path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `hfs sync` generates) + packages/ (the shared presets)
     purpose:
-      en: The NestJS stack every project uses and the toolchain a new backend repository carries from its
-        first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, jest, canon lint),
+      en: The NestJS stack every project uses and the toolchain the back end (`be/`) of a new app carries from its
+        first commit (`hfs scaffold app` writes the root, `be/` and `fe/` at once) — configs that are thin calls into the @starci presets (tsconfig, prettier, jest, canon lint),
         and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci and e2e
         workflows, .gitignore, sonar-project.properties and .starciwork/.gitignore.
   - id: architecture

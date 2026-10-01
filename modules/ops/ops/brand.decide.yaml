@@ -28,7 +28,7 @@ params:
     doc:
       en: The owner's identity rulings, verbatim, each with where it was recorded (an owner-gate
         incident answer, a serve-ask answer). A StarCi Next brand op read only the empty bound
-        frontend repository and reported no ruling while the owner's answer sat in an incident the
+        front end and reported no ruling while the owner's answer sat in an incident the
         worker cannot open.
   referenceSources:
     type: string
@@ -76,15 +76,15 @@ reads:
   - id: sources
     path: <app>/<bound-paths> + params.referenceSources
     purpose:
-      en: Read the real token and style files of the frontend repository - the app's global CSS, the
-        family root, the theme and token files the owner named or that this repository actually
+      en: Read the real token and style files of the app's front end (`fe/`) - each app's global CSS, the
+        family root, the theme and token files the owner named or that `fe/` actually
         contains - and record each file path with the exact declaration every token value comes
         from.
   - id: assets
     path: .starciwork/brand/assets/* + <app>/<bound-paths>
     purpose:
       en: Read the mascot, logo and icon-set assets that already exist - beside the record and in the
-        frontend repository - with their formats, dimensions and provenance. Reuse an existing
+        front end (`fe/`) - with their formats, dimensions and provenance. Reuse an existing
         verified asset before producing any new one; an asset whose rights or origin are unknown is
         reported, not adopted.
   - id: shell
@@ -407,7 +407,7 @@ steps:
       - sources
     writes: [node, evidence]
     action:
-      en: "Run the brand checks against the real frontend repository and keep their output: token values
+      en: "Run the brand checks against the real front end (`fe/`) and keep their output: token values
         match their declared sources, every declared text pair holds the contrast floor (a status soft pair and its glyph, the
         soft floor) or an owner-receipted contrast exception, primary and danger are distinct unless the policy permits
         otherwise, every declared mascot asset exists
@@ -447,7 +447,7 @@ proofs:
         and version alone is not a trace.
   - id: brand-checks
     requirement:
-      en: "The machine checks ran against the actual frontend repository and their real output is retained
+      en: "The machine checks ran against the actual front end (`fe/`) and their real output is retained
         with its exit status: source match, contrast floor, primary/danger distinctness under the
         declared policy, mascot assets present with their recorded hashes, and a single icon set. A
         green summary without retained output is not proof."
