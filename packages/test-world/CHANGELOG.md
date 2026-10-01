@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3
+
+- Fixed: the globalSetup registers the path aliases of the declaration exactly as TypeScript resolves them. It walks the
+  `extends` chain of `src/tests/tsconfig.json` (or `tsconfig.json`): a string or an array (later entries win), relative paths
+  and package specifiers, JSONC. `paths` comes from the nearest config that declares it, and its targets are relative to the
+  effective `baseUrl` (resolved against the folder of the config that declares it) or, without one, to the folder of the
+  config that declares `paths`. Before, a tests tsconfig that only extended the side's tsconfig resolved `@modules/*` under
+  `src/tests/`, so a declaration importing an alias could not be loaded (`TEST_WORLD_CONFIG_INVALID`) although tsc was clean.
+
 ## 1.0.2
 
 - Changed: every path a declaration names (`stack`, seeds, the Keycloak realm, k3d Dockerfiles) resolves from the app root: `appRootOf` finds the directory of the app's `hfs.json` from the jest rootDir (the rootDir itself or its parent, the be side's app). `.starcistacks` lives at the app root, never under `be/`. An explicit `root` still wins.
