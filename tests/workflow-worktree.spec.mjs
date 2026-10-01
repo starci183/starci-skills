@@ -230,9 +230,9 @@ test('release is host-side: a release-pending worktree with live terminals stays
   const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-fin', appRepo: app }).record;
   // Part B's finish: the branch merged into main, the row marked release-pending.
   git(app, 'merge', '-q', '--ff-only', rec.branch);
-  assert.equal(markReleasePending(ctx, 'wf-fin'), true);
+  assert.deepEqual(markReleasePending(ctx, 'wf-fin'), { ok: true });
   assert.equal(workflowWorktreeOf(ctx, 'wf-fin').releasePending, true);
-  assert.equal(markReleasePending(ctx, 'wf-none'), false);
+  assert.deepEqual(markReleasePending(ctx, 'wf-none'), { ok: false });
   let live = 2; // the Kernel and one op still hold a terminal
   const lookup = Object.assign(() => null, { workflowPhase: () => 'finished', workflowTerminalsLive: () => live });
   const held = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca });

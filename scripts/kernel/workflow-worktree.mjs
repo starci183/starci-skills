@@ -195,12 +195,14 @@ export function workflowWorktreePromptRules(rec) {
 }
 
 /**
- * Mark the workflow's worktree for release (part B's finish, after the merge): the host-side GC removes it once no agent
- * of the workflow holds a terminal. true when a live row took the mark.
+ * Mark the workflow's worktree release-pending (part B's finish, after the merge): the host-side GC removes it once no
+ * agent of the workflow holds a terminal - link check, `orca worktree rm`, the row closed, `git branch -d wf/<id>`.
+ * {ok}: ok false when the workflow has no live worktree to mark.
  */
 export function markReleasePending(ctx, workflowId, { at = Date.now() } = {}) {
   const { env } = ctxOf(ctx);
-  return withMachine((m) => m.db.prepare("UPDATE worktrees SET release_pending_at=COALESCE(release_pending_at, ?) WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(at, workflowId).changes > 0, { env });
+  const changed = withMachine((m) => m.db.prepare("UPDATE worktrees SET release_pending_at=COALESCE(release_pending_at, ?) WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(at, workflowId).changes, { env });
+  return { ok: changed > 0 };
 }
 
 /**
