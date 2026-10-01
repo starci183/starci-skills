@@ -17,6 +17,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { documentLanguageHits, isDocument } from '../lib/language.mjs';
 import { BUNDLES } from '../../packages/hfs/scripts/sync-runtime.mjs';
 import { isMain } from './common.mjs';
+import { gitResult } from '../lib/git.mjs';
 
 /** The runtime folders whose documents are read; the repository root's own Markdown is read too. */
 export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', 'ui']);
@@ -26,12 +27,16 @@ const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', 'c
 export function runtimeDocuments(root = skillRoot) {
   const bundles = new Set(Object.keys(BUNDLES));
   const out = [];
+  // A git-ignored file is not a document of the repository (the owner's local config.yaml, scratch files): only tracked
+  // and untracked-but-not-ignored files are judged. Outside a git work tree (an installed copy) every file is judged.
+  const listed = gitResult(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root });
+  const inRepository = listed.ok ? new Set(listed.stdout.split('\0').filter(Boolean)) : null;
   const walk = (rel) => {
     const abs = path.join(root, ...rel.split('/'));
     if (!fs.existsSync(abs) || bundles.has(rel)) return;
     if (fs.statSync(abs).isDirectory()) {
       for (const name of fs.readdirSync(abs).sort()) if (!SKIPPED_DIRECTORIES.has(name)) walk(rel === '' ? name : `${rel}/${name}`);
-    } else if (isDocument(rel)) out.push(rel);
+    } else if (isDocument(rel) && (!inRepository || inRepository.has(rel))) out.push(rel);
   };
   for (const name of fs.readdirSync(root).sort()) {
     const abs = path.join(root, name);

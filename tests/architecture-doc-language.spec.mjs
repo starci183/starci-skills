@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 import { docLanguageFindings } from '../scripts/checks/check-doc-language.mjs';
 import { documentLanguageHits, hasSecondLanguage } from '../scripts/lib/language.mjs';
@@ -119,4 +120,15 @@ test('the runtime gate refuses Vietnamese in docs, modules, packages and example
   });
   assert.deepEqual(docLanguageFindings(root).map(item => `${item.path}:${item.line}`).sort(),
     ['docs/guide.md:3', 'examples/app/README.md:1', 'modules/kernel/failure-codes.yaml:2', 'packages/eslint/fe/docs/rule.md:1']);
+});
+
+test('a git-ignored file is not a repository document: the owner config is skipped, a tracked or new document is judged', t => {
+  const root = runtimeTree(t, {
+    '.gitignore': '/config.yaml\n',
+    'config.yaml': `owner: "${VI}"\n`,
+    'docs/new.md': `${VI}\n`,
+  });
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'ignore' });
+  git('init', '-q');
+  assert.deepEqual(docLanguageFindings(root).map(item => item.path), ['docs/new.md']);
 });
