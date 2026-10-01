@@ -13,7 +13,7 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 Keycloak importing the stack's `realm-todo.json`; `apps/migrate`'s exported `bootstrap` once; the network-edge fakes of the
 external providers, the mail host and the payment gateway, under `src/tests/world/fakes/<provider>/`) and run one worker.
 `use-test-world.ts` exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared
-EntityManager), `world.infra.keycloak` (the real Keycloak: `person()`, `cut()`, `restore()`) and `world.fake.<provider>`.
+EntityManager), `world.infra.keycloak` (the real Keycloak: `person()`, `events()`, `sessions()`, `cut()` freezes it, `restore()` thaws it) and `world.fake.<provider>`.
 Nothing under `src/tests/` overrides a provider and nothing of the stack is faked; shared test data lives in
 `src/tests/fixtures/`.
 

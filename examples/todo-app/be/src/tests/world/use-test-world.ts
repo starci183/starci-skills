@@ -17,8 +17,8 @@ import type { DynamicModule, INestApplicationContext } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { randomUUID } from "node:crypto"
 import { DataSource } from "typeorm"
-import { killContainer, postgresAccepts, startContainer } from "./docker.client"
-import { realmAnswers, registerPerson } from "./keycloak.client"
+import { killContainer, pauseContainer, postgresAccepts, startContainer, unpauseContainer } from "./docker.client"
+import { realmAnswers, registerPerson, userEvents, userSessions } from "./keycloak.client"
 import { createTestApi } from "./test-api.client"
 import type { TestApi } from "./test-api.client"
 import { testOptions } from "./test-apps.options"
@@ -63,7 +63,7 @@ interface Runtime {
     readonly workerBooted: boolean
 }
 
-/** The real Keycloak of the run: persons registered through its admin API, its outage a kill and a start of its container. */
+/** The real Keycloak of the run: persons registered through its admin API, its outage a freeze and a thaw of its container. */
 const realKeycloak = (state: TestWorldState): TestKeycloak => {
     const endpoint = {
         baseUrl: state.keycloakBaseUrl,
@@ -71,10 +71,13 @@ const realKeycloak = (state: TestWorldState): TestKeycloak => {
         adminPassword: state.keycloakAdminPassword,
     }
     return {
+        clientId: state.keycloakClientId,
         person: (email, password) => registerPerson(endpoint, email, password),
-        cut: () => killContainer(state.keycloakContainer),
+        events: (personId) => userEvents(endpoint, personId),
+        sessions: (personId) => userSessions(endpoint, personId),
+        cut: () => pauseContainer(state.keycloakContainer),
         restore: async () => {
-            startContainer(state.keycloakContainer)
+            unpauseContainer(state.keycloakContainer)
             await retryUntil(
                 `keycloak serves the ${state.keycloakRealm} realm again`,
                 KEYCLOAK_RETURN_DEADLINE_MS,

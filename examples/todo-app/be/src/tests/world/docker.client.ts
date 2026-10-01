@@ -126,6 +126,16 @@ export const startContainer = (name: string): void => {
     docker(["start", name])
 }
 
+/** Freezes the container: its processes stop, its port still accepts connections that are never answered. */
+export const pauseContainer = (name: string): void => {
+    docker(["pause", name])
+}
+
+/** Thaws a frozen container: the same processes run on with everything they held. */
+export const unpauseContainer = (name: string): void => {
+    docker(["unpause", name])
+}
+
 /** Removes the container and its anonymous volume, running or not; absent is fine. */
 export const removeContainer = (name: string): void => {
     if (containersNamed(name).length > 0) docker(["rm", "-f", "-v", name])

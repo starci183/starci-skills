@@ -12,14 +12,15 @@ const WRONG_PASSWORD = "definitely-not-the-password"
  * auth/sign-in: one complete journey through the public GraphQL door. A person known to the identity provider signs in
  * twice and uses the session it grants; the refusal contract holds (declared code on `errors[].extensions.code`, the same
  * answer for a wrong password and an unknown email, display text localized by the caller language); an identity provider
- * that is down is a declared provider-unavailable refusal, not a hang, and the door recovers when it returns. The identity
- * provider is the run's real Keycloak with the realm the stack imports, so the real Keycloak client (form, token parsing)
- * signs in against it. Persisted state is read back through the shared entity manager.
+ * that goes silent is a declared provider-unavailable refusal, not a hang, and the door recovers when it answers again.
+ * The identity provider is the run's real Keycloak with the realm the stack imports, so the real Keycloak client (form,
+ * token parsing) signs in against it and the realm's own LOGIN event proves the grant. Persisted state is read back
+ * through the shared entity manager.
  */
 describe("auth/sign-in", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
 
-    it("sign in -> use session -> refuse wrong pairs -> localized refusal -> provider down is a declared refusal", async () => {
+    it("sign in -> use session -> refuse wrong pairs -> localized refusal -> provider silent is a declared refusal", async () => {
         const { api } = world.apps.todo
         const email = `e2e-${randomUUID()}@todo.dev`
         const password = "e2e-pass-1"
@@ -29,6 +30,14 @@ describe("auth/sign-in", () => {
         // A person is the identity provider subject (the realm's user id the password grant vouches for): stable across
         // sign-ins, never a bare email.
         expect(first.personId).toBe(personId)
+
+        // The real provider recorded the password grant: a LOGIN event of this person through the api's client.
+        const login = await world.waitFor("keycloak records the LOGIN", async () =>
+            (await world.infra.keycloak.events(personId)).find(
+                (event) => event.type === "LOGIN" && event.clientId === world.infra.keycloak.clientId,
+            ),
+        )
+        expect(login.userId).toBe(personId)
 
         // The session the door handed out is a real row of the shared database.
         const sessionRows: Array<SessionRow> = await world.db.primary.query(SESSION_BY_TOKEN, [first.sessionToken])
@@ -78,11 +87,12 @@ describe("auth/sign-in", () => {
         expect(vietnamese.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(vietnamese.errorMessage).not.toBe(english.errorMessage)
 
-        // An identity provider that is down is a declared refusal, and the door recovers when it comes back.
+        // An identity provider that goes silent runs the client into its own deadline: a declared refusal, and the door
+        // recovers when it answers again.
         world.infra.keycloak.cut()
         try {
-            const down = await api.graphql<SignInData>("signIn", { input: { email, password } })
-            expect(down.errorCode).toBe(IdentityErrorCode.ProviderUnavailable)
+            const silent = await api.graphql<SignInData>("signIn", { input: { email, password } })
+            expect(silent.errorCode).toBe(IdentityErrorCode.ProviderUnavailable)
         } finally {
             await world.infra.keycloak.restore()
         }

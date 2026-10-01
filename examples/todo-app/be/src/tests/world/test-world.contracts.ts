@@ -2,6 +2,7 @@ import type { DynamicModule } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
+import type { KeycloakEvent, KeycloakSession } from "./keycloak.client"
 import type { TestApi, TestCaller } from "./test-api.client"
 
 /**
@@ -89,18 +90,24 @@ export interface SignedInPerson {
     readonly caller: TestCaller
 }
 
-/** A real service of the stack the world runs (its container), with the outage a spec drives on it. */
-export interface TestInfraService {
-    /** Takes the service down: its container is killed and every connection to it drops, as when its host crashes. */
+/**
+ * The real Keycloak of the run, with the realm the stack imports. Its outage is a silence, not a crash: development mode
+ * keeps the realm in an embedded database that a killed container can lose the last writes of, so `cut()` freezes the
+ * container (every call hangs into the caller's deadline) and `restore()` thaws it with everything it held.
+ */
+export interface TestKeycloak {
+    /** Freezes the identity provider: it accepts connections and never answers. */
     cut(): void
-    /** Starts the same container again (same port, same data) and waits until the service answers. */
+    /** Thaws it and waits until the realm answers again. */
     restore(): Promise<void>
-}
-
-/** The real Keycloak of the run, with the realm the stack imports. */
-export interface TestKeycloak extends TestInfraService {
+    /** The client of the realm the api signs in with. */
+    readonly clientId: string
     /** Registers a person in the realm and answers the person id: the `sub` the realm's tokens carry. */
     person(email: string, password: string): Promise<string>
+    /** The user events the realm stored for a person (LOGIN, LOGOUT, ...), newest first, read through the admin API. */
+    events(personId: string): Promise<ReadonlyArray<KeycloakEvent>>
+    /** The live Keycloak sessions of a person, read through the admin API. */
+    sessions(personId: string): Promise<ReadonlyArray<KeycloakSession>>
 }
 
 /** The services of the repository's own stack the world runs real; only external providers are faked. */

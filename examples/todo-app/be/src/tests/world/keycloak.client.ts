@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createE2EHttpClient } from "@tests/world/kit/e2e-http-client"
+import type { E2EHttpClient } from "@tests/world/kit/e2e-http-client"
 import { isRecord } from "@modules/platform/primitives"
 import { KEYCLOAK_ADMIN_USER } from "./docker.client"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
@@ -92,17 +93,72 @@ const adminToken = async (endpoint: KeycloakEndpoint): Promise<string> => {
     return answer.body.access_token
 }
 
+/** The admin API of the realm, signed in as the bootstrap administrator. */
+const adminApi = async (endpoint: KeycloakEndpoint): Promise<E2EHttpClient> =>
+    createE2EHttpClient({
+        baseUrl: `${endpoint.baseUrl}/admin/realms/${endpoint.realm}`,
+        bearerToken: await adminToken(endpoint),
+        timeoutMs: ADMIN_TIMEOUT_MS,
+    })
+
+/** One user event the realm stored (the realm export enables user and admin events). */
+export interface KeycloakEvent {
+    /** The event type: LOGIN, LOGIN_ERROR, LOGOUT, ... */
+    readonly type: string
+    /** The user the event is about, when there is one. */
+    readonly userId: string | null
+    /** The client that caused it, when there is one. */
+    readonly clientId: string | null
+    /** The Keycloak session it belongs to, when there is one. */
+    readonly sessionId: string | null
+}
+
+/** One live session of a user in the realm. */
+export interface KeycloakSession {
+    /** The session id. */
+    readonly id: string
+    /** The clients that hold tokens of the session. */
+    readonly clientIds: ReadonlyArray<string>
+}
+
+const textOrNull = (value: unknown): string | null => (typeof value === "string" ? value : null)
+
+/** The user events the realm stored for `userId`, newest first, as the admin API answers them. */
+export const userEvents = async (endpoint: KeycloakEndpoint, userId: string): Promise<ReadonlyArray<KeycloakEvent>> => {
+    const http = await adminApi(endpoint)
+    const answer = await http.get<unknown>(`/events?user=${encodeURIComponent(userId)}&max=100`)
+    if (answer.status !== HTTP_OK || !Array.isArray(answer.body))
+        throw refused(`Keycloak did not list the events of ${userId} (${answer.status})`)
+    return answer.body.filter(isRecord).map((event) => ({
+        type: String(event.type),
+        userId: textOrNull(event.userId),
+        clientId: textOrNull(event.clientId),
+        sessionId: textOrNull(event.sessionId),
+    }))
+}
+
+/** The live sessions of `userId` in the realm. */
+export const userSessions = async (
+    endpoint: KeycloakEndpoint,
+    userId: string,
+): Promise<ReadonlyArray<KeycloakSession>> => {
+    const http = await adminApi(endpoint)
+    const answer = await http.get<unknown>(`/users/${encodeURIComponent(userId)}/sessions`)
+    if (answer.status !== HTTP_OK || !Array.isArray(answer.body))
+        throw refused(`Keycloak did not list the sessions of ${userId} (${answer.status})`)
+    return answer.body.filter(isRecord).map((session) => ({
+        id: String(session.id),
+        clientIds: isRecord(session.clients) ? Object.values(session.clients).map(String) : [],
+    }))
+}
+
 /**
  * Registers a person in the realm (enabled, email verified, a permanent password, a complete profile so the password grant
  * is not held back by a required action) and answers the person id: the Keycloak user id, the `sub` of the tokens the
  * realm issues.
  */
 export const registerPerson = async (endpoint: KeycloakEndpoint, email: string, password: string): Promise<string> => {
-    const http = createE2EHttpClient({
-        baseUrl: `${endpoint.baseUrl}/admin/realms/${endpoint.realm}`,
-        bearerToken: await adminToken(endpoint),
-        timeoutMs: ADMIN_TIMEOUT_MS,
-    })
+    const http = await adminApi(endpoint)
     const created = await http.post("/users", {
         username: email,
         email,

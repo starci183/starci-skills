@@ -8,8 +8,9 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 /**
  * session/sign-out end to end: a session that answers calls ends by its own token through the public signOut door (the
  * session row is deleted, so the next bearer read is SESSION_NOT_FOUND and a second signOut refuses the same way), and
- * the same identity recovers with a fresh sign-in against the run's real Keycloak. The row counts are read through the
- * shared entity manager, every step of the journey itself travels /graphql.
+ * the same identity recovers with a fresh sign-in against the run's real Keycloak, which has ended its own session of the
+ * person (a LOGOUT event, or no live session of the api's client). The row counts are read through the shared entity
+ * manager, every step of the journey itself travels /graphql.
  */
 describe("session sign-out (e2e)", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
@@ -31,6 +32,18 @@ describe("session sign-out (e2e)", () => {
         const signedOut = await api.graphql<SignOutData>("signOut", { input: { sessionToken: person.sessionToken } })
         expect(signedOut.errors).toBeNull()
         expect(signedOut.data?.signOut.signedOut).toBe(true)
+
+        // The identity provider ended the session too: the real Keycloak recorded a LOGOUT of the person, or holds no live
+        // session of the person through the api's client any more.
+        const { keycloak } = world.infra
+        const ended = await world.waitFor("keycloak ends the session of the person", async () => {
+            const loggedOut = (await keycloak.events(person.personId)).some((event) => event.type === "LOGOUT")
+            const live = (await keycloak.sessions(person.personId)).some((session) =>
+                session.clientIds.includes(keycloak.clientId),
+            )
+            return loggedOut || !live ? { loggedOut, live } : null
+        })
+        expect(ended.loggedOut || !ended.live).toBe(true)
 
         const refused = await person.caller.graphql<TasksData>("tasks")
         expect(refused.errorCode).toBe(IdentityErrorCode.NotFound)
