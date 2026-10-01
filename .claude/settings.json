@@ -6,6 +6,12 @@
         "hooks": [
           { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/scripts/guards/seat-tools.mjs\"" }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/scripts/guards/command-guard.mjs\"", "timeout": 30 }
+        ]
       }
     ]
   }
