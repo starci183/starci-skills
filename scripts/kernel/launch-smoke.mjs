@@ -116,7 +116,7 @@ export function noopSpec({ role, script = SCRIPT }) {
   return [
     `This is a no-op launch smoke (${SMOKE_SCHEMA}); you are its ${ROLES[role].title}. Do exactly these steps and nothing else:`,
     ...steps,
-    'Do not read, edit, create or delete anything else, and start no other work. After worker_done, stop and idle.',
+    'Do not read, edit, create or delete anything else, and start no other work. After worker_done, stay idle in this agent: never quit or exit it (the runtime releases your terminal; an agent that exits itself leaves Orca unable to prove its process stopped).',
   ].join('\n');
 }
 
@@ -292,11 +292,13 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
       const before = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
       const settled = settledOf(before) || doneMessages.has(a.dispatchId);
       const stop = settled ? null : settle(() => orca.workerStop({ dispatch: a.dispatchId }));
-      const release = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
+      const first = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      const release = first?.ok ? first : settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
       const completed = before.status === 'completed' || before.status === 'succeeded';
       const task = completed || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
       const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : completed ? 'by-worker_done' : null,
-        ...(release?.ok ? {} : { releaseError: release?.error ?? release?.outcome ?? null }) };
+        ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
       if (a.workspace) entryOut.workspaceRemoved = unplace();
       out.cleanup.push(entryOut);
     }

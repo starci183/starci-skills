@@ -6,7 +6,7 @@
 //   round  --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH>
 //          --repo <product repo> [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
 //          renders the source with draw-render into <out>/round-<n>/, runs every machine metric, then the critic
-//          (scripts/work/draw-critic.mjs: a fresh Orca worker started by worker-start in a clean temp dir with only the PNGs, the
+//          (scripts/work/draw-critic.mjs: a fresh Orca worker started by worker-start on an empty-tree runtime worktree with only the PNGs, the
 //          HTML and the product's brand.direction rubric), and records round-<n>/{source.html, <part>.png + its
 //          draw-render .json, <part>.score.json, metrics.json, critique.json} and <out>/loop.json. It prints the
 //          failures, the beauty, whether the round progressed and whether the loop stops; fix the source and run

@@ -18,7 +18,7 @@ import { launchCriticWorker } from '../scripts/work/draw-critic.mjs';
 
 const titleRole = (title) => Object.entries(ROLES).find(([, r]) => r.title === title)?.[0] ?? (String(title).startsWith('[Critic]') ? 'critic' : null);
 
-function fakeOrca(t, { refuse = null, silent = null } = {}) {
+function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null } = {}) {
   const calls = [];
   const tasks = new Map();
   const workers = new Map();
@@ -58,7 +58,12 @@ function fakeOrca(t, { refuse = null, silent = null } = {}) {
     }),
     workerRead: rec('worker-read', ({ dispatch }) => ({ ok: workers.has(dispatch), source: 'transcript', rows: [{ text: 'done' }] })),
     workerStop: rec('worker-stop', ({ dispatch }) => { const w = workers.get(dispatch); w.status = 'failed'; w.state = 'stopped'; return { ok: true }; }),
-    workerRelease: rec('worker-release', ({ dispatch }) => { workers.get(dispatch).released = true; return { ok: true }; }),
+    workerRelease: rec('worker-release', ({ dispatch }) => {
+      const w = workers.get(dispatch);
+      if (w.role === releaseUnknownOnce && !w.releaseTried) { w.releaseTried = true; return { ok: false, outcome: 'unknown', state: 'release_unknown', result: { lastError: 'the stop outcome could not be verified' } }; }
+      w.released = true;
+      return { ok: true };
+    }),
     taskUpdate: rec('task-update', ({ id, status }) => ({ ok: true, taskId: id, status })),
     inbox: rec('inbox', () => ({ ok: true, messages: [...messages] })),
   };
@@ -198,7 +203,10 @@ test('a parent spec runs its stage then worker_done; a leaf spec marks its line 
   assert.match(parent, /timeout of at least 300 seconds/);
   const leaf = noopSpec({ role: 'critic', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
   assert.match(leaf, / mark --as critic$/m);
-  for (const s of [parent, leaf]) assert.match(s, /report worker_done exactly once/);
+  for (const s of [parent, leaf]) {
+    assert.match(s, /report worker_done exactly once/);
+    assert.match(s, /never quit or exit it/, 'an agent that quits itself leaves its release unknown (live run 2)');
+  }
   assert.doesNotMatch(leaf, / stage /);
 });
 
@@ -231,4 +239,18 @@ test('an agent finds its smoke run by its own terminal; without a handle only an
   assert.equal((await resolveState({ ...opts, env: {} })).state, b, 'no handle: the one run whose kernel is not yet marked');
   run('run-c', 'term_c');
   assert.match((await resolveState({ ...opts, env: {} })).error, /2 smoke runs launched kernel/);
+});
+
+test('a release_unknown is retried once under a fresh request; a second refusal fails the path with the release state', async (t) => {
+  const fake = fakeOrca(t, { releaseUnknownOnce: 'supervisor' });
+  const r = await smoke(fake);
+  assert.equal(r.ok, true, JSON.stringify(r.paths));
+  assert.deepEqual(fake.calls.filter((c) => c[0] === 'worker-release' && c[1].dispatch === 'ctx_supervisor').length, 2);
+  assert.equal(r.cleanup.find((c) => c.role === 'supervisor').releaseRetried, true);
+  const stuck = fakeOrca(t);
+  stuck.client.workerRelease = (a) => (a.dispatch === 'ctx_supervisor' ? { ok: false, state: 'release_unknown', result: { lastError: 'not verified' } } : { ok: true });
+  const r2 = await smoke(stuck);
+  assert.equal(r2.paths['supervisor-worker'].status, 'failed');
+  assert.match(r2.paths['supervisor-worker'].problems.join(), /supervisor: not released/);
+  assert.deepEqual([r2.cleanup.find((c) => c.role === 'supervisor').releaseState, r2.cleanup.find((c) => c.role === 'supervisor').releaseError], ['release_unknown', 'not verified']);
 });
