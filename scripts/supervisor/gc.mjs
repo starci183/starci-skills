@@ -713,11 +713,15 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   }
   if (want.has('agents') && apply) { try { const t = (deps.table ?? processTable)(); agentsBeforeOuter = t ? orcaAgents(t) : null; } catch { agentsBeforeOuter = null; } }
   if (want.has('agents')) {
+    // When the job that held a worker's terminal last changed (its settle): the age of a worker Orca still holds.
+    const settledAt = new Map([...ledgers.flatMap((l) => l.jobs.flatMap((j) => j.handles.map((h) => [h, j.updatedAt ?? null]))),
+      ...sup.jobs.filter((j) => j.handle).map((j) => [j.handle, j.updatedAt ?? null])]);
     for (const d of releasePlan(workerRows)) {
       if (d.verdict === 'keep') continue;
+      const since = Number(settledAt.get(d.terminalHandle)) || null;
       const it = { class: 'worker', action: 'release-worker', target: d.dispatchId, terminal: d.terminalHandle, run: d.runId, reason: d.reason, verdict: d.verdict === 'release' ? 'collect' : 'refuse',
         terminalState: d.terminalState, liveness: d.liveness, leftover: d.verdict === 'release' };
-      if (d.verdict === 'refuse') { report.items.push({ ...it, code: 'WORKER_RELEASE_REFUSED' }); report.counts.refused += 1; continue; }
+      if (d.verdict === 'refuse') { report.items.push({ ...it, code: 'WORKER_RELEASE_REFUSED', since, ageMs: since == null ? null : Math.max(0, now - since) }); report.counts.refused += 1; continue; }
       if (!apply) { report.items.push({ ...it, ok: null }); }
       else {
         let r;

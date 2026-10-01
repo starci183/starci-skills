@@ -335,3 +335,24 @@ test('op-settled whose worker Orca holds reclaimable: released through worker-re
   await unv.reconcile('gc:job:nivo-backend:op-1', ctx2);
   assert.equal(calls2.run.length, 0, 'unverifiable: neither released nor closed by tab (Orca accounts for it)');
 });
+
+test('unverifiable workers are never released: the sweep raises ONE owner incident listing each handle, Run and age', async () => {
+  const settledView = () => ({ ...ranView(), jobs: ranView().jobs.map((j) => (j.jobId === 'op-1' ? { ...j, handles: ['term_op'], updatedAt: T - 3 * 3_600_000 } : j)) });
+  const rows = [workerRow('ctx_a', { handle: 'term_op', liveness: 'unverifiable' }), workerRow('ctx_b', { liveness: 'unverifiable' }), workerRow('ctx_ok')];
+  const released = [];
+  const gcd = { ...gcDeps([]), ledgers: () => [settledView()], settleMs: 0, writeState: () => null, log: () => {}, lesson: () => null,
+    workers: () => ({ ok: true, workers: rows }), release: ({ dispatch }) => { released.push(dispatch); return { ok: true }; } };
+  const { c } = controller({ deps: { sweep: sweepWith(gcd), recordSweep: async () => {}, recordRun: async () => 1, settings: { sweepMs: 1_800_000 } } });
+  const { ctx, calls } = ctxOf('active');
+  await c.reconcile('gc:sweep', ctx);
+  assert.deepEqual(released, ['ctx_ok'], 'only the verifiable worker is released');
+  const owner = calls.decisions.filter((d) => d.idempotencyKey === 'gc-unverifiable-workers');
+  assert.equal(owner.length, 1, 'one incident for all of them');
+  assert.equal(owner[0].decider, 'owner');
+  assert.match(owner[0].summary, /2 settled worker\(s\).*term_op \(Run run_a, 3h\).*term_ctx_b \(Run run_a, age unknown\)/);
+  assert.deepEqual(owner[0].evidence.map((e) => e.ref), ['worker:ctx_a', 'worker:ctx_b']);
+  const quiet = controller({ deps: { sweep: sweepWith({ ...gcd, workers: () => ({ ok: true, workers: [workerRow('ctx_ok')] }) }), recordSweep: async () => {}, recordRun: async () => 1, settings: { sweepMs: 1_800_000 } } }).c;
+  const { ctx: ctx2, calls: calls2 } = ctxOf('active');
+  await quiet.reconcile('gc:sweep', ctx2);
+  assert.ok(!calls2.decisions.some((d) => d.idempotencyKey === 'gc-unverifiable-workers'), 'no unverifiable worker, no incident');
+});

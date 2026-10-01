@@ -9,7 +9,8 @@ summary: >-
   lists every Orca Run the ledgers and the Supervisor's jobs name, Run by Run with --run, and releases a reclaimable
   worker whose liveness is live or exited and whose literal nextAction is worker-release of that Dispatch
   (scripts/lib/worker-accounting.mjs releasePlan); an unverifiable, release_unknown or otherwise-directed row is reported
-  (WORKER_RELEASE_REFUSED) and never touched; a failed release is WORKER_RELEASE_FAILED; a Run whose listing failed
+  (WORKER_RELEASE_REFUSED) and never touched; the reconciler GC sweep raises ONE owner Decision Item (key
+  gc-unverifiable-workers) listing every unverifiable worker's terminal handle, Run and age, so none is left silent; a failed release is WORKER_RELEASE_FAILED; a Run whose listing failed
   touches none of its workers (WORKER_LIST_UNAVAILABLE). The title-regex and screen identification of worker terminals
   is deleted ([Worker]/[Kernel]/[Op]/[Supervisor] titles, the staging path on screen, workflowsNamed, the ownerless-lane
   matching and its Supervisor Decision Item): a terminal Orca accounts for is Orca's, a terminal the ledgers bind by
