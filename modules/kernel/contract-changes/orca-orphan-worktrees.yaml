@@ -12,7 +12,7 @@ summary: >-
   terminal in the tree) -> the row is created (orca-orphan-adopted) and the owner's next lookup reuses it; an ended
   owner, or one no ledger knows after worktrees.ownerGoneMs -> the row is created, the work (uncommitted changes and
   unlanded commits, never node_modules) preserved to refs/heads/preserved/orphan/<slot>-<digest>, the tree removed
-  link-safely through removeOrcaWorktree (links first, then `orca worktree rm`), the branch deleted after the preserve
+  link-safely through removeOrcaWorktree (links first, then scripts/api/orca/worktree-rm.mjs), the branch deleted after the preserve
   and the row closed (orca-orphan); a fresh pending slot of the same owner means its creation is running and the tree
   is left alone. Every adoption and removal writes a machine_logs incident (actor gc, kind worktree.orphan). A tree with
   no stamp (a lane, a human's tree) is foreign and never touched; no row is ever made for it. A registered Orca tree that
