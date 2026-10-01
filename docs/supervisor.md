@@ -126,7 +126,7 @@ workers.mjs list | cap | cancel --job <id> | cleanup
 ```
 
 The staging checkout is an Orca worktree of `.claude` (`orca worktree create --name sup-<job>`, made by the runtime
-through `scripts/lib/worktrees.mjs` createOrcaWorktree, registry kind `supervisor-staging` keyed by Orca's worktree
+through `scripts/api/orca/worktree-provision.mjs` createOrcaWorktree, registry kind `supervisor-staging` keyed by Orca's worktree
 id). Orca picks its path and branch; the job records both, and every reader uses the recorded values. It lives only
 until its commit lands, then goes through the link-safe Orca removal. Cap: at most
 10, default base 4 plus one per two queued jobs, halved under machine load. A worker whose terminal dies without a

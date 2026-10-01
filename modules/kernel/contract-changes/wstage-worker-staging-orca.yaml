@@ -2,10 +2,10 @@ id: wstage-worker-staging-orca
 effectiveAt: '2026-10-01T23:30:00+07:00'
 summary: >-
   THE [WORKER] STAGING CHECKOUT IS AN ORCA WORKTREE (lane WSTAGE under C0, deep map WT2, orca-overlap row 2: replaced in
-  alpha.4). scripts/supervisor/workers.mjs createStaging asks Orca for it through scripts/lib/worktrees.mjs
+  alpha.4). scripts/supervisor/workers.mjs createStaging asks Orca for it through scripts/api/orca/worktree-provision.mjs
   createOrcaWorktree (scripts/api/orca/worktree-create.mjs: repo path:<runtime>, name sup-<job>, base branch main, setup
   skip, comment starci:supervisor-staging:<job>, no parent); the registry kind supervisor-staging moved from the git
-  scratch kinds into ORCA_KINDS, so its row is keyed by Orca's worktree id. Orca picks the path and the branch: the job's
+  scratch kinds into ORCA_KINDS (scripts/lib/worktree-registry.mjs), so its row is keyed by Orca's worktree id. Orca picks the path and the branch: the job's
   payload.staging records {path, branch, base, orcaId} exactly as Orca reported them, and every reader (the land gate,
   which cherry-picks from the recorded branch above the recorded base, the self-job close, fileReport, the supervisor
   and reconciler GCs, the worker board) takes the recorded values; no reader builds sup/<job> or a path under
@@ -28,5 +28,8 @@ paths:
   - scripts/supervisor/land.mjs
   - scripts/reconciler/controllers/gc.mjs
   - scripts/lib/worktrees.mjs
+  - scripts/lib/worktree-registry.mjs
+  - scripts/api/orca/worktree-provision.mjs
+  - scripts/api/git/worktree-add.mjs
   - scripts/checks/check-worktree-add.mjs
   - tests/worker-staging-orca.spec.mjs
