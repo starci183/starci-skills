@@ -20,7 +20,7 @@ gate:
 newCode:
   # Coverage of the services only. The be unit run writes coverage/lcov.info (@starci/jest-preset coverageReporters lcov) and the
   # managed sonar-project.properties imports it (sonar.javascript.lcov.reportPaths=be/coverage/lcov.info) with
-  # sonar.coverage.inclusions=be/src/**/*.service.ts, the one scope rendered by hfs sync from the preset's COVERAGE_SOURCES (codecov.yml
+  # sonar.coverage.exclusions = the complement of be/src/**/*.service.ts (SonarQube has no coverage inclusions), rendered by hfs sync from the preset's COVERAGE_SOURCES and the slot manifest (codecov.yml
   # is rendered from the same constant). A handler, resolver, controller, module, config file or test is not a coverage target and
   # fe/ is outside coverage entirely, so coverage on these conditions is the services' coverage alone.
   coverage:

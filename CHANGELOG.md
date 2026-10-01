@@ -8,6 +8,14 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 ## [1.0.0-alpha.4] — in preparation
 
 - The land gate selects specs by dependency: `scripts/lib/spec-deps.mjs` follows each spec's relative imports transitively (TypeScript scanner, so imports in strings or comments are never followed), and `land.mjs` `touching` mode adds every spec whose import graph reaches a changed file. A clash between two lanes (one changes a module another lane's spec relies on) is refused at land time. The full spec run before a tag stays. Spec: `tests/spec-deps.spec.mjs`.
+- Lane C0-SONAR3: Sonar's coverage scope works. SonarQube has no `sonar.coverage.inclusions`, so it was ignored and overall coverage read 65.8% and 45.2% on the examples while every service was at 100.
+  - hfs sync renders `sonar.coverage.exclusions` as the complement of the services, derived from the slot manifest and the preset's coverage sources.
+  - The runtime's `coverageScopeOf`/`coverageTargetOf` read the scope the way Sonar computes it.
+  - A spec proves every executable be file of both examples is a service or excluded, never both and never neither, and that Sonar and Codecov describe one file set.
+  - Re-scanned, both examples read 100% overall coverage and 0 bugs.
+  - The examples declare their own analysis credential: PROJECT_ANALYSIS_TOKENs sealed in `ext/sonar/secrets`, chosen by the credential that names the project, else the one credential whose purpose is analysis.
+  - The FE route-slot name of `error.tsx` is `ErrorBoundary` (Sonar S2137).
+  - Contract change `sonar-coverage-exclusions`.
 - Batch 3 republish: eslint-canon-be 3.0.7, eslint-canon-fe 8.0.7 and hfs 4.0.7 carry the runtime layer move (test-secrets onto api/sops/decrypt). Profiles are rebound.
 - Lane C0-ORPHAN2: orphan worktrees after a crash are found in Orca's `worktree ps`, the GC's source of truth. Every Orca tree the runtime creates carries an ownership stamp (`--comment starci:<kind>:<slot>`); the [Worker] staging kind is stamped too, for when it moves to Orca. A stamped tree with no registry row is adopted while its owner lives, or its work is preserved to `preserved/orphan/<id>` and it is removed link-safely once its owner ended; each case logs an incident. An unstamped tree is never touched. A workflow tree's live terminals come from ps `liveTerminalCount`, and core-watch's WORKTREE fact reads ps. Live specs remove the repositories they register through `project setup-delete`, and the three leaked `fake-main` registrations are removed. Contract change `orca-orphan-worktrees`.
 - Batch 2 republish: eslint-canon-be 3.0.6, eslint-canon-fe 8.0.6 and hfs 4.0.6 carry the runtime api layer (scripts/api/<system>), R112 integration specs with the dead-exports pairing, and the new pins (test-world 1.0.5, jest-preset 2.2.2). Profiles are rebound.

@@ -1022,3 +1022,22 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
   assert.equal(resolveCustodyFile(other,'.claude/ext/x'),path.join(other,'.claude','ext','x'),'only the runtime host .claude is this tree');
   assert.equal(resolveCustodyFile(fake,'../escape'),null);
 });
+
+test('a project token is the declared credential that names the project, else the one declared credential whose purpose is analysis', t => {
+  const root=path.resolve(import.meta.dirname,'..');
+  // The examples declare their own analysis credential, sealed in the host's ext/sonar custody: no --token-ref is needed.
+  for(const [app,key] of [['todo-app','starci-todo-app'],['ecommerce-app','starci-ecommerce-app']]){
+    const declared=readSonarDeclaration(path.join(root,'examples',app,'.starcistacks','application-stacks.yaml'));
+    assert.equal(declared.projects.find(p=>p.key===key).tokenRef,path.join(root,'ext','sonar','secrets',`sonarqube-${key}-token.key`));
+    assert.ok(fs.existsSync(`${declared.projects[0].tokenRef}.enc`),`${app}: the analysis credential is sealed`);
+  }
+  const dir=temporary(t,'purpose');
+  const decl=(credentials)=>write(dir,`repo-${credentials.length}-${Math.random().toString(36).slice(2,6)}/.starcistacks/application-stacks.yaml`,
+    `services:\n  sonar:\n    provider: sonarqube\n    mode: local\n    projects:\n      - {repository: repo, key: proj-key}\n    credentials:\n${credentials.map(c=>`      - {id: ${c.id}, purpose: "${c.purpose}", env: SONAR_TOKEN, custody: {repository: repo, path: .starcistacks/dev/runtime/files/${c.file}}}`).join('\n')}\n`);
+  const one=readSonarDeclaration(decl([{id:'admin',purpose:'project provisioning and analysis',file:'admin.key'},{id:'scanner',purpose:'Local analysis of this project',file:'scanner.key'}]));
+  assert.match(one.projects[0].tokenRef,/scanner\.key$/,'the one analysis credential, never the admin one');
+  const two=readSonarDeclaration(decl([{id:'a',purpose:'analysis one',file:'a.key'},{id:'b',purpose:'analysis two',file:'b.key'}]));
+  assert.equal(two.projects[0].tokenRef,null,'two analysis credentials and none naming the project: no guess');
+  const named=readSonarDeclaration(decl([{id:'proj-key',purpose:'ci',file:'p.key'},{id:'b',purpose:'analysis',file:'b.key'}]));
+  assert.match(named.projects[0].tokenRef,/p\.key$/,'a credential naming the project wins');
+});

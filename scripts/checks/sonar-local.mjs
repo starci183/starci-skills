@@ -187,11 +187,14 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
     :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
-  const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),
+  const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),purpose:text(c.purpose)??'',
     file:resolveCustodyFile(repoDir(text(c.custody?.repository)),text(c.custody?.path))})).filter(c=>c.file);
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
   const analysis=credentials.filter(c=>!isAdmin(c)&&(!c.env||c.env==='SONAR_TOKEN'));
-  const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??null;
+  // A project's analysis token: the credential that names the project, else the one declared credential whose purpose is
+  // analysis (the declaration says what it is for; a name that matches nothing never guesses).
+  const forAnalysis=analysis.filter(c=>/\banalysis\b/i.test(c.purpose));
+  const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??(forAnalysis.length===1?forAnalysis[0].file:null);
   for(const p of projects)p.tokenRef=forProject(p.key);
   return {
     file,repoRoot,

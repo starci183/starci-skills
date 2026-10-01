@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (C0 batch)
+
+- Changed (contract change `sonar-coverage-exclusions`): `route-slot-fixed-name` holds `error.tsx` to `ErrorBoundary`, no longer `Error`. `Error` shadows the global Error constructor (Sonar typescript:S2137, a bug), and React calls this component an error boundary. A slot still named `Error` is now reported.
+
 ## 8.0.7 - 2026-10-01
 
 - Changed: the same bundled runtime layer move.

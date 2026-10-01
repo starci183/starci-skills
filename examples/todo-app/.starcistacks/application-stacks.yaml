@@ -141,6 +141,10 @@ services:
         purpose: Host-owned project provisioning and local example analysis.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
+      - id: starci-todo-app
+        purpose: Local analysis of this example (a PROJECT_ANALYSIS_TOKEN of project starci-todo-app, sealed in the host's ext/sonar custody).
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-starci-todo-app-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: optional-follow-up
