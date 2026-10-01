@@ -27,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { walkFiles } from './common.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { movedTo } from '../hfs/runtime-rules/retired.mjs';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -58,11 +59,8 @@ export function retiredPaths(root = DEFAULT_ROOT) {
   return new Set((Array.isArray(doc.retired) ? doc.retired : []).map((r) => String(r?.path ?? '')).filter(Boolean));
 }
 
-/** The moved paths of `root` (modules/kernel/retired-paths.yaml `moved[]`): Map from -> to; empty when there is none. */
-export function movedPaths(root = DEFAULT_ROOT) {
-  const doc = readRegistry(root);
-  return new Map((Array.isArray(doc.moved) ? doc.moved : []).filter((m) => m?.from && m?.to).map((m) => [String(m.from), String(m.to)]));
-}
+/** (path) -> where it moved under `root`'s modules/kernel/retired-paths.yaml `moved[]` (a directory row covers what is below it), or null. */
+export const movedPaths = (root = DEFAULT_ROOT) => movedTo(readRegistry(root).moved);
 
 const expandBraces = (token) => {
   const open = token.indexOf('{');
@@ -173,9 +171,9 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
         continue;
       }
-      if ((retired.has(cite.target) || moved.has(cite.target)) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
+      if ((retired.has(cite.target) || moved(cite.target)) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
       const body = readTarget(path.join(root, cite.target));
-      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved.has(cite.target) ? `moved to ${moved.get(cite.target)}` : 'no such file' }); continue; }
+      if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, symbol: cite.symbol, why: 'symbol not in file' });
       }

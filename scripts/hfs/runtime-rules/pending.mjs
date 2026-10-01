@@ -4,7 +4,8 @@
 //   matches (`**`, `*`, `{a,b}`; a trailing / covers a directory): such a finding reports at level pending, never failing
 //   RT_PENDING_STALE   an entry that allows no finding, or names a code no runtime rule reports: the debt is paid, delete it
 //   RT_PENDING_ADDED   an entry that allows a finding the base revision's list did not allow (a path moved through
-//                      modules/kernel/retired-paths.yaml moved[] keeps its allowance): the list only shrinks, so a new
+//                      modules/kernel/retired-paths.yaml moved[], a file or a whole directory, keeps its allowance): the
+//                      list only shrinks, so a new
 //                      violation is fixed, never listed
 // Pure: the base revision's list comes in as `basePending` (null when the base has no runtime manifest: nothing to compare).
 import { braceVariants, globExpression } from '../../lib/glob.mjs';
@@ -20,12 +21,13 @@ export function pendingMatcher(glob) {
 /**
  * Judges `findings` against `pending`: {errors, allowed}. `errors` are the findings no entry allows plus the ratchet's own
  * findings; `allowed` are the findings an entry allows, each with level pending and the entry's lane and reason.
- * `codes` is the set of finding codes the runtime rules report; `moved` maps a moved path's new path to its old one.
+ * `codes` is the set of finding codes the runtime rules report; `oldPathOf` maps a moved path to its old one (null when it
+ * did not move: scripts/hfs/runtime-rules/retired.mjs movedFrom).
  */
-export function applyPending({ findings, pending = [], basePending = null, moved = new Map(), codes, manifestFile = 'knowledge/hfs/runtime-slots.yaml' }) {
+export function applyPending({ findings, pending = [], basePending = null, oldPathOf = () => null, codes, manifestFile = 'knowledge/hfs/runtime-slots.yaml' }) {
   const entries = pending.map((entry, index) => ({ entry, index, match: pendingMatcher(entry.path), used: 0, unbased: [] }));
   const base = basePending === null ? null : basePending.map((entry) => ({ entry, match: pendingMatcher(entry.path) }));
-  const allowedByBase = (f) => base.some(({ entry, match }) => entry.rule === f.code && (match(f.path) || (moved.has(f.path) && match(moved.get(f.path)))));
+  const allowedByBase = (f) => base.some(({ entry, match }) => entry.rule === f.code && (match(f.path) || (oldPathOf(f.path) !== null && match(oldPathOf(f.path)))));
   const errors = [];
   const allowed = [];
   for (const f of findings) {

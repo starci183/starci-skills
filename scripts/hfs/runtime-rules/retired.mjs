@@ -12,6 +12,22 @@ import { declaredNames } from './source-ast.mjs';
 export const CODES = Object.freeze({ retired: 'RT_RETIRED_PRESENT', pinned: 'RT_PINNED_PATH_MOVED' });
 export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 
+/** The rows of moved[] as [from, to] pairs; a `from` ending in / moved a directory and everything below it. */
+const pairsOf = (moved) => (moved ?? []).filter((m) => m?.from && m?.to).map((m) => [String(m.from), String(m.to)]);
+/** Maps `p` through the first row whose side `a` covers it (exactly, or below a directory row) to side `b`. */
+const through = (pairs, p, a, b) => {
+  for (const pair of pairs) {
+    const from = pair[a];
+    if (from === p) return pair[b];
+    if (from.endsWith('/') && pair[b].endsWith('/') && p.startsWith(from)) return `${pair[b]}${p.slice(from.length)}`;
+  }
+  return null;
+};
+/** (path) -> its new path under moved[], or null when it did not move. */
+export const movedTo = (moved) => { const pairs = pairsOf(moved); return (p) => through(pairs, p, 0, 1); };
+/** (path) -> the old path a moved file had, or null when it did not move here. */
+export const movedFrom = (moved) => { const pairs = pairsOf(moved); return (p) => through(pairs, p, 1, 0); };
+
 /** True when `p` (a file, or a directory ending in /) is tracked under `files` / `fileSet`. */
 const tracked = (ctx, p) => {
   const clean = p.replace(/\/+$/, '');

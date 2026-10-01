@@ -193,6 +193,7 @@ test('HFS_SIZE_GROWTH: an oversized runtime source that grows, or a new one abov
 test('HFS_SIZE_GROWTH: an oversized file that shrinks, a moved one that keeps its size, and no base revision are clean', () => {
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(590) }, { base: baseRev({ 'scripts/kernel/big.mjs': lines(600) }) })), []);
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ 'scripts/reconciler/decisions.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/reconciler/decisions.mjs', to: 'scripts/machine/decisions.mjs' }] } })), []);
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ 'scripts/kernel/api-verbs/big.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/kernel/api-verbs/', to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(900) })), []);
 });
 

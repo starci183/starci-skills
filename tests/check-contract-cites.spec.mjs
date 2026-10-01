@@ -119,15 +119,16 @@ test('a retired path is valid history in a contract-change entry or owner ruling
 
 test('a moved path is valid history and dead in live text, named with where it went (moved[])', () => {
   const root = fixtureTree({
-    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n',
+    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/api-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
+    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/api-verbs/settle.mjs` settled"\n',
     'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/old/gate.mjs`"\n',
     'scripts/gates/gate.mjs': '',
   });
   try {
     const report = checkContractCites(root);
     assert.deepEqual(report.dead.map((d) => [d.file, d.why]), [['modules/kernel/live.yaml', 'moved to scripts/gates/gate.mjs']]);
-    assert.equal(report.retiredCites, 2, 'the contract change and the registry itself cite the old path as history');
+    assert.equal(report.retiredCites, 3, 'the contract changes and the registry itself cite old paths as history, a file below a moved directory included');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

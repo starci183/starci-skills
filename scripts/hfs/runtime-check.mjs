@@ -29,7 +29,7 @@ import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { externalOwnerFindings } from './runtime-rules/external-owner.mjs';
 import { nodeModulesLinkFindings } from './runtime-rules/node-modules-link.mjs';
 import { applyPending } from './runtime-rules/pending.mjs';
-import { RETIRED_PATHS_FILE, pinnedFindings, retiredFindings } from './runtime-rules/retired.mjs';
+import { RETIRED_PATHS_FILE, movedFrom, pinnedFindings, retiredFindings } from './runtime-rules/retired.mjs';
 import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
@@ -117,10 +117,9 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
 
   // The finding codes of the rules that run at the runtime gate: a pending entry naming another code is stale.
   const codes = new Set(loadRuleCatalog({ root }).forGate('runtime').flatMap((r) => r.failureCodes));
-  const moved = new Map((retiredPaths.moved ?? []).filter((m) => m?.from && m?.to).map((m) => [m.to, m.from]));
   // An entry for a code only an extra emitter reports is judged only when that emitter ran.
   const judgedPending = (runtimeManifest.pending ?? []).filter((e) => !EXTRA_ONLY.has(e.rule) || extraCodes.includes(e.rule));
-  const { errors, allowed } = applyPending({ findings, pending: judgedPending, basePending: basePendingOf(baseRev)?.filter((e) => !EXTRA_ONLY.has(e.rule) || extraCodes.includes(e.rule)) ?? null, moved, codes, manifestFile: RUNTIME_MANIFEST_FILE });
+  const { errors, allowed } = applyPending({ findings, pending: judgedPending, basePending: basePendingOf(baseRev)?.filter((e) => !EXTRA_ONLY.has(e.rule) || extraCodes.includes(e.rule)) ?? null, oldPathOf: movedFrom(retiredPaths.moved), codes, manifestFile: RUNTIME_MANIFEST_FILE });
 
   const why = readWhy(root, [...new Set([...errors, ...allowed].map((f) => f.code))]);
   const withWhy = (f) => ({ ...f, titleVi: why[f.code]?.titleVi, whyVi: why[f.code]?.whyVi, nextStepVi: why[f.code]?.nextStepVi });
