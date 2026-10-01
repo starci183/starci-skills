@@ -66,7 +66,11 @@ branches, functions or statements. From the parent `.claude` tree, run
 `<name>.service.spec.ts` beside each service, integration `*.integration-spec.ts` under `be/src/tests/integration/` and e2e
 `*.e2e-spec.ts` under `be/src/tests/e2e/`. Narrow an e2e run with jest arguments, for example
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook,
-default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check). Existing Work
+default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check); in the runtime repository
+it runs through `workflow_dispatch` of `.github/workflows/examples.yml`. On push and pull request that workflow runs this app's
+typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
+front-end build and the Sonar gate. The app's own `codecov.yml` and `ci.yml` are the app-repository form `hfs sync` renders; they
+run when the app is its own repository. Existing Work
 evidence retains its recorded revisions; the derived index reports stale proof where source or records changed.
 
 ## Ports: there is one projection and it is read, never restated

@@ -12757,3 +12757,96 @@ FE_PROPS_MUTABLE:
   nextStep_vi: "Đánh dấu `readonly` cho mọi field và index signature của props, viết collection là `readonly T[]`, `readonly [A, B]` hoặc `ReadonlyArray<T>`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+EXAMPLES_CI_WORKFLOW_MISSING:
+  title: "The root examples workflow is missing"
+  title_vi: "Thiếu workflow gốc chạy các ứng dụng ví dụ"
+  meaning_vi: "Không có `.github/workflows/examples.yml`: GitHub chỉ chạy workflow ở gốc repository, nên không ứng dụng ví dụ nào được kiểm tra trong CI."
+  causes_vi:
+    - "Workflow gốc bị xoá hoặc đổi tên"
+  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `node scripts/checks/examples-ci.mjs --matrix`."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_WORKFLOW_INVALID:
+  title: "The root examples workflow is not valid YAML"
+  title_vi: "Workflow gốc của các ví dụ không phải YAML hợp lệ"
+  meaning_vi: "Không đọc được `.github/workflows/examples.yml`: `<detail>`."
+  causes_vi:
+    - "Lỗi cú pháp YAML trong workflow"
+  nextStep_vi: "Sửa cú pháp YAML của `.github/workflows/examples.yml` rồi chạy lại `npm run check`."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_MATRIX_NOT_DERIVED:
+  title: "The examples matrix is not derived"
+  title_vi: "Ma trận ví dụ không được suy ra tự động"
+  meaning_vi: "Ma trận của workflow ví dụ phải đúng là `app: ${{ fromJSON(needs.apps.outputs.apps) }}`, lấy từ job `apps` chạy `examples-ci.mjs --matrix`; một danh sách viết tay sẽ để một ví dụ mới lọt khỏi CI."
+  causes_vi:
+    - "Ma trận liệt kê tên ứng dụng bằng tay"
+    - "Job `apps` không chạy lệnh suy ra ma trận hoặc không xuất outputs.apps"
+    - "Job ma trận thiếu `needs: apps`"
+  nextStep_vi: "Dùng job `apps` và biểu thức `fromJSON(needs.apps.outputs.apps)` làm ma trận duy nhất."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_HARDCODED:
+  title: "The examples workflow names an example app directly"
+  title_vi: "Workflow ví dụ ghi thẳng tên một ứng dụng"
+  meaning_vi: "Workflow gốc nhắc tới `examples/<app>` trực tiếp; mọi ứng dụng chỉ được chạy qua ma trận suy ra."
+  causes_vi:
+    - "Một bước viết đường dẫn của một ví dụ cụ thể"
+  nextStep_vi: "Thay đường dẫn cụ thể bằng `examples/${{ matrix.app }}`."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_STACK_LAYER_AUTOMATIC:
+  title: "Integration or e2e runs automatically"
+  title_vi: "Integration hoặc e2e chạy tự động"
+  meaning_vi: "Một bước chạy `test:integration`, `test:e2e` hoặc `test:contract` (khởi động stack docker) không được giới hạn ở `workflow_dispatch`; theo quyết định của chủ dự án, e2e chỉ chạy thủ công."
+  causes_vi:
+    - "Bước thiếu điều kiện `if: github.event_name == 'workflow_dispatch' ...`"
+  nextStep_vi: "Thêm điều kiện `github.event_name == 'workflow_dispatch'` (và input `layers`) cho bước đó."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_NO_MANUAL_TRIGGER:
+  title: "The examples workflow has no manual trigger"
+  title_vi: "Workflow ví dụ thiếu trigger thủ công"
+  meaning_vi: "Workflow ví dụ không có `workflow_dispatch`, nên các lớp integration và e2e không thể chạy thủ công."
+  causes_vi:
+    - "Khối `on` thiếu `workflow_dispatch` với input `layers`"
+  nextStep_vi: "Thêm `workflow_dispatch` với input `layers` (integration, e2e hoặc cả hai) vào workflow."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_STRAY_WORKFLOW:
+  title: "A root workflow runs an example app on its own"
+  title_vi: "Một workflow gốc tự chạy riêng một ứng dụng ví dụ"
+  meaning_vi: "Workflow `<file>` chạy `examples/<app>` ngoài workflow ví dụ chung; mỗi ứng dụng chỉ có một đường CI."
+  causes_vi:
+    - "Workflow riêng của một ví dụ chưa được gộp vào `examples.yml`"
+  nextStep_vi: "Gộp các bước vào `.github/workflows/examples.yml` rồi xoá workflow riêng đó."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_CODECOV_MISSING:
+  title: "The root codecov.yml is missing"
+  title_vi: "Thiếu codecov.yml ở gốc"
+  meaning_vi: "Codecov chỉ đọc một cấu hình gốc; không có `codecov.yml` thì không cờ nào của ứng dụng ví dụ được giữ ở mức 100."
+  causes_vi:
+    - "Tệp `codecov.yml` gốc bị xoá"
+  nextStep_vi: "Chạy `node scripts/checks/examples-ci.mjs --write` để sinh lại tệp."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_CODECOV_DRIFT:
+  title: "The root codecov.yml differs from its render"
+  title_vi: "codecov.yml gốc lệch khỏi bản sinh"
+  meaning_vi: "`codecov.yml` gốc phải có đúng một cờ cho mỗi ứng dụng ví dụ, với đường dẫn là phạm vi coverage của ứng dụng (chỉ các service), project và patch ở mức 100."
+  causes_vi:
+    - "Thêm một ứng dụng ví dụ mà chưa sinh lại tệp"
+    - "Sửa tay tệp sinh ra"
+  nextStep_vi: "Chạy `node scripts/checks/examples-ci.mjs --write` và commit tệp."
+  owner: runtime-core
+  kind: check-finding

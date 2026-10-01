@@ -5,11 +5,15 @@ name: examples
 # kind app (scripts/checks/examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
 # list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/examples-ci.mjs).
 #
-# Per app: install, typecheck, hfs lint (with the Sonar import file), the unit project with coverage (per-file 100 on the
-# services; it writes be/coverage/lcov.info), the Codecov upload under the app's flag, the front-end build, then integration and
-# e2e on the test world (the runner has docker; the world starts the stack). The Sonar scan and quality gate run where a server
-# is configured (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN); otherwise the job notes the skip. The local dashboard gate
-# (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
+# Two triggers, one workflow (owner ruling: e2e runs manually only):
+#   push / pull_request   per app: install, typecheck, hfs lint (with the Sonar import file), the unit project with coverage
+#                         (per-file 100 on the services; it writes be/coverage/lcov.info), the Codecov upload under the app's
+#                         flag, the front-end build, and the Sonar scan and quality gate where a server is configured
+#                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip).
+#   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
+#                         `layers` input: integration, e2e, or both. They never run on push or pull_request (npm run check
+#                         refuses an integration or e2e step that is not gated on workflow_dispatch).
+# The local dashboard gate (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
 #
 # Secrets: CODECOV_TOKEN once for this repository (the owner adds it: Codecov, then GitHub Settings > Secrets and variables >
 # Actions); without it the upload step is skipped and the log says so.
@@ -31,6 +35,13 @@ on:
       - 'scripts/checks/**'
       - 'codecov.yml'
       - '.github/workflows/examples.yml'
+  workflow_dispatch:
+    inputs:
+      layers:
+        description: The docker-stack layers to run on top of the automatic steps (manual only)
+        type: choice
+        options: [integration-and-e2e, integration, e2e]
+        default: integration-and-e2e
 
 permissions:
   contents: read
@@ -127,9 +138,12 @@ jobs:
         run: echo "::notice title=Codecov skipped::CODECOV_TOKEN is not set for this repository, so the coverage of ${{ matrix.app }} was not uploaded (the unit run still enforced per-file 100)."
       - name: Front-end build
         run: npm run build:fe
-      - name: Integration tests (test world)
+      # Manual only: the docker-stack layers run on workflow_dispatch, never on push or pull_request.
+      - name: Integration tests (test world, manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
         run: npm run test:integration -- --ci
-      - name: E2E tests (test world)
+      - name: E2E tests (test world, manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
         run: npm run test:e2e -- --ci
       - name: Sonar scan
         if: ${{ !cancelled() && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}

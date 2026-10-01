@@ -5,8 +5,8 @@
 // codecov.yml (the app-repository form `hfs sync` renders and the scaffold teaches) never run here. The root carries:
 //   .github/workflows/examples.yml  one workflow whose job matrix is THIS module's `--matrix` output (every examples/*
 //                                   folder whose hfs.json is of kind app): install, typecheck, lint, unit with coverage,
-//                                   the Codecov upload under the app's flag, the front-end build, integration and e2e,
-//                                   and the Sonar gate where a server is configured.
+//                                   the Codecov upload under the app's flag, the front-end build and the Sonar gate on
+//                                   push and pull_request; integration and e2e on workflow_dispatch only (owner ruling).
 //   codecov.yml                     one flag per example app, rendered here from the same coverage scope as the app's own
 //                                   sonar.coverage.inclusions and codecov.yml (packages/hfs/sync/index.mjs coverageScope over
 //                                   the jest preset's COVERAGE_SOURCES), each held at 100 on the project and the patch.
@@ -104,6 +104,12 @@ export function checkExamplesCi(root = ROOT) {
         add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
       if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
     }
+    // Owner ruling: integration, e2e and contract (the docker-stack layers) run on workflow_dispatch only.
+    for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
+      if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
+        add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
+    }
+    if (!doc.on?.workflow_dispatch) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger for the manual integration and e2e layers');
     for (const app of apps) if (new RegExp(`examples/${app}\\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
   }
   // No other root workflow runs an example app by itself (the folded per-example workflows are gone, and stay gone).
