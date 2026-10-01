@@ -13,7 +13,7 @@ ui:
     representative state is erasure-refused.
   surfaces:
     - name: privacy
-      route: /privacy
+      route: /audit/privacy
       purpose: export personal data and request erasure
       actors:
         - person
@@ -554,8 +554,8 @@ assets:
       kind: generated-proposed-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 6
+  rev: 7
   kind: clarifying
-  at: 2026-09-18T14:41:21.685Z
-  reason: "ADDENDUM 2: regenerate against current full-screen real renders; secondary nested inputs,
-    white primary ink, real component variants and declared app-owned composition."
+  at: 2026-10-01T12:00:00.000Z
+  reason: "The surface names the route the app serves, /audit/privacy under the locale segment, the deviation from the
+    direction's /privacy that impl.audit.fe.privacy records; the navigation destinations stay where they are."

@@ -8,33 +8,27 @@ between:
 owner: checkout
 surface:
   - name: buyerStatus
-    shape: GET /internal/buyers/:personId -> {personId, hasOrders}
+    shape: "query buyerStatus -> {personId, hasOrders}"
     transport: >-
-      Plain HTTP/JSON between the two services on the ports .starcistacks/dev/infra/metadata.json resolves (order on
-      orderApi). The door is internal - it sits under /internal/buyers on the order service
-      (features/checkout/transport/http/buyer.controller.ts), beside /internal/sessions on the
-      identity side, never on a user-facing route. The consumer is the identity service's
-      account view: the account(personId) GraphQL query composes its own person row with this
-      call's answer and nothing else (features/identity/transport/graphql/queries/account). There is no
-      shared table and no shared cache behind the answer - the call is the only way identity
-      learns it.
+      The buyerStatus GraphQL query of the order service (POST /graphql on orderApi, the port
+      .starcistacks/dev/infra/metadata.json resolves; served by features/checkout/transport/graphql/buyer-status.resolver.ts).
+      The consumer is the identity service's account view, through
+      modules/integrations/order-api/order-api.client.ts: it forwards the caller's own bearer token, so the answer is
+      about the person that token authenticates and no person id travels in the request. There is no shared table and
+      no shared cache behind the answer - the call is the only way identity learns it.
     guarantee: >-
-      The provider always answers 200 with {personId, hasOrders} for any personId, known or not;
-      no orders is the honest answer, never a 404. A network failure, a timeout inside the
-      consumer's deadline, or a non-200 answer is a typed 503 with a stable code on the
-      consumer side (ORDER_SERVICE_UNAVAILABLE), never a silently implied false - with one
-      deliberate exception: a 404, which this provider never sends, reads as the honest
-      no-orders answer under the asked id. A 200 whose body does not echo the asked personId
-      with a boolean hasOrders is refused as ORDER_CONTRACT_MISMATCH, not trusted.
+      For an authenticated caller the provider answers {personId, hasOrders}; no orders is the honest answer, never an
+      error. A network failure, a timeout inside the consumer's deadline or a GraphQL error answer is a typed
+      ORDER_API_UNAVAILABLE on the consumer side, never a silently implied false. An answer without a personId string
+      and a boolean hasOrders is refused as ORDER_API_CONTRACT_MISMATCH, not trusted.
     stability: >-
-      Changing the route, the body shape, or the always-200 rule is breaking for identity;
-      adding fields is not.
+      Changing the operation name or the answer shape is breaking for identity; adding fields is not.
 guarantees:
   - hasOrders reports what the order service holds at the moment of the call, not a copied flag that can drift.
   - An unreachable provider is surfaced as a refusal the consumer propagates; the account view never falls back to a guess.
 consumerObligations:
-  - identity asks this surface once per account read, after the person row is known, and caches nothing.
-  - identity turns a failed call into its own typed 503 and never renders hasOrders false for it - a 404 is the single exception, read as the absent answer the provider itself would have given.
+  - identity asks this surface once per account read, with the caller's bearer token, and caches nothing.
+  - identity turns a failed call into its own typed ORDER_API_UNAVAILABLE and never renders hasOrders false for it.
 refs: [br.checkout.place-order, fr.checkout.place-order, br.identity.sign-in, br.identity.account, fr.identity.account]
 
 requiresProof:
@@ -46,14 +40,11 @@ requiresProof:
     note: The consumer proves it honours its obligations.
 
 change:
-  rev: 2
+  rev: 3
   kind: clarifying
-  at: 2026-09-19T14:00:00.000Z
+  at: 2026-10-01T12:00:00.000Z
   reason: >-
-    Corrected the declared wire shape to the door the code actually serves: the provider is
-    @Controller("internal/buyers"), so the route is GET /internal/buyers/:personId, and the
-    consumer door moved from the retired REST GET /accounts/:personId to the account GraphQL
-    query. The guarantee and consumerObligations now state the refusal taxonomy the consumer
-    implements verbatim (404 as the absent answer, other non-200/timeout as
-    ORDER_SERVICE_UNAVAILABLE, off-shape 200 as ORDER_CONTRACT_MISMATCH) instead of the
-    drafted absolute - code is truth here; the contract was wrong about its own wire.
+    Corrected the declared wire to the door the code serves since the services moved to GraphQL: the provider is the
+    order service's buyerStatus query (the internal REST door is gone) and the consumer forwards the caller's bearer
+    token instead of naming a person id. The refusal taxonomy states the consumer's codes as the code names them
+    (ORDER_API_UNAVAILABLE, ORDER_API_CONTRACT_MISMATCH) - code is truth here; the contract was wrong about its own wire.

@@ -8,46 +8,41 @@ between:
 owner: identity
 surface:
   - name: verifySession
-    shape: POST /internal/sessions/verify -> {personId}
+    shape: "query verifySession(input: {sessionToken}) -> {personId}"
     transport: >-
-      Plain HTTP/JSON between the two services on the ports .starcistacks/dev/infra/metadata.json resolves (identity on
-      identityApi). The door is internal - it sits under /internal/sessions on the identity
-      service (features/identity/transport/http/session.controller.ts), the same shelf
-      contract.checkout.order-for-identity's /internal/buyers door sits on over at the order
-      service, never on a user-facing route. The bearer token travels in the JSON body as
-      {sessionToken}; an internal hop carries no user session of its own. The order service's
-      session guard (features/checkout/transport/graphql/session.guard.ts through
-      modules/integrations/identity/identity.client.ts) calls it on every person-scoped GraphQL
-      door, and the shop frontend's own session door calls it while rendering an account page.
+      The verifySession GraphQL query of the identity service (POST /graphql on identityApi, the port
+      .starcistacks/dev/infra/metadata.json resolves; served by
+      features/identity/transport/graphql/verify-session.resolver.ts). The token to verify travels as the input's
+      sessionToken; an internal hop carries no user session of its own. The order service's session guard calls it
+      through modules/integrations/identity-api/identity-api.client.ts on every person-scoped GraphQL door, and the
+      shop frontend's session door calls it while rendering an account page.
     guarantee: >-
-      A live session answers 200 with {personId}; a token that is absent, malformed or dead
-      answers a typed refusal stamped with the business code SESSION_INVALID (the
-      BusinessCodeExceptionFilter keeps the wire code at the business code - the _EXCEPTION
-      suffix is the exception class's internal name, never part of the contract). A 200 whose
-      body does not carry a nonempty personId string is a contract breach, not a valid answer.
+      A live session answers {personId}; a token that is absent, malformed or dead answers a GraphQL error whose
+      extensions.code is SESSION_INVALID. An answer whose data does not carry a personId string is a contract breach,
+      not a valid answer.
     stability: >-
-      Changing the route, the request body key, or the refusal codes is breaking for both
-      consumers; adding response fields is not.
+      Changing the operation name, the input key or the refusal code is breaking for both consumers; adding response
+      fields is not.
   - name: revokeSession
-    shape: "POST /internal/sessions/revoke -> {revoked: true}"
+    shape: "mutation revokeSession(input: {sessionToken}) -> {revoked: true}"
     transport: >-
-      Same door family on the same controller - the token to retire arrives as {sessionToken}
-      in the body. The shop's session door calls it on sign-out; there the call is best-effort,
-      because the cookie is cleared regardless of the answer.
+      The revokeSession GraphQL mutation on the same identity door
+      (features/identity/transport/graphql/revoke-session.resolver.ts); the token to retire arrives as the input's
+      sessionToken. The shop's session door calls it on sign-out; there the call is best-effort, because the cookie is
+      cleared regardless of the answer.
     guarantee: >-
-      A body that carries no string sessionToken is refused REQUEST_INVALID; a present token is
-      forgotten and the answer is {revoked: true} - retiring is idempotent, so a token that
-      already died answers the same way.
+      A present token is forgotten and the answer is {revoked: true} - retiring is idempotent, so a token that already
+      died answers the same way.
     stability: >-
-      Changing the route or the request body key is breaking for the shop's sign-out; the
-      answer shape is fixed at {revoked: true}.
+      Changing the operation name or the input key is breaking for the shop's sign-out; the answer shape is fixed at
+      {revoked: true}.
 guarantees:
   - "verify never invents a person: a token that names no live session is refused, not resolved."
   - revoke never reports failure for an already-dead token; forgetting is unconditional.
 consumerObligations:
-  - checkout verifies the bearer on every person-scoped door and propagates the provider's refusal
-    as its own SESSION_INVALID; an unreachable identity is a typed 503 IDENTITY_SERVICE_UNAVAILABLE,
-    and a 200 missing personId is IDENTITY_CONTRACT_MISMATCH - never a guessed person.
+  - checkout verifies the bearer on every person-scoped door and answers the provider's SESSION_INVALID as an
+    unauthenticated caller; an unreachable identity, or any other refusal, is a typed IDENTITY_API_UNAVAILABLE, and an
+    answer missing personId is IDENTITY_API_CONTRACT_MISMATCH - never a guessed person.
   - the shop treats revoke as best-effort on sign-out and clears its cookies either way.
 refs: [br.identity.sign-in, fr.identity.sign-in]
 
@@ -60,11 +55,11 @@ requiresProof:
     note: The consumer proves it propagates refusals and never invents an actor.
 
 change:
-  rev: 1
-  kind: initial
-  at: 2026-09-19T21:30:00.000Z
+  rev: 2
+  kind: clarifying
+  at: 2026-10-01T12:00:00.000Z
   reason: >-
-    v10-3: the /internal/sessions doors were served and consumed before any record declared them -
-    the deep check's CAPABILITY_WITHOUT_SPEC named /internal a shipped capability no spec owns.
-    This record declares the verify/revoke wire the session guard and the shop session door
-    already speak.
+    Corrected the declared wire to the doors the code serves since the services moved to GraphQL: verifySession is a
+    query and revokeSession a mutation on the identity service's /graphql (the /internal/sessions REST doors are gone).
+    The consumer's refusal taxonomy states the codes the identity-api client raises (IDENTITY_API_UNAVAILABLE,
+    IDENTITY_API_CONTRACT_MISMATCH) - code is truth here; the contract was wrong about its own wire.
