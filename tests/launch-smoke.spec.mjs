@@ -500,9 +500,7 @@ test('worker-start worktree arguments map to the launcher options; main manifest
   assert.deepEqual(manifestDiff(before, after), { added: [], changed: ['fe/apps/web/page.tsx'], removed: [], nodeModulesSame: false });
 });
 
-const PARTS_LANDED = ['workflow-worktree.mjs', 'workflow-checkpoint.mjs'].every((f) => fs.existsSync(path.join(SPEC_DIR, '..', 'scripts', 'kernel', f)));
-test('the live client loads every runtime launcher, wrapper and workflow-worktree function the smoke calls (no call is made)',
-  { skip: PARTS_LANDED ? false : 'parts A and B of workflow-worktree have not landed on this branch yet' }, async () => {
+test('the live client loads every runtime launcher, wrapper and workflow-worktree function the smoke calls (no call is made)', async () => {
     const { defaultClient } = await import('../scripts/kernel/launch-smoke.mjs');
     const client = await defaultClient();
     for (const k of ['startAgent', 'startWorkerAgent', 'criticWorkspace', 'removeCriticWorkspace', 'launchCriticWorker', 'workerShow', 'workerRead', 'workerStop', 'workerRelease', 'taskUpdate', 'inbox', 'worktreeList', 'git']) {
