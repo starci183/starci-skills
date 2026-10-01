@@ -54,9 +54,12 @@ function writeGuardFile(dir, name, body) {
 }
 
 /** runtime/guards/jobs/<job>.json — who the worker is and which absolute paths it owns. */
-export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned }) {
+export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null }) {
   return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', jobId, workflowId,
-    ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))], writtenAt: new Date().toISOString() });
+    ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))],
+    // The workflow worktree the op works in (scripts/kernel/workflow-worktree.mjs), or null: the guard refuses git history
+    // and ref changes inside it - only the runtime's checkpoint commits there.
+    workflowWorktree: workflowWorktree ? path.resolve(workflowWorktree) : null, writtenAt: new Date().toISOString() });
 }
 
 /**
@@ -263,14 +266,14 @@ const guardSettings = (config) => ({
 });
 
 /**
- * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config}) -> {receipt}
+ * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree}) -> {receipt}
  * receipt rides on the dispatch record. The caller binds receipt.jobFile to the agent's Orca terminal once
  * worker-start returns it (bindGuardTerminal), which is what the command guard and the history hook read.
  */
-export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null }) {
+export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null }) {
   const settings = guardSettings(config);
   const receipt = { jobFile: null, hooks: [] };
-  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned }); }
+  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree }); }
   catch (e) { receipt.jobFile = { error: String(e?.message ?? e) }; }
   if (settings.historyHook) {
     for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {

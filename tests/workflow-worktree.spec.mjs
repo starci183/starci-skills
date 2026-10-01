@@ -68,11 +68,11 @@ function picture(root) {
 }
 const rows = (env) => withMachine((m) => m.db.prepare('SELECT * FROM worktrees ORDER BY created_at').all(), { env });
 
-test('the spec names the Orca creation: wf-<id> off main with setup, the workflow branch wf/<id>', () => {
+test("the spec names the Orca creation: wf-<id> off main with setup; the workflow branch is Orca's wf-<id>", () => {
   const spec = workflowWorktreeSpec({ workflowId: 'wf-shop-k2', appRepo: path.resolve('/apps/shop') });
   assert.equal(spec.name, 'wf-wf-shop-k2');
   assert.equal(spec.baseBranch, 'main');
-  assert.equal(spec.branch, 'wf/wf-shop-k2');
+  assert.equal(spec.branch, 'wf-wf-shop-k2');
   assert.deepEqual(spec.args.slice(0, 2), ['worktree', 'create']);
   for (const flag of ['--repo', '--name', '--base-branch', '--setup', '--no-parent']) assert.ok(spec.args.includes(flag), flag);
   assert.equal(spec.args[spec.args.indexOf('--setup') + 1], 'run', 'the repository setup hook (npm ci) runs: no junctions');
@@ -87,8 +87,8 @@ test('Orca creates the workflow worktree once; the registry keys it by Orca\'s i
   assert.deepEqual({ ...orca.calls[0][1], repo: undefined }, { repo: undefined, name: 'wf-wf-shop-k2', baseBranch: 'main', setup: 'run' });
   assert.equal(orca.calls[0][1].repo, `path:${app.replace(/\\/g, '/')}`);
   assert.ok(!rec.path.startsWith(app), 'Orca places it under its own workspace root, not inside the app checkout');
-  assert.equal(rec.branch, 'wf/wf-shop-k2');
-  assert.equal(git(rec.path, 'rev-parse', '--abbrev-ref', 'HEAD'), 'wf/wf-shop-k2', 'Orca\'s wf-<id> branch renamed to the workflow branch');
+  assert.equal(rec.branch, 'wf-wf-shop-k2');
+  assert.equal(git(rec.path, 'rev-parse', '--abbrev-ref', 'HEAD'), 'wf-wf-shop-k2', 'Orca\'s own branch is the workflow branch, never renamed');
   assert.equal(git(rec.path, 'rev-parse', 'HEAD'), git(app, 'rev-parse', 'main'));
   const live = rows(env).filter((r) => r.removed_at == null);
   assert.equal(live.length, 1, 'no pending slot is left behind');
@@ -105,7 +105,7 @@ test('Orca creates the workflow worktree once; the registry keys it by Orca\'s i
   assert.equal(setCheckpoint(ctx, 'wf-shop-k2', 'abc123'), true);
   assert.equal(workflowWorktreeOf(ctx, 'wf-shop-k2').checkpoint, 'abc123');
   assert.equal(setCheckpoint(ctx, 'wf-none', 'abc123'), false);
-  assert.match(workflowWorktreePromptRules(rec), /ONLY in .*wf\/wf-shop-k2/);
+  assert.match(workflowWorktreePromptRules(rec), /ONLY in .*wf-wf-shop-k2/);
   assert.equal(workflowWorktreePromptRules(null), '');
 });
 
@@ -291,4 +291,21 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
   assert.ok(op.ok, JSON.stringify(op));
   assert.equal(starts[1].worktree, path.resolve('/orca/k/wf-wf-k'));
   for (const k of ['repo', 'baseBranch', 'name', 'setup']) assert.equal(starts[1][k], undefined, `an existing worktree takes no --${k}`);
+});
+
+test('an op launched into a workflow worktree gets a guard file naming it (the history guard refuses commits there)', async (t) => {
+  const { guardLaunch } = await import('../scripts/guards/install.mjs');
+  const { base, app, ctx } = fixture(t);
+  const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-guard', appRepo: app }).record;
+  const skillRoot = path.join(base, 'skill');
+  const into = guardLaunch({ skillRoot, jobId: 'op-guarded', workflowId: 'wf-guard', ledgerRepo: app, owned: [path.join(rec.path, 'be', 'src')], repos: [],
+    config: { guards: { historyHook: false, workHook: false } }, workflowWorktree: rec.path });
+  const guard = JSON.parse(fs.readFileSync(into.receipt.jobFile, 'utf8'));
+  assert.equal(guard.workflowWorktree, path.resolve(rec.path));
+  assert.equal(guard.workflowId, 'wf-guard');
+  const outside = guardLaunch({ skillRoot, jobId: 'op-plain', workflowId: 'wf-none', ledgerRepo: app, owned: [], repos: [], config: { guards: { historyHook: false, workHook: false } } });
+  assert.equal(JSON.parse(fs.readFileSync(outside.receipt.jobFile, 'utf8')).workflowWorktree, null, 'no workflow worktree, no field value');
+  // api dispatch hands the registry path of the workflow's worktree to the guard (scripts/kernel/api-verbs/dispatch.mjs).
+  const dispatchSource = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'scripts', 'kernel', 'api-verbs', 'dispatch.mjs'), 'utf8');
+  assert.match(dispatchSource, /opGuardLaunch\(\{[^}]*workflowWorktree: workflowTree\?\.path \?\? null/);
 });

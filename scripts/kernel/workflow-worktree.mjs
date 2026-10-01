@@ -7,7 +7,8 @@
 //              junctions) - through scripts/lib/worktrees.mjs createOrcaWorktree, which takes the per-repo cap slot
 //              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
 //              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
-//              (wf-<id>); the runtime renames it to the workflow branch wf/<id> right away. The Kernel then starts with
+//              (wf-<id>, its '/' rule): that branch IS the workflow branch, recorded as Orca reported it; every reader
+//              takes it from workflowWorktreeOf().branch and never constructs one. The Kernel then starts with
 //              `orchestration worker-start --worktree <that path>`: an existing worktree, so launch trust (the provider's
 //              project config, a Devin model pin) is written into it before the agent starts, which a `--worktree
 //              new-child` start cannot offer (the directory does not exist until the start returns).
@@ -15,7 +16,7 @@
 //              tree of its own. Ops on the same side (be/ or fe/, from their owned paths) run one at a time; ops on
 //              different sides may run together; an op touching both sides (or the app root) runs alone
 //              (canDispatchConcurrently, enforced by api dispatch as the typed wait workflow-side-busy).
-//   checkpoint part B commits each green op on wf/<id> and calls setCheckpoint; the registry row keeps the sha.
+//   checkpoint part B commits each green op on the workflow branch and calls setCheckpoint; the registry row keeps the sha.
 //   release    never from inside the worktree (coordinator ruling): part B's finish marks the row release-pending
 //              (markReleasePending); the host-side GC (scripts/lib/worktrees.mjs gcWorktrees, the reconciler GC
 //              controller) removes it only once the Kernel's and every op's terminal is released, through
@@ -48,13 +49,14 @@ const gitIn = (cwd, args) => { const r = runGit(args, { cwd, timeout: 60_000 });
 const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 
 /**
- * The Orca creation of a workflow's worktree. {name: 'wf-<id>', baseBranch: 'main', branch: 'wf/<id>', args}: `args` is
+ * The Orca creation of a workflow's worktree. {name: 'wf-<id>', baseBranch: 'main', branch: 'wf-<id>' (the branch Orca
+ * creates for that name; the registry records the one Orca reported), args}: `args` is
  * the `orca` argv that creates it (worktree create, issued through scripts/api/orca/worktree-create.mjs); the Kernel's
  * own worker-start then takes `--worktree <path>` (opWorktreeArgs gives the same to every op).
  */
 export function workflowWorktreeSpec({ workflowId, appRepo }) {
   const name = `wf-${workflowId}`;
-  return { name, baseBranch: 'main', branch: `wf/${workflowId}`,
+  return { name, baseBranch: 'main', branch: name,
     args: ['worktree', 'create', '--repo', `path:${posix(path.resolve(appRepo))}`, '--name', name, '--base-branch', 'main', '--setup', 'run', '--no-parent'] };
 }
 
@@ -85,13 +87,6 @@ export function workflowWorktreeOf(ctx, workflowId) {
   } catch { return null; }
 }
 
-/** The branch of the worktree at `dir` renamed to `want` (Orca names it after the worktree). The branch it has after. */
-function adoptBranch(dir, have, want) {
-  if (!have || have === want) return have ?? want;
-  const r = gitIn(dir, ['branch', '-m', have, want]);
-  return r.ok ? want : have;
-}
-
 /**
  * Register a workflow worktree Orca created (a row keyed by its Orca id, kind workflow, uncapped: the slot is taken by
  * ensureWorkflowWorktree before the creation). {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}
@@ -115,12 +110,11 @@ export function ensureWorkflowWorktree(ctx, { workflowId, appRepo, ledgerId = nu
   const spec = workflowWorktreeSpec({ workflowId, appRepo });
   const made = createOrcaWorktree({ repoRoot: appRepo, kind: WORKFLOW_WORKTREE_KIND, name: spec.name, base: spec.baseBranch, setup: 'run', owner: { workflowId, ledgerId }, env, git, orca });
   if (!made.ok) return { ok: false, reason: made.reason, detail: made.detail ?? null, ...(made.cap != null ? { live: made.live, cap: made.cap } : {}) };
-  const branch = adoptBranch(made.path, made.branch, spec.branch);
-  const record = registerWorkflowWorktree({ env, git }, { workflowId, orcaWorktreeId: made.id, path: made.path, branch, ledgerId });
+  const record = registerWorkflowWorktree({ env, git }, { workflowId, orcaWorktreeId: made.id, path: made.path, branch: made.branch ?? spec.branch, ledgerId });
   return { ok: true, created: true, record };
 }
 
-/** Record the workflow's last checkpoint (part B, after committing a green op on wf/<id>). true when a live row took it. */
+/** Record the workflow's last checkpoint (part B, after committing a green op on the workflow branch). true when a live row took it. */
 export function setCheckpoint(ctx, workflowId, sha) {
   const { env } = ctxOf(ctx);
   return withMachine((m) => m.db.prepare("UPDATE worktrees SET checkpoint_sha=? WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(sha, workflowId).changes > 0, { env });
@@ -208,7 +202,7 @@ export function workflowWorktreePromptRules(rec) {
 
 /**
  * Mark the workflow's worktree release-pending (part B's finish, after the merge): the host-side GC removes it once no
- * agent of the workflow holds a terminal - link check, `orca worktree rm`, the row closed, `git branch -d wf/<id>`.
+ * agent of the workflow holds a terminal - link check, `orca worktree rm`, the row closed, `git branch -d <its branch>`.
  * {ok}: ok false when the workflow has no live worktree to mark.
  */
 export function markReleasePending(ctx, workflowId, { at = Date.now() } = {}) {

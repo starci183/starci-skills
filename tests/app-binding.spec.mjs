@@ -61,7 +61,7 @@ test('one app binding resolves both roles, app-root Work and the one workflow wo
   ]);
   // The workflow worktree is in the bound app repository; an op's side comes from its app-relative owned paths.
   assert.equal(workflowAppRepo(app, { binding }), app);
-  assert.deepEqual(['be/src/main.ts', 'fe/src/page.tsx', 'package.json', '.starciwork/features/a'].map((p) => sideOf([p])), ['be', 'fe', 'both', null]);
+  assert.deepEqual(['be/src/main.ts', 'fe/src/page.tsx', 'package.json', '.starciwork/features/a'].map((p) => sideOf([p])), ['be', 'fe', 'both', 'work']);
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite') };
   const made = ensureWorkflowWorktree({ env, orca: fakeOrcaWorktrees({ root: path.join(base, 'orca') }) }, { workflowId: 'wf-app-12345678', appRepo: app });
   assert.equal(made.ok, true, JSON.stringify(made));

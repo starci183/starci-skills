@@ -4634,7 +4634,7 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 // absolute paths for the command guard (bound to the worker's terminal once it
 // starts), and the history hook in every checkout the job writes. Best effort — a guard that cannot be put in place rides on the
 // dispatch receipt and never refuses the launch.
-const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd }) => {
+const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, workflowWorktree = null }) => {
   try {
     const items = (placements ?? []).filter((p) => p && !p.unresolved && p.base);
     const owned = items.map((p) => path.resolve(p.base, String(p.path ?? '.').replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
@@ -4653,7 +4653,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd }) => {
     const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map(gitRoot))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
-    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config });
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, workflowWorktree });
   } catch (e) {
     return { receipt: { error: String(e?.message ?? e) } };
   }
