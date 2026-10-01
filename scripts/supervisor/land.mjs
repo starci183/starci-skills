@@ -67,7 +67,7 @@ import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
+import { createScratchWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
@@ -294,7 +294,7 @@ export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS,
 function makeScratch({ root, base, env }) {
   const dir = path.join(landRoot(env), `scratch-${process.pid}-${Date.now().toString(36)}${randomBytes(2).toString('hex')}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
-  const added = createWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base, git });
+  const added = createScratchWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base, git });
   if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.detail || added.reason || 'git worktree add failed' }; }
   const nm = path.join(root, 'node_modules');
   try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps */ }

@@ -1,35 +1,14 @@
-# Product worktrees and the op land (DESIGN §16.7, FMEA #20; owner order lane WT 2026-10-01: exactly one worktree per
-# op, created at dispatch, removed as soon as its op settles; the runtime owns the whole git worktree lifecycle).
-# Read by scripts/kernel/product-worktree.mjs productSettings(), scripts/lib/worktrees.mjs worktreeSettings() and
-# scripts/kernel/api-status/imports.mjs. Every value has the same default in code.
-
-# The isolation of an op whose brief sets no policy.isolation (owner 2026-09-28 "one worktree per op": one model for
-# every workflow). `worktree` applies to every op whose policy.commitPolicy COMMITS and whose owned paths land in one
-# bound product repository (scripts/kernel/product-worktree.mjs isolationOf / planIsolation). Kept on the shared tree:
-#   - Work-owner (ledger repo) only ops - scope.define, business.decide, brand.decide, architecture.decide,
-#     decision.prepare, provision.ask, work.author, workspace.manage, test.author/backend.implement when their paths
-#     are in the Work owner: the ledger and the Work records live in that checkout (reason work-owner-only);
-#   - grammar.update and any op on the runtime repository (.claude): it changes only through its own land gate
-#     (reason runtime-repo);
-#   - ops that never commit (commitPolicy none): backend.scaffold, interface.scaffold, package.scaffold,
-#     content.generate, docs.author, interface.asset, knowledge.repair, task.execute leave their product writes
-#     uncommitted - a worktree is deleted right after the settle, so they would lose them; the verify/UAT/review walks
-#     (uat.verify, uat.assisted.*, e2e.verify, integration.verify, perf.verify, security.verify, review.verify,
-#     interface.audit, handover.review, release.deliver, runtime.operate, request.analyze, goal.revise, scope.finish)
-#     write no product code and serve from the product's live checkout, which is main.
-# An op brief can still set policy.isolation: shared (or worktree) itself.
-defaultIsolation: worktree
+# Workflow worktrees and the land (owner decision WFWT, final: ONE Orca-owned worktree per Kernel workflow; the per-op
+# worktree and its node_modules junction overlay are gone). Read by scripts/lib/worktrees.mjs worktreeSettings(),
+# scripts/kernel/product-worktree.mjs productSettings() and scripts/kernel/api-status/imports.mjs. Every value has the
+# same default in code.
 
 worktrees:
-  shortIdLength: 8              # <op> directory / branch ids (Windows path length)
-  capPerRepo: 10                # live runtime worktrees per repository; an op dispatch over it waits (job stays queued)
-  ownerGoneMs: 1800000          # the GC removes a tree whose owner process has been gone this long (after preserving it)
+  capPerRepo: 10                # live runtime worktrees per repository; a workflow over it waits for its Kernel launch
+  ownerGoneMs: 1800000          # the GC removes a tree whose owner has been gone this long (after preserving it)
   gcEveryMs: 300000             # the reconciler GC controller's worktree pass (key gc:worktrees, always active)
-  opRemoveSlaMs: 60000          # an op worktree outliving its job's settle by more than this is an SLA miss (logged)
+  opRemoveSlaMs: 60000          # (per-op land, deleted by part B) an op worktree outliving its settle by more than this
   commandMs: 300000
-  overlay:                      # the node_modules junction overlay of every op worktree
-    lockfiles: [package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json]   # a change rebuilds the overlay
-    maxDepth: 3                 # how deep workspace dirs holding a node_modules are looked for
 
 land:                           # an op's green settle: op/<op> -> the product's main (per-repository serial)
   lockWaitMs: 1800000

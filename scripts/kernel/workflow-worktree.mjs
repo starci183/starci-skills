@@ -1,0 +1,206 @@
+// workflow-worktree.mjs — ONE worktree per Kernel workflow (owner decision WFWT, final; part A: creation, registry,
+// launches, side concurrency, release). It replaces the per-op worktree with no legacy.
+//
+//   create     ensureWorkflowWorktree, before the Kernel launch (scripts/kernel/start-workflow.mjs): Orca creates and owns
+//              the tree - `orca worktree create --repo path:<app repo> --name wf-<workflowId> --base-branch main
+//              --setup run --no-parent` (the repository's setup hook runs a real `npm ci`; there are no node_modules
+//              junctions) - through scripts/lib/worktrees.mjs createOrcaWorktree, which takes the per-repo cap slot
+//              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
+//              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
+//              (wf-<id>); the runtime renames it to the workflow branch wf/<id> right away. The Kernel then starts with
+//              `orchestration worker-start --worktree <that path>`: an existing worktree, so launch trust (the provider's
+//              project config, a Devin model pin) is written into it before the agent starts, which a `--worktree
+//              new-child` start cannot offer (the directory does not exist until the start returns).
+//   ops        every op of the workflow launches with `--worktree <the workflow worktree>` (opWorktreeArgs); no op gets a
+//              tree of its own. Ops on the same side (be/ or fe/, from their owned paths) run one at a time; ops on
+//              different sides may run together; an op touching both sides (or the app root) runs alone
+//              (canDispatchConcurrently, enforced by api dispatch as the typed wait workflow-side-busy).
+//   checkpoint part B commits each green op on wf/<id> and calls setCheckpoint; the registry row keeps the sha.
+//   release    releaseWorkflowWorktree, part B's finish step 6 and the GC's: every link removed as a link and zero asserted,
+//              `orca worktree rm`, the main checkout asserted untouched, the registry row closed. `git branch -d` is
+//              the caller's (Orca deletes a branch it can prove merged, so the caller checks the branch still exists).
+//
+// ctx: {env, orca, git} - env selects machine.sqlite (the registry), orca the Orca worktree client
+// (scripts/lib/worktrees.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runGit } from '../lib/git.mjs';
+import { withMachine } from '../../engine/machine-db.mjs';
+import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, mainRootOf, orcaWorktreeClient } from '../lib/worktrees.mjs';
+import { projectBinding } from './target-repo.mjs';
+
+const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const WORKFLOW_WORKTREE_KIND = 'workflow';
+/** Job statuses whose op still works in the workflow worktree (runtime 0001-init jobs.status). */
+export const OCCUPYING_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
+/** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
+export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
+const SIDES = Object.freeze(['be', 'fe']);
+
+const posix = (p) => String(p).replace(/\\/g, '/');
+const ctxOf = (ctx) => ({ env: ctx?.env ?? process.env, orca: ctx?.orca ?? orcaWorktreeClient, git: ctx?.git ?? null });
+const gitIn = (cwd, args) => { const r = runGit(args, { cwd, timeout: 60_000 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() }; };
+const samePath = (a, b) => { const k = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; }; return k(a) === k(b); };
+const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+
+/**
+ * The Orca creation of a workflow's worktree. {name: 'wf-<id>', baseBranch: 'main', branch: 'wf/<id>', args}: `args` is
+ * the `orca` argv that creates it (worktree create, issued through scripts/api/orca/worktree-create.mjs); the Kernel's
+ * own worker-start then takes `--worktree <path>` (opWorktreeArgs gives the same to every op).
+ */
+export function workflowWorktreeSpec({ workflowId, appRepo }) {
+  const name = `wf-${workflowId}`;
+  return { name, baseBranch: 'main', branch: `wf/${workflowId}`,
+    args: ['worktree', 'create', '--repo', `path:${posix(path.resolve(appRepo))}`, '--name', name, '--base-branch', 'main', '--setup', 'run', '--no-parent'] };
+}
+
+/**
+ * The app repository a workflow of the ledger repo `repo` gets its worktree in, or null (no worktree: an unbound repo,
+ * a repo that is not a git checkout, or the runtime repository itself, which changes only through its own land gate).
+ */
+export function workflowAppRepo(repo, { binding = undefined } = {}) {
+  const b = binding === undefined ? (() => { try { return projectBinding(repo); } catch { return null; } })() : binding;
+  const appRoot = b?.appRoot ?? null;
+  if (!appRoot || !fs.existsSync(path.join(appRoot, '.git'))) return null;
+  if (insidePath(appRoot, SKILL_ROOT) || samePath(appRoot, SKILL_ROOT)) return null;
+  return path.resolve(appRoot);
+}
+
+const recordOf = (row) => (row ? { workflowId: row.workflow_id, orcaWorktreeId: row.orca_id, path: path.resolve(row.path), branch: row.branch ?? null,
+  checkpoint: row.checkpoint_sha ?? null, repoRoot: row.repo_root, ledgerId: row.ledger_id ?? null, createdAt: row.created_at } : null);
+
+/** The live workflow worktree of `workflowId`: {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}, or null. */
+export function workflowWorktreeOf(ctx, workflowId) {
+  const { env } = ctxOf(ctx);
+  try {
+    return recordOf(withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(workflowId), { env }));
+  } catch { return null; }
+}
+
+/** The branch of the worktree at `dir` renamed to `want` (Orca names it after the worktree). The branch it has after. */
+function adoptBranch(dir, have, want) {
+  if (!have || have === want) return have ?? want;
+  const r = gitIn(dir, ['branch', '-m', have, want]);
+  return r.ok ? want : have;
+}
+
+/**
+ * Register a workflow worktree Orca created (a row keyed by its Orca id, kind workflow, uncapped: the slot is taken by
+ * ensureWorkflowWorktree before the creation). {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}
+ */
+export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path: dir, branch, ledgerId = null, pending = null }) {
+  const { env, git } = ctxOf(ctx);
+  const bound = bindOrcaWorktree({ pending, repoRoot: mainRootOf(dir, { git }), kind: WORKFLOW_WORKTREE_KIND, orcaId: orcaWorktreeId, dir, branch: branch ?? null,
+    owner: { workflowId, ledgerId }, env, git });
+  if (!bound.ok) throw Object.assign(new Error(`workflow worktree ${workflowId}: ${bound.detail}`), { code: bound.reason });
+  return recordOf(bound.row);
+}
+
+/**
+ * The workflow's worktree, created through Orca when it has none. {ok, created, record} | {ok:false, reason:
+ * 'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed', detail, live?, cap?}
+ */
+export function ensureWorkflowWorktree(ctx, { workflowId, appRepo, ledgerId = null }) {
+  const { env, orca, git } = ctxOf(ctx);
+  const existing = workflowWorktreeOf({ env }, workflowId);
+  if (existing && fs.existsSync(existing.path)) return { ok: true, created: false, record: existing };
+  const spec = workflowWorktreeSpec({ workflowId, appRepo });
+  const made = createOrcaWorktree({ repoRoot: appRepo, kind: WORKFLOW_WORKTREE_KIND, name: spec.name, base: spec.baseBranch, setup: 'run', owner: { workflowId, ledgerId }, env, git, orca });
+  if (!made.ok) return { ok: false, reason: made.reason, detail: made.detail ?? null, ...(made.cap != null ? { live: made.live, cap: made.cap } : {}) };
+  const branch = adoptBranch(made.path, made.branch, spec.branch);
+  const record = registerWorkflowWorktree({ env, git }, { workflowId, orcaWorktreeId: made.id, path: made.path, branch, ledgerId });
+  return { ok: true, created: true, record };
+}
+
+/** Record the workflow's last checkpoint (part B, after committing a green op on wf/<id>). true when a live row took it. */
+export function setCheckpoint(ctx, workflowId, sha) {
+  const { env } = ctxOf(ctx);
+  return withMachine((m) => m.db.prepare("UPDATE worktrees SET checkpoint_sha=? WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(sha, workflowId).changes > 0, { env });
+}
+
+/** The `--worktree <path>` arguments of an op launch of `workflowId` ([] when the workflow has no worktree). */
+export function opWorktreeArgs(ctx, { workflowId }) {
+  const rec = workflowWorktreeOf(ctx, workflowId);
+  return rec ? ['--worktree', rec.path] : [];
+}
+
+/** The owned paths of an op record (a job payload, {payload}, {ownedPaths} or an array of paths). */
+const ownedPathsOfRecord = (rec) => {
+  if (Array.isArray(rec)) return rec;
+  if (Array.isArray(rec?.ownedPaths)) return rec.ownedPaths;
+  const payload = rec?.payload_json ? (() => { try { return JSON.parse(rec.payload_json); } catch { return {}; } })() : (rec?.payload ?? rec);
+  return (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+};
+
+/**
+ * The side of the app an op writes, from its owned paths (app-relative be/..., fe/...): 'be' | 'fe', 'both' when it
+ * writes both or anything else in the app root, null when it writes nothing in the app (only the workflow's Work
+ * records under .starciwork/, which the path leases already serialise).
+ */
+export function sideOf(opRecord) {
+  const sides = new Set();
+  for (const raw of ownedPathsOfRecord(opRecord)) {
+    const p = posix(raw).replace(/^\.\//, '').replace(/^\/+/, '');
+    const head = p.split('/')[0];
+    if (!head || head === '.starciwork') continue;
+    sides.add(SIDES.includes(head) ? head : 'both');
+  }
+  if (!sides.size) return null;
+  if (sides.has('both') || sides.size > 1) return 'both';
+  return [...sides][0];
+}
+
+/** Whether `next` may run while `running` ops of the same workflow work in its worktree: same side no, across sides yes, 'both' never. */
+export function canDispatchConcurrently(running, next) {
+  const n = sideOf(next);
+  if (n === null) return true;
+  for (const r of running ?? []) {
+    const s = sideOf(r);
+    if (s === null) continue;
+    if (s === 'both' || n === 'both' || s === n) return false;
+  }
+  return true;
+}
+
+/**
+ * The typed wait of an op whose side is busy in its workflow worktree, or null. `db` is the workflow's ledger; `job` the
+ * op's jobs row and `payload` its payload. {reason: 'workflow-side-busy', side, busy: [{jobId, op, side}], detail}
+ */
+export function workflowSideWait(db, job, payload) {
+  const rows = db.prepare(`SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${OCCUPYING_JOB_STATUSES.map(() => '?').join(',')})`)
+    .all(job.workflow_id, job.job_id, ...OCCUPYING_JOB_STATUSES);
+  if (canDispatchConcurrently(rows, payload)) return null;
+  const side = sideOf(payload);
+  const busy = rows.map((r) => ({ jobId: r.job_id, op: r.op_id, side: sideOf(r) })).filter((r) => r.side && (r.side === 'both' || side === 'both' || r.side === side));
+  return { reason: WORKFLOW_SIDE_BUSY, side, busy,
+    detail: `the workflow worktree's ${side === 'both' ? 'whole app' : `${side}/ side`} is in use by ${busy.map((b) => `${b.jobId} (${b.side})`).join(', ')}; the job stays queued and reads ready when that op settles` };
+}
+
+/** The rules every op prompt of a workflow with a worktree carries (the path is explicit to every tool). '' without one. */
+export function workflowWorktreePromptRules(rec) {
+  if (!rec) return '';
+  const wt = posix(rec.path);
+  return [
+    '',
+    '## Your workflow worktree',
+    `- Edit, check and commit ONLY in ${wt} (branch ${rec.branch ?? 'the workflow branch'}): the one worktree of this workflow, shared with the ops of the other side. Never edit ${posix(rec.repoRoot)} itself.`,
+    `- Run checks and commands from ${wt}, the app root: every owned path is app-relative (be/..., fe/..., .starciwork/...).`,
+    '- Write only your owned paths: an op of the other side may be working in this tree at the same time.',
+    "- node_modules here is the worktree's own install (its setup ran npm ci): never run npm/pnpm install, never create a junction or symlink.",
+    '- You never merge, push, rebase or reset: the runtime checkpoints your green work on the workflow branch and lands the branch on main when the workflow finishes.',
+  ].join('\n');
+}
+
+/**
+ * Release the workflow's worktree: every link removed as a link and zero asserted, `orca worktree rm`, the main checkout
+ * asserted untouched, the registry row closed (scripts/lib/worktrees.mjs removeOrcaWorktree). The branch is left to the
+ * caller (`git branch -d` after the merge). {ok, released, path?, links?} | {ok:false, reason, fatal?, ...}
+ */
+export function releaseWorkflowWorktree(ctx, workflowId) {
+  const { env, orca, git } = ctxOf(ctx);
+  const rec = workflowWorktreeOf({ env }, workflowId);
+  if (!rec) return { ok: true, released: false, reason: 'no-workflow-worktree' };
+  const r = removeOrcaWorktree({ repoRoot: rec.repoRoot, orcaId: rec.orcaWorktreeId, dir: rec.path, env, git, orca });
+  return r.ok ? { ok: true, released: true, path: rec.path, orcaWorktreeId: rec.orcaWorktreeId, links: r.links, branch: rec.branch } : { ...r, released: false };
+}

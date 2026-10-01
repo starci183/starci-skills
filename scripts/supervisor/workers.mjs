@@ -48,7 +48,7 @@ import {
 } from './home.mjs';
 import { openMachine } from '../../engine/machine-db.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
+import { createScratchWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -229,7 +229,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, bas
   if (!baseSha) return { ok: false, error: 'cannot resolve main' };
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   if (fs.existsSync(dir)) return { ok: false, error: `staging path ${dir} already exists` };
-  const added = createWorktree({ repoRoot: root, dir, kind: 'supervisor-staging', branch: branchOf(jobId), newBranch: true, base: baseSha, owner: { lane: jobId }, env, git });
+  const added = createScratchWorktree({ repoRoot: root, dir, kind: 'supervisor-staging', branch: branchOf(jobId), newBranch: true, base: baseSha, owner: { lane: jobId }, env, git });
   if (!added.ok) return { ok: false, error: added.detail || added.reason || 'git worktree add failed' };
   const nm = path.join(root, 'node_modules');
   try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps still run */ }

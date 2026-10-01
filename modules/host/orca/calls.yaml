@@ -294,22 +294,36 @@ calls:
     replay: none
     timeoutMs: 180000
     note: |-
-      The lane of one workflow: a git worktree of the named repository on a branch Orca creates, as a top-level
-      row (--no-parent) so the workflow is its own row instead of a child of whoever created it. --setup skip
-      keeps the creation a git operation only. result.worktree carries the Orca id (<repo-id>::<path>), the path
-      and the branch ref the lane actually got, which is what the kernel records - it never guesses either.
-    flags: [repo, name, base-branch, setup, no-parent, parent-worktree]
+      A runtime-owned agent workspace that is not a Kernel's (the draw critic's placement, scripts/lib/worktrees.mjs
+      createOrcaWorktree): a git worktree of the named repository on a branch Orca creates, as a top-level row
+      (--no-parent). --setup skip keeps the creation a git operation only. Orca names the branch after --name with
+      every '/' turned into '-' and a -2, -3 suffix when the name is taken, and places the tree under its own
+      workspace root, so result.worktree carries what the runtime records: the Orca id (<repo-id>::<path>), the path and
+      the branch ref; it never guesses either. --base-branch takes a branch, a ref or a commit sha.
+    flags: [repo, name, base-branch, setup, no-parent, parent-worktree, comment]
     required: [repo, name]
-    receipt: [result.worktree]
+    receipt: [result.worktree.id, result.worktree.path]
   worktree-rm:
     command: worktree rm
     kind: mutation
     replay: none
-    timeoutMs: 60000
-    note: Removes the worktree from Orca and from git and preserves its branch (result.preservedBranch); the kernel closes a lane only after that lane is merged.
+    timeoutMs: 120000
+    note: |-
+      Removes the worktree from Orca and from git (scripts/lib/worktrees.mjs removeOrcaWorktree, after the runtime removed
+      every link in it as a link and proved none is left). Orca also deletes the checked-out local branch when it can
+      prove the branch merged and keeps it otherwise, so a caller that deletes the branch itself first checks it still
+      exists. Measured 2026-10-01 (lane ORCAWT): with node_modules and packages/node_modules junctions into a fake main
+      checkout, `worktree rm --force` removed the tree and left the junction targets byte-identical; the runtime still
+      unlinks every link first.
     flags: [worktree, force]
     required: [worktree]
-    receipt: [result]
+    receipt: [result.removed]
+  worktree-list:
+    command: worktree list
+    kind: read
+    flags: [repo, limit]
+    receipt: [result.worktrees]
+    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/lib/worktrees.mjs reads it to find the worktree a Kernel worker-start --worktree new-child created when the start receipt does not name it.
   worktree-set:
     command: worktree set
     kind: mutation

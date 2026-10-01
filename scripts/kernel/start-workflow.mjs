@@ -51,6 +51,7 @@ import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAva
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
+import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -671,6 +672,23 @@ try {
   // refused before a Dispatch existed, or its Dispatch was proven gone and released) hands the same boot and
   // reservation to the next member. Anything else ends the boot.
   const members = route.members?.length ? route.members : [route];
+  // The workflow's ONE worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca creates it before the
+  // Kernel starts - an existing worktree takes launch trust - and the Kernel and every op of the workflow work in it.
+  // A ledger repo with no bound app checkout (or the runtime repo itself) has none: the Kernel starts on the repo.
+  const appRepo = workflowAppRepo(repo);
+  let workflowWorktree = null;
+  if (appRepo) {
+    const ensured = ensureWorkflowWorktree({ env: process.env }, { workflowId, appRepo, ledgerId: ledger.ledgerId ?? null });
+    if (!ensured.ok) failStart(ensured.reason === 'worktree-cap' ? 'worktree-cap' : 'workflow-worktree', ensured.detail ?? ensured.reason, null,
+      { reason: ensured.reason, appRepo, ...(ensured.cap != null ? { live: ensured.live, cap: ensured.cap } : {}) });
+    workflowWorktree = ensured.record;
+    if (ensured.created) {
+      const wf = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+      ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation: wf?.generation ?? 0, kind: 'workflow-worktree-created',
+        payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch, appRepo } }));
+    }
+  }
+  const kernelWorktree = workflowWorktree?.path ?? repo;
   const fellThrough = [];
   let spawned = null;
   // The Kernel is a worker of its own entry Run (scripts/agent/lib.mjs startAgent; the launching terminal is its
@@ -680,7 +698,7 @@ try {
   const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
   for (const [index, member] of members.entries()) {
     updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + KERNEL_START_RESERVATION_MS });
-    spawned = startAgent({ provider: member.agent, model: member.model, effort: member.effort, worktree: repo, title, prompt, specFile,
+    spawned = startAgent({ provider: member.agent, model: member.model, effort: member.effort, worktree: kernelWorktree, title, prompt, specFile,
       objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null });
     if (spawned.ok) {
       route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
@@ -780,6 +798,7 @@ try {
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
         ...(restartAuthority ? { restartAuthority } : {}),
         managed,
+        ...(workflowWorktree ? { workflowWorktree: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch } } : {}),
         ...(spawned.trust ? { trust: spawned.trust } : {}),
         ...(fellThrough.length ? { fellThrough } : {}),
       },
@@ -797,6 +816,7 @@ try {
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
     ...(fellThrough.length ? { fellThrough } : {}),
     dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId,
+    ...(workflowWorktree ? { workflowWorktree: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch } } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true,
     launchAuthority: restartAuthority

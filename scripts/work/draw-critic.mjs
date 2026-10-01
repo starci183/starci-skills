@@ -3,7 +3,7 @@
 // with no drawing context, launched like every other agent through orchestration worker-start
 // (scripts/agent/lib.mjs startAgent; modules/kernel/contract-changes/draw-critic-worker-start.yaml) with the provider,
 // model and effort of modules/models/runtimes.yaml allocation.drawLoop.critic. Its placement (criticWorkspace) is a
-// runtime worktree detached at the empty tree, so it holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
+// worktree Orca creates at a commit of the empty tree, so it holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
 // and the one file it may write, verdict.json (starci/draw-critique@1: every rubric check pass/fail with evidence and
 // fix, a 1-10 beauty score with its anchor), and forbids every other write. The runtime waits for the worker's
 // worker_done (or its escalation, or the worker ending) through the orchestration commands, bounded by the critic's
@@ -28,7 +28,7 @@ import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import crypto from 'node:crypto';
 import { gitResult } from '../lib/git.mjs';
-import { createWorktree, removeWorktree, mainRootOf, worktreesRootOf } from '../lib/worktrees.mjs';
+import { createOrcaWorktree, removeOrcaWorktree } from '../lib/worktrees.mjs';
 import { opContextOf } from '../kernel/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
@@ -206,28 +206,27 @@ function clientOf(orca) {
 
 /**
  * The critic's placement: Orca places a worker only on a worktree it resolves (a git worktree of a known repository;
- * a bare temp directory is refused selector_not_found - launch smoke 2026-10-01). So the clean directory is a runtime
- * worktree (scripts/lib/worktrees.mjs createWorktree, kind op, owned by the op job running the loop when there is one)
- * of the repository the loop runs in, detached at a commit of the EMPTY tree: it holds nothing but its `.git` file
- * until the round's images, HTML and rubric are copied in. Under <repo>/.starciwork/worktrees (git-excluded); never
- * capped (the op's own worktree already counts). {ok, dir, repoRoot} | {ok:false, error}.
+ * a bare temp directory is refused selector_not_found - launch smoke 2026-10-01). So the clean directory is an Orca
+ * worktree (scripts/lib/worktrees.mjs createOrcaWorktree, kind critic, owned by the op job running the loop when there
+ * is one) of the repository the loop runs in, at a commit of the EMPTY tree: it holds nothing but its `.git` file until
+ * the round's images, HTML and rubric are copied in. Orca creates it, lists it and removes it; the registry keys it by
+ * Orca's id. Never capped (the workflow's own worktree already counts). {ok, dir, repoRoot, orcaId} | {ok:false, error}.
  */
-export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context = opContextOf(), env = process.env } = {}) {
+export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context = opContextOf(), env = process.env, orca = undefined } = {}) {
   if (!repoRoot) return { ok: false, error: `no git repository at ${slash(process.cwd())} to place the critic worktree in` };
   const git = (args, input = undefined) => gitResult(['-c', 'user.name=StarCi runtime', '-c', 'user.email=runtime@starci.invalid', ...args], { cwd: repoRoot, input });
   const tree = git(['hash-object', '-t', 'tree', '-w', '--stdin'], '');
   if (!tree.ok) return { ok: false, error: `empty tree: ${tree.error}` };
   const commit = git(['commit-tree', tree.stdout.trim(), '-m', 'draw critic placement (empty tree)']);
   if (!commit.ok) return { ok: false, error: `empty commit: ${commit.error}` };
-  const dir = path.join(worktreesRootOf(mainRootOf(repoRoot)), `draw-critic-${crypto.randomBytes(4).toString('hex')}`);
-  const made = createWorktree({ repoRoot, dir, kind: 'op', base: commit.stdout.trim(), detach: true, cap: null, env,
-    owner: { workflowId: context?.workflowId ?? null, jobId: context?.jobId ?? null } });
-  return made.ok ? { ok: true, dir: made.path, repoRoot: path.resolve(repoRoot) } : { ok: false, error: `${made.reason}: ${made.detail ?? ''}`.trim() };
+  const made = createOrcaWorktree({ repoRoot, kind: 'critic', name: `draw-critic-${crypto.randomBytes(4).toString('hex')}`, base: commit.stdout.trim(), cap: null, env,
+    owner: { workflowId: context?.workflowId ?? null, jobId: context?.jobId ?? null }, ...(orca ? { orca } : {}) });
+  return made.ok ? { ok: true, dir: made.path, repoRoot: path.resolve(repoRoot), orcaId: made.id, branch: made.branch } : { ok: false, error: `${made.reason}: ${made.detail ?? ''}`.trim() };
 }
 
-/** Remove the critic's placement worktree (scripts/lib/worktrees.mjs removeWorktree). {ok, ...}. */
-export function removeCriticWorkspace({ dir, repoRoot, env = process.env }) {
-  return removeWorktree({ repoRoot, dir, env });
+/** Remove the critic's placement through Orca (scripts/lib/worktrees.mjs removeOrcaWorktree, its branch with it). {ok, ...}. */
+export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, env = process.env, orca = undefined }) {
+  return removeOrcaWorktree({ repoRoot, orcaId, dir, branch, deleteBranch: branch ? 'force' : null, env, ...(orca ? { orca } : {}) });
 }
 
 const gitRootOf = (cwd) => { const r = gitResult(['rev-parse', '--show-toplevel'], { cwd }); return r.ok && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
@@ -328,7 +327,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
       base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
     }
-    const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot }));
+    const removed = settle(() => unplace({ dir, repoRoot: workspace.repoRoot, orcaId: workspace.orcaId, branch: workspace.branch ?? null }));
     if (removed?.ok !== true) base.critic.placementRemoveError = removed?.reason ?? removed?.error ?? 'not removed';
   }
 }
