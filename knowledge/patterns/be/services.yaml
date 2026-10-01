@@ -6,7 +6,7 @@ purpose: |-
   consumed, and how are the calls and messages between services kept honest? Every service is a Nest app at `be/apps/<service>/`
   of the one repository (shared `be/src` libraries, one package.json, its own Dockerfile and image); a service the product does not
   own is a pinned image of the stack; the contract between services is vendored under `be/contracts/<service>/`; an async consumer
-  and a saga are each proven by an e2e spec.
+  and every saga step (the consumer of a compensating event) are each proven by an e2e spec.
 appliesTo:
   - backend
 family: be
@@ -19,7 +19,7 @@ provenance:
     - owner decision 2026-10-02 (be is a Nest monorepo of be/apps/<service>, each app with its own Dockerfile)
     - examples/ecommerce-app
   limitations: |-
-    The checks read the stack declaration, the event tables and their snapshots, the paths of consumers and sagas and the e2e
+    The checks read the stack declaration, the event tables and their snapshots, the consumes tables, the compensating events of the contracts, the queues the code defines and the e2e
     spec files. They cannot see whether a spec asserts the right behaviour beyond naming the event and booting the world, nor
     whether a saga compensates every failure; the e2e run and review do.
 rules:
@@ -76,10 +76,11 @@ rules:
     hfsRules: [R131, R23, R113]
     requirement: |-
       A synchronous API keeps its snapshot (`be/contracts/<service>/schema.graphql`, `openapi.json`; R23, R113). The async contract
-      is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, stream, version, payload fields)
+      is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
       and its snapshot `be/contracts/<service>/events.json` (`starci/event-contract@1`), emitted by `npm run contract:emit`. A
       consumer states what it reads in the literal `CONSUMES` table of `apps/<app>/src/consumes.ts` (service, event, version); each
-      entry must exist in the provider's snapshot at that version. A breaking change bumps the event version in the provider and
+      entry must exist in the provider's snapshot at that version, and every queue a consumer defines with `defineQueue` of
+      `platform/messaging` is listed in a consumes table. A breaking change bumps the event version in the provider and
       fails every consumer that has not followed.
     rationale: |-
       The consumer is judged against the provider's committed contract, not against the provider's source, so a change in either is a
@@ -96,21 +97,26 @@ rules:
         - Review the payload fields of a new event version for compatibility with the old consumers.
     relatedExamples: []
   - id: BE-SERVICES-4
-    title: An async consumer and a saga each have an e2e spec through the world
+    title: An async consumer and every saga step have an e2e spec through the world
     kind: mandatory
     hfsRules: [R132, R80]
     requirement: |-
-      Every `transport/message/<stem>.consumer.ts` and every saga (a method decorated `@Saga()` from `@nestjs/cqrs`, kept in
-      `application/<stem>.saga.ts`) has `be/src/tests/e2e/<area>/<stem>.e2e-spec.ts`, which boots the apps with `useTestWorld`,
-      publishes the event the consumer handles (and redelivers it, the inbox keeping the effect single), and reads the persisted
-      effect back; a saga's spec drives the failure and reads the compensated state back.
+      Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file
+      `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps with `useTestWorld`, publishes the event (and redelivers it,
+      the receiver keeping the effect single) and reads the persisted effect back. A saga is a chain of services reacting to each other's events, never an in-process event
+      (BE-CQRS-1): the failure is an event whose contract declares `compensates: "<event>"` and its consumer undoes that step. The
+      spec of such a saga step also names the compensated event and drives the whole flow: the step, the failure, then the
+      compensated state.
     rationale: |-
       An asynchronous flow fails between processes: a unit spec of one side proves nothing about delivery, redelivery or the
-      compensation. The world runs the real services and the real stream.
+      compensation. The world runs the real services and the real queues.
     cases:
       - id: case-1
         when: The consumer of order.placed in the billing app
         write: 'be/src/tests/e2e/billing/order-placed.e2e-spec.ts publishes order.placed, waits for the invoice, redelivers the event and asserts one invoice.'
+      - id: case-2
+        when: The order service compensates a rejected invoice
+        write: 'be/apps/billing/src/events.ts declares "billing.invoice-rejected" with compensates: "order.placed"; the consumer invoice-rejected.consumer.ts cancels the order; be/src/tests/e2e/order/invoice-rejected.e2e-spec.ts names both events and asserts the cancelled order, the refunded payment and the restored stock.'
     verification:
       automated:
         - BE_ASYNC_SPEC_MISSING

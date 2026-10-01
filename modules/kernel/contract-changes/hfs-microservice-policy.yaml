@@ -7,9 +7,9 @@ summary: >-
   HFS_SERVICE_STACK_DECLARATION requires each api or worker app to be a `role: service` component of the stack, R131
   HFS_EVENT_CONTRACT vendors the async contract (`be/contracts/<service>/events.json`, emitted by `hfs emit-contracts` from the
   literal `EVENTS` table of `apps/<service>/src/events.ts`) and judges every consumer table (`apps/<app>/src/consumes.ts`) against
-  it, R132 BE_ASYNC_SPEC_MISSING requires an e2e spec for every message consumer and saga, and R133 BE_SERVICE_ISOLATION (ESLint
+  it, R132 BE_ASYNC_SPEC_MISSING requires an e2e spec for every consumed event (an event whose contract says `compensates` is a saga step and its spec drives the whole flow), and R133 BE_SERVICE_ISOLATION (ESLint
   `service-isolation`) refuses an import between service apps. New slot be.contract.events, `events.ts` and `consumes.ts` allowed in
-  the api and worker app slots, `saga` joins the closed role suffixes and `<action>.saga.ts` the application slot. The reference
+  the api and worker app slots. The reference
   example is ecommerce-app with a billing worker app.
 reach: new-legs
 paths:

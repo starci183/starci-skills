@@ -1,6 +1,9 @@
 // event-contract.mjs - the async contract between the services of one product (R131 HFS_EVENT_CONTRACT).
 // A provider service declares the events it publishes in `be/apps/<service>/src/events.ts`, a literal table
-//   export const EVENTS = { "order.placed": { stream: "order-events", version: 1, payload: { orderId: "string" } } } as const
+//   export const EVENTS = { "order.placed": { version: 1, payload: { orderId: "string" } } } as const
+// (the queue an event travels on is its name)
+// An event may declare `compensates: "<event name>"`: it announces the failure of the step that event started, so the services
+// that consume it undo that step (a compensating flow; R132 asks its e2e spec to drive the whole flow).
 // and commits the snapshot of it, `be/contracts/<service>/events.json` (`hfs emit-contracts` writes it, never a hand). A consumer
 // service declares what it reads in `be/apps/<service>/src/consumes.ts`, a literal table
 //   export const CONSUMES = { order: { "order.placed": 1 } } as const
@@ -51,7 +54,7 @@ const integerOf = (ts, node) => (ts.isNumericLiteral(node) && Number.isInteger(N
 const parse = (ts, text) => ts.createSourceFile('events.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
 /**
- * The events a provider declares: `{ events: { <name>: { stream, version, payload: { <field>: <type> } } }, problems: [text] }`.
+ * The events a provider declares: `{ events: { <name>: { version, payload: { <field>: <type> }, compensates? } }, problems: [text] }`.
  * `events` is null when the file exports no `EVENTS`; a malformed entry is a problem and is left out.
  */
 export function readEvents(ts, text) {
@@ -61,9 +64,7 @@ export function readEvents(ts, text) {
   const events = {};
   for (const [name, value] of entriesOf(ts, literal, EVENTS_EXPORT, problems)) {
     const fields = Object.fromEntries(entriesOf(ts, value, `${EVENTS_EXPORT}.${name}`, problems));
-    const stream = fields.stream === undefined ? null : stringOf(ts, fields.stream);
     const version = fields.version === undefined ? null : integerOf(ts, fields.version);
-    if (stream === null || stream === '') problems.push(`${EVENTS_EXPORT}.${name} needs a string \`stream\``);
     if (version === null) problems.push(`${EVENTS_EXPORT}.${name} needs a positive integer \`version\``);
     const payload = {};
     if (fields.payload === undefined) problems.push(`${EVENTS_EXPORT}.${name} needs a \`payload\` table`);
@@ -74,7 +75,12 @@ export function readEvents(ts, text) {
         else payload[field] = declared;
       }
     }
-    if (stream !== null && stream !== '' && version !== null) events[name] = { stream, version, payload };
+    let compensates = null;
+    if (fields.compensates !== undefined) {
+      compensates = stringOf(ts, fields.compensates);
+      if (compensates === null || compensates === '') problems.push(`${EVENTS_EXPORT}.${name}.compensates must be the name of the event it compensates`);
+    }
+    if (version !== null) events[name] = { version, payload, ...(compensates ? { compensates } : {}) };
   }
   return { events, problems };
 }

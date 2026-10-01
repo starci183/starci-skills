@@ -89,7 +89,7 @@ test('HFS_SERVICE_STACK_DECLARATION: every service app declared as a role servic
 
 // ------------------------------------------------------------------------------------------------ R131 HFS_EVENT_CONTRACT
 
-const EVENTS_TS = 'export const EVENTS = {\n  "order.placed": { stream: "order-events", version: 1, payload: { orderId: "string", totalCents: "number", note: "string?" } },\n} as const\n';
+const EVENTS_TS = 'export const EVENTS = {\n  "order.placed": { version: 1, payload: { orderId: "string", totalCents: "number", note: "string?" } },\n} as const\n';
 const CONSUMES_TS = (version = 1, event = 'order.placed') => `export const CONSUMES = {\n  core: { "${event}": ${version} },\n} as const\n`;
 /** The provider `core` and the consumer `billing`; the snapshot is what `hfs emit-contracts` writes. */
 const withEvents = ({ consumes = CONSUMES_TS(), snapshot = true, events = EVENTS_TS } = {}) => (dir) => {
@@ -131,9 +131,20 @@ test('HFS_EVENT_CONTRACT: a snapshot that no longer equals the provider table is
   assert.deepEqual(stale.map((f) => [f.path, f.drift]), [['be/contracts/core/events.json', 'stale']]);
   const loose = only(MULTI, (dir) => {
     withEvents()(dir);
-    put(dir, 'be/apps/core/src/events.ts', 'const stream = "x"\nexport const EVENTS = { "a.b": { stream, version: 1, payload: {} } } as const\n');
+    put(dir, 'be/apps/core/src/events.ts', 'const v = 1\nexport const EVENTS = { "a.b": { version: v, payload: {} } } as const\n');
   }, 'HFS_EVENT_CONTRACT');
-  assert.match(loose.find((f) => f.path === 'be/apps/core/src/events.ts').message, /needs a string `stream`/);
+  assert.match(loose.find((f) => f.path === 'be/apps/core/src/events.ts').message, /needs a positive integer `version`/);
+});
+
+test('HFS_EVENT_CONTRACT: an event that compensates an event no contract declares is refused, one that compensates a declared event passes', () => {
+  const withCompensation = (compensates) => (dir) => {
+    withEvents()(dir);
+    put(dir, 'be/apps/billing/src/events.ts', `export const EVENTS = { "billing.invoice-rejected": { version: 1, compensates: "${compensates}", payload: { orderId: "string" } } } as const\n`);
+  };
+  assert.deepEqual(only(MULTI, withCompensation('order.placed'), 'HFS_EVENT_CONTRACT').filter((f) => f.event !== undefined), []);
+  const refused = only(MULTI, withCompensation('order.shipped'), 'HFS_EVENT_CONTRACT').filter((f) => f.event !== undefined);
+  assert.equal(refused.length, 1);
+  assert.match(refused[0].message, /compensates "order.shipped", which no service contract declares/);
 });
 
 test('hfs emit-contracts writes events.json for an api or worker app that declares events.ts, sorted and with a final newline', () => {
@@ -141,42 +152,67 @@ test('hfs emit-contracts writes events.json for an api or worker app that declar
   made.push(temp);
   put(temp, 'package.json', '{}\n');
   installTypeScript(temp);
-  put(temp, 'be/apps/billing/src/events.ts', 'export const EVENTS = { "invoice.rejected": { version: 1, stream: "billing-events", payload: { orderId: "string", reason: "string" } } } as const\n');
+  put(temp, 'be/apps/billing/src/events.ts', 'export const EVENTS = { "invoice.rejected": { version: 1, payload: { orderId: "string", reason: "string" } } } as const\n');
   const result = emitContracts({ repoRoot: path.join(temp, 'be'), declaration: { apps: [{ name: 'billing', kind: 'worker' }] } });
   assert.deepEqual(result.written, ['contracts/billing/events.json']);
   const text = fs.readFileSync(path.join(temp, 'be/contracts/billing/events.json'), 'utf8');
-  assert.equal(text, `${JSON.stringify({ events: { 'invoice.rejected': { payload: { orderId: 'string', reason: 'string' }, stream: 'billing-events', version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
+  assert.equal(text, `${JSON.stringify({ events: { 'invoice.rejected': { payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
 });
 
 // ------------------------------------------------------------------------------------------------ R132 BE_ASYNC_SPEC_MISSING
 
-const CONSUMER = 'be/src/features/orders/transport/message/order-placed.consumer.ts';
-const CONSUMER_TS = 'export class OrderPlacedConsumer {\n  readonly event = "order.placed"\n}\n';
-const SAGA = 'be/src/features/orders/application/cancel-unbilled.saga.ts';
-const SAGA_TS = "import { Saga } from '@nestjs/cqrs';\nexport class CancelUnbilledSaga {\n  @Saga()\n  cancel = () => null;\n}\n";
-const NOT_A_SAGA_TS = "import { Saga } from './local';\nexport class Plain {\n  @Saga()\n  run = () => null;\n}\n";
-const SPEC = (event) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\nit('handles ${event}', () => undefined);\n`;
-const asyncRepo = ({ spec, specPath = 'be/src/tests/e2e/orders/order-placed.e2e-spec.ts', consumer = CONSUMER_TS, extra = {} } = {}) => (dir) => {
+const snapshot = (service, events) => `${JSON.stringify({ events, schema: 'starci/event-contract@1', service }, null, 2)}\n`;
+const consumesOf = (service, event) => `export const CONSUMES = { ${service}: { "${event}": 1 } } as const\n`;
+const SPEC = (...events) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\n${events.map((event) => `it('handles ${event}', () => undefined);`).join('\n')}\n`;
+const SPEC_PLACED = 'be/src/tests/e2e/orders/order-placed.e2e-spec.ts';
+const SPEC_REJECTED = 'be/src/tests/e2e/orders/invoice-rejected.e2e-spec.ts';
+/** `billing` consumes `order.placed` of `core`; `core` consumes `billing.invoice-rejected`, which compensates `order.placed`. */
+const asyncRepo = (specs = {}) => (dir) => {
   withStack(COMPONENTS)(dir);
-  put(dir, 'be/contracts/core/events.json', `${JSON.stringify({ events: { 'order.placed': { payload: {}, stream: 's', version: 1 } }, schema: 'starci/event-contract@1', service: 'core' }, null, 2)}\n`);
-  put(dir, CONSUMER, consumer);
-  for (const [file, text] of Object.entries(extra)) put(dir, file, text);
-  if (spec !== undefined) put(dir, specPath, spec);
+  put(dir, 'be/contracts/core/events.json', snapshot('core', { 'order.placed': { payload: {}, version: 1 } }));
+  put(dir, 'be/contracts/billing/events.json', snapshot('billing', { 'billing.invoice-rejected': { compensates: 'order.placed', payload: {}, version: 1 } }));
+  put(dir, 'be/apps/billing/src/consumes.ts', consumesOf('core', 'order.placed'));
+  put(dir, 'be/apps/core/src/consumes.ts', consumesOf('billing', 'billing.invoice-rejected'));
+  for (const [file, text] of Object.entries(specs)) put(dir, file, text);
 };
-const r132 = (options) => only(MULTI, asyncRepo(options), 'BE_ASYNC_SPEC_MISSING');
+const r132 = (specs) => only(MULTI, asyncRepo(specs), 'BE_ASYNC_SPEC_MISSING');
 
-test('BE_ASYNC_SPEC_MISSING: a consumer with no e2e spec, a saga with no spec and a spec that does not boot the world are refused', () => {
-  assert.deepEqual(r132({ extra: { [SAGA]: SAGA_TS } }).map((f) => [f.path, f.kind]).sort(), [[SAGA, 'saga'], [CONSUMER, 'consumer']]);
-  assert.match(r132({ spec: "it('x', () => undefined)\n" })[0].message, /never calls useTestWorld/);
+test('BE_ASYNC_SPEC_MISSING: a consumed event no e2e spec names, and a spec that does not boot the world, are refused on the consumes table', () => {
+  assert.deepEqual(r132().map((f) => [f.path, f.event]).sort(), [['be/apps/billing/src/consumes.ts', 'order.placed'], ['be/apps/core/src/consumes.ts', 'billing.invoice-rejected']]);
+  const notWorld = r132({ [SPEC_PLACED]: "it('order.placed', () => undefined)\n", [SPEC_REJECTED]: "it('billing.invoice-rejected', () => undefined)\n" });
+  assert.equal(notWorld.length, 2);
+  assert.match(notWorld[0].message, /boots the apps with useTestWorld and names it/);
 });
 
-test('BE_ASYNC_SPEC_MISSING: a consumer spec that never names the consumed event is refused', () => {
-  const findings = r132({ spec: SPEC('something-else') });
+test('BE_ASYNC_SPEC_MISSING: the spec of a saga step must also drive the event it compensates', () => {
+  const stepOnly = r132({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('billing.invoice-rejected') });
+  assert.equal(stepOnly.length, 1);
+  assert.equal(stepOnly[0].path, SPEC_REJECTED);
+  assert.match(stepOnly[0].message, /undoes "order.placed", but never names it/);
+});
+
+test('BE_ASYNC_SPEC_MISSING: every consumed event named by an e2e spec through the world, a saga step driving the whole flow, passes', () => {
+  assert.deepEqual(r132({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') }), []);
+  assert.deepEqual(r132({ 'be/src/tests/e2e/orders/whole-saga.e2e-spec.ts': SPEC('order.placed', 'billing.invoice-rejected') }), []);
+});
+
+// ------------------------------------------------------------------------------------------------ R131 queues of the consumers
+
+const QUEUE_SOURCE = 'be/src/modules/domain/invoice/invoice.contracts.ts';
+const queueSource = (module, name) => `import { defineQueue } from '${module}';\nexport const SHIPPED_QUEUE = defineQueue({ name: '${name}', attempts: 3, backoffMs: 1000, parse: () => null });\n`;
+const r131queues = (source, consumesFile) => only(MULTI, (dir) => {
+  asyncRepo({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') })(dir);
+  if (source !== undefined) put(dir, QUEUE_SOURCE, source);
+  if (consumesFile !== undefined) put(dir, 'be/apps/billing/src/consumes.ts', consumesFile);
+}, 'HFS_EVENT_CONTRACT').filter((f) => f.path === QUEUE_SOURCE);
+
+test('HFS_EVENT_CONTRACT: a queue a consumer defines with defineQueue must be listed in a consumes table', () => {
+  const findings = r131queues(queueSource('@modules/platform/messaging', 'order.shipped'));
   assert.equal(findings.length, 1);
-  assert.match(findings[0].message, /never names the event it consumes \("order.placed"\)/);
+  assert.match(findings[0].message, /defines the consumer queue "order.shipped", but no be\/apps\/<app>\/src\/consumes.ts lists that event/);
 });
 
-test('BE_ASYNC_SPEC_MISSING: a consumer and a saga each with an e2e spec through the world pass; a decorator not of @nestjs/cqrs is no saga', () => {
-  assert.deepEqual(r132({ spec: SPEC('order.placed'), extra: { [SAGA]: SAGA_TS, 'be/src/tests/e2e/orders/cancel-unbilled.e2e-spec.ts': SPEC('anything') } }), []);
-  assert.deepEqual(r132({ spec: SPEC('order.placed'), extra: { 'be/src/features/orders/application/plain.saga.ts': NOT_A_SAGA_TS } }), []);
+test('HFS_EVENT_CONTRACT: a defined queue that a consumes table lists passes, and a defineQueue of another module is not a consumer queue', () => {
+  assert.deepEqual(r131queues(queueSource('@modules/platform/messaging', 'order.placed')), []);
+  assert.deepEqual(r131queues(queueSource('./local-helper', 'order.shipped')), []);
 });

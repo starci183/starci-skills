@@ -1298,7 +1298,7 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R131
     code: "HFS_EVENT_CONTRACT"
-    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version) and every entry must exist in the provider's vendored snapshot at the same version; a missing or stale snapshot, an unknown event or a version mismatch is a finding."
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and every queue a consumer defines with `defineQueue` of `platform/messaging` must be listed in a consumes table; a missing or stale snapshot, an unknown event, a version mismatch or an unlisted consumer queue is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]
@@ -1306,7 +1306,7 @@ rules:
       - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
   - id: R132
     code: "BE_ASYNC_SPEC_MISSING"
-    law: "Every message consumer (`transport/message/<stem>.consumer.ts`) and every saga (a class with a method decorated `@Saga()` imported from `@nestjs/cqrs`) has an e2e spec `be/src/tests/e2e/<area>/<stem>.e2e-spec.ts` that boots the apps through `useTestWorld`; the spec of a consumer also names the event the consumer handles (publishes it and reads the effect back, redelivery included), and the spec of a saga drives the failure and reads the compensated state back."
+    law: "Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps through `useTestWorld` (it publishes the event, reads the effect back and redelivers it); when the contract of the event declares `compensates: \"<event>\"` it is a saga step, and a spec naming it also names the compensated event, so the spec drives the whole flow: the step, the failure, then the compensated state."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_ASYNC_SPEC_MISSING"]

@@ -13014,7 +13014,7 @@ HFS_SERVICE_STACK_DECLARATION:
 HFS_EVENT_CONTRACT:
   title: "The async contract between services is vendored and consumers match it"
   title_vi: "Hợp đồng sự kiện giữa các dịch vụ không khớp"
-  meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, hoặc một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác."
+  meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác, hoặc một hàng đợi consumer định nghĩa bằng `defineQueue` không được liệt kê trong bảng `consumes.ts` nào."
   causes_vi:
     - "Vi phạm luật R131: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
     - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
@@ -13035,10 +13035,10 @@ BE_SERVICE_ISOLATION:
 BE_ASYNC_SPEC_MISSING:
   title: "Every message consumer and saga has an e2e spec"
   title_vi: "Consumer hoặc saga chưa có spec e2e"
-  meaning_vi: "Một `transport/message/<event>.consumer.ts` hoặc một saga (`@Saga()` của `@nestjs/cqrs`) không có `be/src/tests/e2e/<area>/<stem>.e2e-spec.ts`, spec đó không gọi `useTestWorld`, hoặc spec của consumer không nêu sự kiện mà consumer xử lý."
+  meaning_vi: "Một sự kiện mà ứng dụng tiêu thụ (mục trong `consumes.ts`) không được spec e2e nào gọi `useTestWorld` nêu tên, hoặc (với bước saga, hợp đồng khai báo `compensates`) spec không nêu cả sự kiện được bù trừ."
   causes_vi:
-    - "Vi phạm luật R132: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, và thử giao lại."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e `<stem>.e2e-spec.ts` khởi động world, phát sự kiện thật và đọc kết quả (và trạng thái bù trừ cho saga)."
+    - "Vi phạm luật R132: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, thử giao lại; với bước saga, spec chạy cả luồng (bước đầu, lỗi, rồi trạng thái đã bù trừ)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e `be/src/tests/e2e/<area>/<tên>.e2e-spec.ts` khởi động world, phát sự kiện thật và đọc kết quả (với bước saga: nêu cả sự kiện được bù trừ và đọc trạng thái đã bù trừ)."
   owner: op-retry
   kind: check-finding
 
