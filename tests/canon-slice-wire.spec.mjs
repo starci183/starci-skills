@@ -92,7 +92,7 @@ test('the canon-wire and resume params are kernel-set code.refactor params; the 
   const brief = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'ops', 'ops', 'code.refactor.yaml'), 'utf8'));
   const resolved = resolveOpParams(brief, { leg: { canonFamilies: 'all' }, flag: { canonWire: true, resumeFrom: 'abc1234', admissionBase: 'e406d81' }, enforceRequired: true });
   assert.equal(resolved.ok, true, resolved.detail);
-  assert.deepEqual(resolved.params, { canonFamilies: 'all', canonWire: true, resumeFrom: 'abc1234', admissionBase: 'e406d81' });
+  assert.deepEqual(resolved.params, { gateRounds: 5, canonFamilies: 'all', canonWire: true, resumeFrom: 'abc1234', admissionBase: 'e406d81' }, 'the owner-set gateRounds resolves to its declared default');
   assert.equal(resolveOpParams(brief, { leg: { resumeFrom: 'x' } }).ok, false, 'a goal leg cannot carry a kernel param');
   const shared = String(brief.blockers.find((blocker) => blocker.code === 'SCOPE_WIDENING').condition.en).replace(/\s+/g, ' ');
   assert.match(shared, /reports done listing each such finding as owedToWire/);
