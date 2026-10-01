@@ -198,7 +198,7 @@ test('a lost receipt of a replay: reissue mutation is re-issued once with no req
 });
 
 test('every calls.yaml mutation declares a replay mode the runner enforces',async()=>{
-  const {validateCallContract}=await import(pathToFileURL(path.join(ROOT,'scripts','checks','providers.mjs')).href);
+  const {validateCallContract}=await import(pathToFileURL(path.join(ROOT,'scripts','checks','check-providers.mjs')).href);
   const {readModuleJson}=await import(pathToFileURL(path.join(ROOT,'engine','runtime-root.mjs')).href);
   const calls=readModuleJson('modules','host','orca','calls.yaml');
   assert.deepEqual(validateCallContract({calls,api:null}),[]);

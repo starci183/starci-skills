@@ -43,14 +43,14 @@ test('the RUNTIME preflight refuses depth 5 from a depth-4 entry that Orca\'s bo
   const rec = (name, out) => () => { calls.push(name); return out; };
   const io = {
     workerList: () => ({ ok: true, workers: [] }), // Orca scoped to the caller's bound Run: no row for the entry
-    runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }), taskCreate: rec('task-create', { ok: true, taskId: 't' }),
+    runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }),
     spawn: { show: ({ dispatch }) => (calls.push('worker-show'), dispatch === 'ctx_d4' ? { ok: true, dispatch: { depth: 4 } } : { ok: false }),
       trust: rec('trust', { status: 'ok', paths: [] }), start: rec('worker-start', { ok: true }) },
   };
   const launchedFromEnv = process.env.STARCI_LOCAL_ROOT;
   process.env.STARCI_LOCAL_ROOT = env.STARCI_LOCAL_ROOT;
   t.after(() => { if (launchedFromEnv === undefined) delete process.env.STARCI_LOCAL_ROOT; else process.env.STARCI_LOCAL_ROOT = launchedFromEnv; });
-  const refused = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: 'x', title: '[Op] d5', prompt: 'p', objective: 'o', entry: 'term_d4', maxDepth: 4, io });
+  const refused = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: 'x', title: '[Op] d5', prompt: 'p', objective: 'o', entry: 'term_d4', maxDepth: 4, request: { smoke: 'depth-5' }, io });
   assert.equal(refused.ok, false);
   assert.equal(refused.step, 'depth');
   assert.equal(refused.code, 'worker-depth-exceeded');
