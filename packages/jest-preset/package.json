@@ -1,6 +1,6 @@
 {
   "name": "@starci/jest-preset",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, per-file 100 coverage of *.service.ts only) and the one shared unit-test double kit: typed mock<T>(), mockEntityManager(), fakeTransaction(), fakeCache(), fakeLock(), recordingOutbox(), FakeClock, fakeIds(), builder() and the Outcome matchers toBeRefused/toSucceedWith.",
   "license": "UNLICENSED",
   "private": false,

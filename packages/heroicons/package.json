@@ -1,6 +1,6 @@
 {
   "name": "@starci/heroicons",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Custom-only Heroicons-compatible cuts missing from upstream.",
   "repository": {
     "type": "git",

@@ -17,7 +17,7 @@ pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
   '@starci/heroicons':
-    version: 0.3.1
+    version: 0.3.2
     group: starci
     install: registry
     side: fe
@@ -45,33 +45,33 @@ pins:
     source: packages/eslint/fe/package.json
     why: '8.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2 and hfs 4.0.3; no rule changed. 8.0.2: its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root (app.starcistacks, app.sops) and pin hfs 4.0.2. 8.0.1: its bundled canon-pins copy pins hfs 4.0.1. 8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
   '@starci/stylelint-canon':
-    version: 2.0.2
+    version: 2.0.3
     group: starci
     install: registry
     side: fe
     source: packages/stylelint/package.json
     why: '2.0.2: no-class-selector refuses a compound class selector (`div.card`), which the 2.0.1 pattern let through. 2.0.1 accepts `--font-sans` and `--font-mono` in the brand layer (the vocabulary follows the grammar 0.8.0). 2.0.0 adds status-contrast (HeroUI soft pairs measured per theme), fixes brand-layer-shape on the shared :root,.light,.dark block and the info soft pair, and derives appTokens with loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
-    version: 2.0.1
+    version: 2.0.2
     group: starci
     install: registry
     side: both
     source: packages/tsconfig/package.json
   '@starci/prettier-config':
-    version: 1.0.0
+    version: 1.0.1
     group: starci
     install: registry
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.2.2
+    version: 2.2.3
     group: starci
     install: registry
     side: be
     source: packages/jest-preset/package.json
     why: '2.2.2: the unit run writes the lcov Sonar and Codecov import (services only); 2.2.0: the integration, e2e and contract projects run every spec file in a worker process of its own (world-runner.cjs), so a process-global framework registry (@nestjs/graphql type metadata) never leaks between e2e files; 2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
   '@starci/test-world':
-    version: 1.0.5
+    version: 1.0.6
     group: starci
     install: registry
     side: be

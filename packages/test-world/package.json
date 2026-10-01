@@ -1,6 +1,6 @@
 {
   "name": "@starci/test-world",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "The shared e2e library of every StarCi back end: one warm docker stack shared by all repos (postgres, redis, minio, qdrant, kafka, keycloak behind toxiproxy, k3d with a local registry), a framework for network-edge fakes (smtp, openai-compatible, vnpay, momo, payos, sepay), the Nest boot and the typed useTestWorld handle, and the starci-test-stack cli.",
   "license": "UNLICENSED",
   "private": false,

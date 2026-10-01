@@ -1,6 +1,6 @@
 {
   "name": "@starci/prettier-config",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The one StarCi Prettier config: 120 columns, 4 spaces, no semicolons, double quotes, trailing commas everywhere.",
   "license": "UNLICENSED",
   "private": false,
