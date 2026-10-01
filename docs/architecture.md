@@ -60,7 +60,7 @@ The schema itself is data: `engine/migrations/runtime/0001-init.sql` and
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/api.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
-| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its own op worktree. Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
+| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and fleet digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
 | Harness UI | One process | Serves the read-only views of both databases and `GET /api/blob/<sha>`. | Never writes, never calls an API verb, never talks to Orca for a closed terminal. |
@@ -111,7 +111,7 @@ arguments, reads, writes and refusals; `scripts/checks/check-api-surface.mjs` ke
 the code. A write verb records its request in `api_requests` (idempotency), runs one transaction and
 appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed fact, never a crash.
 `dispatch --spawn` is the only place an op agent is started: `scripts/agent/lib.mjs` runs one
-`orchestration worker-start` on the op's worktree, shaped by the agent card
+`orchestration worker-start` on the workflow's worktree, shaped by the agent card
 `modules/models/agents/<agent>.yaml`; every other agent (Kernel, Supervisor, workers) starts through
 `worker-start` too, and no runtime code creates a terminal for an agent ([host contract](host-contract.md)).
 

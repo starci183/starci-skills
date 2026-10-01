@@ -16,7 +16,7 @@ nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - owned source edits
-  - scoped local commits when authorized
+  - no commits of its own - the runtime commits a green settle as the workflow's checkpoint
   - tests in declared sandbox
   - only selected owned development runtime setup and probes needed to verify this implementation;
     no production deployment
@@ -278,13 +278,13 @@ steps:
       en: Review the diff and verify no unrelated changes. A passing backend delivery requires scoped unit
         evidence, every applicable routine quality gate, the exact tested source tree, API
         contract, authorization/error behavior, and runtime identity when the consumer requires a
-        runnable API. Commit only when authorized, then read back the full SHA/diff and prove the
-        tested tree corresponds to that commit; otherwise report uncommitted or no-change honestly.
+        runnable API. Never commit - the runtime commits your green settle as the workflow's checkpoint;
+        prove the tested tree is the working tree you report (its changed paths), or report no-change honestly.
         A frontend support response must return codeRefs, changedPaths, apiContract, runtime,
         qualityEvidence and testedCommit bound to the caller request. Missing or not-run unit or
-        routine-gate proof, commit mismatch, or unavailable required served runtime blocks the handoff, so
-        frontend cannot consume it as verified backend. Never bypass hooks, push, stage unrelated
-        files or invent proof.
+        routine-gate proof, a tested-tree mismatch, or unavailable required served runtime blocks the handoff, so
+        frontend cannot consume it as verified backend. Never commit, stage, bypass hooks, push or
+        invent proof.
   - reads: [op-loop]
     writes: [gate-proof]
     action:
@@ -298,8 +298,9 @@ proofs:
         not-run/fail cannot earn done.
   - id: commit
     requirement:
-      en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and
-        separately retain integration/tested mappings. Report uncommitted or no-change honestly.
+      en: Never commit or stage. Inspect the exact working-tree diff and actual tests, report the changed paths and the
+        tested tree per repository, and separately retain integration/tested mappings; the runtime commits a green
+        settle as this op's checkpoint on wf-<workflowId>. Report no-change honestly.
   - id: behavior
     requirement:
       en: Scoped unit tests pass for each declared operation facet, including negative authorization and

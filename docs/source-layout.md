@@ -141,9 +141,10 @@ Storage states. Ignored (may exist, must be gitignored): `node_modules/`, `dist/
 (redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon presets), lane worktrees
 (`D:/starci-lanes/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
 rounds, UAT captures: the scratchpad or the blob store, cited by `{name, sha256}`) and plaintext
-secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). The runtime's op worktrees live
-under `.starciwork/worktrees/<op>`, git-excluded, and are removed when their op settles
-([workflow kernel](workflow-kernel.md), op worktrees). Anything else moves to its
+secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). A Kernel workflow's worktree is
+created and owned by Orca outside the app checkout, one per workflow, and is removed through
+the host-side controller after the workflow's finish marks it `release-pending` and its terminals are released
+([workflow kernel](workflow-kernel.md), the workflow worktree). Anything else moves to its
 owner: infrastructure, compose, docker and env templates plus seeds and database init to
 `.starcistacks/<environment>/`; migrations to the owning capability's `persistence/`; product
 docs and workflow notes to `.starciwork` records or a side's `docs/`; code generators to the root

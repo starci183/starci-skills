@@ -116,6 +116,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
   never guessed.
 - Do NOT start the workflow here. Starting is the `start-kernel` skill, which
   starts ONE long-lived `[Kernel]` worker; each op it runs is one ephemeral
-  `[Op]` worker (`orchestration worker-start`, in its own op worktree) that
-  `api dispatch` starts and `api settle` releases — a settled job never leaves
-  a live worker or worktree behind.
+  `[Op]` worker (`orchestration worker-start`, in the workflow's one worktree
+  that Orca created at Kernel start) that `api dispatch` starts and `api
+  settle` releases — a settled job never leaves a live worker behind, and the
+  worktree is released only after the workflow's finish.

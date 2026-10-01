@@ -315,18 +315,16 @@ preflight:
 # ============================================================================
   context.product_worktree:
     meaning: >-
-      Where an isolated op works (DESIGN §16.7; scripts/kernel/product-worktree.mjs). An op whose brief sets
-      policy.isolation: worktree and whose owned
-      paths land in ONE bound product repository other than the Work owner gets exactly ONE git worktree
-      <repo>/.starciwork/worktrees/<op> on branch op/<op>, cut from the product's main. `api dispatch --spawn`
-      creates it through the one worktree API (scripts/lib/worktrees.mjs createWorktree: registered in
-      machine.sqlite worktrees with its owner op, repo, branch and created-at; capped per repository by
-      modules/kernel/product-land.yaml worktrees.capPerRepo), a requeued attempt reuses it, a continuation starts
-      from its predecessor's preserved/<job> branch. It places the worker there (the Orca terminal / managed
-      worker's worktree, owned-path placements, packet paths) and records payload.productWorktree
-      {repoRoot, workflowId, jobId, main, op {short, branch, path}, baseSha}. node_modules is a junction overlay
-      (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing run against the live
-      checkout (main), where every op lands. A dry-run shows the planned paths (preview: true).
+      Where an isolated op works (scripts/kernel/workflow-worktree.mjs): the ONE worktree of its workflow, never a
+      worktree of its own. Orca creates it before the Kernel starts (ensureWorkflowWorktree: Orca's worktree create
+      call --name wf-<workflowId> --base-branch main --setup run, branch wf-<workflowId> as the registry records it, a
+      real npm ci at the app root, no node_modules junctions) and the Kernel starts in it with --worktree <its
+      path>; the runtime registers it in machine.sqlite worktrees as kind workflow, keyed by Orca's worktree id,
+      against the per-repository cap. `api dispatch --spawn` starts the op with
+      worker-start --worktree <that worktree> (opWorktreeArgs) and places owned paths and packet paths there. Ops
+      of the same side (be/ or fe/, from the owned paths) run serially; ops on different sides run in parallel; an
+      op owning both sides runs alone (canDispatchConcurrently). Dev servers, UAT and drawing run against the live
+      checkout (main). A dry-run shows the planned paths (preview: true).
     settle: >-
       settle never lands an op into main (WFWT, scripts/kernel/workflow-checkpoint.mjs). In a workflow worktree, as
       its LAST step once every other settle refusal passed, a pass commits the op's side (be/ or fe/, from its owned
@@ -343,8 +341,8 @@ preflight:
       pushed, then the worktree marked release-pending; part A's GC removes it and the workflow branch; event
       workflow-landed).
     refusals:
-      product-worktree-unavailable: the worktree or its node_modules overlay could not be made (reason in detail); the job stays queued
-      worktree-cap: the product repository holds worktrees.capPerRepo live worktrees; the dispatch waits (the job stays queued, no attempt spent)
+      product-worktree-unavailable: the workflow's worktree is not registered or not reachable (reason in detail); the job stays queued
+      worktree-cap: the product repository holds its cap of live workflow worktrees; the workflow waits (no attempt spent)
 
 spawnMechanics:
   caller: >-

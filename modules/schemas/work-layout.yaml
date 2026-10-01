@@ -118,7 +118,7 @@ shape:
     - any evidence/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
     - uat/<flow>/runs/<runId>/**, ui/<screen>/assets/**/draw-loop/** rounds, features/<feature>/operations/**
     - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/
-    - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (op worktrees live at D:/starci-wt)
+    - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (a workflow's one worktree is created and owned by Orca outside the app checkout)
     - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs

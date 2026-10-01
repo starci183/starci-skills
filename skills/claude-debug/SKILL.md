@@ -71,8 +71,10 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   `api usage` verb).
 - `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
 - `worktrees:<repo>`: for the runtime and every active ledger's repo, more registered worktrees than
-  `claudeDebug.worktreeLimit`, or a registered worktree whose directory is gone (prunable). Read only; never prune from
-  the pass.
+  `claudeDebug.worktreeLimit`, or a registered worktree whose directory is gone (prunable). A product repository's
+  registered worktrees are workflow worktrees (kind `workflow`, one per Kernel workflow, keyed by Orca's worktree id,
+  created by Orca with a real `npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
+  pass.
 - `integrity:tracked-deleted`, `integrity:node_modules`, `integrity:packages/node_modules`: the runtime's main checkout
   (first `git worktree list` entry) lost tracked files, or a node_modules directory is missing or empty (the signature of
   a worktree removed through a junction).
@@ -183,6 +185,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 | Supervisor seat `selector_not_found` | The nested `.claude` repo is not an Orca worktree; the seat and worker launch must fall back to the registered host repo. |
 | `LEDGER_CORRUPT` on a legacy store | Usually a false alarm for a legacy in-repo store; verify with `PRAGMA quick_check` on the registered file before acting; `start.mjs --retire-stale-ledgers` for temp/test paths. |
 | `integrity:*`: tracked files deleted and `packages/node_modules` empty in the main checkout (2026-10-01: 490 files, nothing caught it) | A `git worktree remove` ran through a node_modules junction. Fix the remover in a lane (rmdir junctions first); restoring the checkout is the owner's call. |
+| A workflow worktree left after its workflow finished, or a failed op's changes gone | The finish fast-forwards and pushes main, then marks the worktree `release-pending`; the host-side controller removes it once its terminals are released (link check, Orca's worktree removal, then `git branch -d`), so a `release-pending` row with a live terminal is expected and one without is a controller defect. A failed or blocked op's work is the ref `preserved/<workflowId>/<op>` and the tree was reset to the last checkpoint on `wf-<workflowId>`. Read the registry row (`machine.sqlite` `worktrees`, kind `workflow`) and the ref before acting; fix the runtime in a lane, never remove the tree by hand. |
 | `push-mains.mjs` has no `--help` | Running it pushes. Never run it to see usage; read its source. |
 
 Add a row here when a new signature is understood, with the evidence query that found it.

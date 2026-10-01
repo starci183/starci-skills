@@ -1,0 +1,85 @@
+id: workflow-worktree
+effectiveAt: '2026-10-02T12:00:00+07:00'
+summary: >-
+  ONE WORKTREE PER KERNEL WORKFLOW (owner decision, final; lanes WFWT A, B and C under C0). It replaces the per-op
+  worktree lifecycle and the per-op integration, with no legacy. Creation (part A, scripts/kernel/workflow-worktree.mjs):
+  before the Kernel launches, ensureWorkflowWorktree has Orca create and own the worktree (Orca's worktree create call,
+  --name wf-<workflowId> --base-branch main --setup run --no-parent; workflowWorktreeSpec) on Orca's branch wf-<workflowId>,
+  which the runtime reads from the registry, and the Kernel starts in it with worker-start --worktree <its path> (an
+  existing tree takes launch trust; a --worktree new-child start cannot); its setup runs
+  a real npm ci at the app root and there are no node_modules junctions anywhere. Every op of the workflow starts with
+  --worktree <the workflow worktree> (opWorktreeArgs); no worktree is made per op. The registry, cap, GC and safe
+  removal stay, keyed per workflow (registry kind workflow, keyed by Orca's worktree id); the per-op kind op is deleted
+  by a machine.sqlite migration. Ops of the same side (be/ or fe/, from the owned paths: sideOf) run serially; across
+  sides they run in parallel; an op owning both sides runs alone (canDispatchConcurrently, enforced by the dispatcher).
+  Checkpoints (part B, scripts/kernel/workflow-checkpoint.mjs): a green op settle commits a checkpoint on wf-<workflowId>
+  (checkpointOp, setCheckpoint), and the op's gate (scripts/checks/gate.mjs) compares against the previous checkpoint
+  (gateBaseOf; the merge-base with main for the first op), so only that op's new findings block. A failed or blocked op's
+  uncommitted work is preserved to preserved/<workflowId>/<op> (a snapshotCommit) and the worktree reset to the last
+  checkpoint (preserveAndReset). Main is touched only at the workflow's end (finishWorkflow), in order: a full gate on
+  the whole branch against main's merge-base; the merge guard; review.verify; a rebase onto main (also at milestones when
+  main has moved: rebaseWorkflow); main fast-forwarded and pushed; the worktree marked release-pending. review.verify
+  must have verified the exact head that lands. The host-side controller removes a release-pending worktree once its
+  terminals are released: the link check, Orca's worktree removal, git branch -d (releaseWorkflowWorktree). Every
+  refusal is typed and leaves main untouched. Ops never commit: checkpointOp is the only committer on wf-<workflowId>,
+  and the gate base is the previous checkpoint (settle refuses another base); the op texts lose every instruction to
+  commit, and docs/ops.md no longer names commitPolicy. The PreToolUse command guard enforces it at the moment: the op
+  guard file carries workflowWorktree (writeJobGuard, guardLaunch, api.mjs opGuardLaunch; the dispatch passes the
+  registry path), and inside that worktree (cwd or any git -C) scripts/guards/command-guard.mjs workflowHistoryVerdict
+  refuses commit, merge, rebase, push, pull, cherry-pick, revert, am, reset to a revision or with a mode, checkout of a
+  branch or path, switch, restore of the working tree, stash, tag and branch writes, update-ref, filter-branch,
+  replace, reflog expire|delete and notes writes with the new code WORKFLOW_HISTORY_CHANGE (remedy: the runtime
+  checkpoints your work at settle); reads pass and nothing changes outside the worktree. Part C rewrites every
+  description of the old lifecycle (knowledge, docs, modules/ops/_common.yaml and op manifests in en and vi, the
+  start-kernel, orchestration, define-goal, claude-debug and push-git skills, the kernel dispatch contract text) and
+  extends the pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) with the path
+  workflow-worktree: the Kernel's worktree appears in orca worktree list (part A's worktree-list wrapper,
+  scripts/api/orca/worktree-list.mjs), one be op and one fe op run in parallel in it, a failing be op is preserved and
+  reset to its checkpoint, the finish merges to main and leaves the worktree release-pending, the host-side controller
+  removes it, and main's checkout is then byte-identical but for the two green files (the tracked files and the
+  node_modules listing compared). The smoke takes --app-repo, a
+  scratch app registered in Orca. knowledge/hfs/slots.yaml app.worktrees goesTo is rewritten too; its canon-bundled copies are
+  republished and rebound in the alpha.4 batch republish (CANON_BINDING_DIGEST until then). Adds no finding code in part C.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/workflow-worktree.yaml
+  - scripts/kernel/workflow-worktree.mjs
+  - scripts/kernel/workflow-checkpoint.mjs
+  - scripts/kernel/launch-smoke.mjs
+  - scripts/api/orca/worktree-list.mjs
+  - modules/host/orca/index.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/api-commands/incident.yaml
+  - modules/models/registry.yaml
+  - modules/schemas/work-layout.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - modules/ops/ops/runtime.operate.yaml
+  - modules/ops/ops/workspace.manage.yaml
+  - knowledge/op-gate.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/patterns/repo/folder.yaml
+  - knowledge/patterns/repo/starciwork.yaml
+  - docs/workflow-kernel.md
+  - docs/supervisor.md
+  - docs/architecture.md
+  - docs/host-contract.md
+  - docs/ops.md
+  - docs/source-layout.md
+  - docs/releasing.md
+  - skills/start-kernel/SKILL.md
+  - skills/orchestration/SKILL.md
+  - skills/define-goal/SKILL.md
+  - skills/claude-debug/SKILL.md
+  - skills/push-git/SKILL.md
+  - CHANGELOG.md
+  - tests/launch-smoke.spec.mjs
+  - tests/workflow-history-guard.spec.mjs
+  - scripts/guards/command-guard.mjs
+  - scripts/guards/install.mjs
+  - scripts/kernel/api.mjs
+  - modules/kernel/failure-codes.yaml
+  - docs/ops.md

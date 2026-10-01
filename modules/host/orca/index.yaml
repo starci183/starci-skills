@@ -59,7 +59,7 @@ workflowKernel:
       cli: 'orca orchestration task-create --run <entry-run-id> --task-title "[Kernel] <Workflow>" --display-name "[Kernel] <Workflow>" --spec "<kernel prompt>" --json'
     boot:
       api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <kernel-task-id> --worktree <workflow-worktree> --agent <agent> --model <model> --effort <effort> --display-name "[Kernel] <Workflow>" --run <entry-run-id> --json'
+      cli: 'orca orchestration worker-start --task <kernel-task-id> --worktree <workflow-worktree path, created first by worktree create --name wf-<workflowId>> --agent <agent> --model <model> --effort <effort> --display-name "[Kernel] <Workflow>" --run <entry-run-id> --json'
     bindRun:
       api: orchestration.run-create
       cli: 'orca orchestration run-create --objective "<workflow goal>" --from <own-terminal> --json'
@@ -143,7 +143,7 @@ operationAgent:
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree <op-worktree> --agent <resolved-agent> [--model <resolved-model-id> --effort <resolved-effort>] --run <workflow-run-id> --from <kernel-terminal> --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree <workflow-worktree> --agent <resolved-agent> [--model <resolved-model-id> --effort <resolved-effort>] --run <workflow-run-id> --from <kernel-terminal> --json'
       assignee:
         api: orchestration.dispatch-show
         cli: 'orca orchestration dispatch-show --task <operation-task-id> --from <kernel-terminal> --json'

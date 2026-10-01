@@ -98,10 +98,11 @@ and only `api report` plus recorded `api check` rows support a verdict.
 
 ## Dispatch — `modules/kernel/dispatch.yaml`
 
-`dispatch` reserves the lease + budget atomically, creates the op's worktree
-(below), renders the packet and — with `--spawn` — starts the op agent through
-`scripts/agent/lib.mjs` `spawnAgent`: one `orchestration worker-start` on the op
-worktree, the Task carrying the packet, the effective agent and model attested
+`dispatch` reserves the lease + budget atomically, resolves the workflow's
+worktree (below; no worktree is made per op), renders the packet and — with
+`--spawn` — starts the op agent through `scripts/agent/lib.mjs` `spawnAgent`:
+one `orchestration worker-start --worktree <the workflow worktree>`, the Task
+carrying the packet, the effective agent and model attested
 with `worker-show` ([host contract](host-contract.md)). The packet is a bounded
 grant: one op, its brief (`modules/ops/ops/<op>.yaml`), a closed read set, a
 closed write set (`owned_paths`, app-relative: `be/...`, `fe/...`,
@@ -139,15 +140,18 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
    `kinds`: the family's `always` files plus those of the longest listed slot
    prefix) and the example files of the same slots. It records the READ digest
    (`starci/read-digest@1`, every file with its sha256).
-2. **CODE** — inside the owned paths, in the op worktree.
+2. **CODE** — inside the owned paths, in the workflow worktree.
 3. **CHECK** — `scripts/checks/gate.mjs --root <app> --changed <files>
    [--tests <pattern>]`, forced every round. It runs, in order: the merge guard;
    `hfs lint --changed` at the app root (the BE canon under `be/`, the FE canon
    under `fe/`, the repository checks); the root `codegen` and the build of
    every workspace package that exports `dist`; `tsc`, one incremental program
    per tsconfig owning a changed file; with `--tests`, the slice's specs. Only
-   findings new against the base block (the base is measured read-only from git
-   objects, never from a second checkout); failing specs always block. Exit `0`
+   findings new against the base block: the base is the workflow's previous
+   checkpoint (the merge-base with main for the workflow's first op), measured
+   read-only from git objects, never from a second checkout, so only this op's
+   new findings block, and settle refuses a gate measured against any other
+   base; failing specs always block. Exit `0`
    green, `1` new findings, `2` a tool could not run (never a pass). Its stdout is
    one `starci/gate@1` document.
 4. **FIX** — and check again, up to the op's `params.gateRounds` rounds.
@@ -170,45 +174,58 @@ counts as green.
 main line is recomputed with `git merge-tree`; a path main changed whose
 merged blob is the lane's (main's change dropped) is the finding
 `merge/dropped-main-change`, never preexisting. The gate runs it first, and the
-landing runs it again over the op branch before anything is rebased
-(`land-merge-dropped-main`).
+workflow's finish runs it again over the whole workflow branch before anything
+is rebased (`land-merge-dropped-main`).
 
-## Op worktrees and the landing — `modules/kernel/product-land.yaml`
+## The workflow worktree — one per Kernel workflow
 
-Exactly one git worktree per op that commits into a product app; the runtime
-owns its whole lifecycle (`scripts/kernel/product-worktree.mjs`,
-`scripts/lib/worktrees.mjs`). Ops that only touch the Work owner, ops on the
-`.claude` runtime and ops that never commit keep the shared tree
-(`defaultIsolation` and its exceptions in `product-land.yaml`).
+One git worktree per Kernel workflow, never one per op (owner decision,
+contract change `workflow-worktree`). Orca creates and owns it; the runtime
+keys its registry, cap, GC and safe removal per workflow
+(`scripts/kernel/workflow-worktree.mjs`, `scripts/kernel/workflow-checkpoint.mjs`).
+Ops that only touch the Work owner, ops on the `.claude` runtime and ops that
+never commit keep the shared tree.
 
-- **Create.** At dispatch, `<app>/.starciwork/worktrees/<op>` on branch
-  `op/<op>` off the app's main (git-excluded, never tracked). It is registered
-  in `machine.sqlite` `worktrees` with its owner op and a claim, against a cap
-  per repository (`worktrees.capPerRepo`, 10): a dispatch over the cap waits and
-  the job stays queued. `scripts/lib/worktrees.mjs` is the only place the
-  runtime runs `git worktree add` (`check-worktree-add.mjs`). Each worktree gets
-  a real `node_modules` of junctions into the main checkout's install, with the
-  workspace packages pointed at the worktree's own copy; a lockfile change
-  rebuilds it.
-- **Land.** At the op's green settle, under the repository's land lock: the
-  merge guard over the op's history, `op/<op>` rebased onto main's tip (a
-  conflict is a refusal with files and hunks; main's side is never
-  overwritten), `gate.mjs` over the rebased tree against main (`land-gate-red`,
-  `land-gate-unavailable`), the op's re-runnable declared checks, then main
-  compare-and-swap fast-forwarded (the live checkout with it) and pushed. Main
-  moved underneath means rebase and gate again (`land.maxMainRetries`). Any
-  refusal leaves main untouched and the job unsettled.
-- **Delete.** Right after the worker is released the worktree is removed:
-  evidence salvaged, a failed or blocked op's work preserved to
-  `refs/heads/preserved/<op>`, every junction removed as a link (`cmd /c rmdir`,
-  never through it), the tree removed and the removal verified, the branch
-  deleted. A worktree outliving its settle by `opRemoveSlaMs` is an SLA miss.
-- **GC.** The reconciler's GC controller (`gc:worktrees`, always active) removes
-  a live worktree whose branch is merged, whose op has settled or whose owner
-  process is gone longer than `ownerGoneMs`, always after preserving its work,
-  and reclaims unregistered trees under `.starciwork/worktrees`.
-  `node scripts/lib/worktrees.mjs counts` shows each repository's count against
-  its cap; `start --check` reports them.
+- **Create.** At workflow start, before the Kernel launches,
+  `ensureWorkflowWorktree` has Orca create the worktree (`orca worktree create
+  --name wf-<workflowId> --base-branch main --setup run --no-parent`) off the
+  app's main; its branch is Orca's `wf-<workflowId>`, which the runtime reads
+  from the registry. The Kernel then starts with `orchestration worker-start
+  --worktree <that path>`: an existing tree, so launch trust is written into
+  it before the agent starts. Its
+  setup runs a real `npm ci` at the app root: there are no `node_modules`
+  junctions anywhere. The worktree is registered in `machine.sqlite`
+  `worktrees` as kind `workflow`, keyed by Orca's worktree id, against the cap
+  per repository; a workflow over the cap waits.
+- **Ops.** Every op of the workflow starts with `worker-start --worktree <the
+  workflow worktree>`. Ops on the same side (`be/` or `fe/`, from the op's
+  owned paths) run one after another; ops on different sides run in parallel,
+  and an op that owns both sides runs alone. The dispatcher enforces it.
+- **Checkpoint.** Ops never commit. When an op settles green, the runtime
+  (`checkpointOp`) commits its side's changes on `wf-<workflowId>` as that op's
+  checkpoint: it is the only committer on the branch. The op's gate base is the
+  previous checkpoint (the merge-base with main for the first op), so only the
+  op's own new findings block, and settle refuses a gate measured against any
+  other base.
+- **Failure.** A failed or blocked op's uncommitted work is preserved to
+  `refs/heads/preserved/<workflowId>/<op>` (a snapshot commit that never holds
+  `node_modules`), and the worktree is reset to the last checkpoint. The tree is
+  private to the workflow, so the reset touches nothing else.
+- **Finish.** Main is touched only when the workflow ends, in this order: a
+  full `gate.mjs` over the whole branch against its merge-base with main; the
+  merge guard; `review.verify`, which must have verified the exact head that
+  lands; a rebase onto main (also at milestones when main has moved); main
+  fast-forwarded and pushed. The finish then marks the worktree
+  `release-pending`; it never removes it itself, because the workflow's
+  terminals still run there. Any refusal leaves main untouched.
+- **Release.** The host-side controller removes a `release-pending` worktree
+  once every terminal in it is released: the link check, then Orca's worktree
+  removal, then `git branch -d`. The reconciler's GC controller
+  (`gc:worktrees`, always active) also collects a workflow worktree whose
+  owner process is gone longer than `ownerGoneMs`, always after preserving its
+  work, and only through Orca. `node scripts/lib/worktrees.mjs
+  counts` shows each repository's count against its cap; `start --check`
+  reports them.
 
 ## Verdicts — `modules/kernel/verdict-contract.yaml`
 

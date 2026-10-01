@@ -70,6 +70,11 @@ not death. After reboot, the `StarCi-Reconciler` task invokes
 Host boot phase; `node scripts/reconciler/start.mjs` (the `start` skill) does that plus the services, the UI build and the
 seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/supervisor/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
+Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
+created at Kernel start (registry kind `workflow`, keyed by Orca's worktree id, a real `npm ci` and no junctions); a
+failed op inside it is preserved and reset to the last checkpoint; only the workflow's finish moves main, and it marks
+the worktree `release-pending`. The host-side controller removes it once its terminals are released (link check, Orca's
+worktree removal, `git branch -d`). The Supervisor never removes one by hand ([workflow kernel](workflow-kernel.md)).
 
 ## Claude Code updates
 

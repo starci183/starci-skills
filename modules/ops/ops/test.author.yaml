@@ -18,7 +18,7 @@ nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - test file authoring inside the declared test-paths-only allowlist
-  - scoped local commits when authorized
+  - no commits of its own - the runtime commits a green settle as the workflow's checkpoint
   - runner collection/listing checks in the declared sandbox
 graphPolicy:
   mode: read-only
@@ -170,9 +170,8 @@ steps:
       - repo
     writes: [node, evidence]
     action:
-      en: Review the diff and verify only test paths changed. Commit only when authorized, read back the
-        full SHA/diff and bind the authored tests to the inspected tree; otherwise report
-        uncommitted honestly. Report done once with the authored inventory and collection proof -
+      en: Review the diff and verify only test paths changed. Never commit - bind the authored tests to the
+        inspected working tree; the runtime commits a green settle as the workflow's checkpoint. Report done once with the authored inventory and collection proof -
         never a product verdict.
   - reads: [op-loop]
     writes: [gate-proof]
@@ -217,8 +216,9 @@ proofs:
         is asserted; that judgement is the verify op's on a separate run.
   - id: commit
     requirement:
-      en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and
-        separately retain integration/tested mappings. Report uncommitted or no-change honestly.
+      en: Never commit or stage. Inspect the exact working-tree diff and actual tests, report the changed paths and the
+        tested tree per repository, and separately retain integration/tested mappings; the runtime commits a green
+        settle as this op's checkpoint on wf-<workflowId>. Report no-change honestly.
   - id: op-gate
     requirement:
       en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."

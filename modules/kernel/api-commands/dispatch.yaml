@@ -48,7 +48,7 @@ dispatch:
     atomically; the packet's owned_paths resolve through
     scripts/kernel/target-repo.mjs: in a bound app each carries {path
     (app-relative, as declared), repository (its side: be, fe, app, or
-    none for a Work path), root (the app checkout: the op worktree, else
+    none for a Work path), root (the app checkout: the workflow worktree, else
     the app root), declared}; the worker starts at that app checkout, so
     the prompt shows every owned path bare, the same spelling gate.mjs
     --root <app> --changed and every finding use, under a `writes_in`
@@ -113,7 +113,7 @@ dispatch:
     with --spawn the api runs the Orca sequence itself — through
     scripts/agent/lib.mjs spawnAgent, the one agent launch: task-create
     with the rendered packet -> worker-start --agent <provider> [--model
-    <id> --effort <level>] on the op's worktree -> dispatch-show ->
+    <id> --effort <level>] --worktree <the workflow worktree> -> dispatch-show ->
     terminal rename `[Op] <op>` -> worker-show attestation. Orca composes
     the agent command with the owner's per-agent default args. The
     kernel agent never calls orca directly. Without --spawn: dry-run —

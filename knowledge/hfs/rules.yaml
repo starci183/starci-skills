@@ -19,8 +19,8 @@ version: 2.0.0
 gates:
   pre-commit: the managed .husky/pre-commit at the app root - hfs work-hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
   pre-push: typecheck, lint (hfs lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
-  settle: the op gate scripts/checks/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the base block), re-read at api settle, which refuses a red done
-  land: the Kernel's landing of a green op - the op branch rebased onto main and gate.mjs re-run against main before main is fast-forwarded and pushed
+  settle: the op gate scripts/checks/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
+  land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
   ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication and cognitive complexity; no coverage condition
 enforcerKinds:

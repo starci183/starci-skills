@@ -1,26 +1,45 @@
 #!/usr/bin/env node
-// launch-smoke.mjs — the pre-workflow launch smoke (starci/launch-smoke@1): proves on the live Orca host that every
-// nesting path the runtime uses starts its agents through orchestration worker-start, at the depth Orca reports.
+// launch-smoke.mjs — the pre-workflow launch smoke (starci/launch-smoke@2): proves on the live Orca host that every
+// nesting path the runtime uses starts its agents through orchestration worker-start, at the depth Orca reports, and that
+// one Kernel workflow runs in ONE workflow worktree (contract change workflow-worktree).
 //
 //   supervisor-worker  entry (0) -> [Supervisor] (1) -> [Worker] (2)
 //                      the [Worker] is started by scripts/supervisor/workers.mjs startWorkerAgent from the
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
-//   op-critic          entry (0) -> [Kernel] (1) -> [Op] (2) -> draw critic (3)
+//   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
 //                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
 //                      <kernel terminal>, task-create --run --from, worker-start --task --run --from); the critic by
 //                      scripts/work/draw-critic.mjs launchCriticWorker on its criticWorkspace placement, from the Op's
 //                      terminal.
+//   workflow-worktree  before the Kernel starts, scripts/kernel/workflow-worktree.mjs ensureWorkflowWorktree has Orca create
+//                      the workflow worktree (`orca worktree create --name wf-<id> --base-branch main --setup run`, a real
+//                      npm ci, no junctions) and registers it; it must appear in `orca worktree list`, and the Kernel then
+//                      starts with `worker-start --worktree <that path>` (an existing tree, so launch trust is written into
+//                      it first). The workflow branch is the one the registry names (Orca's wf-<id>). The Kernel's stage starts one be op and one fe op IN PARALLEL in that
+//                      worktree (opWorktreeArgs; canDispatchConcurrently says yes across sides); each writes one owned
+//                      file. Each green op is a checkpoint (scripts/kernel/workflow-checkpoint.mjs checkpointOp) whose
+//                      gate base is the previous checkpoint (gateBaseOf). Then a second be op, started from the Kernel's
+//                      terminal once no be op runs (same side: serial), writes its file and FAILS: preserveAndReset keeps
+//                      its work on preserved/<id>/<op> and the worktree is back on the last checkpoint. Finally, with every
+//                      agent released, finishWorkflow fast-forwards the app's main and marks the worktree release-pending;
+//                      the host-side controller must then remove it (gone from `orca worktree list`, its directory and
+//                      branch gone), and only after that main's checkout must hold exactly the two green files more, byte
+//                      for byte (every other tracked file and the node_modules listing unchanged).
 //
 // Every agent is a no-op on the cheapest model modules/models/runtimes.yaml pins (priced by modules/models/prices.yaml):
-// a leaf writes one line to its result file (`mark`) and reports worker_done; a parent first runs its `stage` (which
-// starts its one child from the parent's own terminal, the way the runtime does) and then does the same. The smoke reads
-// each worker back (worker-read), checks the depth and the creator Dispatch worker-show reports, then - always, in a
-// finally, deepest first - stops a worker that has not settled, releases every worker, closes a Task its worker did not
-// settle, and removes the critic's placement and its own state directory. It prints one JSON result.
+// a leaf writes its result line (`mark`; an op also writes its owned file in the workflow worktree) and reports
+// worker_done; a parent first runs its `stage` (which starts its children from the parent's own terminal, the way the
+// runtime does) and then does the same. The smoke reads each worker back (worker-read), checks the depth and the creator
+// Dispatch worker-show reports, then - deepest first - stops a worker that has not settled, releases every worker, closes a
+// Task its worker did not settle, removes the critic's placement, finishes the workflow and waits for the host-side
+// controller to remove its worktree (when the workflow never finished, or the controller never removed it, it releases the
+// worktree through releaseWorkflowWorktree) and removes its own state directory. It prints one JSON result.
 //
-//   node scripts/kernel/launch-smoke.mjs [--entry <terminal>] [--timeout-ms <n>] [--out <file>]
+//   node scripts/kernel/launch-smoke.mjs --app-repo <app main checkout> [--entry <terminal>] [--timeout-ms <n>] [--out <file>]
 //     the smoke; the entry is the terminal it runs in (ORCA_TERMINAL_HANDLE) - the owner's chat or a plain shell,
-//     never an agent. Exit 0 when every path is ok, 1 otherwise, 2 with no entry terminal.
+//     never an agent. The app repository is a SCRATCH app registered in Orca: the finish fast-forwards and pushes its
+//     main with the smoke's two files. The reconciler must run (its host-side controller removes the worktree). Exit 0
+//     when every path is ok, 1 otherwise, 2 with no entry terminal.
 //   node scripts/kernel/launch-smoke.mjs stage --as <role>   (a parent agent runs it in its terminal)
 //   node scripts/kernel/launch-smoke.mjs mark --as <role>    (every agent runs it: its result line)
 // An agent's command names only its role: the smoke's state directory (under <os temp>/starci-launch-smoke/) is found
@@ -29,6 +48,7 @@
 //
 // It is step `launch-smoke` of the pre-workflow readiness (docs/releasing.md "Pre-workflow readiness", docs/host-contract.md); it starts real agents, so it
 // is run by hand once per runtime release, never by a check or a spec (tests/launch-smoke.spec.mjs fakes the client).
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,27 +56,41 @@ import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { gitResult } from '../lib/git.mjs';
 
-export const SMOKE_SCHEMA = 'starci/launch-smoke@1';
+export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(SKILL_ROOT, 'scripts', 'kernel', 'launch-smoke.mjs');
 const slash = (p) => String(p).replaceAll('\\', '/');
 
-/** Each role: its depth under the entry, its parent role, its title. */
+/**
+ * Each role: its depth under the entry, its parent role, its title; an op role also its side (be/fe) and whether its
+ * no-op fails on purpose. `by: 'smoke'` is a role the smoke itself starts from its parent's terminal (the api dispatch
+ * shape: the dispatcher names the Kernel terminal as --from) instead of the parent's stage.
+ */
 export const ROLES = Object.freeze({
   supervisor: { depth: 1, parent: null, title: '[Supervisor] launch smoke' },
   worker: { depth: 2, parent: 'supervisor', title: '[Worker] launch smoke' },
   kernel: { depth: 1, parent: null, title: '[Kernel] launch smoke' },
-  op: { depth: 2, parent: 'kernel', title: '[Op] launch smoke' },
+  op: { depth: 2, parent: 'kernel', title: '[Op] launch smoke be', side: 'be' },
+  opFe: { depth: 2, parent: 'kernel', title: '[Op] launch smoke fe', side: 'fe' },
+  opFail: { depth: 2, parent: 'kernel', title: '[Op] launch smoke be fail', side: 'be', fails: true, by: 'smoke' },
   critic: { depth: 3, parent: 'op', title: '[Critic] launch smoke' },
 });
-export const PATHS = Object.freeze({ 'supervisor-worker': ['supervisor', 'worker'], 'op-critic': ['kernel', 'op', 'critic'] });
-const CHILD = Object.freeze(Object.fromEntries(Object.entries(ROLES).filter(([, r]) => r.parent).map(([role, r]) => [r.parent, role])));
+export const PATHS = Object.freeze({
+  'supervisor-worker': ['supervisor', 'worker'],
+  'op-critic': ['kernel', 'op', 'critic'],
+  'workflow-worktree': ['kernel', 'op', 'opFe', 'opFail'],
+});
+/** The children a parent's stage starts, in parallel. */
+export const CHILDREN = Object.freeze(Object.fromEntries(Object.keys(ROLES).map((p) => [p, Object.entries(ROLES).filter(([, r]) => r.parent === p && r.by !== 'smoke').map(([role]) => role)]).filter(([, c]) => c.length)));
+const OP_ROLES = Object.freeze(Object.keys(ROLES).filter((r) => ROLES[r].side));
 // Deepest first: a child is settled and released while its creator's terminal still exists.
-const CLEANUP_ORDER = Object.freeze(['critic', 'op', 'worker', 'kernel', 'supervisor']);
+const CLEANUP_ORDER = Object.freeze(['critic', 'op', 'opFe', 'opFail', 'worker', 'kernel', 'supervisor']);
 // worker-show: a Dispatch that will do nothing more.
 const SETTLED_STATUS = new Set(['completed', 'succeeded', 'failed', 'cancelled']);
 const ENDED_STATE = new Set(['done', 'completed', 'succeeded', 'failed', 'stopped', 'released', 'exited']);
+const GREEN_STATUS = new Set(['completed', 'succeeded']);
 const TIER_ORDER = ['easy', 'medium', 'hard', 'insane'];
 
 /**
@@ -77,17 +111,31 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() }
   return found[0] ?? { error: 'no runtimes.yaml pool pins a priced model (modules/models/prices.yaml)' };
 }
 
-/** The Orca client: the runtime's own launchers and the scripts/api/orca wrappers, each replaceable (specs). */
+/**
+ * The Orca client: the runtime's own launchers, the scripts/api/orca wrappers and the workflow-worktree runtime
+ * (scripts/kernel/workflow-worktree.mjs, scripts/kernel/workflow-checkpoint.mjs), each replaceable (specs). `ctx` is
+ * the context those two modules take; `git` runs one git command ({ok, stdout, error}).
+ */
 export async function defaultClient() {
-  const [lib, workers, critic, show, read, stop, release, update, inbox] = await Promise.all([
+  const [lib, workers, critic, show, read, stop, release, update, inbox, list, wt, cp] = await Promise.all([
     import('../agent/lib.mjs'), import('../supervisor/workers.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
-    import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'), import('../api/orca/orch-inbox.mjs')]);
+    import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'), import('../api/orca/orch-inbox.mjs'),
+    import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs')]);
   return {
     startAgent: lib.startAgent, startWorkerAgent: workers.startWorkerAgent,
     criticWorkspace: critic.criticWorkspace, removeCriticWorkspace: critic.removeCriticWorkspace, launchCriticWorker: critic.launchCriticWorker,
     workerShow: show.workerShow, workerRead: read.workerRead, workerStop: stop.workerStop, workerRelease: release.workerRelease,
-    taskUpdate: update.taskUpdate, inbox: inbox.orchInbox,
+    taskUpdate: update.taskUpdate, inbox: inbox.orchInbox, worktreeList: list.worktreeList,
+    // The context of parts A and B. The smoke's ops are no-op agents, so no review.verify op runs: the smoke attests that
+    // step itself through part B's `verify` seam, and the result says so (workflow.finish.steps).
+    ctx: { verify: () => ({ ok: true, jobId: null, detail: 'launch smoke: its ops are no-op agents, no review.verify op runs' }) },
+    workflow: {
+      spec: wt.workflowWorktreeSpec, ensure: wt.ensureWorkflowWorktree, of: wt.workflowWorktreeOf, opArgs: wt.opWorktreeArgs,
+      sideOf: wt.sideOf, canDispatchConcurrently: wt.canDispatchConcurrently, release: wt.releaseWorkflowWorktree,
+      checkpointOp: cp.checkpointOp, gateBaseOf: cp.gateBaseOf, preserveAndReset: cp.preserveAndReset, finish: cp.finishWorkflow,
+    },
+    git: (args, dir) => gitResult(args, { dir }),
   };
 }
 
@@ -100,19 +148,77 @@ const writeJson = (file, value) => { fs.mkdirSync(path.dirname(file), { recursiv
 const agentFile = (state, role) => path.join(dirs(state).agents, `${role}.json`);
 const stageFile = (state, role) => path.join(dirs(state).stages, `${role}.json`);
 const resultFile = (state, role) => path.join(dirs(state).results, `${role}.txt`);
-export const planOf = (state) => readJson(path.join(state, 'plan.json'));
+const planFile = (state) => path.join(state, 'plan.json');
+export const planOf = (state) => readJson(planFile(state));
 export const agentOf = (state, role) => readJson(agentFile(state, role));
 const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const settleAsync = async (fn) => { try { return await fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
-/** The no-op Task spec of `role`: a parent runs its stage (starting its child), every agent marks its result line. */
+// ------------------------------------------------------------------ the workflow worktree
+/** The app-relative file an op role owns in the workflow worktree. */
+// Each no-op file sits in a slot every scaffolded app owns, so the finish gate's lint judges the smoke and not an invented
+// folder: a be op writes a payload fixture (be.tests.fixtures, src/tests/fixtures/<name>.<role>.json), an fe op a static
+// file of the app's first fe application (fe.app-optional, apps/<app>/public/).
+const OWNED_SLUG = Object.freeze({ op: 'be', opFe: 'fe', opFail: 'be-fail' });
+export const ownedFileOf = (role, workflowId, feApp) => (ROLES[role].side === 'be'
+  ? `be/src/tests/fixtures/launch-smoke-${workflowId}-${OWNED_SLUG[role]}.payload.json`
+  : `fe/apps/${feApp}/public/launch-smoke-${workflowId}-${OWNED_SLUG[role]}.txt`);
+/** The app's first fe application (hfs.json sides.fe.apps[0].name): the fe op's file goes under its public/ folder. */
+export function feAppOf(appRoot) {
+  try { return JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'))?.sides?.fe?.apps?.[0]?.name ?? null; } catch { return null; }
+}
+/** The bytes an op role writes into its owned file. */
+export const ownedTextOf = (role, workflowId) => (ROLES[role].side === 'be'
+  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role })}\n`
+  : `${SMOKE_SCHEMA} ${workflowId} ${role}\n`);
+/** The op record the dispatcher judges (sideOf, canDispatchConcurrently): its owned paths, app-relative. */
+export const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });
+
+/** worker-start's worktree arguments (['--worktree', x, '--repo', y, ...]) as startAgent's named options. */
+export function worktreeParamsOf(args = []) {
+  const out = {};
+  const names = { worktree: 'worktree', repo: 'repo', 'base-branch': 'baseBranch', name: 'name' };
+  for (let i = 0; i < args.length; i += 1) {
+    const flag = /^--(.+)$/.exec(String(args[i]))?.[1];
+    if (flag && names[flag] && i + 1 < args.length) { out[names[flag]] = args[i + 1]; i += 1; }
+  }
+  return out;
+}
+
+/**
+ * The byte manifest of an app's main checkout: its HEAD, every tracked file's sha256 read from disk (a missing file is
+ * null), and the sorted top-level node_modules listing (null without one). {ok, head, files, nodeModules} | {ok:false, error}.
+ */
+export function mainManifest({ appRoot, git }) {
+  const head = git(['rev-parse', 'HEAD'], appRoot);
+  const listed = git(['ls-files', '-z'], appRoot);
+  if (!head.ok || !listed.ok) return { ok: false, error: head.ok ? listed.error : head.error };
+  const files = {};
+  for (const rel of listed.stdout.split('\0').filter(Boolean)) {
+    try { files[rel] = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, rel))).digest('hex'); } catch { files[rel] = null; }
+  }
+  let nodeModules = null;
+  try { nodeModules = fs.readdirSync(path.join(appRoot, 'node_modules')).sort(); } catch { nodeModules = null; }
+  return { ok: true, head: head.stdout.trim(), files, nodeModules };
+}
+
+/** before -> after: {added, changed, removed} tracked paths, and whether the node_modules listing is unchanged. */
+export function manifestDiff(before, after) {
+  const added = Object.keys(after.files).filter((f) => !(f in before.files)).sort();
+  const removed = Object.keys(before.files).filter((f) => !(f in after.files) || after.files[f] === null).sort();
+  const changed = Object.keys(before.files).filter((f) => f in after.files && after.files[f] !== null && after.files[f] !== before.files[f]).sort();
+  return { added, changed, removed, nodeModulesSame: JSON.stringify(before.nodeModules) === JSON.stringify(after.nodeModules) };
+}
+
+/** The no-op Task spec of `role`: a parent runs its stage (starting its children), every agent marks its result line. */
 export function noopSpec({ role, script = SCRIPT }) {
   const node = (verb) => `node "${slash(script)}" ${verb} --as ${role}`;
-  const steps = CHILD[role]
+  const report = '2. Then report worker_done exactly once, as your Orca worker preamble instructs: --outcome succeeded if the command exited 0, else --outcome failed.';
+  const steps = CHILDREN[role]
     ? [`1. Run exactly: ${node('stage')}`,
-      '   It starts one more no-op agent and can take up to 3 minutes: give the command a timeout of at least 300 seconds (300000 ms) and wait for it to exit.',
-      '2. Then report worker_done exactly once, as your Orca worker preamble instructs: --outcome succeeded if the command exited 0, else --outcome failed.']
-    : [`1. Run exactly: ${node('mark')}`,
-      '2. Then report worker_done exactly once, as your Orca worker preamble instructs: --outcome succeeded if the command exited 0, else --outcome failed.'];
+      '   It starts more no-op agents and can take up to 3 minutes: give the command a timeout of at least 300 seconds (300000 ms) and wait for it to exit.',
+      report]
+    : [`1. Run exactly: ${node('mark')}`, report];
   return [
     `This is a no-op launch smoke (${SMOKE_SCHEMA}); you are its ${ROLES[role].title}. Do exactly these steps and nothing else:`,
     ...steps,
@@ -122,7 +228,8 @@ export function noopSpec({ role, script = SCRIPT }) {
 
 /**
  * Start `role` from the terminal `entry` with the runtime launcher that path uses. Its terminal and Dispatch are
- * recorded in the state directory the moment Orca names them (onCreated), the full receipt after attestation.
+ * recorded in the state directory the moment Orca names them (onCreated), the full receipt after attestation. The Kernel
+ * is started with the workflow worktree spec (Orca creates the worktree); an op role on the workflow worktree.
  */
 export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRIPT }) {
   const plan = planOf(state);
@@ -132,6 +239,7 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   const objective = `${SMOKE_SCHEMA} ${role}`;
   const record = (extra) => writeJson(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
   const onCreated = (terminal, dispatchId) => record({ terminal, dispatchId });
+  const route = { provider: noop.provider, model: noop.model, effort: noop.effort };
   let launched;
   if (role === 'worker') {
     launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, onCreated });
@@ -144,8 +252,19 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
       record({ workspace: placed.dir, workspaceRepo: placed.repoRoot ?? null });
       launched = orca.launchCriticWorker({ critic: { provider: noop.provider, model: noop.model, effort: noop.effort }, dir: placed.dir, prompt, entry });
     }
+  } else if (role === 'kernel') {
+    // The workflow worktree exists before the Kernel starts (ensureWorkflowWorktree): an existing tree takes launch trust.
+    launched = plan.workflow?.path
+      ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, onCreated })
+      : { ok: false, step: 'worktree', error: 'the workflow worktree was never created' };
+  } else if (ROLES[role].side) {
+    const args = settle(() => orca.workflow.opArgs(orca.ctx, { workflowId: plan.workflow?.workflowId }));
+    const params = Array.isArray(args) ? worktreeParamsOf(args) : {};
+    launched = params.worktree
+      ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, onCreated })
+      : { ok: false, step: 'worktree', error: `opWorktreeArgs: ${args?.error ?? 'no --worktree for the workflow'}` };
   } else {
-    launched = orca.startAgent({ provider: noop.provider, model: noop.model, effort: noop.effort, worktree: root, title, prompt, objective, entry, onCreated });
+    launched = orca.startAgent({ ...route, worktree: root, title, prompt, objective, entry, onCreated });
   }
   return Promise.resolve(launched).then((r) => {
     record({ ok: r?.ok === true, terminal: r?.terminal ?? agentOf(state, role)?.terminal ?? null, dispatchId: r?.dispatchId ?? agentOf(state, role)?.dispatchId ?? null,
@@ -175,22 +294,36 @@ export async function resolveState({ role, env = process.env, parent = statePare
   }
 }
 
-/** `mark`: the role's one result line. */
+/**
+ * `mark`: the role's one result line. An op role first writes its owned file into the workflow worktree; the failing
+ * op writes it too and then answers ok:false, so its agent reports failed.
+ */
 export function markResult({ role, state, now = Date.now }) {
+  const r = ROLES[role] ?? {};
+  let owned = null;
+  if (r.side) {
+    const wf = planOf(state)?.workflow;
+    if (!wf?.path) return { ok: false, role, error: 'the workflow worktree is not recorded in the smoke plan' };
+    owned = ownedFileOf(role, wf.workflowId, wf.feApp);
+    const file = path.join(wf.path, owned);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, ownedTextOf(role, wf.workflowId));
+  }
   fs.mkdirSync(dirs(state).results, { recursive: true });
   fs.writeFileSync(resultFile(state, role), `${role} ok ${new Date(now()).toISOString()}\n`);
-  return { ok: true, role };
+  return r.fails ? { ok: false, role, owned, error: 'this op fails on purpose (the preserve-and-reset leg)' } : { ok: true, role, ...(owned ? { owned } : {}) };
 }
 
 /**
- * `stage`: run by a parent agent in its own terminal. It starts the parent's child with `entry` = that terminal
- * (ORCA_TERMINAL_HANDLE, which must be the terminal the launcher recorded for the role), then marks the parent's
- * result line. {ok, role, child, entry, error?}; also written to stages/<role>.json.
+ * `stage`: run by a parent agent in its own terminal. It starts the parent's children, in parallel, with `entry` = that
+ * terminal (ORCA_TERMINAL_HANDLE, which must be the terminal the launcher recorded for the role), then marks the parent's
+ * result line. The Kernel's stage first waits for the workflow worktree to be recorded and asks the dispatcher whether
+ * its children may run together. {ok, role, children, entry, error?}; also written to stages/<role>.json.
  */
 export async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, sleep = defaultSleep, now = Date.now }) {
-  const child = CHILD[role];
+  const children = CHILDREN[role];
   const done = (receipt) => { writeJson(stageFile(state, role), receipt); return receipt; };
-  if (!child) return done({ ok: false, role, error: `${role} has no child to start` });
+  if (!children) return done({ ok: false, role, error: `${role} has no child to start` });
   let recorded = agentOf(state, role);
   for (const deadline = now() + waitMs; !recorded?.terminal && now() < deadline;) { await sleep(500); recorded = agentOf(state, role); }
   const own = env.ORCA_TERMINAL_HANDLE || null;
@@ -199,10 +332,22 @@ export async function runStage({ role, state, orca, env = process.env, root = SK
   if (own && recorded?.terminal && own !== recorded.terminal) {
     return done({ ok: false, role, entry, error: `ORCA_TERMINAL_HANDLE ${own} is not the terminal ${recorded.terminal} the launcher recorded for ${role}` });
   }
-  const launched = await launchRole({ role: child, state, entry, orca, root, script });
+  const ops = children.filter((c) => ROLES[c].side);
+  let concurrent = null;
+  if (ops.length) {
+    for (const deadline = now() + waitMs; !planOf(state)?.workflow?.path && now() < deadline;) await sleep(500);
+    const wf = planOf(state)?.workflow;
+    if (!wf?.path) return done({ ok: false, role, entry, error: 'the workflow worktree was never recorded (not in orca worktree list)' });
+    const records = ops.map((c) => opRecordOf(c, wf.workflowId, wf.feApp));
+    concurrent = records.slice(1).every((next, i) => settle(() => orca.workflow.canDispatchConcurrently(records.slice(0, i + 1), next)) === true);
+    if (!concurrent) return done({ ok: false, role, entry, concurrent, error: `the dispatcher refuses ${ops.join(' and ')} together (they must run in parallel across sides)` });
+  }
+  const launched = await Promise.all(children.map((c) => launchRole({ role: c, state, entry, orca, root, script })));
   markResult({ role, state, now });
-  return done({ ok: launched?.ok === true, role, child, entry, dispatchId: launched?.dispatchId ?? null,
-    ...(launched?.ok ? {} : { error: launched?.error ?? 'no launch receipt', step: launched?.step ?? null }) });
+  const failed = children.filter((c, i) => launched[i]?.ok !== true);
+  return done({ ok: failed.length === 0, role, children, entry, ...(concurrent === null ? {} : { concurrent }),
+    dispatchIds: Object.fromEntries(children.map((c, i) => [c, launched[i]?.dispatchId ?? null])),
+    ...(failed.length ? { error: failed.map((c) => `${c}: ${launched[children.indexOf(c)]?.error ?? 'no launch receipt'}`).join('; ') } : {}) });
 }
 
 const defaultSleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -216,22 +361,162 @@ function observe(show) {
 }
 const settledOf = (o) => SETTLED_STATUS.has(String(o?.status)) || ENDED_STATE.has(String(o?.state));
 
+/** The workflow's Orca worktree in `orca worktree list` (by its Orca id, else its path), or null. */
+function listedWorkflow(orca, appRepo, wf) {
+  const listed = settle(() => orca.worktreeList({ repo: `path:${slash(path.resolve(appRepo))}` }));
+  const rows = listed?.worktrees ?? [];
+  const key = (p) => (p ? slash(path.resolve(p)).toLowerCase() : null);
+  const row = rows.find((w) => wf.orcaWorktreeId && w.id === wf.orcaWorktreeId) ?? rows.find((w) => wf.path && key(w.path) === key(wf.path)) ?? null;
+  return { ok: listed?.ok === true, row, error: listed?.ok ? null : listed?.error ?? 'worktree list failed' };
+}
+
 /**
- * The smoke. `entry` the coordinator terminal; `orca` the client (defaultClient); `timeoutMs` bounds the wait for
- * every agent to settle. Returns the starci/launch-smoke@1 result; never throws.
+ * The workflow leg the smoke drives as the dispatcher and settler would: register the Kernel's worktree once Orca lists
+ * it; checkpoint each green op (the gate base before and after); start the failing op once no be op runs; preserve and
+ * reset it. One call per poll; every step is recorded in `wf` and runs once.
  */
-export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || null, orca, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
-  timeoutMs = 1200000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = os.tmpdir() }) {
+async function driveWorkflow({ wf, state, orca, seen, entry, root, script }) {
+  const plan = planOf(state);
+  const spec = plan.workflow;
+  const ctx = orca.ctx;
+  if (!wf.registered) return;
+  for (const role of ['op', 'opFe']) {
+    if (role in wf.checkpoints || !GREEN_STATUS.has(String(seen[role]?.status))) continue;
+    const base = await settleAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
+    const cp = await settleAsync(() => orca.workflow.checkpointOp(ctx, { workflowId: spec.workflowId, opId: role }));
+    const after = await settleAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
+    wf.checkpoints[role] = cp?.sha ?? null;
+    wf.gateBases[role] = { before: typeof base === 'string' ? base : base?.sha ?? null, after: typeof after === 'string' ? after : after?.sha ?? null };
+    if (!cp?.sha) wf.problems.push(`checkpointOp ${role}: ${cp?.error ?? cp?.refusal ?? 'no sha'}`);
+  }
+  if (!wf.failLaunched && wf.checkpoints.op && wf.checkpoints.opFe) {
+    const fail = opRecordOf('opFail', spec.workflowId, spec.feApp);
+    // Same side is serial: the dispatcher refuses opFail beside a running be op, and admits it beside the fe op.
+    wf.concurrency.beBeside = settle(() => orca.workflow.canDispatchConcurrently([opRecordOf('op', spec.workflowId, spec.feApp)], fail));
+    wf.concurrency.feBeside = settle(() => orca.workflow.canDispatchConcurrently([opRecordOf('opFe', spec.workflowId, spec.feApp)], fail));
+    wf.concurrency.sides = { op: settle(() => orca.workflow.sideOf(opRecordOf('op', spec.workflowId, spec.feApp))), opFe: settle(() => orca.workflow.sideOf(opRecordOf('opFe', spec.workflowId, spec.feApp))) };
+    wf.failLaunched = true;
+    const kernelTerminal = agentOf(state, 'kernel')?.terminal ?? null;
+    if (kernelTerminal) await launchRole({ role: 'opFail', state, entry: kernelTerminal, orca, root, script });
+    else wf.problems.push('opFail: the Kernel has no terminal to start it from');
+  }
+  if (wf.failLaunched && !wf.reset && SETTLED_STATUS.has(String(seen.opFail?.status))) {
+    const lastCheckpoint = settle(() => orca.workflow.of(ctx, spec.workflowId))?.checkpoint ?? null;
+    const r = await settleAsync(() => orca.workflow.preserveAndReset(ctx, { workflowId: spec.workflowId, opId: 'opFail' }));
+    const file = ownedFileOf('opFail', spec.workflowId, spec.feApp);
+    const head = orca.git(['rev-parse', 'HEAD'], wf.path);
+    const status = orca.git(['status', '--porcelain', '--untracked-files=all'], wf.path);
+    const kept = r?.preservedRef ? orca.git(['show', `${r.preservedRef}:${file}`], wf.path) : { ok: false };
+    wf.reset = { preservedRef: r?.preservedRef ?? null, resetTo: r?.resetTo ?? null, lastCheckpoint, head: head.ok ? head.stdout.trim() : null,
+      clean: status.ok && status.stdout.trim() === '', fileGone: !fs.existsSync(path.join(wf.path, file)),
+      preservedHasFile: kept.ok && kept.stdout === ownedTextOf('opFail', spec.workflowId), ...(r?.ok === false ? { error: r.error ?? r.refusal ?? null } : {}) };
+  }
+}
+
+/** The workflow leg's problems, from what driveWorkflow and the finish recorded. */
+function workflowProblems(wf, spec) {
+  const p = [...wf.problems];
+  if (!wf.listed) p.push(`the workflow worktree ${spec.name} never appeared in orca worktree list${wf.listError ? ` (${wf.listError})` : ''}`);
+  if (!wf.parallel) p.push('the be op and the fe op did not run in parallel in the workflow worktree');
+  for (const role of ['op', 'opFe']) if (!wf.checkpoints[role]) p.push(`${role}: no checkpoint`);
+  const first = wf.gateBases.op;
+  if (first && first.before !== wf.baseHead) p.push(`the first op's gate base ${first.before} is not the merge-base with main ${wf.baseHead}`);
+  for (const role of ['op', 'opFe']) {
+    const g = wf.gateBases[role];
+    if (g && wf.checkpoints[role] && g.after !== wf.checkpoints[role]) p.push(`${role}: the gate base after its checkpoint is ${g.after}, not ${wf.checkpoints[role]}`);
+  }
+  if (wf.concurrency.beBeside !== false) p.push('the dispatcher admits a be op beside a running be op (same side must be serial)');
+  if (wf.concurrency.feBeside !== true) p.push('the dispatcher refuses a be op beside a running fe op (sides must run in parallel)');
+  const r = wf.reset;
+  if (!r) p.push('opFail was never preserved and reset');
+  else {
+    if (!r.preservedRef || !r.preservedHasFile) p.push(`opFail's work is not on its preserved ref (${r.preservedRef})`);
+    if (!r.fileGone || !r.clean) p.push('the workflow worktree is not clean after the reset');
+    if (!r.head || r.head !== r.resetTo || (r.lastCheckpoint && r.head !== r.lastCheckpoint)) p.push(`the reset left HEAD at ${r.head}, not the last checkpoint ${r.lastCheckpoint ?? r.resetTo}`);
+  }
+  const f = wf.finish;
+  if (!f?.ok) {
+    const why = f?.refusal && typeof f.refusal === 'object' ? `${f.refusal.step ?? '-'} ${f.refusal.code ?? ''}: ${f.refusal.detail ?? ''}`.trim() : f?.refusal ?? f?.error ?? 'not run';
+    p.push(`finishWorkflow: ${why}`);
+  }
+  const m = wf.main;
+  if (!m) p.push('main was not compared');
+  else {
+    const expected = ['op', 'opFe'].map((role) => ownedFileOf(role, wf.workflowId, wf.feApp)).sort();
+    if (JSON.stringify(m.added) !== JSON.stringify(expected)) p.push(`main gained ${JSON.stringify(m.added)}, not exactly ${JSON.stringify(expected)}`);
+    if (m.changed.length || m.removed.length) p.push(`main is not intact: changed ${JSON.stringify(m.changed)}, removed ${JSON.stringify(m.removed)}`);
+    if (!m.nodeModulesSame) p.push("main's node_modules listing changed");
+    if (!m.addedBytesOk) p.push("a green op's file on main does not hold the bytes it wrote");
+    if (!m.ancestor) p.push(`main ${m.after} does not descend from ${m.before}`);
+  }
+  if (f?.ok && !wf.releasePending) p.push('the finish did not mark the workflow worktree release-pending');
+  if (wf.removed?.listed !== false || wf.removed?.pathExists !== false) p.push('the host-side controller did not remove the workflow worktree after the finish');
+  else if (wf.removed?.branchGone === false) p.push(`the host-side controller removed the worktree but kept ${wf.branch}`);
+  return p;
+}
+
+/**
+ * The smoke. `entry` the coordinator terminal; `orca` the client (defaultClient); `appRepo` the scratch app's main
+ * checkout (also its Orca repository selector); `timeoutMs` bounds the wait for every agent to settle. Returns the
+ * starci/launch-smoke@2 result; never throws.
+ */
+export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
+  timeoutMs = 1200000, releaseTimeoutMs = 600000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = os.tmpdir(), workflowId = `smoke-${Date.now().toString(36)}` }) {
   const startedAt = now();
   const out = { schema: SMOKE_SCHEMA, ok: false, entry, noop: noop?.error ? null : { provider: noop.provider, model: noop.model, effort: noop.effort },
-    paths: {}, agents: {}, cleanup: [], error: null };
+    paths: {}, agents: {}, workflow: null, cleanup: [], error: null };
   if (!entry) return { ...out, error: 'no entry terminal: run the smoke inside an Orca terminal (ORCA_TERMINAL_HANDLE) or pass --entry' };
   if (noop?.error) return { ...out, error: noop.error };
+  if (!appRepo) return { ...out, error: 'no app repository: pass --app-repo <the main checkout of a scratch app registered in Orca>' };
+  const feApp = feAppOf(appRepo);
+  if (!feApp) return { ...out, error: `the app ${slash(appRepo)} declares no fe application in hfs.json (sides.fe.apps): the fe op has nowhere to write` };
+  const spec = settle(() => orca.workflow.spec({ workflowId, appRepo }));
+  if (!spec?.name) return { ...out, error: `workflowWorktreeSpec: ${spec?.error ?? 'no worktree spec'}` };
+  // main's bytes before anything is created, then the workflow worktree, as start-workflow makes it before the Kernel.
+  const before = mainManifest({ appRoot: appRepo, git: orca.git });
+  const ensured = await settleAsync(() => orca.workflow.ensure(orca.ctx, { workflowId, appRepo }));
+  const rec = ensured?.ok ? ensured.record : null;
+  if (!rec?.path) return { ...out, error: `ensureWorkflowWorktree: ${ensured?.reason ?? ensured?.error ?? 'no worktree'}${ensured?.detail ? ` (${ensured.detail})` : ''}` };
+  const wf = { workflowId, feApp, appRepo: slash(appRepo), name: spec.name, branch: rec.branch, listed: false, registered: true, path: slash(rec.path),
+    orcaWorktreeId: rec.orcaWorktreeId, baseHead: null, parallel: false, checkpoints: {}, gateBases: {}, concurrency: {}, failLaunched: false, reset: null,
+    finish: null, main: null, removed: null, problems: [] };
+  out.workflow = wf;
+  const found = listedWorkflow(orca, wf.appRepo, wf);
+  wf.listed = Boolean(found.row);
+  if (found.error) wf.listError = found.error;
+  const head = orca.git(['rev-parse', 'HEAD'], wf.path);
+  wf.baseHead = head.ok ? head.stdout.trim() : null;
   fs.mkdirSync(stateParentOf(stateRoot), { recursive: true });
   const state = fs.mkdtempSync(path.join(stateParentOf(stateRoot), 'run-'));
-  writeJson(path.join(state, 'plan.json'), { schema: SMOKE_SCHEMA, root: slash(root), entry, noop: out.noop });
+  writeJson(planFile(state), { schema: SMOKE_SCHEMA, root: slash(root), entry, noop: out.noop, appRepo: slash(appRepo),
+    workflow: { workflowId, feApp, name: spec.name, branch: wf.branch, path: wf.path, orcaWorktreeId: wf.orcaWorktreeId } });
+  if (!before.ok) wf.problems.push(`main manifest before: ${before.error}`);
   const seen = {};
   const doneMessages = new Set();
+  let cleaned = false;
+  const cleanupAgents = () => {
+    if (cleaned) return;
+    cleaned = true;
+    for (const role of CLEANUP_ORDER) {
+      const a = agentOf(state, role);
+      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null }))?.ok === true;
+      if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
+      if (!a?.dispatchId) continue;
+      const o = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
+      const settled = settledOf(o) || doneMessages.has(a.dispatchId);
+      const stop = settled ? null : settle(() => orca.workerStop({ dispatch: a.dispatchId }));
+      // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
+      const first = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      const release = first?.ok ? first : settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      // A worker that reported (worker_done, or a settled Dispatch status) closed its own Task.
+      const reported = doneMessages.has(a.dispatchId) || SETTLED_STATUS.has(String(o.status));
+      const task = reported || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
+      const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : reported ? 'by-worker_done' : null,
+        ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
+      if (a.workspace) entryOut.workspaceRemoved = unplace();
+      out.cleanup.push(entryOut);
+    }
+  };
   try {
     for (const top of ['supervisor', 'kernel']) {
       const r = await launchRole({ role: top, state, entry, orca, root, script });
@@ -250,15 +535,26 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
           if (!settledOf(seen[role]) && !doneMessages.has(a.dispatchId)) open += 1;
           continue;
         }
-        // A top role is launched synchronously: no Dispatch now means it never started. A child can no longer appear
-        // once its parent never started, its stage failed, or its parent settled.
+        // A top role is launched synchronously: no Dispatch now means it never started. A stage child can no longer
+        // appear once its parent never started, its stage failed, or its parent settled; the smoke's own op (opFail)
+        // once the workflow leg can no longer reach it.
         const parent = ROLES[role].parent;
         if (!parent) continue;
+        if (ROLES[role].by === 'smoke') {
+          const blocked = wf.failLaunched || !agentOf(state, parent)?.dispatchId || readJson(stageFile(state, parent))?.ok === false
+            || ['op', 'opFe'].some((r) => (seen[r] && settledOf(seen[r]) && !GREEN_STATUS.has(String(seen[r].status))) || (r in wf.checkpoints && !wf.checkpoints[r]));
+          if (!blocked) open += 1;
+          continue;
+        }
         const parentAgent = agentOf(state, parent);
         const stage = readJson(stageFile(state, parent));
         const gone = !parentAgent?.dispatchId || stage?.ok === false || (seen[parent] && settledOf(seen[parent]));
         if (!gone) open += 1;
       }
+      // Both green ops alive at once: they ran in parallel in the one worktree.
+      if (['op', 'opFe'].every((r) => agentOf(state, r)?.dispatchId) && readJson(stageFile(state, 'kernel'))?.concurrent === true) wf.parallel = true;
+      await driveWorkflow({ wf, state, orca, seen, entry, root, script });
+      if (wf.failLaunched && agentOf(state, 'opFail')?.dispatchId && !wf.reset) open += 1;
       if (!open) break;
       if (now() >= deadline) { out.error = `timed out after ${timeoutMs}ms waiting for every smoke agent to settle`; break; }
       await sleep(pollMs);
@@ -276,32 +572,47 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
         launched: a.ok === true, dispatchId: a.dispatchId, terminal: a.terminal ?? null, runId: a.runId ?? o.runId, taskId: a.taskId ?? o.taskId,
         creatorTerminal: a.creatorTerminal ?? null, effective: a.effective ?? null, ...(a.workspace ? { workspace: slash(a.workspace) } : {}),
         depth: o.depth, expectedDepth: ROLES[role].depth, creatorDispatchId: o.creatorDispatchId, expectedCreatorDispatchId: creatorExpected,
-        status: o.status, state: o.state, workerDone: doneMessages.has(a.dispatchId) || o.status === 'completed' || o.status === 'succeeded',
+        status: o.status, state: o.state, workerDone: doneMessages.has(a.dispatchId) || GREEN_STATUS.has(String(o.status)),
         result, read: { ok: read?.ok === true, source: read?.source ?? null, liveness: read?.status?.liveness ?? null, rows: read?.rows?.length ?? 0, ...(read?.ok ? {} : { error: read?.error ?? null }) },
         ...(a.ok ? {} : { error: a.error ?? null, step: a.step ?? null }),
       };
     }
+    // Every agent is released before the finish, so the host-side controller can remove the worktree their terminals ran in.
+    cleanupAgents();
+    if (wf.registered) {
+      wf.finish = await settleAsync(() => orca.workflow.finish(orca.ctx, { workflowId }));
+      // The finish never removes the worktree: it marks it release-pending, and the host-side controller removes it once
+      // its terminals are released (link check, Orca's worktree removal, git branch -d). Main is compared after that.
+      const row = settle(() => orca.workflow.of(orca.ctx, workflowId));
+      wf.releasePending = row?.releasePending === true;
+      let gone = null;
+      for (const until = now() + releaseTimeoutMs; wf.finish?.ok;) {
+        const listed = listedWorkflow(orca, wf.appRepo, wf);
+        gone = { listed: listed.ok ? Boolean(listed.row) : null, pathExists: wf.path ? fs.existsSync(wf.path) : null };
+        if (gone.listed === false && gone.pathExists === false) break;
+        if (now() >= until) break;
+        await sleep(pollMs);
+      }
+      const branch = wf.branch ? orca.git(['branch', '--list', wf.branch], appRepo) : { ok: false };
+      wf.removed = { ...(gone ?? { listed: null, pathExists: wf.path ? fs.existsSync(wf.path) : null }),
+        branchGone: branch.ok ? branch.stdout.trim() === '' : null, registry: settle(() => orca.workflow.of(orca.ctx, workflowId)) ?? null };
+      const after = mainManifest({ appRoot: appRepo, git: orca.git });
+      if (before.ok && after.ok) {
+        const diff = manifestDiff(before, after);
+        const ancestor = orca.git(['merge-base', '--is-ancestor', before.head, after.head], appRepo);
+        wf.main = { before: before.head, after: after.head, ancestor: ancestor.ok, ...diff,
+          // The committed blob, not the checkout's bytes: a core.autocrlf checkout rewrites line ends on disk.
+          addedBytesOk: ['op', 'opFe'].every((role) => after.files[ownedFileOf(role, workflowId, feApp)] != null
+            && orca.git(['show', `${after.head}:${ownedFileOf(role, workflowId, feApp)}`], appRepo).stdout === ownedTextOf(role, workflowId)) };
+      } else wf.problems.push(`main manifest after: ${after.error ?? before.error}`);
+    }
   } catch (error) {
     out.error = String(error?.message ?? error);
   } finally {
-    for (const role of CLEANUP_ORDER) {
-      const a = agentOf(state, role);
-      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null }))?.ok === true;
-      if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
-      if (!a?.dispatchId) continue;
-      const before = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
-      const settled = settledOf(before) || doneMessages.has(a.dispatchId);
-      const stop = settled ? null : settle(() => orca.workerStop({ dispatch: a.dispatchId }));
-      // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
-      const first = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
-      const release = first?.ok ? first : settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
-      const completed = before.status === 'completed' || before.status === 'succeeded';
-      const task = completed || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
-      const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : completed ? 'by-worker_done' : null,
-        ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
-      if (a.workspace) entryOut.workspaceRemoved = unplace();
-      out.cleanup.push(entryOut);
-    }
+    cleanupAgents();
+    // A workflow that never finished, or a worktree the controller never removed, is still given back (link check,
+    // Orca's worktree removal, the row closed).
+    if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await settleAsync(() => orca.workflow.release(orca.ctx, workflowId));
     safeRemoveTree(state);
   }
   for (const [name, roles] of Object.entries(PATHS)) {
@@ -319,6 +630,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
       const c = out.cleanup.find((x) => x.role === role);
       if (out.agents[role]?.dispatchId && !c?.released) problems.push(`${role}: not released`);
     }
+    if (name === 'workflow-worktree') problems.push(...workflowProblems(wf, spec));
     out.paths[name] = { status: problems.length ? 'failed' : 'ok', depths: Object.fromEntries(roles.map((r) => [r, out.agents[r]?.depth ?? null])), ...(problems.length ? { problems } : {}) };
   }
   out.ok = !out.error && Object.values(out.paths).every((p) => p.status === 'ok');
@@ -341,7 +653,7 @@ async function main(argv) {
   }
   if (verb) { console.error(`unknown verb ${verb}`); return 2; }
   const timeout = Number(argOf(argv, 'timeout-ms'));
-  const result = await runSmoke({ entry: argOf(argv, 'entry') || process.env.ORCA_TERMINAL_HANDLE || null, orca: await defaultClient(),
+  const result = await runSmoke({ entry: argOf(argv, 'entry') || process.env.ORCA_TERMINAL_HANDLE || null, orca: await defaultClient(), appRepo: argOf(argv, 'app-repo'),
     ...(Number.isFinite(timeout) && timeout > 0 ? { timeoutMs: timeout } : {}) });
   const text = JSON.stringify(result, null, 2);
   const file = argOf(argv, 'out');

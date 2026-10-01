@@ -56,8 +56,8 @@ rules:
       Evidence, logs, reports, checks, captures, draw rounds (initial and intermediate images, prompt files), UAT runs, kernel
       evidence, runtime.sqlite files, operation folders and `_derived/` are not app content. They live in the runtime
       ledger and the blob store, and a record cites them by `{name, sha256}`. A worktree is never tracked under
-      `.starciwork`: the runtime's op worktrees at `.starciwork/worktrees/<op>` are git-excluded (`.git/info/exclude`) and
-      removed when their op settles.
+      `.starciwork`: a Kernel workflow's worktree is created and owned by Orca outside the app checkout, one per workflow,
+      and removed by the runtime after the workflow finishes.
     rationale: |
       Agent data changes every run, bloats history and is reviewed by nobody. Content addressing already gives it identity.
     cases:

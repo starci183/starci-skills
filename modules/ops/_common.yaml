@@ -163,8 +163,8 @@ sections:
         hide unrelated successor jobs."
       - "backend.implement and interface.implement report an accepted SDS as technically missing or
         contradictory when an observed implementation/test fact proves it; the code worker waits
-        and never edits SDS. The kernel enqueues a separate architecture.decide operation in its own
-        worktree, and a fresh implementation attempt reruns affected checks. This is automatic
+        and never edits SDS. The kernel enqueues a separate architecture.decide operation in the
+        workflow's worktree, and a fresh implementation attempt reruns affected checks. This is automatic
         procedure inside an accepted brief; a business/SRS change or wider owner/scope returns
         needUser."
       - Before transitions, preserve exact accepted output → input bindings and require every
@@ -411,23 +411,25 @@ sections:
         delivery from its implementation profile. Refresh applicable repository/environment resource
         revisions from actual inspected source/build state before validating: the core does not
         watch Git HEAD or live deployment drift."
-      - "Every changed code piece has a scoped local commit when the user's task includes committing.
-        Stage exact files, inspect staged diff, run applicable checks and record the real SHA; no
-        blanket `git add .`, amend, force or unrelated changes. A branch other workflows and ops
-        commit on (main of a product repo) is append-only: never `git reset`, rebase, amend, drop or
+      - "You never commit and never stage. In a product workflow the runtime is the only committer on
+        wf-<workflowId>: a green settle commits your owned changes as the workflow's checkpoint
+        (checkpointOp), so a commit of your own is never your delivery; inspect your diff, run the
+        applicable checks and report the changed paths and the tree you tested. History is never yours
+        to move (main of a product repo, which peer workflows land on, included): never `git reset`, rebase, amend, drop or
         force it - a Collab op ran `git reset HEAD~1` on nivo-backend main and silently removed its
-        own filed-report commit while three peer workflows were committing there. A wrong commit is
-        undone with a new revert commit. The checkout is shared too: never stash, `clean -f`, switch
-        branches, or checkout/restore a path you do not own; stage and commit only your owned paths by
-        name (`git add -- <owned paths>`, `git commit -m <msg> -- <owned paths>`, a long list through
-        `--pathspec-from-file=<list>` whose every line is an owned path; `git diff --cached
-        --name-only` lists only yours - unstage a file a hook re-staged, never commit it); never `npm ci`
+        own filed-report commit while three peer workflows were committing there. In a product workflow you work in the workflow's one worktree on wf-<workflowId>,
+        never on main: the runtime commits each green op's checkpoint there, preserves a failed or blocked op's work to
+        preserved/<workflowId>/<op> and resets the tree to the last checkpoint, and only the workflow's finish moves main;
+        never reset, rebase or move that branch yourself. The checkout is shared too: never stash, `clean -f`, switch
+        branches, or checkout/restore a path you do not own; never `git add` or `git commit` (the runtime
+        stages exactly your side's changes at the checkpoint; inside the workflow worktree the command guard refuses
+        every history or ref change, WORKFLOW_HISTORY_CHANGE); never `npm ci`
         or delete node_modules while other workflows run (the repository dependency lock serializes
         `npm install`). Never delete `.git/index.lock` or another git lock: your git recovers a stale
         index lock itself (no git process on the repository, older than the runtime window) and says
         so on stderr; while it says a git process may still hold it, retry the git command shortly,
         and report blocked environment only if it persists. Never create a git worktree, a junction, a symlink or a hard link, anywhere:
-        work in the checkout you were dispatched to, with its own node_modules. A worker's private
+        work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A worker's private
         worktree beside nivo-fe with node_modules junctions into the live checkout was removed with
         `git worktree remove --force`, which followed the junctions and deleted 674 live files
         (inc-c8fbf76aa499); a need for another revision, a clean build tree or a linked dependency is
@@ -438,7 +440,8 @@ sections:
         `Stop-Process -Id <pid>`); a process you did not start is reported, never killed. The command guard
         refuses a kill by name (PROCESS_KILL_BY_NAME). Never run `git worktree add` or `remove` (WORKTREE_NOT_OPS):
         a worktree is made and removed only by the runtime worktree API (scripts/lib/worktrees.mjs, safeRemoveWorktree,
-        the op worktree lifecycle). Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `del /s`,
+        and the workflow worktree that Orca creates at Kernel start and the runtime's host-side controller removes after
+        the workflow's finish). Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `del /s`,
         `robocopy /MIR` or `/PURGE`, `Remove-Item -Recurse` and its aliases; RECURSIVE_DELETE): a recursive delete
         follows a junction into the live tree; a tree goes only through the runtime's safeRemoveTree
         (scripts/lib/safe-remove.mjs), one junction is removed with `cmd /c rmdir <path>` (no /s), one file with
@@ -449,19 +452,18 @@ sections:
         worker-stop / worker-release. The command guard sees through cmd, PowerShell and bash wrappers and chains,
         and lets text that only mentions these commands (echo, commit message, heredoc) pass. The runtime enforces this: an op's git and npm are the guard
         (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,
-        never work around it. A logical piece can require multiple
-        commits or repositories; record them all rather than inventing one universal SHA. When
-        committing is not authorized, report an uncommitted source delivery and do not forge code
-        completion. An unchanged implementation can bind an existing inspected commit and prove it
-        without an empty commit. Documentation/evidence commits belong to the canonical
+        never work around it. A logical piece can span repositories; report each one's changed paths
+        rather than inventing one universal SHA, and never forge code completion: the delivered code
+        is the runtime's checkpoint commit. An unchanged implementation can bind an existing inspected
+        commit and prove it without a new commit. Documentation/evidence commits belong to the canonical
         `.starciwork` repository, not imaginary product commits."
       - "Keep origin commit, integration/cherry-pick commit, tested commit and deployed immutable
         artifact distinct. `completion.codeRefs` binds the delivered code; detailed mapping belongs
         in `evidence/lineage.json` or `evidence/result.md`, with evidence-level `extensions.work3.lineage`
         references when useful. Verify mapping with actual Git diff/ancestry and changed-path tests;
         ancestry alone does not prove later changes preserved behavior. A commit cannot contain its
-        own SHA in its own bytes: commit the implementation, then update `.starciwork` metadata in a
-        separate evidence/documentation commit if tracked in the same repository."
+        own SHA in its own bytes: `.starciwork` metadata that cites delivered code cites the runtime's
+        checkpoint commit, which exists only after the settle."
       - Git is edit history. `.starciwork` keeps current specifications and indispensable evidence,
         not duplicate request/response histories. Deleting a task or temporary Git worktree must not
         remove the only images, evidence or account references. External artifact stores need an
@@ -568,7 +570,7 @@ sections:
       - Record a blocker with the actual missing fact, affected node, last relevant observation and
         required owner decision/action. Continue other selected independent pieces only if safe and
         within remaining limits. Failure never authorizes an out-of-scope repair, deployment or new
-        chain. Each op agent finishes with result, changed node IDs/files, real commits,
+        chain. Each op agent finishes with result, changed node IDs/files,
         tested/untested extent, evidence and the precise remaining gap, writes that one report and
         dies; it never dispatches another op. The kernel settles that verdict and picks the next
         leg, and finishes the workflow when the selected result is reached or a required decision

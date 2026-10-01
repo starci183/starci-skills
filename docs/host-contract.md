@@ -121,12 +121,15 @@ run-create(objective = workflow id + title,
            from = Kernel terminal)              → runId (once per workflow)
 task-create(run, spec = prompt/packet,
             displayName '[Op] <operation>')     → taskId
-spawnAgent(task, op worktree, agent, model,
+spawnAgent(task, workflow worktree, agent, model,
            effort, run, from = Kernel)          → dispatchId + assignee + attestation
 ```
 
-A product op worktree is a git worktree of the product repository, which Orca
-resolves under that repository's project, so the worker starts on it directly.
+The workflow worktree is the one git worktree of the product repository that
+Orca created before the Kernel started (`orca worktree create --name
+wf-<workflowId> --base-branch main --setup run`, a real `npm ci` at the app root,
+no junctions); the Kernel and every op of the workflow start on it with
+`worker-start --worktree <its path>`.
 Attestation is required before the seat is accepted — a worker whose
 effective agent/model mismatches the route is fenced: `worker-stop` then
 `worker-release` on the exact Dispatch, never a retry beside it. On success the
@@ -157,8 +160,8 @@ that, a worker-start from a worker is refused `nested_worker_depth_exceeded`.
 
 ## Pre-workflow launch smoke
 
-`scripts/kernel/launch-smoke.mjs` (`starci/launch-smoke@1`, contract change `launch-smoke`) is the live proof of
-every nesting path, run by hand from a plain Orca shell before a workflow run (docs/releasing.md "Pre-workflow
+`scripts/kernel/launch-smoke.mjs` (`starci/launch-smoke@2`, contract changes `launch-smoke` and `workflow-worktree`) is the live proof of
+every nesting path and of the workflow worktree, run by hand from a plain Orca shell before a workflow run (docs/releasing.md "Pre-workflow
 readiness"). It starts no-op agents through the runtime's own launchers and checks the depth and creator Dispatch
 `worker-show` reports:
 
@@ -166,6 +169,18 @@ readiness"). It starts no-op agents through the runtime's own launchers and chec
 |---|---|---|
 | `supervisor-worker` | entry (0) -> `[Supervisor]` (1) -> `[Worker]` (2) | `workers.mjs startWorkerAgent`, from the Supervisor's terminal |
 | `op-critic` | entry (0) -> `[Kernel]` (1) -> `[Op]` (2) -> critic (3) | `startAgent` from the Kernel's terminal; `draw-critic.mjs launchCriticWorker` from the Op's |
+| `workflow-worktree` | entry (0) -> `[Kernel]` (1) -> be `[Op]`, fe `[Op]`, failing be `[Op]` (2) | `ensureWorkflowWorktree` first (Orca's `worktree create`), then the Kernel with `--worktree <its path>`; each op with `opWorktreeArgs`, from the Kernel's terminal |
+
+The `workflow-worktree` path proves the one-worktree-per-workflow model on a scratch app (`--app-repo`): the Kernel's
+worktree appears in `orca worktree list` (`scripts/api/orca/worktree-list.mjs`); the be op and the fe op start
+together in it (`canDispatchConcurrently` admits them across sides and refuses a second be op beside the first); each
+green op is a checkpoint whose gate base is the previous checkpoint; the failing op is preserved to
+`preserved/<workflowId>/opFail` and the worktree reset to the last checkpoint; and, with every agent released,
+`finishWorkflow` fast-forwards main and marks the worktree `release-pending`, then the host-side controller removes it
+(gone from `orca worktree list`). Main's checkout is compared byte for byte before the run and after the removal:
+exactly the two green files are added, every other tracked file and the `node_modules` listing are unchanged.
+Each no-op file sits in a slot every scaffolded app owns (a be payload fixture under `be/src/tests/fixtures/`, an fe
+static file under `fe/apps/<first fe app>/public/`), so the finish gate's lint judges the smoke, never an invented folder.
 
 Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker
