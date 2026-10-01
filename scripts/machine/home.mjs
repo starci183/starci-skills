@@ -37,8 +37,6 @@ export const SEAT_ID = 'supervisor';
 export const ENABLED_SCOPE = 'supervisor-enabled';
 export const SUPERVISOR_TITLE = `[Supervisor] ${SUPERVISOR_ID}`;
 export const WORKER_TITLE_PREFIX = '[Worker]';
-export const SUPERVISOR_MARKER = /\[Supervisor\]/;
-export const WORKER_MARKER = /\[Worker\]/;
 export const FIX_KIND = 'runtime.fix';
 export const STARTUP_RESERVATION_MS = 180_000;
 

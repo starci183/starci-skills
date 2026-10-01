@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, supervisorTerminals } from '../../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
 import {
@@ -28,6 +28,7 @@ import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../
 import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../../scripts/supervisor/status-block.mjs';
+import { recordedSeatTerminals, seatSessions, entryTerminalOf } from '../../scripts/supervisor/seat-sessions.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { withMachine, openMachine } from '../../engine/db/machine.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
@@ -59,15 +60,15 @@ const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: pat
 
 // The seat is a worker-start worker: `start` is scripts/agent/lib.mjs startAgent, `show`/`stop`/`release` the worker
 // verbs on its Dispatch (workers: dispatch -> state), `bindSeat` the seat guard the PreToolUse hook enforces.
-function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false, workers = new Map() } = {}) {
+function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false, workers = new Map(), entry = true } = {}) {
   const calls = { start: [], close: [], quit: [], stop: [], release: [], bind: [] };
   let n = 0;
   return {
     calls, live, workers,
-    list: () => (hostDown ? { ok: false, hostUnavailable: true } : { ok: true, terminals, visualLayouts: [] }),
+    list: () => (hostDown ? { ok: false, hostUnavailable: true } : { ok: true, terminals: entry ? [...terminals, { handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }] : terminals, visualLayouts: [] }),
     tabTitles: (_layouts, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])),
     screen: (h) => screens[h] ?? '> ',
-    exitedRow: (s) => (/PS [A-Z]:\\[^>]*>\s*$/.test(s) ? s.trim() : null),
+    exitedRow: (s) => (/PS [^>]*>\s*$/.test(s) ? s.trim() : null),
     close: (h) => { calls.close.push(h); live.delete(h); return { ok: true }; },
     quit: (h) => { calls.quit.push(h); return { sent: true, exited: false }; },
     show: (d) => (hostDown ? { ok: false, hostUnavailable: true, error: 'down' } : workers.has(d) ? { ok: true, state: workers.get(d) } : { ok: false, error: 'no such worker' }),
@@ -118,15 +119,19 @@ test('singleton: a live startup reservation, a host outage and a disabled seat a
   assert.equal(replace.action, 'disabled', 'the watchdog never relaunches a stopped seat');
 });
 
-test('singleton dedupe: with the seat dead every marked [Supervisor] terminal is closed and one worker starts; none is adopted', async (t) => {
+/** Record `handles` as earlier seat sessions: a supervisor-booted event each, the way a launch writes it. */
+const recordSeats = (env, handles) => withMachine((m) => { for (const terminal of handles) supervisorEvent(m, { kind: 'supervisor-booted', payload: { terminal } }); }, { env });
+
+test('singleton dedupe: with the seat dead every RECORDED seat session is closed and one worker starts; none is adopted', async (t) => {
   const env = envOf(t);
+  recordSeats(env, ['term_a', 'term_b', 'term_c']);
   const terminals = [
     { handle: 'term_a', title: '✳ supervisor tick', tab: '[Supervisor] main' },
     { handle: 'term_b', title: 'x', tab: '[Supervisor] main' },
     { handle: 'term_c', title: 'shell', tab: '[Supervisor] main' },
     { handle: 'term_k', title: 'kernel', tab: '[Kernel] wf-x' },
   ];
-  const host = fakeHost({ terminals, live: new Set(['term_a', 'term_b', 'term_c', 'term_k']), screens: { term_c: 'PS D:\\x> ' } });
+  const host = fakeHost({ terminals, live: new Set(['term_a', 'term_b', 'term_c', 'term_k']), screens: { term_c: `PS ${os.tmpdir()}> ` } });
   const out = await launch(env, host);
   assert.equal(out.action, 'booted');
   assert.equal(host.calls.start.length, 1, 'the seat is a new worker-start worker');
@@ -135,6 +140,58 @@ test('singleton dedupe: with the seat dead every marked [Supervisor] terminal is
   const plan = planSupervisorDedupe({ marked: [{ handle: 's' }, { handle: 'd' }], seatTerminal: 's', screenOf: () => '> ', exitedRow: () => null });
   assert.deepEqual(plan.close.map((c) => c.handle), ['d']);
   assert.equal(plan.adopt, undefined, 'a terminal is never adopted as the seat');
+});
+
+test('a terminal titled [Supervisor] with no seat record (a smoke, an owner-opened session) is never quit and never closed', async (t) => {
+  const env = envOf(t);
+  const terminals = [
+    { handle: 'term_smoke', title: '[Supervisor] launch smoke', tab: '[Supervisor] launch smoke' },
+    { handle: 'term_owner', title: 'claude', tab: '[Supervisor] main' },
+  ];
+  const host = fakeHost({ terminals, live: new Set(['term_smoke', 'term_owner']) });
+  const out = await launch(env, host);
+  assert.equal(out.action, 'booted');
+  assert.deepEqual([host.calls.close, host.calls.quit], [[], []], 'nothing is reaped');
+  assert.equal(out.closedDuplicates, undefined);
+  // The same with the seat live: a live seat plus a smoke Supervisor leaves the smoke running.
+  const again = await launch(env, host);
+  assert.equal(again.action, 'already-live');
+  assert.deepEqual([host.calls.close, host.calls.quit], [[], []]);
+  withMachine((m) => assert.deepEqual([...recordedSeatTerminals(m)], [out.terminal]), { env });
+});
+
+test('a recorded seat session that is not the current seat is a duplicate even when the seat is live', async (t) => {
+  const env = envOf(t);
+  const host = fakeHost({ terminals: [{ handle: 'term_old', title: 'claude', tab: '[Supervisor] main' }], live: new Set(['term_old']) });
+  recordSeats(env, ['term_old']);
+  const first = await launch(env, host);
+  assert.equal(first.action, 'booted');
+  recordSeats(env, ['term_old']);
+  host.calls.close.length = 0;
+  const again = await launch(env, host);
+  assert.equal(again.action, 'already-live');
+  assert.deepEqual(again.closedDuplicates.map((c) => c.handle), ['term_old']);
+  assert.deepEqual(host.calls.quit, ['term_old', 'term_old']);
+});
+
+test('a seat start from the reconciler (no ORCA_TERMINAL_HANDLE) names an existing terminal as the sender', async (t) => {
+  const env = envOf(t);
+  const terminals = [
+    { handle: 'term_other', title: 'pwsh', worktreePath: path.join(os.tmpdir(), 'elsewhere'), writable: true },
+    { handle: 'term_root', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true },
+  ];
+  const host = fakeHost({ terminals, entry: false });
+  assert.equal((await launch(env, host)).action, 'booted');
+  assert.equal(host.calls.start[0].entry, 'term_root', 'the runtime worktree terminal wins');
+  const own = fakeHost({ terminals, entry: false });
+  await launch(envOf(t), own, { env: { ...envOf(t), ORCA_TERMINAL_HANDLE: 'term_self' } });
+  assert.equal(own.calls.start[0].entry, 'term_self', 'the caller own terminal wins');
+  assert.equal(entryTerminalOf({ env: {}, listing: { terminals }, recorded: new Set(['term_root']) }), null, 'a foreign terminal outside the runtime worktree is never the sender');
+  const foreignOnly = fakeHost({ terminals: [terminals[0]], entry: false });
+  const refused = await launch(envOf(t), foreignOnly);
+  assert.deepEqual([refused.action, refused.step, foreignOnly.calls.start.length], ['launch-failed', 'run-create', 0]);
+  assert.match(refused.error, /no_active_sender_terminal.*runtime's own worktree/);
+  assert.equal(entryTerminalOf({ env: {}, listing: { terminals: [] } }), null);
 });
 
 test('the prompt doctrine is built from supervise.yaml kernelSeat', () => {
@@ -883,14 +940,16 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
     assert.equal(findings.some((f) => f.terminal === 'term_wk'), false, JSON.stringify(findings));
     assert.equal(findings.find((f) => f.terminal === 'term_old')?.code, 'STRAY_TERMINAL', 'a settled worker still is stray');
   });
-  // The seat dedupe: a worker whose pane title mentions [Supervisor], or whose tab says [Worker], is no duplicate.
+  // The seat dedupe keys on the seat record: a worker (whatever its titles say) is no seat session, so never a duplicate.
   const terminals = [
     { handle: 'term_seat', title: 'x', tab: '[Supervisor] main' },
     { handle: 'term_wk', title: 'reading [Supervisor] notes', tab: null },
     { handle: 'term_w2', title: '[Supervisor] x', tab: '[Worker] other' },
     { handle: 'term_dup', title: 'y', tab: '[Supervisor] main' },
   ];
-  const marked = supervisorTerminals({ terminals, visualLayouts: [] }, (_l, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])), { owned: new Set(['term_wk']) });
+  recordSeats(env, ['term_seat', 'term_dup']);
+  const tabs = (_l, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null]));
+  const marked = seatSessions({ terminals, visualLayouts: [] }, new Set(['term_seat', 'term_dup']), tabs);
   assert.deepEqual(marked.map((m) => m.handle), ['term_seat', 'term_dup']);
   const host = fakeHost({ terminals, live: new Set(['term_seat', 'term_wk', 'term_w2', 'term_dup']) });
   const out = await launch(env, host);

@@ -8,6 +8,7 @@ import { tabTitlesOf } from '../../scripts/kernel/terminal-dedupe.mjs';
 import { repairKernelTabTitle } from '../../scripts/kernel/kernel-watchdog.mjs';
 import { repairSupervisorTabTitles, watchdogPass } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { launchSupervisor } from '../../scripts/supervisor/start-supervisor.mjs';
+import { SKILL_ROOT } from '../../scripts/machine/home.mjs';
 
 const listing = (tabs) => ({ ok: true,
   terminals: Object.keys(tabs).map((handle, i) => ({ handle, tabId: `tab${i}`, title: 'Done - Claude', connected: true })),
@@ -79,7 +80,7 @@ test('a Supervisor watchdog pass applies the seat title while handling a wake', 
   const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000,
     language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
   const launch = await launchSupervisor({ env, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, deps: {
-    list: () => ({ ok: true, terminals: [], visualLayouts: [] }), tabTitles: () => new Map(),
+    list: () => ({ ok: true, terminals: [{ handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }], visualLayouts: [] }), tabTitles: () => new Map(),
     screen: () => '❯ ', exitedRow: () => null, close: () => ({ ok: true }), quit: () => ({ exited: true }),
     show: () => ({ ok: false, error: 'no worker' }), bindSeat: () => 'seat.json',
     start: () => ({ ok: true, terminal: 'term_sup', dispatchId: 'ctx_sup', runId: 'run_sup', taskId: 'task_sup' }),
