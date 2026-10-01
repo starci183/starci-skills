@@ -12,5 +12,5 @@ type PlanRootPageProps = { readonly lang: string }
  */
 export const PlanRootPage = (props: PlanRootPageProps) => {
     redirect({ href: ROUTES.planUsage, locale: hasLocale(routing.locales, props.lang) ? props.lang : DEFAULT_LOCALE })
-    return <PlanRootPageBase state="redirecting" props={{}} on={{}} />
+    return <PlanRootPageBase />
 }

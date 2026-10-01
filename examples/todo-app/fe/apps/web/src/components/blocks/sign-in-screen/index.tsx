@@ -3,7 +3,14 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { useSignIn } from "@/hooks/auth"
-import { SignInScreenView } from "./component"
+import { SignInScreenView, type SignInScreenState } from "./component"
+
+/** Which state the view renders: a refusal first, then a running submit, then whether any field holds a value. */
+const stateOf = (isRefused: boolean, isSubmitting: boolean, hasInput: boolean): SignInScreenState => {
+    if (isRefused) return "refused"
+    if (isSubmitting) return "working"
+    return hasInput ? "filled" : "empty"
+}
 
 /** The sign-in screen takes nothing from its page: it owns its own form and submission state. */
 type SignInScreenBlockProps = Record<never, never>
@@ -27,7 +34,8 @@ export const SignInScreenBlock = (props: SignInScreenBlockProps) => {
     /* The transport collapses every refused sign-in into one message; that one is the dictionary's
      * to translate. Any other reason is one the dictionaries never claimed, so the screen says only
      * that the sign-in did not go through. */
-    const refusalCopy = refusal === null ? null : credentialsRefused ? tSignIn("refusal") : tSignIn("unavailable")
+    const reasonCopy = credentialsRefused ? tSignIn("refusal") : tSignIn("unavailable")
+    const refusalCopy = refusal === null ? null : reasonCopy
 
     const onSubmit = () => {
         if (!email || !password) return
@@ -38,7 +46,7 @@ export const SignInScreenBlock = (props: SignInScreenBlockProps) => {
 
     return (
         <SignInScreenView
-            state={refusal ? "refused" : submitting ? "working" : email || password ? "filled" : "empty"}
+            state={stateOf(Boolean(refusal), submitting, Boolean(email || password))}
             email={email}
             password={password}
             refusal={refusalCopy}

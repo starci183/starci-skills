@@ -3,15 +3,11 @@ import { ROUTES } from "@/modules/routes"
 
 /** Props for {@link NotFoundPageBase}. */
 export type NotFoundPageBaseProps = {
-    /** Whole-screen situations this surface settles; the not-found page only ever says the page is missing. */
-    readonly state: "missing"
     /** The words the page shows. */
     readonly props: {
         readonly title: string
         readonly homeLabel: string
     }
-    /** What the surface reports upward; the page reports nothing. */
-    readonly on: Record<never, never>
 }
 
 /** Draw the missing-page message and the way back to the front door. */

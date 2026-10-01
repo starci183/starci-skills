@@ -60,18 +60,40 @@ export type UsageScreenViewProps = {
     readonly onSignOut: () => void
 }
 
+/** The share of the cap in use, in whole percent; zero when there is no positive cap to measure against. */
+const percentOfCapOf = (activeCount: number, cap: number | null): number => {
+    if (cap === null || cap <= 0) return 0
+    return Math.round((activeCount / cap) * 100)
+}
+
+/** The three cap sentences, each naming the reader's own numbers. */
+type CapSentences = {
+    readonly atCap: string | null
+    readonly overCapCount: string | null
+    readonly overCapPaused: string | null
+}
+
+/**
+ * The cap sentences name a number this screen only holds when a cap exists; the connected half
+ * resolves at-cap and over-cap-frozen from a non-null cap, so the null branch is a type obligation
+ * rather than a state a reader can reach.
+ */
+const capSentencesOf = (copy: UsageScreenViewCopy, activeCount: number, cap: number | null): CapSentences => {
+    if (cap === null) return { atCap: null, overCapCount: null, overCapPaused: null }
+    return {
+        atCap: copy.formatAtCap(cap),
+        overCapCount: copy.formatOverCapCount(activeCount, cap),
+        overCapPaused: copy.formatOverCapPaused(cap),
+    }
+}
+
 /** The pure render of ui.plan.usage: the workspace shell, the usage card and every named state. */
 export const UsageScreenView = (props: UsageScreenViewProps) => {
     const copy = props.copy
     const state = props.state
-    const percentOfCap = props.cap !== null && props.cap > 0 ? Math.round((props.activeCount / props.cap) * 100) : 0
+    const percentOfCap = percentOfCapOf(props.activeCount, props.cap)
     const activeTasks = copy.formatActiveTasks(props.activeCount)
-    /* The two cap sentences name a number this screen only holds when a cap exists; the connected
-     * half resolves at-cap and over-cap-frozen from a non-null cap, so the null branch is a type
-     * obligation rather than a state a reader can reach. */
-    const atCapSentence = props.cap === null ? null : copy.formatAtCap(props.cap)
-    const overCapCountSentence = props.cap === null ? null : copy.formatOverCapCount(props.activeCount, props.cap)
-    const overCapPausedSentence = props.cap === null ? null : copy.formatOverCapPaused(props.cap)
+    const capSentences = capSentencesOf(copy, props.activeCount, props.cap)
 
     return (
         <GrammarRoot>
@@ -129,7 +151,7 @@ export const UsageScreenView = (props: UsageScreenViewProps) => {
                                 {state === "at-cap" ? (
                                     <>
                                         <div>
-                                            <Text live="polite">{atCapSentence}</Text>
+                                            <Text live="polite">{capSentences.atCap}</Text>
                                         </div>
                                         <div className={PLAN_ACTIONS_CLASS_NAME}>
                                             <Button
@@ -145,10 +167,10 @@ export const UsageScreenView = (props: UsageScreenViewProps) => {
                                 {state === "over-cap-frozen" ? (
                                     <>
                                         <div>
-                                            <Text live="assertive">{overCapCountSentence}</Text>
+                                            <Text live="assertive">{capSentences.overCapCount}</Text>
                                         </div>
                                         <div>
-                                            <Text weight="semibold">{overCapPausedSentence}</Text>
+                                            <Text weight="semibold">{capSentences.overCapPaused}</Text>
                                         </div>
                                         <div>
                                             <Text>{copy.overCapNote}</Text>

@@ -11,7 +11,6 @@ type GlobalErrorPageProps = { readonly onRetry: () => void }
  */
 export const GlobalErrorPage = (props: GlobalErrorPageProps) => (
     <GlobalErrorPageBase
-        state="failed"
         props={{
             lang: DEFAULT_LOCALE,
             title: messages.errors.global.title,

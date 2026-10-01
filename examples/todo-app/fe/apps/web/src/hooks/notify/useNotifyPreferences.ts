@@ -4,6 +4,24 @@ import { useSessionToken } from "@/hooks/auth"
 import { useHydrated } from "@/hooks/hydration"
 import { readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "@/modules/notify"
 
+/** Which preference failure the screen reports, if any. */
+type PreferencesRefusal = "sessionEnded" | "loadRefusal" | "saveRefusal"
+
+/** The failures the refusal is read from. */
+type PreferencesFailures = {
+    readonly saveRefused: boolean
+    readonly sessionEnded: boolean
+    readonly loadRefused: boolean
+}
+
+/** The one refusal the screen owes the reader: a refused save first, then an ended session, then a refused read. */
+const refusalOf = (failures: PreferencesFailures): PreferencesRefusal | null => {
+    if (failures.saveRefused) return "saveRefusal"
+    if (failures.sessionEnded) return "sessionEnded"
+    if (failures.loadRefused) return "loadRefusal"
+    return null
+}
+
 /**
  * ui.notify.preferences' world state: the notificationPreferences read, the updateNotificationPreferences
  * and unsubscribe writes, and the unsaved toggle draft. The toggle edits a draft only -
@@ -29,13 +47,11 @@ export const useNotifyPreferences = () => {
 
     const server = preferencesQuery.data
     const subscribed = server === undefined ? null : (draft ?? !server.unsubscribed)
-    const refusal: "sessionEnded" | "loadRefusal" | "saveRefusal" | null = saveRefused
-        ? "saveRefusal"
-        : hydrated && token === null
-          ? "sessionEnded"
-          : preferencesQuery.error !== undefined && server === undefined
-            ? "loadRefusal"
-            : null
+    const refusal = refusalOf({
+        saveRefused,
+        sessionEnded: hydrated && token === null,
+        loadRefused: preferencesQuery.error !== undefined && server === undefined,
+    })
 
     const toggle = () => {
         if (server === undefined || pending !== null) return

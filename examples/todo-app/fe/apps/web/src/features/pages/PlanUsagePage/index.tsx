@@ -5,5 +5,5 @@ import { PlanUsagePageBase } from "./component"
  * page's whole situation space is "ready".
  */
 export const PlanUsagePage = () => {
-    return <PlanUsagePageBase state="ready" props={{}} on={{}} />
+    return <PlanUsagePageBase />
 }

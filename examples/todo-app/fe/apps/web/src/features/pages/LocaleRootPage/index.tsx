@@ -13,5 +13,5 @@ type LocaleRootPageProps = { readonly lang: string }
  */
 export const LocaleRootPage = (props: LocaleRootPageProps) => {
     redirect({ href: ROUTES.signIn, locale: hasLocale(routing.locales, props.lang) ? props.lang : DEFAULT_LOCALE })
-    return <LocaleRootPageBase state="redirecting" props={{}} on={{}} />
+    return <LocaleRootPageBase />
 }

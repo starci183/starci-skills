@@ -2,8 +2,6 @@ import { Alert, GrammarRoot, PageContainer, WorkspaceShell } from "@starci/gramm
 
 /** Props for {@link GlobalErrorPageBase}. */
 export type GlobalErrorPageBaseProps = {
-    /** Whole-screen situations this surface settles; the global error page only ever shows the failure. */
-    readonly state: "failed"
     /** The language of the document and the words the failure shows. */
     readonly props: {
         readonly lang: string

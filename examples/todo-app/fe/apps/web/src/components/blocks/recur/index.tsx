@@ -12,16 +12,25 @@ type RecurBlockProps = {
     readonly taskTitle: string | null
 }
 
+/** The recur namespace's translator, the one the summary sentences are read from. */
+type RecurTranslator = ReturnType<typeof useTranslations<"recur">>
+
+/** The frequency phrase that leads the rule summary. */
+const frequencyPhraseOf = (t: RecurTranslator, rule: RecurRule): string => {
+    if (rule.frequency === "every-weekday") return t("summaryEveryWeekday")
+    if (rule.frequency !== "every-n-days") return t("summaryMonthlyDay", { day: rule.dayOfMonth ?? "?" })
+    return rule.n === 1 ? t("summaryEveryDay") : t("summaryEveryNDays", { n: rule.n ?? "?" })
+}
+
+/** Which state the schedule renders: no rule (or a refused one), then an active or an ended rule. */
+const stateOf = (rule: RecurRule | null, isRefused: boolean): ScheduleState => {
+    if (rule === null) return isRefused ? "refused" : "no-rule"
+    return rule.endedAt === null ? "active" : "ended"
+}
+
 /** The one sentence the active and ended states both show above the collection: the frequency phrase first. */
-const summaryOf = (t: ReturnType<typeof useTranslations<"recur">>, rule: RecurRule): string => {
-    const summary =
-        rule.frequency === "every-weekday"
-            ? t("summaryEveryWeekday")
-            : rule.frequency === "every-n-days"
-              ? rule.n === 1
-                  ? t("summaryEveryDay")
-                  : t("summaryEveryNDays", { n: rule.n ?? "?" })
-              : t("summaryMonthlyDay", { day: rule.dayOfMonth ?? "?" })
+const summaryOf = (t: RecurTranslator, rule: RecurRule): string => {
+    const summary = frequencyPhraseOf(t, rule)
     const frame = { summary, time: rule.time, timeZone: rule.timeZone, startDate: rule.startDate }
     return rule.endedAt === null
         ? t("ruleSummaryActive", frame)
@@ -41,8 +50,7 @@ export const RecurBlock = (props: RecurBlockProps) => {
     const schedule = useSchedule(props.taskTitle)
     const rule = schedule.rule
 
-    const state: ScheduleState =
-        rule === null ? (schedule.refusal === null ? "no-rule" : "refused") : rule.endedAt === null ? "active" : "ended"
+    const state = stateOf(rule, schedule.refusal !== null)
 
     return (
         <RecurView

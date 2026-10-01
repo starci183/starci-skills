@@ -87,6 +87,14 @@ export type SignInScreenViewProps = {
     readonly onSubmit: () => void
 }
 
+/** The helper line under the form: it names the field still missing, and is absent once both hold a value. */
+const helperOf = (copy: SignInScreenViewCopy, email: string, password: string): string | null => {
+    if (!email && !password) return copy.helperEmpty
+    if (!password) return copy.helperPassword
+    if (!email) return copy.helperEmail
+    return null
+}
+
 /**
  * The pure render of ui.login.sign-in: the settled split-screen direction - turtle welcome panel on
  * the brand canvas in the primary region, the complete sign-in form in the rail - over the published
@@ -97,15 +105,7 @@ export const SignInScreenView = (props: SignInScreenViewProps) => {
     const copy = props.copy
     const isWorking = props.state === "working"
     const unavailable = isWorking || !(props.email && props.password)
-    const helper = isWorking
-        ? null
-        : !props.email && !props.password
-          ? copy.helperEmpty
-          : !props.password
-            ? copy.helperPassword
-            : !props.email
-              ? copy.helperEmail
-              : null
+    const helper = isWorking ? null : helperOf(copy, props.email, props.password)
     return (
         <GrammarRoot theme="light">
             <WorkspaceShell
