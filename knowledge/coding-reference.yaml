@@ -68,9 +68,7 @@ rules:
       lint requiring named managers must be updated coherently before changing its source pattern.
     rationale: Explicit responsibility and a verified framework profile prevent both inconsistent architecture and
       needless generated layers.
-    relatedExamples:
-      - graphql-command
-      - transactional-service
+    relatedExamples: []
     verification:
       automated: []
       manual:
@@ -85,8 +83,7 @@ rules:
       remain intact until an authorized transition."
     rationale: Explicit responsibility and a verified framework profile prevent both inconsistent architecture and
       needless generated layers.
-    relatedExamples:
-      - graphql-command
+    relatedExamples: []
     verification:
       automated: []
       manual:
