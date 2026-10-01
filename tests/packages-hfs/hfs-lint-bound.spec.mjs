@@ -12,7 +12,7 @@ import { appDeclarationText, DEFAULT_APPS } from '../helpers/hfs-arch-fixture.mj
 
 const PACKAGES = path.resolve(import.meta.dirname, '..', '..', 'packages');
 const require = createRequire(path.join(PACKAGES, 'package.json'));
-const { bindSys } = require('../packages/hfs/lint/bound-sys.cjs');
+const { bindSys } = createRequire(import.meta.url)('../../packages/hfs/lint/bound-sys.cjs');
 const ts = require('typescript');
 
 const made = [];
