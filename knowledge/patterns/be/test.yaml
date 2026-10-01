@@ -35,8 +35,9 @@ rules:
     hfsRules: [R12, R47, R48]
     requirement: |-
       Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `be/src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
-      Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (one capability module on the real database, no
-      HTTP, through `useTestWorld({ modules })`). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
+      Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (capability modules on the real infrastructure,
+      no HTTP door of ours, through `useTestWorld({ modules })`; real peer apps the client calls join as `apps`; every integration
+      of `src/modules/integrations/<provider>/` has one, R112). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
       `useTestWorld({ apps })`). Contract is `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
       without sandbox config). `be/src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,

@@ -3,6 +3,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { KeycloakAdminClient } from "./keycloak-admin.client"
 import { KEYCLOAK_ADMIN } from "./keycloak-admin.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./keycloak-admin.module-definition"
+import { KeycloakAdminTokenService } from "./keycloak-admin-token.service"
 
 @Module({})
 /** Provides the keycloak admin client. */
@@ -12,7 +13,11 @@ export class KeycloakAdminModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), { provide: KEYCLOAK_ADMIN, useClass: KeycloakAdminClient }],
+            providers: [
+                ...(base.providers ?? []),
+                KeycloakAdminTokenService,
+                { provide: KEYCLOAK_ADMIN, useClass: KeycloakAdminClient },
+            ],
             exports: [KEYCLOAK_ADMIN],
         }
     }

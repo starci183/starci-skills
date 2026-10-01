@@ -1,4 +1,4 @@
-export { ORDER_API_ERROR_KINDS } from "./errors/order-api.error"
+export { ORDER_API_ERROR_KINDS, OrderApiErrorCode } from "./errors/order-api.error"
 export { ORDER_API_MESSAGES } from "./messages/order-api.messages"
 export { parseOrderApiConfig } from "./order-api.config"
 export { InjectOrderApi, ORDER_API } from "./order-api.decorators"

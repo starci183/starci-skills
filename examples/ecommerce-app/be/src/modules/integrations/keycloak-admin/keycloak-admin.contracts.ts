@@ -7,3 +7,11 @@ export interface KeycloakMember {
     /** The name the member goes by. */
     readonly displayName: string
 }
+
+/** The service account's access token and the instant it is renewed at (epoch milliseconds, before Keycloak's expiry). */
+export interface CachedAccessToken {
+    /** The bearer token. */
+    readonly value: string
+    /** When the next call asks for a new one. */
+    readonly renewAt: number
+}

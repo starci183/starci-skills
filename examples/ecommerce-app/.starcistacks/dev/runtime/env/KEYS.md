@@ -13,7 +13,8 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `CACHE_REDIS_URL` | Redis URL of the session store (secret) | none |
 | `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server the member profiles are read from | none |
 | `KEYCLOAK_ADMIN_REALM` | Realm the members live in | none |
-| `KEYCLOAK_ADMIN_TOKEN` | Service-account bearer token of the admin API (secret) | none |
+| `KEYCLOAK_ADMIN_CLIENT_ID` | Confidential client whose service account reads the realm's users (`identity-admin`) | none |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of that client (secret, sealed in `secrets/keycloak-env.enc`) | none |
 | `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |
 | `ORDER_API_TIMEOUT` | Deadline of a call to the order service (`250`, `3s`) | `3s` |
@@ -34,6 +35,16 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `IDENTITY_API_URL` | Base URL of the identity service | none |
 | `IDENTITY_API_TIMEOUT` | Deadline of a call to the identity service | `3s` |
 | `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
+
+## keycloak (the stack's identity provider)
+
+| Key | Meaning | Sealed in |
+| --- | --- | --- |
+| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | `secrets/keycloak-env.enc` |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | `secrets/keycloak-env.enc` |
+
+DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expected at `runtime/env/demo.agekey`. `sops -d`
+writes its decrypted member to `runtime/env/keycloak.env`, which Compose reads and git never tracks.
 
 ## migrate (`apps/migrate`)
 

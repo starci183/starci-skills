@@ -10,6 +10,10 @@ components:
     image: redis:7
     role: stateful
     compose: infra/compose/redis.yaml
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    role: stateful
+    compose: infra/compose/keycloak.yaml
   identity:
     image: ecommerce-app/identity
     role: service
@@ -29,15 +33,20 @@ environments:
         port: 5501
       redis:
         port: 6448
+      keycloak:
+        port: 8149
       identity:
         port: 5070
       order:
         port: 6070
     runbook: README.md
-    # The dev stack carries no secret material (the local Postgres runs with trust auth), so there is
-    # nothing to custody yet - a real environment adopts the SOPS+age pattern the todo-app example
-    # demonstrates before it holds anything worth encrypting.
-    secrets: []
+    # The local Postgres runs with trust auth; the one secret material is Keycloak's (its bootstrap admin password and the
+    # secret of the identity-admin client), sealed with SOPS+age as the todo-app example does.
+    secrets:
+      - name: keycloak-env
+        where: secrets/keycloak-env
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
 # Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;
 # CI does not scan this example.
 services:

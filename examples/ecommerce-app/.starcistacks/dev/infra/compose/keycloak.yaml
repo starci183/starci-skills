@@ -1,0 +1,17 @@
+services:
+  keycloak:
+    # Resolved shared-port arithmetic: 8080 + offset 69 = 8149 (metadata.json is the projection).
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    # KC_BOOTSTRAP_ADMIN_PASSWORD and KEYCLOAK_ADMIN_CLIENT_SECRET (the realm import reads it into the identity-admin
+    # client) come from the decrypted secrets/keycloak-env.enc.
+    env_file:
+      - ../../runtime/env/keycloak.env
+    volumes:
+      - ./realm-ecommerce.json:/opt/keycloak/data/import/realm-ecommerce.json:ro
+    ports:
+      - "8149:8080"
