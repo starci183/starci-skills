@@ -25,7 +25,7 @@ Not "tests pass" — *a stranger can clone it, run it, understand it, and trust 
 | **Durability** | `.starciwork/runtime.sqlite` is the single truth — state survives worktree deletion, reboots, agent churn. Zero input loss, zero lease drift. |
 | **Correctness** | Work-correction policy enforced: wrong business flow → re-run from affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |
 | **Test quality** | E2E via real HTTP/GraphQL clients over real `TestingModule` stacks on BOTH example apps. Unit tests cover real business journeys, not stub assertions. Sonar + Codecov wired and green. |
-| **Product quality** | Output projects meet `docs/quality-bar.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code sát design bám grammar, evidence proves every claim. |
+| **Product quality** | Output projects meet `docs/quality-bar.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code that follows the design and the grammar closely, evidence proves every claim. |
 | **Determinism** | Model/op routing is declarative and reproducible — same inputs → same selection, with cited reasons. Spine code (not agent prose) settles truth. |
 | **Docs** | CONTEXT.md load order is accurate; a new agent cold-starts correctly from `AGENTS.md` alone. Architecture docs match what the code actually does. |
 | **Demonstrability** | The whole loop is showable: prompt → plan → dispatched ops → evidence → settled verdict. This is the content story. |

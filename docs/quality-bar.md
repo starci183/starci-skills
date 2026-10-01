@@ -55,7 +55,7 @@ how it is *proven* — declaration never counts, evidence does.
       custom widgets, contrast ratio
 - [ ] i18n-ready strings; vi/en per project convention
 
-## 4. Code quality — sát design, bám grammar
+## 4. Code quality — close to the design, faithful to the grammar
 
 - [ ] Implementation matches the SDS/draw contract — drift between design and
       code is a failed check, not a style note

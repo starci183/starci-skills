@@ -33,6 +33,10 @@ exceptions:
   - path: .claude/settings.json
     reason: >
       Claude Code project settings for the runtime checkout (the PreToolUse seat-tools guard hook); Claude Code reads JSON.
+  - path: hfs.json
+    reason: >
+      HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
+      reads hfs.json as JSON in every repository it judges, so the runtime's own declaration keeps the same form.
   - path: engine/yaml-license.json
     reason: >
       License metadata for the bundled yaml runtime in engine/yaml.mjs;
