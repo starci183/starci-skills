@@ -55,9 +55,26 @@ function runtimeFiles() {
 /** Does `expr` anchor module resolution inside the runtime tree: import.meta.* or a runtime-root name? */
 function anchorIsRuntime(expr, sf, ids) {
   if (IMPORT_META.test(expr.getText(sf))) return true;
+  // A name counts only where it refers to the anchor: a parameter of a function inside `expr` shadows it (gate.mjs
+  // `[root, ...].find((dir) => ...)` reads its own `dir`, not the runtime `dir` another function declares), and a
+  // property name (`x.dir`, `{dir: v}`) is not a reference.
   let hit = false;
-  const visit = (n) => { if (!hit && ts.isIdentifier(n) && ids.has(n.text)) hit = true; else ts.forEachChild(n, visit); };
-  visit(expr);
+  const visit = (n, shadowed) => {
+    if (hit) return;
+    if (ts.isIdentifier(n)) { if (ids.has(n.text) && !shadowed.has(n.text)) hit = true; return; }
+    let inner = shadowed;
+    if (ts.isFunctionLike(n)) {
+      // the function's own parameters and locals are its bindings, not the outer anchor of the same name
+      inner = new Set(shadowed);
+      for (const p of n.parameters ?? []) if (ts.isIdentifier(p.name)) inner.add(p.name.text);
+      const locals = (m) => { if (ts.isVariableDeclaration(m) && ts.isIdentifier(m.name)) inner.add(m.name.text); ts.forEachChild(m, locals); };
+      if (n.body) locals(n.body);
+    }
+    if (ts.isPropertyAccessExpression(n)) { visit(n.expression, inner); return; }
+    if (ts.isPropertyAssignment(n)) { visit(n.initializer, inner); return; }
+    ts.forEachChild(n, (child) => visit(child, inner));
+  };
+  visit(expr, new Set());
   return hit;
 }
 
@@ -128,4 +145,15 @@ test('check-helper-once.mjs loads acorn in the runtime context, so acorn is decl
   const rel = 'scripts/checks/check-helper-once.mjs';
   assert.ok(runtimeSpecifiers(rel, fs.readFileSync(path.join(root, rel), 'utf8')).includes('acorn'));
   assert.ok(declared.has('acorn'), "acorn resolves inside the runtime tree: declare it in package.json");
+});
+
+test('a callback parameter that shares a runtime-anchored name does not make a caller-rooted require runtime-bound', () => {
+  const source = [
+    "import { createRequire } from 'node:module';",
+    "const runtimeRoot = new URL('.', import.meta.url).pathname;",
+    "export const a = () => { const dir = runtimeRoot; return dir; };",
+    "export const b = (root) => { const cwd = [root].find((dir) => dir.length) ?? root; return createRequire(cwd + '/package.json').resolve('jest/bin/jest.js'); };",
+    "export const c = () => createRequire(import.meta.url).resolve('undeclared-runtime-dep');",
+  ].join('\n');
+  assert.deepEqual(runtimeSpecifiers('fixture.mjs', source), ['node:module', 'undeclared-runtime-dep']);
 });
