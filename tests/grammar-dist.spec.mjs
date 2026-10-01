@@ -145,8 +145,11 @@ test('token declarations ignore comments and collapse whitespace',()=>{
 });
 
 test('npm run check runs the grammar dist check',()=>{
+  // npm run check is `node bin/starci.mjs check`, which runs the retained self-checks the runtime manifest lists.
   const manifest=JSON.parse(fs.readFileSync(path.join(repoRoot,'package.json'),'utf8'));
-  assert.match(manifest.scripts.check,/node scripts\/checks\/grammar-dist\.mjs/);
+  assert.equal(manifest.scripts.check,'node bin/starci.mjs check');
+  const slots=fs.readFileSync(path.join(repoRoot,'knowledge','hfs','runtime-slots.yaml'),'utf8');
+  assert.match(slots,/\{id: grammar-dist, run: scripts\/checks\/grammar-dist\.mjs\}/,'the runtime self-checks include grammar-dist');
   const grammar=JSON.parse(fs.readFileSync(path.join(repoRoot,'packages','grammar','package.json'),'utf8'));
   assert.match(grammar.scripts.build,/node scripts\/build-stamp\.mjs$/,'the build ends by stamping dist');
 });
