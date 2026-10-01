@@ -18,15 +18,15 @@ frontend repository, the one `workspace.yaml` binds with role `fe`, and writes n
 
 A frontend monorepo may hold several apps (nivo-fe: `apps/app`, the console, and `apps/landing`, the public
 website). The record holds one tree per app under `apps[]`, and a node id is a route within its app, so `/` exists
-once per app. The workspace declares which apps are the product's:
+once per app. The app's `hfs.json` declares which apps are the product's (`sides.fe.apps`, each at `fe/apps/<name>`);
+`workspace.yaml` names only the two sides as its repositories:
 
 ```yaml
 repositories:
+  - role: be
+    name: be
   - role: fe
-    name: nivo-fe
-    apps:
-      - {name: app, root: apps/app}
-      - {name: landing, root: apps/landing}
+    name: fe
 ```
 
 The App Router directory of an app is `<root>/src/app` or `<root>/app`. A frontend that declares no `apps` must hold
