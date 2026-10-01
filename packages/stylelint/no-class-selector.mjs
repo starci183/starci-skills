@@ -9,8 +9,11 @@
 import { makeRule } from "./lib/make-rule.mjs"
 import { fileKind, fileOf } from "./lib/scope.mjs"
 
-/** A class selector, after attribute selectors and strings are removed. */
-const CLASS = /(?<![\w\\-])\.-?[A-Za-z_][\w-]*/
+/**
+ * A class selector, after attribute selectors and strings are removed: a dot that is not escaped, then a name that starts with a
+ * letter or underscore. A compound `div.card` is a class selector too; a keyframe offset `50.5%` is not (a digit follows the dot).
+ */
+const CLASS = /(?<!\\)\.-?[A-Za-z_][\w-]*/
 
 export const noClassSelector = makeRule(
   "no-class-selector",

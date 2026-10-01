@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 - 2026-10-01
+
+- **Fix: `starci/no-class-selector` missed a compound class selector.** The pattern refused a dot after a word character, so `div.card`
+  and `button.primary:hover` passed; only an escaped dot is skipped now (a keyframe offset `50.5%` never matched: a digit follows its dot).
+- Tests: the disable-comment specs use sequences stylelint 17 accepts (an enable closing a disable), and pin that a sequence it rejects
+  (an enable with nothing disabled, a disable inside a disable-all) fails the file as a `CssSyntaxError` at error.
+
 ## 2.0.1 - 2026-10-01
 
 - **Fix: `starci/brand-layer-shape` refused the brand typeface.** The vocabulary now knows `--font-sans` (the grammar 0.8.0 reads it

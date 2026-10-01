@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PROOF_CODES, PROOF_EXIT, cleanEnv, installUnits, packagesChanged, provePackages, publishSet } from '../scripts/checks/package-clean-test.mjs';
 import { loadPins } from '../scripts/checks/check-canon-pins.mjs';
+import { spawnSync } from 'node:child_process';
+import { withoutGitLocalEnv } from '../scripts/supervisor/land.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
 
 // scripts/checks/package-clean-test.mjs: a published package proves itself from a clean install. The fixture packages
@@ -41,9 +43,15 @@ test('the clean environment drops what an enclosing npm run, NODE_PATH or a test
   assert.deepEqual(env, { PATH: 'p', npm_config_cache: 'c' });
 });
 
-/** A dependency package and a consumer whose test imports it; `declare` adds it to the consumer's devDependencies. */
+const gitIn = (dir, ...args) => { const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: withoutGitLocalEnv(), windowsHide: true }); assert.equal(r.status, 0, r.stderr); };
+
+/**
+ * A git work tree holding a dependency package and a consumer whose test imports it; `declare` adds it to the consumer's
+ * devDependencies. Only the consumer's package.json and test are tracked: the proof copies tracked files only.
+ */
 function fixture(t, { declare, test: script = 'node --test', hoisted = false }) {
   const dir = mkdtemp(t, 'starci-pkg-proof-fixture-');
+  gitIn(dir, 'init', '-q');
   const dep = path.join(dir, 'dep');
   fs.mkdirSync(dep);
   fs.writeFileSync(path.join(dep, 'package.json'), JSON.stringify({ name: 'fixture-dep', version: '1.0.0', type: 'module', main: 'index.js' }));
@@ -55,6 +63,7 @@ function fixture(t, { declare, test: script = 'node --test', hoisted = false }) 
   fs.writeFileSync(path.join(pkg, 'answer.test.mjs'), "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { answer } from 'fixture-dep';\ntest('answer', () => assert.equal(answer, 42));\n");
   // the incident's shape: a node_modules beside the source (a hoisted or junctioned install) that satisfies the import here
   if (hoisted) fs.cpSync(dep, path.join(pkg, 'node_modules', 'fixture-dep'), { recursive: true });
+  gitIn(dir, 'add', 'pkg/package.json', 'pkg/answer.test.mjs');
   return { root: dir, packages: [{ name: 'fixture-pkg', dir: 'pkg' }] };
 }
 
@@ -97,4 +106,27 @@ test('an install that fails on the network is not run; one that fails on the man
   const red = provePackages(f.packages, { root: f.root, npm: failing('npm error code EUSAGE\nnpm error `npm ci` can only install packages when your package.json and package-lock.json are in sync') });
   assert.equal(red.exit, PROOF_EXIT.red);
   assert.equal(red.results[0].code, PROOF_CODES.install);
+});
+
+test('a committed stub under a nested node_modules of the package comes along; an untracked file never does', (t) => {
+  const f = fixture(t, { declare: true });
+  const fixtures = path.join(f.root, 'pkg', 'fixtures');
+  // a lint fixture's committed type stub (as packages/eslint/be/fixtures/typed/node_modules): tracked, so part of the package
+  fs.mkdirSync(path.join(fixtures, 'node_modules', 'fixture-stub'), { recursive: true });
+  fs.writeFileSync(path.join(fixtures, 'node_modules', 'fixture-stub', 'package.json'), JSON.stringify({ name: 'fixture-stub', version: '1.0.0', type: 'module', main: 'index.js' }));
+  fs.writeFileSync(path.join(fixtures, 'node_modules', 'fixture-stub', 'index.js'), 'export const stub = 1;' + String.fromCharCode(10));
+  fs.writeFileSync(path.join(fixtures, 'stub.test.mjs'), ["import test from 'node:test';", "import { stub } from 'fixture-stub';", "test('stub', () => { if (stub !== 1) throw new Error('stub'); });", ''].join(String.fromCharCode(10)));
+  gitIn(f.root, 'add', '-f', 'pkg/fixtures');
+  fs.writeFileSync(path.join(f.root, 'pkg', 'untracked.test.mjs'), ["import test from 'node:test';", "test('never copied', () => { throw new Error('an untracked file reached the proof'); });", ''].join(String.fromCharCode(10)));
+  const { exit, results } = provePackages(f.packages, { root: f.root, env: OFFLINE });
+  assert.equal(exit, PROOF_EXIT.green, JSON.stringify(results));
+});
+
+test('a package outside a git work tree is a proof that did not run', (t) => {
+  const dir = mkdtemp(t, 'starci-pkg-proof-nogit-');
+  fs.mkdirSync(path.join(dir, 'pkg'));
+  fs.writeFileSync(path.join(dir, 'pkg', 'package.json'), JSON.stringify({ name: 'p', version: '1.0.0', scripts: { test: 'node --test' } }));
+  const { exit, results } = provePackages([{ name: 'p', dir: 'pkg' }], { root: dir, env: OFFLINE });
+  assert.equal(exit, PROOF_EXIT.unrun, JSON.stringify(results));
+  assert.match(results[0].output, /not inside a git work tree/);
 });

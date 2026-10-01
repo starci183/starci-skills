@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.0.3 - 2026-10-01
+
+- Changed: the bundled canon-pins copy pins @starci/stylelint-canon 2.0.2, @starci/eslint-canon-be 3.0.3 and @starci/hfs 4.0.3. No rule changed.
+
 ## 8.0.2 - 2026-10-01
 
 - Changed: the bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put `.starcistacks` and `.sops.yaml` at the app root (`app.starcistacks`, `app.sops`; a side holding either is refused, `HFS_STACKS_IN_SIDE`) and pin @starci/hfs 4.0.2 and this canon at 8.0.2. No lint rule changed.

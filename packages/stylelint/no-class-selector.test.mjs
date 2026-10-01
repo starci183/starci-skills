@@ -10,6 +10,7 @@ test("refuses a class selector, alone, compound, nested in a pseudo or in a list
   assert.equal((await rule(":is(.a, .b) { color: var(--accent); }")).length, 1)
   assert.equal((await rule(".a, .b { color: var(--accent); }")).length, 2)
   assert.match((await rule(".sign-in-card { gap: 0; }"))[0].text, /\.sign-in-card.*class selector/)
+  assert.equal((await rule("button.primary:hover, a { color: var(--accent); }")).length, 1)
 })
 
 test("accepts element, attribute and pseudo selectors, and a dot inside an attribute value", async () => {

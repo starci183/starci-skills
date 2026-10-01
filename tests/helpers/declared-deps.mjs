@@ -136,3 +136,17 @@ export function isDeclared({ spec, typeOnly }, declared) {
   if (declared.has(name)) return true;
   return typeOnly && declared.has(`@types/${name.startsWith('@') ? name.slice(1).replace('/', '__') : name}`);
 }
+
+/** The `compilerOptions.paths` patterns of one tsconfig file ([] when it has none or cannot be read); `extends` is not followed. */
+export function tsconfigAliases(file) {
+  const read = ts.readConfigFile(file, (f) => fs.readFileSync(f, 'utf8'));
+  return Object.keys(read.config?.compilerOptions?.paths ?? {});
+}
+
+/** Whether a tsconfig `paths` pattern (`@modules/*`, `@/*`, an exact name) matches `spec`. */
+export function aliasMatches(pattern, spec) {
+  const star = pattern.indexOf('*');
+  if (star < 0) return pattern === spec;
+  const head = pattern.slice(0, star), tail = pattern.slice(star + 1);
+  return spec.length >= head.length + tail.length && spec.startsWith(head) && spec.endsWith(tail);
+}

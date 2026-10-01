@@ -9,8 +9,8 @@
 // `source` is a published package, and the folder of that source is the package. For each one the proof:
 //   1. copies the package to a fresh temp directory with no node_modules above it, at its runtime-relative path, with the
 //      SOURCES of every other published package beside it at theirs (a parity test may read a sibling's source, as the
-//      stylelint vocabulary reads the grammar CSS); node_modules, dist and every link are left behind everywhere, so
-//      nothing hoisted, installed or built in this checkout can satisfy it;
+//      stylelint vocabulary reads the grammar CSS); only TRACKED files are copied (copyTracked), so nothing installed,
+//      hoisted, junctioned or built in this checkout can satisfy it, while committed fixture stubs come along;
 //   2. installs it from its own manifest: `npm ci` on its own lockfile, or `npm install` when it carries none (the
 //      report says `npm install (no lockfile)`, so a package that ships without a lock is visible);
 //   3. runs its declared `test` script there. A package that declares none is red (PACKAGE_NO_TEST): a published
@@ -42,7 +42,6 @@ export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json'];
-const LEFT_BEHIND = new Set(['node_modules', 'dist', '.git']);
 const INSTALL_TIMEOUT_MS = 1_200_000;
 const TEST_TIMEOUT_MS = 1_800_000;
 /** npm's own words for a registry it could not reach: the proof did not run, the package is not judged. */
@@ -120,16 +119,28 @@ export function nodeModulesAbove(dir) {
   }
 }
 
-/** Copy one folder without node_modules, dist, .git or any link (a junction to a hoisted install is exactly what must not come along). */
-export function copyClean(from, to) {
-  fs.cpSync(from, to, {
-    recursive: true,
-    filter: (src) => {
-      if (path.resolve(src) === path.resolve(from)) return true;
-      if (LEFT_BEHIND.has(path.basename(src))) return false;
-      return !fs.lstatSync(src).isSymbolicLink();
-    },
-  });
+/** The files git tracks under `dir`, relative to it; null when `dir` is not inside a git work tree. */
+export function gitTrackedUnder(dir) {
+  const r = runGit(['ls-files', '-z', '--', '.'], { cwd: dir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return r.status === 0 ? String(r.stdout).split('\0').filter(Boolean) : null;
+}
+
+/**
+ * Copy the TRACKED files of one folder (their working-tree content). What git does not track never comes along: an
+ * installed node_modules or a junction to a hoisted install, a build's dist, a local .env. What it tracks always does,
+ * a lint fixture's committed type stubs under fixtures/typed/node_modules included. A tracked link is not copied.
+ */
+export function copyTracked(from, to) {
+  const files = gitTrackedUnder(from);
+  if (!files) throw new Error(`${from} is not inside a git work tree: the proof copies tracked files only`);
+  for (const rel of files) {
+    const src = path.join(from, rel);
+    let stat;
+    try { stat = fs.lstatSync(src); } catch { continue; }
+    if (!stat.isFile()) continue;
+    fs.mkdirSync(path.dirname(path.join(to, rel)), { recursive: true });
+    fs.copyFileSync(src, path.join(to, rel));
+  }
 }
 
 /** The environment of the clean install: the caller's, minus what an enclosing `npm run`, NODE_PATH or a running node --test would leak. */
@@ -169,10 +180,10 @@ export function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = n
       fs.mkdirSync(installRoot, { recursive: true });
       for (const name of ['package.json', ...LOCKFILES, '.npmrc']) if (fs.existsSync(path.join(unit.dir, name))) fs.copyFileSync(path.join(unit.dir, name), path.join(installRoot, name));
     }
-    for (const dir of own) copyClean(dir, at(dir));
+    for (const dir of own) copyTracked(dir, at(dir));
     // the other published packages' sources, never inside a folder copied above
     const inside = (dir, parent) => { const rel = path.relative(parent, dir); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
-    for (const dir of sources.map((d) => path.resolve(root, d))) if (!own.some((o) => inside(dir, o) || inside(o, dir))) copyClean(dir, at(dir));
+    for (const dir of sources.map((d) => path.resolve(root, d))) if (!own.some((o) => inside(dir, o) || inside(o, dir))) copyTracked(dir, at(dir));
     const placed = new Map(unit.packages.map((pkg) => [pkg.name, at(path.resolve(root, pkg.dir))]));
     const locked = LOCKFILES.some((name) => fs.existsSync(path.join(installRoot, name)));
     const install = locked ? 'npm ci' : 'npm install (no lockfile)';

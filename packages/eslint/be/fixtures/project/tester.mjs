@@ -1,7 +1,7 @@
 /**
  * The project-rule tester: a hermetic app on disk (the app-root hfs.json and package.json, and in the side folder of `profile` a
  * tsconfig and the files a case lists) whose project graph the project rules read, and a RuleTester over @typescript-eslint/parser
- * whose `settings.starci.hfs` is that side's view. A case's `filename` is `at("src/modules/...")`, relative to the side folder; its
+ * whose `settings.starci.hfs` is that side's view. `rootFiles` are written at the app root (`.starcistacks/` lives there). A case's `filename` is `at("src/modules/...")`, relative to the side folder; its
  * `code` is the text of that file (the rules judge the graph, which reads the disk). Used by the back-end and the front-end project
  * rule tests (`profile`).
  */
@@ -21,10 +21,10 @@ const RUNTIME = path.join(import.meta.dirname, "..", "..", "runtime")
 const DEFAULT_APPS = { be: [{ name: "core", kind: "api" }], fe: [{ name: "web", kind: "next" }] }
 
 /**
- * @param {{ profile?: "be" | "fe", files?: Record<string, string | null>, declaration?: object, apps?: object[] }} input
+ * @param {{ profile?: "be" | "fe", files?: Record<string, string | null>, rootFiles?: Record<string, string>, declaration?: object, apps?: object[] }} input
  * @returns {{ root: string, at: (rel: string) => string, tester: RuleTester, cleanup: () => void }}
  */
-export const projectFixture = ({ profile = "be", files = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) => {
+export const projectFixture = ({ profile = "be", files = {}, rootFiles = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) => {
     const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-project-${profile}-`))
     const root = path.join(appRoot, profile)
     const app = apps[0].name
@@ -46,6 +46,7 @@ export const projectFixture = ({ profile = "be", files = {}, declaration = {}, a
     write(appRoot, "hfs.json", `${JSON.stringify(hfsJson, null, 2)}\n`)
     write(appRoot, "package.json", JSON.stringify({ name: "fixture", private: true }))
     for (const [rel, content] of Object.entries({ ...baseline, ...files })) if (content !== null) write(root, rel, content)
+    for (const [rel, content] of Object.entries(rootFiles)) write(appRoot, rel, content)
     // the project graph reads the tracked tree: the fixture app is a Git work tree with every file added
     execFileSync("git", ["init", "-q"], { cwd: appRoot })
     execFileSync("git", ["add", "-A"], { cwd: appRoot })
