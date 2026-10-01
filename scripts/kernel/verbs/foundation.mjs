@@ -2,8 +2,8 @@
 import path from 'node:path';
 import { resolveIncident } from '../../../engine/db/ledger.mjs';
 import { csvList, getWorkflow, workflowRunning } from './shared/rows.mjs';
-import { PEER_WAIT, openPeerWaits, releaseTypedWaits, writePeerMessage } from './shared/peers.mjs';
-import { FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from '../foundations.mjs';
+import { PEER_WAIT, openPeerWaits, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';
+import { FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from '../foundation-registry.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 const FOUNDATION_ACTIONS = ['claim', 'declare-dependent', 'land', 'declare-none'];
 

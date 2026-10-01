@@ -23,7 +23,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
-import { operationNodeId } from './verbs/shared/hierarchy.mjs';
+import { operationNodeId } from './verbs/shared/agent-hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';

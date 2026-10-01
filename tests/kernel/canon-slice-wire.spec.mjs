@@ -1,7 +1,7 @@
 // A canon-conformance slice is granted the relocation destinations its findings need, contested relocations
 // and config files go to ONE canon-wire leg per wave (HFS has no shared registration file: owners are derived
 // from knowledge/hfs/slots.yaml, so policy sharedRoots is empty), and a blocked slice is redone from its commit
-// (scripts/kernel/cut-seam.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
+// (scripts/kernel/seam-policy.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
 // enqueue.cutExecution). A canon slice (7/34) committed
 // 9 -> 7 findings, then blocked shared-change - the rest needed its product-shells owners MOVED into
 // features/layouts, none of which it owned; 22 of 56 slices failed so.
@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
-import { canonCutPlanOf, canonRedispatchOf, canonSettleFollowUpOf, relocationOf, canonConformancePolicy } from '../../scripts/kernel/cut-seam.mjs';
+import { canonCutPlanOf, canonRedispatchOf, canonSettleFollowUpOf, relocationOf, canonConformancePolicy } from '../../scripts/kernel/seam-policy.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

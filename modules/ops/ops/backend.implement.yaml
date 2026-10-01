@@ -181,7 +181,7 @@ steps:
       - repo
     writes: [source]
     action:
-      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/cut-seam.mjs,
+      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/seam-policy.mjs,
         modules/kernel/driver-loop.yaml enqueue.cutExecution seamContractFirst). As ordinal 1 of a cut of
         more than one you are the seam: before anything else author and commit its interface - types,
         DTOs, ports/contracts and a stub implementation inside your owned paths - then publish it with

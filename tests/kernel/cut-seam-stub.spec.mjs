@@ -1,5 +1,5 @@
 // A cut's seam never stalls the chain (owner ruling 2026-09-28: "a seam must not stall the whole
-// chain: a slipped seam is cut again or the later slices run in parallel with a stub, never a 3-hour wait"; scripts/kernel/cut-seam.mjs,
+// chain: a slipped seam is cut again or the later slices run in parallel with a stub, never a 3-hour wait"; scripts/kernel/seam-policy.mjs,
 // modules/kernel/driver-loop.yaml enqueue.seamContractFirst). nivo wf-nivo-collab-group-chat-mujek7ue held seven
 // backend.implement ordinals for more than a day behind seam op-backend.implement-9a2c4c2f03 (attempt 11, queued
 // under a peer-wait after three failed attempts).
@@ -11,7 +11,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
-import {cutSeamSettings,seamPriorityOf,seamPromptLines,seamReconcileOf,siblingSeamHold,SEAM_RECONCILED_EVENT} from '../../scripts/kernel/cut-seam.mjs';
+import {cutSeamSettings,seamPriorityOf,seamPromptLines,seamReconcileOf,siblingSeamHold,SEAM_RECONCILED_EVENT} from '../../scripts/kernel/seam-policy.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');

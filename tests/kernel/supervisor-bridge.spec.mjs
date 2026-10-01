@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
-import { claimFoundation, declareDependent, readFoundation, writeFoundation } from '../../scripts/kernel/foundations.mjs';
+import { claimFoundation, declareDependent, readFoundation, writeFoundation } from '../../scripts/kernel/foundation-registry.mjs';
 import { HUB_STUCK_MS, RECORD_CHANGE_REFUSED, dependencyGraph, foundationAliasKey, readBridges } from '../../scripts/kernel/dependency-graph.mjs';
 import { createOwnership } from '../../scripts/kernel/work-ownership.mjs';
 import { approvalOf, commandFor, main } from '../../scripts/supervisor/bridge.mjs';

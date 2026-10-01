@@ -1,6 +1,6 @@
 import { setJobStatus, updateAttempt } from '../../../../engine/db/ledger.mjs';
 import { recordWhy } from '../../why-record.mjs';
-import { DISPATCHES, requirePhase } from './lifecycle.mjs';
+import { DISPATCHES, requirePhase } from './workflow-transitions.mjs';
 
 /**
  * The leased → running move, compare-and-set (H9): the job must still be leased under this dispatch's own

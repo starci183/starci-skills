@@ -110,7 +110,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
   if (value.failureClass !== undefined && !FAILURE_CLASSES.includes(value.failureClass)) fail(`failureClass must be one of ${FAILURE_CLASSES.join('|')}`);
   if (value.failureClass !== undefined && value.outcome !== 'failed') fail("failureClass belongs to outcome 'failed' only");
   // seamAssumptions: what a cut sibling that ran on a stub assumed of its unlanded seam
-  // (scripts/kernel/cut-seam.mjs); the Kernel's cut-seam-reconcile re-verifies them once the seam lands.
+  // (scripts/kernel/seam-policy.mjs); the Kernel's cut-seam-reconcile re-verifies them once the seam lands.
   if (value.seamAssumptions !== undefined && (!Array.isArray(value.seamAssumptions)
     || value.seamAssumptions.some((a) => !a || typeof a !== 'object' || Array.isArray(a) || !text(a.symbol) || !text(a.assumption) || (a.file !== undefined && !text(a.file)))))
     fail('seamAssumptions must be an array of {symbol, assumption, file?}');

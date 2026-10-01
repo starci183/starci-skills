@@ -55,7 +55,7 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
  * parked behind an owner-gate-held queued job counts like that job does: as open). `parked` is
  * parkedBehindWaits' map.
  */
-// Autopilot (scripts/kernel/autopilot.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
+// Autopilot (scripts/kernel/autopilot-run.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
 // to the handover credential checklist), is no open work of the Kernel's either.
 const HELD_ELSEWHERE = ['peer-wait', 'supervisor-gate', 'deferred', 'deferred-to-handover'];
 export function waitHeldOperations(queued = [], heldSettle = [], parked = new Map()) {

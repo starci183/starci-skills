@@ -19,7 +19,7 @@
 //   --until-commit <repo>:<ref-or-path>        <ref> resolves to a commit, or <path> is committed at HEAD
 //   --until-incident <incidentId>[:resolved]   that incident is no longer open
 //   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
-//                                              --land; scripts/kernel/foundations.mjs)
+//                                              --land; scripts/kernel/foundation-registry.mjs)
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it
 //                                              landed there at its finish (workflow-landed: a workflow lands
 //                                              into main once, at api finish, workflow-checkpoint.mjs) (a
@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeFoundationName, readFoundation } from './foundations.mjs';
+import { normalizeFoundationName, readFoundation } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { resolveIncident } from '../../engine/db/ledger.mjs';

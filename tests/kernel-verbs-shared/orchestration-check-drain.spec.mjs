@@ -1,4 +1,4 @@
-// The orchestration drain (scripts/kernel/verbs/shared/messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
+// The orchestration drain (scripts/kernel/verbs/shared/worker-messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
 // workflow is read through Orca's consuming check naming the Kernel terminal, every message of a Delivery is written into
 // the ledger in ONE transaction, and the Delivery is acknowledged only after that commit. A replayed Delivery writes
 // nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the orch-check
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
-import { drainWorkflowMessages, workerDoneOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/messages.mjs';
+import { drainWorkflowMessages, workerDoneOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/worker-messages.mjs';
 
 const WF = 'wf-drain', JOB = 'job-drain', KERNEL = 'term-kernel', RUN = 'run-wf', DISPATCH = 'ctx_op';
 

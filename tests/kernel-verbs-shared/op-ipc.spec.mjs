@@ -35,7 +35,7 @@ const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
 import {normalizeOwnedPath} from '../../engine/admission.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
-// The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is on
+// The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is on
 // by default, so this spec runs with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 

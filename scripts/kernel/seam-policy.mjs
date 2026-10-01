@@ -486,8 +486,8 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
 }
 
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
-//   node scripts/kernel/cut-seam.mjs canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
-//   node scripts/kernel/cut-seam.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
+//   node scripts/kernel/seam-policy.mjs canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
+//   node scripts/kernel/seam-policy.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
 // Each prints JSON whose `commands` / `command` are the api enqueue lines to run. Ledger reads only.
 async function main(argv) {
   const [verb, ...rest] = argv;

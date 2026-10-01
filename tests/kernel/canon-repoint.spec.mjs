@@ -1,4 +1,4 @@
-// The repoint unit (DESIGN §16.7, FMEA #20; scripts/kernel/cut-seam.mjs canonCutPlanOf + scripts/kernel/import-scan.mjs).
+// The repoint unit (DESIGN §16.7, FMEA #20; scripts/kernel/seam-policy.mjs canonCutPlanOf + scripts/kernel/import-scan.mjs).
 // fe-canon: slice 1 moved apps/app/src/i18n/request.ts into modules/i18n and 26 files still imported the old
 // `@/i18n` paths - owned by nobody, the breakage surfaced as a sibling's checker "unavailable". A wave that moves code
 // now gets ONE canon-wire unit owning EVERY importer of the moved paths (tsconfig aliases included), --after every
@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { canonCutPlanOf, REPOINT_BRIEF } from '../../scripts/kernel/cut-seam.mjs';
+import { canonCutPlanOf, REPOINT_BRIEF } from '../../scripts/kernel/seam-policy.mjs';
 import { importersOf, brokenImports, specifiersOf, matchAlias } from '../../scripts/kernel/import-scan.mjs';
 
 const SRC = 'apps/app/src';

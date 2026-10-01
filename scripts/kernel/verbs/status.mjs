@@ -12,11 +12,11 @@ import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW, jobResultSql } from '../../machine/job-row.mjs';
 import { getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal } from './shared/rows.mjs';
 import { kernelSeatOf } from './shared/kernel-seat.mjs';
-import { drainWorkflowMessages, workerQuestionsOf } from './shared/messages.mjs';
-import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './shared/peers.mjs';
+import { drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
+import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './shared/peer-waits.mjs';
 import { hostThrottle, throttleSummary } from '../../machine/ram-throttle.mjs';
 import { askClassOf, isLiveProofOp, parkAsk } from '../ask-server.mjs';
-import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, SUPERVISOR_GATE, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialsOwed, deferralOf, deferredLegsOf, provisionalOps, reopenedOwed } from '../autopilot.mjs';
+import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, SUPERVISOR_GATE, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialsOwed, deferralOf, deferredLegsOf, provisionalOps, reopenedOwed } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 import { OP_REV_DRIFT, kernelRevState, opRevDrift, revRootOf, shortRev } from '../runtime-rev.mjs';
 import { ownerSpecs, deferredTestsOf, specsOff } from '../../route/spec-deferral.mjs';
@@ -49,7 +49,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // A typed condition that can no longer hold (the awaited job settled failed under :succeeded, a
   // named job or incident is gone) is the Kernel's to re-point: actionable, like a dead peer wait.
   const typedUnmeetable = typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
-  // Autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
+  // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
   // pending asks are answered provisionally or deferred to handover, owner gates re-routed to the Supervisor, timed-out
   // supervisor gates deferred and budgets checked, before anything below is projected. Never fails the read.
   const autopilotSettingsNow = autopilotSettings();

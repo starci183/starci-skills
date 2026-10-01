@@ -80,7 +80,7 @@ const OPTIONS = ['Accept the drawn parts', 'Redraw - say in the note what to cha
 const OWNER = 'owner';
 /** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
 export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
-/** Autopilot (scripts/kernel/autopilot.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
+/** Autopilot (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
 export const AUTOPILOT_BY = 'autopilot';
 /** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);

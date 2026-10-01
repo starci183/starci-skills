@@ -3,11 +3,11 @@ import path from 'node:path';
 import { newToken, openIncident, resolveIncident } from '../../../engine/db/ledger.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { csvList, getWorkflow } from './shared/rows.mjs';
-import { PEER_WAIT, openPeerWaits, peerRefusalOf, releaseTypedWaits, writePeerMessage } from './shared/peers.mjs';
+import { PEER_WAIT, openPeerWaits, peerRefusalOf, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';
 import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, resolutionOwnerCheck } from '../../machine/owner-claim.mjs';
 import { CONDITIONS_ATTACHED_EVENT, conditionLabel, parseConditions, sharedBlockerUntil } from '../gate-conditions.mjs';
-import { declareDependent, readFoundation, writeFoundation } from '../foundations.mjs';
-import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotOn } from '../autopilot.mjs';
+import { declareDependent, readFoundation, writeFoundation } from '../foundation-registry.mjs';
+import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotOn } from '../autopilot-run.mjs';
 import { commitOwnerJobs, followUpMessage, resolveIntroducer } from '../introducer.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 

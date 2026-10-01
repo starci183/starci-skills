@@ -14,7 +14,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { validateOpReport } from '../report-envelope.mjs';
 import { jobPayloadOf, jobOpOf, operationDispatchOf } from './shared/rows.mjs';
 import { HANDOVER_OP, handoverAskProblem } from '../handover.mjs';
-import { autopilotOn, autopilotBundle } from '../autopilot.mjs';
+import { autopilotOn, autopilotBundle } from '../autopilot-run.mjs';
 import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../../work/draw-review.mjs';
 import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-feedback.mjs';
 import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../../machine/contract-version.mjs';

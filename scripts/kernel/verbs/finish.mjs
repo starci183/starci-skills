@@ -1,7 +1,7 @@
 // api finish: finalize an owner-approved workflow and release its kernel seat.
 import { changeWorkflowPhase, resolveIncident, setInboxStatus, updateIncident } from '../../../engine/db/ledger.mjs';
 import { getWorkflow } from './shared/rows.mjs';
-import { requirePhase } from './shared/lifecycle.mjs';
+import { requirePhase } from './shared/workflow-transitions.mjs';
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
 import { handoverGateOf } from '../handover.mjs';

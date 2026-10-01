@@ -11,7 +11,7 @@ status:
     Status can resolve met typed waits, sweep autopilot asks and gates, renew
     leases of live workers, and record provider outages observed on worker
     screens. Unless the workflow finished, it drains the workflow's Orca Runs
-    into the ledger first (the same drain as api questions, scripts/kernel/verbs/shared/messages.mjs:
+    into the ledger first (the same drain as api questions, scripts/kernel/verbs/shared/worker-messages.mjs:
     orchestration check, one ledger transaction, then --ack). Its projection
     reflects those transitions in the same call.
   returns:
@@ -82,7 +82,7 @@ status:
       deferred[{jobId, opId, reason, incidentId?, since}], deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
       credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars}, stubPath, owed, record?,
       reason?}], supervisorGates[{incidentId, opId, holds[], since}], budget{used, caps, exceeded[]}, checklist?{due, jobId,
-      items}, sweep?} (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
+      items}, sweep?} (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
       runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api autopilot --sweep). Under
       autopilot: legs[].color adds green-provisional (label "self-accepted provisionally": green resting on a provisional acceptance) and
       deferred; queued[].queuedBecause adds supervisor-gate, deferred and deferred-to-handover (a live proof waiting for
@@ -219,7 +219,7 @@ status:
       (scripts/kernel/frontier-parked.mjs): behind a peer-wait or a deferred settle it is the wait's to
       release like the held job and never makes the frontier `engaged` (an ord-6
       --after a peer-wait-held ord-3 once read engaged and the stall check alerted); behind an owner-gate-held
-      job it counts as open, like that job. Cut seams (scripts/kernel/cut-seam.mjs): a queued seam
+      job it counts as open, like that job. Cut seams (scripts/kernel/seam-policy.mjs): a queued seam
       (ordinal 1 of a cut of more than one) carries seam {cutId, siblings} and ranks right after the
       foundation legs; a sibling ordinal its seam no longer holds carries seamStub {mode, seamJobId,
       seamStatus, reason} (mode interface|released|seam-failed|seam-slipped|timeout) and reads by its
@@ -308,7 +308,7 @@ status:
       passed, failures, interface?:{files[{path,sha256,bytes}], publishedBy, at}, released?:{reason, at},
       siblingsHeld?[], siblingsOnStub?[{jobId, mode}], reconcile?:{seamPassed, seamJobId, pending[],
       owed[], green[], red[]}, recutPlan?:{cutId, op, seamJobId, failures, featureRoot, seam[], wire[],
-      steps[]}} is the seam's contract-first state (scripts/kernel/cut-seam.mjs): each owed reconcile
+      steps[]}} is the seam's contract-first state (scripts/kernel/seam-policy.mjs): each owed reconcile
       is a nextActions impact-check (seamDuty reconcile), each red one a retry of that ordinal
       (reconcile-red), a recutPlan a retry of the seam (recut) - all make the frontier actionable and
       are listed in frontier.seamDuties [{duty, jobId, cutId}]. A queued seam's dispatch action carries

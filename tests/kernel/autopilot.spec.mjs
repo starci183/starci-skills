@@ -1,4 +1,4 @@
-// Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): "Run to the finish in
+// Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot-run.mjs): "Run to the finish in
 // one go. Don't stop to ask the owner - not even UX/UI review. When everything is done, the owner reviews once."
 // Machine-gated reviews are accepted provisionally (never golden, never an owner answer), runtime/process gates go
 // to the Supervisor, credentials / real money / shared systems are deferred to handover, and provision.ask is only
@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot.mjs';
+import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot-run.mjs';
 import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';

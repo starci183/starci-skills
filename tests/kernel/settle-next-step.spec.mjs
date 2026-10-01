@@ -12,7 +12,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {unitSubjectKey} from '../../engine/admission.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 

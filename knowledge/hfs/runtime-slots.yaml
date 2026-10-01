@@ -682,10 +682,6 @@ pending:
   - {path: "scripts/checks/check-providers.mjs", rule: RT_API_SHAPE, lane: C6, since: 2026-10-01, reason: "orca call files export one call each, named after their calls.yaml id; callers use call files, never the orca runner; api/orca stops importing api/git"}
   - {path: "scripts/kernel/{clear-draft.mjs,host-outage.mjs,kernel-watchdog.mjs,quit-agent.mjs,wake-delivery.mjs}", rule: RT_API_SHAPE, lane: C6, since: 2026-10-01, reason: "orca call files export one call each, named after their calls.yaml id; callers use call files, never the orca runner; api/orca stops importing api/git"}
   - {path: "scripts/reconciler/services.mjs", rule: RT_API_SHAPE, lane: C6, since: 2026-10-01, reason: "orca call files export one call each, named after their calls.yaml id; callers use call files, never the orca runner; api/orca stops importing api/git"}
-  - {path: "scripts/kernel/{ask-server.mjs,autopilot.mjs,cut-seam.mjs,foundations.mjs,migrate-plan-edges.mjs,repair-rejected-attempts.mjs}", rule: RT_SOURCE_NAME, lane: C6, since: 2026-10-01, reason: "one-off names (_view, migrate-*, repair-*, *-backfill) and duplicate basenames inside a tier are renamed or deleted"}
-  - {path: "scripts/kernel/verbs/shared/{hierarchy.mjs,lifecycle.mjs,messages.mjs,peers.mjs}", rule: RT_SOURCE_NAME, lane: C6, since: 2026-10-01, reason: "one-off names (_view, migrate-*, repair-*, *-backfill) and duplicate basenames inside a tier are renamed or deleted"}
-  - {path: "scripts/kernel/status/{_view.mjs,usage.mjs}", rule: RT_SOURCE_NAME, lane: C6, since: 2026-10-01, reason: "one-off names (_view, migrate-*, repair-*, *-backfill) and duplicate basenames inside a tier are renamed or deleted"}
-  - {path: "scripts/kernel/verbs/{autopilot.mjs,cut-seam.mjs,foundations.mjs,hierarchy.mjs,lifecycle.mjs,messages.mjs,peers.mjs,serve-ask.mjs,usage.mjs}", rule: RT_SOURCE_NAME, lane: C6, since: 2026-10-01, reason: "one-off names (_view, migrate-*, repair-*, *-backfill) and duplicate basenames inside a tier are renamed or deleted"}
 
 consumers:
   - scripts/hfs/slots.mjs

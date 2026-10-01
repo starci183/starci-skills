@@ -19,7 +19,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
 import {recordEnvelopeChecks} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
 
-// These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot.mjs)
+// These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot-run.mjs)
 // is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
 // tests/kernel/autopilot.spec.mjs covers the autopilot flow (same as tests/kernel-verbs-shared/op-ipc.spec.mjs).
 process.env.STARCI_AUTOPILOT ??= 'off';

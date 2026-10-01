@@ -321,7 +321,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
         owner: 'supervisor', detail: `route ${cap.step.route} fired ${cap.step.firing ?? '?'} of ${cap.step.limit ?? '?'}: diagnose the root cause before anything runs it again` });
       continue;
     }
-    // Autopilot (scripts/kernel/autopilot.mjs): a supervisor-gate is the Supervisor's step, never the owner's.
+    // Autopilot (scripts/kernel/autopilot-run.mjs): a supervisor-gate is the Supervisor's step, never the owner's.
     if (gate.kind === 'supervisor-gate') {
       push({ kind: 'owner-gate', cause: 'supervisor-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: 'supervisor', detail: gate.detail ?? '' });
       continue;

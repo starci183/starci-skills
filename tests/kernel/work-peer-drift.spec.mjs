@@ -8,7 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,PROJECTS_ROOT_ENV,writeContract} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {claimFoundation,writeFoundation} from '../../scripts/kernel/foundations.mjs';
+import {claimFoundation,writeFoundation} from '../../scripts/kernel/foundation-registry.mjs';
 import {baselineWorkInputs,inputDrift,peerDriftSummaryOf,recordInputs,staleOperationsOf} from '../../scripts/kernel/input-digests.mjs';
 import {changeNoteOf,committedMatches,committedReader,createOwnership,ownerDeclarationFor} from '../../scripts/kernel/work-ownership.mjs';
 

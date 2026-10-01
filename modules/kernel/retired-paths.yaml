@@ -954,6 +954,14 @@ moved:
   - {from: scripts/example/example-ownership.mjs, to: scripts/work/record-ownership.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/example/example-render-proof.mjs, to: scripts/work/render-proof.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/kernel/status/view.mjs, to: scripts/kernel/verbs/shared/status-view.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/autopilot.mjs, to: scripts/kernel/autopilot-run.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/cut-seam.mjs, to: scripts/kernel/seam-policy.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/foundations.mjs, to: scripts/kernel/foundation-registry.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/status/usage.mjs, to: scripts/kernel/status/token-usage.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/verbs/shared/hierarchy.mjs, to: scripts/kernel/verbs/shared/agent-hierarchy.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/verbs/shared/lifecycle.mjs, to: scripts/kernel/verbs/shared/workflow-transitions.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/verbs/shared/messages.mjs, to: scripts/kernel/verbs/shared/worker-messages.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/verbs/shared/peers.mjs, to: scripts/kernel/verbs/shared/peer-waits.mjs, movedIn: C6, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}

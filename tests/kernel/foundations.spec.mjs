@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName} from '../../scripts/kernel/foundations.mjs';
+import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName} from '../../scripts/kernel/foundation-registry.mjs';
 
 // Owner ruling: workflows sharing one repository planned independently and found their shared
 // foundations mid-flight (one workflow held on another's layout tree rev behind an owner-gate that was

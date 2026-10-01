@@ -10,7 +10,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -428,7 +428,7 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   let frontier=frontierNow();
   assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
-  // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/cut-seam.mjs): they run on a stub.
+  // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/seam-policy.mjs): they run on a stub.
   assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'ready');
   assert.equal(frontier.queued.find(q=>q.jobId===second).seamStub.mode,'seam-failed');
   assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');

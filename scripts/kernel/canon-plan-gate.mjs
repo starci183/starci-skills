@@ -2,13 +2,13 @@
 //
 // A canon slice (code.refactor with params.canonFamilies, cut, not the canon-wire leg) that owns only the files with
 // findings cannot make the moves its findings ask for: fe-canon settled 41 of 110 slices blocked, PATH_NOT_OWNED. The
-// planner (scripts/kernel/cut-seam.mjs canonCutPlanOf) grants each slice the relocation destinations its findings need
+// planner (scripts/kernel/seam-policy.mjs canonCutPlanOf) grants each slice the relocation destinations its findings need
 // and gives contested destinations to the wave's wire leg. This module is the gate over that plan: the first try of a
 // canon slice is admitted only with the canon-scan record it was cut from (--canon-scan), and only when its owned paths
 // cover the plan's `owned` for its ordinal; api graph-edit recut enqueues through the plan and refuses a slice whose
 // moves all landed on another slice (no fix target: it is cut again, never enqueued to block).
 import fs from 'node:fs';
-import { canonCutPlanOf } from './cut-seam.mjs';
+import { canonCutPlanOf } from './seam-policy.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 
 const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
@@ -49,7 +49,7 @@ export function unfixableSlicesOf(plan) {
  */
 export function requirePlannedCanonSlice({ cut, ownedPaths, scanFile }) {
   if (!scanFile) {
-    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (node scripts/kernel/cut-seam.mjs canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
+    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (node scripts/kernel/seam-policy.mjs canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
   }
   const plan = canonCutPlanOf(readCanonScan(scanFile), { cutId: cut.id });
   const slice = plan.slices.find((s) => Number(s.ordinal) === Number(cut.ordinal));

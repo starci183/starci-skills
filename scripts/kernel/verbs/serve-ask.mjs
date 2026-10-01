@@ -19,7 +19,7 @@ import { skillRoot } from '../../../engine/runtime-root.mjs';
 import { ledgerFileFor } from '../../../engine/db/ledger.mjs';
 import { connectorsConfig } from '../../../engine/config.mjs';
 import { getWorkflow } from './shared/rows.mjs';
-import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot.mjs';
+import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot-run.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from '../ask-server.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 

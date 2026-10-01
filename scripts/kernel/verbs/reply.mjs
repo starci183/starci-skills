@@ -1,7 +1,7 @@
 // api reply: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatusByKey } from '../../../engine/db/ledger.mjs';
-import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/messages.mjs';
+import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
 import { orchReply } from '../../api/orca/orch-reply.mjs';
 
 export default {

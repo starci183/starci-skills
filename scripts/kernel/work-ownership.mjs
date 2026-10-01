@@ -22,7 +22,7 @@
 // Owner rule (ownerOf), the first that names a LIVE workflow (not finished, not archived):
 //   0 transfer      the [Supervisor] transferred the record or a directory above it (scripts/supervisor/
 //                   bridge.mjs transfer --record; signals scope ownership-transfer, provisional under autopilot)
-//   1 foundation    a shared foundation's owner (scripts/kernel/foundations.mjs): a brand foundation
+//   1 foundation    a shared foundation's owner (scripts/kernel/foundation-registry.mjs): a brand foundation
 //                   owns .starciwork/brand, a layout-tree .starciwork/shell, and any foundation owns
 //                   the record directory named after it under a `foundation/` segment
 //                   (features/commerce/contract/foundation/entitlement-contract).
@@ -40,7 +40,7 @@ import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readFoundations } from './foundations.mjs';
+import { readFoundations } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';

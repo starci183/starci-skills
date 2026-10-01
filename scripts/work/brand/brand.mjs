@@ -866,7 +866,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   return {ok:true,receipt:receipt.file};
 }
 
-/** Autopilot's provisional accept (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
+/** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
 export const AUTOPILOT_ANSWERER='autopilot';
 /**
  * Whether an archetype's `provisional` block is backed by an autopilot receipt for the rev it names, with passing gate

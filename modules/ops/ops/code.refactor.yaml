@@ -26,7 +26,7 @@ params:
     default: false
     setBy: kernel
     doc:
-      en: "True on the ONE serial canon-wire leg per wave of a canon cut (scripts/kernel/cut-seam.mjs
+      en: "True on the ONE serial canon-wire leg per wave of a canon cut (scripts/kernel/seam-policy.mjs
         canonCutPlanOf): it owns the shared root config (package.json, lockfile, tsconfig, eslint config, hfs.json;
         policy.canonConformance.sharedRoots is empty, owners are derived from slots), the consumers the slices listed as owedToWire and
         the contested relocations, and runs after every slice of its wave."
@@ -36,7 +36,7 @@ params:
     setBy: kernel
     doc:
       en: "The commit a redone slice starts from: the head its blocked or failed attempt committed
-        (scripts/kernel/cut-seam.mjs canonRedispatchOf). Empty starts from the checkout as it is."
+        (scripts/kernel/seam-policy.mjs canonRedispatchOf). Empty starts from the checkout as it is."
   admissionBase:
     type: string
     default: ''
@@ -407,7 +407,7 @@ blockers:
         not blocked - it moves what it owns (its relocation grants are in its owned paths), commits,
         and reports done listing each such finding as owedToWire [{path, finding}]; the wave's
         canon-wire leg lands it. A canon slice that still settles blocked is followed up by settle
-        itself (scripts/kernel/cut-seam.mjs canonSettleFollowUpOf) - a continuation from its commit
+        itself (scripts/kernel/seam-policy.mjs canonSettleFollowUpOf) - a continuation from its commit
         (params.resumeFrom) owning the destinations its report names, and the shared, config and
         public-entry paths go to the canon-wire leg.
   - code: REQUIREMENT_UNSETTLED
@@ -518,7 +518,7 @@ policy:
     partition: the cut is canon-scan's slices over the whole repository - one job per slice with its paths as owned paths and the same params.canonFamilies, the foundation wave settled before the shared wave and the shared wave before the surfaces wave
     excluded: paths another running workflow owns go to canon-scan --exclude and stay unsliced until it finishes
     lintSource: canon-scan resolves the repository's canon package import to this runtime's packages/eslint source, so the slice needs no published canon
-    # scripts/kernel/cut-seam.mjs canonCutPlanOf reads these: the relocation a finding needs (the file
+    # scripts/kernel/seam-policy.mjs canonCutPlanOf reads these: the relocation a finding needs (the file
     # that moves - the finding's own file or its related import target - lands in <src>/<into>/<Owner>; the
     # role is the folder under src) is GRANTED to the slice at enqueue unless a sibling holds it.
     # sharedRoots is empty: HFS has no shared registration file (owners are derived from slots);

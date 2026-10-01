@@ -15,7 +15,7 @@ import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from '../machine/owner-answers.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
-import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
+import { cutManifestPromptLines, seamPromptLines } from './seam-policy.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
 import { translator } from '../lib/i18n.mjs';

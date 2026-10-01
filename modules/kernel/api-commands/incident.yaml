@@ -2,7 +2,7 @@ incident:
   args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
   reads: 'the workflows row for --workflow'
   supervisorGate: >-
-    Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): nothing waits on the
+    Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot-run.mjs): nothing waits on the
     owner mid-flow. --kind owner-gate on an autopilot workflow is recorded as kind supervisor-gate (payload rerouted
     {from, to}); settle's retry cap and an environment blocker open one (settle.nextStep kind supervisor-gate, with
     the attempts' evidence); api status re-routes any older open owner-gate. A supervisor-gate holds its jobs like an

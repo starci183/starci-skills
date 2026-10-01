@@ -3,7 +3,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW } from '../../machine/job-row.mjs';
 import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './shared/rows.mjs';
 import { deliveriesOf } from '../handover.mjs';
-import { autopilotBundle, autopilotOn } from '../autopilot.mjs';
+import { autopilotBundle, autopilotOn } from '../autopilot-run.mjs';
 import { workflowDisplayName } from '../../lib/display-names.mjs';
 import { staleOperationsOf, sourceDriftSummaryOf, peerDriftSummaryOf } from '../input-digests.mjs';
 import { providerCircuits } from '../../machine/provider-circuit.mjs';

@@ -1,7 +1,7 @@
 // api autopilot: workflow autonomy controls.
 import { createHash } from 'node:crypto';
 import { csvList, getWorkflow } from './shared/rows.mjs';
-import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot.mjs';
+import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 
 export default {

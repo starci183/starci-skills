@@ -12,7 +12,7 @@ import {autoAcceptAsk,wakeAskAnswered} from '../../scripts/kernel/ask-server.mjs
 import {autoAcceptedMessage,notifyAutoAccepted} from '../../scripts/connectors/telegram.mjs';
 import {openAsks} from '../../scripts/supervisor/poll.mjs';
 import {isBlobFile} from '../../scripts/machine/ask-receipts.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 

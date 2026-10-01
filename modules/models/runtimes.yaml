@@ -360,7 +360,7 @@ allocation:
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}
-  # cutSeam (scripts/kernel/cut-seam.mjs; owner ruling 2026-09-28 "a seam must not block the whole chain"): a cut
+  # cutSeam (scripts/kernel/seam-policy.mjs; owner ruling 2026-09-28 "a seam must not block the whole chain"): a cut
   # sibling ordinal waits on its seam at most maxSiblingWaitMs (30 min), then runs on a stub and owes one
   # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
   # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
@@ -416,7 +416,7 @@ allocation:
     # How long the workflow that claimed foundation `shell` (the layout chain an interface.draw draws) may hold it before a
     # waiting draw opens a Supervisor Decision Item (scripts/kernel/shell-foundation.mjs; owner ruling 2026-09-29 draw-from-todo).
     shellFoundationStallMs: 7200000
-  # autopilot (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish, modules/kernel/
+  # autopilot (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish, modules/kernel/
   # owner-rulings.yaml): "run to the finish in one go, don't stop to ask the owner - not even UX/UI review; the owner
   # reviews once at the end". enabled is the default for every running workflow; workflows.<workflowId>.enabled
   # overrides it for one workflow (api autopilot --workflow <id> --set on|off records a ledger override that wins

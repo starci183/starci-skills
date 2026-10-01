@@ -275,7 +275,7 @@ calls:
       Consuming FIFO Delivery of a Run's coordinator inbox: up to 50 messages of every type in
       {runId, deliveryId, messages[], acknowledged}; the same Delivery replays until --ack names it, and
       check --ack <delivery> acknowledges it (idempotently) and returns the next one. Issued only through
-      scripts/api/orca/orch-check.mjs. scripts/kernel/verbs/shared/messages.mjs drains each workflow Run with
+      scripts/api/orca/orch-check.mjs. scripts/kernel/verbs/shared/worker-messages.mjs drains each workflow Run with
       --run <run> --terminal <Kernel terminal>, writes every message into the ledger in one transaction and
       acks only after that commit (map REPLACE #7). Smoke E2 (2026-10-01, Orca 1.4.209): a process outside
       any Orca terminal is accepted; only a terminal that is no longer the Run's coordinator (a newer

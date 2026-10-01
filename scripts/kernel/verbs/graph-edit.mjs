@@ -32,7 +32,7 @@ import {
   recordKernel, refuse, requireDecision, restoreJob, setPayload, settingsN, shapeOf, validateOverride,
 } from '../kernel-authority.mjs';
 import { GRAPH_EDIT_KIND, OPEN_JOB, opJobsOf, unitsOf } from '../progress-rca.mjs';
-import { canonCutPlanOf } from '../cut-seam.mjs';
+import { canonCutPlanOf } from '../seam-policy.mjs';
 import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
 import { putArtifact, stageBlob } from '../../machine/evidence-store.mjs';
 import { latestReportOf } from './shared/rows.mjs';
@@ -231,7 +231,7 @@ export default {
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
       human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: api graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
     } else if (edit === 'recut') {
-      // H6: a re-cut goes through the canon planner (scripts/kernel/cut-seam.mjs canonCutPlanOf): each slice owns its paths
+      // H6: a re-cut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths
       // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
       // whose moves another slice holds (no fix target) is refused here and cut again - never enqueued to block.
       const file = String(args['from-scan'] ?? '');

@@ -14,7 +14,7 @@ import { bridgeAskRepos, bridgeText, createBridge } from '../../scripts/supervis
 import { collectProgress, progressMessages } from '../../scripts/supervisor/progress-report.mjs';
 import { stallFindings } from '../../scripts/supervisor/stall.mjs';
 import { translator } from '../../scripts/lib/i18n.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 

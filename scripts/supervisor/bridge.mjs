@@ -45,7 +45,7 @@ import {
 } from '../kernel/dependency-graph.mjs';
 import {
   FOUNDATION_KINDS, claimFoundation, declareDependent, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation,
-} from '../kernel/foundations.mjs';
+} from '../kernel/foundation-registry.mjs';
 import { TRANSFER_SCHEMA, createOwnership } from '../kernel/work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';

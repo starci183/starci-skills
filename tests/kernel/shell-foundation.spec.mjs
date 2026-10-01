@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
-import { readFoundation } from '../../scripts/kernel/foundations.mjs';
+import { readFoundation } from '../../scripts/kernel/foundation-registry.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, gateShellFoundation, landShellFoundationIfSettled, shellFoundationNeed, shellFoundationWaitOf } from '../../scripts/kernel/shell-foundation.mjs';
 import { checkPrerequisites, prerequisiteDetail, DESIGN_NOT_SETTLED } from '../../scripts/kernel/prerequisites.mjs';
 import { nodeById, treeOf } from '../../scripts/work/layout-tree.mjs';

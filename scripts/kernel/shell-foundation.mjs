@@ -21,7 +21,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { appNamesOf, appOfUi, isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, nodesOf, readShellRecord, treeOf } from '../work/layout-tree.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { getWorkflow, workflowRunning } from './verbs/shared/rows.mjs';
-import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundations.mjs';
+import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundation-registry.mjs';
 
 export const SHELL_FOUNDATION = 'shell';
 export const FOUNDATION_WAIT = 'foundation-wait';

@@ -94,9 +94,9 @@ import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './verbs/shared/kernel-seat.m
 import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
 import { foundationDutyFor } from './verbs/shared/foundation-duty.mjs';
 import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatchedReportBinding, parseAttempt, reportIdentityOf } from './verbs/shared/report-binding.mjs';
-import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './verbs/shared/hierarchy.mjs';
-import { WORKER_QUESTION } from './verbs/shared/messages.mjs';
-import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peers.mjs';
+import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './verbs/shared/agent-hierarchy.mjs';
+import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
+import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
@@ -111,7 +111,7 @@ import {
   AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
   SUPERVISOR_GATE, credentialsOwed, deferredQueueCause, openSupervisorGate, provisionalOps,
   routeCapUnderAutopilot,
-} from './autopilot.mjs';
+} from './autopilot-run.mjs';
 import {
   classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, collapse,
   clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN,
@@ -157,7 +157,7 @@ import {
   SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK, cutSeamSettings, isSeamCut, recutPlanOf, seamPriorityOf,
   seamReconcileOf, seamStateOf, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf,
   canonConformancePolicy,
-} from './cut-seam.mjs';
+} from './seam-policy.mjs';
 import { destinationsOf } from './progress-rca.mjs';
 import {
   LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, insertLogRows,
@@ -768,7 +768,7 @@ const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) 
 });
 
 /* ----------------------------------------------------------- foundations */
-// Shared foundations across the workflows of one ledger (scripts/kernel/foundations.mjs;
+// Shared foundations across the workflows of one ledger (scripts/kernel/foundation-registry.mjs;
 // modules/kernel/driver-loop.yaml foundations): a layout tree/shell, a brand, a @starci/grammar
 // version, a shared module - each with ONE owner workflow, a state and its dependents. The owner's
 // foundation legs run first; a dependent waits on the landing with a typed wait
@@ -830,7 +830,7 @@ const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-t
  * and the watchdog never wakes a Kernel for it.
  */
 const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
-// Autopilot (scripts/kernel/autopilot.mjs): a supervisor-gate holds its jobs the way an owner gate does, but it is
+// Autopilot (scripts/kernel/autopilot-run.mjs): a supervisor-gate holds its jobs the way an owner gate does, but it is
 // the Supervisor's to resolve; `holds: ['*']` (a spent autopilot budget) holds every queued job.
 const HOLDING_GATE_KINDS = [...OWNER_GATE_KINDS, SUPERVISOR_GATE];
 const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
@@ -921,7 +921,7 @@ function afterChainReaches(db, row, targetId) {
   return false;
 }
 /**
- * queuedBecauseOf plus the cut seam's contract-first release (scripts/kernel/cut-seam.mjs): a sibling
+ * queuedBecauseOf plus the cut seam's contract-first release (scripts/kernel/seam-policy.mjs): a sibling
  * ordinal its seam no longer holds carries seamStub {mode, seamJobId, reason} - it runs now on the seam's
  * published interface or a stub of its own, never waiting past allocation.cutSeam.maxSiblingWaitMs.
  */
@@ -1206,7 +1206,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
   const actions = [];
-  // Autopilot (scripts/kernel/autopilot.mjs): deferred legs wait for the final review and block nothing.
+  // Autopilot (scripts/kernel/autopilot-run.mjs): deferred legs wait for the final review and block nothing.
   const deferredJobs = new Set((autopilot?.deferred ?? []).map((item) => item.jobId));
   // The owner's config.yaml specs switches, read once per projection: a test leg of a class that is off is
   // deferred, so nothing waits on it and its enqueue/route only records the deferral (spec-deferral.mjs).
@@ -1386,7 +1386,7 @@ function seamSettleReconciles(db, { job, jobId, payload, closesSet }) {
   return out;
 }
 /**
- * The seam view of one cut set for api status cutSets[].seam (scripts/kernel/cut-seam.mjs): the seam head,
+ * The seam view of one cut set for api status cutSets[].seam (scripts/kernel/seam-policy.mjs): the seam head,
  * the siblings released to a stub (from the queued projection), the reconcile duty and a re-cut plan once
  * the seam slipped. Null when the cut has no seam attempt.
  */
@@ -4059,7 +4059,7 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 }
 
 /* -------------------------------------------------------------- autopilot */
-// The autopilot surface (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). Every write
+// The autopilot surface (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). Every write
 // is an autopilot-* event by autopilot or by the supervisor; nothing here records an owner answer.
 /* ------------------------------------------------------ caller boundary */
 // An op worker ran node:sqlite against .starciwork/runtime.sqlite to inspect

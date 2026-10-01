@@ -1,7 +1,7 @@
 // api foundations: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
-import { openPeerWaits } from './shared/peers.mjs';
-import { readFoundations } from '../foundations.mjs';
+import { openPeerWaits } from './shared/peer-waits.mjs';
+import { readFoundations } from '../foundation-registry.mjs';
 import { loadContractChanges } from '../../machine/contract-version.mjs';
 
 export default {

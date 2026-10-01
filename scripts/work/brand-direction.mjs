@@ -38,7 +38,7 @@ import { sha256 } from '../../engine/digest.mjs';
 import { translator } from '../lib/i18n.mjs';
 
 const OWNER = 'owner';
-/** Autopilot's provisional accept (scripts/kernel/autopilot.mjs AUTOPILOT_BY). */
+/** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY). */
 const AUTOPILOT_BY = 'autopilot';
 const OPTIONS = ['Accept this archetype of the direction', 'Revise - say in the note what to change'];
 
