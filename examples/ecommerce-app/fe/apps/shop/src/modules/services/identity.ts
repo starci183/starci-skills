@@ -1,5 +1,5 @@
 import "server-only"
-import { isRecord, parseOutcome, request, requestGraphql, type Outcome } from "@ecommerce/api"
+import { isRecord, parseOutcome, requestGraphql, type Outcome } from "@ecommerce/api"
 import { IDENTITY_API_URL } from "../config"
 import { readSessionToken } from "../session"
 import { DOCUMENTS } from "./__generated__/documents"
@@ -50,11 +50,11 @@ const toAccountView = (data: unknown): AccountView | null =>
 /**
  * THE SETTLED CONTRACT - the landing -> shop session handoff, concretely.
  *
- * What the backend serves (`features/identity`): the anonymous GraphQL doors `register` and
- * `signIn` (email + password in; `signIn` answers an opaque bearer `sessionToken` + `personId`),
- * the person-keyed `account(personId)` query, and the internal machine doors
- * `internal/sessions/{verify,revoke}` that carry the bearer in a JSON body - the same doors the
- * order service's SessionGuard consumes.
+ * What the backend serves (`be/contracts/identity/schema.graphql`): the anonymous GraphQL doors
+ * `register` and `signIn` (email + password in; `signIn` answers an opaque bearer `sessionToken` +
+ * `personId`), `verifySession(input: { sessionToken })` - the same door the order service verifies
+ * every bearer with - the bearer-guarded `account` query (the caller's own view) and
+ * `revokeSession(input: { sessionToken })`.
  *
  * What this app does with them: the browser-facing door is the shop's own `/api/session` route
  * handler - the identity service serves no CORS, so the browser never crosses origins to it. On a
@@ -62,11 +62,11 @@ const toAccountView = (data: unknown): AccountView | null =>
  * cookie (`modules/session`). Cookies do not bind to a port, so the same cookie accompanies the
  * browser between landing and shop on `localhost` - THAT is the handoff, with no token in a URL.
  *
- * Reading "who is this" is the two-hop machine question below: the cookie's bearer verifies at
- * `internal/sessions/verify`, and the person it names is read through `account(personId)`.
+ * Reading "who is this" is the two-hop question below: the cookie's bearer verifies at
+ * `verifySession`, and the account it names is read through `account` with that bearer.
  */
 
-/** `signIn`: check the pair and mint the session. A wrong pair refuses with `INVALID_CREDENTIALS`, naming neither half. */
+/** `signIn`: check the pair and mint the session. A wrong pair refuses with `ACCOUNT_INVALID_CREDENTIALS`, naming neither half. */
 export const signInWithPassword = async (email: string, password: string): Promise<Outcome<IssuedSession>> =>
     parseOutcome(
         await requestGraphql({
@@ -77,7 +77,7 @@ export const signInWithPassword = async (email: string, password: string): Promi
         toIssuedSession,
     )
 
-/** `register`: create the account. A taken address refuses with `EMAIL_TAKEN`; the answer is the new person's id. */
+/** `register`: create the account. A taken address refuses with `ACCOUNT_EMAIL_TAKEN`; the answer is the new person's id. */
 export const registerAccount = async (email: string, password: string): Promise<Outcome<string>> =>
     parseOutcome(
         await requestGraphql({
@@ -89,42 +89,39 @@ export const registerAccount = async (email: string, password: string): Promise<
     )
 
 /**
- * `internal/sessions/verify`: the bearer in, the person behind a live session out. A refused token
+ * `verifySession`: the bearer in, the person behind a live session out. A refused token
  * (`SESSION_INVALID`) is a genuine anonymous answer - `null` - not a failure; only an unreachable
  * or mis-speaking door is a refusal.
  */
 const verifySession = async (sessionToken: string): Promise<Outcome<string | null>> => {
     const outcome = parseOutcome(
-        await request({
-            url: `${IDENTITY_API_URL}/internal/sessions/verify`,
-            method: "POST",
-            body: { sessionToken },
+        await requestGraphql({
+            baseUrl: IDENTITY_API_URL,
+            document: DOCUMENTS.VerifySession,
+            variables: { input: { sessionToken } },
         }),
         toPersonId,
     )
     return outcome.kind === "refused" ? { kind: "ok", data: null } : outcome
 }
 
-/** `account(personId)`: the person's own view, joining their live buyer status from the order service. */
-const fetchAccount = async (personId: string): Promise<Outcome<AccountView>> =>
+/** `account`: the caller's own view behind the bearer, joining their live buyer status from the order service. */
+const fetchAccount = async (sessionToken: string): Promise<Outcome<AccountView>> =>
     parseOutcome(
-        await requestGraphql({
-            baseUrl: IDENTITY_API_URL,
-            document: DOCUMENTS.Account,
-            variables: { request: { personId } },
-        }),
+        await requestGraphql({ baseUrl: IDENTITY_API_URL, document: DOCUMENTS.Account, token: sessionToken }),
         toAccountView,
     )
 
 /**
- * `internal/sessions/revoke`: end the session at the store that owns it. Best-effort on purpose -
- * the caller clears the local cookie either way, because a dead token must never trap it.
+ * `revokeSession`: end the session at the store that owns it. Best-effort on purpose - the caller
+ * clears the local cookie either way, because a dead token must never trap it.
  */
 export const revokeSession = async (sessionToken: string): Promise<void> => {
-    await request({
-        url: `${IDENTITY_API_URL}/internal/sessions/revoke`,
-        method: "POST",
-        body: { sessionToken },
+    await requestGraphql({
+        baseUrl: IDENTITY_API_URL,
+        document: DOCUMENTS.RevokeSession,
+        variables: { input: { sessionToken } },
+        token: sessionToken,
     })
 }
 
@@ -139,7 +136,7 @@ export const fetchCurrentUser = async (): Promise<Outcome<CurrentUser | null>> =
     const verified = await verifySession(sessionToken)
     if (verified.kind !== "ok") return verified
     if (verified.data === null) return { kind: "ok", data: null }
-    const account = await fetchAccount(verified.data)
+    const account = await fetchAccount(sessionToken)
     if (account.kind !== "ok") return account
     return {
         kind: "ok",

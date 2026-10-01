@@ -1,5 +1,5 @@
 mutation ShopAddCartItem($input: AddCartItemInput!) {
-    addCartItem(request: $input) {
+    addCartItem(input: $input) {
         item {
             productId
             quantity

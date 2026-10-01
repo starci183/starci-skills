@@ -1,5 +1,5 @@
 mutation DeleteTask($id: ID!) {
-    deleteTask(request: { id: $id }) {
+    deleteTask(input: { id: $id }) {
         deleted
     }
 }

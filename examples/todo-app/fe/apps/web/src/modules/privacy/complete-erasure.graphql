@@ -1,5 +1,5 @@
 mutation CompleteErasure($requestId: ID!) {
-    completeErasure(request: { requestId: $requestId }) {
+    completeErasure(input: { requestId: $requestId }) {
         requestId
         state
     }

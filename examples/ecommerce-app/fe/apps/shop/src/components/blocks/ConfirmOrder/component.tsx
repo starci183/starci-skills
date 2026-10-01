@@ -56,19 +56,17 @@ const refusalLine = (
     props: ConfirmOrderBaseProps["props"],
 ): string => {
     if (outcome.kind === "refused") return props.refusedSession
-    if (outcome.kind === "invalid" && outcome.code === "CHECKOUT_REFUSAL") {
-        const reason = detailText(outcome.details, "reason")
-        const productId = detailText(outcome.details, "productId")
-        if (reason === "cart-empty") return props.refusedCartEmpty
-        if (reason === "insufficient-stock") {
-            return interpolate(props.refusedStock, {
-                product: props.productNames[productId] ?? productId,
-                requested: detailText(outcome.details, "requested"),
-                available: detailText(outcome.details, "available"),
-            })
-        }
-        if (reason === "unknown-product") return interpolate(props.refusedUnknownProduct, { productId })
-        return interpolate(props.refusedGeneric, { code: "CHECKOUT_REFUSAL" })
+    const productId = outcome.kind === "invalid" ? detailText(outcome.details, "productId") : ""
+    if (outcome.kind === "invalid" && outcome.code === "ORDER_CART_EMPTY") return props.refusedCartEmpty
+    if (outcome.kind === "invalid" && outcome.code === "ORDER_INSUFFICIENT_STOCK") {
+        return interpolate(props.refusedStock, {
+            product: props.productNames[productId] ?? productId,
+            requested: detailText(outcome.details, "requested"),
+            available: detailText(outcome.details, "available"),
+        })
+    }
+    if (outcome.kind === "invalid" && outcome.code === "ORDER_UNKNOWN_PRODUCT") {
+        return interpolate(props.refusedUnknownProduct, { productId })
     }
     return interpolate(props.refusedGeneric, {
         code: outcome.kind === "invalid" ? (outcome.code ?? "REFUSED") : outcome.kind,

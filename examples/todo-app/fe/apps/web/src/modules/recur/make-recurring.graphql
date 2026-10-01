@@ -1,5 +1,5 @@
 mutation MakeRecurring($input: MakeRecurringInput!) {
-    makeRecurring(request: $input) {
+    makeRecurring(input: $input) {
         ruleId
         title
         frequency

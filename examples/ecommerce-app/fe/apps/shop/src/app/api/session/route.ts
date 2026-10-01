@@ -30,7 +30,7 @@ export const POST = async (request: Request): Promise<Response> => {
 
 /**
  * DELETE `/api/session` - end the session: the bearer is revoked at the identity service's
- * `internal/sessions/revoke` door first and the local cookie cleared second. The revoke is
+ * `revokeSession` door first and the local cookie cleared second. The revoke is
  * best-effort - a dead token must never trap the cookie on the browser.
  */
 export const DELETE = async (): Promise<Response> => {

@@ -1,5 +1,5 @@
 mutation Invite($input: InviteInput!) {
-    invite(request: $input) {
+    invite(input: $input) {
         invitationId
         taskId
         email

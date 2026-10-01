@@ -1,5 +1,5 @@
 mutation CompleteTask($id: ID!) {
-    completeTask(request: { id: $id }) {
+    completeTask(input: { id: $id }) {
         taskId
         complete
     }

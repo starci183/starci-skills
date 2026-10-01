@@ -8,8 +8,8 @@ import { DOCUMENTS } from "./__generated__/documents"
 /**
  * Confirm the person's cart into an order. The idempotency key travels in the mutation input -
  * the same key returns the first answer with `replayed: true` rather than writing a second order.
- * A named refusal (`CHECKOUT_REFUSAL`: cart-empty, unknown-product, insufficient-stock) comes back
- * as an `invalid` Outcome carrying the refusal's own fields.
+ * A named refusal (`ORDER_CART_EMPTY`, `ORDER_UNKNOWN_PRODUCT`, `ORDER_INSUFFICIENT_STOCK`) comes back
+ * as an `invalid` Outcome carrying the refusal's parameters.
  */
 export const placeOrder = async (sessionToken: string, idempotencyKey: string): Promise<Outcome<OrderConfirmation>> =>
     parseOutcome(

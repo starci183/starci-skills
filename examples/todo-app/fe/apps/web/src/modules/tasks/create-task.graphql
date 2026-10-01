@@ -1,5 +1,5 @@
 mutation CreateTask($input: CreateTaskInput!) {
-    createTask(request: $input) {
+    createTask(input: $input) {
         taskId
         title
     }

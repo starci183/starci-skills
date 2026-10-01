@@ -1,5 +1,5 @@
 query NotificationPreferences {
-    notificationPreferences(request: {}) {
+    notificationPreferences(input: {}) {
         channel
         unsubscribed
         digestWindowMinutes

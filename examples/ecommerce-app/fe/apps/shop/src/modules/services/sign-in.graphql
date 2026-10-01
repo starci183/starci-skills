@@ -1,5 +1,5 @@
 mutation SignIn($input: SignInInput!) {
-    signIn(request: $input) {
+    signIn(input: $input) {
         sessionToken
         personId
     }

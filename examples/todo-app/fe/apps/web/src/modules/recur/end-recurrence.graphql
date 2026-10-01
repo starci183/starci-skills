@@ -1,5 +1,5 @@
 mutation EndRecurrence($input: EndRecurrenceInput!) {
-    endRecurrence(request: $input) {
+    endRecurrence(input: $input) {
         ruleId
         endedAt
         orphanedCount

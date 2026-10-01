@@ -1,5 +1,5 @@
 mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) {
-    updateNotificationPreferences(request: $input) {
+    updateNotificationPreferences(input: $input) {
         channel
         unsubscribed
         digestWindowMinutes

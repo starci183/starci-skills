@@ -1,5 +1,5 @@
 mutation ReopenTask($id: ID!) {
-    reopenTask(request: { id: $id }) {
+    reopenTask(input: { id: $id }) {
         taskId
         complete
     }

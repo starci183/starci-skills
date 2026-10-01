@@ -25,7 +25,7 @@ const ordersSlotOf = (who: Outcome<CurrentUser | null>): Slot<true> => {
 
 /**
  * The connected account page. The identity read happens here on the server - the session cookie's
- * bearer verified at `internal/sessions/verify`, then `account(personId)` for the person - and
+ * bearer verified at `verifySession`, then `account` with that bearer for the person - and
  * every sentence resolves before the pure twin sees a prop. The signed-out surface mounts the
  * connected session form; the signed-in surface mounts the connected sign-out action beside the
  * title.
