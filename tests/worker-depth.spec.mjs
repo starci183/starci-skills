@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { orcaSettings, validateConfig, ORCA_DEFAULTS } from '../engine/config.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
-import { dispatchDepthOf, launchDepth, depthVerdict, compareMeasuredDepth, isOrcaDepthRefusal, WORKER_DEPTH_EXCEEDED } from '../scripts/lib/worker-depth.mjs';
-import { spawnAgent, startAgent, depthPreflight } from '../scripts/agent/lib.mjs';
+import { dispatchDepthOf, launchDepth, depthVerdict, compareMeasuredDepth, isOrcaDepthRefusal, WORKER_DEPTH_EXCEEDED, dispatchOfTerminal } from '../scripts/lib/worker-depth.mjs';
+import { spawnAgent, startAgent, depthPreflight, entryDispatchOf } from '../scripts/agent/lib.mjs';
 import { probeWorkerDepth } from '../scripts/agent/depth-probe.mjs';
 import { depthItems } from '../scripts/reconciler/start.mjs';
 import { DEFAULT_RUBRIC, runCritic } from '../scripts/work/draw-critic.mjs';
@@ -215,4 +215,60 @@ test('api dispatch refuses an op whose Kernel already sits at orca.maxWorkerDept
   const reader = inspectLedger({ file: ledgerFileFor(repo) });
   try { assert.equal(reader.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-deep').status, 'ready', 'no try spent: the job is ready again'); }
   finally { reader.close(); }
+});
+
+test('a launching terminal that is itself a worker maps to its Dispatch through worker-list; a chat or shell maps to none', () => {
+  const rows = [{ dispatchId: 'ctx_sup', resource: { terminalHandle: 'term_sup' }, terminalState: 'active' },
+    { dispatchId: 'ctx_old', agentTerminalHandle: 'term_old', terminalState: 'active' }];
+  assert.equal(dispatchOfTerminal(rows, 'term_sup'), 'ctx_sup');
+  assert.equal(dispatchOfTerminal(rows, 'term_old'), 'ctx_old');
+  assert.equal(dispatchOfTerminal(rows, 'term_chat'), null);
+  assert.equal(dispatchOfTerminal(rows, null), null);
+  assert.equal(entryDispatchOf('term_sup', { list: () => ({ ok: true, workers: rows }) }), 'ctx_sup');
+  assert.equal(entryDispatchOf('term_sup', { list: () => ({ ok: false, error: 'host unavailable' }) }), null, 'a failed listing proves nothing');
+  assert.equal(entryDispatchOf('term_sup', { list: () => { throw new Error('boom'); } }), null);
+  assert.equal(entryDispatchOf(null, { list: () => { throw new Error('never listed'); } }), null);
+  // startAgent with no parent named reads the entry's Dispatch: a worker already at the limit cannot start another.
+  const calls = [];
+  const { io } = fakeSpawnIo(4, calls);
+  const rec = (name, out) => () => { calls.push(name); return out; };
+  const refused = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Kernel] depth', prompt: 'x', objective: 'depth',
+    entry: 'term_parent', maxDepth: 4, io: { runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }), taskCreate: rec('task-create', { ok: true, taskId: 't' }),
+      workerList: rec('worker-list', { ok: true, workers: [{ dispatchId: 'ctx_parent', resource: { terminalHandle: 'term_parent' } }] }), spawn: io } });
+  assert.equal(refused.step, 'depth');
+  assert.deepEqual([refused.depth, refused.parentDispatch], [5, 'ctx_parent']);
+  assert.deepEqual(calls, ['worker-list', 'worker-show']);
+});
+
+test('start-workflow from a worker terminal at the depth limit refuses the Kernel before worker-start', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-depth-kernel-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const repo = path.join(root, 'repo');
+  fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
+  const ownerRoot = path.join(root, 'owner');
+  fs.mkdirSync(ownerRoot);
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  const fake = path.join(root, 'fake-orca.mjs');
+  const state = path.join(root, 'orca-state.json');
+  const log = path.join(root, 'calls.jsonl');
+  // The launching terminal term_sup is an active worker (the Supervisor's seat) that Orca reports at depth 4.
+  fs.writeFileSync(state, JSON.stringify({ sends: 0, counter: 0, terminals: {}, commands: [],
+    workerRows: [{ dispatchId: 'ctx_sup', runId: 'run_sup', terminalState: 'active', resource: { terminalHandle: 'term_sup' } }], dispatchDepths: { ctx_sup: 4 } }));
+  fs.writeFileSync(fake, FAKE_ORCA);
+  const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
+    STARCI_FAKE_ORCA_LOG: log, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', STARCI_OWNER_ROOT: ownerRoot, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
+    STARCI_SLEEP_SCALE: '0.02', ORCA_TERMINAL_HANDLE: 'term_sup' };
+  const run = (rel, ...args) => spawnSync(process.execPath, [path.join(ROOT, ...rel), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const defined = run(['scripts', 'goal', 'define-goal.mjs'], '--repo', repo, '--text', 'kernel from a deep worker', '--json');
+  assert.equal(defined.status, 0, defined.stderr);
+  const workflowId = JSON.parse(defined.stdout).workflowId;
+  t.after(() => fs.rmSync(path.join(ROOT, 'runtime', 'guards', 'jobs', `kernel-${workflowId}.json`), { force: true }));
+  const started = run(['scripts', 'kernel', 'start-workflow.mjs'], '--repo', repo, '--goal', workflowId, '--json');
+  assert.equal(started.status, 1, started.stdout);
+  const failure = JSON.parse(started.stderr.trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop());
+  assert.equal(failure.step, 'depth');
+  assert.equal(failure.errorCode, 'worker-depth-exceeded');
+  const verbs = fs.readFileSync(log, 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l).argv.slice(0, 2).join(' '));
+  assert.ok(verbs.includes('orchestration worker-list'));
+  for (const verb of ['orchestration run-create', 'orchestration task-create', 'orchestration worker-start']) assert.equal(verbs.includes(verb), false, `${verb} never ran`);
 });

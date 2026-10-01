@@ -196,6 +196,7 @@ function clientOf(orca) {
   const o = orca ?? {};
   return {
     launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate, taskCreate: o.taskCreate,
+      workerList: o.workerList ?? (() => ({ ok: false, error: 'the fake client lists no workers' })),
       spawn: { trust: o.trust, start: o.workerStart, assignee: o.dispatchShow, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,

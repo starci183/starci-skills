@@ -10,8 +10,10 @@ summary: >-
   depth + 1 > orca.maxWorkerDepth with the new code worker-depth-exceeded, effectState none, before anything is trusted
   or started: startAgent before its Run and Task exist, spawnAgent before worker-start, api dispatch before the op's Task
   (the op nests under its Kernel's managed.dispatchId; the rejection carries managed.code, no try spent), and the draw
-  critic under its op (opContextOf gains the op's dispatchId; runCritic parentDispatch). A launch with no runtime-launched
-  parent (a Kernel or the [Supervisor] from a chat or shell) counts as depth 1; an unreadable parent depth proves nothing
+  critic under its op (opContextOf gains the op's dispatchId; runCritic parentDispatch). A launch with no parent named
+  (a Kernel, the [Supervisor], a [Worker]) nests under its entry terminal's own Dispatch, found in Orca's active workers
+  (worker-list through scripts/api/orca/worker-list.mjs, entryDispatchOf / dispatchOfTerminal); an entry no worker row
+  names (the owner's chat, a plain shell) counts as depth 1; an unreadable parent depth proves nothing
   and Orca stays the authority. The receipt carries the attested depth. `start --check` gains the config row orca-depth:
   the configured value, and with STARCI_ORCA_LIVE=1 and Orca reachable a measured probe (scripts/agent/depth-probe.mjs:
   no-op workers chained by --from until Orca refuses for depth, all stopped and released deepest first), red on a
@@ -26,6 +28,7 @@ paths:
   - config.example.yaml
   - scripts/lib/worker-depth.mjs
   - scripts/agent/lib.mjs
+  - scripts/api/orca/worker-list.mjs
   - scripts/agent/depth-probe.mjs
   - scripts/kernel/api-verbs/dispatch.mjs
   - scripts/kernel/op-context.mjs

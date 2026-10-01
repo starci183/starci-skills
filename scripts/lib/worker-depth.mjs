@@ -6,6 +6,8 @@
 // orca.maxWorkerDepth (engine/config.mjs orcaSettings); scripts/agent/lib.mjs spawnAgent refuses a launch deeper than it
 // before worker-start, and `start --check` compares it with a measured probe (scripts/agent/depth-probe.mjs).
 
+import { terminalHandleOf } from './worker-accounting.mjs';
+
 /** The runtime's refusal of a launch deeper than orca.maxWorkerDepth (modules/kernel/failure-codes.yaml). */
 export const WORKER_DEPTH_EXCEEDED = 'worker-depth-exceeded';
 /** Orca's own refusal of a nested worker-start past its depth setting. */
@@ -32,6 +34,16 @@ export function depthVerdict({ depth, maxDepth }) {
   if (!Number.isInteger(depth) || !Number.isInteger(maxDepth) || depth <= maxDepth) return null;
   return { code: WORKER_DEPTH_EXCEEDED, depth, maxDepth,
     error: `the worker would start at depth ${depth}, deeper than orca.maxWorkerDepth ${maxDepth} (Orca refuses it with ${ORCA_DEPTH_ERROR}); launch it from a shallower coordinator or raise the Orca app's depth setting and orca.maxWorkerDepth together` };
+}
+
+/**
+ * The Dispatch of the worker whose terminal is `handle`, from Orca's worker-list rows, or null (no row: the handle is
+ * the owner's chat, a plain shell, or a worker outside the listing). The newest row wins (Orca lists newest first).
+ */
+export function dispatchOfTerminal(rows, handle) {
+  if (!handle) return null;
+  const row = (Array.isArray(rows) ? rows : []).find((r) => terminalHandleOf(r) === handle && r?.dispatchId);
+  return row?.dispatchId ?? null;
 }
 
 /** Whether a start error is Orca's depth refusal. */

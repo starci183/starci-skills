@@ -30,7 +30,8 @@ import { taskCreate } from '../api/orca/task-create.mjs';
 import { taskSpecOf } from '../kernel/task-spec.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { orcaSettings } from '../../engine/config.mjs';
-import { dispatchDepthOf, launchDepth, depthVerdict } from '../lib/worker-depth.mjs';
+import { dispatchDepthOf, launchDepth, depthVerdict, dispatchOfTerminal } from '../lib/worker-depth.mjs';
+import { workerListAll } from '../api/orca/worker-list.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -477,6 +478,19 @@ export function depthPreflight({ parentDispatch = null, maxDepth = null, show = 
     effectState: 'none', depth, maxDepth: limit, parentDispatch } : null };
 }
 
+/**
+ * The Dispatch of the worker the entry terminal is, read from Orca's active workers (worker-list, every page), or null.
+ * A Kernel, the [Supervisor] or a [Worker] started from a worker's terminal nests under that worker; started from the
+ * owner's chat or a plain shell (no row), it is chat-rooted. A failed listing proves nothing (null).
+ */
+export function entryDispatchOf(entry, { list = () => workerListAll({ terminalState: 'active' }) } = {}) {
+  if (!entry) return null;
+  try {
+    const listed = list();
+    return listed?.ok ? dispatchOfTerminal(listed.workers, entry) : null;
+  } catch { return null; }
+}
+
 // config.yaml orca.maxWorkerDepth; an unreadable or invalid owner config falls back to the default (start --check
 // reports the config itself).
 const configuredMaxDepth = () => { try { return orcaSettings().maxWorkerDepth; } catch { return orcaSettings({}).maxWorkerDepth; } };
@@ -492,7 +506,9 @@ const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: f
 export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
   heading = null, objective, entry = null, priorRunId = null, onCreated = null, parentDispatch = null, maxDepth = null, io = null } = {}) {
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate, taskCreate: io?.taskCreate ?? taskCreate };
-  // The depth preflight runs before the Run and Task exist, so a refused launch leaves nothing behind in Orca.
+  // The depth preflight runs before the Run and Task exist, so a refused launch leaves nothing behind in Orca. With no
+  // parent named, the entry terminal's own Dispatch (worker-list) is the parent: a Kernel started from a worker nests.
+  if (!parentDispatch && entry) parentDispatch = entryDispatchOf(entry, io?.workerList ? { list: io.workerList } : {});
   const preflight = depthPreflight({ parentDispatch, maxDepth, show: io?.spawn?.show ?? workerShow });
   if (preflight.refusal) return { ...preflight.refusal, provider };
   const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
