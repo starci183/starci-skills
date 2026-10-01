@@ -122,8 +122,8 @@ No runtime code creates a terminal for an agent (`check-host-boundary.mjs` rule
 op agents and Supervisor workers all start this way. `start-workflow.mjs`
 creates the Kernel's entry Run from the launching terminal and starts the
 Kernel in it. The Kernel then binds its own Run (`run-create --from <its
-terminal>`) and starts every op there (`task-create --run`, `worker-start
---task --run --from <its terminal>`), never with `--parent`: Orca nests the
+terminal>`) and starts every op there (`worker-start --spec --run --from <its
+terminal>`, which files the op's Task), never with `--parent`: Orca nests the
 workflow Run under the Kernel's Dispatch, so `worker-show` shows the Kernel at
 depth 1 and its ops at depth 2. `settle` stops and releases the op's worker.
 

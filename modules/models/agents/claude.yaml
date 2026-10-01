@@ -4,6 +4,9 @@ kind: native-managed-agent
 start:
   api: orchestration.worker-start
   agentArgument: claude
+  # The agent's own approval-bypass mode. Orca applies it from settings.agentDefaultArgs; the host preflight refuses a launch
+  # when that setting lacks it (the agent would stop at an approval prompt no one answers).
+  bypassFlag: '--dangerously-skip-permissions'
 readiness: worker-start-receipt
 roles:
   - workflow-kernel
@@ -46,8 +49,8 @@ liveness:
     - '^\s*⧉\s+(?:In\s+\S|\d+\s+lines?\s+(?:selected|from)\b)'
     - '^\s*(?:[✘✗×⚠]\s+)?(?:MCP (?:\d+ )?servers? blocked by enterprise policy:|one or more of your MCP server choices could not be saved\b|your MCP server choices apply to this session only\b|skipping \.mcp\.json server approval\b)'
     - '^\s*(?:\d+% until auto-compact|\d+% context used|Context low \(\d+% remaining\))(?:\s·\s.*)?\s*$'
-verifiedAt: 2026-09-23
-verifiedAgainst: 'claude CLI 2.1.280'
+verifiedAt: 2026-10-02
+verifiedAgainst: 'claude CLI 2.1.282'
 forbidden:
   - shell-only-role
   - unsupervised-dispatch-inject-as-success

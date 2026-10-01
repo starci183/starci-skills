@@ -121,12 +121,12 @@ test('TASK_OUTSIDE_RUN: an open Task in a Run the workflow no longer uses',t=>{
   });
 });
 
-test('a Task the settle already closed is out of the tree, not a finding',t=>{
+test('a settled job\'s Task settled with its Dispatch: out of the tree, not a finding',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
     ledger.db.prepare("UPDATE jobs SET status='reported' WHERE job_id='job-op-1'").run();
     ledger.db.prepare("UPDATE jobs SET status='succeeded',worker_id=NULL,payload_json=? WHERE job_id='job-op-1'")
-      .run(JSON.stringify({managed:{runId:'run-0',taskId:'task-old'},taskClosed:{taskId:'task-old',status:'done',ok:true}}));
+      .run(JSON.stringify({managed:{runId:'run-0',taskId:'task-old'}}));
     assert.deepEqual(orcaTreeFindings(ledger.db,seen(term(KERNEL,'[Kernel] wf-tree'))),[]);
   });
 });

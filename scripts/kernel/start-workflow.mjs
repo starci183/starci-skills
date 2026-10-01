@@ -688,7 +688,7 @@ try {
   for (const [index, member] of members.entries()) {
     updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + KERNEL_START_RESERVATION_MS });
     spawned = startAgent({ provider: member.agent, model: member.model, effort: member.effort, worktree: kernelWorktree, title, prompt, specFile,
-      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard });
+      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard, request: { workflow: workflowId, kernelAttempt: kernelAttemptOf(priorKernelJob) + 1, reservation: token } });
     if (spawned.ok) {
       route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
       break;

@@ -61,7 +61,10 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   assert.equal(calls['terminal-create'],undefined,'no terminal-create call');
   assert.equal(calls.dispatch,undefined,'no orchestration dispatch into a pre-made terminal');
   assert.equal(calls['worker-start'].flags.includes('terminal'),false,'worker-start never adopts a terminal');
-  assert.equal(calls['task-create'].flags.includes('parent'),false,'the nested Run rule: a Task never names a --parent');
+  assert.equal(calls['task-create'],undefined,'worker-start --spec files the Task: there is no task-create call');
+  assert.equal(calls['dispatch-show'],undefined,'the agent terminal comes from the start receipt or worker-show: no dispatch-show');
+  for(const gone of ['parent','task','retry-of'])assert.equal(calls['worker-start'].flags.includes(gone),false,`worker-start never passes --${gone}`);
+  assert.ok(calls['worker-start'].required.includes('spec'),'every start files its Task from --spec');
   assert.ok(calls['worker-start'].required.includes('agent'),'worker-start always names the agent it launches');
   const api=readYaml('modules/host/orca/api.yaml');
   for(const command of BYPASS)assert.ok(api.forbiddenForStarciOrchestration.includes(command),`${command} is forbidden`);
@@ -71,7 +74,7 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
     `import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};`+
     "const t=f=>{try{f();return null;}catch(e){return e.message;}};"+
     "console.log(JSON.stringify([t(()=>orcaCall('terminal-create',{title:'x',command:'claude'})),"+
-    "t(()=>orcaCall('worker-start',{task:'t',worktree:'w',agent:'claude',run:'r',terminal:'term-1'}))]));"],
+    "t(()=>orcaCall('worker-start',{spec:'s',worktree:'w',agent:'claude',run:'r',terminal:'term-1'},{request:{job:'j'}}))]));"],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,env:{...process.env,STARCI_ORCA_COMMAND:'orca-must-not-run'}});
   const [createRefused,adoptRefused]=json(refusals.stdout.trim())??[];
   assert.match(createRefused??'',/terminal-create/,refusals.stderr);
@@ -98,36 +101,55 @@ test('every profile and registry target launches through worker-start --agent <c
 /* ------------------------------------------------------------ spawnAgent / startAgent */
 
 // Orca seams: every host call is recorded; nothing reaches a real host or the owner's trust files.
-const seams=({start=null,show=null,assignee=null}={})=>{
+const seams=({start=null,show=null,handle='term_1'}={})=>{
   const calls=[];
   const rec=(name,fn)=>(args)=>{calls.push([name,args]);return fn(args);};
   const io={
     trust:rec('trust',()=>({status:'ok',paths:[]})),
-    start:rec('start',start??(({agent,model})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',state:'ready',agent,model}))),
-    assignee:rec('assignee',assignee??(()=>({ok:true,assigneeHandle:'term_1'}))),
+    start:rec('start',start??(({agent,model,run})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:`task_${run}`,agentTerminalHandle:handle,state:'ready',agent,model}))),
     rename:rec('rename',()=>({ok:true})),
-    show:rec('show',show??(()=>({ok:true,state:'ready',effective:{agent:calls.find(c=>c[0]==='start')[1].agent,model:calls.find(c=>c[0]==='start')[1].model??null}}))),
+    show:rec('show',show??(()=>({ok:true,state:'ready',dispatch:{id:'ctx_1',assigneeHandle:'term_shown'},
+      effective:{agent:calls.find(c=>c[0]==='start')[1].agent,model:calls.find(c=>c[0]==='start')[1].model??null}}))),
     stop:rec('stop',()=>({ok:true})),
     release:rec('release',()=>({ok:true})),
   };
   return {io,calls,names:()=>calls.map(c=>c[0])};
 };
 
-test('spawnAgent starts the routed agent through worker-start, resolves its assignee, names it and attests it',()=>{
+test('spawnAgent starts the routed agent with its spec through worker-start, takes the terminal from the receipt, names it and attests it',()=>{
   const s=seams();
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',effort:'high',worktree:'D:/w',title:'[Op] x',task:'task_1',run:'run_1',from:'term_k',io:s.io});
+  const created=[];
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',effort:'high',worktree:'D:/w',title:'[Op] x',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',
+    request:{job:'j1',lease:'l1'},onCreated:(h,d)=>created.push([h,d]),io:s.io});
   assert.equal(r.ok,true,JSON.stringify(r));
-  assert.deepEqual(s.names(),['trust','start','assignee','rename','show']);
+  assert.deepEqual(s.names(),['trust','start','show','rename'],'no task-create and no dispatch-show');
   const start=s.calls.find(c=>c[0]==='start')[1];
-  assert.deepEqual({agent:start.agent,model:start.model,effort:start.effort,task:start.task,run:start.run,from:start.from,worktree:start.worktree},
-    {agent:'claude',model:'claude-opus-5-5',effort:'high',task:'task_1',run:'run_1',from:'term_k',worktree:'D:/w'});
+  assert.deepEqual({agent:start.agent,model:start.model,effort:start.effort,spec:start.spec,taskTitle:start.taskTitle,run:start.run,from:start.from,worktree:start.worktree},
+    {agent:'claude',model:'claude-opus-5-5',effort:'high',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',worktree:'D:/w'});
+  assert.deepEqual(start.request,{job:'j1',lease:'l1',run:'run_1',agent:'claude',model:'claude-opus-5-5'},'the start identity is the ledger identity plus the Run, agent and model');
+  assert.equal(start.task,undefined,'a start never names an existing Task');
   assert.equal(start.terminal,undefined,'no terminal is ever handed to worker-start');
-  assert.deepEqual([r.terminal,r.dispatchId,r.titleApplied],['term_1','ctx_1',true]);
+  assert.deepEqual([r.terminal,r.dispatchId,r.taskId,r.titleApplied],['term_1','ctx_1','task_run_1',true]);
+  assert.deepEqual(created,[['term_1','ctx_1']],'the handle is recorded the moment the receipt names it');
+});
+
+test('a start receipt without the agent terminal takes it from worker-show; neither is a typed refusal that cleans the worker',()=>{
+  const s=seams({handle:null});
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
+  assert.equal(r.ok,true,JSON.stringify(r));
+  assert.equal(r.terminal,'term_shown');
+  const none=seams({handle:null,show:()=>({ok:true,state:'ready',dispatch:{id:'ctx_1'},effective:{agent:'claude',model:'claude-opus-5-5'}})});
+  const n=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:none.io});
+  assert.deepEqual([n.ok,n.step,n.code,n.effectState],[false,'worker-show','worker-terminal-unknown','none']);
+  assert.ok(none.names().includes('stop')&&none.names().includes('release'),'the nameless worker is stopped and released');
+  const noTask=seams({start:({agent,model})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:null,agentTerminalHandle:'term_1',agent,model})});
+  const t=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:noTask.io});
+  assert.deepEqual([t.ok,t.step,t.code],[false,'worker-start','worker-start-no-task']);
 });
 
 test('a card that takes no model flag starts without --model/--effort and is attested on its agent alone',()=>{
   const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'devin',model:null}})});
-  const r=spawnAgent({provider:'devin',model:'swe-2-max',effort:'high',worktree:'D:/w',title:'[Op] x',task:'task_1',run:'run_1',io:s.io});
+  const r=spawnAgent({provider:'devin',model:'swe-2-max',effort:'high',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
   assert.equal(r.ok,true,JSON.stringify(r));
   const start=s.calls.find(c=>c[0]==='start')[1];
   assert.equal(start.agent,'devin');
@@ -137,7 +159,7 @@ test('a card that takes no model flag starts without --model/--effort and is att
 
 test('an attestation mismatch fences and releases the worker it started and never reports it live',()=>{
   const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'claude-sonnet-5'}})});
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'t',task:'task_1',run:'run_1',io:s.io});
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'t',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
   assert.equal(r.ok,false);
   assert.equal(r.step,'attestation');
   assert.ok(s.names().includes('stop')&&s.names().includes('release'),'the mismatched worker is stopped and released');
@@ -146,35 +168,41 @@ test('an attestation mismatch fences and releases the worker it started and neve
 
 test('a start refused before any effect is not cleaned; an unknown effect is left fenced while worker-show says live',()=>{
   const refused=seams({start:()=>({ok:false,outcome:'failed',effectState:'none',dispatchId:null,error:'worker_start_failed'})});
-  const a=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',task:'task_1',run:'r',io:refused.io});
+  const a=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:refused.io});
   assert.deepEqual([a.ok,a.step,a.effectState],[false,'worker-start','none']);
   assert.equal(refused.names().some(n=>['stop','release','show'].includes(n)),false);
   const unknown=seams({start:()=>({ok:false,outcome:'unknown',effectState:'unknown',dispatchId:'ctx_9'}),show:()=>({ok:true,state:'ready'})});
-  const b=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',task:'task_1',run:'r',io:unknown.io});
+  const b=spawnAgent({provider:'claude',model:'m',worktree:'w',title:'t',spec:'s',run:'r',request:{job:'j'},io:unknown.io});
   assert.deepEqual([b.ok,b.effectState],[false,'unknown']);
   assert.equal(unknown.names().includes('stop'),false,'absence of exit proof never authorizes a stop');
 });
 
-test('startAgent reuses the prior Run while Orca knows it and takes the Task, else opens a fresh Run',()=>{
+test('startAgent reuses the prior Run while Orca knows it and takes the start, else opens a fresh Run',()=>{
   const run=(priorKnown,priorAccepts)=>{
     const log=[];
+    const spawn=seams({start:({run,agent,model})=>(log.push(`worker-start:${run}`),run==='run_old'&&!priorAccepts
+      ?{ok:false,outcome:'failed',effectState:'none',dispatchId:null,errorCode:'not_run_coordinator',error:'not_run_coordinator'}
+      :{ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:`task_${run}`,agentTerminalHandle:'term_1',agent,model})});
     const io={
       runShow:()=>(log.push('run-show'),{ok:priorKnown}),
-      runCreate:({from})=>(log.push(`run-create:${from??'-'}`),{ok:true,runId:'run_new'}),
-      taskCreate:({run})=>(log.push(`task-create:${run}`),run==='run_old'&&!priorAccepts?{ok:false,error:'not_run_coordinator'}:{ok:true,taskId:`task_${run}`}),
-      spawn:seams().io,
+      runCreate:({from,request})=>(log.push(`run-create:${from??'-'}`),{ok:true,runId:'run_new',request}),
+      spawn:spawn.io,
     };
-    const r=startAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Kernel] wf',prompt:'boot',objective:'o',entry:'term_owner',priorRunId:'run_old',io});
-    return {r,log};
+    const r=startAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Kernel] wf',prompt:'boot',objective:'o',entry:'term_owner',priorRunId:'run_old',
+      request:{workflow:'wf',kernelAttempt:2,reservation:'tok'},io});
+    return {r,log,spawn};
   };
   const reused=run(true,true);
-  assert.deepEqual(reused.log,['run-show','task-create:run_old']);
+  assert.deepEqual(reused.log,['run-show','worker-start:run_old']);
   assert.deepEqual([reused.r.ok,reused.r.runId,reused.r.taskId],[true,'run_old','task_run_old']);
   const fenced=run(true,false);
-  assert.deepEqual(fenced.log,['run-show','task-create:run_old','run-create:term_owner','task-create:run_new']);
+  assert.deepEqual(fenced.log,['run-show','worker-start:run_old','run-create:term_owner','worker-start:run_new']);
   assert.equal(fenced.r.runId,'run_new');
+  const starts=fenced.spawn.calls.filter(c=>c[0]==='start').map(c=>c[1].request.run);
+  assert.deepEqual(starts,['run_old','run_new'],'each Run gets its own start identity, so the refused start is never replayed');
   const lost=run(false,true);
-  assert.deepEqual(lost.log,['run-show','run-create:term_owner','task-create:run_new']);
+  assert.deepEqual(lost.log,['run-show','run-create:term_owner','worker-start:run_new']);
+  assert.throws(()=>startAgent({provider:'claude',worktree:'w',title:'t',prompt:'p',objective:'o',io:{}}),/needs request/);
 });
 
 /* ------------------------------------------------------------ on the wire */
@@ -238,11 +266,14 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     const flag=(argv,name)=>argv.includes(name)?argv[argv.indexOf(name)+1]:null;
     const [runCreate]=argvOf('orchestration run-create');
     assert.equal(flag(runCreate,'--from'),'fake-kernel-terminal','the workflow Run is created from the Kernel terminal, its coordinator');
-    const [taskCreate]=argvOf('orchestration task-create');
-    assert.equal(taskCreate.includes('--parent'),false,'an op Task never names a --parent');
-    assert.equal(flag(taskCreate,'--from'),'fake-kernel-terminal');
+    assert.deepEqual(argvOf('orchestration task-create'),[],'worker-start --spec files the op Task: no task-create');
+    assert.equal(start.includes('--parent'),false,'an op Task never names a --parent');
+    assert.equal(start.includes('--task'),false,'a start never names an existing Task');
+    assert.ok(flag(start,'--spec'),'the rendered packet rides on --spec');
+    assert.equal(flag(start,'--task-title'),'code.refactor #1');
+    assert.match(flag(start,'--retry-request')??'',/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'the start carries its request id from the first issue');
     assert.equal(flag(start,'--from'),'fake-kernel-terminal','the op is started from the Kernel terminal');
-    assert.equal(flag(start,'--run'),flag(taskCreate,'--run'));
+    assert.equal(flag(start,'--run'),flag(runCreate,'--run')??'run-fake-1');
     const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
     try{
       const job=ledger.db.prepare('SELECT status,worker_id FROM jobs WHERE job_id=?').get(jobId);
@@ -263,8 +294,9 @@ test('the Kernel boots as a worker of its own entry Run through worker-start, ne
   assert.equal(out.dispatch,'dispatch-fake-1');
   const seen=fx.calls();
   for(const bypass of BYPASS)assert.equal(seen.includes(bypass),false,`the Kernel launched with ${bypass}: ${seen.join(', ')}`);
-  const order=['orchestration run-create','orchestration task-create','orchestration worker-start','orchestration dispatch-show','orchestration worker-show'];
-  assert.deepEqual(seen.filter(c=>order.includes(c)),order,'entry Run -> Kernel Task -> worker-start -> assignee -> attestation');
+  const order=['orchestration run-create','orchestration worker-start','orchestration worker-show'];
+  assert.deepEqual(seen.filter(c=>order.includes(c)),order,'entry Run -> worker-start --spec (the Kernel Task) -> attestation');
+  assert.equal(seen.includes('orchestration task-create')||seen.includes('orchestration dispatch-show'),false);
   const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6-sol','high']);
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});

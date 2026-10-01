@@ -64,8 +64,7 @@ const fakeSpawnIo = (parentDepth, calls = []) => {
   const rec = (name, fn) => (a = {}) => { calls.push(name); return fn(a); };
   return { calls, io: {
     trust: rec('trust', () => ({ status: 'ok', paths: [] })),
-    start: rec('worker-start', () => ({ ok: true, outcome: 'ok', dispatchId: 'ctx_child' })),
-    assignee: rec('dispatch-show', () => ({ ok: true, assigneeHandle: 'term_child' })),
+    start: rec('worker-start', () => ({ ok: true, outcome: 'ok', dispatchId: 'ctx_child', taskId: 'task_1', agentTerminalHandle: 'term_child' })),
     rename: rec('terminal-rename', () => ({ ok: true })),
     show: rec('worker-show', ({ dispatch }) => dispatch === 'ctx_parent'
       ? (parentDepth == null ? { ok: false, error: 'host unavailable' } : { ok: true, dispatch: { depth: parentDepth } })
@@ -74,7 +73,7 @@ const fakeSpawnIo = (parentDepth, calls = []) => {
     release: rec('worker-release', () => ({ ok: true })),
   } };
 };
-const launch = (io, extra = {}) => spawnAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Op] depth', task: 'task_1', run: 'run_1',
+const launch = (io, extra = {}) => spawnAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Op] depth', spec: 'judge', run: 'run_1', request: { job: 'depth' },
   parentDispatch: 'ctx_parent', io, ...extra });
 
 test('spawnAgent refuses a worker nested past orca.maxWorkerDepth before anything is trusted or started', () => {
@@ -106,8 +105,8 @@ test('startAgent refuses before its Run and Task exist, so a refused launch leav
   const calls = [];
   const { io } = fakeSpawnIo(4, calls);
   const rec = (name) => () => { calls.push(name); return { ok: true, runId: 'run_x', taskId: 'task_x' }; };
-  const r = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Critic] depth', prompt: 'judge', objective: 'depth',
-    parentDispatch: 'ctx_parent', maxDepth: 4, io: { runShow: rec('run-show'), runCreate: rec('run-create'), taskCreate: rec('task-create'), spawn: io } });
+  const r = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Critic] depth', prompt: 'judge', objective: 'depth', request: { critic: 'depth' },
+    parentDispatch: 'ctx_parent', maxDepth: 4, io: { runShow: rec('run-show'), runCreate: rec('run-create'), spawn: io } });
   assert.equal(r.step, 'depth');
   assert.equal(r.errorCode, 'worker-depth-exceeded');
   assert.deepEqual(calls, ['worker-show']);
@@ -237,8 +236,8 @@ test('a launching terminal that is itself a worker maps to its Dispatch through 
   const calls = [];
   const { io } = fakeSpawnIo(4, calls);
   const rec = (name, out) => () => { calls.push(name); return out; };
-  const refused = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Kernel] depth', prompt: 'x', objective: 'depth',
-    entry: 'term_parent', maxDepth: 4, io: { runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }), taskCreate: rec('task-create', { ok: true, taskId: 't' }),
+  const refused = startAgent({ provider: 'claude', model: 'claude-opus-4-7', worktree: ROOT, title: '[Kernel] depth', prompt: 'x', objective: 'depth', request: { kernel: 'depth' },
+    entry: 'term_parent', maxDepth: 4, io: { runShow: rec('run-show', { ok: false }), runCreate: rec('run-create', { ok: true, runId: 'r' }),
       workerList: rec('worker-list', { ok: true, workers: [{ dispatchId: 'ctx_parent', resource: { terminalHandle: 'term_parent' } }] }), spawn: io } });
   assert.equal(refused.step, 'depth');
   assert.deepEqual([refused.depth, refused.parentDispatch], [5, 'ctx_parent']);

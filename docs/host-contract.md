@@ -88,18 +88,26 @@ capabilities:                    # optional — agent-specific facts
 `scripts/agent/lib.mjs` is the mechanism:
 
 ```text
-spawnAgent({provider, model, effort, worktree, title, task, run, from})
+spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
   ensureLaunchTrust(agent, worktree)   → the owner never answers a trust prompt
-  worker-start(task, worktree, --agent, [--model, --effort], run, from)
-                                       → dispatchId (ready worker; Orca injected the Task)
-  dispatch-show(task, from)            → the exact assignee terminal (never a second dispatch)
-  terminal rename(assignee, title)     → [Op] … / [Kernel] … / [Supervisor] main / [Worker] …
-  worker-show(dispatch)                → attestation: effective agent (and model, when pinned) = the route
-startAgent({…, prompt, objective, entry, priorRunId})
-  run-create(objective, from = entry)  → the agent's own Run (Kernel, Supervisor, [Worker])
-  task-create(run, spec = prompt)      → spilled to a file past the host argv (task-spec.mjs)
-  spawnAgent(...)
+  worker-start(spec, worktree, --agent, [--model, --effort], run, from, --retry-request)
+                                       → dispatchId + taskId (Orca filed the Task from --spec and injected it)
+                                         + result.worker.agentTerminalHandle
+  worker-show(dispatch)                → attestation: effective agent (and model, when pinned) = the route;
+                                         result.dispatch.assigneeHandle when the start receipt named no terminal
+  terminal rename(terminal, title)     → [Op] … / [Kernel] … / [Supervisor] main / [Worker] …
+startAgent({…, prompt, objective, entry, priorRunId, request})
+  run-create(objective, from = entry, --retry-request)
+                                       → the agent's own Run (Kernel, Supervisor, [Worker])
+  spawnAgent(spec = prompt, ...)       → spilled to a file past the host argv (task-spec.mjs)
 ```
+
+Every mutation declares `replay` in `calls.yaml` (`idempotency`): `request`
+mutations (run-create, run-use, worker-start) carry `--retry-request <id>` from
+their first issue, the id derived from the caller's ledger identity (`request`),
+and a lost receipt is settled by `request-show` and one replay under that id;
+`reissue` mutations (worker-stop, worker-release, task-update) are naturally
+idempotent and re-issued once; `none` is never re-issued by the runner.
 
 A failed start is reconciled before it returns: no effect → nothing; unknown →
 worker-show first, cleaned only when Orca shows the worker ended; partial →
@@ -124,10 +132,10 @@ sequence (typed calls from `calls.yaml`, wrappers under `scripts/api/orca/`):
 ```text
 run-create(objective = workflow id + title,
            from = Kernel terminal)              → runId (once per workflow)
-task-create(run, spec = prompt/packet,
-            displayName '[Op] <operation>')     → taskId
-spawnAgent(task, workflow worktree, agent, model,
-           effort, run, from = Kernel)          → dispatchId + assignee + attestation
+spawnAgent(spec = prompt/packet, taskTitle '<op> #<attempt>',
+           displayName '[Op] <operation>', workflow worktree, agent, model,
+           effort, run, from = Kernel,
+           request = {job, lease})              → taskId + dispatchId + agent terminal + attestation
 ```
 
 The workflow worktree is the one git worktree of the product repository that
@@ -141,8 +149,8 @@ effective agent/model mismatches the route is fenced: `worker-stop` then
 job's `worker_id` is the **Dispatch id**.
 
 The Kernel is a worker too: `start-workflow.mjs` creates the Kernel's entry Run
-from the launching terminal (its coordinator), files the Kernel Task and starts
-it with `startAgent`. The Kernel's first operation creates the workflow Run from
+from the launching terminal (its coordinator) and starts the Kernel with
+`startAgent` (worker-start --spec files the Kernel Task). The Kernel's first operation creates the workflow Run from
 the Kernel's own terminal (Orca takes Run-scoped calls only from a Run's
 coordinator). An explicit Kernel agent/model pin fails closed when unavailable;
 it is never silently substituted. `api hierarchy` projects `workflow → Kernel → Op`.
@@ -150,13 +158,13 @@ it is never silently substituted. `api hierarchy` projects `workflow → Kernel 
 **The nested Run rule.** An agent that starts agents binds its OWN Run and starts
 them there, which is the shape Orca's own worker preamble prescribes (SUB-DISPATCH):
 the Kernel runs `run-create --from <kernel terminal>` (so it coordinates that Run),
-`task-create --run <it> --from <kernel terminal>` and `worker-start --task --run
---from <kernel terminal>`. No Task names a `--parent`: Orca accepts a parent only
+and `worker-start --spec --run <it> --from <kernel terminal>`, which files each
+op Task there. No Task names a `--parent`: Orca accepts a parent only
 from the same Run (`Parent task … must belong to run …`), and the Kernel cannot
 file a Task in its entry Run, where it is a worker (`consumer_fenced`). Orca nests
 the workflow Run under the Kernel's Dispatch; `worker-show` reports the Kernel at
 depth 1 and its op at depth 2 (real-Orca smoke 2026-10-01, lane dv-c0-launch).
-`calls.yaml` `task-create` declares no `parent` flag, so the wrapper cannot build one.
+`calls.yaml` `worker-start` declares no `parent` flag, so the wrapper cannot build one.
 
 Nested workers need Orca's Settings → Orchestration → Nested worker depth of at
 least 2 when the owner's chat starts the Kernel (chat → Kernel → Op), and 3 when the

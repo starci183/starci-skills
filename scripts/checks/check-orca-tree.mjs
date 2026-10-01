@@ -15,8 +15,9 @@
 //                      kernel or op worker (settled worker, leftover shell)
 //   TITLE_DRIFT        a live managed op worker whose [Op] tab-title rename did
 //                      not apply (the unnamed worker-task_<id> sidebar row)
-//   TASK_OUTSIDE_RUN   a job whose Orca Run is not the workflow's current Run,
-//                      so its Task hangs outside the workflow's tree
+//   TASK_OUTSIDE_RUN   a live job whose Orca Run is not the workflow's current Run,
+//                      so its Task hangs outside the workflow's tree (a settled job's
+//                      Task settled with its Dispatch: worker_done or settle's fence)
 //
 // ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or
 // a worker Orca accounts for in one of this ledger's Runs (orchestration

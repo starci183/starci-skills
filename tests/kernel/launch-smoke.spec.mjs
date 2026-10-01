@@ -16,8 +16,8 @@ import { gitResult } from '../../scripts/api/git/lib.mjs';
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) drives the runtime's own
 // launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
 // and draw-critic.mjs launchCriticWorker (the critic on its criticWorkspace placement) - against a fake Orca at the
-// wrapper level: Runs, Tasks, worker-start, dispatch-show, worker-show (depth and creator Dispatch, the way Orca
-// reports them), worker-read, worker-stop, worker-release, task-update and worktree list. Each fake agent does
+// wrapper level: Runs, worker-start --spec (it files the Task), worker-show (depth and creator Dispatch, the way Orca
+// reports them), worker-read, worker-stop, worker-release, task-update, and worktree list. Each fake agent does
 // what its no-op spec says: a parent runs its stage (starting its children from its own terminal), every agent marks its
 // result line (an op writes its owned file in the workflow worktree) and sends worker_done. Nothing reaches a host.
 //
@@ -145,14 +145,11 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
   const wrappers = {
     runShow: rec('run-show', () => ({ ok: false })),
     runCreate: rec('run-create', ({ from }) => { runs += 1; return { ok: true, runId: `run_${runs}`, from }; }),
-    taskCreate: rec('task-create', ({ run, displayName, spec, from }) => {
-      const taskId = `task_${titleRole(displayName)}`;
-      tasks.set(taskId, { role: titleRole(displayName), run, spec, from });
-      return { ok: true, taskId };
-    }),
     trust: rec('trust', () => ({ status: 'already', paths: [] })),
-    workerStart: rec('worker-start', ({ task, from, worktree, agent, model }) => {
-      const { role, spec } = tasks.get(task);
+    workerStart: rec('worker-start', ({ spec, displayName, run, from, worktree, agent, model }) => {
+      const role = titleRole(displayName);
+      const task = `task_${role}`;
+      tasks.set(task, { role, run, spec, from });
       if (role === refuse) return { ok: false, outcome: 'failed', effectState: 'none', dispatchId: null, errorCode: 'selector_not_found', error: `selector_not_found: path:${worktree}` };
       const placed = worktree;
       const creator = byTerminal.get(from) ?? null;
@@ -161,9 +158,8 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
       workers.set(w.id, w);
       byTerminal.set(w.terminal, w);
       pending.push(w);
-      return { ok: true, outcome: 'ok', effectState: 'committed', dispatchId: w.id, state: 'ready' };
+      return { ok: true, outcome: 'ok', effectState: 'committed', dispatchId: w.id, taskId: task, agentTerminalHandle: w.terminal, state: 'ready' };
     }),
-    dispatchShow: rec('dispatch-show', ({ task }) => ({ ok: true, assigneeHandle: `term_${tasks.get(task).role}` })),
     terminalRename: rec('terminal-rename', () => ({ ok: true })),
     workerShow: rec('worker-show', ({ dispatch }) => {
       const w = workers.get(dispatch);
@@ -181,8 +177,8 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
     taskUpdate: rec('task-update', ({ id, status }) => ({ ok: true, taskId: id, status })),
     worktreeList: rec('worktree-list', () => ({ ok: true, worktrees: [...wfr.listed.values()] })),
   };
-  const io = { runShow: wrappers.runShow, runCreate: wrappers.runCreate, taskCreate: wrappers.taskCreate,
-    spawn: { trust: wrappers.trust, start: wrappers.workerStart, assignee: wrappers.dispatchShow, rename: wrappers.terminalRename,
+  const io = { runShow: wrappers.runShow, runCreate: wrappers.runCreate,
+    spawn: { trust: wrappers.trust, start: wrappers.workerStart, rename: wrappers.terminalRename,
       show: wrappers.workerShow, stop: wrappers.workerStop, release: wrappers.workerRelease } };
   const launches = [];
   const client = {
@@ -250,15 +246,17 @@ test('every nesting path starts through the runtime launchers at the depth Orca 
   const starts = fake.calls.filter((c) => c[0] === 'worker-start').map((c) => c[1]);
   assert.equal(starts.length, 7, 'one worker-start per agent');
   for (const s of starts) assert.deepEqual([s.agent, s.model, s.effort], ['codex', 'gpt-6-luna', 'low'], 'every no-op agent runs the cheapest model');
-  const startOf = (role) => starts.find((s) => fake.workers.get(`ctx_${role}`).task === s.task);
+  const startOf = (role) => starts.find((s) => fake.workers.get(`ctx_${role}`).task === `task_${titleRole(s.displayName)}`);
   assert.equal(startOf('supervisor').from, 'term_entry');
   assert.equal(startOf('kernel').from, 'term_entry');
   assert.equal(startOf('worker').from, 'term_supervisor', 'the [Worker] is started from the Supervisor terminal, in its Run');
-  for (const op of ['op', 'opFe', 'opFail']) assert.equal(startOf(op).from, 'term_kernel', `${op} is started from the Kernel terminal (worker-start --task --run --from)`);
+  for (const op of ['op', 'opFe', 'opFail']) assert.equal(startOf(op).from, 'term_kernel', `${op} is started from the Kernel terminal (worker-start --spec --run --from)`);
   assert.equal(startOf('critic').from, 'term_op', 'the critic is started from the Op terminal');
   const runFroms = fake.calls.filter((c) => c[0] === 'run-create').map((c) => c[1].from).sort();
   assert.deepEqual(runFroms, ['term_entry', 'term_entry', 'term_kernel', 'term_kernel', 'term_kernel', 'term_op', 'term_supervisor'], 'each parent creates and coordinates the Run of its child');
-  assert.equal(fake.calls.some(([n, a]) => n === 'task-create' && a.parent), false, 'no Task names a --parent');
+  assert.equal(fake.calls.some(([n]) => n === 'task-create' || n === 'dispatch-show'), false, 'worker-start --spec files every Task: no task-create, no dispatch-show');
+  assert.equal(starts.some((s) => s.parent || s.task), false, 'no start names a --parent or an existing Task');
+  for (const s of starts) assert.ok(s.request?.run, 'every start carries its ledger identity (calls.yaml replay: request)');
   assert.equal(startOf('critic').worktree, r.agents.critic.workspace.replaceAll('/', path.sep), 'the critic is placed on draw-critic criticWorkspace');
   assert.equal(r.agents.critic.creatorDispatchId, 'ctx_op');
   for (const role of Object.keys(ROLES)) {
@@ -293,10 +291,10 @@ test('Orca creates the workflow worktree before the Kernel starts in it; the be 
   assert.match(wf.path, /orca-worktrees\/wf-smoke-t$/);
   const starts = fake.calls.filter((c) => c[0] === 'worker-start').map((c) => c[1]);
   for (const op of ['op', 'opFe', 'opFail']) {
-    assert.equal(starts.find((s) => s.task === `task_${op}`).worktree.replaceAll('\\', '/'), wf.path, `${op} starts with --worktree <the workflow worktree>`);
+    assert.equal(starts.find((s) => titleRole(s.displayName) === op).worktree.replaceAll('\\', '/'), wf.path, `${op} starts with --worktree <the workflow worktree>`);
   }
   assert.equal(wf.parallel, true, 'the be op and the fe op were started together');
-  const stage = fake.calls.filter((c) => c[0] === 'worker-start').map((c) => c[1].task);
+  const stage = fake.calls.filter((c) => c[0] === 'worker-start').map((c) => `task_${titleRole(c[1].displayName)}`);
   assert.ok(stage.indexOf('task_opFe') < stage.indexOf('task_opFail'), 'the failing be op starts only after the first be op settled');
   assert.deepEqual([wf.concurrency.sides.op, wf.concurrency.sides.opFe], ['be', 'fe']);
   assert.equal(wf.concurrency.beBeside, false, 'same side: serial');
@@ -572,4 +570,14 @@ test('the Kernel stage holds until the driver releases it, so opFail starts unde
   let clock = 0;
   assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 5000, sleep: async () => { clock += 1000; }, now: () => clock }), false, 'never released: bounded by holdMs');
   assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 0, sleep }), false, 'holdMs 0 waits for nothing');
+});
+
+test('the be op payload is prettier-clean, so the finish gate (HFS_FORMAT) never reds on the smoke\'s own file', async () => {
+  const prettier = await import('prettier');
+  for (const role of ['op', 'opFail']) {
+    const text = ownedTextOf(role, 'smoke-abcdef12');
+    const file = ownedFileOf(role, 'smoke-abcdef12', 'web');
+    assert.equal(await prettier.format(text, { filepath: file }), text, `${role}'s payload is already what prettier writes`);
+    assert.equal(JSON.parse(text).role, role);
+  }
 });

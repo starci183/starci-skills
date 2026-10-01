@@ -9716,6 +9716,25 @@ repository-unknown:
   nextStep_vi: "Runtime từ chối lệnh; cần dùng đúng tên kho đã gắn hoặc bổ sung binding của dự án."
   owner: owner
   kind: verb-refusal
+request-absent:
+  title: "Orca has no receipt for a lost request"
+  title_vi: "Orca không có biên nhận cho yêu cầu bị mất"
+  meaning_vi: "Một lệnh Orca không được lặp tự do (tạo Run, gắn lại Run, khởi động worker) mất biên nhận, và Orca báo không có biên nhận nào cho mã yêu cầu đó."
+  causes_vi:
+    - "Lệnh Orca hết thời gian chờ hoặc trả về dữ liệu không phải JSON"
+    - "Orca khởi động lại trước khi ghi biên nhận"
+  nextStep_vi: "Runtime không gửi lại lệnh mà coi kết quả là chưa rõ; bên gọi đọc lại trạng thái (worker-show, run-show) rồi mới làm tiếp."
+  owner: runtime-core
+  kind: runtime-fault
+request-show-unreadable:
+  title: "Orca request-show gave no readable answer"
+  title_vi: "Orca không trả lời rõ về yêu cầu bị mất"
+  meaning_vi: "Sau khi một lệnh Orca không được lặp tự do mất biên nhận, lệnh request-show không trả về trạng thái completed, pending hay absent."
+  causes_vi:
+    - "Orca không phản hồi hoặc trả về dữ liệu không đọc được"
+  nextStep_vi: "Runtime không gửi lại lệnh mà coi kết quả là chưa rõ; bên gọi đọc lại trạng thái rồi mới làm tiếp."
+  owner: runtime-core
+  kind: runtime-fault
 rerun-red:
   title: "Parity re-run came back red"
   title_vi: "Chạy lại kiểm tra vẫn đỏ"
@@ -10397,6 +10416,47 @@ worker-depth-exceeded:
   nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; Supervisor khởi động lại từ một cửa sổ nông hơn, hoặc chủ dự án đổi cài đặt độ sâu trong Orca và orca.maxWorkerDepth cùng lúc (start --check với STARCI_ORCA_LIVE=1 đo và so sánh hai giá trị)."
   owner: supervisor
   kind: dispatch-refusal
+agent-disabled-on-host:
+  title: "Agent is disabled on this host"
+  title_vi: "Agent bị tắt trên máy này"
+  meaning_vi: "Runtime từ chối khởi động một worker trước khi gọi worker-start, vì cài đặt của Orca (disabledTuiAgents trong orca-data.json của profile đang dùng) đã tắt agent mà route chọn."
+  causes_vi:
+    - "Chủ dự án đã tắt agent này trong cài đặt Orca"
+    - "Route hoặc config.yaml trỏ vai trò tới một agent không dùng được trên máy này"
+  nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; bật lại agent trong Orca hoặc đổi route của vai trò sang agent khác."
+  owner: supervisor
+  kind: dispatch-refusal
+agent-binary-missing:
+  title: "Agent CLI binary is not installed"
+  title_vi: "Chưa cài CLI của agent"
+  meaning_vi: "Runtime từ chối khởi động một worker trước khi gọi worker-start, vì file CLI của agent (theo thẻ agent hoặc lệnh ghi đè agentCmdOverrides của Orca) không có trong PATH; thông báo lỗi nêu tên file thiếu."
+  causes_vi:
+    - "CLI của agent chưa được cài trên máy này"
+    - "PATH của tiến trình không chứa thư mục của CLI"
+    - "agentCmdOverrides của Orca trỏ tới lệnh không tồn tại"
+  nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; cài CLI được nêu trong thông báo hoặc đổi route của vai trò sang agent khác."
+  owner: supervisor
+  kind: dispatch-refusal
+agent-bypass-missing:
+  title: "Agent has no approval-bypass mode in Orca's settings"
+  title_vi: "Agent chưa có chế độ bỏ qua phê duyệt trong cài đặt Orca"
+  meaning_vi: "Runtime từ chối khởi động một worker trước khi gọi worker-start, vì agentDefaultArgs của Orca cho agent này không chứa cờ bypass mà thẻ agent khai báo (bypassFlag), nên worker sẽ dừng ở một yêu cầu phê duyệt mà không ai trả lời."
+  causes_vi:
+    - "Chủ dự án đã sửa agentDefaultArgs trong cài đặt Orca và bỏ cờ bypass"
+    - "Cài đặt Orca của profile đang dùng chưa từng có cờ này"
+  nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; thêm cờ được nêu trong thông báo vào agentDefaultArgs của agent trong Orca. Runtime không bao giờ ghi cài đặt của Orca."
+  owner: owner
+  kind: dispatch-refusal
+model-not-listed:
+  title: "Model is not declared for the provider"
+  title_vi: "Model chưa được khai báo cho nhà cung cấp"
+  meaning_vi: "Runtime từ chối khởi động một worker trước khi gọi worker-start, vì model của route không nằm trong các model mà modules/models khai báo cho nhà cung cấp đó (bảng giá, mặc định của registry, các pool trong runtimes.yaml)."
+  causes_vi:
+    - "config.yaml ghim một model đã bị gỡ hoặc viết sai tên"
+    - "Route trả về một model không thuộc nhà cung cấp của agent"
+  nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; sửa model trong config.yaml hoặc khai báo model trong modules/models."
+  owner: supervisor
+  kind: dispatch-refusal
 worker-died-no-report:
   title: "Worker died without report"
   title_vi: "Worker chết mà chưa báo cáo"
@@ -10437,6 +10497,16 @@ worker-question:
   nextStep_vi: "Kernel trả lời hoặc chuyển cho chủ dự án; sau đó giao lại job."
   owner: op-retry
   kind: blocker
+worker-done-unsent:
+  title: "api report could not send the op's worker_done"
+  title_vi: "api report không gửi được worker_done của op"
+  meaning_vi: "Báo cáo của op đã được ghi vào ledger, nhưng lệnh Orca gửi worker_done từ terminal của op bị từ chối hoặc không có kết quả, nên Orca chưa đóng Task và Dispatch của op."
+  causes_vi:
+    - "Orca không phản hồi hoặc từ chối người gửi không phải terminal được giao Dispatch"
+    - "Job không có taskId hoặc dispatchId của worker Orca"
+  nextStep_vi: "Không cần làm gì thêm: báo cáo vẫn là kết luận; khi settle, worker-show thấy Dispatch chưa đóng nên runtime dừng worker bằng worker-stop rồi worker-release."
+  owner: runtime-core
+  kind: runtime-fault
 worker-quiet:
   title: "Worker quiet after nudge"
   title_vi: "Worker im lặng sau khi nhắc"
@@ -10447,6 +10517,15 @@ worker-quiet:
   nextStep_vi: "Nhắc bị từ chối; xử lý như worker chết hoặc khởi động lại."
   owner: op-retry
   kind: verb-refusal
+worker-start-no-task:
+  title: "Worker started without its Task"
+  title_vi: "Worker khởi động mà không có Task"
+  meaning_vi: "Orca báo worker đã sẵn sàng sau worker-start --spec nhưng biên nhận không có mã Task, nên runtime không thể quyết toán lần chạy đó."
+  causes_vi:
+    - "Orca đổi dạng biên nhận của worker-start"
+  nextStep_vi: "Worker vừa khởi động bị dừng và giải phóng, lần giao việc bị từ chối; cần sửa lớp nối Orca của runtime theo dạng biên nhận mới."
+  owner: runtime-core
+  kind: dispatch-refusal
 worker-starting:
   title: "Worker still starting"
   title_vi: "Worker đang khởi động"
@@ -10465,6 +10544,16 @@ worker-state-unknown:
   nextStep_vi: "Nhắc bị từ chối; quan sát lại trước khi làm gì."
   owner: op-retry
   kind: verb-refusal
+worker-terminal-unknown:
+  title: "Worker terminal unknown"
+  title_vi: "Không biết terminal của worker"
+  meaning_vi: "Cả biên nhận worker-start lẫn worker-show đều không cho biết terminal của agent vừa khởi động."
+  causes_vi:
+    - "Orca đổi dạng biên nhận"
+    - "Orca không trả lời lệnh worker-show"
+  nextStep_vi: "Worker vừa khởi động bị dừng và giải phóng, lần giao việc bị từ chối; lần sau runtime khởi động lại từ đầu."
+  owner: runtime-core
+  kind: dispatch-refusal
 worker-unavailable:
   title: "Worker terminal unavailable"
   title_vi: "Terminal của worker không dùng được"

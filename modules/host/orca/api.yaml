@@ -2,8 +2,9 @@ schema: starci/orca-api@1
 snapshot:
   source: orca agent-context --json
   schemaVersion: 1
-  observedCommandCount: 232
+  observedCommandCount: 233
   capturedAt: 2026-09-12
+  amended: orchestration request-show added from the Orca 1.4.209 agent-context on 2026-10-01 (calls.yaml replay request).
 authority:
   commandNames: publicCommands
   signatures: live-agent-context.commands
@@ -147,6 +148,7 @@ publicCommands:
   - 'orchestration gate-resolve'
   - 'orchestration inbox'
   - 'orchestration reply'
+  - 'orchestration request-show'
   - 'orchestration reset'
   - 'orchestration run-create'
   - 'orchestration run-current'
@@ -255,7 +257,6 @@ starciOrchestrationAllowlist:
   workflowKernel:
     # Issued on the kernel's behalf by scripts/kernel/cli.mjs through
     # scripts/api/orca/ — the kernel agent never runs orca itself.
-    - orchestration task-create
     - orchestration task-list
     - orchestration task-update
     - orchestration worker-start
@@ -273,7 +274,7 @@ starciOrchestrationAllowlist:
     - orchestration gate-create
     - orchestration gate-resolve
     - orchestration gate-list
-    - orchestration dispatch-show
+    - orchestration request-show
     - worktree set
     - terminal rename
     - terminal close

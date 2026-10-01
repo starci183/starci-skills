@@ -357,10 +357,6 @@ allocation:
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
   landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6}
-  # orcaRuns (scripts/kernel/orca-runs.mjs): an open StarCi Task younger than staleTaskMinAgeMs may
-  # belong to a dispatch still in flight (api dispatch writes the Task id onto the job only once the
-  # worker is attested), so settle keeps it instead of closing it as unheld.
-  orcaRuns: {staleTaskMinAgeMs: 900000}
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}

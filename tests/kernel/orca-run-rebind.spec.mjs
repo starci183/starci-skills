@@ -7,13 +7,13 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {bindWorkflowRun,staleTasks} from '../../scripts/kernel/orca-runs.mjs';
+import {bindWorkflowRun} from '../../scripts/kernel/orca-runs.mjs';
 
 // After the 2026-09-24 reboot every restarted Kernel was rejected at
-// task-create with an empty error (nivo inc-5c0ff394e676): the workflow's Run
+// the Task's creation with an empty error (nivo inc-5c0ff394e676): the workflow's Run
 // still existed, but Orca named the pre-reboot terminal as its coordinator, and
 // orcaCall reported only stderr while Orca wrote its refusal as JSON on stdout.
-// The fake Orca refuses a task-create from a terminal that is not the Run's
+// The fake Orca refuses a worker-start --spec (it files the Task) from a terminal that is not the Run's
 // coordinator the same way; api dispatch must re-bind the Run once and
 // dispatch, and a lost Run must be replaced by a new one.
 
@@ -85,7 +85,8 @@ test('a Run Orca no longer knows is replaced by a new Run bound to the current K
 
 test("an Orca refusal written as JSON on stdout reaches the caller's error instead of an empty string",t=>{
   const fx=fixture(t,{'run-fake-1':{id:'run-fake-1',coordinator:'term-old'}});
-  const r=spawnSync(process.execPath,[path.join(ROOT,'scripts','api','orca','task-create.mjs'),'--run','run-fake-1','--spec','x','--from','term-new'],
+  const r=spawnSync(process.execPath,[path.join(ROOT,'scripts','api','orca','worker-start.mjs'),'--run','run-fake-1','--spec','x','--worktree','w','--agent','codex',
+    '--from','term-new','--request',JSON.stringify({job:'j',lease:'l'})],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000,env:fx.env});
   assert.notEqual(r.status,0);
   const out=JSON.parse(r.stdout);
@@ -105,18 +106,4 @@ test('bindWorkflowRun: bound, rebound, missing and a host that does not answer',
   assert.equal(down.action,'failed');
   assert.equal(down.hostUnavailable,true);
   assert.equal(uses.length,1,'no run-use without a proven mismatch');
-});
-
-test('staleTasks closes only open StarCi Tasks no live job holds',()=>{
-  const old='2026-09-23 08:36:57',now=Date.parse('2026-09-24T06:00:00Z');
-  const tasks=[
-    {id:'task_a',status:'ready',task_title:'backend.implement #3',display_name:'[Op] backend.implement',created_at:old},
-    {id:'task_b',status:'dispatched',task_title:'interface.draw #1',display_name:'[Op] interface.draw',created_at:old},
-    {id:'task_c',status:'completed',task_title:'backend.implement #2',display_name:'[Op] backend.implement',created_at:old},
-    {id:'task_d',status:'ready',task_title:'owner scratch task',display_name:'mine',created_at:old},
-    {id:'task_e',status:'ready',task_title:'backend.implement #4',display_name:'[Op] backend.implement',created_at:'2026-09-24 05:58:00'},
-  ];
-  const plan=staleTasks(tasks,{heldTaskIds:new Set(['task_b']),now});
-  assert.deepEqual(plan.close.map(t=>t.id),['task_a']);
-  assert.deepEqual(plan.keep.map(k=>[k.task.id,k.reason]),[['task_b','held-by-live-job'],['task_d','not-starci'],['task_e','recent']]);
 });

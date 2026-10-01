@@ -2,7 +2,7 @@
 //   host-event.mjs      a death inside a host-wide terminal disconnect is the environment's
 //   report-salvage.mjs  a report written but never filed is filed on the worker's behalf
 //   resume-context.mjs  the retry of a no-report death resumes from what it left
-//   op-prompt.mjs       a long owned-path list rides in a file, never the task-create argv
+//   op-prompt.mjs       a long owned-path list rides in a file, never the worker-start --spec argv
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

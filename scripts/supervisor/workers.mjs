@@ -392,7 +392,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
       specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
-      onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
+      request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
       start: deps.start ?? null });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: stagingRecord(staging),
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,

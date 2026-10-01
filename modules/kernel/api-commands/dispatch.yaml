@@ -71,8 +71,8 @@ dispatch:
     entries to the bytes the job left; workflows.phase queued->running with a
     'phase-transition' event; jobs.status ->running with lease_token +
     worker_id only after attestation below (intent -> attested -> running);
-    managed workers in an existing worktree have their exact assignee
-    terminal renamed to `[Op] <op-id>` after dispatch-show (worker-start's
+    managed workers in an existing worktree have their agent terminal
+    renamed to `[Op] <op-id>` once the start names it (worker-start's
     creation display name otherwise renders as `worker-task_<id>`);
     events 'op-dispatched' ('dispatch-rejected' on refusal). A dispatch-rejected
     launch claims nothing — no contract row, no leases, no running phase.
@@ -110,10 +110,12 @@ dispatch:
     dispatch before this)
   spawn: >-
     with --spawn the api runs the Orca sequence itself — through
-    scripts/agent/lib.mjs spawnAgent, the one agent launch: task-create
-    with the rendered packet -> worker-start --agent <provider> [--model
-    <id> --effort <level>] --worktree <the workflow worktree> -> dispatch-show ->
-    terminal rename `[Op] <op>` -> worker-show attestation. Orca composes
+    scripts/agent/lib.mjs spawnAgent, the one agent launch: worker-start
+    --spec <the rendered packet> --agent <provider> [--model <id> --effort
+    <level>] --worktree <the workflow worktree> (Orca files the Task in the
+    same call; --retry-request derived from the job and its lease) -> the
+    agent terminal (start receipt, else worker-show) -> terminal rename
+    `[Op] <op>` -> worker-show attestation. Orca composes
     the agent command with the owner's per-agent default args. The
     kernel agent never calls orca directly. Without --spawn: dry-run —
     the packet prints, nothing is reserved and nothing launches.
@@ -158,9 +160,10 @@ dispatch:
         admission (an expired or orphaned `path:<owned_path>` lease row, a
         resource with no declared capacity, or the machine arbiter — the
         reasons ride `reserve.reasons`; a LIVE lease another job holds is
-        path-lease above, a wait), run-create, task-create, a dead
+        path-lease above, a wait), run-create, a dead
         spawn, prompt send/submission, attestation against the adapter
-        card's knownFailures, or a dispatch-show assignee mismatch. In every
+        card's knownFailures, or a start whose receipt names no Task or
+        agent terminal (worker-start-no-task, worker-terminal-unknown). In every
         case the job is NOT running, the terminal is closed and the lease +
         budget reservations are released. The refused launch is appended to
         payload.rejectedDispatches[] {dispatchId, step, at, effectState} —

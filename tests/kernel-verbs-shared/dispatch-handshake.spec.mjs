@@ -73,6 +73,17 @@ const jobRow=(fx,jobId)=>{
   finally{ledger.close();}
 };
 
+test('the dispatch preview prints the worker-start flags the spawn sends: devin gets no --model',t=>{
+  const fx=fixture(t).make('healthy');
+  const r=spawnSync(process.execPath,[API,'dispatch','--repo',fx.repo,'--job',fx.jobId,'--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:fx.env});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const plan=JSON.parse(r.stdout);
+  const start=plan.orca.commands.find(c=>c.step==='worker-start')?.cli??'';
+  assert.match(start,/--agent devin(\s|$)/);
+  assert.doesNotMatch(start,/--model|--effort/,'start.modelArgument is false for devin: the preview must not claim a --model the spawn never sends');
+});
+
 test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   const fx=fixture(t).make('healthy');
   const r=runDispatch(fx);
@@ -81,8 +92,9 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   assert.equal(job?.status,'running',`a successfully attested spawn must mark the job running, got ${job?.status}`);
   assert.equal(job?.worker_id,'dispatch-fake-1','the op is a worker-start worker, keyed by its Dispatch');
   const seen=calls(fx);
-  for(const step of ['orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
+  for(const step of ['orchestration worker-start','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
+  assert.equal(seen.includes('orchestration task-create')||seen.includes('orchestration dispatch-show'),false,'worker-start --spec: no task-create, no dispatch-show');
   assert.equal(seen.includes('terminal create'),false,'no agent terminal is created by the runtime');
   const start=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.equal(start?.[start.indexOf('--agent')+1],'devin');

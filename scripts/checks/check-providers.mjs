@@ -146,6 +146,13 @@ export function validateCallContract(docs){
       add(errors,!forbidden.has(call?.command),`calls.${name} names a forbidden command: ${call?.command}`);
     }
     add(errors,['read','mutation'].includes(call?.kind),`calls.${name} must declare kind read or mutation`);
+    const modes=calls.idempotency?.modes??[];
+    if(call?.kind==='mutation')
+      add(errors,modes.includes(call?.replay),`calls.${name} is a mutation and must declare replay ${modes.join('|')} — scripts/api/orca/lib.mjs refuses it otherwise`);
+    else
+      add(errors,call?.replay===undefined,`calls.${name} is a read and must not declare replay`);
+    if(call?.replay==='request')
+      add(errors,declared.has(calls.idempotency?.flag),`calls.${name} is replay: request and must declare --${calls.idempotency?.flag}`);
     if(Array.isArray(call?.classify)){
       const last=call.classify.at(-1);
       add(errors,last&&Object.keys(last.when??{}).length===0,

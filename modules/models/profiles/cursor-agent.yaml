@@ -1,0 +1,29 @@
+# Profile: cursor-agent - the Cursor CLI (cursor-agent) as a launch-only operation target (not a pool).
+# Business frame: the fourth Orca agent provider. The runtime can launch it with `--agent cursor`; no automatic chain
+# routes to it, because it has no quota probe (live-proven 2026-10-02 with --model auto).
+
+target: cursor-agent          # registry.yaml targets
+provider: cursor
+runtime: cursor               # registry.yaml
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: auto        # Orca's catalog default for cursor; the account's list is `cursor-agent --list-models` (logged in on this host)
+  profiles:
+    working: auto
+    reasoning: auto
+
+launch:
+  orca: {agent: cursor}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
+
+business:
+  question: >-
+    "Which Cursor model carries an explicitly requested operation?" - the account's model, `auto` by default.
+  whenNeeded:
+    - An owner-named explicit route to Cursor once `cursor-agent login` has been run on the host.
+  whenNot:
+    - Any automatic chain: registry.yaml names none, and the host has no Cursor quota probe.
+    - While `cursor-agent status` does not read logged in: every launch exits at "Authentication required".
+  pickedBy: An owner who names this target explicitly.
+  failureModes:
+    - Launching while not logged in - the worker exits before its prompt.

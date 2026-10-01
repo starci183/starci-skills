@@ -12,6 +12,7 @@ files:
     codex: ../../models/agents/codex.yaml
     claude: ../../models/agents/claude.yaml
     devin: ../../models/agents/devin.yaml
+    cursor: ../../models/agents/cursor.yaml
 purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
   only supported construction path; prompts may fill placeholders but may not invent a
@@ -54,12 +55,9 @@ workflowKernel:
     entryRun:
       api: orchestration.run-create
       cli: 'orca orchestration run-create --objective "[Kernel] <Workflow> — <workflow-id>" --json'
-    kernelTask:
-      api: orchestration.task-create
-      cli: 'orca orchestration task-create --run <entry-run-id> --task-title "[Kernel] <Workflow>" --display-name "[Kernel] <Workflow>" --spec "<kernel prompt>" --json'
     boot:
       api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <kernel-task-id> --worktree <workflow-worktree path, created first by worktree create --name wf-<workflowId>> --agent <agent> --model <model> --effort <effort> --display-name "[Kernel] <Workflow>" --run <entry-run-id> --json'
+      cli: 'orca orchestration worker-start --spec "<kernel prompt>" --task-title "[Kernel] <Workflow>" --worktree <workflow-worktree path, created first by worktree create --name wf-<workflowId>> --agent <agent> --model <model> --effort <effort> --display-name "[Kernel] <Workflow>" --run <entry-run-id> --retry-request <id from the launch identity> --json'
     bindRun:
       api: orchestration.run-create
       cli: 'orca orchestration run-create --objective "<workflow goal>" --from <own-terminal> --json'
@@ -132,9 +130,6 @@ operationAgent:
       exactSecondaryOp: architecture.decide
       requires: explicit-bounded-sds-allowlist
       neverFrom: [review-finding, review-suggestion, open-question, inferred-gap]
-  createTask:
-    api: orchestration.task-create
-    cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation>" --spec "<one-operation-contract>" --json'
   start:
     note: >-
       The one launch for every provider (claude, codex, devin): Orca composes the agent command with the owner's
@@ -143,13 +138,11 @@ operationAgent:
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree <workflow-worktree> --agent <resolved-agent> [--model <resolved-model-id> --effort <resolved-effort>] --run <workflow-run-id> --from <kernel-terminal> --json'
-      assignee:
-        api: orchestration.dispatch-show
-        cli: 'orca orchestration dispatch-show --task <operation-task-id> --from <kernel-terminal> --json'
+        cli: 'orca orchestration worker-start --spec "<one-operation-contract>" --task-title "<op> #<attempt>" --display-name "[Op] <operation>" --worktree <workflow-worktree> --agent <resolved-agent> [--model <resolved-model-id> --effort <resolved-effort>] --run <workflow-run-id> --from <kernel-terminal> --retry-request <id from job + lease> --json'
+        note: Orca files the operation Task from --spec in the same call (result.taskId); there is no task-create and no dispatch-show.
       nameAgent:
         api: terminal.rename
-        cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation>" --json'
+        cli: 'orca terminal rename --terminal <result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle> --title "[Op] <operation>" --json'
   settle:
     release:
       api: orchestration.worker-release
@@ -171,7 +164,7 @@ routing:
       proven from the screen; a status message never carries a control instruction.
   operationToOperation: forbidden
 forbiddenCalls:
-  - raw-operation-task-create-or-worker-start-outside-canonical-launcher
+  - raw-operation-worker-start-outside-canonical-launcher
   - orchestration.dispatch-inject-for-operation
   - orchestration.dispatch-to-reused-terminal-for-operation
   - terminal-send-outside-canonical-launcher
@@ -180,7 +173,7 @@ forbiddenCalls:
   - operation-agent-tool-agent
   - orchestration-send-status-for-control-instruction
   - operation-agent-direct-control-of-another-operation
-  - task-create-for-an-operation-outside-the-approved-goal
+  - operation-task-outside-the-approved-goal
   - operation-effect-without-provider-attestation
   - architecture-sidearm-inferred-from-review
   - literal-or-guessed-worker-start-environment

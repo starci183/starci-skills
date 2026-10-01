@@ -179,7 +179,7 @@ export function criticFor(settings, drawer = null) {
 
 // worker-show states after which the worker does nothing more.
 const ENDED = new Set(['done', 'completed', 'failed', 'stopped', 'released', 'exited']);
-// The Orca Task status a settled Task is closed with (scripts/kernel/cli.mjs TASK_CLOSED_STATUS).
+// The Orca Task status a Task settled by worker_done reads.
 const TASK_CLOSED = 'completed';
 const DEFAULT_POLL_MS = 5000;
 const payloadOf = (m) => { try { return typeof m?.payload === 'string' ? JSON.parse(m.payload) : m?.payload ?? null; } catch { return null; } };
@@ -192,9 +192,9 @@ const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, er
 function clientOf(orca) {
   const o = orca ?? {};
   return {
-    launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate, taskCreate: o.taskCreate,
+    launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate,
       workerList: o.workerList ?? (() => ({ ok: false, error: 'the fake client lists no workers' })),
-      spawn: { trust: o.trust, start: o.workerStart, assignee: o.dispatchShow, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
+      spawn: { trust: o.trust, start: o.workerStart, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,
     release: o.workerRelease ?? workerRelease,
@@ -232,12 +232,14 @@ const gitRootOf = (cwd) => { const r = gitResult(['rev-parse', '--show-toplevel'
 
 /**
  * Start the critic worker on its placement `dir` through worker-start (startAgent: run-create --from `entry`,
- * task-create, worker-start --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
+ * worker-start --spec --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
  * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
  */
 export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null }) {
   return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir,
-    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry, parentDispatch });
+    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry, parentDispatch,
+    // Its clean directory is made once per round (criticWorkspace): the launch's ledger identity.
+    request: { critic: dir } });
 }
 
 /**
@@ -274,8 +276,8 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
 /**
  * Run the independent critic over one round. `images` [{path, label}], `html` the round's source, `rubric` from
  * rubricFor, `critic` {provider, model, effort, timeoutMs} from criticFor. `orca` replaces the Orca client (tests: a
- * fake of the wrappers - runCreate, taskCreate, trust, workerStart, dispatchShow, terminalRename, workerShow,
- * workerStop, workerRelease, check, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
+ * fake of the wrappers - runCreate, trust, workerStart, terminalRename, workerShow,
+ * workerStop, workerRelease, inbox, taskUpdate, and criticWorkspace/removeCriticWorkspace for the placement); `entry` is the
  * coordinator terminal (the op's ORCA_TERMINAL_HANDLE); `placement` the criticWorkspace options (repoRoot, context);
  * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight, contract change worker-depth-limit).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.

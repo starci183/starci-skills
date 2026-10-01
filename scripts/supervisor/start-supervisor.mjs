@@ -264,7 +264,8 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     });
     const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
       specFile: path.join(starciLocalRoot(), 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
-      entry, priorRunId: seat?.value?.runId ?? null });
+      entry, priorRunId: seat?.value?.runId ?? null,
+      request: { seat: SUPERVISOR_ID, attempt, token } });
     if (!spawned?.ok) {
       m.transaction(() => {
         clearSeat(m, { token });

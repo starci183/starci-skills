@@ -3,7 +3,7 @@
 // Keys:
 //   host:boot                     the boot order of DESIGN 7.7, once per HOST boot (schedules host/boot, MB-01) and when Orca comes back
 //                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
-//                                 --orphan-kernel-jobs / --orca-tasks per ledger, then the seats. Seat keys wait for it.
+//                                 --orphan-kernel-jobs per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
 //   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/kernel-watchdog.mjs --once
@@ -522,10 +522,8 @@ export function createHostController(deps = {}) {
       steps.push({ step: 'dedupe', dryRun: true, wouldClose: (dry?.closed ?? []).length, ok: dry?.ok !== false });
     }
     for (const l of productLedgers(ctx)) {
-      for (const flag of ['--orphan-kernel-jobs', '--orca-tasks']) {
-        const r = await ctx.api(l.ledgerId, 'reconcile', [flag], { timeoutMs: 600_000 });
-        steps.push({ step: `reconcile ${flag}`, ledgerId: l.ledgerId, ok: r?.ok !== false });
-      }
+      const r = await ctx.api(l.ledgerId, 'reconcile', ['--orphan-kernel-jobs'], { timeoutMs: 600_000 });
+      steps.push({ step: 'reconcile --orphan-kernel-jobs', ledgerId: l.ledgerId, ok: r?.ok !== false });
     }
     state.bootPending = false;
     claimDue(ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });

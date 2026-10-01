@@ -17,7 +17,6 @@ const RUNTIMES = 'modules/models/runtimes.yaml';
 const WINDOWS = {
   'scripts/kernel/host-outage.mjs': [['HOST_WAIT_MS', 'hostOutage.waitMs'], ['DEATH_SETTLE_MS', 'hostOutage.deathSettleMs']],
   'scripts/kernel/reap-agent-process.mjs': [['REAP_WINDOW_MS', 'reap.windowMs']],
-  'scripts/kernel/orca-runs.mjs': [['STALE_TASK_MIN_AGE_MS', 'orcaRuns.staleTaskMinAgeMs']],
   'scripts/kernel/waiter-priority.mjs': [['BLOCKING_HEADS_UP_MS', 'waiterPriority.blockingHeadsUpMs']],
   'scripts/kernel/quit-agent.mjs': [['QUIT_WAIT_MS', 'quitAgent.waitMs']],
   'scripts/kernel/ask-server.mjs': [['DEFAULT_TTL_MS', 'serveAsk.ttlMs']],

@@ -8,7 +8,7 @@
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
 //   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
 //                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
-//                      <kernel terminal>, task-create --run --from, worker-start --task --run --from); the critic by
+//                      <kernel terminal>, worker-start --spec --run --from); the critic by
 //                      scripts/work/draw-critic.mjs launchCriticWorker on its criticWorkspace placement, from the Op's
 //                      terminal.
 //   workflow-worktree  before the Kernel starts, scripts/kernel/workflow-worktree.mjs ensureWorkflowWorktree has Orca create
@@ -170,7 +170,7 @@ export function feAppOf(appRoot) {
 }
 /** The bytes an op role writes into its owned file. */
 export const ownedTextOf = (role, workflowId) => (ROLES[role].side === 'be'
-  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role })}\n`
+  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role }, null, 2)}\n`
   : `${SMOKE_SCHEMA} ${workflowId} ${role}\n`);
 /** The op record the dispatcher judges (sideOf, canDispatchConcurrently): its owned paths, app-relative. */
 export const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });
@@ -241,9 +241,9 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   const record = (extra) => writeJson(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
   const onCreated = (terminal, dispatchId) => record({ terminal, dispatchId });
   const route = { provider: noop.provider, model: noop.model, effort: noop.effort };
-  let launched;
+  const request = { smoke: state, role }; let launched; // request: the launch's ledger identity (calls.yaml replay: request)
   if (role === 'worker') {
-    launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, onCreated });
+    launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, request, onCreated });
   } else if (role === 'critic') {
     // draw-critic's own placement, in the runtime repository (no op job owns it: the smoke removes it).
     const placed = orca.criticWorkspace({ repoRoot: root, context: null });
@@ -256,16 +256,16 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   } else if (role === 'kernel') {
     // The workflow worktree exists before the Kernel starts (ensureWorkflowWorktree): an existing tree takes launch trust.
     launched = plan.workflow?.path
-      ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, onCreated })
+      ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, request, onCreated })
       : { ok: false, step: 'worktree', error: 'the workflow worktree was never created' };
   } else if (ROLES[role].side) {
     const args = settle(() => orca.workflow.opArgs(orca.ctx, { workflowId: plan.workflow?.workflowId }));
     const params = Array.isArray(args) ? worktreeParamsOf(args) : {};
     launched = params.worktree
-      ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, onCreated })
+      ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, request, onCreated })
       : { ok: false, step: 'worktree', error: `opWorktreeArgs: ${args?.error ?? 'no --worktree for the workflow'}` };
   } else {
-    launched = orca.startAgent({ ...route, worktree: root, title, prompt, objective, entry, onCreated });
+    launched = orca.startAgent({ ...route, worktree: root, title, prompt, objective, entry, request, onCreated });
   }
   return Promise.resolve(launched).then((r) => {
     record({ ok: r?.ok === true, terminal: r?.terminal ?? agentOf(state, role)?.terminal ?? null, dispatchId: r?.dispatchId ?? agentOf(state, role)?.dispatchId ?? null,

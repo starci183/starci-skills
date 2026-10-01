@@ -6,7 +6,7 @@ import { JOB_ROW } from '../../machine/job-row.mjs';
 import { ARCHIVED_BY, getWorkflow, jobOpOf, jobPayloadOf, latestAttemptOf } from './shared/rows.mjs';
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { openAskDispatchesOf, retireAsk } from './shared/asks.mjs';
-import { closeHeldTasks, closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
+import { closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
 import { reportedJobs } from '../../machine/reported-jobs.mjs';
 import { closeWorkflowDecisions } from '../../machine/decisions.mjs';
 
@@ -110,11 +110,10 @@ export default {
     const artifacts = job.status === 'queued' ? null : indexSettledArtifacts(ledger, job, repo);
     return { jobId: job.job_id, priorStatus: job.status, leasesReleased, ...worker, ...(artifacts ? { artifacts } : {}) };
   });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
   const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, decisionsClosed, jobsDropped, asksRetired,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
-  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), retention };
+  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
 
   },
