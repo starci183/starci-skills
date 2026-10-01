@@ -33,7 +33,7 @@ import { runGit } from './git.mjs';
 import { safeRemoveWorktree, isLinkLike } from './safe-remove.mjs';
 import { WORKTREES_REL } from './worktree-exclude.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { withMachine } from '../../engine/machine-db.mjs';
+import { withMachine, pidAlive } from '../../engine/machine-db.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -41,7 +41,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
 export const PRESERVED_PREFIX = 'preserved';
 /** The registry kinds (machine.sqlite worktrees.kind CHECK). */
-export const WORKTREE_KIND_NAMES = Object.freeze(['op', 'land-scratch', 'push-scratch', 'supervisor-staging', 'lane']);
+export const WORKTREE_KINDS = Object.freeze(['op', 'land-scratch', 'push-scratch', 'supervisor-staging', 'lane']);
 const SETTLED = new Set(SETTLED_JOB_LIST);
 const DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000 });
 
@@ -65,7 +65,7 @@ const plain = runnerOf(null);
 const revParse = (cwd, ref) => { const r = plain(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { cwd }); return r.ok && r.stdout ? r.stdout : null; };
 const isAncestor = (cwd, a, b) => plain(['merge-base', '--is-ancestor', a, b], { cwd }).ok;
 const key = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; };
-export const samePath = (a, b) => key(a) === key(b);
+const sameTree = (a, b) => key(a) === key(b);
 const inside = (child, parent) => { const rel = path.relative(key(parent), key(child)); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
 
 /** {path, branch, head, prunable} of every registered worktree of the repository (the main checkout first). */
@@ -83,7 +83,7 @@ export function worktreeList(repoRoot, { git = null } = {}) {
 }
 /** The repository's main checkout (the first `git worktree list` entry): the registry's repo key, from any of its trees. */
 export const mainRootOf = (repoRoot, opts) => worktreeList(repoRoot, opts)[0]?.path ?? path.resolve(repoRoot);
-export const registeredAt = (repoRoot, dir, opts) => worktreeList(repoRoot, opts).find((w) => samePath(w.path, dir)) ?? null;
+export const registeredAt = (repoRoot, dir, opts) => worktreeList(repoRoot, opts).find((w) => sameTree(w.path, dir)) ?? null;
 export const worktreesRootOf = (repoRoot) => path.join(repoRoot, ...WORKTREES_REL.split('/'));
 
 /* ------------------------------------------------------------ registry */
@@ -94,7 +94,7 @@ const withRegistry = (fn, env) => withMachine(fn, { env });
 /* ------------------------------------------------------------ create */
 
 /**
- * Create one worktree (the only `git worktree add` of the runtime). kind: one of WORKTREE_KIND_NAMES. Exactly one of
+ * Create one worktree (the only `git worktree add` of the runtime). kind: one of WORKTREE_KINDS. Exactly one of
  * `detach` (a detached HEAD at `base`), `newBranch` (branch `branch` created at `base`) or an existing `branch`.
  * owner: {ledgerId, workflowId, jobId, lane}. cap: the per-repo cap to enforce (default: worktrees.capPerRepo for an
  * op, none for the other kinds). git: the caller's runner (args, {cwd}) -> {ok|status, stdout|out, stderr|err}.
@@ -103,7 +103,7 @@ const withRegistry = (fn, env) => withMachine(fn, { env });
  */
 export function createWorktree({ repoRoot, dir, kind, base = null, branch = null, newBranch = false, detach = false, owner = {}, ownerPid = process.pid,
   cap = undefined, env = process.env, git = null, settings = worktreeSettings() }) {
-  if (!WORKTREE_KIND_NAMES.includes(kind)) throw new Error(`createWorktree: unknown kind ${kind} (one of ${WORKTREE_KIND_NAMES.join(', ')})`);
+  if (!WORKTREE_KINDS.includes(kind)) throw new Error(`createWorktree: unknown kind ${kind} (one of ${WORKTREE_KINDS.join(', ')})`);
   const run = runnerOf(git);
   const target = path.resolve(dir);
   const limit = cap === undefined ? (kind === 'op' ? settings.capPerRepo : null) : cap;
@@ -288,9 +288,9 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
   for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) continue; const home = mainRootOf(r, { git }); const k = key(home); if (!all.has(k)) all.set(k, home); }
   const out = [];
   for (const repoRoot of all.values()) {
-    const mine = rows.filter((r) => samePath(r.repo_root, repoRoot));
+    const mine = rows.filter((r) => sameTree(r.repo_root, repoRoot));
     const orphans = mine.filter((r) => !fs.existsSync(r.path)).map((r) => ({ path: r.path, why: 'registered, directory gone' }));
-    for (const w of runtimeTreesOf(repoRoot, { git })) if (!mine.some((r) => samePath(r.path, w.path))) orphans.push({ path: w.path, why: w.prunable ? 'prunable registration' : 'no live registry row' });
+    for (const w of runtimeTreesOf(repoRoot, { git })) if (!mine.some((r) => sameTree(r.path, w.path))) orphans.push({ path: w.path, why: w.prunable ? 'prunable registration' : 'no live registry row' });
     // Every linked worktree git knows, the runtime's or not (agent lanes): the cap is the repository's.
     const linked = Math.max(0, worktreeList(repoRoot, { git }).length - 1);
     out.push({ repoRoot, live: mine.length, linked, cap: settings.capPerRepo, orphans, over: Math.max(mine.length, linked) > settings.capPerRepo });
@@ -327,7 +327,6 @@ function ledgerStatusLookup(env) {
 }
 
 const hashOf = (p) => crypto.createHash('sha1').update(key(p)).digest('hex').slice(0, 10);
-const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const descriptionOf = (repoRoot, branch) => (branch ? plain(['config', '--get', `branch.${branch}.description`], { cwd: repoRoot }).stdout || null : null);
 const ageOf = (p, now) => { try { return now - fs.statSync(p).mtimeMs; } catch { return Infinity; } };
 
@@ -443,7 +442,7 @@ function main(argv) {
   const [verb, ...rest] = argv;
   const json = rest.includes('--json');
   if (verb === 'counts') {
-    const rows = worktreeCounts({ repos: [path.resolve(SKILL_ROOT)] });
+    const rows = worktreeCounts({ repos: [SKILL_ROOT] });
     console.log(json ? JSON.stringify(rows, null, 2) : rows.map((r) => `${r.over || r.orphans.length ? 'RED  ' : 'ok   '} ${r.repoRoot}: ${r.live}/${r.cap} runtime, ${r.linked} linked, ${r.orphans.length} orphan(s)`).join('\n') || 'no runtime worktree');
     return rows.some((r) => r.over || r.orphans.length) ? 1 : 0;
   }

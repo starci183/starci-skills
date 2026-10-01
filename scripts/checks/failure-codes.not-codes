@@ -37,6 +37,7 @@ RATE_LIMITED_EVENT	event-kind constant that routes a re-read of quota pools, not
 READONLY_BOUNDARY_RULE_ID	JS constant name; the emitted rule id is BE_READONLY_BOUNDARY
 RECORDINGS_ROOT_ENV	constant naming the STARCI_UAT_RECORDINGS_ROOT env var
 REDLINE_ATTR	name of the data-draw-redline HTML attribute constant
+SKILL_ROOT	constant naming the runtime root directory (an array element [SKILL_ROOT], not a code)
 SOURCE_LAYOUT_RULE_ID	constant naming a lint rule id in architecture coverage, not an emitted code
 SOURCE_NAME_RULE_ID	constant naming a lint rule id in architecture coverage, not an emitted code
 STACK_ROOT	constant, the .starcistacks directory name
@@ -86,6 +87,7 @@ incident-resolved	ledger event kind
 irreversible-confirmation	ask kind label
 job-dropped	ledger event kind
 job-enqueued	ledger event kind
+land-scratch	worktree registry kind (machine.sqlite worktrees.kind, scripts/lib/worktrees.mjs WORKTREE_KINDS), not a code
 layout-tree	foundation kind label
 live-unbound-session	seat adoption plan label
 live-worker-reconciled	ledger event kind
@@ -105,6 +107,7 @@ plan-derived	ledger event kind for progress tracking, not a failure code
 planned-restart	start reason label in PLANNED_START_REASONS, not a failure
 policy-shared	informational isolation-plan reason (brief opts out of worktree), not a failure
 product-direction	note class label in draw-feedback, not a failure code
+push-scratch	worktree registry kind (machine.sqlite worktrees.kind, scripts/lib/worktrees.mjs WORKTREE_KINDS), not a code
 queued-ready	wait-kind metric label in supervisor op-metrics, not a failure code
 rate-limited	doorbell ring-planning reason (skipped ring), not a failure
 reload-handover	planned engine exit_reason label, not a failure
@@ -120,6 +123,7 @@ sessions-db-owned	session archive skip reason (informational)
 shared-system	owner ask class label
 starci-agent-session	terminal dedupe reason (close decision), not a failure
 supervisor-gate	next-action kind label
+supervisor-staging	worktree registry kind (machine.sqlite worktrees.kind, scripts/lib/worktrees.mjs WORKTREE_KINDS), not a code
 test-env-unrooted	session archive skip reason (informational)
 time-budget	GC item label: a bounded worktree GC pass stopped at its time budget and resumes next pass, not a failure
 typed-dependent	staleness relation label
