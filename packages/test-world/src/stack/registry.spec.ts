@@ -1,11 +1,11 @@
+import { tmpdir } from "node:os"
 import assert from "node:assert/strict"
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "node:test"
 import { Registry, leaseProxyPort, leaseRedisDb, releaseRedisDb, secretsFor } from "./registry"
 
-mkdirSync("D:/starci-tmp/hfs/devin/tw-a1", { recursive: true })
-const scratch = mkdtempSync(join("D:/starci-tmp/hfs/devin/tw-a1", "reg-"))
+const scratch = mkdtempSync(join(tmpdir(), "starci-tw-reg-"))
 let counter = 0
 const home = (): string => join(scratch, `h${(counter += 1)}`)
 const lease = (namespace: string, runId: string, pid: number) => ({ namespace, runId, pid, since: "2026-01-01T00:00:00.000Z", containers: [] })

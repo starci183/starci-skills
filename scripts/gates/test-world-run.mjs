@@ -6,7 +6,8 @@
 //
 // Over the app at --root it records, and `api settle` re-reads (scripts/kernel/gate-settle.mjs):
 //   harness  the be jest config is @starci/jest-preset's starciJestConfig() (its world projects run on the preset's world
-//            runner: one file at a time, each in a fresh process) and the world declaration be/src/tests/world/test-world.config.ts
+//            runner: up to min(--maxWorkers, slots) files at once, each in a fresh process on its own data slot) and the world
+//            declaration be/src/tests/world/test-world.config.ts
 //            calls defineTestWorld;
 //   specs    every spec of the project (be/src/tests/{e2e,integration,contract}/**/*.<project>-spec.ts, narrowed by --tests)
 //            takes its world from the library in the layer's form - useTestWorld({ apps }) for e2e, useTestWorld({ modules })

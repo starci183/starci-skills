@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.0 - 2026-10-02
+
+- Added: per-worker data slots, so world spec files run in parallel. The globalSetup provisions N slots, N = min(jest
+  `maxWorkers`, the declaration's new `workers` cap, default 2). A slot is a complete, independent run: its own namespace
+  `<package>_<hash>_w<k>` and run token `<run>-w<k>`, so its own Postgres database per connection (migrated and seeded per slot),
+  its own Keycloak realm, its own leased Redis DB index, its own MinIO/Qdrant/Kafka/k3d prefixes, its own fakes host, its own
+  toxiproxy proxies and its own outage lock (in the slot's run directory). The teardown disposes every slot; a failed setup
+  disposes the slots already made.
+- Changed: the state file is protocol 2 (`{ version: 2, library, runId, slots }`); a spec process reads the slot named by
+  `STARCI_TEST_WORLD_SLOT`, which `@starci/jest-preset` 2.2.4's world runner sets per file. The pair is exact: a state file of
+  another protocol, or a process with no slot of the run, is the new `TEST_WORLD_PAIR_MISMATCH` naming both versions (re-pin
+  both per canon-pins). `RunContext.version` is replaced by `RunContext.slot`; `namespaceOf(root, slot)` takes the slot.
+- Fixed: a realm file that pins entity ids (a user `id` that a seed row names as the token `sub`) could be imported once per Keycloak server only: ids are unique server-wide, so a second slot (or a second checkout) failed with 409 Conflict. The import remaps each pinned user id to a per-namespace UUID (`namespacedId`, sha256 of `<namespace>:<id>`), drops the ids of clients, roles, groups, client scopes and components, and the slot's seeds are applied with the same user-id rewrite (`RunKeycloak.userIds`).
+- Fixed: the stack, namespace and registry specs built their fixtures under a host path; they use the OS temp directory.
+- Known limitation: Kafka's proxy is stack-wide (the broker advertises its proxied address), so a Kafka outage in one slot
+  reaches the others; Redis has 16 DB indexes machine-wide, so slots x concurrent repositories must stay within 16.
+
 ## 1.0.5
 
 - Added: a modules world boots real peer apps beside its modules: `useTestWorld({ modules, apps: ["order"] })` reserves the

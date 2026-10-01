@@ -17,8 +17,10 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
   `src/tests/tsconfig.json`, start the one test world through `globalSetup`/`globalTeardown`
   (`src/tests/world/global-setup.ts`, `global-teardown.ts`) and run on the world runner (`world-runner.cjs`, `WORLD_RUNNER`): every
   spec file in a worker process of its own and never in band, so nothing the globalSetup or another file left on a process global
-  (a framework registry such as `@nestjs/graphql`'s type metadata) reaches the file; and ONE FILE AT A TIME whatever
-  `--maxWorkers` says, because every file shares the run's data (the test world resets it when a file boots). Only the unit project has a `setupFilesAfterEnv`. The managed scripts select one
+  (a framework registry such as `@nestjs/graphql`'s type metadata) reaches the file; and up to `min(--maxWorkers, slots)` files at
+  once, each bound to its own data slot of `@starci/test-world` 1.1.0 (`STARCI_TEST_WORLD_SLOT`), never two files on one slot,
+  because the test world resets a slot's data when a file boots. The runner reads test-world state protocol 2 only: pin
+  the two packages together (canon-pins); another protocol fails with `JEST_PRESET_WORLD_PAIR_MISMATCH`. Only the unit project has a `setupFilesAfterEnv`. The managed scripts select one
   project each: `test`, `test:integration`, `test:e2e`, `test:contract`; a contract spec skips itself without sandbox config.
 - **The three path aliases** `@features/*`, `@modules/*`, `@tests/*` (`MODULE_NAME_MAPPER`), the same ones the managed `tsconfig.json` declares.
 - **ts-jest with `diagnostics: false`** in every project. `isolatedModules: true` comes from `@starci/tsconfig` (ts-jest 29.4 reads it

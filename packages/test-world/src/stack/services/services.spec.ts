@@ -172,6 +172,32 @@ describe("keycloak realm preparation", () => {
         assert.equal("secret" in (clients.find((client) => client.clientId === "api") ?? {}), false)
     })
 
+    it("gives every namespace its own entity ids: user ids remapped (stable per namespace), other ids dropped", () => {
+        const pinned = "4f1c2b7e-8a3d-4e5f-9b6a-0c1d2e3f4a5b"
+        const exported = JSON.stringify({
+            realm: "shop",
+            clients: [{ id: "c-1", clientId: "web", publicClient: true, directAccessGrantsEnabled: true }],
+            users: [{ id: pinned, username: "demo@shop.dev" }, { username: "no-id" }],
+            roles: { realm: [{ id: "r-1", name: "admin" }], client: { web: [{ id: "r-2", name: "reader" }] } },
+            groups: [{ id: "g-1", name: "staff", subGroups: [{ id: "g-2", name: "leads" }] }],
+            clientScopes: [{ id: "s-1", name: "profile" }],
+            components: { "org.keycloak.keys.KeyProvider": [{ id: "k-1", name: "rsa", subComponents: { x: [{ id: "k-2", name: "sub" }] } }] },
+        })
+        const one = prepareRealm(exported, "shop-a1b2c3-w1", "realm.json")
+        const two = prepareRealm(exported, "shop-a1b2c3-w2", "realm.json")
+        const idOf = (prepared: typeof one): unknown => (prepared.body.users as ReadonlyArray<Record<string, unknown>>)[0]?.id
+        assert.match(String(idOf(one)), /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+        assert.notEqual(idOf(one), idOf(two))
+        assert.notEqual(idOf(one), pinned)
+        assert.deepEqual(one.userIds, { [pinned]: idOf(one) })
+        assert.deepEqual(prepareRealm(exported, "shop-a1b2c3-w1", "realm.json").userIds, one.userIds, "stable per namespace")
+        assert.equal("id" in ((one.body.users as ReadonlyArray<Record<string, unknown>>)[1] ?? {}), false)
+        const text = JSON.stringify(one.body)
+        for (const dropped of ["c-1", "r-1", "r-2", "g-1", "g-2", "s-1", "k-1", "k-2"]) assert.equal(text.includes(`"${dropped}"`), false, dropped)
+        assert.match(text, /"name":"leads"/)
+        assert.match(text, /"name":"sub"/)
+    })
+
     it("refuses a file without a realm name", () => {
         assert.throws(() => prepareRealm("{}", "k", "realm.json"), /no "realm"/)
     })

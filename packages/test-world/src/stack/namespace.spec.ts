@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os"
 import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -5,8 +6,7 @@ import { describe, it } from "node:test"
 import { containerName, imageKey } from "./naming"
 import { namespaceOf, runToken } from "./namespace"
 
-mkdirSync("D:/starci-tmp/hfs/devin/tw-a1", { recursive: true })
-const scratch = mkdtempSync(join("D:/starci-tmp/hfs/devin/tw-a1", "ns-"))
+const scratch = mkdtempSync(join(tmpdir(), "starci-tw-ns-"))
 
 const checkout = (name: string, packageName: string | null): string => {
     const root = join(scratch, name)
@@ -16,28 +16,43 @@ const checkout = (name: string, packageName: string | null): string => {
 }
 
 describe("namespaceOf", () => {
-    it("slugs the unscoped package name and appends 6 hex of the root hash", () => {
-        const namespace = namespaceOf(checkout("a", "@starci/Todo-App-Be"))
-        assert.match(namespace.snake, /^todo_app_be_[0-9a-f]{6}$/)
+    it("slugs the unscoped package name and appends 6 hex of the root hash and the slot", () => {
+        const namespace = namespaceOf(checkout("a", "@starci/Todo-App-Be"), 1)
+        assert.match(namespace.snake, /^todo_app_be_[0-9a-f]{6}_w1$/)
         assert.equal(namespace.kebab, namespace.snake.replace(/_/g, "-"))
     })
 
-    it("differs per checkout of the same package and is stable per root", () => {
-        const one = namespaceOf(checkout("b1", "shop"))
-        const two = namespaceOf(checkout("b2", "shop"))
+    it("differs per checkout of the same package and is stable per root and slot", () => {
+        const one = namespaceOf(checkout("b1", "shop"), 1)
+        const two = namespaceOf(checkout("b2", "shop"), 1)
         assert.notEqual(one.snake, two.snake)
-        assert.equal(namespaceOf(one.root).snake, one.snake)
+        assert.equal(namespaceOf(one.root, 1).snake, one.snake)
+    })
+
+    it("gives every slot of one checkout its own namespace (each jest worker owns a slot)", () => {
+        const root = checkout("slots", "shop")
+        const names = [1, 2, 3, 10].map((slot) => namespaceOf(root, slot).snake)
+        assert.equal(new Set(names).size, names.length)
+        assert.equal(names[0]?.replace(/_w1$/, ""), names[1]?.replace(/_w2$/, ""))
+    })
+
+    it("refuses a slot that is not a positive integer", () => {
+        assert.throws(() => namespaceOf(checkout("bad", "shop"), 0), RangeError)
+        assert.throws(() => namespaceOf(checkout("bad", "shop"), 1.5), RangeError)
     })
 
     it("keeps the snake form within 40 characters so <snake>_<connection> fits a Postgres identifier", () => {
-        const namespace = namespaceOf(checkout("c", "a-very-long-package-name-that-goes-on-and-on-forever-and-ever"))
-        assert.ok(namespace.snake.length <= 40)
-        assert.ok(`${namespace.snake}_expert_portal`.length <= 63)
+        for (const slot of [1, 99]) {
+            const namespace = namespaceOf(checkout("c", "a-very-long-package-name-that-goes-on-and-on-forever-and-ever"), slot)
+            assert.ok(namespace.snake.length <= 40, namespace.snake)
+            assert.ok(namespace.snake.endsWith(`_w${slot}`))
+            assert.ok(`${namespace.snake}_expert_portal`.length <= 63)
+        }
     })
 
     it("falls back to the directory name and never starts with a digit", () => {
-        assert.match(namespaceOf(checkout("plain", null)).snake, /^plain_/)
-        assert.match(namespaceOf(checkout("d", "2fa")).snake, /^r_2fa_/)
+        assert.match(namespaceOf(checkout("plain", null), 1).snake, /^plain_/)
+        assert.match(namespaceOf(checkout("d", "2fa"), 1).snake, /^r_2fa_/)
     })
 })
 
