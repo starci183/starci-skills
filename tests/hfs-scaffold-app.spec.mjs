@@ -3,13 +3,14 @@
 // A fresh scaffold has 0 findings and 0 tool errors; a violation planted on each side is reported by its own side's canon alone, and
 // every path a finding names, in its path and in its message, is app-relative. The scaffold also type-checks with its own root
 // `typecheck` script (after `codegen`), so every import of the skeleton is proven to resolve; an unresolvable import planted on each
-// side is reported.
+// side is reported. The be api also builds with its own build:be script and boots with start:api (GET /health/live answers 200), then stops.
 // Nothing is installed: the dependencies are linked from existing installs (tests/_hfs-app-install.mjs; STARCI_APP_INSTALLS may add
 // a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { main } from '../packages/hfs/bin/hfs.mjs';
@@ -51,6 +52,39 @@ function typecheck(app) {
   for (const command of scripts.typecheck.split('&&')) step(command);
   return errors;
 }
+
+/** What the boot smoke runs besides the lint set: the be build (`build:be`: tsc, tsc-alias) and the HTTP platform the api serves on. */
+const BOOT_DEPENDENCIES = Object.freeze(['tsc-alias', '@nestjs/platform-express', 'express', 'rxjs', 'reflect-metadata']);
+const bootSkip = missing.length ? skip : (missingFrom(installs, BOOT_DEPENDENCIES).length ? `no install holds ${missingFrom(installs, BOOT_DEPENDENCIES).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+
+/** The bin script of an installed package (`tsc` of typescript, `tsc-alias`), read from its package.json. */
+function binOf(app, pkg, name) {
+  const dir = path.join(app, 'node_modules', ...pkg.split('/'));
+  const { bin } = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  return path.join(dir, typeof bin === 'string' ? bin : bin[name]);
+}
+
+/** Runs a root script of the app the way npm would, step by step: `cd <dir>`, `npm run <script>`, `tsc`, `tsc-alias`. */
+function runScript(app, name) {
+  const scripts = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts;
+  let cwd = app;
+  for (const command of scripts[name].split('&&')) {
+    const [tool, ...args] = command.trim().split(/\s+/);
+    if (tool === 'cd') { cwd = path.resolve(cwd, args[0]); continue; }
+    if (tool === 'npm' && args[0] === 'run') { runScript(app, args[1]); continue; }
+    const bins = { tsc: binOf(app, 'typescript', 'tsc'), 'tsc-alias': binOf(app, 'tsc-alias', 'tsc-alias') };
+    assert.ok(bins[tool], `${name} runs only cd, npm run, tsc and tsc-alias, not ${command}`);
+    const run = spawnSync(process.execPath, [bins[tool], ...args], { cwd, encoding: 'utf8' });
+    assert.equal(run.status, 0, `${command}: ${run.stdout}${run.stderr}`);
+  }
+}
+
+/** A free TCP port on the loopback interface. */
+const freePort = () => new Promise((resolve, reject) => {
+  const server = net.createServer();
+  server.once('error', reject);
+  server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => resolve(port)); });
+});
 
 const edit = (app, file, from, to) => {
   const target = path.join(app, ...file.split('/'));
@@ -129,4 +163,41 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
     const side = finding.path.split('/')[0];
     assert.ok(!finding.rule.startsWith('starci-') || finding.rule.startsWith(`starci-${side}/`), `${finding.rule} on ${finding.path}: a canon judges only its own side`);
   }
+});
+
+test('the scaffolded be api builds with build:be and boots with start:api from the linked installs, then stops', { skip: bootSkip, timeout: 600_000 }, async (t) => {
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-boot-'));
+  const app = path.join(into, 'demo');
+  let links = [];
+  let child = null;
+  t.after(() => { if (child && child.exitCode === null) child.kill(); uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
+
+  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  // The scaffold declares the runtime peer of every driver integration pair it depends on (R111): nothing to add.
+  const { peerIntegrationFindings } = await import('../scripts/lib/hfs-rules/peer-integrations.mjs');
+  assert.deepEqual(peerIntegrationFindings({ repoRoot: app, files: ['package.json'] }), []);
+  links = installInto(app, installs);
+
+  runScript(app, 'build:be');
+  const start = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['start:api'];
+  const [tool, entry] = start.split(/\s+/);
+  assert.equal(tool, 'node', `start:api runs the built api with node: ${start}`);
+  const port = await freePort();
+  const origin = 'http://localhost:3000';
+  const { spawn } = await import('node:child_process');
+  child = spawn(process.execPath, [entry], { cwd: app, env: { ...process.env, PORT: String(port), HTTP_SECURITY_ALLOWED_ORIGINS: origin }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', (chunk) => { output += chunk; });
+  child.stderr.on('data', (chunk) => { output += chunk; });
+  const exited = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
+
+  let live = null;
+  for (let attempt = 0; attempt < 120 && live === null && child.exitCode === null; attempt += 1) {
+    try { live = await fetch(`http://127.0.0.1:${port}/health/live`, { headers: { origin } }); } catch { await new Promise((resolve) => setTimeout(resolve, 250)); }
+  }
+  assert.ok(live, `the api answered on port ${port}: ${output}`);
+  assert.equal(live.status, 200, `GET /health/live: ${live.status} ${await live.text()} ${output}`);
+  assert.match(output, /"event":"server\.started"/, 'the api logged its start');
+  child.kill();
+  await exited;
 });

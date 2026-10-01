@@ -7,6 +7,12 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane SHAPE: gaps the merged examples exposed are closed, each with a violating and a passing spec.
+  - New rule R111 `HFS_PEER_INTEGRATION_MISSING`: the app root package.json declares the runtime peer of every driver integration pair of the data catalog `knowledge/hfs/peer-integrations.yaml` (`@nestjs/apollo` on `@nestjs/platform-express` 11 requires `@as-integrations/express5`); the scaffold spec builds the scaffolded be api with `build:be` and boots it with `start:api`.
+  - `BE_SOURCE_FORM` admits `be/src/tests/world/fakes/<provider>/server.ts` through the slot manifest (be.tests.world allows the literal entry), the path `test-world-files` already accepted.
+  - The managed `typecheck` of an app with fe packages builds them before it type-checks the fe apps; the scaffold writes `workspace.yaml` with the `be`/`fe` sides, validated against `work/workspace@1`.
+  - R105 judges the `.starciwork` records of the `be` and `fe` sides from the app root.
+  - The Work checks resolve a record's `repository` only as a declared side: the two-repository binding fallback of `repoRootFor`, `check-evidence-binding --repo` and `PROOF_COMMAND_AMBIGUOUS` are deleted, and the Work fixtures use the app shape. Contract change `hfs-peer-integrations`.
 - A product is one app repository (hfs 4.0.0, slot and rule manifests at 2.0.0, `@starci/eslint-canon-be` 3.0.0, `@starci/eslint-canon-fe` 8.0.0; package changelogs under `packages/hfs`, `packages/eslint/be` and `packages/eslint/fe`). The app root holds:
   - the one `package.json` (every dependency and script of both sides; npm workspaces only for the sides' `packages/*`), the one lockfile and `node_modules`;
   - `hfs.json` of kind `app`: `{ hfs: 2, kind: "app", project, sides: { be: { apps, optionalSlots, connections }, fe: { apps, optionalSlots, reads: ["be/contracts/"] } } }`;
