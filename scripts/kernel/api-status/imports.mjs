@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { brokenImports } from '../import-scan.mjs';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../../lib/git.mjs';
+import { runGit } from '../../api/git/lib.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { workflowWorktreeOf } from '../workflow-worktree.mjs';
 

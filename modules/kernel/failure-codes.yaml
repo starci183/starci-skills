@@ -4388,17 +4388,6 @@ RT_HELPER_REDEFINED:
   owner: supervisor
   kind: check-finding
 
-RT_RAW_GIT_SPAWN:
-  title: "Direct git spawn"
-  title_vi: "Gọi git trực tiếp bằng spawn"
-  meaning_vi: "Một lời gọi spawnSync, execFileSync, spawn hoặc execFile với đối số đầu là chuỗi 'git' nằm ngoài scripts/lib/git.mjs. Mọi lần chạy git đi qua gitSpawn, runGit, gitOutput hoặc gitResult ở đó."
-  causes_vi:
-    - "Viết lại tùy chọn encoding, windowsHide, timeout bằng tay ở từng nơi gọi git"
-    - "Thêm một hàm bọc git riêng thay vì dùng thư viện"
-  nextStep_vi: "Người giám sát chuyển lời gọi sang scripts/lib/git.mjs (runGit hoặc gitOutput) với cùng đối số, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
 RULE_DUPLICATED:
   title: "Rule sentence repeated"
   title_vi: "Câu quy tắc bị lặp"

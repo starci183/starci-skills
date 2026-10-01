@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../lib/safe-remove.mjs';
 import { foldCase } from '../lib/path-key.mjs';
-import { gitSpawn } from '../lib/git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

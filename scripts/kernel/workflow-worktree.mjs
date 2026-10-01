@@ -4,7 +4,7 @@
 //   create     ensureWorkflowWorktree, before the Kernel launch (scripts/kernel/start-workflow.mjs): Orca creates and owns
 //              the tree - `orca worktree create --repo path:<app repo> --name wf-<workflowId> --base-branch main
 //              --setup run --no-parent` (the repository's setup hook runs a real `npm ci`; there are no node_modules
-//              junctions) - through scripts/lib/worktrees.mjs createOrcaWorktree, which takes the per-repo cap slot
+//              junctions) - through scripts/api/orca/worktree-provision.mjs createOrcaWorktree, which takes the per-repo cap slot
 //              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
 //              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
 //              (wf-<id>, its '/' rule): that branch IS the workflow branch, recorded as Orca reported it; every reader
@@ -25,12 +25,16 @@
 //              deletes a branch it can prove merged itself; -d runs only when the branch is still there).
 //
 // ctx: {env, orca, git} - env selects machine.sqlite (the registry), orca the Orca worktree client
-// (scripts/lib/worktrees.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
+// (scripts/api/orca/worktree-client.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { withMachine } from '../../engine/machine-db.mjs';
-import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, mainRootOf, orcaWorktreeClient, TERMINAL_JOB_STATUSES } from '../lib/worktrees.mjs';
+import { createOrcaWorktree, bindOrcaWorktree } from '../api/orca/worktree-provision.mjs';
+import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
+import { mainRootOf } from '../api/git/worktree-list.mjs';
+import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
+import { TERMINAL_JOB_STATUSES } from '../lib/worktree-registry.mjs';
 import { projectBinding } from './target-repo.mjs';
 
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
@@ -229,7 +233,7 @@ export function markReleasePending(ctx, workflowId, { at = Date.now() } = {}) {
 /**
  * Release the workflow's worktree, from the host (the GC; never from inside the worktree: refused release-from-inside):
  * every link removed as a link and zero asserted, `orca worktree rm`, the main checkout asserted untouched, the registry
- * row closed (scripts/lib/worktrees.mjs removeOrcaWorktree), then `git branch -d` of the workflow branch when Orca kept it.
+ * row closed (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree), then `git branch -d` of the workflow branch when Orca kept it.
  * {ok, released, path?, links?, branch?} | {ok:false, reason, fatal?, ...}
  */
 export function releaseWorkflowWorktree(ctx, workflowId, { cwd = process.cwd() } = {}) {

@@ -6,7 +6,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {appRootOf, readWorkspace, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
 import {slash, sameOrUnder} from '../lib/path-key.mjs';
-import {runGit} from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import {isDir} from '../lib/fs-kind.mjs';
 import {list} from '../lib/list.mjs';
 import {sha256File} from '../../engine/digest.mjs';

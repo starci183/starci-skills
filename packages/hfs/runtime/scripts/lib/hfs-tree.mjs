@@ -4,7 +4,7 @@
 // Read-only: it walks the file system and asks git, nothing else.
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from './git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 import { posixPath } from './path-key.mjs';
 
 /** Directory names no tree check enters: git's own store and installed packages. */

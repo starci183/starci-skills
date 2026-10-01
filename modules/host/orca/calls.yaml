@@ -293,7 +293,7 @@ calls:
     kind: mutation
     replay: none
     timeoutMs: 60000
-    note: Registers a git repository with Orca by its path; idempotent (the same path answers the same repo id). scripts/lib/worktrees.mjs createOrcaWorktree issues it once when worktree-create answers repo_not_found, then creates again.
+    note: Registers a git repository with Orca by its path; idempotent (the same path answers the same repo id). scripts/api/orca/worktree-provision.mjs createOrcaWorktree issues it once when worktree-create answers repo_not_found, then creates again.
     flags: [path]
     required: [path]
     receipt: [result.repo.id]
@@ -318,7 +318,7 @@ calls:
     replay: none
     timeoutMs: 120000
     note: |-
-      Removes the worktree from Orca and from git (scripts/lib/worktrees.mjs removeOrcaWorktree, after the runtime removed
+      Removes the worktree from Orca and from git (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree, after the runtime removed
       every link in it as a link and proved none is left). Orca also deletes the checked-out local branch when it can
       prove the branch merged and keeps it otherwise, so a caller that deletes the branch itself first checks it still
       exists. Measured 2026-10-01 (lane ORCAWT): with node_modules and packages/node_modules junctions into a fake main
@@ -332,7 +332,7 @@ calls:
     kind: read
     flags: [repo, limit]
     receipt: [result.worktrees]
-    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/lib/worktrees.mjs (orcaWorktreeClient) reads it to find a workflow worktree Orca created, and the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
+    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/api/orca/worktree-client.mjs (orcaWorktreeClient) reads it to find a workflow worktree Orca created, and the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
   worktree-set:
     command: worktree set
     kind: mutation

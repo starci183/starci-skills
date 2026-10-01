@@ -31,7 +31,7 @@
 // The kernel-rev-stale gate (opRevStale) is unchanged: it still reads every op contract change since the ack
 // (the non-enumerable kernelRev.gate), so a leg is never built from a contract its Kernel has not read.
 import path from 'node:path';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from './contract-version.mjs';
 import { isContractChangesPath, readContractChangesDocAt } from './contract-changes-store.mjs';

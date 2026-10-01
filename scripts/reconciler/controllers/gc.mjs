@@ -105,7 +105,7 @@ const liveDeps = {
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
   worktrees: async ({ env, repos }) => (await import('../../lib/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
-  worktreeSettings: async () => (await import('../../lib/worktrees.mjs')).worktreeSettings(),
+  worktreeSettings: async () => (await import('../../lib/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
   hostResources: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
   lesson: async (args) => (await import('../../supervisor/lessons.mjs')).recordLeftover(args),

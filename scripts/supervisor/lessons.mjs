@@ -46,8 +46,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { gitSpawn } from '../lib/git.mjs';
-import { createScratchWorktree, removeScratchWorktree } from '../lib/worktrees.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
+import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { removeScratchWorktree } from '../api/git/worktree-remove.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
@@ -347,7 +348,7 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
   const plan = { id, signature: e.signature, commits: e.commits, lane: name, dir };
   if (!apply) return { ok: true, planned: true, ...plan };
   const step = (args, cwd = dir) => { const r = git(args, { cwd }); if (!r.ok) throw Object.assign(new Error(`git ${args.join(' ')}: ${r.err}`), { code: 'revert-git' }); return r.out; };
-  // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed in the finally below.
+  // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed in the finally below.
   const made = createScratchWorktree({ repoRoot: root, dir, kind: 'lane', branch: `lane/${name}`, newBranch: true, base: 'main', owner: { lane: name }, env, git: (args, o) => git(args, o) });
   if (!made.ok) throw Object.assign(new Error(`worktree ${dir}: ${made.detail ?? made.reason}`), { code: 'revert-git' });
   try {

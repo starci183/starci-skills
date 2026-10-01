@@ -11,7 +11,7 @@ import { checkRepository } from '../scripts/lib/hfs-check.mjs';
 import { startAgent } from '../scripts/agent/lib.mjs';
 import { startWorkerAgent } from '../scripts/supervisor/workers.mjs';
 import { launchCriticWorker } from '../scripts/work/draw-critic.mjs';
-import { gitResult } from '../scripts/lib/git.mjs';
+import { gitResult } from '../scripts/api/git/lib.mjs';
 
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) drives the runtime's own
 // launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), workers.mjs startWorkerAgent ([Worker])

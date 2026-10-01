@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runGit } from '../scripts/lib/git.mjs';
+import { runGit } from '../scripts/api/git/lib.mjs';
 
 // `git cat-file --batch` readers ask for raw bytes. encoding:'buffer' is the request token the callers
 // spell; it is not a real encoding, and spawnSync throws ERR_UNKNOWN_ENCODING for it the moment a

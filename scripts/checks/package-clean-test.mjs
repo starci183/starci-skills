@@ -36,7 +36,7 @@ import { isMain } from './common.mjs';
 import { loadPins } from './check-canon-pins.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });

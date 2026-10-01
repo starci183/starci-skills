@@ -15,7 +15,10 @@ import {
   workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, opWorktreeArgs, sideOf,
   canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY,
 } from '../scripts/kernel/workflow-worktree.mjs';
-import { createScratchWorktree, createOrcaWorktree, isPendingRow, gcWorktrees } from '../scripts/lib/worktrees.mjs';
+import { createScratchWorktree } from '../scripts/api/git/worktree-add.mjs';
+import { createOrcaWorktree } from '../scripts/api/orca/worktree-provision.mjs';
+import { isPendingRow } from '../scripts/lib/worktree-registry.mjs';
+import { gcWorktrees } from '../scripts/lib/worktrees.mjs';
 import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 
 const require = createRequire(import.meta.url);

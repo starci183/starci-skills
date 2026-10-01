@@ -17,7 +17,7 @@
 //  5. conventional-commit scope      "type(scope):" matches the title of exactly one workflow line
 // A resolved workflow that is no longer running hands the follow-up to the
 // running workflow with the same title (its successor run).
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { ownedPathsIntersect } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 

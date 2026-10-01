@@ -5,7 +5,7 @@
 // Contract: modules/kernel/api.yaml commands.enqueue / commands.settle landed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';

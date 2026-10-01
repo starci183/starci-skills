@@ -56,7 +56,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { gitResult } from '../lib/git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -30,8 +30,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../lib/git.mjs';
-import { mainRootOf, TERMINAL_JOB_STATUSES } from '../lib/worktrees.mjs';
+import { runGit } from '../api/git/lib.mjs';
+import { mainRootOf } from '../api/git/worktree-list.mjs';
+import { TERMINAL_JOB_STATUSES } from '../lib/worktree-registry.mjs';
 import { mergeGuard } from '../checks/gate.mjs';
 import { fastForwardLive } from '../supervisor/land.mjs';
 import { claimManager } from '../connectors/lib.mjs';
@@ -98,7 +99,7 @@ const ownedOf = (payloadJson) => {
 /**
  * The leases of the workflow's ops in its worktree: `own`, the owned paths of `opId` (exactly what its leases hold: its
  * be/ or fe/ paths and its owned .starciwork Work records; the whole tree for an op the ledger does not know), and
- * `others`, the owned paths of every other op of the workflow still occupying the tree (part A's TERMINAL_JOB_STATUSES, scripts/lib/worktrees.mjs).
+ * `others`, the owned paths of every other op of the workflow still occupying the tree (part A's TERMINAL_JOB_STATUSES, scripts/lib/worktree-registry.mjs).
  */
 export function leasesOf(ctx, { workflowId, opId }) {
   const row = ctx?.db?.prepare?.('SELECT job_id, payload_json FROM jobs WHERE job_id=?').get(opId) ?? null;

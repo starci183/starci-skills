@@ -67,7 +67,8 @@ import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createScratchWorktree, markRemoved } from '../lib/worktrees.mjs';
+import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { markRemoved } from '../lib/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';

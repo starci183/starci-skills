@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
-import {gitOutput} from '../lib/git.mjs';
+import { gitOutput } from '../api/git/lib.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 

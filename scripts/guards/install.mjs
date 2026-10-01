@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn } from '../lib/git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 

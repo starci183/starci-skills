@@ -1,4 +1,4 @@
-// fake-orca-worktrees.mjs — a fake Orca worktree client (scripts/lib/worktrees.mjs orcaWorktreeClient's shape: create,
+// fake-orca-worktrees.mjs — a fake Orca worktree client (scripts/api/orca/worktree-client.mjs orcaWorktreeClient's shape: create,
 // remove, list) that behaves as the real `orca worktree create/rm/list` was measured to (lane ORCAWT, 2026-10-01): the tree
 // goes under its own workspace root `<root>/<repo name>/<name>`, the branch is the name with '/' turned into '-' and a
 // -2, -3 suffix when taken, the id is `<repo-id>::<path>`; rm removes the tree and its registration (a spec's git does it

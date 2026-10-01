@@ -4,7 +4,7 @@
 // by Orca (`orca worktree create` through scripts/api/orca/worktree-create.mjs: the Kernel's workflow worktree, the
 // draw critic's placement), never by git. A runtime-internal scratch tree no agent works in (land/push scratch, the
 // verify-proof base tree, the revert lane, the [Worker] staging checkout) is made by git in ONE function:
-// scripts/lib/worktrees.mjs createScratchWorktree, which registers it in machine.sqlite and hands it to the GC. A
+// scripts/api/git/worktree-add.mjs createScratchWorktree, which registers it in machine.sqlite and hands it to the GC. A
 // `git worktree add` anywhere else - another file, or the worktree API outside that function - is red. A land gate
 // tree check (scripts/supervisor/land.mjs TREE_CHECKS) and part of `npm run check`.
 //
@@ -20,9 +20,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../lib/git.mjs';
+import { runGit } from '../api/git/lib.mjs';
 
-export const WORKTREE_API = 'scripts/lib/worktrees.mjs';
+export const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 /** The one function of WORKTREE_API that may run `git worktree add`. */
 export const WORKTREE_ADD_HOME = 'createScratchWorktree';
 const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;

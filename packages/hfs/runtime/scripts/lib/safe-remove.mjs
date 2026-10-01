@@ -18,11 +18,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sleepSync } from './sleep-sync.mjs';
 import { samePath } from './path-key.mjs';
-import { gitSpawn } from './git.mjs';
+import { gitSpawn } from '../api/git/lib.mjs';
+import { rmdirLink } from '../api/fs/rmdir-link.mjs';
 import { artifactHoldReason } from './artifact-hold.mjs';
 import { realpathOr } from './fs-kind.mjs';
 
@@ -186,7 +186,7 @@ export function removeLink(p) {
   if (WIN) {
     let st = null;
     try { st = fs.lstatSync(p); } catch { return true; }
-    if (st.isDirectory() || st.isSymbolicLink()) spawnSync('cmd', ['/d', '/c', 'rmdir', p], { windowsHide: true, encoding: 'utf8' });
+    if (st.isDirectory() || st.isSymbolicLink()) rmdirLink(p);
   }
   return unlinkOnly(p);
 }
@@ -213,7 +213,7 @@ export function mainCheckoutDamage(before, after) {
 }
 
 /**
- * The link step of every worktree removal (git's here, Orca's in scripts/lib/worktrees.mjs removeOrcaWorktree): every link
+ * The link step of every worktree removal (git's here, Orca's in scripts/api/orca/worktree-remove.mjs removeOrcaWorktree): every link
  * under `target` found WITHOUT following one (linksUnder), each removed as a link (removeLink: `cmd /c rmdir <link>`, never
  * /s), outermost first, then a re-scan that must find ZERO. {ok, links, errors: [{path, code, message}]}; ok false: a link
  * is stuck and the caller removes nothing.

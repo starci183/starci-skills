@@ -35,7 +35,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { runGit } from '../scripts/lib/git.mjs';
+import { runGit } from '../scripts/api/git/lib.mjs';
 import { sleepSync as scaledSleepSync } from '../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from '../scripts/lib/artifact-store.mjs';
 import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
@@ -1303,7 +1303,7 @@ const upsertWorktree = (m, wt) => upsertRow(m.db, 'worktrees', { created_at: m.n
 const removedWorktree = (m, wtPath, { error = null, archivedRef = null } = {}) => m.db.prepare('UPDATE worktrees SET removed_at=CASE WHEN ? IS NULL THEN ? ELSE removed_at END, remove_error=?, archived_ref=COALESCE(?,archived_ref) WHERE path=?')
   .run(error, m.now(), error, archivedRef, path.resolve(wtPath)).changes > 0;
 /**
- * The worktree registry (scripts/lib/worktrees.mjs is its one caller): reserve a row for a worktree about to be created,
+ * The worktree registry (scripts/lib/worktree-registry.mjs and the worktree api files are its callers): reserve a row for a worktree about to be created,
  * atomically against the per-repo cap. BEGIN IMMEDIATE: two dispatches never both take the last slot. `cap` null: no cap.
  * {ok, live} | {ok:false, reason:'worktree-cap', live, cap}
  */

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allocationMs } from '../../engine/config.mjs';
 import { ownedPathspec } from '../../engine/admission.mjs';
-import { gitResult } from '../lib/git.mjs';
+import { gitResult } from '../api/git/lib.mjs';
 
 const git = (cwd, args, timeout) => gitResult(args, { dir: cwd, timeout });
 
