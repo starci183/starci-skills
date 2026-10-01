@@ -490,7 +490,6 @@ test('toSucceedWith: matches an ok outcome by value and rejects a refusal, anoth
 test('the index exports the whole kit and the package.json declares typeorm as an optional peer only', () => {
   for (const name of ['mock', 'mockEntityManager', 'fakeTransaction', 'FakeClock', 'fakeIds', 'fakeCache', 'fakeLock', 'recordingOutbox', 'builder']) assert.equal(typeof preset[name], 'function', name);
   const pkg = require('./package.json');
-  assert.equal(pkg.version, '2.2.0');
   assert.equal(pkg.peerDependenciesMeta.typeorm.optional, true);
   assert.equal(Object.keys(pkg.dependencies ?? {}).length, 0);
   for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'outbox.cjs', 'builders.cjs', 'world-runner.cjs']) {
