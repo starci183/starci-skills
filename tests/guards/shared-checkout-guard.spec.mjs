@@ -155,23 +155,18 @@ test('npm install-family commands are installs; npm ci is the node_modules delet
 });
 
 test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-ledger-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(repo, '.starciwork'));
-  const { openLedger } = await import('../../engine/db/ledger.mjs');
-  const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
-  const ledger = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
-  try {
+  const { withLedger, seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  await withLedger(t, async ({ repoRoot: repo, ledger }) => {
     seedWorkflow(ledger, { id: 'wf-collab', jobs: [{ jobId: 'op-a', opId: 'backend.implement', status: 'running' }] });
     seedWorkflow(ledger, { id: 'wf-auth', jobs: [
       { jobId: 'op-b', opId: 'backend.implement', status: 'running' },
       { jobId: 'op-c', opId: 'backend.implement', status: 'succeeded' },
       { jobId: 'k-1', kind: 'kernel', status: 'running' }] });
-  } finally { ledger.close(); }
-  const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
-  assert.equal(peers.known, true);
-  assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);
-  assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-auth' })).jobs.map((j) => j.jobId), ['op-a']);
+    const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
+    assert.equal(peers.known, true);
+    assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);
+    assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-auth' })).jobs.map((j) => j.jobId), ['op-a']);
+  });
 });
 
 const sh = (cwd, args, env = {}) => spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, ...env } });

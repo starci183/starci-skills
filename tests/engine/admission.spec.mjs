@@ -17,7 +17,7 @@ test('owned paths normalize to concrete workspace-relative prefixes',()=>{
 
 test('owned path sets collapse duplicate descendants but preserve disjoint product slices',()=>{
   assert.deepEqual(normalizeOwnedPaths(['todo-app-fe/apps/landing/src','todo-app-fe/apps/landing','todo-app-fe/apps/landing/**','.starciwork/migration']),[
-    'todo-app-fe/apps/landing','.starciwork/migration',
+    '.starciwork/migration','todo-app-fe/apps/landing',
   ]);
   assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','todo-app-fe/apps/landing/src/page.tsx'),true);
   assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','.starciwork/migration'),false);
