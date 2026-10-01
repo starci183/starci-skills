@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { checkContractCites, checkContractCitesMain, citesIn, isUnverifiable } from '../scripts/checks/check-contract-cites.mjs';
+import { CITED_PATH_MISSING, checkContractCites, checkContractCitesMain, citedPathFindings, citesIn, isUnverifiable, runtimeCiteScan } from '../scripts/checks/check-contract-cites.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
@@ -112,6 +112,53 @@ test('a retired path is valid history in a contract-change entry or owner ruling
     const report = checkContractCites(root);
     assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/live.yaml'], JSON.stringify(report.dead));
     assert.equal(report.retiredCites, 3);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a moved path is valid history and dead in live text, named with where it went (moved[])', () => {
+  const root = fixtureTree({
+    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n',
+    'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
+    'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/old/gate.mjs`"\n',
+    'scripts/gates/gate.mjs': '',
+  });
+  try {
+    const report = checkContractCites(root);
+    assert.deepEqual(report.dead.map((d) => [d.file, d.why]), [['modules/kernel/live.yaml', 'moved to scripts/gates/gate.mjs']]);
+    assert.equal(report.retiredCites, 2, 'the contract change and the registry itself cite the old path as history');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('RT_CITED_PATH_MISSING: a dead runtime path in live docs or skills is a finding', () => {
+  const root = fixtureTree({
+    'modules/kernel/live.yaml': 'a: 1\n',
+    'docs/guide.md': 'Run `scripts/missing/tool.mjs` first.\n',
+    'docs/examples/app.md': 'Run `scripts/codegen.mjs` in the product.\n',
+    'skills/s/SKILL.md': 'Read `scripts/present.mjs`.\n',
+    'scripts/present.mjs': '',
+  });
+  try {
+    assert.ok(runtimeCiteScan(root).includes('docs/guide.md') && !runtimeCiteScan(root).includes('docs/examples/app.md'), 'docs/examples describe product apps and are not read');
+    const findings = citedPathFindings(root);
+    assert.deepEqual(findings.map((f) => [f.code, f.path]), [[CITED_PATH_MISSING, 'docs/guide.md']]);
+    assert.equal(findings[0].code, 'RT_CITED_PATH_MISSING');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('RT_CITED_PATH_MISSING: live prose whose every runtime path exists has no finding', () => {
+  const root = fixtureTree({
+    'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/present.mjs`"\n',
+    'docs/guide.md': 'Run `scripts/present.mjs` first.\n',
+    'scripts/present.mjs': '',
+  });
+  try {
+    assert.deepEqual(citedPathFindings(root).filter((f) => f.code === 'RT_CITED_PATH_MISSING'), []);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -58,7 +58,7 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
   assert.ok(!unbuilt.includes('R12'), 'R12 is enforced by the architecture machine today');
   assert.ok(!unbuilt.includes('R58'), 'R58 is enforced by eslint-fe');
   assert.ok(catalog.planned().every((p) => p.rule && p.kind && p.id));
-  assert.deepEqual(Object.keys(catalog.gates), ['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar']);
+  assert.deepEqual(Object.keys(catalog.gates), ['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
 });
 
 test('rules() and openHfs().rules() give the same frozen catalog', () => {
