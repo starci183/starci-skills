@@ -27,8 +27,10 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['.starcistacks/vps/infra/compose/nginx.conf','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
-      '.starcistacks/vps/README.md','.starcistacks/vps/infra/compose/stack.yaml']
-      .map(name=>'examples/todo-app/'+(name.startsWith('.starcistacks/')?'be/':'')+name)])assert.ok(files.has(file),file);
+      '.starcistacks/vps/README.md','.starcistacks/vps/infra/compose/stack.yaml','.sops.yaml']
+      .map(name=>'examples/todo-app/'+name)])assert.ok(files.has(file),file);
+  // the stack kit sits at the app root: nothing of it ships from a side folder
+  assert.equal([...files.keys()].some(file=>/^examples\/[^/]+\/(be|fe)\/(\.starcistacks\/|\.sops\.yaml$)/.test(file)),false);
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&file.endsWith('.mjs')),false);

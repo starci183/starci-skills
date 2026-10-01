@@ -5,11 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {checkApplicationStacks} from '../scripts/checks/stacks.mjs';
 
-const source=path.resolve(import.meta.dirname,'../examples/todo-app/be');
+// The stack kit of the todo app: its app root's .starcistacks tree, its sops rule and the .gitignore whose managed block holds the custody rules.
+const source=path.resolve(import.meta.dirname,'../examples/todo-app');
+const KIT=['.starcistacks','.sops.yaml','.gitignore'];
 
 test('portable application-stack kit is complete and statically safe in dev and vps',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-application-kit-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.cpSync(source,root,{recursive:true});
+  for(const entry of KIT)fs.cpSync(path.join(source,entry),path.join(root,entry),{recursive:true});
   // dev runs postgres/keycloak/redis/minio/prometheus by default; api and web are behind the
   // `app` Compose profile and run on the host per the dev README, so a plain `up` never renders them.
   const devModel={services:{postgres:{},keycloak:{},redis:{},minio:{},prometheus:{}}};
