@@ -64,7 +64,7 @@ import { git, normPath, unlinkNodeModulesLink, finishLanded, selfJobsLandedBy, r
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';

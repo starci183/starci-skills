@@ -8,8 +8,10 @@ summary: >-
   is capped per repository (modules/kernel/product-land.yaml worktrees.capPerRepo, 10): a full repository refuses the
   dispatch worktree-cap and the job waits queued. Exactly one worktree per op, <repo>/.starciwork/worktrees/<op> off main
   at dispatch; the per-workflow integration worktree (_wf), the workflow branch, `api product-land` and `api product-deps`
-  are gone. A green settle lands the op LAST (every other settle refusal first): op/<op> rebased onto main's tip, the land
-  gate on exactly what lands, main compare-and-swap fast-forwarded and pushed; the worktree and its branch are removed right
+  are gone. A green settle lands the op LAST (every other settle refusal first): the merge guard over its history
+  (land-merge-dropped-main), op/<op> rebased onto main's tip, the land gate on exactly the tree that lands, the pre-land
+  verify (product-integrate-red), main compare-and-swap fast-forwarded (land-main-refused) and pushed, one
+  product-op-landed event per op; the worktree and its branch are removed right
   after the worker is released (`branch -d` once landed). A failed or blocked op's uncommitted work and unlanded commits go
   to refs/heads/preserved/<job> first, and its worktree is removed too. Removal (scripts/lib/safe-remove.mjs
   safeRemoveWorktree) finds every link without following one, removes each as a link, asserts zero remain, only then runs
@@ -19,8 +21,8 @@ summary: >-
   merged, whose owner op settled, or whose owner process has been gone 30 minutes; the Supervisor sweep judges lanes in
   bounded, resumable passes (allocation.gc.laneBudgetMs). `node scripts/reconciler/start.mjs --check` shows each
   repository's worktree count against its cap, red when over it or holding orphans. Adds the codes worktree-cap,
-  worktree-registry-unavailable, op-worktree-dirty, op-branch-moved, main-unresolved, preserve-failed, link-stuck and
-  main-checkout-damaged; retires the workflow-branch codes.
+  worktree-registry-unavailable, op-worktree-dirty, op-worktree-reset-failed, land-merge-dropped-main, land-main-refused,
+  main-unresolved, preserve-failed, link-stuck and main-checkout-damaged; retires the workflow-branch codes.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/worktree-lifecycle-runtime-owned.yaml

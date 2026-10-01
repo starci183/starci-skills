@@ -15,8 +15,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { withMachine } from '../engine/machine-db.mjs';
-import { ensureOpWorktree, integrateOp, reapJobWorktree, productSettings, preservedOpRef } from '../scripts/kernel/product-worktree.mjs';
-import { createWorktree, removeWorktree, gcWorktrees, worktreeCounts, worktreesRootOf } from '../scripts/lib/worktrees.mjs';
+import { ensureOpWorktree, integrateOp, reapJobWorktree, productSettings, preservedOpRef, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { evaluateCondition } from '../scripts/kernel/gate-conditions.mjs';
+import { createWorktree, removeWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit } from '../scripts/lib/worktrees.mjs';
 import { linksUnder, mainCheckoutDamage } from '../scripts/lib/safe-remove.mjs';
 import { scanWorktreeAdd, strayLines } from '../scripts/checks/check-worktree-add.mjs';
 import { collectLanes, readLaneCursor, writeLaneCursor } from '../scripts/supervisor/gc.mjs';
@@ -122,6 +123,74 @@ test('an op settles: rebased onto main, gated, main fast-forwarded and pushed; t
   assert.deepEqual(branches(repo, 'preserved/*'), []);
   assert.equal(liveRows(env).length, 0, 'the registry row is removed');
   assert.equal(git(repo, 'status', '--porcelain'), '', 'the product checkout is clean');
+});
+
+test('the land refuses before main moves: a merge that dropped main\'s change, a red pre-land verify, a dirty op tree', (t) => {
+  const { repo, env } = fixture(t);
+  const base = productSettings();
+  // 1. a merge on the op branch that kept the lane side over main's change of src/b.ts.
+  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-9e1d000001', env }).record;
+  write(rec.op.path, 'src/b.ts', 'export const b = "lane";\n');
+  git(rec.op.path, 'commit', '-qam', 'lane: b');
+  write(repo, 'src/b.ts', 'export const b = "main";\n');
+  git(repo, 'commit', '-qam', 'main: b');
+  spawnSync('git', ['merge', 'main'], { cwd: rec.op.path, encoding: 'utf8' });
+  write(rec.op.path, 'src/b.ts', 'export const b = "lane";\n');
+  git(rec.op.path, 'commit', '-qam', 'merge main, keep lane');
+  const mainBefore = git(repo, 'rev-parse', 'main');
+  const dropped = integrateOp({ record: rec, gate: green });
+  assert.equal(dropped.reason, 'land-merge-dropped-main', JSON.stringify(dropped));
+  assert.deepEqual(dropped.dropped, ['src/b.ts']);
+  assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'main untouched');
+  // 2. a land check red on the rebased tree: product-integrate-red with a continuation; the op tree is back on its head.
+  const two = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-9e1d000002', env }).record;
+  write(two.op.path, 'src/c.ts', 'export const c = 1;\n');
+  git(two.op.path, 'add', '-A'); git(two.op.path, 'commit', '-qm', 'c');
+  const own = git(two.op.path, 'rev-parse', 'HEAD');
+  write(repo, 'src/a.ts', 'export const a = 3;\n');
+  git(repo, 'commit', '-qam', 'main: a = 3');
+  const mainTwo = git(repo, 'rev-parse', 'main');
+  const redSettings = { ...base, land: { ...base.land, push: false, checks: [{ name: 'always-red', argv: [process.execPath, '-e', 'process.exit(1)'] }] } };
+  const red = integrateOp({ record: two, gate: green, settings: redSettings });
+  assert.equal(red.reason, 'product-integrate-red', JSON.stringify(red));
+  assert.match(red.failures.join(' '), /always-red/);
+  assert.equal(red.continuation.resumeFrom, own);
+  assert.equal(git(two.op.path, 'rev-parse', 'HEAD'), own, 'the op worktree is put back on its own head');
+  assert.equal(git(repo, 'rev-parse', 'main'), mainTwo, 'main untouched');
+  // 3. a tracked change left in the op tree: op-worktree-dirty, nothing rebased.
+  write(two.op.path, 'src/c.ts', 'export const c = 2;\n');
+  assert.equal(integrateOp({ record: two, gate: green, settings: redSettings }).reason, 'op-worktree-dirty');
+});
+
+test('snapshotCommit preserves tracked and untracked work and never the node_modules overlay', (t) => {
+  const { repo, env } = fixture(t);
+  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-5aa0000001', env }).record;
+  write(rec.op.path, 'src/a.ts', 'export const a = 7;\n');
+  write(rec.op.path, 'notes/todo.md', 'todo\n');
+  fs.mkdirSync(path.join(rec.op.path, 'packages', 'x'), { recursive: true });
+  fs.symlinkSync(path.join(repo, 'src'), path.join(rec.op.path, 'packages', 'x', 'node_modules'), LINK);
+  const head = git(rec.op.path, 'rev-parse', 'HEAD');
+  const snap = snapshotCommit(rec.op.path, head, 'spec snapshot');
+  assert.ok(snap.ok && snap.dirty, JSON.stringify(snap));
+  const files = git(repo, 'ls-tree', '-r', '--name-only', snap.sha).split(/\r?\n/);
+  assert.ok(files.includes('src/a.ts') && files.includes('notes/todo.md'));
+  assert.ok(!files.some((f) => f.includes('node_modules')), 'no overlay entry is ever preserved');
+  assert.equal(git(rec.op.path, 'status', '--porcelain', '--', 'src/a.ts'), 'M src/a.ts', 'the worktree index is untouched');
+  assert.equal(snapshotCommit(repo, git(repo, 'rev-parse', 'HEAD'), 'clean').dirty, false);
+});
+
+test('a per-op product-op-landed event is what --until-landed reads', (t) => {
+  const { base, repo } = fixture(t);
+  const ledgerRepo = path.join(base, 'ledger-ev');
+  fs.mkdirSync(ledgerRepo);
+  const ledger = openLedger({ file: ledgerFileFor(ledgerRepo) });
+  t.after(() => { try { ledger.close(); } catch { /* closed */ } });
+  ledger.ensureWorkflow({ workflowId: WF, title: 'landed' });
+  const cond = { type: 'landed', workflowId: WF, repository: path.basename(repo) };
+  assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, false);
+  assert.equal(EVENTS.landed, 'product-op-landed');
+  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-x', kind: EVENTS.landed, payload: { repoRoot: repo, branch: 'main', head: 'abc' } }));
+  assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, true);
 });
 
 test('a failed op: its uncommitted work is preserved to preserved/<job>, and its worktree and branch are removed', (t) => {

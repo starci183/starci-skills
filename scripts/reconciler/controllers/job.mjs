@@ -89,7 +89,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
   'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK', 'WORKTREE_REMOVE_OVERDUE']);
 /** Settle refusals of an isolated op's land into main that a continuation answers (product-worktree.mjs integrateOp). */
-export const LAND_REFUSALS = Object.freeze(['product-land-conflict', 'land-gate-red']);
+export const LAND_REFUSALS = Object.freeze(['product-land-conflict', 'land-gate-red', 'product-integrate-red']);
 export const PRODUCT_EVENTS = Object.freeze({ landRefused: 'product-land-refused', worktreeRemoved: 'job-worktree-removed' });
 
 /* ------------------------------------------------------------------------------------------------ keys */

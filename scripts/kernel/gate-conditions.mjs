@@ -21,7 +21,7 @@
 //   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
 //                                              --land; scripts/kernel/foundations.mjs)
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it is
-//                                              finished, or one of its ops product-landed there (product-land-landed:
+//                                              finished, or one of its ops product-landed there (product-op-landed:
 //                                              every op lands into main at its settle) and none of its code-writing
 //                                              legs is still open (a cross-workflow hold on a restructure, e.g.
 //                                              nivo FE legs held until wf-nivo-fe-canon lands into nivo-fe)
@@ -315,7 +315,7 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       const wf = db.prepare('SELECT phase,archived_at FROM workflows WHERE workflow_id=?').get(cond.workflowId);
       if (!wf) return { met: false, unmeetable: `workflow ${cond.workflowId} is gone`, evidence: `${cond.workflowId} absent` };
       if (wf.phase === 'finished') return { met: true, evidence: `${cond.workflowId} finished` };
-      const lands = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind='product-land-landed' ORDER BY seq DESC").all(cond.workflowId)
+      const lands = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind='product-op-landed' ORDER BY seq DESC").all(cond.workflowId)
         .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), at: row.created_at }))
         .filter((payload) => repoMatches(payload.repoRoot, cond.repository));
       if (!lands.length) return { met: false, evidence: `${cond.workflowId} has not product-landed into ${cond.repository} yet (phase ${wf.phase ?? '-'})` };

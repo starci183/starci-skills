@@ -84,6 +84,7 @@ import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/wor
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import { integrateOp } from './product-worktree.mjs';
+import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
@@ -4040,7 +4041,7 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   }
   // The land into main runs last (settleProductLand, from api settle once every other settle refusal passed): a settle
   // refused after main moved would leave main ahead of a job that never settled.
-  if (productRec) return { ...proof, op, status: job.status, pushes, productLand: { record: productRec, head: envelope?.head ?? null } };
+  if (productRec) return { ...proof, op, status: job.status, pushes, productLand: { record: productRec, head: envelope?.head ?? null, checks: envelope?.checks ?? [] } };
   const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
   if (gate.refused) {
     return { checked: true, ok: false, reason: gate.refused.reason, detail: { ...proof.detail, pushGate: gate.refused.detail }, hint: gate.hint, op, status: job.status, pushes };
@@ -4048,6 +4049,7 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
+const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
 /**
  * The land of an isolated op (DESIGN §16.7) into its repository's main, the LAST step of a pass settle: api settle calls it
  * after every other settle refusal passed. Settle passes only once the op's commits are IN main: rebased onto main's tip
@@ -4057,7 +4059,16 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
 function settleProductLand(landed) {
   const { record, head } = landed.productLand;
   const main = record.main ?? 'main';
-  const integration = integrateOp({ record, head });
+  // Only a check the op itself declared GREEN is re-run before the land: the pre-land verify asks whether main's tip under
+  // the op broke something. A check already red on the op's base was judged by the settle that got here.
+  const declared = (Array.isArray(landed.productLand.checks) ? landed.productLand.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')) && c?.exitCode === 0);
+  const recheck = (checks, { cwd, timeoutMs }) => checks.flatMap((c) => {
+    const cls = settlerClassifyCheck(c, { skillRoot });
+    if (cls.kind !== 'runtime') return [];
+    const r = settlerRerunCheck(cls, { repo: cwd, timeoutMs });
+    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, status: r.output?.slice?.status ?? r.output?.status ?? null, tail: r.tail, ms: r.ms }];
+  });
+  const integration = integrateOp({ record, head, checks: declared, recheck });
   if (!integration.ok) return { ok: false, reason: integration.reason, integration, hint: integration.hint ?? `the op's commits do not land into ${main}` };
   const inBranch = integratedProof({ root: record.repoRoot, head: integration.after, branch: main, base: record.baseSha ?? null });
   if (!inBranch.ok) return { ok: false, reason: inBranch.reason, integration: { ...integration, inBranch } };

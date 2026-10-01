@@ -181,29 +181,6 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
   return out;
 }
 
-/**
- * Every link (junction, symlink, other reparse point) under `dir`, found WITHOUT following one: the walk is its own
- * (lstat / isLinkLike), it never recurses into a directory that is itself a link, so a link inside a live tree some junction
- * points at is never listed (`dir /AL /S` descends through junctions and listed main's own links: the 490-file
- * .claude incident). Outermost first (walk order). The worktree's own .git file is not a link.
- */
-export function linksUnder(dir) {
-  const out = [];
-  if (isLinkLike(dir)) return [path.resolve(dir)];
-  const walk = (p) => {
-    let entries = [];
-    try { entries = fs.readdirSync(p, { withFileTypes: true }); } catch { return; }
-    const parentReal = realpathOr(p);
-    for (const e of entries) {
-      const child = path.join(p, e.name);
-      if (isLinkLike(child, { parentReal })) { out.push(child); continue; }
-      if (e.isDirectory()) walk(child);
-    }
-  };
-  walk(path.resolve(dir));
-  return out;
-}
-
 /** Remove one link as a link, never its target: `cmd /c rmdir <link>` on Windows (no /s), then unlinkOnly. */
 export function removeLink(p) {
   if (WIN) {

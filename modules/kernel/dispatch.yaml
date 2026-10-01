@@ -332,10 +332,12 @@ preflight:
     settle: >-
       settle --verdict pass proves the commit clean in the op worktree, then - as its LAST step, once every other
       settle refusal passed - lands it into main (scripts/kernel/product-worktree.mjs integrateOp, per-repository
-      lock): op/<op> rebased onto main's tip (main's side is never overwritten), the land gate
-      (scripts/checks/gate.mjs) over exactly what lands, main compare-and-swap fast-forwarded, main pushed.
-      Refusals: product-land-conflict (files + hunks; a continuation on the new main, never a failure),
-      land-gate-red, land-gate-unavailable, op-worktree-dirty; main is untouched on every refusal. The worktree
+      lock): the merge guard over the op's history (scripts/checks/gate.mjs mergeGuard), op/<op> rebased onto main's
+      tip (main's side is never overwritten), the land gate over exactly the tree that lands, the pre-land verify (the
+      op's re-runnable declared checks, land.checks, the import check), main compare-and-swap fast-forwarded, main
+      pushed; a product-op-landed event per op. Refusals: land-merge-dropped-main, product-land-conflict (files +
+      hunks) and product-integrate-red (a continuation on the new main, never a failure), land-gate-red,
+      land-gate-unavailable, op-worktree-dirty, land-main-refused; main is untouched on every refusal. The worktree
       and its branch are removed right after the worker is released (released -> worktree-removed, verified,
       SLA worktrees.opRemoveSlaMs; a failed or blocked op's work is preserved to preserved/<job> first); the
       reconciler GC (key gc:worktrees, always active) removes whatever outlives its op.

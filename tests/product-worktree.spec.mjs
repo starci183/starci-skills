@@ -160,12 +160,12 @@ test('released -> worktree-removed: the reap records the transition once', (t) =
   } finally { ledger.close(); }
 });
 
-test('isolation is opt-in by op policy and never takes the Work owner repository', (t) => {
+test('isolation is opt-in by op policy and uses the one app repository for either side', (t) => {
   const { repo } = fixtureRepo(t);
-  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: process.cwd() }, { role: 'fe', root: repo }] };
+  const binding = { appRoot: repo, repos: [{ role: 'be', root: path.join(repo, 'be') }, { role: 'fe', root: path.join(repo, 'fe') }] };
   assert.equal(planIsolation({ brief: { policy: {} }, placements: [], binding }).reason, 'policy-shared');
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).reason, 'work-owner-only');
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository-name' }], binding }).isolate, true);
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).repoRoot, repo);
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be' }, { role: 'fe' }], binding }).repoRoot, repo);
   assert.equal(shortIdOf('wf-nivo-fe-canon-mujek980'), 'mujek980');
   assert.equal(shortIdOf('op-code.refactor-d704825abb'), 'd704825a');
 });
@@ -185,6 +185,6 @@ test('defaultIsolation worktree takes every committing op; non-committing ops an
   assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'none' } } }, settings), 'shared', 'an op that never commits would lose its writes');
   assert.equal(isolationOf({ policy: {} }, settings), 'shared');
   assert.equal(isolationOf({ policy: { isolation: 'shared', commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'shared', 'a brief may opt out');
-  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: path.resolve(SKILL_ROOT, '..') }, { role: 'grammar', root: SKILL_ROOT }] };
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'grammar', via: 'path-repository' }], binding }).reason, 'runtime-repo');
+  const binding = { appRoot: SKILL_ROOT, repos: [{ role: 'be', root: path.join(SKILL_ROOT, 'be') }, { role: 'fe', root: path.join(SKILL_ROOT, 'fe') }] };
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository' }], binding }).reason, 'runtime-repo');
 });

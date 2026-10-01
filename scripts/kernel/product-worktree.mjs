@@ -52,6 +52,10 @@ import { createWorktree, removeWorktree, registeredAt, worktreesRootOf, PRESERVE
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { realpathOr } from '../lib/fs-kind.mjs';
 import { fastForwardLive } from '../supervisor/land.mjs';
+import { mergeGuard } from '../checks/gate.mjs';
+import { brokenImports } from './import-scan.mjs';
+import { checkVerdictOf } from '../reconcile/check-verdict.mjs';
+import { launchFor } from '../uat/launch.mjs';
 
 export { worktreesRootOf };
 const selfFile = fileURLToPath(import.meta.url);
@@ -59,7 +63,7 @@ export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 export const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
 export const EVENTS = Object.freeze({
   created: 'product-worktree-created',
-  landed: 'product-land-landed',
+  landed: 'product-op-landed',
   landRefused: 'product-land-refused',
   removed: 'job-worktree-removed',
   removeFailed: 'job-worktree-remove-failed',
@@ -75,6 +79,7 @@ const DEFAULTS = Object.freeze({
   worktrees: { shortIdLength: 8, capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, opRemoveSlaMs: 60_000, commandMs: 300_000,
     overlay: { lockfiles: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json'], maxDepth: 3 } },
   land: { lockWaitMs: 1_800_000, gateTimeoutMs: 1_800_000, push: true, pushTimeoutMs: 600_000, maxMainRetries: 3,
+    recheck: 'declared', recheckTimeoutMs: 300_000, importCheck: 'changed-files', checks: [],
     depsFiles: ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', 'pnpm-workspace.yaml'] },
   invariant: { importsCacheMs: 300_000 },
 });
@@ -387,34 +392,33 @@ export const isolationOf = (brief, settings = productSettings()) => String(brief
 
 /**
  * Whether a job gets a product worktree and in which repository: its op isolates, and its owned paths resolve into
- * exactly one bound repository that is not the Work owner (the ledger repo keeps its shared tree: the ledger and
- * the Work records live there). {isolate, reason, repoRoot?, role?}. `placements` are ownedPathPlacements with no
+ * the bound app repository. One op worktree serves both side folders and Work.
+ * {isolate, reason, repoRoot?, role?}. `placements` are ownedPathPlacements with no
  * worktree (target-repo.mjs); `binding` its projectBinding.
  */
 export function planIsolation({ brief, placements, binding, settings = productSettings() }) {
   if (isolationOf(brief, settings) !== 'worktree') return { isolate: false, reason: 'policy-shared' };
   if (!binding) return { isolate: false, reason: 'no-project-binding' };
-  const owner = binding.ownerRole;
-  const roles = new Set((placements ?? []).filter((p) => !p.unresolved && p.role && p.role !== owner && p.via !== 'work-owner').map((p) => p.role));
-  if (!roles.size) return { isolate: false, reason: 'work-owner-only' };
-  if (roles.size > 1) return { isolate: false, reason: 'multi-repo', roles: [...roles] };
-  const role = [...roles][0];
-  const bound = binding.repos.find((r) => r.role === role);
-  if (!bound || !fs.existsSync(path.join(bound.root, '.git'))) return { isolate: false, reason: 'repo-not-a-checkout', role };
+  const roles = new Set((placements ?? []).filter((p) => !p.unresolved && p.role && p.via !== 'work-owner').map((p) => p.role));
+  if (!roles.size) return { isolate: false, reason: 'work-only' };
+  const role = roles.size === 1 ? [...roles][0] : null;
+  const appRoot = binding.appRoot;
+  if (!appRoot || !fs.existsSync(path.join(appRoot, '.git'))) return { isolate: false, reason: 'repo-not-a-checkout', role };
   // The runtime repository (a binding's grammar role is .claude itself) changes only through its own land gate.
-  if (insidePath(bound.root, SKILL_ROOT) || samePath(bound.root, SKILL_ROOT)) return { isolate: false, reason: 'runtime-repo', role };
-  return { isolate: true, repoRoot: path.resolve(bound.root), role };
+  if (insidePath(appRoot, SKILL_ROOT) || samePath(appRoot, SKILL_ROOT)) return { isolate: false, reason: 'runtime-repo', role };
+  return { isolate: true, repoRoot: path.resolve(appRoot), role };
 }
 
 /** The rules every isolated op's prompt carries (the path is explicit to every tool). */
-export function worktreePromptRules(rec) {
+export function worktreePromptRules(rec, sideCwd = null) {
   if (!rec) return '';
   const op = posix(rec.op.path);
+  const cwd = sideCwd ? posix(sideCwd) : op;
   return [
     '',
     '## Your product worktree (DESIGN §16.7)',
     `- Edit, check and commit ONLY in ${op} (branch ${rec.op.branch}, off ${rec.main ?? 'main'} at ${String(rec.baseSha ?? '').slice(0, 12)}). Never edit ${posix(rec.repoRoot)} itself.`,
-    `- Pass this path explicitly to every tool: canon-scan --root ${op}, check-scoped-lint --root ${op}, starci validate, draw-render, test runners (cwd ${op}).`,
+    `- Run role-specific checks and commands from ${cwd}; the app's package.json and .starciwork are at ${op}.`,
     `- Dev servers, UAT and drawing run against the live checkout ${posix(rec.repoRoot)} (main); never start one in this worktree.`,
     '- node_modules is a junction overlay of the main checkout: never run npm/pnpm install here.',
     '- Commit everything you produce under .starciwork/ in this worktree before you report; the runtime salvages and then deletes this worktree right after your settle.',
@@ -500,78 +504,131 @@ function pushMain(repoRoot, main, timeoutMs) {
   return p.ok ? { pushed: true } : { pushed: false, detail: p.stderr.slice(-300) };
 }
 
+/** One configured land check (product-land.yaml land.checks: {name, argv}) in `cwd`, no shell. */
+function runLandCheck(check, cwd, timeoutMs) {
+  const argv = Array.isArray(check?.argv) ? check.argv.map(String) : [];
+  if (!argv.length) return { name: String(check?.name ?? 'land-check'), exitCode: null, status: 'unavailable', tail: 'no argv' };
+  const { file, args } = launchFor(argv);
+  const r = spawnSync(file, args, { cwd, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
+  const exitCode = r.error ? (r.error.code === 'ETIMEDOUT' ? 124 : 127) : r.status;
+  return { name: String(check.name ?? argv[0]), exitCode, ...(r.error ? { status: 'unavailable' } : {}), tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-2).join(' ').slice(0, 300) };
+}
+
 /**
  * Land one op into its repository's main (the settle-pass step), under the per-repository land lock:
- *   1. op/<op>'s commits up to `head` rebased onto main's tip (a merge-tree chain: main's side is never overwritten), and
- *      the op worktree moved to the rebased head (`reset --keep`), so what is gated is exactly what lands;
- *   2. the land gate over the op worktree against main (runLandGate; exit 1 red, 2 a tool could not run: no land);
- *   3. main compare-and-swap fast-forwarded to it - the live checkout's changed paths with it when main is checked out
- *      there (land.mjs fastForwardLive) - retried from 1 when main moved (land.maxMainRetries);
- *   4. main pushed to origin (land.push; a failed push is reported, main stays advanced, push-mains retries it).
- * Seams: gate({root, base, timeoutMs}) -> starci/gate@1 report, fastForward({root, base, head, rows}), push(repoRoot, main).
- * Returns {ok, already?, before, after, map, changed, gate, push} or a refusal {ok:false, reason, ...}:
- *   product-land-conflict   files + hunks; main untouched; `continuation` names the new base (never a failure)
- *   land-gate-red           the gate reports new findings on the rebased op; `gate` carries them; main untouched
- *   land-gate-unavailable   a gate tool could not run: never a land
- *   op-worktree-dirty       the op worktree holds uncommitted changes the rebase would overwrite
+ *   1. the merge guard (scripts/checks/gate.mjs mergeGuard) over the op's own history before anything is rebased away: a
+ *      merge on the op branch that kept the lane side over a main change is land-merge-dropped-main;
+ *   2. op/<op>'s commits up to `head` rebased onto main's tip (a merge-tree chain: main's side is never overwritten, a
+ *      conflict is product-land-conflict with files + hunks) and the op worktree put on the rebased head (reset --hard of
+ *      a tree with no tracked change), so what is gated is exactly what lands;
+ *   3. THE GATE on that tree against main (runLandGate; exit 1 land-gate-red, 2 land-gate-unavailable);
+ *   4. pre-land verify in the same tree: the op's re-runnable declared checks, land.checks and the import check of its
+ *      changed files; red is product-integrate-red, a continuation on the new main (never a failure);
+ *   5. main compare-and-swap fast-forwarded - the live checkout's changed paths with it when main is checked out there
+ *      (land.mjs fastForwardLive; refused: land-main-refused) - the whole land rerun when main moved (land.maxMainRetries);
+ *   6. main pushed to origin (land.push; a failed push is reported, main stays advanced, push-mains retries it).
+ * Any refusal after step 2 puts the op worktree back on its own head: main never moves on a refusal.
+ * Seams: guard(root, {base, head, mainTip}), gate({root, base, timeoutMs}), recheck(checks, {cwd, from, to, timeoutMs}),
+ * fastForward({root, base, head, rows}), push(repoRoot, main).
+ * Returns {ok, already?, before, after, map, changed, gate, verify, push} or a refusal {ok:false, reason, ...}.
  */
-export function integrateOp({ record, head = null, hunksOf = conflictHunksOf, gate = runLandGate, fastForward = fastForwardLive, push = null, settings = productSettings(), env = process.env }) {
+export function integrateOp({ record, head = null, checks = [], recheck = null, hunksOf = conflictHunksOf, gate = runLandGate, guard = mergeGuard,
+  fastForward = fastForwardLive, push = null, settings = productSettings(), env = process.env }) {
+  const { repoRoot } = record;
+  const main = record.main ?? 'main';
+  return withLock(landLockName(repoRoot), () => {
+    let last = null;
+    for (let attempt = 1; attempt <= settings.land.maxMainRetries; attempt += 1) {
+      last = landOnce({ record, head, checks, recheck, hunksOf, gate, guard, fastForward, settings });
+      if (last.reason !== 'main-moved') break;
+    }
+    if (last.reason === 'main-moved') return { ok: false, reason: 'main-moving', detail: `main moved under the land ${settings.land.maxMainRetries} times` };
+    if (!last.ok || last.already) return last;
+    // The op branch names what landed, so `git branch -d` deletes it at removal.
+    if (revParse(repoRoot, `refs/heads/${record.op.branch}`) !== last.after) git(repoRoot, ['update-ref', `refs/heads/${record.op.branch}`, last.after]);
+    last.push = settings.land.push ? (push ?? ((root, m) => pushMain(root, m, settings.land.pushTimeoutMs)))(repoRoot, main) : { pushed: false, skipped: 'land.push off' };
+    const depsChanged = (last.changed ?? []).filter((f) => settings.land.depsFiles.includes(path.posix.basename(f)));
+    if (depsChanged.length) Object.assign(last, { depsChanged, hint: `main's dependency manifests changed (${depsChanged.join(', ')}): run the install in the live checkout ${repoRoot} so new worktree overlays mirror it` });
+    return last;
+  }, { waitMs: settings.land.lockWaitMs, env });
+}
+
+function landOnce({ record, head, checks, recheck, hunksOf, gate, guard, fastForward, settings }) {
   const { repoRoot } = record;
   const op = record.op, main = record.main ?? 'main';
-  return withLock(landLockName(repoRoot), () => {
-    for (let attempt = 1; attempt <= settings.land.maxMainRetries; attempt += 1) {
-      const M = revParse(repoRoot, `refs/heads/${main}`);
-      if (!M) return { ok: false, reason: 'main-unresolved', branch: main };
-      const opTip = revParse(repoRoot, `refs/heads/${op.branch}`);
-      const tip = head ? revParse(repoRoot, head) : opTip;
-      if (!tip) return { ok: false, reason: 'head-unresolved', head };
-      if (opTip && tip !== opTip && !isAncestor(repoRoot, tip, opTip)) return { ok: false, reason: 'head-not-on-op-branch', head: tip, branch: op.branch };
-      if (isAncestor(repoRoot, tip, M)) return { ok: true, already: true, before: M, after: M, map: [] };
-      const commits = git(repoRoot, ['rev-list', '--reverse', '--no-merges', tip, `^${M}`]).stdout.split(/\r?\n/).filter(Boolean);
-      const cherry = cherryOf(repoRoot, main, tip, M);
-      const pending = commits.filter((c) => cherry.get(c) !== '-');
-      if (!pending.length) return { ok: true, already: true, before: M, after: M, map: [], viaPatchId: true };
-      // 1. rebase onto main's tip (a no-op when the op is already on it).
-      let landHead = tip, map = [];
-      if (!isAncestor(repoRoot, M, tip)) {
-        const chain = rebaseChain(repoRoot, pending, M, { hunksOf });
-        if (!chain.ok && !chain.conflicts) return { ok: false, reason: chain.reason, onto: M, detail: chain.detail ?? null };
-        if (!chain.ok) return { ok: false, reason: 'product-land-conflict', conflicts: chain.conflicts, onto: M,
-          continuation: { base: M, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and conflicts with main: a continuation on the new main, never a failure' },
-          hint: `rebase ${op.branch} onto ${main} (git rebase ${main} in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
-        landHead = chain.head; map = chain.map;
-        if (fs.existsSync(op.path)) {
-          const moved = git(op.path, ['reset', '--keep', landHead]);
-          if (!moved.ok) return { ok: false, reason: 'op-worktree-dirty', path: op.path, detail: moved.stderr.slice(0, 300) };
-        } else if (!git(repoRoot, ['update-ref', `refs/heads/${op.branch}`, landHead, opTip ?? tip]).ok) return { ok: false, reason: 'op-branch-moved', branch: op.branch };
-      }
-      // 2. the land gate over exactly what lands.
-      const gated = gate({ root: op.path, base: M, timeoutMs: settings.land.gateTimeoutMs });
-      const gateSummary = { exit: gated.exit, base: M, head: gated.head ?? landHead, counts: gated.counts ?? null, findings: (gated.findings ?? []).slice(0, 40), errors: gated.errors ?? [] };
-      if (gated.exit !== 0) return { ok: false, reason: gated.exit === 1 ? 'land-gate-red' : 'land-gate-unavailable', gate: gateSummary,
-        hint: gated.exit === 1 ? `the op branch carries findings main does not have: fix them in ${posix(op.path)} (node scripts/checks/gate.mjs --root ${posix(op.path)} --base ${M}), commit, report the new head`
-          : `the land gate could not run a tool (${gateSummary.errors[0] ?? 'no report'}): fix the environment and settle again; a land without its gate never happens` };
-      // 3. compare-and-swap fast-forward of main (and the live checkout's changed paths when main is checked out there).
-      const rows = git(repoRoot, ['diff', '--name-status', '--no-renames', M, landHead]).stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
-      const changed = rows.map((r) => r[r.length - 1]);
-      const checkedOut = git(repoRoot, ['symbolic-ref', '-q', 'HEAD']).stdout === `refs/heads/${main}`;
-      const ff = checkedOut ? fastForward({ root: repoRoot, base: M, head: landHead, rows })
-        : (git(repoRoot, ['update-ref', '-m', `land ${op.branch}`, `refs/heads/${main}`, landHead, M]).ok ? { ok: true } : { ok: false, reason: 'main-moved' });
-      if (!ff.ok) {
-        if (ff.reason === 'main-moved') continue;
-        return { ok: false, reason: ff.reason, base: M, head: landHead, dirty: ff.dirty ?? null, detail: ff.detail ?? null, gate: gateSummary };
-      }
-      // The op branch names what landed, so `git branch -d` deletes it at removal.
-      if (revParse(repoRoot, `refs/heads/${op.branch}`) !== landHead) git(repoRoot, ['update-ref', `refs/heads/${op.branch}`, landHead]);
-      // 4. push main.
-      const pushed = settings.land.push ? (push ?? ((root, m) => pushMain(root, m, settings.land.pushTimeoutMs)))(repoRoot, main) : { pushed: false, skipped: 'land.push off' };
-      const out = { ok: true, before: M, after: landHead, map, changed, gate: gateSummary, push: pushed };
-      const depsChanged = changed.filter((f) => settings.land.depsFiles.includes(path.posix.basename(f)));
-      if (depsChanged.length) Object.assign(out, { depsChanged, hint: `main's dependency manifests changed (${depsChanged.join(', ')}): run the install in the live checkout ${repoRoot} so new worktree overlays mirror it` });
-      return out;
+  const M = revParse(repoRoot, `refs/heads/${main}`);
+  if (!M) return { ok: false, reason: 'main-unresolved', branch: main };
+  const opTip = revParse(repoRoot, `refs/heads/${op.branch}`);
+  const tip = head ? revParse(repoRoot, head) : opTip;
+  if (!tip) return { ok: false, reason: 'head-unresolved', head };
+  if (opTip && tip !== opTip && !isAncestor(repoRoot, tip, opTip)) return { ok: false, reason: 'head-not-on-op-branch', head: tip, branch: op.branch };
+  if (isAncestor(repoRoot, tip, M)) return { ok: true, already: true, before: M, after: M, map: [] };
+  const base = git(repoRoot, ['merge-base', M, tip]).stdout;
+  // 1. the merge guard, on the op's own history.
+  const guarded = guard(repoRoot, { base, head: tip, mainTip: M });
+  if (guarded.errors?.length) return { ok: false, reason: 'land-gate-unavailable', gate: { exit: 2, base, errors: guarded.errors, findings: [], counts: { new: 0 } },
+    hint: `the merge guard could not recompute a merge of ${op.branch} (${guarded.errors[0]}): fix the environment and settle again` };
+  if (guarded.findings?.length) return { ok: false, reason: 'land-merge-dropped-main', dropped: guarded.findings.slice(0, 40).map((f) => f.path), merges: guarded.checked,
+    hint: `a merge on ${op.branch} kept the lane side over main's change of ${guarded.findings.length} path(s) (${guarded.findings.slice(0, 3).map((f) => f.path).join(', ')}): redo the merge taking main's changes (git merge ${main} in ${posix(op.path)}, resolve each path by hand), commit, report the new head` };
+  const commits = git(repoRoot, ['rev-list', '--reverse', '--no-merges', tip, `^${M}`]).stdout.split(/\r?\n/).filter(Boolean);
+  const cherry = cherryOf(repoRoot, main, tip, M);
+  const pending = commits.filter((c) => cherry.get(c) !== '-');
+  if (!pending.length) return { ok: true, already: true, before: M, after: M, map: [], viaPatchId: true };
+  const changed = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean);
+  // 2. rebase onto main's tip (a no-op when the op is already on it).
+  let landHead = tip, map = [];
+  if (!isAncestor(repoRoot, M, tip)) {
+    const chain = rebaseChain(repoRoot, pending, M, { hunksOf });
+    if (!chain.ok && !chain.conflicts) return { ok: false, reason: chain.reason, onto: M, detail: chain.detail ?? null };
+    if (!chain.ok) return { ok: false, reason: 'product-land-conflict', conflicts: chain.conflicts, onto: M,
+      continuation: { base: M, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and conflicts with main: a continuation on the new main, never a failure' },
+      hint: `rebase ${op.branch} onto ${main} (git rebase ${main} in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
+    if (chain.head === M) return { ok: true, already: true, before: M, after: M, map: chain.map, viaPatchId: true };
+    landHead = chain.head; map = chain.map;
+  }
+  const tree = fs.existsSync(op.path) ? op.path : null;
+  if (!tree) return { ok: false, reason: 'land-gate-unavailable', gate: { exit: 2, base: M, errors: [`the op worktree ${posix(op.path)} is gone: nothing to gate`], findings: [], counts: { new: 0 } } };
+  if (git(tree, ['status', '--porcelain', '--untracked-files=no']).stdout) return { ok: false, reason: 'op-worktree-dirty', path: op.path,
+    hint: `commit or discard the tracked changes in ${posix(op.path)}, report the new head, settle again` };
+  const own = revParse(tree, 'HEAD');
+  const restore = () => { if (revParse(tree, 'HEAD') !== own) git(tree, ['reset', '--hard', own]); };
+  if (landHead !== own && !git(tree, ['reset', '--hard', landHead]).ok) return { ok: false, reason: 'op-worktree-reset-failed', path: op.path };
+  try {
+    // 3. the gate, on exactly the tree that lands.
+    const gated = gate({ root: tree, base: M, timeoutMs: settings.land.gateTimeoutMs });
+    const gateSummary = { exit: gated.exit, base: M, head: gated.head ?? landHead, counts: gated.counts ?? null, findings: (gated.findings ?? []).slice(0, 40), errors: gated.errors ?? [] };
+    if (gated.exit === 1) { restore(); return { ok: false, reason: 'land-gate-red', gate: gateSummary, hint: `the op branch carries findings main does not have: fix them in ${posix(op.path)} (node scripts/checks/gate.mjs --root ${posix(op.path)} --base ${main}), commit, report the new head` }; }
+    if (gated.exit !== 0) { restore(); return { ok: false, reason: 'land-gate-unavailable', gate: gateSummary, hint: `the land gate could not run a tool (${gateSummary.errors[0] ?? 'no report'}): fix the environment and settle again; a land without its gate never happens` }; }
+    // 4. pre-land verify: the op's re-runnable checks, land.checks and the import check, in the same tree.
+    const verify = { checks: [], imports: null, unavailable: [] };
+    const failures = [];
+    if (settings.land.recheck === 'declared' && recheck && checks.length) verify.checks.push(...recheck(checks, { cwd: tree, from: op.path, to: tree, timeoutMs: settings.land.recheckTimeoutMs }));
+    for (const c of settings.land.checks ?? []) verify.checks.push(runLandCheck(c, tree, settings.land.recheckTimeoutMs));
+    // H7: only a RED re-run refuses the land; a checker that could not run is tooling (verify.unavailable).
+    const verdictOf = (c) => checkVerdictOf(c).verdict;
+    verify.unavailable = verify.checks.filter((c) => verdictOf(c) === 'unavailable').map((c) => `${c.name}:${c.exitCode ?? '-'}${c.status ? ` ${c.status}` : ''}`);
+    failures.push(...verify.checks.filter((c) => verdictOf(c) === 'red').map((c) => `${c.name}:${c.exitCode} ${c.tail ?? ''}`.trim()));
+    if (settings.land.importCheck === 'changed-files') {
+      const present = changed.filter((f) => fs.existsSync(path.join(tree, f)));
+      try { verify.imports = present.length ? brokenImports(tree, { only: present, limit: 20 }) : { count: 0, files: 0, broken: [] }; }
+      catch (error) { verify.imports = { error: String(error?.message ?? error).slice(0, 200) }; }
+      if (verify.imports?.count) failures.push(`IMPORTS_BROKEN_AFTER_MOVE:${verify.imports.count} ${verify.imports.broken.slice(0, 3).map((b) => `${b.from} -> ${b.spec}`).join('; ')}`);
     }
-    return { ok: false, reason: 'main-moving', detail: `main moved under the land ${settings.land.maxMainRetries} times` };
-  }, { waitMs: settings.land.lockWaitMs, env });
+    if (failures.length) {
+      restore();
+      return { ok: false, reason: 'product-integrate-red', failures, verify, gate: gateSummary,
+        continuation: { base: M, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and breaks on main: a continuation on the new main, never a failure' } };
+    }
+    // 5. compare-and-swap fast-forward of main (and the live checkout's changed paths when main is checked out there).
+    const rows = git(repoRoot, ['diff', '--name-status', '--no-renames', M, landHead]).stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
+    const checkedOut = git(repoRoot, ['symbolic-ref', '-q', 'HEAD']).stdout === `refs/heads/${main}`;
+    const ff = checkedOut ? fastForward({ root: repoRoot, base: M, head: landHead, rows })
+      : (git(repoRoot, ['update-ref', '-m', `land ${op.branch}`, `refs/heads/${main}`, landHead, M]).ok ? { ok: true } : { ok: false, reason: 'main-moved' });
+    if (!ff.ok && ff.reason === 'main-moved') { restore(); return { ok: false, reason: 'main-moved', detail: ff.detail ?? null }; }
+    if (!ff.ok) { restore(); return { ok: false, reason: 'land-main-refused', detail: ff.reason ?? ff.detail ?? null, dirty: ff.dirty ?? null, gate: gateSummary,
+      hint: `main could not be fast-forwarded (${ff.reason ?? 'refused'}${ff.dirty ? `: the live checkout is dirty on ${ff.dirty.slice(0, 3).join(', ')}` : ''}): clean the live checkout or put it on ${main}, then settle again` }; }
+    return { ok: true, before: M, after: landHead, map, changed, gate: gateSummary, verify };
+  } catch (error) { restore(); throw error; }
 }
 
 /* ------------------------------------------------------------ removal */

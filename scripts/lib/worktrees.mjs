@@ -181,33 +181,42 @@ export function markRemoved(dir, { error = null, preservedRef = null, env = proc
 const tmpIndex = () => path.join(os.tmpdir(), `starci-preserve-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
 
 /**
- * Preserve what a worktree holds that main does not: its uncommitted changes (tracked and untracked, .gitignore
- * respected) as one commit on top of its HEAD, written through a private index (no hook, the tree untouched), and
- * its unlanded commits. The result is refs/heads/preserved/<name>. Nothing to preserve (clean and in main) -> no ref.
- * {ok, ref|null, sha|null, dirty}
+ * One commit holding everything a worktree has: `head` plus every tracked and untracked (not ignored) change, written
+ * through a temporary index - the worktree's own index, files and hooks are untouched; `head` itself when nothing is
+ * dirty. node_modules (the junction overlay) and the worktrees container are never staged.
+ * {ok, sha, dirty} | {ok:false, step, detail}
+ */
+export function snapshotCommit(worktree, head, message) {
+  const status = plain(['status', '--porcelain', '--untracked-files=all', '--', '.', ':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_modules/**', `:(exclude)${WORKTREES_REL}`], { cwd: worktree });
+  if (!status.ok) return { ok: false, step: 'status', detail: status.stderr.slice(0, 200) };
+  if (!status.stdout) return { ok: true, sha: head, dirty: false };
+  const index = tmpIndex();
+  const env = { ...process.env, GIT_INDEX_FILE: index };
+  try {
+    for (const args of [['read-tree', head], ['add', '-A', '--', '.', ':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_modules/**', `:(exclude)${WORKTREES_REL}`]]) {
+      const r = plain(args, { cwd: worktree, env });
+      if (!r.ok) return { ok: false, step: 'index', detail: `${args.slice(0, 2).join(' ')}: ${r.stderr.slice(0, 200)}` };
+    }
+    const tree = plain(['write-tree'], { cwd: worktree, env });
+    if (!tree.ok || !tree.stdout) return { ok: false, step: 'write-tree', detail: tree.stderr.slice(0, 200) };
+    const commit = plain(['-c', 'user.name=starci', '-c', 'user.email=runtime@starci.local', 'commit-tree', tree.stdout, '-p', head, '-m', message], { cwd: worktree, env });
+    if (!commit.ok || !commit.stdout) return { ok: false, step: 'commit-tree', detail: commit.stderr.slice(0, 200) };
+    return { ok: true, sha: commit.stdout, dirty: true };
+  } finally { try { fs.rmSync(index, { force: true }); } catch { /* temp */ } }
+}
+
+/**
+ * Preserve what a worktree holds that main does not: its uncommitted changes (snapshotCommit) and its unlanded commits,
+ * as refs/heads/preserved/<name>. Nothing to preserve (clean and in main) -> no ref. {ok, ref|null, sha|null, dirty}
  */
 export function preserveWork({ repoRoot, dir, name, main = 'main' }) {
   const ref = `refs/heads/${PRESERVED_PREFIX}/${name}`;
   if (!fs.existsSync(dir)) return { ok: true, ref: null, sha: null, dirty: false, missing: true };
   const head = revParse(dir, 'HEAD');
   if (!head) return { ok: false, reason: 'preserve-failed', step: 'head' };
-  const status = plain(['status', '--porcelain', '--untracked-files=all'], { cwd: dir });
-  if (!status.ok) return { ok: false, reason: 'preserve-failed', step: 'status', detail: status.stderr.slice(0, 200) };
-  const dirty = status.stdout.split(/\r?\n/).filter((l) => l && !/^\?\? \.starciwork\/worktrees\//.test(l)).length > 0;
-  let sha = head;
-  if (dirty) {
-    const index = tmpIndex();
-    const env = { ...process.env, GIT_INDEX_FILE: index };
-    try {
-      const steps = [['read-tree', 'HEAD'], ['add', '-A', '--', '.']];
-      for (const args of steps) { const r = plain(args, { cwd: dir, env }); if (!r.ok) return { ok: false, reason: 'preserve-failed', step: 'index', detail: `${args.join(' ')}: ${r.stderr.slice(0, 200)}` }; }
-      const tree = plain(['write-tree'], { cwd: dir, env });
-      if (!tree.ok || !tree.stdout) return { ok: false, reason: 'preserve-failed', step: 'write-tree', detail: tree.stderr.slice(0, 200) };
-      const commit = plain(['-c', 'user.name=starci', '-c', 'user.email=runtime@starci.local', 'commit-tree', tree.stdout, '-p', head, '-m', `preserve ${name}: uncommitted work of its worktree`], { cwd: dir, env });
-      if (!commit.ok || !commit.stdout) return { ok: false, reason: 'preserve-failed', step: 'commit-tree', detail: commit.stderr.slice(0, 200) };
-      sha = commit.stdout;
-    } finally { try { fs.rmSync(index, { force: true }); } catch { /* temp */ } }
-  }
+  const snap = snapshotCommit(dir, head, `preserve ${name}: uncommitted work of its worktree`);
+  if (!snap.ok) return { ok: false, reason: 'preserve-failed', step: snap.step, detail: snap.detail };
+  const { sha, dirty } = snap;
   const mainSha = revParse(repoRoot, main);
   if (!dirty && mainSha && isAncestor(repoRoot, sha, mainSha)) return { ok: true, ref: null, sha: null, dirty: false };
   const u = plain(['update-ref', ref, sha], { cwd: repoRoot });

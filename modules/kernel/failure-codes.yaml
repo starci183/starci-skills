@@ -8018,6 +8018,26 @@ kind-invalid:
   nextStep_vi: "Lệnh provider-backoff bị từ chối; chọn một loại nằm trong danh sách hiện ra."
   owner: supervisor
   kind: input-invalid
+land-gate-red:
+  title: "The land gate reports new findings"
+  title_vi: "Cổng khi land báo lỗi mới"
+  meaning_vi: "Khi Kernel đưa op vào main, gate.mjs chạy trên worktree của op so với main và thấy lỗi mà main không có (lint, tsc, spec). main không được di chuyển."
+  causes_vi:
+    - "Op báo done nhưng nhánh vẫn còn lỗi mới"
+    - "Rebase lên main mới làm phát sinh lỗi kiểu hoặc lint"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa các lỗi trong gate, commit rồi báo head mới."
+  owner: op-retry
+  kind: settle-reason
+land-gate-unavailable:
+  title: "The land gate could not run a tool"
+  title_vi: "Cổng khi land không chạy được một công cụ"
+  meaning_vi: "gate.mjs trên worktree của op (hoặc chốt chặn merge) không chạy được một công cụ, nên không có kết quả để land. Không bao giờ land khi cổng không chạy được."
+  causes_vi:
+    - "Worktree của op đã mất"
+    - "hfs lint, tsc hoặc git merge-tree không chạy được"
+  nextStep_vi: "Sửa môi trường công cụ rồi chốt lại; main giữ nguyên."
+  owner: runtime-core
+  kind: settle-reason
 land-incomplete:
   title: "Land request is incomplete"
   title_vi: "Yêu cầu land thiếu thông tin"
@@ -8027,6 +8047,26 @@ land-incomplete:
   nextStep_vi: "Lệnh bị từ chối; gọi lại đủ ba tham số."
   owner: supervisor
   kind: input-invalid
+land-main-refused:
+  title: "main could not be fast-forwarded"
+  title_vi: "Không fast-forward được main"
+  meaning_vi: "Op đã qua cổng nhưng main không di chuyển được: bản checkout đang dùng không ở main hoặc đang sửa dở đúng các tệp mà lần land này ghi."
+  causes_vi:
+    - "Bản checkout chính có thay đổi chưa commit trên các tệp đó"
+    - "Bản checkout chính không ở nhánh main"
+  nextStep_vi: "Làm sạch bản checkout chính hoặc chuyển nó về main rồi chốt lại; main giữ nguyên."
+  owner: supervisor
+  kind: settle-reason
+land-merge-dropped-main:
+  title: "A merge on the op branch dropped main's changes"
+  title_vi: "Một commit merge trên nhánh op làm mất thay đổi của main"
+  meaning_vi: "Chốt chặn merge tính lại commit merge bằng git merge-tree và thấy có tệp main đã sửa mà bản merge lại giữ phía nhánh op (như merge 9958cce38). main không được di chuyển."
+  causes_vi:
+    - "Giải xung đột bằng cách lấy toàn bộ phía nhánh"
+    - "Merge main vào nhánh với chiến lược ours"
+  nextStep_vi: "Làm lại merge, giữ thay đổi của main ở từng tệp được liệt kê, commit rồi báo head mới."
+  owner: op-retry
+  kind: settle-reason
 land-refused:
   title: "Lesson land refused"
   title_vi: "Lần land bài học bị từ chối"
@@ -8413,6 +8453,25 @@ no-project-binding:
   nextStep_vi: "Việc chạy chung kho thay vì cây riêng; bổ sung liên kết dự án nếu cần."
   owner: owner
   kind: settle-reason
+op-worktree-reset-failed:
+  title: "The op worktree could not be put on the rebased head"
+  title_vi: "Không đặt được worktree của op lên head đã rebase"
+  meaning_vi: "Để cổng chạy đúng trên cây sẽ land, worktree của op được reset lên head đã rebase lên main; git từ chối bước đó."
+  causes_vi:
+    - "Tệp trong worktree đang bị khóa"
+  nextStep_vi: "Giải phóng tệp bị khóa rồi chốt lại; main giữ nguyên."
+  owner: runtime-core
+  kind: runtime-fault
+product-integrate-red:
+  title: "The op breaks on main"
+  title_vi: "Op hỏng khi đặt lên main"
+  meaning_vi: "Phần việc đã xanh trên nền của nó, nhưng khi rebase lên main mới thì các kiểm tra chạy lại của op hoặc kiểm tra import bị đỏ, nên main không được di chuyển."
+  causes_vi:
+    - "Xung đột ngầm với thay đổi của op khác đã vào main"
+    - "main đã đổi kể từ lúc op bắt đầu"
+  nextStep_vi: "main giữ nguyên; op tiếp tục trên nền main mới (continuation), không tính là thất bại."
+  owner: op-retry
+  kind: runtime-fault
 work-only:
   title: "The op only touches work records"
   title_vi: "Việc chỉ chạm hồ sơ công việc"
@@ -8485,15 +8544,6 @@ nothing-to-land:
   nextStep_vi: "Lần land bị từ chối; kiểm tra công việc đã commit chưa."
   owner: op-retry
   kind: verb-refusal
-op-branch-moved:
-  title: "Op branch moved during the land"
-  title_vi: "Nhánh của op bị đổi trong lúc land"
-  meaning_vi: "Runtime định chuyển nhánh op sang bản đã rebase lên main thì nhánh đã bị ai đó đổi."
-  causes_vi:
-    - "Một tiến trình khác ghi vào nhánh op cùng lúc"
-  nextStep_vi: "Main giữ nguyên. Chốt lại việc; lượt land sau đọc lại đầu nhánh."
-  owner: runtime-core
-  kind: settle-reason
 op-context-refused:
   title: "Op may not run this mode"
   title_vi: "Op không được dùng chế độ này"
