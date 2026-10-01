@@ -14,7 +14,7 @@ import * as migrateMain from "../../../apps/migrate/src/main"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
     IDENTITY_ENTITIES,
-    KEYCLOAK_ADMIN_CLIENT,
+    KEYCLOAK_SIGN_IN_CLIENT,
     ORDER_ENTITIES,
     RECEIPTS_BUCKET,
     identityOptions,
@@ -46,7 +46,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         },
         redis: {},
         minio: { buckets: [RECEIPTS_BUCKET] },
-        keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_ADMIN_CLIENT },
+        keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_SIGN_IN_CLIENT },
     },
     apps: {
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },

@@ -3,14 +3,13 @@ import type { Outcome } from "./outcome"
 /** How long a request waits, unless it asks for more, before it is abandoned and answered `unavailable`. */
 const DEFAULT_TIMEOUT_MS = 2500
 
-/** The codes the backends use when the caller has no live session or may not do what it asked. */
-const REFUSED_CODES: ReadonlyArray<string> = [
+/** The codes the backends use when the caller has no live session, a wrong pair, or may not do what it asked. */
+const REFUSED_CODES: ReadonlySet<string> = new Set([
     "SESSION_INVALID",
-    "INVALID_CREDENTIALS",
-    "UNAUTHENTICATED",
-    "UNAUTHORIZED",
-    "FORBIDDEN",
-]
+    "ACCOUNT_INVALID_CREDENTIALS",
+    "IDENTITY_UNAUTHENTICATED",
+    "IDENTITY_FORBIDDEN",
+])
 
 /** One request of the client: the caller's own signal is joined with the timeout. */
 export interface ClientRequest {
@@ -38,17 +37,17 @@ export const isRecord = (value: unknown): value is Readonly<Record<string, unkno
     typeof value === "object" && value !== null && !Array.isArray(value)
 
 /**
- * The stable code and the extra fields of a refusal body, whichever shape carried them: a GraphQL error
- * (`extensions.code` beside the exception's own metadata) or the flat `{ code, details }` body the shop's
- * own doors answer.
+ * The stable code and the parameters of a refusal body, whichever shape carried them: a GraphQL error
+ * (`extensions.code` and `extensions.params`, as the backends' error formatter writes them) or the flat
+ * `{ code, details }` body the shop's own doors answer.
  */
 const refusalOf = (body: unknown): { readonly code?: string; readonly details?: Readonly<Record<string, unknown>> } => {
     if (!isRecord(body)) return {}
     if (isRecord(body.extensions)) {
-        const { code, ...details } = body.extensions
+        const { code, params } = body.extensions
         return {
             ...(typeof code === "string" ? { code } : {}),
-            ...(Object.keys(details).length > 0 ? { details } : {}),
+            ...(isRecord(params) && Object.keys(params).length > 0 ? { details: params } : {}),
         }
     }
     return {
@@ -60,8 +59,8 @@ const refusalOf = (body: unknown): { readonly code?: string; readonly details?: 
 /** A refusal body as an Outcome: a missing-session code is `refused`, a `_NOT_FOUND` code is `not-found`, the rest is the door's own named refusal. */
 const refusalOutcome = (body: unknown): Outcome<never> => {
     const { code, details } = refusalOf(body)
-    if (code !== undefined && REFUSED_CODES.includes(code)) return { kind: "refused", code }
-    if (code !== undefined && code.endsWith("NOT_FOUND")) return { kind: "not-found" }
+    if (code !== undefined && REFUSED_CODES.has(code)) return { kind: "refused", code }
+    if (code?.endsWith("NOT_FOUND")) return { kind: "not-found" }
     return { kind: "invalid", ...(code === undefined ? {} : { code }), ...(details === undefined ? {} : { details }) }
 }
 

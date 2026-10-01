@@ -1,21 +1,17 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm"
+import { Column, Entity, PrimaryColumn } from "typeorm"
 
 @Entity("persons")
-/** A registered person: the email is unique, the password hash never leaves the identity service. */
+/** A shopper of the product: the identity provider's subject is the id; the credential lives in the provider, never here. */
 export class PersonEntity {
-    /** The person id. */
-    @PrimaryGeneratedColumn("uuid", { name: "id" })
+    /** The Keycloak subject of the shopper. */
+    @PrimaryColumn("uuid", { name: "id" })
     id!: string
 
-    /** The sign-in email, unique. */
+    /** The sign-in email. */
     @Column({ name: "email", type: "text", unique: true })
     email!: string
 
-    /** The scrypt hex of the password. */
-    @Column({ name: "password_hash", type: "text" })
-    passwordHash!: string
-
-    /** When the person registered. */
+    /** When the person first registered or signed in. */
     @Column({ name: "created_at", type: "timestamptz", default: () => "now()" })
     createdAt!: Date
 }

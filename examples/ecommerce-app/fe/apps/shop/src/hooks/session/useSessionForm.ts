@@ -22,7 +22,7 @@ export const useSessionForm = () => {
     /** The sentence a refused answer owes the reader: the door's stable code picks the copy, never a server sentence. */
     const refusalCopy = (outcome: Exclude<Outcome<unknown>, { readonly kind: "ok" }>): string => {
         if (outcome.kind === "refused") return t("refusal")
-        if (outcome.kind === "invalid") return outcome.code === "EMAIL_TAKEN" ? t("taken") : t("invalid")
+        if (outcome.kind === "invalid") return outcome.code === "ACCOUNT_EMAIL_TAKEN" ? t("taken") : t("invalid")
         return t("unavailable")
     }
 
@@ -44,7 +44,9 @@ export const useSessionForm = () => {
         setPassword("")
     }
 
-    const state: FormState = refusal ? "refused" : working ? "working" : "ready"
+    let state: FormState = "ready"
+    if (refusal) state = "refused"
+    else if (working) state = "working"
     return {
         state,
         props: {

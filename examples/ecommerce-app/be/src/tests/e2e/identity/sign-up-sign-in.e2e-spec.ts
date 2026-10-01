@@ -9,12 +9,15 @@ import type {
 } from "../../fixtures/e2e-views.contracts"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { PUBLIC_TABLES, PERSON_BY_ID } from "../../fixtures/persistence/e2e-verification.sql"
+import { KEYCLOAK_SIGN_IN_CLIENT } from "../../world/test-apps.options"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
- * fr.identity.sign-in as one complete journey over the public doors only: register, a refused duplicate and refused wrong
- * pairs, sign-in, session verification, the account view that itself proves the identity to order hop (hasOrders is read
- * live from the order service with the caller own bearer), revoke, and out-of-band persistence verification. Every
+ * fr.identity.sign-in as one complete journey over the public doors only: register (the shopper is created in the stack's
+ * real Keycloak realm, which owns the credential), a refused duplicate and refused wrong pairs, sign-in (the realm's
+ * password grant, recorded as its LOGIN), session verification, the account view that itself proves the identity to order
+ * hop (hasOrders is read live from the order service with the caller own bearer), revoke (which ends the realm session
+ * too), a realm that goes silent (a declared refusal, and recovery), and out-of-band persistence verification. Every
  * refusal is asserted on errors[0].extensions.code, not on an HTTP status.
  *
  * Run: npm run test:e2e -- identity/sign-up-sign-in
@@ -60,6 +63,14 @@ describe("identity sign-up and sign-in journey", () => {
         const session = present(signedIn.data, "signIn data").signIn
         expect(session.personId).toBe(personId)
 
+        // The realm vouched for the pair: its LOGIN through the identity api's client belongs to the registered subject.
+        const login = await world.waitFor("keycloak records the LOGIN", async () =>
+            (await world.keycloak.events(personId)).find(
+                (event) => event.type === "LOGIN" && event.clientId === KEYCLOAK_SIGN_IN_CLIENT,
+            ),
+        )
+        expect(login.userId).toBe(personId)
+
         // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
         const verified = await anonymous.read<VerifySessionData>("verifySession", {
             variables: { input: { sessionToken: session.sessionToken } },
@@ -98,5 +109,30 @@ describe("identity sign-up and sign-in journey", () => {
         expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
         const accountAfter = await caller.read<AccountData>("account")
         expect(accountAfter.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
+
+        // The realm ended its session of the shopper too: a LOGOUT, and no live session through the identity api's client.
+        const ended = await world.waitUntil(
+            "keycloak ends the session of the shopper",
+            async () => ({
+                loggedOut: (await world.keycloak.events(personId)).some((event) => event.type === "LOGOUT"),
+                live: (await world.keycloak.sessions(personId)).some((live) =>
+                    live.clientIds.includes(KEYCLOAK_SIGN_IN_CLIENT),
+                ),
+            }),
+            (observed) => observed.loggedOut && !observed.live,
+        )
+        expect(ended).toEqual({ loggedOut: true, live: false })
+
+        // A realm that goes silent is a declared refusal for sign-in and register alike, and the doors recover with it.
+        await world.infra.keycloak.during(async () => {
+            const silent = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+            expect(silent.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
+            const unregistered = await anonymous.mutate<RegisterData>("register", {
+                variables: { input: { email: `outage-${email}`, password } },
+            })
+            expect(unregistered.errorCode).toBe("ACCOUNT_PROVIDER_UNAVAILABLE")
+        })
+        const back = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+        expect(back.data?.signIn.personId).toBe(personId)
     })
 })

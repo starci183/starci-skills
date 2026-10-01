@@ -1,9 +1,9 @@
 import type { Outcome } from "@modules/platform/primitives"
 import type { KeycloakAdminErrorCode } from "./errors/keycloak-admin.error"
-import type { KeycloakMember } from "./keycloak-admin.contracts"
+import type { CreatedMember, CreateMemberParams } from "./keycloak-admin.contracts"
 
-/** The identity provider admin port: the only way product code reads a member from Keycloak. */
+/** The identity provider admin port: the only way product code writes a shopper into Keycloak. */
 export interface KeycloakAdmin {
-    /** The member with `memberId`, or the refusal: missing when the provider has none, unavailable when it cannot answer. */
-    findMember(memberId: string): Promise<Outcome<KeycloakMember, KeycloakAdminErrorCode>>
+    /** Creates the shopper with the password, or the refusal: email taken, or the provider unavailable. */
+    createMember(params: CreateMemberParams): Promise<Outcome<CreatedMember, KeycloakAdminErrorCode>>
 }

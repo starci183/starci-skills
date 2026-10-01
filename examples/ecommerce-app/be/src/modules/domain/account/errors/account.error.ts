@@ -9,6 +9,8 @@ export enum AccountErrorCode {
     InvalidCredentials = "ACCOUNT_INVALID_CREDENTIALS",
     /** No person has this id. */
     PersonUnknown = "ACCOUNT_PERSON_UNKNOWN",
+    /** The identity provider could not be reached or did not answer in time. */
+    ProviderUnavailable = "ACCOUNT_PROVIDER_UNAVAILABLE",
 }
 
 /** How each account code travels. */
@@ -16,6 +18,7 @@ export const ACCOUNT_ERROR_KINDS: Record<AccountErrorCode, ErrorKind> = {
     [AccountErrorCode.EmailTaken]: "conflict",
     [AccountErrorCode.InvalidCredentials]: "unauthenticated",
     [AccountErrorCode.PersonUnknown]: "not-found",
+    [AccountErrorCode.ProviderUnavailable]: "unavailable",
 }
 
 /** The one error class of the account capability. */

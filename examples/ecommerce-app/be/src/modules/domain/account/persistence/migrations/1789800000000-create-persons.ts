@@ -7,9 +7,8 @@ export class CreatePersons1789800000000 implements MigrationInterface {
     /** Creates the table. */
     async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE persons (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id uuid PRIMARY KEY,
     email text NOT NULL UNIQUE,
-    password_hash text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 )`)
     }

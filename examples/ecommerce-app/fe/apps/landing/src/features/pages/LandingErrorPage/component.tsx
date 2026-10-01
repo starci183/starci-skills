@@ -11,7 +11,6 @@ type LandingErrorPageBaseOn = { readonly retry: () => void }
 
 /** What the error page reads: the one situation it draws, its resolved words and its retry. */
 type LandingErrorPageBaseContract = {
-    readonly state: "ready"
     readonly props: LandingErrorPageBaseProps
     readonly on: LandingErrorPageBaseOn
 }

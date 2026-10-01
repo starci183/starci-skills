@@ -19,8 +19,6 @@ export type LandingTeaserProduct = {
 
 /** The landing page's resolved inputs: every string and link arrived already settled. */
 export type LandingPageProps = {
-    /** Whole-screen situations this surface settles; the landing has no alternatives. */
-    readonly state: "ready"
     /** The data payload for whatever state is showing. */
     readonly props: {
         readonly heroTitle: string
@@ -36,8 +34,6 @@ export type LandingPageProps = {
         /** The shop origin with the locale already joined, for the cross-app hand-off links. */
         readonly shopHref: string
     }
-    /** What the surface reports upward; the landing is read-only. */
-    readonly on: Record<never, never>
 }
 
 /**

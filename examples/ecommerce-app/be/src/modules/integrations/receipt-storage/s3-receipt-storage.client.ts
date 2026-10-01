@@ -64,7 +64,9 @@ export class S3ReceiptStorageClient implements ReceiptStorage {
     }
 
     private bucketUrl(): string {
-        return `${this.options.endpoint.replace(/\/+$/, "")}/${this.options.bucket}`
+        let endpoint = this.options.endpoint
+        while (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1)
+        return `${endpoint}/${this.options.bucket}`
     }
 
     private objectUrl(key: string): string {

@@ -23,7 +23,7 @@ export const respond = (outcome: Outcome<unknown>): NextResponse => {
     if (outcome.kind === "invalid") {
         return NextResponse.json(
             { code: outcome.code ?? "REQUEST_INVALID", details: outcome.details },
-            { status: outcome.code === "EMAIL_TAKEN" ? 409 : 422 },
+            { status: outcome.code === "ACCOUNT_EMAIL_TAKEN" ? 409 : 422 },
         )
     }
     if (outcome.kind === "not-found") return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 })

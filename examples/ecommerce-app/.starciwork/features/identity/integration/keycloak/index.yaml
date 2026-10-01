@@ -1,13 +1,15 @@
 schema: work/integration@1
 id: integration.identity.keycloak
-title: Keycloak is the member directory the identity service reads profiles from
+title: Keycloak owns the shoppers' credentials
 state: todo
 provider: keycloak
-boundary: The identity service reads members through the realm's admin API as the service account of the confidential
-  identity-admin client (realm-management view-users), never with a person's credentials; it writes nothing there.
+boundary: The realm owns every shopper credential. The identity service creates shoppers through the admin API as the
+  service account of the confidential identity-admin client (realm-management manage-users), signs them in with the
+  password grant of the public identity-api client, and ends the realm session with the kept refresh token at sign-out.
 endpoints:
   - {name: token, method: POST, path: /realms/ecommerce/protocol/openid-connect/token}
-  - {name: member, method: GET, path: /admin/realms/ecommerce/users/<member id>}
+  - {name: logout, method: POST, path: /realms/ecommerce/protocol/openid-connect/logout}
+  - {name: create-user, method: POST, path: /admin/realms/ecommerce/users}
 credential:
   name: KEYCLOAK_ADMIN_CLIENT_SECRET
   providedBy: owner
@@ -15,11 +17,17 @@ credential:
   # sealed in .starcistacks/dev/secrets/keycloak-env.enc (DEMO-ONLY recipient)
 sandbox: The dev environment runs its own Keycloak on 8149 with the imported ecommerce realm; it is a real Keycloak, not a
   stub.
-refs: [fr.identity.account]
+refs: [fr.identity.sign-in]
 
 requiresProof:
   live:
     required: true
-    note: A member read through the service account against the real realm, not against a fake.
+    note: A shopper created and signed in against the real realm, not against a fake.
 
-change: {rev: 1, kind: initial, at: 2026-10-01T23:00:00.000Z}
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-10-02T10:00:00.000Z
+  reason: >-
+    The member directory had no product use and is gone; Keycloak now owns the shoppers' credentials (user creation,
+    password grant, logout).

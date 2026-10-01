@@ -1,13 +1,10 @@
 import { getTranslations } from "next-intl/server"
 import type { Outcome } from "@ecommerce/api"
-import { collectionSlot, type Slot } from "@ecommerce/ui"
+import type { Slot } from "@ecommerce/ui"
 import { IDENTITY_API_URL } from "../../../modules/config"
 import { fetchCurrentUser, type CurrentUser } from "../../../modules/services"
 import { AccountPageBase } from "./component"
 import type { AccountPageState } from "./component"
-
-/** Props for the connected account page: the route mounts it empty and it reads its own world. */
-type AccountPageProps = Record<never, never>
 
 /**
  * The screen situation an account read settles: the gate when no live session answers, the refusal
@@ -17,6 +14,12 @@ type AccountPageProps = Record<never, never>
 const accountPageStateOf = (who: Outcome<CurrentUser | null>): AccountPageState =>
     who.kind === "ok" && who.data === null ? "signedOut" : "account"
 
+/** The one line under the title that says who is signed in, or why that cannot be said. */
+const accountLineOf = (who: Outcome<CurrentUser | null>, t: Awaited<ReturnType<typeof getTranslations>>): string => {
+    if (who.kind !== "ok") return t("unreachable", { url: IDENTITY_API_URL })
+    return who.data === null ? t("anonymous") : t("signedInAs", { email: who.data.email })
+}
+
 /** Identity and order-history status for the page's one data slot. */
 const ordersSlotOf = (who: Outcome<CurrentUser | null>): Slot<true> => {
     if (who.kind !== "ok" || who.data === null) return { status: "error" }
@@ -25,20 +28,14 @@ const ordersSlotOf = (who: Outcome<CurrentUser | null>): Slot<true> => {
 
 /**
  * The connected account page. The identity read happens here on the server - the session cookie's
- * bearer verified at `internal/sessions/verify`, then `account(personId)` for the person - and
+ * bearer verified at `verifySession`, then `account` with that bearer for the person - and
  * every sentence resolves before the pure twin sees a prop. The signed-out surface mounts the
  * connected session form; the signed-in surface mounts the connected sign-out action beside the
  * title.
  */
-export const AccountPage = async (props: AccountPageProps) => {
-    void props
+export const AccountPage = async () => {
     const [t, who] = await Promise.all([getTranslations("shop.account"), fetchCurrentUser()])
-    const accountLine =
-        who.kind !== "ok"
-            ? t("unreachable", { url: IDENTITY_API_URL })
-            : who.data === null
-              ? t("anonymous")
-              : t("signedInAs", { email: who.data.email })
+    const accountLine = accountLineOf(who, t)
     return (
         <AccountPageBase
             state={accountPageStateOf(who)}
@@ -59,7 +56,6 @@ export const AccountPage = async (props: AccountPageProps) => {
                 ordersBuyerDescription: t("ordersBuyer.description"),
                 ordersSlot: ordersSlotOf(who),
             }}
-            on={{}}
         />
     )
 }

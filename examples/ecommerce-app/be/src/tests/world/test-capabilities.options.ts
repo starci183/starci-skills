@@ -7,6 +7,7 @@ import type { ModuleFactory } from "@starci/test-world"
 import { CatalogModule } from "@modules/domain/catalog"
 import { CacheModule } from "@modules/integrations/cache"
 import { IdentityApiModule } from "@modules/integrations/identity-api"
+import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
@@ -14,6 +15,7 @@ import {
     cacheOptionsOf,
     identityApiOptionsOf,
     keycloakAdminOptionsOf,
+    keycloakOptionsOf,
     orderApiOptionsOf,
     receiptStorageOptionsOf,
 } from "./test-apps.options"
@@ -26,6 +28,11 @@ export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 /** The cache client over the run's Redis. */
 export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => CacheModule.register({ isGlobal: true, ...cacheOptionsOf(w) }),
+]
+
+/** The password-grant client over the run's realm. */
+export const KEYCLOAK_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) => KeycloakModule.register({ isGlobal: true, ...keycloakOptionsOf(w) }),
 ]
 
 /** The Keycloak admin client over the run's realm. */

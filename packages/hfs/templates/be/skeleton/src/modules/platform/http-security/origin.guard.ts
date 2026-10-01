@@ -5,7 +5,7 @@ import { requestOf } from "./execution-request.mapper"
 import { InjectHttpSecurityOptions } from "./http-security.decorators"
 import type { HttpSecurityOptions } from "./http-security.options"
 
-const SAFE_METHODS: ReadonlyArray<string> = ["GET", "HEAD", "OPTIONS"]
+const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"])
 
 const originOf = (origin: string | undefined, referer: string | undefined): string | undefined => {
     if (origin) return origin
@@ -23,7 +23,7 @@ export class OriginGuard implements CanActivate {
     /** Refuses a state-changing request from an origin outside the allowlist. */
     canActivate(context: ExecutionContext): boolean {
         const request = requestOf(context)
-        if (SAFE_METHODS.includes(request.method)) return true
+        if (SAFE_METHODS.has(request.method)) return true
         const origin = originOf(request.headers.origin, request.headers.referer)
         if (origin === undefined || this.options.allowedOrigins.includes(origin)) return true
         throw new HttpSecurityError({ code: HttpSecurityErrorCode.OriginRejected })

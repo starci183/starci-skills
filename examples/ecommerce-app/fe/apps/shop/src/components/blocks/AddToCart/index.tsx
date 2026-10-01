@@ -20,5 +20,5 @@ type AddToCartControlProps = Pick<
  */
 export const AddToCartControl = (props: AddToCartControlProps) => {
     const add = useAddToCart(props.productId)
-    return <AddToCartControlBase state="ready" props={{ ...props, ...add.props }} on={add.on} />
+    return <AddToCartControlBase props={{ ...props, ...add.props }} on={add.on} />
 }

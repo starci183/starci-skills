@@ -3,7 +3,8 @@ id: br.identity.sign-in
 title: A person signs in with an email and a password
 state: done
 statements:
-  - A sign-in succeeds only when the email is known and the password matches its stored hash.
+  - A sign-in succeeds only when the stack's Keycloak realm accepts the pair (its password grant); the product never
+    stores a password, and the person is keyed by the realm's subject.
   - A failed sign-in says only that the pair is wrong, never which half.
   - A session is an opaque token held in the identity service's Redis with a TTL; other services verify it over HTTP and never read the store.
 authorityRefs:
@@ -23,7 +24,9 @@ module:
   - be/src/modules/domain/account
   - be/src/modules/domain/session
 change:
-  rev: 2
+  rev: 3
   kind: breaking
-  at: 2026-09-19T15:58:00.000Z
-  reason: 'v11 compact-format migration: the acceptanceCriteria name list is removed and this rule''s former ac/ records are inlined as `acceptance` entries carrying their own ac.* ids; every criterion''s wording is verbatim. Breaking in shape - the acceptanceCriteria field is gone - not in substance.'
+  at: 2026-10-02T10:00:00.000Z
+  reason: >-
+    The realm owns the credential now: registering creates the shopper in Keycloak and signing in is its password grant,
+    so the statement that a pair matches a stored hash is replaced; the uniform refusal and the session rules hold.

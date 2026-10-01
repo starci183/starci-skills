@@ -3,8 +3,15 @@ import createMiddleware from "next-intl/middleware"
 import { NextResponse, type NextRequest } from "next/server"
 import { routing } from "./index"
 
-/** The API, the health probe, framework files and files with an extension are never locale-negotiated. */
-const UNNEGOTIATED = /^\/(?:api|health|_next|_vercel)(?:\/|$)|\.[^/]+$/
+/** The first path segments of the API, the health probe and the framework: never locale-negotiated. */
+const UNNEGOTIATED_ROOTS: ReadonlySet<string> = new Set(["api", "health", "_next", "_vercel"])
+
+/** Whether the path belongs to the API, the health probe, the framework or a file with an extension. */
+const isUnnegotiated = (pathname: string): boolean => {
+    const segments = pathname.split("/")
+    const last = segments.at(-1) ?? ""
+    return UNNEGOTIATED_ROOTS.has(segments[1] ?? "") || (last.includes(".") && !last.endsWith("."))
+}
 
 const negotiate = createMiddleware(routing)
 
@@ -15,4 +22,4 @@ const negotiate = createMiddleware(routing)
  * table for both apps, so `/vi` means the same thing on both origins.
  */
 export const proxy = (request: NextRequest) =>
-    UNNEGOTIATED.test(request.nextUrl.pathname) ? NextResponse.next() : negotiate(request)
+    isUnnegotiated(request.nextUrl.pathname) ? NextResponse.next() : negotiate(request)

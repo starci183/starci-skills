@@ -16,5 +16,5 @@ export const ShopRootRedirect = (props: ShopRootRedirectProps) => {
         href: SHOP_ROUTES.browse,
         locale: hasLocale(routing.locales, props.lang) ? props.lang : routing.defaultLocale,
     })
-    return <ShopRootRedirectBase state="redirecting" props={{}} on={{}} />
+    return <ShopRootRedirectBase />
 }

@@ -1,5 +1,5 @@
 mutation Register($input: RegisterInput!) {
-    register(request: $input) {
+    register(input: $input) {
         personId
     }
 }

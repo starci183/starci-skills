@@ -1,0 +1,5 @@
+mutation RevokeSession($input: RevokeSessionInput!) {
+    revokeSession(input: $input) {
+        revoked
+    }
+}

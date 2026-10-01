@@ -7,9 +7,6 @@ import { readSessionToken } from "../../../modules/session"
 import { CartPageBase } from "./component"
 import type { CartPageState } from "./component"
 
-/** Props for the connected cart page: the route mounts it empty and it reads its own world. */
-type CartPageProps = Record<never, never>
-
 /** The screen situation a cart read settles: gate, refusal, genuine empty, or the lines. */
 const cartPageStateOf = (outcome: Outcome<CartView>): CartPageState =>
     outcome.kind === "refused" ? "signedOut" : "cart"
@@ -20,8 +17,7 @@ const cartPageStateOf = (outcome: Outcome<CartView>): CartPageState =>
  * and price before the pure twin sees a prop. A line the catalog no longer knows renders under its
  * product id, honestly unnamed.
  */
-export const CartPage = async (props: CartPageProps) => {
-    void props
+export const CartPage = async () => {
     const [t, locale, format, sessionToken] = await Promise.all([
         getTranslations("shop.cart"),
         getLocale(),
@@ -45,7 +41,6 @@ export const CartPage = async (props: CartPageProps) => {
                 backToBrowse: t("backToBrowse"),
                 browseHref: `/${locale}${SHOP_ROUTES.browse}`,
             }}
-            on={{}}
         />
     )
 }

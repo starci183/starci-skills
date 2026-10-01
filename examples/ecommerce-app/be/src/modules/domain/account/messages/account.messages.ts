@@ -6,10 +6,12 @@ export const ACCOUNT_MESSAGES: MessageBundle = {
         "errors.ACCOUNT_EMAIL_TAKEN": "Email này đã được đăng ký.",
         "errors.ACCOUNT_INVALID_CREDENTIALS": "Email hoặc mật khẩu không đúng.",
         "errors.ACCOUNT_PERSON_UNKNOWN": "Không tìm thấy người dùng.",
+        "errors.ACCOUNT_PROVIDER_UNAVAILABLE": "Dịch vụ danh tính tạm thời không khả dụng, hãy thử lại sau.",
     },
     en: {
         "errors.ACCOUNT_EMAIL_TAKEN": "This email is already registered.",
         "errors.ACCOUNT_INVALID_CREDENTIALS": "The email or the password is wrong.",
         "errors.ACCOUNT_PERSON_UNKNOWN": "No such person.",
+        "errors.ACCOUNT_PROVIDER_UNAVAILABLE": "The identity provider is unavailable, try again shortly.",
     },
 }

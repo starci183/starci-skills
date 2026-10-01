@@ -2,7 +2,6 @@ import { Button, Text } from "@starci/grammar/common"
 
 /** Resolved labels and local action outcome for the clear control. */
 export type ClearCartControlBaseProps = {
-    readonly state: "ready"
     readonly props: {
         readonly clearLabel: string
         readonly clearingLabel: string

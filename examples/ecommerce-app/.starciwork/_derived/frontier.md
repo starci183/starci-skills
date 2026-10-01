@@ -14,7 +14,7 @@ Open unbuilt-module gaps: 0.
 - fr.checkout.cart.clear — Clear the cart
 - fr.checkout.cart.list — Read the cart
 - fr.checkout.download-receipt — Download the receipt of an order
-- gap.checkout.second-example-gates — No CI job or host port-registry entry exists for this second example yet
+- gap.checkout.second-example-gates — No host port-registry entry exists for this second example yet
 - integration.checkout.minio — MinIO archives the receipts of placed orders
 - integration.checkout.postgres — PostgreSQL holds the catalog, cart, order and payment rows
 - integration.checkout.redis — Redis is the identity service's session store
@@ -25,5 +25,5 @@ Open unbuilt-module gaps: 0.
 ## identity
 - br.identity.account — An account view joins the known person with their live buyer status
 - fr.identity.account — Read an account
-- integration.identity.keycloak — Keycloak is the member directory the identity service reads profiles from
+- integration.identity.keycloak — Keycloak owns the shoppers' credentials
 - ui.identity.sign-in — Account sign-in direction

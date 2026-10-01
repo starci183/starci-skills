@@ -11,7 +11,6 @@ type ShopErrorPageBaseOn = { readonly retry: () => void }
 
 /** What the error page reads: the one situation it draws, its resolved words and its retry. */
 type ShopErrorPageBaseContract = {
-    readonly state: "ready"
     readonly props: ShopErrorPageBaseProps
     readonly on: ShopErrorPageBaseOn
 }

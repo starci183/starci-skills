@@ -114,7 +114,7 @@
         "registerIntro": "One email and a password is the whole of it.",
         "email": "Email",
         "password": "Password",
-        "passwordHint": "Choose a password — this demo stores it hashed locally.",
+        "passwordHint": "Choose a password of at least 8 characters - the shop's identity provider keeps it, the shop never does.",
         "submitSignIn": "Sign in",
         "submitRegister": "Register",
         "submittingSignIn": "Signing in…",

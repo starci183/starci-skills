@@ -13002,6 +13002,16 @@ BE_INTEGRATION_SPEC_MISSING:
   owner: op-retry
   kind: check-finding
 
+FE_GRAPHQL_CONTRACT:
+  title: "A front-end GraphQL document is one its back end serves"
+  title_vi: "Tài liệu GraphQL của front end không khớp hợp đồng của back end"
+  meaning_vi: "Một thao tác trong tệp `.graphql` dưới `fe/` không khớp ảnh chụp hợp đồng `be/contracts/<service>/schema.graphql` của dịch vụ phục vụ trường gốc đầu tiên của nó: trường, đối số hoặc trường input không được khai báo, thiếu đối số bắt buộc, biến khác kiểu, chọn trường trên giá trị lá hoặc thiếu lựa chọn trên đối tượng, biến khai báo mà không dùng, hoặc không hợp đồng nào phục vụ trường gốc đó."
+  causes_vi:
+    - "Vi phạm luật R113: front end gửi một tài liệu viết theo hợp đồng cũ (ví dụ `(request: ...)` trong khi back end nhận `input`), nên lời gọi hỏng khi chạy mà type-check của front end không thấy."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa tài liệu `.graphql` cho khớp hợp đồng (hoặc chạy `npm run contract:emit` nếu ảnh chụp đã cũ); không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 HFS_PROOF_COMMAND_FILE_MISSING:
   title: "A proof command names only files the repository holds"
   title_vi: "Lệnh chứng minh trỏ tới tệp không tồn tại"

@@ -4,4 +4,6 @@ import type { Secret } from "@modules/platform/config"
 export interface CacheOptions {
     /** The Redis URL; it may embed credentials. */
     readonly url: Secret
+    /** How long one Redis command waits for its answer before it fails as unavailable. */
+    readonly timeoutMs: number
 }

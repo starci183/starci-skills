@@ -2,77 +2,104 @@ import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { InjectSessionService } from "@modules/domain/session"
 import type { IssuedSession, SessionService } from "@modules/domain/session"
+import { InjectKeycloak, KeycloakError, KeycloakErrorCode } from "@modules/integrations/keycloak"
+import type { KeycloakClient, KeycloakSignIn } from "@modules/integrations/keycloak"
+import { InjectKeycloakAdmin, KeycloakAdminErrorCode } from "@modules/integrations/keycloak-admin"
+import type { KeycloakAdmin } from "@modules/integrations/keycloak-admin"
 import { InjectOrderApi } from "@modules/integrations/order-api"
 import type { OrderApiClient } from "@modules/integrations/order-api"
 import { InjectIdentityEntityManager } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type {
+    AccountCredentials,
     AccountOverview,
     AccountOverviewParams,
     AccountPersonView,
     AccountView,
     GetAccountParams,
-    VerifyCredentialsParams,
 } from "./account.contracts"
 import { AccountErrorCode } from "./errors/account.error"
-import { hashPassword, verifyPassword } from "./password.policy"
-import { toPersonId } from "./persistence/account.rows"
-import type { PersonIdRow } from "./persistence/account.rows"
 import { INSERT_PERSON_IF_NEW } from "./persistence/account.sql"
 import { PersonEntity } from "./persistence/entities/person.entity"
 
+/** How each failure of the password grant is told to the caller: a wrong pair stays uniform, an outage is its own answer. */
+const SIGN_IN_REFUSAL_OF: Record<
+    KeycloakErrorCode,
+    AccountErrorCode.InvalidCredentials | AccountErrorCode.ProviderUnavailable
+> = {
+    [KeycloakErrorCode.InvalidCredentials]: AccountErrorCode.InvalidCredentials,
+    [KeycloakErrorCode.ProviderUnavailable]: AccountErrorCode.ProviderUnavailable,
+}
+
+/** How each refusal of the realm's admin API is told to the caller. */
+const REGISTER_REFUSAL_OF: Record<
+    KeycloakAdminErrorCode,
+    AccountErrorCode.EmailTaken | AccountErrorCode.ProviderUnavailable
+> = {
+    [KeycloakAdminErrorCode.EmailTaken]: AccountErrorCode.EmailTaken,
+    [KeycloakAdminErrorCode.Unavailable]: AccountErrorCode.ProviderUnavailable,
+}
+
 @Injectable()
-/** Credential checking, registration, sign-in and the account behind a person id. Refusals are returned, never thrown. */
+/**
+ * The shoppers of the product. Keycloak owns every credential: registering creates the shopper in the realm through the
+ * admin API, and signing in is the realm's password grant; the product keeps only the person row (the realm's subject is
+ * its id) and the session the sign-in opens. The provider is called before any write, so a refused or unreachable realm
+ * leaves nothing behind.
+ */
 export class AccountService {
     constructor(
         @InjectIdentityEntityManager() private readonly entityManager: EntityManager,
         @InjectSessionService() private readonly sessions: SessionService,
+        @InjectKeycloak() private readonly keycloak: KeycloakClient,
+        @InjectKeycloakAdmin() private readonly keycloakAdmin: KeycloakAdmin,
         @InjectOrderApi() private readonly orderApi: OrderApiClient,
     ) {}
 
-    /** The person whose email and password match; unknown email and wrong password are the same refusal. */
-    async verifyCredentials(
-        params: VerifyCredentialsParams,
-    ): Promise<Outcome<AccountPersonView, AccountErrorCode.InvalidCredentials>> {
-        const person = await this.entityManager.findOneBy(PersonEntity, { email: params.email })
-        if (!person || !verifyPassword(params.password, person.passwordHash)) {
-            return refused(AccountErrorCode.InvalidCredentials)
-        }
-        return ok({ personId: person.id })
+    /** Creates the shopper in the realm and records the person under the subject the realm gave it. */
+    async register(
+        params: AccountCredentials,
+    ): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken | AccountErrorCode.ProviderUnavailable>> {
+        const created = await this.keycloakAdmin.createMember({ email: params.email, password: params.password })
+        if (created.kind === "refused") return refused(REGISTER_REFUSAL_OF[created.code])
+        await this.entityManager.query(INSERT_PERSON_IF_NEW, [created.value.id, params.email])
+        return ok({ personId: created.value.id })
     }
 
-    /** Checks the credentials and starts a session; a wrong email and a wrong password are the same refusal. */
+    /**
+     * Signs the shopper in with the realm's password grant and opens a session that keeps the refresh token. A person the
+     * realm vouches for but the product has not met yet (a user created in the realm directly) is recorded on the way.
+     */
     async signIn(
-        params: VerifyCredentialsParams,
-    ): Promise<Outcome<IssuedSession, AccountErrorCode.InvalidCredentials>> {
-        const verified = await this.verifyCredentials(params)
-        if (verified.kind === "refused") return verified
-        return ok(await this.sessions.issue({ personId: verified.value.personId }))
+        params: AccountCredentials,
+    ): Promise<Outcome<IssuedSession, AccountErrorCode.InvalidCredentials | AccountErrorCode.ProviderUnavailable>> {
+        const granted = await this.grant(params)
+        if (granted.kind === "refused") return granted
+        const { subject, refreshToken } = granted.value
+        await this.entityManager.query(INSERT_PERSON_IF_NEW, [subject, params.email])
+        return ok(await this.sessions.issue({ personId: subject, providerRefreshToken: refreshToken }))
     }
 
-    /** Registers a person in one transaction; a taken email is a refusal. */
-    register(params: VerifyCredentialsParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
-        return this.entityManager.transaction(async (manager) => {
-            const rows: Array<PersonIdRow> = await manager.query(INSERT_PERSON_IF_NEW, [
-                params.email,
-                hashPassword(params.password),
-            ])
-            const personId = toPersonId(rows)
-            return personId === null ? refused(AccountErrorCode.EmailTaken) : ok({ personId })
-        })
+    /** The realm's password grant, its failures told as the account's own refusals. */
+    private async grant(
+        params: AccountCredentials,
+    ): Promise<Outcome<KeycloakSignIn, AccountErrorCode.InvalidCredentials | AccountErrorCode.ProviderUnavailable>> {
+        try {
+            return ok(await this.keycloak.signIn({ email: params.email, password: params.password }))
+        } catch (error) {
+            if (error instanceof KeycloakError) return refused(SIGN_IN_REFUSAL_OF[error.code])
+            throw error
+        }
     }
 
-    /** The account of one person. */
+    /** The person's id and email. */
     async getAccount(params: GetAccountParams): Promise<Outcome<AccountView, AccountErrorCode.PersonUnknown>> {
         const person = await this.entityManager.findOneBy(PersonEntity, { id: params.personId })
         return person ? ok({ personId: person.id, email: person.email }) : refused(AccountErrorCode.PersonUnknown)
     }
 
-    /**
-     * The account joined with the buyer status read live from the order service. An unreachable order service fails
-     * the read with its own error: an outage never degrades into hasOrders false, which would look like an answer.
-     */
+    /** The person's account joined with the buyer status the order service reports for the caller's token. */
     async overview(params: AccountOverviewParams): Promise<Outcome<AccountOverview, AccountErrorCode.PersonUnknown>> {
         const account = await this.getAccount({ personId: params.personId })
         if (account.kind === "refused") return account

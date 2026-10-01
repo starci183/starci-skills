@@ -27,7 +27,7 @@ const signatureOf = (secretAccessKey: string, dateStamp: string, region: string,
 
 /** RFC 3986 encoding of a query value, as SigV4 canonicalises it. */
 const encodeRfc3986 = (value: string): string =>
-    encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${(char.codePointAt(0) ?? 0).toString(16).toUpperCase()}`)
 
 /**
  * The AWS Signature Version 4 headers of one S3 request (path-style URL, no query string): `x-amz-date`,

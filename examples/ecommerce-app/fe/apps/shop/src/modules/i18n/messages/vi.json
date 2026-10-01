@@ -114,7 +114,7 @@
         "registerIntro": "Chỉ cần một email và một mật khẩu.",
         "email": "Email",
         "password": "Mật khẩu",
-        "passwordHint": "Chọn một mật khẩu — bản demo này lưu nó dưới dạng băm cục bộ.",
+        "passwordHint": "Chọn mật khẩu từ 8 ký tự - nhà cung cấp danh tính của cửa hàng giữ nó, cửa hàng thì không.",
         "submitSignIn": "Đăng nhập",
         "submitRegister": "Đăng ký",
         "submittingSignIn": "Đang đăng nhập…",

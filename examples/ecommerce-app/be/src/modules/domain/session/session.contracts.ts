@@ -10,6 +10,8 @@ export interface IssuedSession {
 export interface IssueSessionParams {
     /** The person the session authenticates. */
     readonly personId: string
+    /** The identity provider's refresh token of the sign-in, kept to end the provider session at sign-out. */
+    readonly providerRefreshToken: string
 }
 
 /** The session behind a token, or null when the token has none. */
@@ -33,4 +35,12 @@ export interface RevokeOwnSessionParams {
 export interface RevokedSession {
     /** Always true: a refusal is the other half of the outcome. */
     readonly revoked: true
+}
+
+/** What the cache keeps behind a session token. */
+export interface StoredSession {
+    /** The person the session belongs to. */
+    readonly personId: string
+    /** The identity provider's refresh token of the sign-in. */
+    readonly providerRefreshToken: string
 }

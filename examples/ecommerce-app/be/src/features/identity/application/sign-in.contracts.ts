@@ -10,5 +10,8 @@ export interface SignInRequest {
     readonly password: string
 }
 
-/** The new session, or the refusal that names neither half of the credentials. */
-export type SignInResult = Outcome<IssuedSession, AccountErrorCode.InvalidCredentials>
+/** The new session, or the refusal that names neither half of the credentials, or the unreachable identity provider. */
+export type SignInResult = Outcome<
+    IssuedSession,
+    AccountErrorCode.InvalidCredentials | AccountErrorCode.ProviderUnavailable
+>

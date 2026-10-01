@@ -17,7 +17,6 @@ export const ShopLayout = async (props: ShopLayoutProps) => {
     const locale = await getLocale()
     return (
         <ShopLayoutBase
-            state="ready"
             props={{
                 brand: t("brand"),
                 homeHref: `/${locale}${SHOP_ROUTES.browse}`,
@@ -29,7 +28,6 @@ export const ShopLayout = async (props: ShopLayoutProps) => {
                     localeNames: { en: tDisplay("locale.en"), vi: tDisplay("locale.vi") },
                 },
             }}
-            on={{}}
         >
             {props.content}
         </ShopLayoutBase>

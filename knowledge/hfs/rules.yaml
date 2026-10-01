@@ -1160,6 +1160,14 @@ rules:
     failureCodes: ["BE_INTEGRATION_SPEC_MISSING"]
     enforcers:
       - {kind: hfs, id: integration-specs, at: scripts/lib/hfs-rules/integration-specs.mjs}
+  - id: R113
+    code: "FE_GRAPHQL_CONTRACT"
+    law: "Every GraphQL operation a front end keeps in a `.graphql` file under `fe/` is one its back end serves: it is judged against the contract snapshot (`be/contracts/<service>/schema.graphql`) whose root type declares its first root field, and every selected field, argument and input field must be declared there, every required argument and required input field given, every variable passed with the argument's named type, every leaf selected without and every object with a selection, and every declared variable used; a root field no contract declares is a finding too."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["FE_GRAPHQL_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: fe-contract-documents, at: scripts/lib/hfs-rules/fe-contract-documents.mjs}
   - id: R114
     code: "RT_EXTERNAL_OWNER"
     law: "In the runtime repository a process, the network, SQLite or an external binary is reached only by its owner in ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml: an owned module specifier, global or spawned program word is used only by the files of scripts/api/<system> or engine/db that the map names."

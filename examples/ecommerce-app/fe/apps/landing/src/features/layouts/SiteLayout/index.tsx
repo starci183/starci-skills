@@ -19,7 +19,6 @@ export const SiteLayout = async (props: SiteLayoutProps) => {
     const locale = await getLocale()
     return (
         <SiteLayoutBase
-            state="ready"
             props={{
                 brand: t("brand"),
                 display: {
@@ -40,7 +39,6 @@ export const SiteLayout = async (props: SiteLayoutProps) => {
                 aboutHref: `/${locale}${LANDING_ROUTES.about}`,
                 shopHref: `${SHOP_URL}/${locale}`,
             }}
-            on={{}}
         >
             {props.content}
         </SiteLayoutBase>

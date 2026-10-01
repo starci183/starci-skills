@@ -149,7 +149,6 @@ records:
     usedBy:
       refs:
         - contract.checkout.order-for-identity
-        - integration.identity.keycloak
   fr.identity.sign-in:
     schema: work/functional-requirement@1
     feature: identity
@@ -159,6 +158,7 @@ records:
     usedBy:
       refs:
         - contract.identity.internal.sessions
+        - integration.identity.keycloak
         - ui.identity.sign-in
   gap.checkout.live-proof:
     schema: work/gap@1
@@ -340,7 +340,7 @@ frontier:
     title: Download the receipt of an order
   - id: gap.checkout.second-example-gates
     feature: checkout
-    title: No CI job or host port-registry entry exists for this second example yet
+    title: No host port-registry entry exists for this second example yet
   - id: integration.checkout.minio
     feature: checkout
     title: MinIO archives the receipts of placed orders
@@ -367,7 +367,7 @@ frontier:
     title: Read an account
   - id: integration.identity.keycloak
     feature: identity
-    title: Keycloak is the member directory the identity service reads profiles from
+    title: Keycloak owns the shoppers' credentials
   - id: ui.identity.sign-in
     feature: identity
     title: Account sign-in direction

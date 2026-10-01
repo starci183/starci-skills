@@ -1,5 +1,5 @@
-query UpcomingOccurrences($ruleId: String!) {
-    upcomingOccurrences(request: { ruleId: $ruleId }) {
+query UpcomingOccurrences($ruleId: ID!) {
+    upcomingOccurrences(input: { ruleId: $ruleId }) {
         ruleId
         materialised {
             occurrenceId

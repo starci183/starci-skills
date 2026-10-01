@@ -7,11 +7,5 @@ type ShopErrorPageProps = { readonly onRetry: () => void }
 /** A render failure in the shop shows this instead of a blank page; retry re-renders the segment. */
 export const ShopErrorPage = (props: ShopErrorPageProps) => {
     const t = useTranslations("shop.errors.page")
-    return (
-        <ShopErrorPageBase
-            state="ready"
-            props={{ title: t("title"), retryLabel: t("retry") }}
-            on={{ retry: props.onRetry }}
-        />
-    )
+    return <ShopErrorPageBase props={{ title: t("title"), retryLabel: t("retry") }} on={{ retry: props.onRetry }} />
 }

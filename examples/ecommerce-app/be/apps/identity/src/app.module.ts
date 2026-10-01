@@ -9,9 +9,9 @@ import {
     accountMigrations,
 } from "@modules/domain/account"
 import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } from "@modules/domain/identity"
-import { MemberModule } from "@modules/domain/member"
 import { SESSION_ERROR_KINDS, SESSION_MESSAGES, SessionModule, SessionService } from "@modules/domain/session"
 import { CACHE, CACHE_ERROR_KINDS, CACHE_MESSAGES, CacheModule } from "@modules/integrations/cache"
+import { KEYCLOAK_ERROR_KINDS, KEYCLOAK_MESSAGES, KeycloakModule } from "@modules/integrations/keycloak"
 import {
     KEYCLOAK_ADMIN_ERROR_KINDS,
     KEYCLOAK_ADMIN_MESSAGES,
@@ -57,6 +57,7 @@ export class AppModule {
                         HTTP_SECURITY_MESSAGES,
                         PROBES_MESSAGES,
                         CACHE_MESSAGES,
+                        KEYCLOAK_MESSAGES,
                         KEYCLOAK_ADMIN_MESSAGES,
                         ORDER_API_MESSAGES,
                         ACCOUNT_MESSAGES,
@@ -73,6 +74,7 @@ export class AppModule {
                         HTTP_SECURITY_ERROR_KINDS,
                         PROBES_ERROR_KINDS,
                         CACHE_ERROR_KINDS,
+                        KEYCLOAK_ERROR_KINDS,
                         KEYCLOAK_ADMIN_ERROR_KINDS,
                         ORDER_API_ERROR_KINDS,
                         ACCOUNT_ERROR_KINDS,
@@ -88,11 +90,11 @@ export class AppModule {
                 }),
                 CacheModule.register({ isGlobal: true, ...options.cache }),
                 HttpModule.register({ isGlobal: true }),
+                KeycloakModule.register({ isGlobal: true, ...options.keycloak }),
                 KeycloakAdminModule.register({ isGlobal: true, ...options.keycloakAdmin }),
                 OrderApiModule.register({ isGlobal: true, ...options.orderApi }),
                 AccountModule.register({ isGlobal: true }),
                 SessionModule.register({ isGlobal: true }),
-                MemberModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: SessionService }),
                 ProbesModule.register({ isGlobal: true, service: "identity", probes: [DatabaseProbe, CACHE] }),
                 GraphqlModule.register({ isGlobal: true }),

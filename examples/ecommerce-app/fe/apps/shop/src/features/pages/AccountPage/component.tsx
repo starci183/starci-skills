@@ -35,8 +35,6 @@ export type AccountPageProps = {
         readonly ordersBuyerDescription: string
         readonly ordersSlot: Slot<true>
     }
-    /** What the surface reports upward; the session acts through its own blocks, not through this prop. */
-    readonly on: Record<never, never>
 }
 
 /**

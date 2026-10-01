@@ -8,9 +8,6 @@ import { readSessionToken } from "../../../modules/session"
 import { CheckoutPageBase } from "./component"
 import type { CheckoutPageState } from "./component"
 
-/** Props for the connected checkout page: the route mounts it empty and it reads its own world. */
-type CheckoutPageProps = Record<never, never>
-
 /** The screen situation a checkout read settles: gate, refusal, empty cart, or the summary. */
 const checkoutPageStateOf = (outcome: Outcome<CartView>): CheckoutPageState =>
     outcome.kind === "refused" ? "signedOut" : "checkout"
@@ -21,8 +18,7 @@ const checkoutPageStateOf = (outcome: Outcome<CartView>): CheckoutPageState =>
  * at this render, so pressing confirm again replays rather than double-orders. Every sentence, every
  * amount and both prefixed hrefs resolve before the pure twin sees a prop.
  */
-export const CheckoutPage = async (props: CheckoutPageProps) => {
-    void props
+export const CheckoutPage = async () => {
     const sessionToken = await readSessionToken()
     const t = await getTranslations("shop.checkout")
     const locale = await getLocale()
@@ -57,7 +53,6 @@ export const CheckoutPage = async (props: CheckoutPageProps) => {
                 browseHref: `/${locale}${SHOP_ROUTES.browse}`,
                 accountHref: `/${locale}${SHOP_ROUTES.account}`,
             }}
-            on={{}}
         />
     )
 }
