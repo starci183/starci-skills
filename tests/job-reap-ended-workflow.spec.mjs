@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
-import { ensureOpWorktree, reapJobWorktree, productWorktreeDuty, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { reapJobWorktree, productWorktreeDuty, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { worktreesRootOf } from '../scripts/lib/worktrees.mjs';
 import job, { jobFacts, planJob, jobSettings, isArchivedRefusal, _terminalRuns } from '../scripts/reconciler/controllers/job.mjs';
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 
@@ -22,7 +23,7 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 
-/** A product repo with one isolated op worktree of a settled job in a workflow that then ends (`to`). */
+/** A product repo with one per-op worktree (made by the spec: the per-op land part B deletes) of a settled job in a workflow that then ends (`to`). */
 function fixture(t, to) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reap-ended-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -39,7 +40,10 @@ function fixture(t, to) {
   const ledger = openLedger({ file: ledgerFileFor(ledgerRepo) });
   t.after(() => { try { ledger.close(); } catch { /* closed */ } });
   ledger.ensureWorkflow({ workflowId: WF, title: 'ended' });
-  const made = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: JOB });
+  const opDir = path.join(worktreesRootOf(repo), '01d5d0ea');
+  fs.mkdirSync(path.dirname(opDir), { recursive: true });
+  git(repo, 'worktree', 'add', '-q', '-b', 'op/01d5d0ea', opDir, 'main');
+  const made = { record: { repoRoot: repo, workflowId: WF, jobId: JOB, main: 'main', op: { short: '01d5d0ea', branch: 'op/01d5d0ea', path: opDir }, baseSha: git(repo, 'rev-parse', 'main'), createdAt: Date.now() } };
   ledger.write.createUnit({ workflowId: WF, unitId: JOB, opId: 'interface.implement', subjectKey: JOB, goalRevision: 1 });
   ledger.enqueueJob({ jobId: JOB, workflowId: WF, unitId: JOB, opId: 'interface.implement', kind: 'op',
     payload: { opId: 'interface.implement', productWorktree: made.record, terminalClosed: { ok: true, verified: { ok: true, proof: 'spec' } } } });

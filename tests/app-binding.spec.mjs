@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { projectBinding, enqueueRepository, ownedPathPlacements } from '../scripts/kernel/target-repo.mjs';
-import { planIsolation, ensureOpWorktree } from '../scripts/kernel/product-worktree.mjs';
+import { ensureWorkflowWorktree, workflowAppRepo, sideOf } from '../scripts/kernel/workflow-worktree.mjs';
+import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 import { boundRepos, defaultPushRepos } from '../scripts/supervisor/push-mains.mjs';
 import { workspaceBoundRepoRoots } from '../scripts/lib/hk-orphan-ledgers.mjs';
 
@@ -14,7 +15,7 @@ const git = (root, ...args) => {
   assert.equal(run.status, 0, run.stderr);
 };
 
-test('one app binding resolves both roles, app-root Work and one op worktree', (t) => {
+test('one app binding resolves both roles, app-root Work and the one workflow worktree', (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-app-binding-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const source = path.join(base, 'source');
@@ -58,12 +59,13 @@ test('one app binding resolves both roles, app-root Work and one op worktree', (
     [null, app, '.starciwork/features/a', 'work-owner'],
     ['app', app, 'package.json', 'app-relative'],
   ]);
-  const isolation = planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: grants, binding });
-  assert.equal(isolation.isolate, true);
-  assert.equal(isolation.repoRoot, app);
-  const made = ensureOpWorktree({ repoRoot: isolation.repoRoot, workflowId: 'wf-app-12345678', jobId: 'op-app-12345678' });
+  // The workflow worktree is in the bound app repository; an op's side comes from its app-relative owned paths.
+  assert.equal(workflowAppRepo(app, { binding }), app);
+  assert.deepEqual(['be/src/main.ts', 'fe/src/page.tsx', 'package.json', '.starciwork/features/a'].map((p) => sideOf([p])), ['be', 'fe', 'both', null]);
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite') };
+  const made = ensureWorkflowWorktree({ env, orca: fakeOrcaWorktrees({ root: path.join(base, 'orca') }) }, { workflowId: 'wf-app-12345678', appRepo: app });
   assert.equal(made.ok, true, JSON.stringify(made));
-  const wt = made.record.op.path;
+  const wt = made.record.path;
   assert.ok(fs.existsSync(path.join(wt, 'be', 'src', 'main.ts')));
   assert.ok(fs.existsSync(path.join(wt, 'fe', 'src', 'page.tsx')));
   const mapped = ownedPathPlacements({ op: 'code.refactor', payload: {}, ownedPaths: ['be/src/main.ts', 'fe/src/page.tsx', '.starciwork/features/a'], repo: app, worktree: wt });

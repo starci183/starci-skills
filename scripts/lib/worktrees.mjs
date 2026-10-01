@@ -564,7 +564,7 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
       if (isPendingRow(row)) {
         // A slot whose creator died before Orca answered: the slot goes back (an Orca tree it may have left is listed by
         // `orca worktree list` and released by hand; alpha.5 adopts it).
-        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) markRemoved(row.path, { error: 'orca slot never bound', env }); items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
+        if (stalePending(row, now, settings.ownerGoneMs)) { if (apply) releaseOrcaSlot(row.path, { env }); items.push({ path: row.path, repoRoot, reason: 'slot-never-bound', action: 'unregister', ok: true }); }
         continue;
       }
       if (!fs.existsSync(row.path)) {

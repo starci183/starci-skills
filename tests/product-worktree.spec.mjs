@@ -1,8 +1,8 @@
-// Product worktrees (DESIGN §16.7, FMEA #20; scripts/kernel/product-worktree.mjs). fe-canon 2026-09-28: 16 code.refactor
-// slices shared ONE nivo-fe tree, a slice moving apps/app/src/i18n/request.ts changed a sibling's checker inputs mid-run
-// (INPUTS_CHANGED_DURING_CHECK). Each op now works in exactly one worktree off main (owner order lane WT), with a
-// node_modules junction overlay whose workspace packages point at the worktree's OWN copy, and the worktree is removed
-// (links removed first, verified) right after the job is released. The land into main is tests/worktree-lifecycle.spec.mjs.
+// The per-op removal and reap of scripts/kernel/product-worktree.mjs (part B deletes them with the per-op land; owner
+// decision WFWT: one Orca-owned worktree per Kernel workflow replaced the per-op worktree, whose creation, layout,
+// node_modules junction overlay and isolation policy part A deleted - tests/workflow-worktree.spec.mjs). Until then the
+// removal is exercised on a per-op tree the spec makes itself: links removed first, evidence salvaged, unlanded work
+// preserved, the tree verified gone, and the root install untouched.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,10 +10,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
-import {
-  ensureOpWorktree, removeOpWorktree, verifyResolution, reapJobWorktree, preservedOpRef, planIsolation, shortIdOf, EVENTS,
-} from '../scripts/kernel/product-worktree.mjs';
-import { WORKTREES_REL } from '../scripts/lib/worktree-exclude.mjs';
+import { removeOpWorktree, reapJobWorktree, preservedOpRef, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { worktreesRootOf } from '../scripts/lib/worktrees.mjs';
 
 const WF = 'wf-nivo-fe-canon-mujek980';
 const git = (cwd, ...args) => {
@@ -22,7 +20,17 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-const real = (p) => fs.realpathSync.native(p);
+
+/** A per-op tree made by the spec (the shape payload.productWorktree had): <repo>/.starciwork/worktrees/<short> on op/<short>. */
+function opTree(repo, jobId) {
+  const short = jobId.split('-').pop().slice(0, 8);
+  const dir = path.join(worktreesRootOf(repo), short);
+  const branch = `op/${short}`;
+  const baseSha = git(repo, 'rev-parse', 'main');
+  fs.mkdirSync(path.dirname(dir), { recursive: true });
+  git(repo, 'worktree', 'add', '-q', '-b', branch, dir, baseSha);
+  return { repoRoot: repo, workflowId: WF, jobId, main: 'main', op: { short, branch, path: dir }, baseSha, createdAt: Date.now() };
+}
 
 /** A monorepo like nivo-fe: npm workspaces, node_modules/@nivo/ui -> packages/ui (a junction), tsconfig `@/*` alias. */
 function fixtureRepo(t) {
@@ -58,51 +66,12 @@ function fixtureRepo(t) {
   return { base, repo };
 }
 
-test('two jobs of one workflow get exactly one worktree each off main, no workflow worktree; the product checkout stays clean', (t) => {
-  const { repo } = fixtureRepo(t);
-  const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' });
-  const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' });
-  assert.ok(a.ok, JSON.stringify(a)); assert.ok(b.ok, JSON.stringify(b));
-  const root = path.join(repo, ...WORKTREES_REL.split('/'));
-  assert.equal(a.record.op.path, path.join(root, 'd704825a'));
-  assert.equal(b.record.op.path, path.join(root, '97666fb9'));
-  assert.equal(a.record.op.branch, 'op/d704825a');
-  assert.equal(a.record.workflow, undefined, 'no workflow integration worktree');
-  assert.deepEqual(fs.readdirSync(root).sort(), ['97666fb9', 'd704825a'], 'only the two op trees');
-  assert.equal(git(repo, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length, 3, 'main + one per op');
-  assert.equal(git(repo, 'config', '--get', 'branch.op/d704825a.description'), 'op-code.refactor-d704825abb', 'the short branch names its full job id');
-  assert.equal(git(repo, 'config', '--get', 'core.longpaths'), 'true');
-  assert.match(fs.readFileSync(path.join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.starciwork\/worktrees\/$/m);
-  assert.equal(git(repo, 'status', '--porcelain', '--untracked-files=all'), '', 'the worktrees dir never shows in the product checkout');
-  assert.equal(a.record.baseSha, git(repo, 'rev-parse', 'main'));
-  // A requeued attempt of the same job reuses its tree.
-  const again = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' });
-  assert.ok(again.ok && again.created === false);
-});
-
-test('the node_modules overlay: real dirs of junctions, workspace packages resolve INSIDE the worktree', (t) => {
-  const { repo } = fixtureRepo(t);
-  const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' });
-  assert.ok(a.ok, JSON.stringify(a));
-  const wt = a.record.op.path;
-  assert.ok(!fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink(), 'node_modules is a real directory, not one junction');
-  assert.ok(!fs.lstatSync(path.join(wt, 'node_modules', '@nivo')).isSymbolicLink(), 'a scope dir is real too');
-  assert.equal(real(path.join(wt, 'node_modules', '@nivo', 'ui')), real(path.join(wt, 'packages', 'ui')), '@nivo/ui is the worktree\'s own packages/ui');
-  assert.equal(real(path.join(wt, 'node_modules', 'react')), real(path.join(repo, 'node_modules', 'react')), 'a third-party package is the root install');
-  assert.equal(real(path.join(wt, 'apps', 'app', 'node_modules', 'lodash')), real(path.join(repo, 'apps', 'app', 'node_modules', 'lodash')), 'a workspace dir\'s own node_modules is overlaid too');
-  assert.ok(fs.existsSync(path.join(wt, 'node_modules', '.package-lock.json')), 'files are copied');
-  // Node itself resolves the workspace package inside the worktree.
-  write(wt, 'packages/ui/index.js', 'module.exports = "worktree-ui";\n');
-  const r = spawnSync(process.execPath, ['-e', 'process.stdout.write(require("@nivo/ui"))'], { cwd: wt, encoding: 'utf8' });
-  assert.equal(r.stdout, 'worktree-ui', `require('@nivo/ui') from the worktree reads the worktree's copy (${r.stderr})`);
-  const check = verifyResolution(wt, { workspace: [{ name: 'node_modules/@nivo/ui' }] });
-  assert.ok(check.ok, JSON.stringify(check));
-});
-
 test('a file move in one op worktree is invisible to its sibling; removal never touches a junction target', (t) => {
   const { repo } = fixtureRepo(t);
-  const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' }).record;
-  const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' }).record;
+  const a = opTree(repo, 'op-code.refactor-d704825abb');
+  const b = opTree(repo, 'op-code.refactor-97666fb9ba');
+  // The links an op tree may hold into the root install (a junction): removed as links, never followed.
+  fs.symlinkSync(path.join(repo, 'node_modules'), path.join(a.op.path, 'node_modules'), 'junction');
   fs.mkdirSync(path.join(a.op.path, 'apps/app/src/modules/i18n'), { recursive: true });
   git(a.op.path, 'mv', 'apps/app/src/i18n/request.ts', 'apps/app/src/modules/i18n/request.ts');
   git(a.op.path, 'commit', '-q', '-m', 'move i18n');
@@ -121,16 +90,13 @@ test('a file move in one op worktree is invisible to its sibling; removal never 
   assert.ok(fs.existsSync(path.join(repo, 'packages', 'ui', 'index.js')), 'the root workspace package is untouched');
   assert.ok(fs.existsSync(path.join(repo, 'apps', 'app', 'node_modules', 'lodash', 'package.json')));
   assert.ok(fs.existsSync(path.join(b.op.path, 'packages', 'ui', 'index.js')), 'the sibling worktree is untouched');
+  assert.equal(removed.links, 1, 'the junction was removed as a link');
   // Its commit never landed: it is preserved for a continuation, not lost, and the op branch is gone.
   assert.equal(removed.preserved?.ref, 'refs/heads/preserved/op-code.refactor-d704825abb', JSON.stringify(removed));
   assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb')?.sha, git(repo, 'rev-parse', removed.preserved.ref));
   assert.equal(removed.branch.deleted, true);
   assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/op/d704825a'], { cwd: repo }).status, 1, 'no op branch left');
-  // A continuation of that job starts from the preserved work and consumes it.
-  const cont = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-aa11bb22cc', handFrom: ['op-code.refactor-d704825abb'] });
-  assert.ok(cont.ok, JSON.stringify(cont));
-  assert.ok(fs.existsSync(path.join(cont.record.op.path, 'apps/app/src/modules/i18n/request.ts')), 'the continuation holds the partial commit');
-  assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb'), null, 'the preserved branch was handed over');
+  assert.equal(git(repo, 'show', `${removed.preserved.ref}:apps/app/src/modules/i18n/request.ts`), 'export const locale = "vi";', 'the partial commit is in the preserved ref');
 });
 
 test('released -> worktree-removed: the reap records the transition once', (t) => {
@@ -141,7 +107,7 @@ test('released -> worktree-removed: the reap records the transition once', (t) =
   try {
   ledger.ensureWorkflow({ workflowId: WF, title: 'fe canon' });
   const jobId = 'op-code.refactor-d704825abb';
-  const made = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId });
+  const made = { record: opTree(repo, jobId) };
   ledger.write.createUnit({ workflowId: WF, unitId: jobId, opId: 'code.refactor', subjectKey: jobId, goalRevision: 1 });
   ledger.enqueueJob({ jobId, workflowId: WF, unitId: jobId, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', productWorktree: made.record, terminalClosed: { ok: true, verified: { ok: true, proof: 'spec' } } } });
   const now = Date.now();
@@ -160,31 +126,10 @@ test('released -> worktree-removed: the reap records the transition once', (t) =
   } finally { ledger.close(); }
 });
 
-test('isolation is opt-in by op policy and uses the one app repository for either side', (t) => {
-  const { repo } = fixtureRepo(t);
-  const binding = { appRoot: repo, repos: [{ role: 'be', root: path.join(repo, 'be') }, { role: 'fe', root: path.join(repo, 'fe') }] };
-  assert.equal(planIsolation({ brief: { policy: {} }, placements: [], binding }).reason, 'policy-shared');
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).repoRoot, repo);
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be' }, { role: 'fe' }], binding }).repoRoot, repo);
-  assert.equal(shortIdOf('wf-nivo-fe-canon-mujek980'), 'mujek980');
-  assert.equal(shortIdOf('op-code.refactor-d704825abb'), 'd704825a');
-});
-
 test('the .starciwork holding the worktrees container is never the Work root of a path inside a worktree', async () => {
   const { workRootOf } = await import('../scripts/work/work-io.mjs');
   const repo = path.resolve(os.tmpdir(), 'nivo-fe');
   assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'd704825a', 'apps', 'app')), null);
   assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'd704825a', '.starciwork', 'features')),
     path.join(repo, '.starciwork', 'worktrees', 'd704825a', '.starciwork'), 'a worktree\'s own Work dir still is');
-});
-
-test('defaultIsolation worktree takes every committing op; non-committing ops and the runtime repo keep the shared tree', async () => {
-  const { isolationOf, productSettings, SKILL_ROOT } = await import('../scripts/kernel/product-worktree.mjs');
-  const settings = { ...productSettings(), defaultIsolation: 'worktree' };
-  assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'worktree');
-  assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'none' } } }, settings), 'shared', 'an op that never commits would lose its writes');
-  assert.equal(isolationOf({ policy: {} }, settings), 'shared');
-  assert.equal(isolationOf({ policy: { isolation: 'shared', commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'shared', 'a brief may opt out');
-  const binding = { appRoot: SKILL_ROOT, repos: [{ role: 'be', root: path.join(SKILL_ROOT, 'be') }, { role: 'fe', root: path.join(SKILL_ROOT, 'fe') }] };
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository' }], binding }).reason, 'runtime-repo');
 });
