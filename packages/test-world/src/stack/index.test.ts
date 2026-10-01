@@ -1,0 +1,199 @@
+import assert from "node:assert/strict"
+import { mkdirSync, mkdtempSync } from "node:fs"
+import { join } from "node:path"
+import { describe, it } from "node:test"
+import { TestWorldErrorCode } from "../errors"
+import type { AttachRequest, Namespace } from "./contracts"
+import { Docker } from "./docker"
+import type { ExecResult } from "./exec"
+import type { PgClient } from "./pg"
+import { createStack } from "./index"
+import { containerName } from "./naming"
+
+mkdirSync("D:/starci-tmp/hfs/devin/tw-a1", { recursive: true })
+const scratch = mkdtempSync(join("D:/starci-tmp/hfs/devin/tw-a1", "stack-"))
+let counter = 0
+
+/** A scripted docker: containers, published ports and the calls made. */
+const fakeDocker = () => {
+    const containers = new Map<string, { running: boolean; ports: Map<number, number> }>()
+    const calls: Array<string> = []
+    let nextPort = 40000
+    const ok = (stdout = ""): ExecResult => ({ code: 0, stdout, stderr: "" })
+    const exec = async (_command: string, args: ReadonlyArray<string>): Promise<ExecResult> => {
+        calls.push(args.join(" "))
+        const [verb] = args
+        if (verb === "network") return ok()
+        if (verb === "inspect") return containers.has(args[args.length - 1] ?? "") ? ok(containers.get(args[args.length - 1] ?? "")?.running ? "running" : "exited") : { code: 1, stdout: "", stderr: "no such" }
+        if (verb === "run") {
+            const name = args[args.indexOf("--name") + 1] ?? ""
+            const ports = new Map<number, number>()
+            args.forEach((arg, index) => {
+                const match = /^127\.0\.0\.1::(\d+)$/.exec(arg)
+                if (args[index - 1] === "-p" && match?.[1] !== undefined) ports.set(Number(match[1]), (nextPort += 1))
+            })
+            containers.set(name, { running: true, ports })
+            return ok("id")
+        }
+        if (verb === "port") {
+            const port = containers.get(args[1] ?? "")?.ports.get(Number((args[2] ?? "").split("/")[0]))
+            return port === undefined ? { code: 1, stdout: "", stderr: "" } : ok(`127.0.0.1:${port}`)
+        }
+        if (verb === "start") {
+            const found = containers.get(args[1] ?? "")
+            if (found !== undefined) found.running = true
+            return ok()
+        }
+        if (verb === "rm") {
+            containers.delete(args[args.length - 1] ?? "")
+            return ok()
+        }
+        if (verb === "ps") {
+            return ok(
+                [...containers.keys()]
+                    .map((name) => `${name}|${containers.get(name)?.running ? "running" : "exited"}|${name.split("-")[2] ?? ""}|image`)
+                    .join("\n"),
+            )
+        }
+        return ok()
+    }
+    return { docker: new Docker(exec), containers, calls, runCount: () => calls.filter((call) => call.startsWith("run ")).length }
+}
+
+const fakeFetch = (log: Array<string>) =>
+    (async (url: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(String(url)).pathname
+        log.push(`${init?.method ?? "GET"} ${path}`)
+        if (path === "/version") return new Response('"2.9.0"', { status: 200 })
+        if (path === "/proxies" && (init?.method ?? "GET") === "GET") return new Response("{}", { status: 200 })
+        if (path === "/proxies") return new Response("{}", { status: 201 })
+        return new Response(null, { status: 204 })
+    }) as typeof fetch
+
+const fakePg = (queries: Array<string>) => (): PgClient => ({
+    connect: async () => undefined,
+    on: () => undefined,
+    end: async () => undefined,
+    query: async (sql: string) => {
+        queries.push(sql)
+        return { rows: [{ "?column?": 1 }] }
+    },
+})
+
+const namespace = (snake: string): Namespace => ({ snake, kebab: snake.replace(/_/g, "-"), root: `/repo/${snake}` })
+
+const harness = () => {
+    const docker = fakeDocker()
+    const http: Array<string> = []
+    const queries: Array<string> = []
+    const redisCalls: Array<string> = []
+    const stack = createStack({
+        docker: docker.docker,
+        home: join(scratch, `home${(counter += 1)}`),
+        pause: async () => undefined,
+        fetch: fakeFetch(http),
+        pg: fakePg(queries),
+        redis: async (_host, _port, commands) => {
+            redisCalls.push(commands.map((command) => command.join(" ")).join(" | "))
+            return commands.map((command) => (command[0] === "PING" ? "PONG" : "OK"))
+        },
+        cluster: {
+            up: async () => undefined,
+            attach: async () => {
+                throw new Error("the fake cluster is not used")
+            },
+            reset: async () => undefined,
+            detach: async () => undefined,
+            status: async () => [],
+            down: async () => undefined,
+        },
+        isAlive: () => true,
+        pid: 4321,
+    })
+    return { docker, http, queries, redisCalls, stack }
+}
+
+const request = (ns: Namespace, runId: string): AttachRequest => ({
+    namespace: ns,
+    runId,
+    services: [
+        { service: "postgresql", image: "pgvector/pgvector:pg16" },
+        { service: "redis", image: "redis:7-alpine" },
+    ],
+    postgresql: { connections: [{ name: "primary" }] },
+})
+
+describe("stack attach", () => {
+    it("starts the shared containers keyed by image and answers proxied endpoints", async () => {
+        const { docker, stack, http } = harness()
+        const infra = await stack.attach(request(namespace("shop_aaaaaa"), "run1"))
+        assert.deepEqual(
+            [...docker.containers.keys()].sort(),
+            [containerName("postgresql", "pgvector/pgvector:pg16"), containerName("redis", "redis:7-alpine"), containerName("toxiproxy", "ghcr.io/shopify/toxiproxy:2.9.0")].sort(),
+        )
+        assert.equal(infra.postgresql?.host, "127.0.0.1")
+        assert.equal(infra.postgresql?.proxy, "run1-postgresql")
+        assert.equal(infra.postgresql?.port, 30100)
+        assert.equal(infra.redis?.port, 30101)
+        assert.notEqual(infra.postgresql?.directPort, infra.postgresql?.port)
+        assert.deepEqual(infra.postgresql?.databases, { primary: "shop_aaaaaa_primary" })
+        assert.equal(infra.redis?.db, 0)
+        assert.match(infra.toxiproxyApi, /^http:\/\/127\.0\.0\.1:\d+$/)
+        assert.equal(http.filter((call) => call === "POST /proxies").length, 2)
+        const run = docker.calls.find((call) => call.startsWith("run ") && call.includes("starci-ts-postgresql"))
+        assert.ok(run?.includes("--restart no"))
+        assert.ok(run?.includes("--network starci-test-net"))
+        assert.ok(run?.includes("--label starci.test-stack=1"))
+        assert.ok(run?.includes("-p 127.0.0.1::5432"))
+    })
+
+    it("a second attach of another repo starts nothing and gets its own databases, redis db and proxy ports", async () => {
+        const { docker, stack, queries } = harness()
+        await stack.attach(request(namespace("shop_aaaaaa"), "run1"))
+        const runsAfterFirst = docker.runCount()
+        const second = await stack.attach(request(namespace("blog_bbbbbb"), "run2"))
+        assert.equal(docker.runCount(), runsAfterFirst)
+        assert.equal(second.redis?.db, 1)
+        assert.equal(second.postgresql?.port, 30102)
+        assert.deepEqual(second.postgresql?.databases, { primary: "blog_bbbbbb_primary" })
+        assert.ok(queries.includes('CREATE DATABASE "blog_bbbbbb_primary"'))
+    })
+
+    it("refuses a second live run of the same namespace with NamespaceBusy", async () => {
+        const { stack } = harness()
+        await stack.attach(request(namespace("shop_aaaaaa"), "run1"))
+        await assert.rejects(stack.attach(request(namespace("shop_aaaaaa"), "run2")), (error: unknown) => error instanceof Error && "code" in error && error.code === TestWorldErrorCode.NamespaceBusy)
+    })
+
+    it("detach drops what the run owns, frees its leases, and lets the namespace attach again", async () => {
+        const { stack, queries, redisCalls, http } = harness()
+        const ns = namespace("shop_aaaaaa")
+        const infra = await stack.attach(request(ns, "run1"))
+        await stack.detach({ namespace: ns, runId: "run1", infra })
+        assert.ok(queries.includes('DROP DATABASE IF EXISTS "shop_aaaaaa_primary" WITH (FORCE)'))
+        assert.ok(redisCalls.includes("SELECT 0 | FLUSHDB"))
+        assert.ok(http.includes("DELETE /proxies/run1-postgresql"))
+        assert.equal((await stack.status()).leases.length, 0)
+        const again = await stack.attach(request(ns, "run3"))
+        assert.equal(again.redis?.db, 0)
+        assert.equal(again.postgresql?.port, 30100)
+    })
+
+    it("reset empties the namespace's databases and redis db", async () => {
+        const { stack, queries, redisCalls } = harness()
+        const ns = namespace("shop_aaaaaa")
+        const infra = await stack.attach(request(ns, "run1"))
+        await stack.reset({ namespace: ns, infra, keepTables: {} })
+        assert.ok(queries.includes("SET session_replication_role = replica"))
+        assert.ok(redisCalls.filter((call) => call === "SELECT 0 | FLUSHDB").length >= 2)
+    })
+
+    it("down keeps containers a live lease uses and removes everything with force", async () => {
+        const { stack, docker } = harness()
+        await stack.attach(request(namespace("shop_aaaaaa"), "run1"))
+        await stack.down()
+        assert.equal(docker.containers.size, 3)
+        await stack.down({ force: true })
+        assert.equal(docker.containers.size, 0)
+    })
+})

@@ -1,0 +1,145 @@
+/**
+ * What an options builder (`options: (w) => typedOptions`) sees: every URL of the run, built before any app boots. Ports of
+ * the apps are reserved first, so apps that call each other know each other's URL. Reading a service the declaration
+ * does not run is a `NotDeclared` failure, never `undefined`.
+ */
+
+/** A database of the run (one per declared connection, named per repository). */
+export interface WiredDatabase {
+    /** `postgres://user:password@host:port/database`, through toxiproxy. */
+    readonly url: string
+    /** The host (through toxiproxy). */
+    readonly host: string
+    /** The port (through toxiproxy). */
+    readonly port: number
+    /** The user. */
+    readonly user: string
+    /** The password. */
+    readonly password: string
+    /** The database name, prefixed per repository and connection. */
+    readonly database: string
+}
+
+/** The Redis of the run: an own DB index, so two repositories never see each other's keys. */
+export interface WiredRedis {
+    readonly host: string
+    readonly port: number
+    /** The DB index owned by the repository. */
+    readonly db: number
+    /** `redis://host:port/db`. */
+    readonly url: string
+}
+
+/** The MinIO of the run. */
+export interface WiredMinio {
+    readonly host: string
+    readonly port: number
+    /** `http://host:port`. */
+    readonly endpoint: string
+    readonly accessKey: string
+    readonly secretKey: string
+    /** The prefix of every bucket of the repository. */
+    readonly bucketPrefix: string
+    /** The stored name of a declared logical bucket. */
+    bucket(name: string): string
+}
+
+/** The Qdrant of the run. */
+export interface WiredQdrant {
+    /** `http://host:port` (REST). */
+    readonly url: string
+    readonly host: string
+    readonly port: number
+    /** The prefix of every collection of the repository. */
+    readonly collectionPrefix: string
+    /** The stored name of a logical collection. */
+    collection(name: string): string
+}
+
+/** The Kafka of the run. */
+export interface WiredKafka {
+    readonly brokers: ReadonlyArray<string>
+    /** The prefix of every topic of the repository. */
+    readonly topicPrefix: string
+    /** The stored name of a logical topic. */
+    topic(name: string): string
+}
+
+/** The Keycloak realm of the repository. */
+export interface WiredKeycloak {
+    /** `http://host:port` (through toxiproxy). */
+    readonly baseUrl: string
+    /** The realm name, prefixed per repository. */
+    readonly realm: string
+    /** `<baseUrl>/realms/<realm>`. */
+    readonly issuer: string
+    /** `<issuer>/protocol/openid-connect/token`. */
+    readonly tokenUrl: string
+    /** `<issuer>/protocol/openid-connect/certs`. */
+    readonly jwksUrl: string
+    /** The public client of the realm that allows the password grant. */
+    readonly clientId: string
+}
+
+/** A fake at the network edge as the app is pointed at it. */
+export interface WiredFake {
+    /** The base URL of an HTTP fake (empty for an SMTP fake). */
+    readonly url: string
+    readonly host: string
+    readonly port: number
+    /** What the fake exposes for the app options (`apiKey`, `webhookSecret`, `tmnCode`, ...), by name. */
+    readonly values: Readonly<Record<string, string>>
+    /** Any further endpoint the fake serves (`tokenUrl`, `webhookUrl`, ...), by name. */
+    readonly endpoints: Readonly<Record<string, string>>
+}
+
+/** A sibling service container. */
+export interface WiredService {
+    readonly url: string
+    readonly host: string
+    readonly port: number
+}
+
+/** A real app of this world. */
+export interface WiredApp {
+    /** `http://127.0.0.1:<port>`; reserved before any options are built. */
+    readonly url: string
+    readonly port: number
+}
+
+/** The cluster of the run. */
+export interface WiredCluster {
+    /** Prefix of every namespace the world creates. */
+    readonly namespacePrefix: string
+    /** The local registry as the host reaches it (`localhost:5001`). */
+    readonly registry: string
+    /** Own images built by content hash: logical name to `registry/name:src-<hash>`. */
+    readonly images: Readonly<Record<string, string>>
+}
+
+/** Everything an options builder needs. */
+export interface WorldWiring<TApp extends string = string, TDb extends string = string, TFake extends string = string, TService extends string = string> {
+    /** The run token. */
+    readonly runId: string
+    /** The isolation prefix of this repository checkout (`nivo_backend_a1b2c3`); every database, realm, bucket and namespace derives from it. */
+    readonly namespace: string
+    /** The apps of the world by name (their URL and port). */
+    readonly apps: Readonly<Record<TApp, WiredApp>>
+    /** The databases by connection name. */
+    readonly db: Readonly<Record<TDb, WiredDatabase>>
+    readonly redis: WiredRedis
+    readonly minio: WiredMinio
+    readonly qdrant: WiredQdrant
+    readonly kafka: WiredKafka
+    readonly keycloak: WiredKeycloak
+    /** The fakes by their `fakes` key. */
+    readonly fake: Readonly<Record<TFake, WiredFake>>
+    /** The sibling services by name. */
+    readonly services: Readonly<Record<TService, WiredService>>
+    /** The cluster. */
+    readonly cluster: WiredCluster
+    /** A directory owned by the run (removed by the teardown); `name` distinguishes several. */
+    directory(name: string): string
+    /** A random secret, stable within the run for the same `label` (signing keys, API keys). */
+    secret(label: string): string
+}

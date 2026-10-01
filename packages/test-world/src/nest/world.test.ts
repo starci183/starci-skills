@@ -1,0 +1,292 @@
+import "reflect-metadata"
+import assert from "node:assert/strict"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import test from "node:test"
+import { Controller, Get, Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import type { AnyTestWorldConfig } from "../config/types"
+import { FakesHost } from "../fakes/framework/host"
+import { STATE_FILE_ENV, writeRunContext, removeRunContext } from "../jest/context"
+import type { RunContext } from "../jest/context"
+import { World } from "./world"
+import type { WorldSpec } from "./world-types"
+
+interface ApiOptions {
+    readonly greeting: string
+    readonly workerUrl: string
+}
+
+@Controller()
+class HelloController {
+    static greeting = ""
+    @Get("hello")
+    hello(): { hello: string } {
+        return { hello: HelloController.greeting }
+    }
+}
+
+@Module({})
+class ApiApp {
+    static register(options: ApiOptions): DynamicModule {
+        HelloController.greeting = options.greeting
+        return { module: ApiApp, controllers: [HelloController] }
+    }
+}
+
+@Module({})
+class WorkerApp {
+    static seen: string | null = null
+    static register(options: { readonly peer: string }): DynamicModule {
+        WorkerApp.seen = options.peer
+        return { module: WorkerApp }
+    }
+}
+
+const started: Array<() => Promise<void>> = []
+
+const declaration = (order: Array<string>): AnyTestWorldConfig =>
+    ({
+        stack: ".starcistacks/dev",
+        stacks: {},
+        apps: {
+            api: {
+                module: ApiApp,
+                options: (w: { apps: Record<string, { url: string }>; secret(label: string): string }) => {
+                    order.push("api")
+                    return { greeting: `hi-${w.secret("greeting").slice(0, 4)}`, workerUrl: w.apps["api"]?.url ?? "" }
+                },
+            },
+            worker: {
+                module: WorkerApp,
+                listen: false,
+                options: (w: { apps: Record<string, { url: string }> }) => {
+                    order.push("worker")
+                    return { peer: w.apps["api"]?.url ?? "no-api" }
+                },
+            },
+        },
+        migrate: { module: async () => undefined, options: () => undefined },
+        identity: {
+            signIn: async () => ({ personId: "p1", sessionToken: "s1" }),
+        },
+        logger: ["error"],
+    }) as unknown as AnyTestWorldConfig
+
+const publish = async (): Promise<RunContext> => {
+    const fakes = new FakesHost({}, { runId: "t", secret: (label) => label, now: () => new Date() })
+    const { controlUrl, fakes: entries } = await fakes.start()
+    started.push(() => fakes.close())
+    const context: RunContext = {
+        version: 1,
+        runId: "t",
+        namespace: { snake: "t_000000", kebab: "t-000000", root: "/x" },
+        secretSeed: "seed",
+        infra: { toxiproxyApi: "http://127.0.0.1:1" },
+        fakes: { controlUrl, entries },
+        services: {},
+        directories: { run: mkdtempSync(join(tmpdir(), "tw-world-")) },
+        keepTables: {},
+        root: "/x",
+    }
+    writeRunContext(context)
+    return context
+}
+
+test.afterEach(async () => {
+    removeRunContext()
+    while (started.length > 0) await started.pop()?.()
+})
+
+test("apps boot in declared order, the api port is reserved before any options are built, and a worker has no api", async () => {
+    await publish()
+    const order: Array<string> = []
+    const resets: Array<string> = []
+    const world = new World(declaration(order), { apps: ["worker", "api"] } as WorldSpec, { resetRun: async (context) => void resets.push(context.runId) })
+    await world.start()
+    try {
+        assert.deepEqual(order, ["api", "worker"])
+        assert.deepEqual(resets, ["t"])
+        const { api } = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get<T>(path: string): Promise<{ status: number; body: T }> } }
+        const hello = await api.get<{ hello: string }>("/hello")
+        assert.equal(hello.status, 200)
+        assert.match(hello.body.hello, /^hi-/)
+        assert.equal(WorkerApp.seen, api.baseUrl)
+        assert.throws(() => (world.apps["worker" as keyof typeof world.apps] as { api: unknown }).api, /has no listener/)
+        assert.equal(process.env[STATE_FILE_ENV] !== undefined, true)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("an app the declaration lacks, or the spec did not boot, is a NotDeclared failure", async () => {
+    await publish()
+    const missing = new World(declaration([]), { apps: ["nope"] } as WorldSpec, { resetRun: async () => undefined })
+    await assert.rejects(missing.start(), /TEST_WORLD_NOT_DECLARED.*apps.nope/)
+    const world = new World(declaration([]), { apps: { worker: true } } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        assert.throws(() => (world.apps["api" as keyof typeof world.apps] as { name: string }).name, /apps.api/)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("using the world before it booted names the cause; waitFor and waitUntil poll state", async () => {
+    await publish()
+    const world = new World(declaration([]), { apps: ["api"] } as WorldSpec, { resetRun: async () => undefined })
+    assert.throws(() => world.db, /TEST_WORLD_NOT_BOOTED/)
+    await world.start()
+    try {
+        let counter = 0
+        assert.equal(await world.waitFor("counter reaches 3", async () => (++counter === 3 ? counter : null), { intervalMs: 5 }), 3)
+        assert.equal(await world.waitUntil("counter above 5", async () => ++counter, (value) => value > 5, { intervalMs: 5 }), 6)
+        await assert.rejects(world.waitFor("never", async () => null, { timeoutMs: 40, intervalMs: 5 }), /waiting for never/)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("signedInPerson runs register then signIn of the declared identity and answers a caller of the first listening app", async () => {
+    await publish()
+    const calls: Array<string> = []
+    const config = declaration([])
+    const identity = {
+        emailDomain: "shop.dev",
+        register: async (_world: unknown, credentials: { email: string }) => void calls.push(`register ${credentials.email}`),
+        signIn: async (_world: unknown, credentials: { email: string }) => {
+            calls.push(`signIn ${credentials.email}`)
+            return { personId: "p9", sessionToken: "tok9" }
+        },
+    }
+    const world = new World({ ...config, identity } as unknown as AnyTestWorldConfig, { apps: ["api", "worker"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        const person = await world.signedInPerson("alice")
+        assert.match(person.email, /^alice-.+@shop\.dev$/)
+        assert.equal(person.personId, "p9")
+        assert.equal(person.sessionToken, "tok9")
+        assert.equal(calls.length, 2)
+        assert.equal((await person.caller.get<{ hello: string }>("/hello")).status, 200)
+        assert.equal((await world.signIn("bob@shop.dev", "pw")).sessionToken, "tok9")
+        assert.equal(world.actAs(person) !== undefined, true)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("a modules world without a declared base is a NotDeclared failure", async () => {
+    await publish()
+    const world = new World(declaration([]), { modules: [] } as WorldSpec, { resetRun: async () => undefined })
+    await assert.rejects(world.start(), /modules/)
+})
+
+test("buckets expose the run-isolated bucket with scoped credentials, and a run without minio says so", async () => {
+    const context = await publish()
+    const minioContext: RunContext = {
+        ...context,
+        infra: {
+            toxiproxyApi: "http://127.0.0.1:1",
+            minio: { host: "127.0.0.1", port: 30103, directPort: 55003, proxy: "p", image: "m", container: "c", accessKey: "ak", secretKey: "sk", bucketPrefix: "t-000000-", buckets: { authoring: "t-000000-authoring" } },
+        },
+    }
+    removeRunContext()
+    writeRunContext(minioContext)
+    const world = new World(declaration([]), { apps: ["api"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        assert.deepEqual(world.buckets["authoring"], {
+            endpoint: "http://127.0.0.1:30103",
+            region: "us-east-1",
+            bucket: "t-000000-authoring",
+            accessKeyId: "ak",
+            secretAccessKey: "sk",
+            forcePathStyle: true,
+        })
+    } finally {
+        await world.stop()
+    }
+    removeRunContext()
+    writeRunContext(context)
+    const plain = new World(declaration([]), { apps: ["api"] } as WorldSpec, { resetRun: async () => undefined })
+    await plain.start()
+    try {
+        assert.throws(() => plain.buckets, /stacks.minio/)
+    } finally {
+        await plain.stop()
+    }
+})
+
+test("applicationOrigin answers scheme://host:port of the named or first listening app, and restart boots the app again on the same port with the same builders", async () => {
+    await publish()
+    const order: Array<string> = []
+    const world = new World(declaration(order), { apps: ["api", "worker"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        const handle = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get<T>(p: string): Promise<{ status: number }> }; restart(): Promise<void> }
+        const before = handle.api.baseUrl
+        assert.equal(world.applicationOrigin(), before)
+        assert.equal(world.applicationOrigin("api"), before)
+        assert.throws(() => world.applicationOrigin("worker"), /worker/)
+        await handle.restart()
+        assert.deepEqual(order, ["api", "worker", "api"])
+        const after = world.apps["api" as keyof typeof world.apps] as { api: { baseUrl: string; get<T>(p: string): Promise<{ status: number }> } }
+        assert.equal(after.api.baseUrl, before)
+        assert.equal((await after.api.get("/hello")).status, 200)
+        await assert.rejects(world.restartApp("nope"), /apps.nope/)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("withRequest runs commands, queries and providers in a real request scope that carries the request values", async () => {
+    await publish()
+    const { CommandBus, CommandHandler, CqrsModule, QueryBus, QueryHandler } = await import("@nestjs/cqrs")
+    const { Inject, Injectable, Scope } = await import("@nestjs/common")
+    const { REQUEST } = await import("@nestjs/core")
+
+    class WhoAmI {}
+    class WhichPlan {}
+    @Injectable({ scope: Scope.REQUEST })
+    class Acting {
+        constructor(@Inject(REQUEST) readonly request: { principal?: string; locale?: string; plan?: string }) {}
+    }
+    @CommandHandler(WhoAmI, { scope: Scope.REQUEST })
+    class WhoAmIHandler {
+        constructor(@Inject(REQUEST) private readonly request: { principal?: string; locale?: string }) {}
+        async execute(): Promise<string> {
+            return `${this.request.principal}/${this.request.locale}`
+        }
+    }
+    @QueryHandler(WhichPlan)
+    class WhichPlanHandler {
+        constructor(private readonly acting: Acting) {}
+        async execute(): Promise<string | undefined> {
+            return this.acting.request.plan
+        }
+    }
+    @Module({ imports: [CqrsModule.forRoot()], providers: [Acting, WhoAmIHandler, WhichPlanHandler] })
+    class Capability {}
+
+    const config = {
+        ...declaration([]),
+        modules: { base: () => [] },
+    } as unknown as AnyTestWorldConfig
+    const world = new World(config, { modules: [() => ({ module: Capability })] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        assert.equal(world.commandBus !== undefined && world.queryBus !== undefined, true)
+        const first = await world.withRequest({ principal: "learner-1", locale: "vi", plan: "pro" }, async (scope) => ({
+            who: await scope.commandBus.execute(new WhoAmI()),
+            plan: await scope.queryBus.execute(new WhichPlan()),
+            acting: (await scope.resolve(Acting)).request.principal,
+        }))
+        assert.deepEqual(first, { who: "learner-1/vi", plan: "pro", acting: "learner-1" })
+        const second = await world.withRequest({ principal: "learner-2", locale: "en" }, (scope) => scope.commandBus.execute(new WhoAmI()))
+        assert.equal(second, "learner-2/en")
+        assert.equal(CommandBus !== undefined && QueryBus !== undefined, true)
+    } finally {
+        await world.stop()
+    }
+})
