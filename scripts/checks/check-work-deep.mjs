@@ -284,9 +284,14 @@ function checkTree(workRoot, out, baseline) {
         if (!hit) suspect(indexFile, 'PROOF_FILTER_EMPTY', `${label}: filter "-- ${filter}" matches no spec under be/src/tests`);
       }
     };
-    checkCommand(data.requiresProof?.e2e?.command, indexFile, 'requiresProof.e2e');
+    // Only the commands that must run now are judged: every requiresProof.<kind>.command, and the assertion commands of
+    // evidence that is not `stale: true`. Stale evidence is a true statement about a past moment (work/evidence@1): its
+    // commands are history, never rewritten, and a fresh run replaces them.
+    const proofKinds = data.requiresProof && typeof data.requiresProof === 'object' ? Object.entries(data.requiresProof) : [];
+    for (const [kind, proof] of proofKinds) checkCommand(proof?.command, indexFile, `requiresProof.${kind}`);
     const evEntry = evidenceByRecord.get(id);
-    for (const a of Array.isArray(evEntry?.ev?.assertions) ? evEntry.ev.assertions : []) {
+    const liveAssertions = evEntry?.ev?.stale === true ? [] : evEntry?.ev?.assertions;
+    for (const a of Array.isArray(liveAssertions) ? liveAssertions : []) {
       checkCommand(a?.command, evEntry.file, `assertion ${a?.id ?? '(unnamed)'}`);
     }
 

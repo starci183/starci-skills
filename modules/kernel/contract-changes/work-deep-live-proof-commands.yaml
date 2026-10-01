@@ -1,0 +1,14 @@
+id: work-deep-live-proof-commands
+effectiveAt: '2026-10-02T00:00:00+07:00'
+summary: >-
+  check-work-deep PROOF_COMMAND_DEAD judges only the commands that must run now: every requiresProof.<kind>.command
+  (not only e2e) and the assertion commands of evidence that is not stale: true. Stale evidence is a true statement
+  about a past moment (work/evidence@1); its commands are history and are never refused or rewritten. UAT_RUN_AGING reads
+  the evidence run object (its minted id, the code's commits) instead of joining it as a runs/ directory. npm run check
+  now runs check-work-deep (0 REFUSE on the examples). No code added or removed.
+reach: new-legs
+paths:
+  - scripts/checks/check-work-deep.mjs
+  - tests/check-work-deep.spec.mjs
+  - package.json
+  - modules/kernel/contract-changes/work-deep-live-proof-commands.yaml
