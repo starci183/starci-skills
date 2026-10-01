@@ -7,6 +7,14 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- The orphaned code-pattern checkers are settled. `scripts/checks/code-patterns/` lost its runner when `check-scoped-lint` was removed; the folder, its 8 docs, 11 specs and 24 failure codes are deleted and listed in `modules/kernel/retired-paths.yaml`. The 24 codes went three ways:
+  - 15 were already enforced by a canon rule or an hfs check (R38, R39, R43, R47, R49, R51, R53, R56, R65, R85, R89, R90, R102, base-props-atom);
+  - 2 were contradicted by the convention (import formatting belongs to Prettier; the test-title verb list);
+  - 4 were inexact, deleted with proposals.
+  Three obligations had no enforcer and are ported at error, with specs:
+  - R108 `replacement-throw-carries-cause` (BE);
+  - R109 `require-public-member-jsdoc` (BE, exported classes, interfaces and object types outside the test tiers);
+  - R110 `props-fields-readonly` (FE, deep readonly props).
 - `scripts/checks/failure-codes.mjs` reads a bracketed `UPPER_SNAKE` name as an emitted code only in text: a message prefix such as `[TARGET_MISSING] ...`, a template, a comment or a YAML flow list. In JavaScript, a bracket holding a single identifier is code that reads a constant, and it is found by parsing: an element access (`baseline[MIRROR_CHECK]`, `x?.[KEY]`), an array literal (`[SKILL_ROOT]`) or a computed key (`{ [KEY]: v }`). Removed with it:
   - the stale `TRANSCRIPT_CODE` catalog entry (its emitted value `TRANSCRIPT_MISSING` keeps its entry);
   - 38 `failure-codes.not-codes` entries that existed only to silence those false positives.
