@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../engine/yaml.mjs';
 import {
-  GRAMMAR_FAMILIES,censusGrammar,checkGrammarKnowledge,cssDeclarations,cssReads,lexSource,loadDnaModule,registryNames,replaceBlock,
+  GRAMMAR_FAMILIES,censusGrammar,checkGrammarKnowledge,cssDeclarations,cssReads,lexSource,loadDnaModule,registryNames,replaceBlock,writeGrammarKnowledge,
 } from '../scripts/checks/grammar-knowledge.mjs';
 import {grammarTokenNames} from '../scripts/checks/brand.mjs';
 import {cardClassesOf} from '../scripts/checks/render.mjs';
@@ -89,6 +89,20 @@ test('a snapshot that falls behind the package is reported: renderer, class, tok
   has('common/DNA.yaml','renderers.Toast.classes');
   has('common/DNA.yaml','provenance.version');
   has('index.yaml','topics.common.summary');
+});
+
+test('--write refreshes the stated package version too, so a version bump leaves no drift after the rewrite', async t=>{
+  const dir=copyGrammarRoot(t);
+  const stale=['common/DNA.yaml','starci/DNA.yaml','starci/index.yaml','offset-pop/DNA.yaml','offset-pop/index.yaml'];
+  for(const rel of stale){
+    const file=path.join(dir,...rel.split('/'));
+    fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(/version: "\d+\.\d+\.\d+"/g,'version: "0.0.1"'));
+  }
+  const before=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
+  assert.ok(before.findings.some(f=>f.what==='provenance.version'),'the stale version is drift');
+  await writeGrammarKnowledge({packageRoot,grammarRoot:dir});
+  const after=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
+  assert.deepEqual(after.findings,[]);
 });
 
 test('a package that moves ahead of the snapshot is reported too', async()=>{

@@ -799,11 +799,19 @@ const familyDigestFiles=family=>family.source==='core'
 
 const yamlDigests=digests=>['  digests:',...digests.flatMap(d=>[`    - path: ${q(d.path)}`,`      sha256: ${q(d.sha256)}`])].join('\n');
 
+/** The package version the check compares (provenance.version, identity.version), rewritten where the snapshot states it. */
+function withVersion(text,version){
+  const doc=parseYaml(text)??{};
+  for(const parent of ['provenance','identity'])
+    if(doc[parent]?.version!==undefined)text=replaceBlock(text,'version',`  version: ${q(version)}`,{parent});
+  return text;
+}
+
 export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot}={}){
   const census=await censusGrammar({packageRoot});
   const written=[];
   const commonFile=path.join(grammarRoot,'common','DNA.yaml');
-  let text=read(commonFile).replace(/\r\n/g,'\n');
+  let text=withVersion(read(commonFile).replace(/\r\n/g,'\n'),census.version);
   text=replaceBlock(text,'tokens',yamlCommonTokens(census.commonTokens));
   text=replaceBlock(text,'renderers',yamlRenderers(census.renderers,{closedValues:false}));
   const gaps=(parseYaml(text).gaps??[]).length;
@@ -814,7 +822,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
     const file=path.join(grammarRoot,family.knowledge,'DNA.yaml');
     if(!fs.existsSync(file))continue;
     const measured=census.families[family.knowledge];
-    let doc=read(file).replace(/\r\n/g,'\n');
+    let doc=withVersion(read(file).replace(/\r\n/g,'\n'),census.version);
     doc=replaceBlock(doc,'dna',`dna:\n${yamlObject(measured.dna,2)}`);
     doc=replaceBlock(doc,'tokens',yamlFamilyTokens(measured.tokens));
     doc=replaceBlock(doc,'renderers',yamlRenderers(census.renderers,{closedValues:true}));
@@ -823,6 +831,11 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
       claimEntries:census.counts.claimEntries,gaps:familyGaps},4)}`,{parent:'identity'});
     doc=replaceBlock(doc,'digests',yamlDigests(censusDigests(packageRoot,familyDigestFiles(family))),{parent:'provenance'});
     fs.writeFileSync(file,doc);written.push(`${family.knowledge}/DNA.yaml`);
+    const index=path.join(grammarRoot,family.knowledge,'index.yaml');
+    if(fs.existsSync(index)){
+      const before=read(index).replace(/\r\n/g,'\n'),after=withVersion(before,census.version);
+      if(after!==before){fs.writeFileSync(index,after);written.push(`${family.knowledge}/index.yaml`);}
+    }
   }
   return {written,census};
 }
