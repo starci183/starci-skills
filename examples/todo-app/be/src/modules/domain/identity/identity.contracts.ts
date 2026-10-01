@@ -47,6 +47,8 @@ export interface OpenSessionParams {
     readonly manager: EntityManager
     /** The person signing in. */
     readonly personId: string
+    /** The refresh token of the provider session the sign-in opened. */
+    readonly providerRefreshToken: string
     /** The instant of the sign-in. */
     readonly at: Date
 }

@@ -1,5 +1,5 @@
 /** Log events of the keycloak integration. */
 export enum KeycloakLogEvent {
-    /** The best-effort sign-out notice to the provider failed; the local session was already revoked. */
+    /** Ending the provider session at sign-out failed (the realm was unreachable); the local session was already revoked. */
     SignOutNotifyFailed = "keycloak.sign-out-notify.failed",
 }

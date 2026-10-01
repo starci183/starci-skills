@@ -5,7 +5,7 @@ import { KeycloakError, KeycloakErrorCode } from "./errors/keycloak.error"
 import type { KeycloakSignIn, KeycloakSignInParams, KeycloakSignOutParams } from "./keycloak.contracts"
 import { InjectKeycloakOptions } from "./keycloak.decorators"
 import type { KeycloakOptions } from "./keycloak.options"
-import { readSubject } from "./keycloak-token.policy"
+import { readRefreshToken, readSubject } from "./keycloak-token.policy"
 
 type Call = Parameters<HttpClient["request"]>[0]
 type Answer = Awaited<ReturnType<HttpClient["request"]>>
@@ -35,20 +35,26 @@ export class KeycloakClient {
             },
             timeoutMs: this.options.timeoutMs,
         })
-        const subject = response.status >= 200 && response.status < 300 ? readSubject(response.body) : null
-        if (subject === null) throw new KeycloakError({ code: KeycloakErrorCode.InvalidCredentials })
-        return { subject }
+        const granted = response.status >= 200 && response.status < 300
+        const subject = granted ? readSubject(response.body) : null
+        const refreshToken = granted ? readRefreshToken(response.body) : null
+        if (subject === null || refreshToken === null) {
+            throw new KeycloakError({ code: KeycloakErrorCode.InvalidCredentials })
+        }
+        return { subject, refreshToken }
     }
 
     /**
-     * Tells the provider a session ended, so a revoked local session leaves no stale provider-side grant. An error
-     * answer of the provider is ignored; only a call that cannot complete fails, with a KeycloakError.
+     * Ends the provider session a sign-in opened, so a revoked local session leaves no live grant at the realm: the
+     * OpenID Connect logout endpoint of the realm (beside its token endpoint) with the client id and the session's
+     * refresh token, form-encoded. A refusal of the provider (the session already ended there) is not an error; only a
+     * call that cannot complete fails, with a KeycloakError.
      */
     async notifySignOut(params: KeycloakSignOutParams): Promise<void> {
         await this.send({
             method: "POST",
-            url: this.options.tokenUrl,
-            body: { action: "sign-out", personId: params.personId },
+            url: new URL("logout", this.options.tokenUrl).toString(),
+            form: { client_id: this.options.clientId, refresh_token: params.refreshToken },
             timeoutMs: this.options.timeoutMs,
         })
     }

@@ -18,4 +18,8 @@ export class SessionEntity {
     /** When the session lapses. */
     @Column({ name: "expires_at", type: "timestamptz" })
     expiresAt!: Date
+
+    /** The refresh token of the identity provider session the sign-in opened; sign-out ends that session with it. */
+    @Column({ name: "provider_refresh_token", type: "text" })
+    providerRefreshToken!: string
 }

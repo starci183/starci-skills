@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   issued_at timestamptz NOT NULL,
   expires_at timestamptz NOT NULL
 );
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS provider_refresh_token text NOT NULL;
 CREATE INDEX IF NOT EXISTS sessions_person_id_idx ON sessions (person_id);
 
 CREATE TABLE IF NOT EXISTS tasks (

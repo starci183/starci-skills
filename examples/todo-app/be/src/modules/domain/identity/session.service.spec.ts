@@ -100,7 +100,7 @@ describe("SessionService", () => {
             const { service, keycloak, transaction, outbox } = await build(
                 mockEntityManager({ save: [SessionEntity, LIVE] }),
             )
-            keycloak.signIn.mockResolvedValue({ subject: "p1" })
+            keycloak.signIn.mockResolvedValue({ subject: "p1", refreshToken: "r1" })
 
             await expect(service.signIn(signInInput())).resolves.toSucceedWith({
                 sessionToken: "t1",
@@ -117,6 +117,7 @@ describe("SessionService", () => {
                         {
                             token: "00000000-0000-4000-8000-000000000001",
                             personId: "p1",
+                            providerRefreshToken: "r1",
                             issuedAt: AT,
                             expiresAt: new Date("2026-10-02T10:00:00.000Z"),
                         },
@@ -170,7 +171,7 @@ describe("SessionService", () => {
             expect(keycloak.notifySignOut).not.toHaveBeenCalled()
         })
 
-        it("revokes the session with its audit line in one transaction, then tells the provider", async () => {
+        it("revokes the session with its audit line in one transaction, then ends the provider session with its refresh token", async () => {
             const { service, keycloak, transaction, outbox, logger } = await build(
                 mockEntityManager({
                     findOneBy: [SessionEntity, LIVE],
@@ -192,7 +193,7 @@ describe("SessionService", () => {
                     availableAt: AT,
                 },
             ])
-            expect(keycloak.notifySignOut).toHaveBeenCalledWith({ personId: "p1" })
+            expect(keycloak.notifySignOut).toHaveBeenCalledWith({ refreshToken: "r1" })
             expect(logger.error).not.toHaveBeenCalled()
         })
 
@@ -214,6 +215,12 @@ describe("SessionService", () => {
     })
 
     describe("find", () => {
+        it("refuses an unknown token", async () => {
+            const { service } = await build(mockEntityManager({ findOneBy: [SessionEntity, null] }))
+
+            await expect(service.find(findSessionInput())).resolves.toBeRefused(IdentityErrorCode.NotFound)
+        })
+
         it("answers the view of a live session", async () => {
             const { service } = await build(mockEntityManager({ findOneBy: [SessionEntity, LIVE] }))
 

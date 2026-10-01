@@ -10,10 +10,12 @@ export interface KeycloakSignInParams {
 export interface KeycloakSignIn {
     /** The stable subject id of the person, read from the access token. */
     readonly subject: string
+    /** The refresh token of the provider session the grant opened: what ends that session at sign-out. */
+    readonly refreshToken: string
 }
 
-/** What the sign-out notice takes. */
+/** What ending the provider session takes. */
 export interface KeycloakSignOutParams {
-    /** The person whose session was revoked. */
-    readonly personId: string
+    /** The refresh token the sign-in grant returned for the session. */
+    readonly refreshToken: string
 }

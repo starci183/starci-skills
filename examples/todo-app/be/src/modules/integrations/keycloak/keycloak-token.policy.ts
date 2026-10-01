@@ -13,6 +13,10 @@ export const readSubject = (body: unknown): string | null => {
     return isRecord(claims) && typeof claims.sub === "string" && claims.sub !== "" ? claims.sub : null
 }
 
+/** The refresh token of a token response, or null when the body carries none. */
+export const readRefreshToken = (body: unknown): string | null =>
+    isRecord(body) && typeof body.refresh_token === "string" && body.refresh_token !== "" ? body.refresh_token : null
+
 /** What a payload segment decodes to: the claims, or the cause when the segment is not base64url JSON. */
 interface ParsedClaims {
     readonly claims: unknown

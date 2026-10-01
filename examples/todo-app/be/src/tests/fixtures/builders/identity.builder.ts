@@ -7,6 +7,7 @@ export interface SessionRow {
     personId: string
     issuedAt: Date
     expiresAt: Date
+    providerRefreshToken: string
 }
 
 /** The instant the identity specs treat as now. */
@@ -18,6 +19,7 @@ export const sessionRow = builder<SessionRow>({
     personId: "p1",
     issuedAt: new Date("2026-09-29T10:00:00.000Z"),
     expiresAt: new Date("2026-10-01T10:00:00.000Z"),
+    providerRefreshToken: "r1",
 })
 
 /** A stored session that lapses exactly at `IDENTITY_NOW`, which counts as lapsed. */
@@ -26,6 +28,7 @@ export const lapsedSessionRow = builder<SessionRow>({
     personId: "p1",
     issuedAt: new Date("2026-09-29T10:00:00.000Z"),
     expiresAt: new Date(IDENTITY_NOW),
+    providerRefreshToken: "r1",
 })
 
 /** A valid credential pair. */

@@ -71,15 +71,18 @@ export class SessionService {
         const { email, password } = params
         if (!isPlausibleEmail(email)) return refused(IdentityErrorCode.InvalidCredentials)
         let personId: string
+        let providerRefreshToken: string
         try {
-            personId = (await this.keycloak.signIn({ email, password })).subject
+            const granted = await this.keycloak.signIn({ email, password })
+            personId = granted.subject
+            providerRefreshToken = granted.refreshToken
         } catch (error) {
             if (error instanceof KeycloakError) return refused(REFUSAL_OF[error.code])
             throw error
         }
         const at = this.clock.now()
         const session = await this.entityManager.transaction(async (manager) => {
-            const opened = await this.open({ manager, personId, at })
+            const opened = await this.open({ manager, personId, providerRefreshToken, at })
             await this.outbox.enqueue(
                 manager,
                 toAuditAppendMessage({
@@ -97,15 +100,15 @@ export class SessionService {
 
     /**
      * Ends the session behind the presented token. The session row is revoked together with the audit message, in one
-     * transaction; the identity provider is told afterwards, outside the transaction, and a failure of that notice is
-     * only logged: the local revoke already happened and must not be undone by it.
+     * transaction; the provider session it opened is ended afterwards with its stored refresh token, outside the
+     * transaction, and a failure of that call is only logged: the local revoke already happened and must not be undone.
      */
     async signOut(params: SignOutParams): Promise<SignOutOutcome> {
         const token = params.sessionToken
         const at = this.clock.now()
-        const found = await this.find({ token, at })
+        const found = await this.liveRow({ token, at })
         if (found.kind === "refused") return found
-        const { personId } = found.value
+        const { personId, providerRefreshToken } = found.value
         await this.entityManager.transaction(async (manager) => {
             await this.revoke({ manager, token })
             await this.outbox.enqueue(
@@ -120,7 +123,7 @@ export class SessionService {
             )
         })
         try {
-            await this.keycloak.notifySignOut({ personId })
+            await this.keycloak.notifySignOut({ refreshToken: providerRefreshToken })
         } catch (error) {
             this.logger.error(KeycloakLogEvent.SignOutNotifyFailed, error)
         }
@@ -133,6 +136,7 @@ export class SessionService {
         const saved = await params.manager.save(SessionEntity, {
             token: this.ids.next(),
             personId: params.personId,
+            providerRefreshToken: params.providerRefreshToken,
             issuedAt: params.at,
             expiresAt,
         })
@@ -146,11 +150,19 @@ export class SessionService {
     async find(
         params: FindSessionParams,
     ): Promise<Outcome<SessionView, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>> {
+        const found = await this.liveRow(params)
+        return found.kind === "refused" ? found : ok(toSessionView(found.value))
+    }
+
+    /** The stored row of the live session behind a token, refused as `find` refuses it. */
+    private async liveRow(
+        params: FindSessionParams,
+    ): Promise<Outcome<SessionEntity, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>> {
         if (!params.token) return refused(IdentityErrorCode.NotFound, { reason: "missing-token" })
         const row = await this.entityManager.findOneBy(SessionEntity, { token: params.token })
         if (!row) return refused(IdentityErrorCode.NotFound)
         if (row.expiresAt.getTime() <= params.at.getTime()) return refused(IdentityErrorCode.Expired)
-        return ok(toSessionView(row))
+        return ok(row)
     }
 
     /** Ends a session outright. */
