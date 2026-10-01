@@ -119,9 +119,13 @@ describe("upload journey (e2e)", () => {
         expect(strangerDelete.errorCode).toBe(UploadErrorCode.Forbidden)
 
         // The direct intake answers the same ready record in one step.
-        const direct = await caller.post<UploadEntry>("/uploads?filename=direct.txt", Buffer.from("direct bytes", "utf8"), {
-            headers: { "content-type": "text/plain" },
-        })
+        const direct = await caller.post<UploadEntry>(
+            "/uploads?filename=direct.txt",
+            Buffer.from("direct bytes", "utf8"),
+            {
+                headers: { "content-type": "text/plain" },
+            },
+        )
         expect(direct.status).toBe(201)
         expect(direct.body.status).toBe("ready")
         expect(direct.body.filename).toBe("direct.txt")
