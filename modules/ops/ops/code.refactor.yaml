@@ -533,13 +533,6 @@ policy:
           features: [features/pages, features/layouts, features/overlays]
           components: [components/blocks, components/composites, components/branches, components/leaves, features/pages, features/layouts, features/overlays]
     sharedRoots: []
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    reuseAuthorization: true
-    noChange: return-existing-verified-commit-no-empty-commit
   qualityPolicy:
     owner: code.refactor
     checks: [sonar]

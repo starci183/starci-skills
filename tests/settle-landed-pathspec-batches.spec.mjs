@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { foreignLandedPaths, ownedPathEffects } from '../scripts/kernel/settle-landed.mjs';
+import { ownedPathEffects } from '../scripts/kernel/settle-landed.mjs';
 import { writeJobPatch } from '../scripts/kernel/job-artifacts.mjs';
 
 const git = (root, ...args) => {
@@ -27,14 +27,6 @@ const fixture = (t, count) => {
   git(root, 'commit', '--quiet', '-m', 'owned and foreign files');
   return { root, specs, head: git(root, 'rev-parse', 'HEAD') };
 };
-
-for (const count of [2, 1601]) {
-  test(`foreignLandedPaths finds a foreign file across ${count} owned pathspecs`, (t) => {
-    const { root, specs, head } = fixture(t, count);
-    const found = foreignLandedPaths({ root, specs, head, sinceMs: 0, timeoutMs: 120_000 });
-    assert.deepEqual(found, { commits: [{ sha: head, foreign: ['foreign.txt'] }] });
-  });
-}
 
 test('dead-worker effects and job patch cover a large owned set', (t) => {
   const { root, specs, head } = fixture(t, 1601);

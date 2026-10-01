@@ -102,12 +102,12 @@ proofs:
     requirement:
       en: Exactly the selected mode contract and all requested criteria pass with real evidence before
         delivery.
-  - id: landed
+  - id: checkpointed
     requirement:
-      en: Every Work record file this operation wrote under its owned paths is committed with exact
-        pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
-        refuses not-landed while one of them is untracked or dirty; authored Work never settles
-        outside the repository history.
+      en: Every Work record file this operation wrote under its owned paths is committed by the runtime
+        as its workflow's checkpoint when the operation settles green (scripts/kernel/workflow-checkpoint.mjs
+        checkpointOp). The operation never commits and changes nothing outside its owned paths; settle
+        refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: worktree-api
     requirement:
       en: "The evidence names the worktree API call behind every worktree the op inspected or retired (the registry row or the removeWorktree result) and the worker-start id behind every agent it launched; a raw git worktree, a recursive delete or a raw agent terminal makes the run a defect."
@@ -129,12 +129,6 @@ placeholders:
 layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
 policy:
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    noChange: return-existing-verified-commit-no-empty-commit
   cutSetAuthority:
     scope: workspace-manage-prepare-import
     appliesWhen: The dispatch packet carries context.cut {id, ordinal, total} with total >= 2 for the

@@ -61,6 +61,8 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
 import { recordWhy } from './why-record.mjs';
+import { gateBaseOf } from './workflow-checkpoint.mjs';
+import { workflowWorktreeOf } from './workflow-worktree.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
@@ -70,21 +72,13 @@ import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs'
 import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
-import { opCommitPolicyOf } from './op-prompt.mjs';
-import {
-  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, integratedProof, landedProof, ownedPathEffects,
-  ownedPathsDirty, policyCommits, policyPushes,
-} from './settle-landed.mjs';
-import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
+import { ownedPathEffects } from './settle-landed.mjs';
 import { lineageJobsOf } from './owner-answers.mjs';
-import { OWNER_CLAIM_UNPROVEN, resolutionClaimOf, resolutionOf } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
-import { integrateOp } from './product-worktree.mjs';
-import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
@@ -106,7 +100,7 @@ import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, 
 import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workflowRunIdsOf } from './api-lib/messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
-import { slash, pathKey } from '../lib/path-key.mjs';
+import { slash } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { releaseSettledSession } from './op-session.mjs';
@@ -306,18 +300,14 @@ const usage = (code) => {
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job>] [--reopen <reason>] [--derived-from <jobs>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--new-module <repository-relative dir>,...]   the grant creates these module roots (else every granted directory must already exist)
-           [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
-  enqueue  --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
-           one commit-only attempt for all of this op's attributed Work debt (or a finished workflow's, adopted)
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]]
+  reconcile --job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
   reconcile --orca-tasks [--workflow <id>] [--dry-run]           re-bind the Run to the live Kernel, close open Tasks no live job holds
-  reconcile --work-debt [--workflow <id>]                        settled authoring legs' uncommitted Work + the commit-only enqueue for each
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
@@ -330,7 +320,7 @@ const usage = (code) => {
   foundations [--workflow <id>]   the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
   foundation --workflow <id> (--claim <name> [--kind <k>] [--version <v>] | --declare-dependent <name> | --land <name> --proof <text> [--version <v>] [--refs <csv>] | --declare-none) [--detail <s>]
   record-change --workflow <id> --record <.starciwork path> --reach <follow-up|advisory> --reason <text>   the record's OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory
-  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <path>[,<path>][,incident:<id>]]
+  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
@@ -373,8 +363,8 @@ const parseArgs = (argv) => {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
-    // reconcile --dead-worker --no-salvage, reconcile --debris [--commit]: boolean flags of this lane.
-    if (['--no-salvage', '--debris', '--commit'].includes(k)) { a[k.slice(2)] = true; continue; }
+    // reconcile --dead-worker --no-salvage: a boolean flag of this lane.
+    if (k === '--no-salvage') { a[k.slice(2)] = true; continue; }
     // Typed release conditions repeat and collect in order as [type, spec] (gate-conditions.mjs). A bare
     // --until-message keeps its peer-wait meaning (any next message from --peer); with a value it is
     // the typed condition.
@@ -386,7 +376,7 @@ const parseArgs = (argv) => {
     }
     if (API_EXT.flags.has(k.slice(2))) { a[k.slice(2)] = true; continue; }   // scripts/kernel/api-extensions.mjs
     const name = k.slice(2);
-    if (['json', 'spawn', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -1019,8 +1009,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // enqueued it (intake legs) or already moved past it. Nor is a pending row whose own --after chain
   // reaches this job — the Kernel declared that order explicitly, so it overrides the plan. A leg the
   // plan edges do not lead from never holds it.
-  // Nor does a commit-only adoption, or a job whose own wait's typed conditions name this one
-  // (scripts/kernel/leg-order.mjs legOrderExemption).
+  // Nor does a job whose own wait's typed conditions name this one (scripts/kernel/leg-order.mjs legOrderExemption).
   // With a work graph, a business or architecture leg is held only by an ancestor of the same phase in a domain it shares.
   const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.includes(opId) && DOMAIN_PARALLEL_OPS.includes(row.op_id)
     && disjointDomains(workGraph.graph, payload.owned_paths, jobPayloadOf(row).owned_paths);
@@ -1996,7 +1985,6 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     records: payload.records ?? [],
     owned_paths: packetOwnedPaths(payload, placements),
     ...(payload.cut ? { cut: payload.cut } : {}),
-    ...(payload.commitOnly ? { commit_only: payload.commitOnly } : {}),
     ...(payload.title ? { title: payload.title } : {}),
     ...(payload.risk ? { risk: payload.risk } : {}),
     // The asks this job's retry lineage already had answered (scripts/kernel/owner-answers.mjs):
@@ -3511,180 +3499,7 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
 // is named, never closed here (resume-all's dedupe owns stray terminals).
-// Work-debt keys: one spelling per file across checkouts, case-folded where Windows paths are.
-const workKey = (abs) => pathKey(abs);
 const workflowFinished = (db, workflowId) => { const wf = getWorkflow(db, workflowId); return !wf || wf.phase === 'finished' || !!wf.archived_at; };
-const liveWorkflowIds = (db) => db.prepare('SELECT workflow_id FROM workflows ORDER BY created_at').all().map((row) => row.workflow_id).filter((id) => !workflowFinished(db, id));
-const placementKey = (p) => workKey(path.resolve(p.base, String(p.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
-// A workflow's Work scope, as keys: the owned paths of its op jobs (every status but cancelled), each
-// widened to the Work directory it sits in - .starciwork/features/<feature>, or .starciwork/<area> such
-// as shell/ or brand/ - since a workflow that authors in a feature owns that feature's records.
-// Kernel custody and per-workflow evidence are never widened.
-const WORK_DIR_RX = /^(.*\/\.starciwork\/(?:features\/[^/]+|(?!features\/|evidence\/|kernel-)[^/]+))(?:\/|$)/;
-function workflowScopeOf(db, repo, workflowId, cache = new Map()) {
-  if (cache.has(workflowId)) return cache.get(workflowId);
-  const keys = [];
-  for (const job of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op' AND status<>'cancelled'`).all(workflowId)) {
-    let placements = [];
-    try { placements = jobPlacements(db, job, repo); } catch { continue; }
-    for (const p of placements) {
-      if (p.unresolved) continue;
-      const key = placementKey(p).replace(/\/+$/, '');
-      keys.push(key);
-      const work = WORK_DIR_RX.exec(key);
-      if (work) keys.push(work[1]);
-    }
-  }
-  cache.set(workflowId, keys);
-  return keys;
-}
-const scopeCovers = (scope, key) => scope.some((prefix) => key === prefix || key.startsWith(`${prefix}/`));
-
-// The Work debt of settled legs of the ops that now commit (contract change authoring-ops-commit-work).
-// Every uncommitted file under the owned paths of any succeeded job of those ops, in any workflow, is
-// attributed to the job that WROTE it, not to whichever job's owned directory holds it: first the job
-// whose filed report lists the file (`files`), else the job whose run window (dispatch -> report, 5s
-// before / 60s after) holds the file's mtime, newest first; a file neither names is the newest covering
-// job's when every covering job's workflow is finished or archived (`cover`), else `unattributed`,
-// listed apart with its live owners and never batched. A file a live or succeeded commit-only attempt owns is pending that
-// repair, not owed. Debts are per job and checkout, then filtered to `workflow` / `op`; paths,
-// spelled (as --paths takes them) and keys run in parallel.
-function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
-  const change = changeById(loadContractChanges(skillRoot), WORK_COMMIT_CHANGE);
-  const governed = change?.ops ?? [];
-  const jobs = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status='succeeded' ORDER BY updated_at DESC`).all().filter((job) => governed.includes(jobOpOf(job)));
-  const files = new Map(), placementsOf = new Map(), unreadable = [];
-  for (const job of jobs) {
-    let placements;
-    try { placements = jobPlacements(db, job, repo); } catch (error) { unreadable.push({ jobId: job.job_id, error: String(error?.message ?? error) }); continue; }
-    placementsOf.set(job.job_id, placements);
-    const found = ownedPathsDirty({ placements });
-    if (found.error) { unreadable.push({ jobId: job.job_id, repo: found.repo ?? null, error: found.error }); continue; }
-    for (const { repo: root, role, dirty } of found.repos) {
-      for (const file of dirty) {
-        // kernel custody (kernel-evidence, -strays, -approvals) is the kernel's own, never an op's Work debt
-        if (/(^|\/)\.starciwork\/kernel-(evidence|strays|approvals)(\/|$)/.test(slash(file))) continue;
-        const abs = path.join(root, file), key = workKey(abs);
-        if (!files.has(key)) files.set(key, { root, file, role, abs, covering: [] });
-        files.get(key).covering.push(job);
-      }
-    }
-  }
-  const repaired = new Map();
-  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status NOT IN ('failed','awaiting_owner','cancelled')`).all()) {
-    if (!jobPayloadOf(row).commitOnly) continue;
-    let placements = [];
-    try { placements = jobPlacements(db, row, repo); } catch { continue; }
-    for (const p of placements) if (!p.unresolved) repaired.set(placementKey(p), row.job_id);
-  }
-  const evidence = new Map();
-  const evidenceOf = (job) => {
-    if (evidence.has(job.job_id)) return evidence.get(job.job_id);
-    const report = latestReportOf(db, job.job_id);
-    const listed = parseJson(report?.report_json)?.files;
-    const bases = [...new Set([repo, contractWorktreeOf(db, job, repo), ...(placementsOf.get(job.job_id) ?? []).map((p) => p.base)].filter(Boolean))];
-    const named = new Set((Array.isArray(listed) ? listed : []).filter((f) => typeof f === 'string' && f.trim())
-      .flatMap((f) => (path.isAbsolute(f) ? [workKey(f)] : bases.map((base) => workKey(path.resolve(base, f))))));
-    const start = admittedContractOf(db, job).at;
-    const end = Number(report?.created_at ?? jobPayloadOf(job).settledAt ?? job.updated_at);
-    const out = { named, start, end };
-    evidence.set(job.job_id, out);
-    return out;
-  };
-  const byOwner = new Map(), unattributed = [], finished = new Map();
-  const isFinished = (id) => { if (!finished.has(id)) finished.set(id, workflowFinished(db, id)); return finished.get(id); };
-  for (const [key, entry] of files) {
-    const covers = [...new Set(entry.covering.map((job) => job.workflow_id))];
-    const liveCovers = covers.filter((id) => !isFinished(id));
-    let owner = entry.covering.find((job) => evidenceOf(job).named.has(key)), via = 'report';
-    if (!owner) {
-      via = 'window';
-      let mtime = null;
-      try { mtime = fs.statSync(entry.abs).mtimeMs; } catch { /* deleted: only a report can name it */ }
-      owner = mtime == null ? null : entry.covering.find((job) => {
-        const { start, end } = evidenceOf(job);
-        return Number.isFinite(start) && Number.isFinite(end) && mtime >= start - 5_000 && mtime <= end + 60_000;
-      });
-    }
-    // Neither names it, but every job that covers it belongs to a finished or archived workflow: no
-    // live workflow can still claim it, so it is that finished debt (the newest covering job's),
-    // adoptable (--adopt-from any covering workflow) instead of stranded (inc-6262420b8467).
-    if (!owner && !liveCovers.length) { owner = entry.covering[0]; via = 'cover'; }
-    if (!owner) {
-      unattributed.push({ repo: entry.root, file: entry.file, coveredBy: entry.covering.map((job) => job.job_id), workflows: covers, liveOwners: liveCovers });
-      continue;
-    }
-    const id = `${owner.job_id}\0${entry.root}`;
-    if (!byOwner.has(id)) {
-      byOwner.set(id, { workflowId: owner.workflow_id, workflowFinished: isFinished(owner.workflow_id), jobId: owner.job_id, op: jobOpOf(owner), attempt: tryOf(owner),
-        repo: entry.root, role: entry.role, paths: [], spelled: [], keys: [], covers: [], pending: [], attributedBy: { report: 0, window: 0 }, repairPending: null });
-    }
-    const debt = byOwner.get(id);
-    debt.attributedBy[via] = (debt.attributedBy[via] ?? 0) + 1;
-    if (repaired.has(key)) { debt.pending.push(entry.file); debt.repairPending ??= repaired.get(key); continue; }
-    debt.paths.push(entry.file);
-    debt.spelled.push(path.resolve(entry.root) === path.resolve(repo) ? entry.file : slash(entry.abs));
-    debt.keys.push(key);
-    debt.covers.push({ workflows: covers, live: liveCovers });
-  }
-  const debts = [...byOwner.values()].filter((debt) => (!workflow || debt.workflowId === workflow) && (!op || debt.op === op));
-  return { change: change ? WORK_COMMIT_CHANGE : null, ops: governed, debts,
-    unattributed: unattributed.filter((item) => !workflow || item.workflows.includes(workflow)), unreadable };
-}
-
-// api reconcile --work-debt [--workflow <id>]: workDebtOf above, read-only. A live workflow repairs its own
-// debt: `batches`, ONE commit-only attempt per workflow and op (api enqueue --commit-only-work-debt). A
-// finished workflow cannot enqueue, so its debt is adopted: `adoptions` names, per finished workflow and
-// op, each live workflow whose Work scope covers some of it (--adopt-from <finished>; a file a live
-// workflow's job still covers is `held` by it, never adopted) and, for paths no
-// live scope covers, the repo owner (--as-repo-owner; named when the ledger has one live workflow).
-// Unattributed files are listed apart and never batched (driver-loop.yaml tick, landed debt).
-function reconcileWorkDebt(ledger, args, repo) {
-  const db = ledger.db, only = args.workflow ?? null;
-  const { change, ops, debts: all, unattributed, unreadable } = workDebtOf(db, repo, {});
-  const apiCmd = `node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} enqueue --repo ${repo}`;
-  const shown = ({ spelled, keys, covers, ...debt }) => ({ ...debt,
-    enqueue: !debt.workflowFinished && debt.paths.length ? `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --paths ${spelled.join(',')} --commit-only-of ${debt.jobId}` : null });
-  const debts = all.filter((debt) => !only || debt.workflowId === only).map(shown);
-  const owed = debts.filter((debt) => debt.paths.length);
-  const batches = [];
-  for (const debt of owed.filter((d) => !d.workflowFinished)) {
-    let batch = batches.find((b) => b.workflowId === debt.workflowId && b.op === debt.op);
-    if (!batch) batches.push(batch = { workflowId: debt.workflowId, op: debt.op, jobs: [], files: 0, enqueue: `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --commit-only-work-debt` });
-    batch.jobs.push(debt.jobId);
-    batch.files += debt.paths.length;
-  }
-  const live = liveWorkflowIds(db), scopes = new Map(), groups = [];
-  for (const debt of all.filter((d) => d.workflowFinished && d.paths.length)) {
-    let group = groups.find((g) => g.from === debt.workflowId && g.op === debt.op);
-    if (!group) groups.push(group = { from: debt.workflowId, op: debt.op, jobs: [], keys: [], held: [] });
-    group.jobs.push(debt.jobId);
-    debt.keys.forEach((key, i) => {
-      if (debt.covers[i].live.length) group.held.push({ file: debt.paths[i], liveOwners: debt.covers[i].live });
-      else group.keys.push(key);
-    });
-  }
-  const adoptions = [];
-  for (const { from, op, jobs, keys, held } of groups) {
-    const candidates = live.map((id) => ({ workflowId: id, covers: keys.filter((key) => scopeCovers(workflowScopeOf(db, repo, id, scopes), key)).length }))
-      .filter((c) => c.covers > 0).map((c) => ({ ...c, enqueue: `${apiCmd} --workflow ${c.workflowId} --op ${op} --commit-only-work-debt --adopt-from ${from}` }));
-    const uncovered = keys.filter((key) => !live.some((id) => scopeCovers(workflowScopeOf(db, repo, id, scopes), key))).length;
-    const owner = uncovered && live.length === 1 ? live[0] : null;
-    const repoOwner = uncovered ? { workflowId: owner, files: uncovered, enqueue: `${apiCmd} --workflow ${owner ?? '<live-workflow>'} --op ${op} --commit-only-work-debt --adopt-from ${from} --as-repo-owner` } : null;
-    const mine = only ? candidates.filter((c) => c.workflowId === only) : candidates;
-    if (only && !mine.length && repoOwner?.workflowId !== only && !held.some((h) => h.liveOwners.includes(only))) continue;
-    adoptions.push({ from, op, jobs: [...new Set(jobs)], files: keys.length, candidates: mine, uncovered, repoOwner: only && repoOwner?.workflowId !== only ? null : repoOwner, held });
-  }
-  const out = { ok: true, change, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), batches, adoptions, unattributed, unreadable };
-  const lines = debts.map((debt) => `${debt.jobId} (${debt.op}${debt.workflowFinished ? ', finished workflow' : ''}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.pending.length ? `; ${debt.pending.length} pending repair ${debt.repairPending}` : ''}`);
-  if (batches.length) lines.push('repair, one commit-only attempt per workflow and op:', ...batches.map((b) => `  ${b.op}: ${b.jobs.length} job(s), ${b.files} file(s)\n    ${b.enqueue}`));
-  if (adoptions.length) lines.push('adopt finished workflows\' debt:', ...adoptions.flatMap((a) => [`  ${a.from} ${a.op}: ${a.files} file(s)`,
-    ...a.candidates.map((c) => `    ${c.workflowId} covers ${c.covers}: ${c.enqueue}`), ...(a.repoOwner ? [`    repo owner, ${a.repoOwner.files} uncovered: ${a.repoOwner.enqueue}`] : []),
-    ...(a.held.length ? [`    ${a.held.length} held by live covering workflow(s) ${[...new Set(a.held.flatMap((h) => h.liveOwners))].join(', ')}, not adoptable`] : [])]));
-  if (unattributed.length) lines.push(`${unattributed.length} uncommitted file(s) no job's report or run window attributes - never batched`);
-  emit(out, lines.length ? lines.join('\n') : `no Work debt: every settled ${ops.join('|') || '(no registered op)'} leg's owned paths are committed`, args.json);
-}
-
 function reconcileOrphanKernelJobs(ledger, args) {
   const db = ledger.db, now = Date.now();
   const rows = db.prepare(`SELECT j.job_id,j.workflow_id,j.status,j.worker_id,j.try_no AS attempt,j.generation,j.payload_json,w.phase,w.archived_at
@@ -3812,84 +3627,8 @@ function reconcileOrcaTasks(ledger, args) {
   if (!out.ok) process.exitCode = 1;
 }
 
-// `reconcile --job <id> --debris [--commit]`: the sanctioned path for the debris a job found in its owned
-// paths - files written before its admission that its report does not name (settle-landed.mjs landedProof
-// debris), which settle no longer waits on. Read-only by default: each file classed `proof` (a report, an
-// evidence/asset/run payload or an operations record under .starciwork - kept, never deleted) or `source`
-// (anything else: a lineage's uncommitted code, listed for its owner and never committed here). --commit
-// commits the proof files, per checkout, in chunks of DEBRIS_COMMIT_CHUNK through a pathspec list file
-// (git commit --pathspec-from-file: only those paths, hooks on), and records one debris-committed event per
-// commit. nivo workspace-provision's DEFERRED SETTLE gates (inc-a158db5dc9b7: 687 predecessor files) waited
-// on exactly this, with no one but the owner to do it.
-const DEBRIS_COMMIT_CHUNK = 200;
-const PROOF_SEGMENT = /^(?:evidence|assets|runs|observed|captures|kernel-reports)$/;
-const debrisClassOf = (rel) => {
-  const parts = slash(rel).split('/');
-  const at = parts.indexOf('.starciwork');
-  if (at < 0) return 'source';
-  const inWork = parts.slice(at + 1);
-  if (/^report(?:\.[\w.-]+)?\.json$/.test(inWork.at(-1) ?? '')) return 'proof';
-  if (inWork.slice(0, -1).some((seg) => PROOF_SEGMENT.test(seg))) return 'proof';
-  if (inWork[0] === 'features' && inWork[2] === 'operations') return 'proof';
-  return 'source';
-};
-function reconcileDebris(ledger, args, job, repo) {
-  const db = ledger.db, jobId = job.job_id;
-  const placements = jobPlacements(db, job, repo);
-  const admittedAt = admittedContractOf(db, job).at;
-  if (!Number.isFinite(admittedAt)) throw Object.assign(new Error(`job ${jobId} has no admission time; debris is what predates it`), { code: 'debris-unadmitted' });
-  const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
-  const files = parseJson(row?.report_json ?? '')?.files;
-  const bases = [...new Set([repo, ...placements.filter((p) => !p.unresolved).map((p) => p.base)])];
-  const own = (Array.isArray(files) ? files : []).filter((f) => typeof f === 'string' && f.trim()).flatMap((f) => (path.isAbsolute(f) ? [f] : bases.map((b) => path.resolve(b, f))));
-  const proof = landedProof({ placements, head: null, pushes: false, exclude: filedReportPathsOf(db, job.workflow_id, null), debris: { sinceMs: admittedAt, own } });
-  const repos = (proof.detail?.repos ?? []).filter((r) => r.debris?.length).map((r) => ({ repo: r.repo,
-    proof: r.debris.filter((f) => debrisClassOf(f) === 'proof'), source: r.debris.filter((f) => debrisClassOf(f) === 'source') }));
-  const commits = [];
-  if (args.commit) {
-    for (const r of repos) {
-      for (let i = 0; i < r.proof.length; i += DEBRIS_COMMIT_CHUNK) {
-        const chunk = r.proof.slice(i, i + DEBRIS_COMMIT_CHUNK);
-        const list = path.join(os.tmpdir(), `starci-debris-${jobId}-${process.pid}-${i}.txt`);
-        fs.writeFileSync(list, `${chunk.join('\n')}\n`, 'utf8');
-        try {
-          const timeout = allocationMs('settleGit.commandMs') * 4;
-          const add = gitResult(['add', `--pathspec-from-file=${list}`], { dir: r.repo, timeout });
-          if (!add.ok) { commits.push({ repo: r.repo, files: chunk.length, ok: false, step: 'add', error: add.error.slice(0, 400) }); break; }
-          const message = `chore(work-debt): commit ${chunk.length} debris proof file(s) found in ${jobId}'s owned paths\n\nWritten before the job's admission and named by no report of it (${job.workflow_id}); kept as proof, never deleted.\napi reconcile --job ${jobId} --debris --commit`;
-          const commit = gitResult(['commit', '-m', message, `--pathspec-from-file=${list}`], { dir: r.repo, timeout });
-          if (!commit.ok) { commits.push({ repo: r.repo, files: chunk.length, ok: false, step: 'commit', error: commit.error.slice(0, 400) }); break; }
-          const sha = gitResult(['rev-parse', 'HEAD'], { dir: r.repo }).stdout.trim();
-          commits.push({ repo: r.repo, files: chunk.length, ok: true, sha });
-          ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'debris-committed',
-            payload: { repo: r.repo, sha, files: chunk.length, sample: chunk.slice(0, 10) } });
-        } finally { try { fs.rmSync(list, { force: true }); } catch { /* temp list */ } }
-      }
-    }
-  }
-  const counts = repos.reduce((acc, r) => ({ proof: acc.proof + r.proof.length, source: acc.source + r.source.length }), { proof: 0, source: 0 });
-  const out = { ok: commits.every((c) => c.ok), jobId, workflowId: job.workflow_id, admittedAt, debris: proof.detail?.debrisCount ?? 0, ...counts,
-    repos: repos.map((r) => ({ repo: r.repo, proof: r.proof.slice(0, 50), proofCount: r.proof.length, source: r.source.slice(0, 50), sourceCount: r.source.length })),
-    ...(args.commit ? { commits } : { next: counts.proof ? `api reconcile --job ${jobId} --debris --commit commits the ${counts.proof} proof file(s)` : null }),
-    stillDirty: proof.detail?.dirty?.length ?? 0 };
-  emit(out, `debris in ${jobId}'s owned paths: ${counts.proof} proof, ${counts.source} source (${out.stillDirty} other dirty file(s) are the job's own)`
-    + `${args.commit ? `; committed ${commits.filter((c) => c.ok).reduce((n, c) => n + c.files, 0)} in ${commits.filter((c) => c.ok).length} commit(s)${commits.some((c) => !c.ok) ? `; FAILED: ${commits.filter((c) => !c.ok).map((c) => `${c.step} ${c.error}`).join('; ')}` : ''}` : ''}`
-    + `${counts.source ? `; source debris (never committed here, its lineage owns it): ${repos.flatMap((r) => r.source).slice(0, 8).join(', ')}` : ''}`, args.json);
-  if (!out.ok) process.exit(1);
-}
-
 // Ambiguous state remains fenced and requires owner/runtime intervention.
 /* ------------------------------------------------------ settle helpers */
-// The op manifest's policy.commitPolicy — null for an unknown op or one that
-// declares none. api report and api settle read it the same way.
-const opCommitPolicy = (op) => opCommitPolicyOf({ skillRoot, op });
-// The commitPolicy a job owes: its op's, unless the op gained it with a registered change after the
-// job was admitted (authoring-ops-commit-work, reach new-legs) - then the job reports and settles
-// on the contract it was admitted under (scripts/kernel/settle-landed.mjs admittedCommitPolicy).
-const jobCommitPolicy = (db, job) => admittedCommitPolicy({
-  policy: opCommitPolicy(jobOpOf(job)), op: jobOpOf(job), admittedAt: admittedContractOf(db, job).at, registry: loadContractChanges(skillRoot),
-});
-
 // A job's owned paths resolved per target repository, against the dispatch
 // contract's worktree (where the worker was placed) when it recorded one.
 const contractWorktreeOf = (db, job, repo) => {
@@ -3916,167 +3655,11 @@ function reportOwnedPaths(db, job, repo) {
   return [...new Set([...declared, ...resolved])];
 }
 
-// The landed proof a pass owes when the op's commitPolicy commits
-// (scripts/kernel/settle-landed.mjs). Null — settle as before — when there is
-// nothing to prove yet: an unknown or inactive job and a pass without a filed
-// done report are refused by the settle transaction itself, and an op without
-// a committing commitPolicy never commits. Each owned path resolves against
-// its own repository (jobPlacements above; order in
-// scripts/kernel/target-repo.mjs ownedPathPlacements) and the proof runs per
-// repository; a job whose owned paths sit in no git checkout returns
-// {checked:false}.
-// The repository push gate a landed pass also owes (scripts/kernel/push-gate.mjs): the lint the
-// target repository's .husky/pre-push (else its lint:check script) runs, over the files this job
-// changed in each checkout the landed proof read. A leg admitted before settle-push-gate-lint took
-// effect settles on the contract it was admitted under (modules/kernel/contract-changes.yaml,
-// reach new-legs). {detail} to record, or {refused, hint}.
-function settlePushGate(db, job, landed, envelope, pushes) {
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), PUSH_GATE_CHANGE);
-  if (admittedBeforeChange(admitted, change)) {
-    return { detail: { skipped: 'admitted-before-change', change: PUSH_GATE_CHANGE, admittedAt: admitted.at } };
-  }
-  const reportFiles = Array.isArray(envelope?.files) ? envelope.files : [];
-  const repos = [];
-  for (const { repo: root, paths } of landed.repos ?? []) {
-    const proof = pushGateProof({ root, specs: paths, reportFiles, sinceMs: admitted.at, timeoutMs: allocationMs('pushGate.lintMs'), commandMs: allocationMs('settleGit.commandMs') });
-    if (proof.checked && !proof.ok) {
-      const hint = proof.reason === 'push-gate-red'
-        ? `Re-dispatch the owning slice to fix the findings in detail.pushGate (the repository's own push-gate lint, ${proof.detail.source}) in its own files - properly, never by disabling a rule - and commit them${pushes ? ' and push' : ''}`
-        : `Make the repository's declared push-gate lint runnable in ${root} (detail.pushGate.error), then re-run the settle; a gate that cannot answer never passes`;
-      return { refused: proof, hint };
-    }
-    repos.push(proof.checked ? proof.detail : { repo: root, skipped: proof.why });
-  }
-  return { detail: { repos } };
-}
-
-// Every report file an op of this workflow filed (report-filed events): an op's
-// own evidence/<attempt>/report.json is written after its head commit and is
-// never what makes its owned paths dirty (scripts/kernel/settle-landed.mjs exclude).
-const filedReportPathsOf = (db, workflowId, extra = null) => {
-  const paths = db.prepare("SELECT json_extract(payload_json,'$.report') AS report FROM events WHERE workflow_id=? AND kind='report-filed'")
-    .all(workflowId).map((row) => row.report).filter((p) => typeof p === 'string' && p);
-  return [...new Set([...paths, ...(extra ? [extra] : [])])];
-};
-// The foreign-path half of the landed proof applies to legs admitted under the
-// shared-checkout change; an older leg settles as it was admitted.
-const SHARED_CHECKOUT_CHANGE = 'shared-checkout-guard';
-// --accept-foreign <path>[,<path>][,incident:<id>]: a path outside the job's owned paths is accepted
-// only on proof its owner confirmed or reverted it - a `foreign-file-committed` incident on this
-// workflow that is resolved and whose text names every accepted path (guards G20; the refusal hint
-// below instructs raising it with api incident). The incident:<id> token carries the proof, the rest
-// are paths; an accepted path with no proven incident settles as an ordinary foreign path and refuses.
-const foreignAcceptProof = (db, workflowId, accept) => {
-  const paths = [], incidentIds = [];
-  for (const item of accept) {
-    const match = /^incident:(\S+)$/.exec(item);
-    (match ? incidentIds : paths).push(match ? match[1] : item);
-  }
-  if (!paths.length) return { paths, unproven: null };
-  if (!incidentIds.length) return { paths, unproven: { reason: 'no incident named', detail: 'an accepted foreign path names the resolved foreign-file-committed incident that proves it: --accept-foreign <path>,incident:<id>' } };
-  const unproven = { paths: [], incidents: [] };
-  for (const incidentId of incidentIds) {
-    const row = db.prepare('SELECT status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(incidentId, workflowId);
-    if (!row) { unproven.incidents.push({ incidentId, reason: 'not on this workflow' }); continue; }
-    if (!String(row.last_progress ?? '').startsWith('[foreign-file-committed]')) { unproven.incidents.push({ incidentId, reason: `kind is not foreign-file-committed (${String(row.last_progress ?? '').slice(0, 80)})` }); continue; }
-    if (row.status !== 'resolved') { unproven.incidents.push({ incidentId, reason: `still ${row.status}; the owner confirms or reverts the files, then api incident --resolve` }); continue; }
-    // A resolution that says the owner confirmed, with no verified owner answer behind it, proves nothing
-    // (scripts/kernel/owner-claim.mjs; nivo inc-2474f6593dfe "Owner confirmed: ..." with no owner answer).
-    const claim = resolutionClaimOf(db, resolutionOf(db, workflowId, incidentId));
-    if (claim.unproven) { unproven.incidents.push({ incidentId, reason: `${OWNER_CLAIM_UNPROVEN}: its resolution claims "${claim.claim}" but ${claim.reason}` }); continue; }
-    unproven.paths.push(...paths.filter((p) => !asciiName(row.last_progress ?? '').replace(/\\/g, '/').toLowerCase().includes(asciiName(p).replace(/\\/g, '/').toLowerCase()))
-      .map((pathNotNamed) => ({ path: pathNotNamed, incidentId, reason: 'the incident does not name this path' })));
-  }
-  return { paths, unproven: (unproven.paths.length || unproven.incidents.length) ? unproven : null };
-};
-const foreignPathCheckOf = (db, job, accept = []) => {
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), SHARED_CHECKOUT_CHANGE);
-  if (!change || !Number.isFinite(admitted.at) || admittedBeforeChange(admitted, change)) return null;
-  const { paths, unproven } = foreignAcceptProof(db, job.workflow_id, accept);
-  return { sinceMs: admitted.at, accept: paths, unproven };
-};
 /** The job's OWN product worktree record (payload.productWorktree), never a retry's copy of its predecessor's. */
 const ownProductWorktreeOf = (job) => {
   const rec = jobPayloadOf(job)?.productWorktree;
   return rec?.op?.path && rec?.op?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
 };
-function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const op = jobOpOf(job);
-  const policy = jobCommitPolicy(db, job);
-  if (!policyCommits(policy)) return null;
-  const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
-  // reportText is the one guarded read cmdSettle already made: the file is never re-read here (G26).
-  const envelope = row ? parseJson(row.report_json) : (reportText !== null ? parseJson(reportText) : null);
-  if (envelope?.outcome !== 'done') return null;
-  const pushes = policyPushes(policy);
-  const placements = jobPlacements(db, job, repo);
-  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then the runtime lands it into main
-  // below (rebase, land gate, fast-forward, push); the op itself never pushes.
-  const productRec = ownProductWorktreeOf(job);
-  const foreign = foreignPathCheckOf(db, job, acceptForeign);
-  if (foreign?.unproven) {
-    return { checked: true, ok: false, reason: 'foreign-accept-unproven', detail: { accept: foreign.accept, unproven: foreign.unproven },
-      hint: `An accepted foreign path needs proof its owner confirmed or reverted it: raise api incident --kind foreign-file-committed naming the files, resolve it once the owner has, then settle with --accept-foreign <path>,incident:<incidentId>`,
-      op, status: job.status, pushes };
-  }
-  // Debris the job found in its owned paths (written before its admission, not in its report) never holds
-  // its settle (settle-landed.mjs landedProof debris): DEFERRED SETTLE gates waited on predecessors' files.
-  const admittedAt = admittedContractOf(db, job).at;
-  const reportBases = [...new Set([repo, ...placements.filter((p) => !p.unresolved).map((p) => p.base)])];
-  const ownFiles = (Array.isArray(envelope.files) ? envelope.files : []).filter((f) => typeof f === 'string' && f.trim())
-    .flatMap((f) => (path.isAbsolute(f) ? [f] : reportBases.map((b) => path.resolve(b, f))));
-  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes: productRec ? false : pushes,
-    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign,
-    // A commit-only attempt exists to commit exactly such files: for it they are never debris.
-    debris: Number.isFinite(admittedAt) && !jobPayloadOf(job).commitOnly ? { sinceMs: admittedAt, own: ownFiles } : null });
-  if (!proof.checked || !proof.ok) {
-    const hint = proof.reason === 'foreign-paths'
-      ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>,incident:<incidentId>`
-      : undefined;
-    return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
-  }
-  // The land into main runs last (settleProductLand, from api settle once every other settle refusal passed): a settle
-  // refused after main moved would leave main ahead of a job that never settled.
-  if (productRec) return { ...proof, op, status: job.status, pushes, productLand: { record: productRec, head: envelope?.head ?? null, checks: envelope?.checks ?? [] } };
-  const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
-  if (gate.refused) {
-    return { checked: true, ok: false, reason: gate.refused.reason, detail: { ...proof.detail, pushGate: gate.refused.detail }, hint: gate.hint, op, status: job.status, pushes };
-  }
-  return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
-}
-
-const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
-/**
- * The land of an isolated op (DESIGN §16.7) into its repository's main, the LAST step of a pass settle: api settle calls it
- * after every other settle refusal passed. Settle passes only once the op's commits are IN main: rebased onto main's tip
- * (conflict -> files + hunks), gated (scripts/checks/gate.mjs on exactly what lands), main fast-forwarded and pushed
- * (product-worktree.mjs integrateOp). {ok, integration} | {ok:false, reason, integration, hint}
- */
-function settleProductLand(landed) {
-  const { record, head } = landed.productLand;
-  const main = record.main ?? 'main';
-  // Only a check the op itself declared GREEN is re-run before the land: the pre-land verify asks whether main's tip under
-  // the op broke something. A check already red on the op's base was judged by the settle that got here.
-  const declared = (Array.isArray(landed.productLand.checks) ? landed.productLand.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')) && c?.exitCode === 0);
-  const recheck = (checks, { cwd, timeoutMs }) => checks.flatMap((c) => {
-    const cls = settlerClassifyCheck(c, { skillRoot });
-    if (cls.kind !== 'runtime') return [];
-    const r = settlerRerunCheck(cls, { repo: cwd, timeoutMs });
-    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, status: r.output?.slice?.status ?? r.output?.status ?? null, tail: r.tail, ms: r.ms }];
-  });
-  const integration = integrateOp({ record, head, checks: declared, recheck });
-  if (!integration.ok) return { ok: false, reason: integration.reason, integration, hint: integration.hint ?? `the op's commits do not land into ${main}` };
-  const inBranch = integratedProof({ root: record.repoRoot, head: integration.after, branch: main, base: record.baseSha ?? null });
-  if (!inBranch.ok) return { ok: false, reason: inBranch.reason, integration: { ...integration, inBranch } };
-  return { ok: true, integration: { repoRoot: record.repoRoot, branch: main, inBranch: inBranch.via, before: integration.before, after: integration.after, head: integration.after,
-    already: Boolean(integration.already), commits: (integration.map ?? []).length, changed: (integration.changed ?? []).length, gate: integration.gate ?? null, push: integration.push ?? null,
-    ...(integration.depsChanged ? { depsChanged: integration.depsChanged } : {}) } };
-}
-
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
@@ -4130,21 +3713,21 @@ async function settleOpGate(db, jobId, repo) {
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
   const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
-  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo] });
+  // A workflow-worktree op is gated against its workflow's previous checkpoint (op-gate-base-mismatch otherwise).
+  const wfCtx = { db, env: process.env };
+  const expectedBase = workflowWorktreeOf(wfCtx, job.workflow_id) ? gateBaseOf(wfCtx, job.workflow_id) : null;
+  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo], expectedBase });
   return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
 }
 // The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):
 // the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
 // gate and defect classes, the release proof. The runtime re-reads each attached document itself. Read-only here - api settle
 // records the judgment. A leg admitted before the op-mechanism-proofs change settles on its old contract. Null when the op owes
-// no proof for its mode, and for a commit-only repair leg.
+// no proof for its mode.
 async function settleOpProofs(db, jobId, repo) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
-  // A commit-only repair leg (payload.commitOnly, reconcile --work-debt) only commits Work an earlier leg wrote: it decides and
-  // authors nothing, so it owes no mechanism proof of its own.
-  if (jobPayloadOf(job).commitOnly) return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), OP_PROOF_CHANGE);
   if (admittedBeforeChange(admitted, change)) return null;
@@ -4678,15 +4261,14 @@ const API_INTERNALS = Object.freeze({
   stagedInputEvidenceOf, livenessMsOf, ACTIVE_STALE_MS, workerOutageEvidence, recordWorkerOutageEvidence,
   LAUNCH_GRACE_MS, workerCardOf, GATE_ANSWERED_EVENT, runningOpRevDriftOf,
   workerInputRowText, INPUT_ROW_PLACEHOLDER, runtimeOwnedInput, TERMINAL_NOT_WRITABLE, UNWRITABLE_EVENT,
-  requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf, jobCommitPolicy,
+  requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf,
   handoverProofGate, reportFiledWake, releaseWorkerOnReport,
   isCheckResultEnvelope, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck,
   summarizeCheckEvidence,
   normalizeProviderId, providerQuotaProbeCommand, providerRecoverCommand,
   currentCredentialOf,
   accountsOnceOf: () => accountsOnce,
-  refuseDecisionsFirst, goalLegOf, workflowFinished, workDebtOf, workflowScopeOf,
-  liveWorkflowIds, scopeCovers,
+  refuseDecisionsFirst, goalLegOf, workflowFinished,
   ACTIONABLE_FRONTIER_STATES, CUT_SET_CLOSING_CHECK, DEAD_WORKER_LIVENESS, LEG_IN_FLIGHT, NEXT_ACTION_MOVES,
   QUEUED_BECAUSE, approvedLegOps, askFormAlive, cutSeamViewOf, cutSetStateOf, graphProjectionOf,
   heldSettleText, nextActionLabel, opRevDriftOf, poolLoadOf, queuedBecauseOf, recordDependencies,
@@ -4698,14 +4280,14 @@ const API_INTERNALS = Object.freeze({
   lineageRouteAdjust, accountList, probeQuotaSafe,
   configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf,
   isFanOutSlice, selectPool, blockingViewOf, parseYaml, fs, path,
-  reconcileOrphanKernelJobs, reconcileOrcaTasks, reconcileWorkDebt,
-  reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker, reconcileDebris,
+  reconcileOrphanKernelJobs, reconcileOrcaTasks,
+  reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker,
   cleanupManagedWorker,
   releaseManagedWorker, closeOperationTask, custodyOf, quitWorkerTerminal,
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleOpProofs, settleProductLand, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

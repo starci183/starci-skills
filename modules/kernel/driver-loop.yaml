@@ -458,20 +458,13 @@ tick:
       `peerDrift` and `sourceDrift` are advisory and never redone
       (sharedWorkRecords, contractRollout).
       An op `ask` or `blocked` that names another slice's owned paths (files
-      it may not commit), and an `api settle` refused `not-landed`, is
-      resolved by re-dispatching the owning slice to commit its own paths
-      (and push, when its policy pushes) as a new attempt of that op and cut
-      ordinal, never by leaving the asker waiting. An `api settle` refused
-      `push-gate-red` (the job's changed files break the repository's own
-      pre-push lint, landed.pushGate) is resolved the same way: the owning
-      slice is re-dispatched to fix those findings in its own files, never by
-      disabling a rule, and commit them. Landed debt - Work a settled
-      authoring leg left untracked or dirty, which `api reconcile --work-debt`
-      lists per job - is repaired by running each printed batch enqueue: ONE
-      commit-only attempt per workflow and op on exactly the union of those
-      paths (--commit-only-work-debt), dispatched, checked and settled like any leg
-      (the landed proof), never by the Kernel committing itself and never by
-      re-authoring the records. A job whose owned paths or
+      it may not write) is resolved by re-dispatching the owning slice as a new
+      attempt of that op and cut ordinal, never by leaving the asker waiting.
+      An `api settle` refused `workflow-foreign-change` or
+      `workflow-foreign-commit` is settled fail or blocked (its work is
+      preserved and reset) and re-dispatched; no op and no Kernel ever commits
+      by hand - the runtime commits each green op's owned paths as the
+      workflow's checkpoint. A job whose owned paths or
       repository name the wrong target is settled fail or blocked with that
       reason and re-enqueued with the right --paths/--repository
       (api.yaml commands.enqueue), never fixed by editing its payload — a
@@ -896,8 +889,8 @@ tick:
         starci validate) and reads the
         worker's committed evidence files. It never runs a script that writes
         into the worker's owned paths (postcondition, regression-inventory or
-        any evidence generator); a write there dirties the owned evidence and
-        the settle lands as not-landed.
+        any evidence generator); a write there changes the owned evidence the
+        op's checkpoint commits.
       durableHalf: >-
         The settle is a ledger transaction: the durable job completes, the
         consumed report stands integrated, its machine lease refs release

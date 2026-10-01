@@ -30,8 +30,7 @@ export default {
       const owedBefore = contractFollowUpsOf(db, workflowId, registry, { released }).owed;
       const after = new Map([...released, ...covered.map((c) => [c.id, now])]);
       const owedAfter = contractFollowUpsOf(db, workflowId, registry, { released: after }).owed;
-      const queued = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY created_at,job_id`).all(workflowId, family)
-        .filter((job) => !jobPayloadOf(job).commitOnly);
+      const queued = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY created_at,job_id`).all(workflowId, family);
       // Never-dispatched duplicates: same cut group and owned paths; the newest stays, an older one nothing waits on goes.
       const keyOf = (job) => { const p = jobPayloadOf(job); return JSON.stringify([p.cut ? [p.cut.id, p.cut.ordinal] : null, [...(p.owned_paths ?? [])].sort()]); };
       const newestByKey = new Map(queued.map((job) => [keyOf(job), job]));

@@ -22,12 +22,11 @@ import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../spec-
 
 export default {
   verb: 'enqueue',
-  required: (args) => ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])],
+  required: ['workflow', 'op', 'paths'],
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { refuseDecisionsFirst, refuseStaleKernelRev, goalLegOf, workflowFinished, workDebtOf,
-      workflowScopeOf, liveWorkflowIds, scopeCovers, foundationDutyOf,
+    const { refuseDecisionsFirst, refuseStaleKernelRev, goalLegOf, foundationDutyOf,
       AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, FINAL_SETTLED, skillRoot } = internals;
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   refuseDecisionsFirst(db, workflowId, 'enqueue', { now, resolves: args.resolves ?? null, repo });
@@ -73,65 +72,6 @@ export default {
     process.exit(1);
   }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
-  // --commit-only-work-debt: ONE commit-only attempt of this op covering the union of the exact paths
-  // its settled legs in this workflow wrote and left uncommitted (api reconcile --work-debt batches), so a
-  // workflow repairs its debt in one attempt per op. With --adopt-from <finished workflow> it adopts that
-  // workflow's debt instead - every file it wrote or its jobs cover while no live workflow's job still
-  // covers it (those are named in `held`, never taken) - only the paths this workflow's Work scope
-  // covers, plus, with --as-repo-owner, the paths no other live workflow's scope covers.
-  let commitOnlyBatch = null;
-  if (args['as-repo-owner'] && args['adopt-from'] == null) throw Object.assign(new Error('--as-repo-owner goes with --commit-only-work-debt --adopt-from <finished workflow>'), { code: 'commit-only-conflict' });
-  if (args['adopt-from'] != null && !args['commit-only-work-debt']) throw Object.assign(new Error('--adopt-from goes with --commit-only-work-debt'), { code: 'commit-only-conflict' });
-  if (args['commit-only-work-debt']) {
-    if (args.paths != null || args['commit-only-of'] != null) throw Object.assign(new Error('--commit-only-work-debt derives --paths and the repaired jobs itself; pass neither --paths nor --commit-only-of'), { code: 'commit-only-conflict' });
-    const from = args['adopt-from'] != null ? String(args['adopt-from']).trim() : null;
-    if (from) {
-      if (from === workflowId || !getWorkflow(db, from)) throw Object.assign(new Error(`--adopt-from ${from} names no other workflow of this ledger`), { code: 'adopt-from-invalid' });
-      if (!workflowFinished(db, from)) throw Object.assign(new Error(`--adopt-from ${from} is live; a live workflow repairs its own Work debt`), { code: 'adopt-from-live' });
-    }
-    const found = workDebtOf(db, repo, { workflow: from ? null : workflowId, op: args.op });
-    let owed = found.debts.filter((debt) => debt.paths.length);
-    let outOfScope = 0;
-    const held = [];
-    if (from) {
-      // A file is from's to hand over when from wrote it or one of its jobs covers it, and adoptable
-      // only while every workflow covering it is finished or archived; one a live workflow (other than
-      // the adopter) still covers stays with that workflow and is named in `held`, never taken.
-      const scopes = new Map(), own = workflowScopeOf(db, repo, workflowId, scopes);
-      const others = liveWorkflowIds(db).filter((id) => id !== workflowId).map((id) => workflowScopeOf(db, repo, id, scopes));
-      owed = owed.filter((debt) => debt.workflowId !== workflowId).map((debt) => {
-        const keep = debt.keys.map((key, i) => {
-          const covers = debt.covers[i];
-          if (debt.workflowId !== from && !covers.workflows.includes(from)) return false;
-          const live = [...new Set([...(debt.workflowFinished ? [] : [debt.workflowId]), ...covers.live])].filter((id) => id !== workflowId);
-          if (live.length) { held.push({ file: debt.paths[i], liveOwners: live }); return false; }
-          const inScope = scopeCovers(own, key) || (args['as-repo-owner'] && !others.some((scope) => scopeCovers(scope, key)));
-          if (!inScope) outOfScope += 1;
-          return inScope;
-        });
-        return { ...debt, paths: debt.paths.filter((_, i) => keep[i]), spelled: debt.spelled.filter((_, i) => keep[i]) };
-      }).filter((debt) => debt.paths.length);
-      for (const item of found.unattributed) {
-        const live = item.liveOwners.filter((id) => id !== workflowId);
-        if (item.workflows.includes(from) && live.length) held.push({ file: item.file, liveOwners: live });
-      }
-    }
-    const heldBy = [...new Set(held.flatMap((h) => h.liveOwners))];
-    if (!owed.length) {
-      const reason = from ? (held.length && !outOfScope ? 'adopt-held-live' : 'adopt-out-of-scope') : 'no-work-debt';
-      const detail = reason === 'adopt-held-live'
-        ? `every ${args.op} Work debt of ${from} is still covered by live workflow(s) ${heldBy.join(', ')} and stays with them (${held.map((h) => h.file).join(', ')})`
-        : from
-        ? `none of ${from}'s ${args.op} Work debt lies in ${workflowId}'s Work scope${args['as-repo-owner'] ? ' or outside every other live workflow\'s' : ''} (${outOfScope} path(s) out of scope${held.length ? `; ${held.length} held by live ${heldBy.join(', ')}` : ''}; api reconcile --work-debt adoptions)`
-        : `no settled ${args.op} job of ${workflowId} has attributed uncommitted Work without a pending repair (api reconcile --work-debt)`;
-      const out = { ok: false, workflowId, op: args.op, reason, detail, ...(held.length ? { held } : {}) };
-      emit(out, `enqueue REFUSED for ${args.op}: ${reason} — ${detail}`, args.json);
-      process.exit(1);
-    }
-    args.paths = [...new Set(owed.flatMap((debt) => debt.spelled))].join(',');
-    commitOnlyBatch = { of: [...new Set(owed.map((debt) => debt.jobId))], batch: 'work-debt',
-      ...(from ? { adoptedFrom: from, ...(args['as-repo-owner'] ? { asRepoOwner: true } : {}), outOfScope, ...(held.length ? { held } : {}) } : {}) };
-  }
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
   // tell the worker "(per brief write-ceiling)" and nothing would fence it.
@@ -147,8 +87,7 @@ export default {
   }
   // An authoring op goes only onto the Work families its manifest writes (scripts/kernel/write-families.mjs):
   // business.decide onto integration/, impl/ or src/ was an LLM attempt spent to report blocked authority.
-  // A commit-only attempt authors nothing and commits settled output wherever it lies.
-  if (!commitOnlyBatch && args['commit-only-of'] == null) {
+  {
     const familyGuard = familyGuardOf(brief);
     const wrongFamily = familyViolations(familyGuard, ownedPaths);
     if (wrongFamily.length) {
@@ -186,9 +125,9 @@ export default {
     process.exit(1);
   }
   // A grant the worker could never satisfy (its directory does not exist in the target repository) is refused here,
-  // unless it is an explicit --new-module grant (scripts/kernel/grant-parents.mjs). A commit-only attempt authors nothing.
+  // unless it is an explicit --new-module grant (scripts/kernel/grant-parents.mjs).
   const newModules = [...new Set(String(args['new-module'] ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
-  if (!commitOnlyBatch && args['commit-only-of'] == null) {
+  {
     const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo });
     if (!grant.ok) {
       const out = { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
@@ -245,19 +184,6 @@ export default {
     if (!source) throw Object.assign(new Error(`--follow-up-of ${args['follow-up-of'] ?? '(missing)'} is not a job of ${workflowId}`), { code: 'follow-up-of-unknown' });
     contractChange = { id: change.id, followUpOf: source.job_id };
   }
-  // --commit-only-of <job>: a commit-only attempt for Work a settled leg of the same op wrote and never
-  // committed (api reconcile --work-debt lists them with their exact paths).
-  let commitOnly = commitOnlyBatch;
-  if (args['commit-only-of'] != null) {
-    const ids = [...new Set(String(args['commit-only-of']).split(',').map((id) => id.trim()).filter(Boolean))];
-    if (!ids.length) throw Object.assign(new Error('--commit-only-of names no job'), { code: 'commit-only-of-unknown' });
-    for (const id of ids) {
-      const source = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=? AND workflow_id=?').get(id, workflowId);
-      if (!source) throw Object.assign(new Error(`--commit-only-of ${id} is not a job of ${workflowId}`), { code: 'commit-only-of-unknown' });
-      if (source.op_id !== args.op || source.status !== 'succeeded') throw Object.assign(new Error(`--commit-only-of ${source.job_id} is a ${source.status} ${source.op_id} job; a commit-only attempt commits what succeeded jobs of the same op (${args.op}) wrote`), { code: 'commit-only-of-invalid' });
-    }
-    commitOnly = { of: ids.length === 1 ? ids[0] : ids };
-  }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
@@ -283,7 +209,6 @@ export default {
       ...(after.length ? { after } : {}),
       ...(foundationLeg ? { foundation: foundationLeg } : {}),
       ...(contractChange ? { contractChange } : {}),
-      ...(commitOnly ? { commitOnly } : {}),
       ...(canonPlan ? { canonPlan } : {}),
       // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
       ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length ? { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) } : {}),

@@ -10,7 +10,7 @@ contract-release:
     contract-release event {family, batch, changes[], by, reason, runtimeSha, owedBefore, owedAfter, restamped[],
     dropped[]} (entity contract/<family>). After it a new leg carries the released changes (dispatch withholds
     only still-frozen ones: contracts.context_json.contract.withheld) and a leg that does not carry them owes ONE
-    follow-up for the whole set (status contractFollowUps, alsoCovers). Every queued non-commit-only leg of the
+    follow-up for the whole set (status contractFollowUps, alsoCovers). Every queued leg of the
     family op is re-stamped payload.contractRelease {family, changes, at, event} - it is admitted under the
     released set at dispatch, so it is the redo; an older never-dispatched duplicate of it (same cut group and
     owned paths, no live job --after it) is cancelled {verdict: dropped, reason: superseded-by-contract-release}

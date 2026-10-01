@@ -1,7 +1,7 @@
 // op-prompt.mjs — the one [Op] prompt builder for every dispatch path (OPS-07).
 // api.mjs dispatch and scripts/route/dispatch-op.mjs's dry-run/spawn preview render the same
 // contract text from the same packet shape, so the preview can never drift from the prompt a real
-// worker receives (shared-checkout rules, commit policy, report filing and questions used to exist
+// worker receives (shared-checkout rules, report filing and questions used to exist
 // only in api.mjs's private copy).
 
 import fs from 'node:fs';
@@ -12,8 +12,6 @@ import { sha256 } from '../../engine/digest.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from './owner-answers.mjs';
-import { commitPolicyOf, policyCommits } from './settle-landed.mjs';
-import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
@@ -26,12 +24,6 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 // checkout, rooted at its own checkout otherwise.
 export const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
   ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
-
-// The commitPolicy an op's brief declares (modules/ops/ops/<op>.yaml). An unreadable brief means no
-// policy - the same fallback dispatch and settle already use.
-export const opCommitPolicyOf = ({ skillRoot, op }) => {
-  try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
-};
 
 // Whether the op's brief (its manifest text) names `needle`: a machine line is printed only for the ops
 // whose contract uses it. An unreadable brief names nothing.
@@ -53,7 +45,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 }
 
 // A long owned-path list rides in a file, never inline: the prompt is the Orca task-create --spec argv,
-// and Windows caps a command line at 32,767 characters. nivo workspace-provision's commit-only adoption
+// and Windows caps a command line at 32,767 characters. nivo workspace-provision's leg
 // of 993 frozen paths (op-business.decide-cc63d20d87) failed task-create with spawnSync ENAMETOOLONG on
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
@@ -173,12 +165,11 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
   ...seamPromptLines({ cut: packet.context.cut, jobLabel, api: path.join(skillRoot, 'scripts', 'kernel', 'api.mjs'), repoLabel }),
   ...cutManifestPromptLines(packet.context.cut?.manifest),
-  ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
+  ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit it in the checkout that holds it`] : []),
   ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId, scratchDir }),
   `   only owned_paths may be modified; anything else is out of scope.`,
-  `shared_checkout: other workflows edit, build and commit in this same checkout and branch while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
-  `  never git reset/rebase/commit --amend/stash/clean -f/switch, never checkout or restore a path you do not own, never force-push; a wrong commit is undone with git revert.`,
-  `  stage and commit ONLY your owned paths, by name: git add -- <owned paths>; git diff --cached --name-only (only yours); git commit -m "<msg>" -- <owned paths>.`,
+  `shared_checkout: other ops of this workflow edit and build in this same worktree while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
+  `  never git commit, reset, rebase, stash, clean, switch, checkout or restore, never push: the runtime is the only committer - when your op settles green it commits exactly your owned paths as the workflow's checkpoint (scripts/kernel/workflow-checkpoint.mjs); a commit of yours, or a change outside your owned paths, refuses your settle.`,
   `  dependencies: npm install runs under the repository's dependency lock; never npm ci or delete node_modules while other workflows run (the guard refuses it) - report blocked environment instead.`,
   `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed (nivo-fe inc-c8fbf76aa499); report a need for another tree, never make one.`,
   `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
@@ -220,8 +211,6 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  In report.checks keep each real command and the exitCode the shell returned (the runtime re-runs the checks it owns and never trusts a declared exit); set unavailable:true only for a checker that could not run (missing tool, host down) - that is infra, not red; set stdoutPath, stderrPath and outputPath to the corresponding scratch files so the ledger links them to the check run. Attach raw output with --attach <absolute-path-under-STARCI_JOB_SCRATCH>, one per file or directory (a directory attaches every file under it): evidence/ (your evidence folder), runs/<runId>/ (a UAT run), captures/ and interface-audit.json are read by their place; api report answers with every artifact {id, name, sha256} for evidence.yaml to cite. Include other raw artifacts the result needs in the same submission. Do not list scratch paths in report.files, which names authored owned_paths.`,
   ...loggingLines({ skillRoot, packet, jobLabel, repoLabel }),
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
-  ...(policyCommits(opCommitPolicyOf({ skillRoot, op: packet.op })) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
-  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output - the runtime attributed each file by the job's report files, its run window (the file's mtime inside the job's dispatch-to-report span) or, for a finished workflow's debt, the newest covering job (api reconcile --work-debt); a file attributed by window or cover is that output even when the job's report.files does not list it, so check it is uncommitted and under owned_paths, never that report.files names it - commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write <STARCI_JOB_SCRATCH>/report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it with its attachments:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repoLabel} --job ${jobLabel} --report <STARCI_JOB_SCRATCH>/report.json [--attach <absolute-scratch-file> ...]`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repoLabel} --job ${jobLabel}`,

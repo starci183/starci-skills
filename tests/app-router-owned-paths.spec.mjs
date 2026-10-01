@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseRequests,ownedPathsIntersect,ownedPathspec} from '../engine/admission.mjs';
-import {landedProof,ownedPathEffects} from '../scripts/kernel/settle-landed.mjs';
+import {ownedPathEffects} from '../scripts/kernel/settle-landed.mjs';
 import {resolveReadPath} from '../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
@@ -22,7 +22,7 @@ import {placeOnRepo} from './helpers/op-placement.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const WORKFLOW='wf-app-router';
-const OP='code.refactor'; // commitPolicy scoped-local-commit, push false: settle runs the landed-check
+const OP='code.refactor';
 
 // dir: the owned route directory. twin: a sibling a glob reading of the bracket segment also
 // matches (null when the form carries no glob meta at all).
@@ -132,27 +132,9 @@ test('durable path leases fence each App Router route against its children, neve
   });
 }));
 
-test('landed-check and no-effect proof read App Router owned paths literally, per form',t=>{
+test('the no-effect proof reads App Router owned paths literally',t=>{
   const repo=path.join(tempDir(t,'starci-approuter-landed-'),'work');
   routeCheckout(repo);
-  const head=git(repo,'rev-parse','HEAD');
-  for(const {form,dir,twin} of FORMS){
-    assert.equal(landedProof({base:repo,ownedPaths:[dir],head,branch:'main',pushes:false}).ok,true,`${form}: clean route lands`);
-    if(twin){
-      write(repo,twin,'dirty twin\n');
-      const globbed=gitRaw(repo,'status','--porcelain','--',dir).stdout;
-      assert.ok(globbed.includes(twin.split('/').at(-1)),`${form}: precondition - git's glob reading of ${dir} also matches ${twin}`);
-      const proof=landedProof({base:repo,ownedPaths:[`${dir}/**`],head,branch:'main',pushes:false});
-      assert.equal(proof.ok,true,`${form}: a dirty ${twin} is not under ${dir}: ${JSON.stringify(proof.detail?.dirty)}`);
-      git(repo,'checkout','--quiet','--',ownedPathspec(twin));
-    }
-    write(repo,`${dir}/draft.tsx`,'export {};\n');
-    const dirty=landedProof({base:repo,ownedPaths:[dir],head,branch:'main',pushes:false});
-    assert.equal(dirty.reason,'not-landed',form);
-    assert.deepEqual(dirty.detail.dirty,[`${dir}/draft.tsx`],form);
-    assert.deepEqual(dirty.detail.repos[0].paths,[dir],`${form}: the reported path is the plain owned path`);
-    fs.rmSync(path.join(repo,...dir.split('/'),'draft.tsx'));
-  }
   const since=Date.now()-60000;
   write(repo,'src/app/l','twin edit\n');
   git(repo,'commit','--quiet','-am','twin');
@@ -212,7 +194,7 @@ const leading=stdout=>{
   return JSON.parse(close<0?stdout.slice(open):stdout.slice(open,close+2));
 };
 
-test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-check settle, every App Router form',t=>{
+test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, every App Router form',t=>{
   const fx=apiFixture(t);
   const enqueue=paths=>{
     const r=fx.run('enqueue','--workflow',WORKFLOW,'--op',OP,'--paths',paths.join(','));
@@ -258,22 +240,8 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-che
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...fx.env,STARCI_CALLER:'runtime-settler'}});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
 
-  // A dirty twin sits outside every route; a dirty file inside one route is not landed.
-  write(fx.repo,'src/app/l','dirty twin\n');
-  write(fx.repo,'src/app/@modal/(.)photo/[id]/draft.tsx','export {};\n');
-  const refused=fx.run('settle','--job',routes,'--verdict','pass');
-  assert.notEqual(refused.status,0,refused.stdout);
-  const body=leading(refused.stdout);
-  assert.equal(body.reason,'not-landed');
-  assert.deepEqual(body.detail.dirty,['src/app/@modal/(.)photo/[id]/draft.tsx'],'only the file inside a route is dirty');
-  fs.rmSync(path.join(fx.repo,'src','app','@modal','(.)photo','[id]','draft.tsx'));
-
   const settled=fx.run('settle','--job',routes,'--verdict','pass');
-  assert.equal(settled.status,0,`the landed-check passes with only a glob twin dirty: ${settled.stderr||settled.stdout}`);
-  const landed=leading(settled.stdout).landed;
-  assert.equal(landed.head,head);
-  assert.equal(landed.headCheck,'verified');
-  assert.deepEqual([...landed.repos[0].paths].sort(),[...ALL_DIRS].sort());
+  assert.equal(settled.status,0,`settle passes: ${settled.stderr||settled.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(routes).status),'succeeded');
   assert.deepEqual(leases(routes),[],'settle releases every route lease');
 });

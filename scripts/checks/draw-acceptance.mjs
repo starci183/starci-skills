@@ -331,7 +331,7 @@ async function main(argv) {
     try {
       const bound = jobBoundFiles(db, jobId);
       if (!bound) { process.stderr.write(`unknown job ${jobId}\n`); return 2; }
-      job = { jobId, op: bound.job.op_id, status: bound.job.status, commitOnly: bound.payload.commitOnly ?? null };
+      job = { jobId, op: bound.job.op_id, status: bound.job.status };
       files = bound.files;
     } finally { db.close(); }
   }

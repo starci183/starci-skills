@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { withMachine } from '../engine/machine-db.mjs';
 import {
-  workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, workflowWorktreeOf, setCheckpoint, opWorktreeArgs, sideOf,
+  workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, opWorktreeArgs, sideOf,
   canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY,
 } from '../scripts/kernel/workflow-worktree.mjs';
 import { createScratchWorktree, createOrcaWorktree, isPendingRow, gcWorktrees } from '../scripts/lib/worktrees.mjs';
@@ -94,6 +94,10 @@ test('Orca creates the workflow worktree once; the registry keys it by Orca\'s i
   assert.equal(live.length, 1, 'no pending slot is left behind');
   assert.deepEqual([live[0].kind, live[0].orca_id, live[0].workflow_id, live[0].ledger_id], ['workflow', rec.orcaWorktreeId, 'wf-shop-k2', 'ledger-1']);
   assert.deepEqual(workflowWorktreeOf(ctx, 'wf-shop-k2'), rec);
+  // A tool run inside the tree (gate.mjs) finds its workflow by path through the registry, never by a branch name.
+  assert.deepEqual(workflowWorktreeAt(ctx, rec.path), rec);
+  assert.deepEqual(workflowWorktreeAt(ctx, path.join(rec.path, 'be', 'src')), rec, 'a directory inside the tree is the tree');
+  assert.equal(workflowWorktreeAt(ctx, app), null, 'the app checkout is no workflow worktree');
   assert.deepEqual(opWorktreeArgs(ctx, { workflowId: 'wf-shop-k2' }), ['--worktree', rec.path]);
   assert.deepEqual(opWorktreeArgs(ctx, { workflowId: 'wf-other' }), [], 'a workflow with no worktree runs its ops on the ledger repo');
   // A Kernel restart finds it again: Orca is not asked twice.

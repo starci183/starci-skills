@@ -69,7 +69,6 @@ test('the hazard: with a linked worktree\'s GIT_DIR inherited, a temp dir\'s `gi
 const SPECS = [
   ['supervisor-kernel.spec.mjs', '^staging lifecycle'],
   ['supervisor-push.spec.mjs', 'a dry run stops at the scan'],
-  ['settle-landed.spec.mjs', 'dirty owned path is refused not-landed'],
   ['settle-target-repo.spec.mjs', 'backend op.s bare owned path still resolves'],
 ];
 for (const [spec, pattern] of SPECS) {

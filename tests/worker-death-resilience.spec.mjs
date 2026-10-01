@@ -2,7 +2,6 @@
 //   host-event.mjs      a death inside a host-wide terminal disconnect is the environment's
 //   report-salvage.mjs  a report written but never filed is filed on the worker's behalf
 //   resume-context.mjs  the retry of a no-report death resumes from what it left
-//   settle-landed.mjs   debris older than the job's admission is neither its effect nor its unlanded write
 //   op-prompt.mjs       a long owned-path list rides in a file, never the task-create argv
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { HOST_EVENT_MIN_WORKFLOWS, HOST_EVENT_WINDOW_MS, hostWideDisconnectOf } from '../scripts/kernel/host-event.mjs';
 import { salvageUnfiledReport, unfiledReportCandidates } from '../scripts/kernel/report-salvage.mjs';
 import { resumeContextOf, resumePromptLines } from '../scripts/kernel/resume-context.mjs';
-import { landedProof, ownedPathEffects } from '../scripts/kernel/settle-landed.mjs';
+import { ownedPathEffects } from '../scripts/kernel/settle-landed.mjs';
 import { OWNED_INLINE_MAX, ownedPathsFileOf, ownedPathsLine } from '../scripts/kernel/op-prompt.mjs';
 import { withLedger,seedWorkflow } from './_ledger-fixture.mjs';
 
@@ -89,29 +88,6 @@ test('resume context: a retry of a failed-no-report attempt carries its evidence
   assert.equal(resumeContextOf(db, { payload_json: '{}' }), null);
   assert.deepEqual(resumePromptLines(null), []);
 }));
-
-test('settle debris: a file written before admission and not in the report never makes the job not-landed; its own file still does', (t) => {
-  const repo = tmp(t, 'starci-debris-');
-  git(repo, 'init', '-q', '-b', 'main');
-  write(repo, 'README.md', 'x');
-  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'init');
-  const admitted = Date.now() - 60_000;
-  write(repo, '.starciwork/features/wp/impl/evidence/manifest.yaml', 'old', admitted - 3_600_000);    // predecessor debris
-  const base = { base: repo, ownedPaths: ['.starciwork/features/wp'], pushes: false, head: git(repo, 'rev-parse', 'HEAD') };
-  const clean = landedProof({ ...base, debris: { sinceMs: admitted, own: [] } });
-  assert.equal(clean.ok, true, JSON.stringify(clean.detail));
-  assert.equal(clean.detail.debrisCount, 1);
-  assert.equal(landedProof(base).ok, false, 'without the debris rule the old refusal stands');
-  const named = landedProof({ ...base, debris: { sinceMs: admitted, own: [path.join(repo, '.starciwork/features/wp/impl/evidence/manifest.yaml')] } });
-  assert.equal(named.ok, false, 'a file the report names is the job\'s own');
-  write(repo, '.starciwork/features/wp/fr/new/index.yaml', 'mine');                               // written after admission
-  const fresh = landedProof({ ...base, debris: { sinceMs: admitted, own: [] } });
-  assert.equal(fresh.ok, false);
-  assert.deepEqual(fresh.detail.dirty, ['.starciwork/features/wp/fr/new/index.yaml']);
-  const effects = ownedPathEffects({ base: repo, ownedPaths: ['.starciwork/features/wp'], sinceMs: admitted });
-  assert.deepEqual(effects.dirty, ['.starciwork/features/wp/fr/new/index.yaml']);
-  assert.deepEqual(effects.preexisting, ['.starciwork/features/wp/impl/evidence/manifest.yaml']);
-});
 
 test('a long owned-path list is written to owned-paths.txt and the prompt names the file, never the 993 paths', (t) => {
   const repo = tmp(t, 'starci-owned-');

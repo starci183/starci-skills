@@ -16,9 +16,6 @@
 #                                                     (the runtime settler, wrapped: consume, re-verify or canon parity
 #                                                     [contract change canon-parity-settle], api check + api settle,
 #                                                     release, product worktree reap)
-#   handed over: product-integrate-conflict / -red    api enqueue --retry-of J --params {resumeFrom: <refused head>}  job.settle
-#                                                     (a continuation on the new workflow-branch base; at most
-#                                                     continuationCap per lineage, then the DI below)
 #   handed over: deps-unit-required                   api enqueue the deps unit (the refusal's manifest files, params.depsUnit)
 #   handed over: anything else                        DI settle-nongreen (idempotency settle-nongreen:<jobId>:<dispatchId>)
 #   answering                                         api questions --workflow W + DI worker-question per pending question
@@ -40,7 +37,6 @@ decisionDueMs: 900000
 effectUnknownMs: 300000
 dispatchEveryMs: 60000
 settledWindowMs: 3600000     # settled jobs this recent are close-verified
-continuationCap: 2           # continuations per lineage before the Kernel decides
 worktreeRemoveSlaMs: 60000   # modules/kernel/product-land.yaml worktrees.opRemoveSlaMs
 allowedVerbs: [settle, check, reconcile, enqueue, incident]
 # Worker-health probe (scripts/reconciler/worker-health.mjs; owner-driven 2026-09-28): key health:all, one orca terminal

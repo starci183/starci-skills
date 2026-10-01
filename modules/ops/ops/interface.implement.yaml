@@ -661,13 +661,6 @@ policy:
   # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/kernel/spec-deferral.mjs):
   # defer-leg = never dispatched, settled deferred; skip = runs without that class of test or coverage; not-counted = the gate does not demand it.
   specsToggle: {unit: skip, e2e: skip}
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    reuseAuthorization: true
-    noChange: return-existing-verified-commit-no-empty-commit
   qualityPolicy:
     owner: interface.implement
     checks: [lint, typecheck, tests, coverage, build, sonar]

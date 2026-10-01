@@ -104,9 +104,7 @@ incident:
     what landed. incident-resolved records ownerAnswer {dispatchId, workflowId,
     receiptPath}. scripts/kernel/owner-claim.mjs; nivo wf-nivo-workspace-provision-mujek7cb
     inc-2474f6593dfe and inc-f19d118298f1 were resolved "Owner confirmed" with no owner
-    answer and then served as --accept-foreign proof. settle --accept-foreign
-    refuses an incident whose resolution's owner claim is unproven
-    (foreign-accept-unproven, reason owner-claim-unproven)
+    answer)
   ownerClaimLint: >-
     api status carries two lints, each key present only when non-empty:
     frontier.ownerGatesNotOwnerWork [{incidentId, kind, marker, detail}] - an open
@@ -159,9 +157,9 @@ incident:
     resolves to a commit, or the path is committed at that repo's HEAD), --until-incident
     <incidentId>[:resolved], --until-foundation <name> (the shared foundation landed: api
     foundation; incident.foundationWait), --until-landed <workflowId>@<repository> (that workflow's
-    product work reached the repository's main: it is finished, or one of its ops product-landed there
-    (product-op-landed: each op lands into main at its settle) and none of its code-writing legs
-    (gate-conditions.mjs CODE_WRITING_OPS) is open; on a peer-wait the named workflow is the peer and
+    product work reached the repository's main: it is finished, or its workflow-landed event names that
+    repository (a workflow lands into main once, at api finish: workflow-checkpoint.mjs finishWorkflow);
+    on a peer-wait the named workflow is the peer and
     the wait reads untilLanded - the cross-workflow hold of FE-writing legs behind a restructure,
     contract change fe-hold-until-landed). They are stored on 'incident-raised' as until:[{type,...}]. The
     runtime evaluates them read-only on every api status (so every watchdog tick), before route

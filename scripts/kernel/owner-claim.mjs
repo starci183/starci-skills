@@ -2,8 +2,8 @@
 //
 // Defect (nivo-backend wf-nivo-workspace-provision-mujek7cb): the Kernel resolved the
 // foreign-file-committed incidents inc-2474f6593dfe and inc-f19d118298f1 with "Owner confirmed: ..."
-// while the ledger holds no owner answer, and `api settle --accept-foreign` then took those resolved
-// incidents as the proof that the file owner confirmed the paths. `api incident --resolve` took free
+// while the ledger holds no owner answer, and a settle then took those resolved incidents as the proof
+// that the file owner confirmed the paths. `api incident --resolve` took free
 // text and recorded no resolver.
 //
 // Now a resolution records who resolved it (by: kernel | owner | supervisor) and, when its text claims

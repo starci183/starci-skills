@@ -1,16 +1,5 @@
 reconcile:
-  args: '--job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
-  debris: >-
-    `--job <id> --debris [--commit]`: the debris a job found in its owned paths - dirty files last written
-    before its admission that its report does not name (scripts/kernel/settle-landed.mjs landedProof
-    debris; api settle lists them in result.landed.debris and never refuses not-landed on them). Each is
-    classed proof (a report*.json, a file under an evidence/, assets/, runs/, observed/ or captures/
-    folder, or an operations/ record under .starciwork: kept, never deleted) or source (anything else:
-    a lineage's uncommitted code, listed and never committed here). Read-only by default; --commit
-    commits the proof files per checkout in chunks of 200 through a pathspec list file (only those
-    paths, hooks on), one 'debris-committed' event {repo, sha, files, sample} per commit. Returns
-    {ok, jobId, workflowId, admittedAt, debris, proof, source, repos[{repo, proof[], proofCount,
-    source[], sourceCount}], commits?[{repo, files, ok, sha?|step,error}], next?, stillDirty}.
+  args: '--job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run]'
   salvage: >-
     `--dead-worker` first looks for a report the dead worker wrote but never filed: an op-report@1
     report*.json under its owned paths modified since its dispatch, stamped for this job or unstamped
@@ -36,40 +25,6 @@ reconcile:
     status, terminal, phase, archivedAt, signal, settledAs, leasesReleased,
     signalReleased}]}. Supervisor-safe: it touches only rows of workflows that
     can no longer run. Called by the reconciler Host controller's boot phase.
-  workDebt: >-
-    `--work-debt` (no --job) lists the Work that settled legs of the ops
-    contract change authoring-ops-commit-work governs wrote and left
-    uncommitted, read-only. Every untracked or dirty file under the owned
-    paths of a succeeded job of those ops, in any workflow, is attributed to
-    the job that wrote it: the job whose filed report lists it in `files`,
-    else the job whose run window (dispatch to report, 5s before / 60s after)
-    holds its mtime, newest first. A file neither names whose covering jobs
-    all belong to finished or archived workflows is the newest covering
-    job's debt (attributedBy.cover), adoptable from any covering workflow;
-    one a live workflow's job covers is listed in `unattributed` with its
-    liveOwners and never batched; a file a live or succeeded commit-only
-    attempt owns is `pending` that repair (repairPending), not owed.
-    `batches`: one per live workflow and op, the exact
-    `api enqueue --workflow <wf> --op <op> --commit-only-work-debt`, ONE
-    commit-only attempt for the union of that op's attributed owed paths,
-    settled through the landed proof over all of them. `adoptions`: a
-    finished workflow cannot enqueue, so per finished workflow and op each
-    live workflow whose Work scope covers some of its debt with its
-    `--adopt-from <finished>` enqueue, and for paths no live scope covers
-    the repo owner's `--as-repo-owner` enqueue (named when the ledger has
-    one live workflow); a file of that debt a live workflow's job also
-    covers is listed in the adoption's `held`, not in its files. Each debt also names its single-job repair
-    (`--paths <those files> --commit-only-of <jobId>`) while its workflow is
-    live. --workflow narrows debts, batches and unattributed to that
-    workflow and adoptions to those it can adopt. Returns {ok, change, ops,
-    debts:[{workflowId, workflowFinished, jobId, op, attempt, repo, role,
-    paths, pending, attributedBy:{report, window, cover?}, repairPending,
-    enqueue}],
-    owed, files, batches:[{workflowId, op, jobs, files, enqueue}],
-    adoptions:[{from, op, jobs, files, candidates:[{workflowId, covers,
-    enqueue}], uncovered, repoOwner, held:[{file, liveOwners}]}],
-    unattributed:[{repo, file, coveredBy, workflows, liveOwners}],
-    unreadable}.
   orcaTasks: >-
     `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
     (or --workflow) with the ledger. A running workflow whose kernel job is

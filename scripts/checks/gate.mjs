@@ -21,7 +21,7 @@
 //      recomputed with `git merge-tree`; a path main changed whose merged blob is the lane's (main's change dropped, merge
 //      9958cce38) is a finding `merge/dropped-main-change`, never preexisting.
 // Only NEW findings block: lint per (file, engine/rule) count and tsc per normalised message are compared with the base commit
-// (--base, else the merge-base of HEAD with its upstream, else with main). The base is measured READ-ONLY from git objects: an
+// (--base; in a workflow worktree the workflow's previous checkpoint; else the merge-base of HEAD with its upstream, else with main). The base is measured READ-ONLY from git objects: an
 // ESLint lintText of the base blob, the repository checks over the base listing, and a TypeScript program whose host reads the
 // changed files from the base. No worktree, no checkout and no junction is ever created for it (node_modules incident
 // 2026-09-30). A finding the base already has is counted as preexisting, never a finding of the op. Failing specs always block.
@@ -47,6 +47,7 @@ import { isMain, walkFiles } from './common.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from '../lib/canon-digest.mjs';
 import { PROFILES_FILE, loadPins } from './check-canon-pins.mjs';
+import { gateBaseAt } from '../kernel/workflow-checkpoint.mjs';
 
 export const GATE_SCHEMA = 'starci/gate@1';
 export const LINT_SCHEMA = 'starci/lint@1';
@@ -83,13 +84,19 @@ const git = (root, args, options = {}) => runGit(['-c', 'core.quotepath=off', ..
 const gitText = (root, args) => { const r = git(root, args); return !r.error && r.status === 0 ? r.stdout : null; };
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 
-/** The base commit: --base verified as a commit, else the merge-base of HEAD with its upstream, main or master. */
-export function resolveGateBase(root, base = null) {
+/**
+ * The base commit: --base verified as a commit; else, when --root is a workflow worktree (the registry knows it, never a
+ * branch-name guess), the workflow's previous checkpoint (workflow-checkpoint.mjs gateBaseAt), so only the op's own new
+ * findings block; else the merge-base of HEAD with its upstream, main or master.
+ */
+export function resolveGateBase(root, base = null, { workflowBase = (dir) => gateBaseAt({ env: process.env }, dir) } = {}) {
   if (base) {
     const sha = gitText(root, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])?.trim();
     if (!sha) throw Object.assign(new Error(`--base ${base} is not a commit of ${root}`), { code: 'GATE_BASE_UNKNOWN' });
     return sha;
   }
+  const checkpoint = workflowBase(root);
+  if (checkpoint) return checkpoint;
   for (const ref of ['@{upstream}', 'main', 'master', 'origin/HEAD']) {
     const sha = gitText(root, ['merge-base', 'HEAD', ref])?.trim();
     if (sha) return sha;

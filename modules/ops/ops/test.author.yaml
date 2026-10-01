@@ -284,13 +284,6 @@ policy:
       - choosing another nodes[] entry because it appears compatible
       - materializing or editing the proposed Work node; workspace.manage owns later reconstruction
       - treating an unbound, differently revised or non-predecessor scope proposal as authority
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    reuseAuthorization: true
-    noChange: return-existing-verified-commit-no-empty-commit
   testPolicy:
     writes: test-paths-only
     judges: never

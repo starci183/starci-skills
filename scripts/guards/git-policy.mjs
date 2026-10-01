@@ -141,10 +141,8 @@ export function pathspecsWithinOwned(specs, { cwd, owned, top = null }) {
 }
 
 // --pathspec-from-file=<file> (or <file> as the next word; `-` is stdin) with --pathspec-file-nul:
-// the pathspecs of add, commit, reset, restore, checkout and rm live in a file. The commit-only
-// (Work debt) packet commits a long owned list this way (nivo inc-d1833bc89c1f: the guard refused
-// every `git commit --pathspec-from-file`, so the batched repair could never commit). The guard
-// reads the list the way git does and scopes every entry exactly like an explicit pathspec.
+// the pathspecs of add, commit, reset, restore, checkout and rm live in a file (nivo inc-d1833bc89c1f). The
+// guard reads the list the way git does and scopes every entry exactly like an explicit pathspec.
 const PATHSPEC_FILE = '--pathspec-from-file';
 const PATHSPEC_FILE_SUBS = new Set(['add', 'commit', 'reset', 'restore', 'checkout', 'rm', 'stash']);
 function takePathspecFile(rest) {
@@ -185,8 +183,6 @@ export function parsePathspecList(text, nul = false) {
   // A badly quoted line stays raw: it names no owned path, so it is refused (git itself dies on it).
   return items.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l)).map((l) => unquoteC(l) ?? l);
 }
-/** The commands the commit-only packet (scripts/kernel/api.mjs) gives for a long owned list; tests/shared-checkout-guard.spec.mjs proves this policy passes them. */
-export const PATHSPEC_LIST_COMMIT = Object.freeze([`git add ${PATHSPEC_FILE}=<list>`, `git commit -m "<msg>" ${PATHSPEC_FILE}=<list>`]);
 // The file resolves against the command's directory (git's OPT_FILENAME); `-` is stdin (ctx.stdin), which the
 // command guard never sees before the command runs, so a stdin list is refused with the list-file remedy.
 const readPathspecFile = (file, dir, stdin) => {

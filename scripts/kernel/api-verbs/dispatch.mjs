@@ -75,8 +75,8 @@ export default {
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
     process.exit(1);
   }
-  // The grant is re-judged at launch: the tree may have moved since enqueue. A commit-only attempt authors nothing.
-  if (!payload.commitOnly) {
+  // The grant is re-judged at launch: the tree may have moved since enqueue.
+  {
     const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
     if (!grant.ok) {
       const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };

@@ -801,12 +801,12 @@ proofs:
         ID/path and asset byte exists, required assertions are
         covered, input bindings are current, and an honest not-run/fail cannot earn done."
     check: bin/starci.mjs
-  - id: landed
+  - id: checkpointed
     requirement:
-      en: Every Work record file this operation wrote under its owned paths is committed with exact
-        pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
-        refuses not-landed while one of them is untracked or dirty; authored Work never settles
-        outside the repository history.
+      en: Every Work record file this operation wrote under its owned paths is committed by the runtime
+        as its workflow's checkpoint when the operation settles green (scripts/kernel/workflow-checkpoint.mjs
+        checkpointOp). The operation never commits and changes nothing outside its owned paths; settle
+        refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: produced-lint
     requirement:
       en: "api settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
@@ -874,13 +874,6 @@ placeholders:
   asset: Rendered part, brief, render source or raster prompt filename under the owning UI node
 layoutPolicy:
   checks: [starci-validate]
-policy:
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    noChange: return-existing-verified-commit-no-empty-commit
 route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]

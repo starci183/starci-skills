@@ -1,11 +1,8 @@
 // leg-order.mjs — which pending earlier-leg jobs do NOT hold a later leg in the approved order.
 //
 // api status reads a queued job `dependency` while a plan ancestor still has a job in flight or
-// queued (api.mjs queuedBecauseOf). Two kinds of pending row are not a predecessor in that sense:
+// queued (api.mjs queuedBecauseOf). One kind of pending row is not a predecessor in that sense:
 //
-//   commit-only   payload.commitOnly (api enqueue --commit-only-of / --commit-only-work-debt): the
-//                 attempt authors nothing - it commits files settled jobs already wrote - so the leg's
-//                 output a later leg reads exists whether or not it has landed yet.
 //   gate-waits-on-job
 //                 the row's settle (or dispatch) is held by a wait of this workflow whose typed
 //                 --until-job conditions name the queued job (through its retry lineage). The Kernel
@@ -15,11 +12,8 @@
 //
 // nivo wf-nivo-workspace-provision-mujek7cb (2026-09-27): a deferred settle, inc-a158db5dc9b7 on
 // op-business.decide-660a4d3e9a, waited until-job op-interface.draw-9f387aad28 succeeded, while that
-// draw read `dependency` behind the very business.decide job the gate held and behind two commit-only
-// work-debt adoptions (op-business.decide-075d88f736, op-business.decide-cc63d20d87) - three holds on
-// one draw, none of which could ever release it.
+// draw read `dependency` behind the very business.decide job the gate held, a hold that could never release it.
 
-export const COMMIT_ONLY = 'commit-only';
 export const GATE_WAITS_ON_JOB = 'gate-waits-on-job';
 
 /**
@@ -29,7 +23,6 @@ export const GATE_WAITS_ON_JOB = 'gate-waits-on-job';
  */
 export function legOrderExemption({ row, rowPayload = null, job, typedGates = [], headOf = (id) => id }) {
   if (!row || !job) return null;
-  if (rowPayload?.commitOnly) return { why: COMMIT_ONLY };
   const rowOp = row.op_id ?? rowPayload?.opId ?? null;
   for (const gate of typedGates ?? []) {
     const holds = Array.isArray(gate?.holds) ? gate.holds : [];

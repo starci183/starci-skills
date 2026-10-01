@@ -7,7 +7,6 @@ import { spawn, spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
-import { landedProof } from '../scripts/kernel/settle-landed.mjs';
 import { resolveIntroducer } from '../scripts/kernel/introducer.mjs';
 
 // The runtime defects the running workflows filed on 2026-09-23/24, each proven through the api:
@@ -284,39 +283,7 @@ test('an uncut retry chains to its own unit of work; --retry-of pins it; the goa
   assert.ok(dry, dryRun.stderr || dryRun.stdout);
   assert.equal(dry.packet.context.goal.statement, '# wf-lin goal');
   assert.match(dry.prompt, /shared_checkout:/);
-  assert.match(dry.prompt, /git commit -m "<msg>" -- <owned paths>/);
-});
-
-test('the landed proof ignores filed report files and refuses a commit carrying foreign paths', (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-landed-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  const g = gitRepo(repo);
-  fs.mkdirSync(path.join(repo, 'src', 'mine'), { recursive: true });
-  fs.mkdirSync(path.join(repo, '.starcistacks', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.ts'), '1\n');
-  fs.writeFileSync(path.join(repo, '.starcistacks', 'dev', 'stack.yaml.enc'), 'v1\n');
-  g('add', '.');
-  spawnSync('git', ['commit', '-q', '-m', 'base'], { cwd: repo, env: { ...process.env, GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' } });
-  const admitted = Date.parse('2026-06-01T00:00:00Z');
-  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.ts'), '2\n');
-  g('add', 'src/mine/a.ts'); g('commit', '-q', '-m', 'mine');
-  const head = g('rev-parse', 'HEAD').stdout.trim();
-  const report = path.join(repo, 'src', 'mine', 'evidence', 'a23', 'report.json');
-  fs.mkdirSync(path.dirname(report), { recursive: true }); fs.writeFileSync(report, '{}\n');
-  const placements = [{ base: repo, path: 'src/mine', role: null }];
-  assert.equal(landedProof({ placements, head, pushes: false }).reason, 'not-landed', 'the report file alone made it dirty');
-  const clean = landedProof({ placements, head, pushes: false, exclude: [report], foreign: { sinceMs: admitted } });
-  assert.equal(clean.ok, true, JSON.stringify(clean));
-  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.ts'), '3\n');
-  fs.writeFileSync(path.join(repo, '.starcistacks', 'dev', 'stack.yaml.enc'), 'v2 re-encrypted by a hook\n');
-  g('add', 'src/mine/a.ts', '.starcistacks/dev/stack.yaml.enc'); g('commit', '-q', '-m', 'mine + swept');
-  const swept = g('rev-parse', 'HEAD').stdout.trim();
-  const refused = landedProof({ placements, head: swept, pushes: false, exclude: [report], foreign: { sinceMs: admitted } });
-  assert.equal(refused.reason, 'foreign-paths');
-  assert.deepEqual(refused.detail.foreign, [{ sha: swept, foreign: ['.starcistacks/dev/stack.yaml.enc'] }]);
-  const accepted = landedProof({ placements, head: swept, pushes: false, exclude: [report], foreign: { sinceMs: admitted, accept: ['.starcistacks/dev/stack.yaml.enc'] } });
-  assert.equal(accepted.ok, true);
-  assert.equal(landedProof({ placements, head: swept, pushes: false, exclude: [report] }).ok, true, 'a leg admitted before the change is not judged on foreign paths');
+  assert.match(dry.prompt, /the runtime is the only committer/);
 });
 
 test('an answered ask stays awaiting its owner-answer retry until a job of ITS work exists (mia inc-2f7968ede59c)', (t) => {

@@ -2,9 +2,8 @@ enqueue:
   args: >-
     --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
     [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
-    [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>,...]
+    [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>]
     [--new-module <repository-relative dir>,...] [--retry-of <jobId>] [--reopen <reason>] [--derived-from <jobId>,...] [--canon-scan <canon-scan record>] [--what <short human name of the target, <=40 chars>]
-    | --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
   workUnit: >-
     Every op job is a try of exactly one work unit (scripts/kernel/units.mjs; DBTREE work_units,
     jobs_enqueue_guard): one op, one subject key (engine/admission.mjs unitSubjectKey - cut:<id>#<ordinal>, else
@@ -34,47 +33,6 @@ enqueue:
     `reach: follow-up` contract change owes an older leg (modules/kernel/contract-changes/;
     api status frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass
     --after <jobId> while the older leg still runs; it is never held for the change.
-  commitOnly: >-
-    --commit-only-of <jobId> enqueues a commit-only attempt for Work a
-    succeeded job of the same op in this workflow wrote and never committed
-    (api reconcile --work-debt prints the exact command): payload.commitOnly
-    {of}, rendered into the packet as commit_only. --paths are exactly the
-    uncommitted files; the attempt changes none of them and commits them at
-    a reported head. --commit-only-of takes several jobs (csv), one attempt
-    for all of them (payload.commitOnly.of is then the list). Refused
-    commit-only-of-unknown / commit-only-of-invalid for another workflow's
-    job, another op's, or one not succeeded.
-    --commit-only-work-debt (with --workflow and --op, no --paths) is the
-    batched repair: --paths becomes the union of the exact owed paths of every
-    settled job of that op in the workflow with Work debt and no pending
-    repair (api reconcile --work-debt), payload.commitOnly {of:[jobIds],
-    batch:work-debt}. Refused no-work-debt when there is none, and
-    commit-only-conflict with --paths or --commit-only-of. The packet has
-    the worker commit a long list through git add / git commit
-    --pathspec-from-file=<list> (git-policy.mjs PATHSPEC_LIST_COMMIT), which
-    the git guard passes when every line is inside owned_paths (nivo
-    inc-d1833bc89c1f). The landed proof
-    reads the batch's pathspecs in bounded git calls. Debt is attributed to
-    the job that wrote each file (reconcile workDebt), so a batch never takes
-    a file another job wrote. --adopt-from <finishedWf> adopts a finished
-    workflow's debt of that op, which that workflow can no longer enqueue:
-    every file it wrote or one of its jobs covers, while every workflow
-    whose succeeded jobs cover the file is finished or archived (Supervisor
-    ruling 2026-09-24, inc-6262420b8467: the debt of a finished or archived
-    workflow is adoptable by ONE live workflow of the same ledger with
-    --as-repo-owner; a file several workflows' jobs cover goes to the
-    adopter when every covering workflow is finished or archived and stays
-    with the live covering workflow otherwise). A file a live workflow
-    other than the adopter still covers, or wrote, is never taken: it is
-    named in `held` [{file, liveOwners}]. Of the rest, only paths the
-    adopting workflow's Work scope (the owned paths of its jobs, any status
-    but cancelled) covers, and with --as-repo-owner also paths no other live
-    workflow's scope covers; payload.commitOnly gains {adoptedFrom,
-    asRepoOwner?, outOfScope, held?}. Refused adopt-from-invalid (no such
-    other workflow), adopt-from-live (a live workflow repairs its own),
-    adopt-held-live (everything left is held by a live covering workflow,
-    named in the detail and `held`) and adopt-out-of-scope (nothing left in
-    scope).
   reads: >-
     workflows.phase; existing jobs for {workflow_id, op_id}; the brief
     modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -139,10 +97,10 @@ enqueue:
     - 'canon-slice-unknown | canon-scan-invalid: the ordinal is not a slice of the record, or the record is no canon-scan'
     - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
     - 'kernel-rev-stale: the Kernel''s acked runtime rev is behind and this op''s contract (its brief, _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api status kernelRev lists, api kernel-ack-rev, enqueue again; legs of other ops are unaffected'
-    - 'grant-parent-missing: an owned path whose directory does not exist in its target repository (the path itself for a directory or glob grant, its parent for a file grant - e.g. nivo-fe/src/app when nivo-fe keeps its router at apps/app/src/app), so the worker could never satisfy the grant; prints {ok:false, reason, violations[{owned, dir, closest}], detail} naming the missing directory and the closest existing one, exits 1, no job written (dispatch re-judges it and leaves the job queued). --new-module <repository-relative dir,...> declares a create-new-module grant (payload.new_modules): grants under that module root pass, provided the module root''s own parent directory exists. Work paths and commit-only attempts are exempt'
+    - 'grant-parent-missing: an owned path whose directory does not exist in its target repository (the path itself for a directory or glob grant, its parent for a file grant - e.g. nivo-fe/src/app when nivo-fe keeps its router at apps/app/src/app), so the worker could never satisfy the grant; prints {ok:false, reason, violations[{owned, dir, closest}], detail} naming the missing directory and the closest existing one, exits 1, no job written (dispatch re-judges it and leaves the job queued). --new-module <repository-relative dir,...> declares a create-new-module grant (payload.new_modules): grants under that module root pass, provided the module root''s own parent directory exists. Work paths are exempt'
     - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
     - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
-    - 'owned-paths-outside-writes (field `reason`): an authoring op whose manifest writes only .starciwork/features/<feature>/<family> records (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs) is given an owned path of another family, the feature overview it may not write, or a path outside .starciwork; prints {ok:false, workflowId, op, reason, violations[{path, family, why}], families, owners{family:[op]}, detail} and exits 1, no job written. The detail routes each family to the ops that write it. A commit-only attempt (--commit-only-of, --commit-only-work-debt) is exempt'
+    - 'owned-paths-outside-writes (field `reason`): an authoring op whose manifest writes only .starciwork/features/<feature>/<family> records (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs) is given an owned path of another family, the feature overview it may not write, or a path outside .starciwork; prints {ok:false, workflowId, op, reason, violations[{path, family, why}], families, owners{family:[op]}, detail} and exits 1, no job written. The detail routes each family to the ops that write it'
     - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
     - path-not-app-relative: 'in a bound app, an owned path is not app-relative (a repository:<id>/ prefix, an absolute or ../ path, the app name as a prefix, or a side-relative path); the detail names the app-relative spelling when a side holds it'
     - path-repository-unknown: 'unbound, an owned path repository:<id>/… names a repository no project binding resolves'

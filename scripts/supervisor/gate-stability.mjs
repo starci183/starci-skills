@@ -5,7 +5,7 @@
 // (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
 // decides (api contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
 // land touches the family's gatePaths or registers a change that adds checks/codes for it: the family's gates, as
-// the BASE tree and as the CANDIDATE tree have them, over the latest accepted leg (newest succeeded, non-commit-only)
+// the BASE tree and as the CANDIDATE tree have them, over the latest accepted leg (newest succeeded)
 // of the family op in every live workflow of every ledger on this host's registry - read-only. A flip is a leg the
 // base gates pass and the candidate gates fail; newFindings are the candidate findings the base did not report.
 //
@@ -42,7 +42,7 @@ export function acceptedLegsOf(ledgerFile, family) {
     const workflows = db.prepare("SELECT workflow_id FROM workflows WHERE archived_at IS NULL AND (phase IS NULL OR phase<>'finished') ORDER BY created_at").all();
     for (const { workflow_id: workflowId } of workflows) {
       const jobs = db.prepare("SELECT job_id,op_id,try_no AS attempt,payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND status='succeeded' ORDER BY created_at DESC,job_id DESC").all(workflowId, family);
-      const job = jobs.find((row) => !parseJson(row.payload_json, {})?.commitOnly);
+      const job = jobs[0];
       if (!job) continue;
       const payload = parseJson(job.payload_json, {}) ?? {};
       const files = [...list(payload.owned_paths)];

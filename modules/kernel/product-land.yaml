@@ -10,13 +10,5 @@ worktrees:
   opRemoveSlaMs: 60000          # (per-op land, deleted by part B) an op worktree outliving its settle by more than this
   commandMs: 300000
 
-land:                           # an op's green settle: op/<op> -> the product's main (per-repository serial)
-  lockWaitMs: 1800000
-  gateTimeoutMs: 1800000        # scripts/checks/gate.mjs over the op worktree, rebased onto main
-  push: true                    # push main to origin after the land (a failed push is reported; push-mains retries it)
-  pushTimeoutMs: 600000
-  maxMainRetries: 3             # main moved under the fast-forward: rebase and gate again, at most this often
-  depsFiles: [package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json, pnpm-workspace.yaml]
-
 invariant:
   importsCacheMs: 300000        # api status importsBroken: one scan per tree state within this window

@@ -5,7 +5,7 @@
 // scratch tree by createScratchWorktree, the GC reclaims whatever outlives its owner through the home that made it, and
 // every git removal goes through scripts/lib/safe-remove.mjs safeRemoveWorktree: links found without following one,
 // removed as links, zero asserted, only then `git worktree remove`, and the main checkout asserted untouched. The per-op
-// land (integrateOp, the reap) is exercised on a tree the spec makes itself until part B deletes it.
+// land is deleted (part B: the workflow lands at api finish); the reap is exercised on a tree the spec makes itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +16,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { withMachine } from '../engine/machine-db.mjs';
-import { integrateOp, reapJobWorktree, productSettings, preservedOpRef, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { reapJobWorktree, preservedOpRef } from '../scripts/kernel/product-worktree.mjs';
+import { CHECKPOINT_EVENTS } from '../scripts/kernel/workflow-checkpoint.mjs';
 import { evaluateCondition } from '../scripts/kernel/gate-conditions.mjs';
 import { createScratchWorktree, removeScratchWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit, reserveOrcaSlot } from '../scripts/lib/worktrees.mjs';
 import { ensureWorkflowWorktree } from '../scripts/kernel/workflow-worktree.mjs';
@@ -91,85 +92,6 @@ function opTree(repo, jobId) {
   git(repo, 'config', `branch.${branch}.description`, jobId);
   return { repoRoot: repo, workflowId: WF, jobId, main: 'main', op: { short, branch, path: dir }, baseSha, createdAt: Date.now() };
 }
-const green = () => ({ exit: 0, findings: [], errors: [], counts: { new: 0 } });
-
-test('an op settles: rebased onto main, gated, main fast-forwarded and pushed; then no worktree and no branch are left', (t) => {
-  const { base, repo, origin, env } = fixture(t);
-  const jobId = 'op-code.refactor-a1b2c3d4e5';
-  const rec = opTree(repo, jobId);
-  write(rec.op.path, 'src/a.ts', 'export const a = 2;\n');
-  git(rec.op.path, 'commit', '-qam', 'op: a = 2');
-  // main moved meanwhile (another op landed): the land rebases, main's change is kept.
-  write(repo, 'src/b.ts', 'export const b = 2;\n');
-  git(repo, 'commit', '-qam', 'main: b = 2');
-  const mainBefore = git(repo, 'rev-parse', 'main');
-  // A red gate lands nothing.
-  const red = integrateOp({ record: rec, gate: () => ({ exit: 1, findings: [{ engine: 'lint', rule: 'x' }], errors: [], counts: { new: 1 } }) });
-  assert.equal(red.ok, false);
-  assert.equal(red.reason, 'land-gate-red');
-  assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'main untouched by a red gate');
-  const gates = [];
-  const landed = integrateOp({ record: rec, gate: (g) => { gates.push(g); return green(); } });
-  assert.ok(landed.ok, JSON.stringify(landed));
-  assert.equal(gates.length, 1);
-  assert.equal(gates[0].root, rec.op.path, 'the gate runs on the op worktree');
-  assert.equal(gates[0].base, mainBefore, 'against the main it lands on');
-  assert.equal(git(repo, 'rev-parse', 'main'), landed.after, 'main advanced');
-  assert.ok(gitOk(repo, 'merge-base', '--is-ancestor', mainBefore, 'main'), 'a fast-forward of main');
-  assert.equal(fs.readFileSync(path.join(repo, 'src/a.ts'), 'utf8'), 'export const a = 2;\n', 'the live checkout carries the op');
-  assert.equal(fs.readFileSync(path.join(repo, 'src/b.ts'), 'utf8'), 'export const b = 2;\n', 'main\'s own change is kept');
-  assert.equal(landed.push.pushed, true, JSON.stringify(landed.push));
-  assert.equal(git(origin, 'rev-parse', 'main'), landed.after, 'origin/main pushed');
-  assert.equal(integrateOp({ record: rec, gate: green }).already, true, 'idempotent');
-  // The settle releases the worker, then the reap removes the tree and the branch.
-  const { ledger, ledgerRepo, now } = ledgerWith(t, base, rec, jobId, 'succeeded');
-  const r = reapJobWorktree({ ledger, ledgerRepo, jobId, now: now + 1000, env });
-  assert.equal(r.removed, true, JSON.stringify(r));
-  assert.equal(r.preserved, null, 'a landed op preserves nothing');
-  assert.ok(!fs.existsSync(rec.op.path), 'no worktree');
-  assert.equal(trees(repo), 1, 'only the main checkout is registered');
-  assert.deepEqual(branches(repo, 'op/*'), [], 'no op branch');
-  assert.deepEqual(branches(repo, 'preserved/*'), []);
-  assert.equal(liveRows(env).length, 0, 'the registry row is removed');
-  assert.equal(git(repo, 'status', '--porcelain'), '', 'the product checkout is clean');
-});
-
-test('the land refuses before main moves: a merge that dropped main\'s change, a red pre-land verify, a dirty op tree', (t) => {
-  const { repo } = fixture(t);
-  const base = productSettings();
-  // 1. a merge on the op branch that kept the lane side over main's change of src/b.ts.
-  const rec = opTree(repo, 'op-code.refactor-9e1d000001');
-  write(rec.op.path, 'src/b.ts', 'export const b = "lane";\n');
-  git(rec.op.path, 'commit', '-qam', 'lane: b');
-  write(repo, 'src/b.ts', 'export const b = "main";\n');
-  git(repo, 'commit', '-qam', 'main: b');
-  spawnSync('git', ['merge', 'main'], { cwd: rec.op.path, encoding: 'utf8' });
-  write(rec.op.path, 'src/b.ts', 'export const b = "lane";\n');
-  git(rec.op.path, 'commit', '-qam', 'merge main, keep lane');
-  const mainBefore = git(repo, 'rev-parse', 'main');
-  const dropped = integrateOp({ record: rec, gate: green });
-  assert.equal(dropped.reason, 'land-merge-dropped-main', JSON.stringify(dropped));
-  assert.deepEqual(dropped.dropped, ['src/b.ts']);
-  assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'main untouched');
-  // 2. a land check red on the rebased tree: product-integrate-red with a continuation; the op tree is back on its head.
-  const two = opTree(repo, 'op-code.refactor-9e1d000002');
-  write(two.op.path, 'src/c.ts', 'export const c = 1;\n');
-  git(two.op.path, 'add', '-A'); git(two.op.path, 'commit', '-qm', 'c');
-  const own = git(two.op.path, 'rev-parse', 'HEAD');
-  write(repo, 'src/a.ts', 'export const a = 3;\n');
-  git(repo, 'commit', '-qam', 'main: a = 3');
-  const mainTwo = git(repo, 'rev-parse', 'main');
-  const redSettings = { ...base, land: { ...base.land, push: false, checks: [{ name: 'always-red', argv: [process.execPath, '-e', 'process.exit(1)'] }] } };
-  const red = integrateOp({ record: two, gate: green, settings: redSettings });
-  assert.equal(red.reason, 'product-integrate-red', JSON.stringify(red));
-  assert.match(red.failures.join(' '), /always-red/);
-  assert.equal(red.continuation.resumeFrom, own);
-  assert.equal(git(two.op.path, 'rev-parse', 'HEAD'), own, 'the op worktree is put back on its own head');
-  assert.equal(git(repo, 'rev-parse', 'main'), mainTwo, 'main untouched');
-  // 3. a tracked change left in the op tree: op-worktree-dirty, nothing rebased.
-  write(two.op.path, 'src/c.ts', 'export const c = 2;\n');
-  assert.equal(integrateOp({ record: two, gate: green, settings: redSettings }).reason, 'op-worktree-dirty');
-});
 
 test('snapshotCommit preserves tracked and untracked work and never a node_modules entry', (t) => {
   const { repo } = fixture(t);
@@ -188,7 +110,7 @@ test('snapshotCommit preserves tracked and untracked work and never a node_modul
   assert.equal(snapshotCommit(repo, git(repo, 'rev-parse', 'HEAD'), 'clean').dirty, false);
 });
 
-test('a per-op product-op-landed event is what --until-landed reads', (t) => {
+test('the workflow-landed event of api finish is what --until-landed reads', (t) => {
   const { base, repo } = fixture(t);
   const ledgerRepo = path.join(base, 'ledger-ev');
   fs.mkdirSync(ledgerRepo);
@@ -197,8 +119,9 @@ test('a per-op product-op-landed event is what --until-landed reads', (t) => {
   ledger.ensureWorkflow({ workflowId: WF, title: 'landed' });
   const cond = { type: 'landed', workflowId: WF, repository: path.basename(repo) };
   assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, false);
-  assert.equal(EVENTS.landed, 'product-op-landed');
-  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-x', kind: EVENTS.landed, payload: { repoRoot: repo, branch: 'main', head: 'abc' } }));
+  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: CHECKPOINT_EVENTS.landed, payload: { repoRoot: path.join(base, 'elsewhere'), main: 'main', head: 'abc' } }));
+  assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, false, 'a land into another repository does not count');
+  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: CHECKPOINT_EVENTS.landed, payload: { repoRoot: repo, main: 'main', head: 'abc' } }));
   assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, true);
 });
 

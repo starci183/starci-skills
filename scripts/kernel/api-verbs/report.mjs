@@ -38,7 +38,7 @@ export default {
   },
   async run({ ledger, args, repo, emit, internals }) {
     const { resolveJob, reportOwnedPaths, reportIdentityOf,
-      jobCommitPolicy, handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
+      handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
   const attempt = requireReportAttempt(db, job);
@@ -61,7 +61,7 @@ export default {
   try { reportRaw = fs.readFileSync(reportAbs, 'utf8'); }
   catch { throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
   const parsed = parseJson(reportRaw);
-  const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job), commitPolicy: jobCommitPolicy(db, job) });
+  const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)

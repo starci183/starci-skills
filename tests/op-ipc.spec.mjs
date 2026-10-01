@@ -119,8 +119,6 @@ const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1
     schema:'starci/op-report@1',outcome,summary:`op ${outcome} — ${sentinel}`,
     files:[...files,...(outcome==='done'?(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json']):[])],checks:[{name:'self-check',command:'true',exitCode:0}],
     ...(outcome==='partial'?{open:['one unfinished item']}:{}),
-    // OP commits (commitPolicy), so api report requires head on done|partial.
-    ...(['done','partial'].includes(outcome)?{head:'abc1234def'}:{}),
     ...(outcome==='ask'?{question:{text:'which way?',options:['a','b']}}:{}),
     ...(outcome==='blocked'?{blocker:{kind:'environment',detail:'dep missing'}}:{}),
     ...extra,

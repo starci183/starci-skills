@@ -150,9 +150,9 @@ conventions:
     remote-tracking ref holds - a merge's own content and each commit it merges in - carries only its
     owned paths (refs/stash stays writable for lint-staged's pre-commit backup). The hook has no
     override. Staging into a private GIT_INDEX_FILE passes. config.yaml guards.historyHook /
-    guards.workHook false switch a hook layer off. Settle backs it: a committing pass whose commits since
-    admission carry a path outside the owned paths refuses `foreign-paths` (settle --accept-foreign
-    <paths> after the file's owner confirmed them), for legs admitted under shared-checkout-guard
+    guards.workHook false switch a hook layer off. Settle backs it: only the runtime commits on a workflow
+    branch (workflow-checkpoint.mjs checkpointOp), and a commit or change outside an op's leases refuses
+    its pass (workflow-foreign-commit, workflow-foreign-change)
   hierarchy: >-
     `hierarchy` projects starci/agent-hierarchy@1 from durable workflow/job
     identity. Stable nodes are workflow:<workflow>, agent:kernel:<workflow>

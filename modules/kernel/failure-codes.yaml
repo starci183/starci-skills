@@ -6007,25 +6007,6 @@ action-until-invalid:
   nextStep_vi: "Lệnh bị từ chối và không ghi gì; Supervisor đưa lại mốc đúng (--until hoặc --hold-ms)."
   owner: supervisor
   kind: input-invalid
-adopt-from-invalid:
-  title: "adopt-from names no other workflow"
-  title_vi: "adopt-from không trỏ tới quy trình khác nào"
-  meaning_vi: "Lệnh nhận nợ Work từ một quy trình khác nhưng quy trình đó không tồn tại hoặc chính là quy trình hiện tại."
-  causes_vi:
-    - "Gõ sai mã quy trình"
-    - "Trỏ chính quy trình đang chạy"
-  nextStep_vi: "Lệnh enqueue bị từ chối; đưa đúng mã một quy trình đã kết thúc của cùng sổ cái."
-  owner: supervisor
-  kind: verb-refusal
-adopt-from-live:
-  title: "adopt-from workflow is still live"
-  title_vi: "Quy trình nhận nợ vẫn đang chạy"
-  meaning_vi: "Lệnh nhận nợ Work từ một quy trình còn đang chạy, trong khi quy trình đang chạy tự sửa nợ Work của mình."
-  causes_vi:
-    - "Chọn nhầm quy trình chưa kết thúc"
-  nextStep_vi: "Lệnh enqueue bị từ chối; chờ quy trình kia kết thúc hoặc để nó tự sửa nợ Work."
-  owner: supervisor
-  kind: verb-refusal
 after-self-lineage:
   title: "--after would wait on itself"
   title_vi: "Chờ chính đơn vị việc của mình"
@@ -6601,43 +6582,6 @@ code-digest-mismatch:
   nextStep_vi: "Bằng chứng bị coi là cũ; chạy lại bước tạo ví dụ để chụp bằng chứng mới."
   owner: op-retry
   kind: check-finding
-commit-only-conflict:
-  title: "Commit-only flags conflict"
-  title_vi: "Cờ commit-only dùng sai kết hợp"
-  meaning_vi: "Các cờ --as-repo-owner và --adopt-from phải đi cùng --commit-only-work-debt nhưng đã bị dùng riêng lẻ."
-  causes_vi:
-    - "Thiếu một trong các cờ đi kèm"
-  nextStep_vi: "Enqueue bị từ chối; dùng đủ bộ cờ đi cùng nhau rồi chạy lại."
-  owner: supervisor
-  kind: verb-refusal
-commit-only-of-invalid:
-  title: "commit-only-of job not eligible"
-  title_vi: "Việc nguồn của commit-only không hợp lệ"
-  meaning_vi: "Việc được chọn không phải việc đã thành công của cùng op nên không có gì để commit."
-  causes_vi:
-    - "Chọn việc khác op hoặc chưa thành công"
-  nextStep_vi: "Enqueue bị từ chối; chọn việc thành công của đúng op này."
-  owner: supervisor
-  kind: verb-refusal
-commit-only-of-unknown:
-  title: "commit-only-of job not found"
-  title_vi: "Không tìm thấy việc nguồn của commit-only"
-  meaning_vi: "Mã việc nguồn của commit-only trống hoặc không thuộc quy trình này."
-  causes_vi:
-    - "Gõ sai mã việc"
-  nextStep_vi: "Enqueue bị từ chối; đưa đúng mã việc của quy trình hiện tại."
-  owner: supervisor
-  kind: verb-refusal
-commit-tree-failed:
-  title: "Could not build the commit"
-  title_vi: "Không tạo được commit"
-  meaning_vi: "Git từ chối tạo commit mới khi đưa thay đổi của op vào nhánh quy trình."
-  causes_vi:
-    - "Lỗi git commit-tree"
-    - "Kho git hỏng hoặc bị khóa"
-  nextStep_vi: "Việc hợp nhất dừng; cần lõi runtime xem lỗi git rồi thử lại."
-  owner: runtime-core
-  kind: runtime-fault
 commit-unreadable:
   title: "Commit cannot be read"
   title_vi: "Không đọc được commit"
@@ -6930,15 +6874,6 @@ dead-worker-requeued:
   nextStep_vi: "Runtime tự xếp lại cùng một việc và giao lại; không cần ai làm gì thêm."
   owner: op-retry
   kind: settle-reason
-debris-unadmitted:
-  title: "Job has no admission time for debris"
-  title_vi: "Việc chưa có thời điểm được nhận nên không xác định được rác"
-  meaning_vi: "Không dọn được tàn dư vì việc không có thời điểm được nhận, mà tàn dư được định nghĩa là những gì có trước thời điểm đó."
-  causes_vi:
-    - "việc chưa từng được nhận qua quy trình bình thường"
-  nextStep_vi: "Lệnh bị từ chối; cần Supervisor xem lại việc này bằng công cụ chẩn đoán."
-  owner: supervisor
-  kind: verb-refusal
 decision-closed:
   title: "Decision already closed"
   title_vi: "Quyết định đã được đóng"
@@ -7437,15 +7372,6 @@ follow-up-of-unknown:
   nextStep_vi: "Không tạo việc; người xếp việc nhập lại đúng mã việc gốc."
   owner: supervisor
   kind: input-invalid
-foreign-accept-unproven:
-  title: "Accepted foreign path lacks proof"
-  title_vi: "Đường dẫn của người khác chưa có bằng chứng"
-  meaning_vi: "Việc chốt bị từ chối vì chấp nhận thay đổi ở đường dẫn không thuộc mình mà chưa chứng minh chủ của nó đã xác nhận."
-  causes_vi:
-    - "chấp nhận đường dẫn ngoài phạm vi mà không kèm sự cố đã giải quyết"
-  nextStep_vi: "Việc chưa chốt; hãy mở sự cố nêu các tệp, chờ chủ xác nhận hoặc hoàn tác, rồi chốt lại kèm mã sự cố."
-  owner: supervisor
-  kind: settle-reason
 foreign-hook:
   title: "Foreign git hook present"
   title_vi: "Có hook git không phải của hệ thống"
@@ -7465,16 +7391,6 @@ foreign-input:
   nextStep_vi: "Lần đánh thức bị từ chối và không gõ gì; Runtime thử xóa nháp, nếu không được thì cần người xử lý ô nhập."
   owner: owner
   kind: verb-refusal
-foreign-paths:
-  title: "Foreign paths changed by the job"
-  title_vi: "Việc đã thay đổi đường dẫn không thuộc mình"
-  meaning_vi: "Đã phát hiện commit chạm vào đường dẫn ngoài phạm vi sở hữu của việc trong lúc nó chạy."
-  causes_vi:
-    - "op sửa tệp của luồng khác"
-    - "commit của người khác lọt vào cùng khoảng thời gian"
-  nextStep_vi: "Việc không được xác nhận đã land; cần đối chiếu commit lạ, chấp nhận có bằng chứng hoặc hoàn tác."
-  owner: op-retry
-  kind: settle-reason
 foundation-action-invalid:
   title: "Foundation needs exactly one action"
   title_vi: "Lệnh nền tảng phải chọn đúng một thao tác"
@@ -7674,26 +7590,6 @@ handover-unknown:
   nextStep_vi: "Kernel từ chối lệnh; cần chạy lại với đúng mã yêu cầu bàn giao của quy trình này."
   owner: supervisor
   kind: input-invalid
-head-not-on-op-branch:
-  title: "Commit is not on the op branch"
-  title_vi: "Commit không nằm trên nhánh của op"
-  meaning_vi: "Commit được chỉ định để đưa vào nhánh quy trình không thuộc lịch sử nhánh của op vừa làm."
-  causes_vi:
-    - "op báo sai mã commit"
-    - "nhánh của op đã bị viết lại sau khi báo"
-  nextStep_vi: "Việc gộp vào nhánh quy trình bị từ chối; op phải báo lại đúng commit nằm trên nhánh của nó."
-  owner: op-retry
-  kind: runtime-fault
-head-unresolved:
-  title: "Commit cannot be resolved"
-  title_vi: "Không tìm thấy commit được chỉ định"
-  meaning_vi: "Git không tìm ra commit mà op nói là điểm kết thúc công việc của nó."
-  causes_vi:
-    - "mã commit sai hoặc đã bị xóa"
-    - "commit chưa từng được tạo trong kho"
-  nextStep_vi: "Việc đưa công việc vào nhánh quy trình bị từ chối; op phải báo lại commit có thật."
-  owner: op-retry
-  kind: runtime-fault
 hub-blocker:
   title: "One job blocks several workflows"
   title_vi: "Một việc đang chặn nhiều quy trình"
@@ -7945,26 +7841,6 @@ kind-invalid:
   nextStep_vi: "Lệnh provider-backoff bị từ chối; chọn một loại nằm trong danh sách hiện ra."
   owner: supervisor
   kind: input-invalid
-land-gate-red:
-  title: "The land gate reports new findings"
-  title_vi: "Cổng khi land báo lỗi mới"
-  meaning_vi: "Khi Kernel đưa op vào main, gate.mjs chạy trên worktree của op so với main và thấy lỗi mà main không có (lint, tsc, spec). main không được di chuyển."
-  causes_vi:
-    - "Op báo done nhưng nhánh vẫn còn lỗi mới"
-    - "Rebase lên main mới làm phát sinh lỗi kiểu hoặc lint"
-  nextStep_vi: "Việc chốt bị từ chối; op sửa các lỗi trong gate, commit rồi báo head mới."
-  owner: op-retry
-  kind: settle-reason
-land-gate-unavailable:
-  title: "The land gate could not run a tool"
-  title_vi: "Cổng khi land không chạy được một công cụ"
-  meaning_vi: "gate.mjs trên worktree của op (hoặc chốt chặn merge) không chạy được một công cụ, nên không có kết quả để land. Không bao giờ land khi cổng không chạy được."
-  causes_vi:
-    - "Worktree của op đã mất"
-    - "hfs lint, tsc hoặc git merge-tree không chạy được"
-  nextStep_vi: "Sửa môi trường công cụ rồi chốt lại; main giữ nguyên."
-  owner: runtime-core
-  kind: settle-reason
 land-incomplete:
   title: "Land request is incomplete"
   title_vi: "Yêu cầu land thiếu thông tin"
@@ -7974,26 +7850,6 @@ land-incomplete:
   nextStep_vi: "Lệnh bị từ chối; gọi lại đủ ba tham số."
   owner: supervisor
   kind: input-invalid
-land-main-refused:
-  title: "main could not be fast-forwarded"
-  title_vi: "Không fast-forward được main"
-  meaning_vi: "Op đã qua cổng nhưng main không di chuyển được: bản checkout đang dùng không ở main hoặc đang sửa dở đúng các tệp mà lần land này ghi."
-  causes_vi:
-    - "Bản checkout chính có thay đổi chưa commit trên các tệp đó"
-    - "Bản checkout chính không ở nhánh main"
-  nextStep_vi: "Làm sạch bản checkout chính hoặc chuyển nó về main rồi chốt lại; main giữ nguyên."
-  owner: supervisor
-  kind: settle-reason
-land-merge-dropped-main:
-  title: "A merge on the op branch dropped main's changes"
-  title_vi: "Một commit merge trên nhánh op làm mất thay đổi của main"
-  meaning_vi: "Chốt chặn merge tính lại commit merge bằng git merge-tree và thấy có tệp main đã sửa mà bản merge lại giữ phía nhánh op (như merge 9958cce38). main không được di chuyển."
-  causes_vi:
-    - "Giải xung đột bằng cách lấy toàn bộ phía nhánh"
-    - "Merge main vào nhánh với chiến lược ours"
-  nextStep_vi: "Làm lại merge, giữ thay đổi của main ở từng tệp được liệt kê, commit rồi báo head mới."
-  owner: op-retry
-  kind: settle-reason
 land-refused:
   title: "Lesson land refused"
   title_vi: "Lần land bài học bị từ chối"
@@ -8012,15 +7868,6 @@ landed-peer-mismatch:
   nextStep_vi: "Lệnh mở sự cố bị từ chối; sửa để hai giá trị trùng hoặc bỏ --peer."
   owner: supervisor
   kind: input-invalid
-landed-unverifiable:
-  title: "Landed code cannot be verified"
-  title_vi: "Không kiểm được code đã land"
-  meaning_vi: "Cổng đẩy code yêu cầu kiểm lint nhưng kho không cài đủ công cụ để kiểm."
-  causes_vi:
-    - "kho khai báo lint nhưng chưa cài eslint"
-  nextStep_vi: "Cổng đẩy không qua; cài công cụ lint của kho rồi thử lại."
-  owner: other-op:workspace.manage
-  kind: check-finding
 ledger-corrupt:
   title: "Ledger database is corrupt"
   title_vi: "Cơ sở dữ liệu sổ ghi bị hỏng"
@@ -8244,16 +8091,6 @@ main-moving:
   nextStep_vi: "Land thất bại sau số lần thử tối đa; thử lại khi main ổn định."
   owner: op-retry
   kind: runtime-fault
-main-unresolved:
-  title: "Main branch not found"
-  title_vi: "Không tìm thấy nhánh main"
-  meaning_vi: "Khi đưa op vào main, runtime không đọc được nhánh main của repo sản phẩm."
-  causes_vi:
-    - "Repo sản phẩm không có nhánh main"
-    - "Repo đang hỏng hoặc bị khoá"
-  nextStep_vi: "Không land gì. Kiểm tra repo sản phẩm có nhánh main rồi chốt lại việc."
-  owner: runtime-core
-  kind: settle-reason
 max-ops:
   title: "Operation slots are full"
   title_vi: "Đã hết chỗ chạy op"
@@ -8272,15 +8109,6 @@ measurement-findings-are-the-result:
   nextStep_vi: "Chốt bị từ chối kiểu thất bại; ghi phát hiện làm kết quả đo rồi chốt lại."
   owner: op-retry
   kind: settle-reason
-merge-tree-failed:
-  title: "Merge simulation failed"
-  title_vi: "Chạy thử phép gộp bị lỗi"
-  meaning_vi: "Git không chạy nổi phép gộp thử, không phải do xung đột."
-  causes_vi:
-    - "lỗi git hoặc kho hỏng"
-  nextStep_vi: "Việc land dừng và đính kèm lỗi git; cần kiểm tra kho."
-  owner: runtime-core
-  kind: runtime-fault
 missing-account:
   title: "No account for provider"
   title_vi: "Không có tài khoản cho nhà cung cấp"
@@ -8371,15 +8199,6 @@ no-longer-reported:
   nextStep_vi: "Bỏ qua; không cần làm gì thêm."
   owner: op-retry
   kind: settle-reason
-op-worktree-reset-failed:
-  title: "The op worktree could not be put on the rebased head"
-  title_vi: "Không đặt được worktree của op lên head đã rebase"
-  meaning_vi: "Để cổng chạy đúng trên cây sẽ land, worktree của op được reset lên head đã rebase lên main; git từ chối bước đó."
-  causes_vi:
-    - "Tệp trong worktree đang bị khóa"
-  nextStep_vi: "Giải phóng tệp bị khóa rồi chốt lại; main giữ nguyên."
-  owner: runtime-core
-  kind: runtime-fault
 orca-worktree-create-failed:
   title: "Orca did not create the worktree"
   title_vi: "Orca không tạo được cây làm việc"
@@ -8400,16 +8219,6 @@ orca-worktree-rm-failed:
     - "Một tiến trình còn giữ thư mục của cây"
   nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/lib/worktrees.mjs gc."
   owner: runtime-core
-  kind: runtime-fault
-product-integrate-red:
-  title: "The op breaks on main"
-  title_vi: "Op hỏng khi đặt lên main"
-  meaning_vi: "Phần việc đã xanh trên nền của nó, nhưng khi rebase lên main mới thì các kiểm tra chạy lại của op hoặc kiểm tra import bị đỏ, nên main không được di chuyển."
-  causes_vi:
-    - "Xung đột ngầm với thay đổi của op khác đã vào main"
-    - "main đã đổi kể từ lúc op bắt đầu"
-  nextStep_vi: "main giữ nguyên; op tiếp tục trên nền main mới (continuation), không tính là thất bại."
-  owner: op-retry
   kind: runtime-fault
 no-typescript:
   title: "TypeScript not found"
@@ -8438,15 +8247,6 @@ not-an-op-job:
   nextStep_vi: "Không giải phóng phiên nào; bỏ qua."
   owner: runtime-core
   kind: settle-reason
-not-landed:
-  title: "Work is not landed"
-  title_vi: "Công việc chưa được land"
-  meaning_vi: "Kiểm tra sau chốt thấy có tệp còn dở hoặc chưa vào nhánh đích."
-  causes_vi:
-    - "op chưa commit hoặc chưa đẩy"
-  nextStep_vi: "Chốt không xanh; op phải commit và land đủ rồi báo lại."
-  owner: op-retry
-  kind: check-finding
 not-windows:
   title: "Not running on Windows"
   title_vi: "Không chạy trên Windows"
@@ -8491,15 +8291,6 @@ op-rev-drift:
     - "runtime được cập nhật giữa chừng"
   nextStep_vi: "Chỉ là cảnh báo, không chặn chốt; Kernel xem có cần chạy lại theo hợp đồng mới không."
   owner: supervisor
-  kind: settle-reason
-op-worktree-dirty:
-  title: "Op worktree has uncommitted changes"
-  title_vi: "Cây làm việc của op còn thay đổi chưa commit"
-  meaning_vi: "Runtime cần đưa cây của op sang bản đã rebase lên main, nhưng các thay đổi chưa commit sẽ bị ghi đè."
-  causes_vi:
-    - "Op sửa file mà không commit trước khi báo cáo"
-  nextStep_vi: "Main giữ nguyên. Op commit hoặc bỏ các thay đổi đó, báo cáo đầu nhánh mới rồi chốt lại."
-  owner: op-retry
   kind: settle-reason
 orphan-kernel-job:
   title: "Orphaned Kernel job cancelled"
@@ -9058,15 +8849,6 @@ process-tree-lingers:
   nextStep_vi: "Việc đóng terminal không được ghi nhận là sạch; lượt dọn định kỳ (tick GC) sẽ thu dọn tiến trình còn sót."
   owner: runtime-core
   kind: runtime-fault
-product-land-conflict:
-  title: "Land would conflict with main"
-  title_vi: "Đưa vào main sẽ bị xung đột"
-  meaning_vi: "Nhánh của luồng không gộp sạch được vào main, có file xung đột."
-  causes_vi:
-    - "Main đã thay đổi cùng chỗ với nhánh luồng"
-  nextStep_vi: "Không land gì, main giữ nguyên; thông báo liệt kê từng file xung đột để giải quyết trên nhánh luồng rồi land lại."
-  owner: supervisor
-  kind: blocker
 progress-stall:
   title: "Workflow progress has stalled"
   title_vi: "Tiến độ luồng công việc bị đứng"
@@ -9144,16 +8926,6 @@ provisional-unknown:
   nextStep_vi: "Không có gì đổi. Xem danh sách nhận tạm đang mở rồi dùng đúng mã."
   owner: supervisor
   kind: verb-refusal
-push-gate-red:
-  title: "Push gate found errors"
-  title_vi: "Cổng đẩy code phát hiện lỗi"
-  meaning_vi: "Cổng kiểm tra trước khi đẩy code lên phát hiện lỗi hoặc cảnh báo vượt mức cho phép."
-  causes_vi:
-    - "Có lỗi (error) trong các file sắp đẩy"
-    - "Số cảnh báo vượt ngưỡng cho phép"
-  nextStep_vi: "Việc đẩy code bị chặn; sửa các lỗi trong danh sách phát hiện rồi đẩy lại."
-  owner: op-retry
-  kind: check-finding
 push-refused:
   title: "Push to remote was refused"
   title_vi: "Lệnh đẩy code lên bị từ chối"
@@ -10293,6 +10065,258 @@ worker-unavailable:
   nextStep_vi: "Nhắc bị từ chối; xử lý như worker chết (khởi động lại)."
   owner: op-retry
   kind: verb-refusal
+op-gate-base-mismatch:
+  title: "The gate measured against another base than the workflow checkpoint"
+  title_vi: "Cổng đo so với một mốc khác checkpoint của workflow"
+  meaning_vi: "Op chạy trong worktree của workflow phải đo cổng so với checkpoint trước đó (gateBaseOf); gate.json đính kèm lại đo so với commit khác, nên lỗi mới của chính op không được xác định đúng."
+  causes_vi:
+    - "Op truyền --base cũ hoặc --base main"
+    - "Một op khác đã ghi checkpoint mới trong lúc op này chạy"
+  nextStep_vi: "Việc chốt bị từ chối; chạy lại gate.mjs trong worktree của workflow không kèm --base, đính kèm gate.json mới rồi chốt lại."
+  owner: op-retry
+  kind: settle-reason
+workflow-branch-mismatch:
+  title: "The workflow worktree is on another branch"
+  title_vi: "Worktree của workflow đang ở nhánh khác"
+  meaning_vi: "Worktree của workflow không nằm trên nhánh của workflow, nên runtime không ghi checkpoint hay khôi phục gì lên nhánh khác."
+  causes_vi:
+    - "Ai đó đã checkout nhánh khác hoặc tách HEAD trong worktree của workflow"
+  nextStep_vi: "Đưa worktree về lại nhánh của workflow rồi chốt lại; main giữ nguyên."
+  owner: runtime-core
+  kind: settle-reason
+workflow-checkpoint-failed:
+  title: "The checkpoint of a green op could not be committed"
+  title_vi: "Không ghi được checkpoint cho op đã xanh"
+  meaning_vi: "Op đã qua mọi bước chốt nhưng runtime không commit được phần việc của nó lên nhánh của workflow: nhánh bị đổi giữa chừng hoặc git lỗi."
+  causes_vi:
+    - "Nhánh của workflow bị một tiến trình khác di chuyển trong lúc ghi checkpoint"
+    - "Worktree không có commit HEAD"
+  nextStep_vi: "Việc chốt bị từ chối, op giữ nguyên trạng thái; kiểm tra worktree của workflow rồi chốt lại."
+  owner: runtime-core
+  kind: settle-reason
+workflow-finish-dirty:
+  title: "The workflow worktree has work no checkpoint carries"
+  title_vi: "Worktree còn phần việc chưa có checkpoint"
+  meaning_vi: "api finish không đưa workflow vào main khi worktree còn tệp chưa nằm trong checkpoint nào."
+  causes_vi:
+    - "Một op chưa chốt"
+    - "Có tệp được sửa tay trong worktree"
+  nextStep_vi: "Chốt hoặc reset các op còn mở rồi gọi finish lại; main giữ nguyên."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-gate-red:
+  title: "The full gate of the workflow branch is red"
+  title_vi: "Cổng toàn nhánh của workflow báo lỗi mới"
+  meaning_vi: "gate.mjs chạy trên cả nhánh của workflow so với merge-base với main và thấy lỗi mới (lint, tsc, spec). main không di chuyển."
+  causes_vi:
+    - "Lỗi giữa các op mà cổng từng op không thấy"
+    - "Rebase lên main mới làm phát sinh lỗi"
+  nextStep_vi: "Giao một op sửa các lỗi trong gate trên worktree của workflow, rồi finish lại."
+  owner: op-retry
+  kind: verb-refusal
+workflow-finish-gate-unavailable:
+  title: "The full gate could not run a tool"
+  title_vi: "Cổng toàn nhánh không chạy được một công cụ"
+  meaning_vi: "gate.mjs không chạy được một công cụ nên không có kết quả; không bao giờ đưa vào main khi cổng không chạy."
+  causes_vi:
+    - "hfs lint, tsc hoặc jest không chạy được"
+    - "Thiếu node_modules sau npm ci"
+  nextStep_vi: "Sửa môi trường công cụ rồi finish lại; main giữ nguyên."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-guard-unavailable:
+  title: "The merge guard could not run"
+  title_vi: "Chốt chặn merge không chạy được"
+  meaning_vi: "Chốt chặn merge không tính lại được một commit merge trên nhánh workflow bằng git merge-tree."
+  causes_vi:
+    - "git merge-tree lỗi"
+  nextStep_vi: "Sửa môi trường git rồi finish lại; main giữ nguyên."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-lock-busy:
+  title: "Another land holds the repository lock"
+  title_vi: "Một lần đưa vào main khác đang giữ khoá"
+  meaning_vi: "Một workflow khác đang đưa vào main của cùng repository và giữ khoá quá thời gian chờ."
+  causes_vi:
+    - "Hai workflow finish cùng lúc trên một repository"
+  nextStep_vi: "Chờ lần kia xong rồi finish lại."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-main-moved:
+  title: "main moved during the finish"
+  title_vi: "main đã di chuyển trong lúc finish"
+  meaning_vi: "main thay đổi giữa bước rebase và bước fast-forward, nên compare-and-swap từ chối."
+  causes_vi:
+    - "Một workflow khác vừa vào main"
+  nextStep_vi: "Gọi finish lại; lần sau sẽ rebase lên main mới."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-main-refused:
+  title: "main could not be fast-forwarded at finish"
+  title_vi: "Không fast-forward được main khi finish"
+  meaning_vi: "Bản checkout chính không ở main hoặc đang có thay đổi chưa commit trên đúng các tệp mà workflow ghi."
+  causes_vi:
+    - "Bản checkout chính bẩn trên các tệp đó"
+    - "Bản checkout chính không ở nhánh main"
+  nextStep_vi: "Làm sạch bản checkout chính hoặc đưa nó về main rồi finish lại."
+  owner: supervisor
+  kind: verb-refusal
+workflow-finish-merge-dropped-main:
+  title: "A merge on the workflow branch dropped main changes"
+  title_vi: "Một commit merge trên nhánh workflow làm mất thay đổi của main"
+  meaning_vi: "Chốt chặn merge thấy có tệp main đã sửa mà bản merge lại giữ phía nhánh workflow. main không di chuyển."
+  causes_vi:
+    - "Xung đột được giải bằng cách giữ toàn bộ phía nhánh"
+  nextStep_vi: "Làm lại merge, lấy thay đổi của main cho từng tệp, rồi finish lại."
+  owner: op-retry
+  kind: verb-refusal
+workflow-finish-push-failed:
+  title: "main advanced but its push failed"
+  title_vi: "main đã tiến nhưng push lỗi"
+  meaning_vi: "main đã được fast-forward nhưng git push lên origin thất bại."
+  causes_vi:
+    - "Mạng lỗi"
+    - "origin từ chối push"
+  nextStep_vi: "Gọi finish lại để push lại; main giữ nguyên ở commit mới."
+  owner: supervisor
+  kind: verb-refusal
+workflow-finish-rebase-conflict:
+  title: "The workflow branch conflicts with main at finish"
+  title_vi: "Nhánh workflow xung đột với main khi finish"
+  meaning_vi: "Khi finish, rebase nhánh của workflow lên main gặp xung đột; rebase đã được huỷ và main giữ nguyên."
+  causes_vi:
+    - "main đã sửa cùng tệp trong lúc workflow chạy"
+  nextStep_vi: "Giao một op giải xung đột trên worktree của workflow rồi finish lại."
+  owner: op-retry
+  kind: verb-refusal
+workflow-finish-rebase-failed:
+  title: "The workflow branch could not be rebased at finish"
+  title_vi: "Không rebase được nhánh workflow khi finish"
+  meaning_vi: "Khi finish, rebase lỗi không do xung đột (worktree bẩn hoặc main không resolve được)."
+  causes_vi:
+    - "Worktree còn thay đổi"
+    - "git rebase lỗi môi trường"
+  nextStep_vi: "Sửa nguyên nhân rồi finish lại; main giữ nguyên."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-release-pending-failed:
+  title: "The workflow worktree could not be marked release-pending"
+  title_vi: "Không đánh dấu được worktree của workflow là chờ giải phóng"
+  meaning_vi: "main đã được đưa vào và push, nhưng registry không ghi được trạng thái release-pending, nên GC của phần A không biết để gỡ worktree."
+  causes_vi:
+    - "machine.sqlite không ghi được"
+    - "Registry không còn dòng của workflow"
+  nextStep_vi: "main đã đúng; sửa registry rồi finish lại để đánh dấu release-pending."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-verify-missing:
+  title: "No passing review.verify on what lands"
+  title_vi: "Chưa có review.verify đạt trên phần sắp vào main"
+  meaning_vi: "Op cuối cùng được chốt của workflow phải là một review.verify đạt; có op khác chốt sau nó hoặc chưa có review.verify."
+  causes_vi:
+    - "Chưa chạy review.verify"
+    - "Có op sửa code chốt sau review.verify"
+  nextStep_vi: "Chạy review.verify làm chặng cuối rồi finish lại."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-finish-verify-stale:
+  title: "review.verify did not verify the head that lands"
+  title_vi: "review.verify chưa kiểm đúng head sắp vào main"
+  meaning_vi: "Head mà review.verify ghi trong báo cáo khác head sắp được đưa vào main, hoặc lần rebase khi finish đã dời head; main không di chuyển."
+  causes_vi:
+    - "main đã tiến nên rebase tạo head mới"
+    - "review.verify chạy trên một head cũ hoặc không ghi head"
+  nextStep_vi: "Chạy lại review.verify trên head hiện tại của nhánh workflow rồi finish lại."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-foreign-change:
+  title: "A change in the workflow worktree is under no live op's leases"
+  title_vi: "Worktree của workflow có thay đổi không thuộc lease của op nào"
+  meaning_vi: "Op xanh chỉ được ghi checkpoint cho các đường dẫn nó sở hữu; có tệp thay đổi nằm ngoài lease của mọi op đang chạy trong workflow, nên việc chốt xanh bị từ chối."
+  causes_vi:
+    - "Op ghi ra ngoài owned_paths của nó"
+    - "Có người sửa tay một tệp trong worktree của workflow"
+  nextStep_vi: "Chốt op là fail hoặc blocked để runtime giữ thay đổi đó vào preserved/<workflowId>/<op> và đưa về checkpoint, hoặc mở rộng owned_paths rồi chạy lại op."
+  owner: op-retry
+  kind: settle-reason
+workflow-foreign-commit:
+  title: "A commit on the workflow branch was not made by the runtime"
+  title_vi: "Nhánh workflow có commit không do runtime tạo"
+  meaning_vi: "Chỉ runtime (checkpointOp) được commit trên nhánh của workflow; đầu nhánh phải đúng là checkpoint cuối. Có commit khác nằm sau checkpoint nên việc chốt xanh hoặc finish bị từ chối."
+  causes_vi:
+    - "Op tự chạy git commit trong worktree của workflow"
+    - "Có người commit tay lên nhánh workflow"
+  nextStep_vi: "Chốt op đó là fail hoặc blocked để runtime giữ commit vào preserved/<workflowId>/<op> và đưa nhánh về checkpoint, rồi chạy lại op mà không tự commit."
+  owner: op-retry
+  kind: settle-reason
+workflow-gate-base-unknown:
+  title: "The gate base of the workflow is unknown"
+  title_vi: "Không xác định được mốc so sánh của cổng"
+  meaning_vi: "Checkpoint ghi trong registry không phải commit của worktree, hoặc nhánh của workflow không có merge-base với main, nên cổng không biết so với đâu."
+  causes_vi:
+    - "Registry ghi một checkpoint đã mất"
+    - "Nhánh workflow không xuất phát từ main"
+  nextStep_vi: "Sửa checkpoint trong registry (hoặc tạo lại workflow) rồi chạy lại."
+  owner: runtime-core
+  kind: runtime-fault
+workflow-preserve-failed:
+  title: "The work of a failed op could not be preserved"
+  title_vi: "Không giữ lại được phần việc của op thất bại"
+  meaning_vi: "Runtime không ghi được ref preserved/<workflowId>/<op> cho phần việc của op thất bại hoặc bị chặn, nên không reset worktree."
+  causes_vi:
+    - "git update-ref thất bại"
+  nextStep_vi: "Không có gì bị xoá; sửa lỗi git rồi chốt lại op."
+  owner: runtime-core
+  kind: settle-reason
+workflow-rebase-conflict:
+  title: "The workflow branch conflicts with main"
+  title_vi: "Nhánh workflow xung đột với main"
+  meaning_vi: "Rebase nhánh của workflow lên đầu main gặp xung đột; rebase đã được huỷ và nhánh giữ nguyên."
+  causes_vi:
+    - "main đã sửa cùng tệp mà workflow sửa"
+  nextStep_vi: "Một op sửa xung đột trên worktree của workflow (rebase lên main, giải quyết từng tệp), rồi chạy lại."
+  owner: op-retry
+  kind: verb-refusal
+workflow-rebase-dirty:
+  title: "The workflow worktree has uncommitted changes"
+  title_vi: "Worktree của workflow còn thay đổi chưa commit"
+  meaning_vi: "Không rebase khi worktree còn tệp thay đổi: một op đang chạy hoặc phần việc chưa được ghi checkpoint."
+  causes_vi:
+    - "Một op vẫn đang chạy trong worktree"
+    - "Op thất bại chưa được reset"
+  nextStep_vi: "Chờ op đang chạy chốt xong (checkpoint hoặc reset) rồi rebase lại."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-rebase-failed:
+  title: "The workflow branch could not be rebased"
+  title_vi: "Không rebase được nhánh workflow"
+  meaning_vi: "git rebase lỗi mà không phải do xung đột, hoặc main không tồn tại trong worktree."
+  causes_vi:
+    - "Nhánh main không resolve được"
+    - "git rebase lỗi môi trường"
+  nextStep_vi: "Sửa môi trường git rồi chạy lại; nhánh giữ nguyên."
+  owner: runtime-core
+  kind: verb-refusal
+workflow-reset-failed:
+  title: "The op side could not be reset to the checkpoint"
+  title_vi: "Không đưa được phần của op về checkpoint"
+  meaning_vi: "Sau khi giữ lại phần việc, runtime không đưa được thư mục của op (be/ hoặc fe/) về checkpoint cuối: còn tệp thay đổi hoặc HEAD lệch."
+  causes_vi:
+    - "Tệp bị khoá bởi tiến trình khác"
+    - "git restore hoặc git clean lỗi"
+  nextStep_vi: "Phần việc đã được giữ trong preserved/<workflowId>/<op>; dọn tay thư mục đó rồi chốt lại."
+  owner: runtime-core
+  kind: settle-reason
+workflow-snapshot-failed:
+  title: "The op side could not be snapshotted"
+  title_vi: "Không chụp lại được phần của op"
+  meaning_vi: "Runtime dùng một index tạm để chụp phần việc của op thành commit nhưng git read-tree, add, write-tree hoặc commit-tree lỗi."
+  causes_vi:
+    - "Đĩa đầy hoặc thư mục tạm không ghi được"
+    - "Đường dẫn quá dài trên Windows"
+  nextStep_vi: "Sửa môi trường rồi chốt lại; worktree không bị đổi."
+  owner: runtime-core
+  kind: runtime-fault
 workflow-not-running:
   title: "Workflow not running"
   title_vi: "Workflow không ở trạng thái chạy"

@@ -4,7 +4,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateJob } from '../../../engine/ledger-db.mjs';
 import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../engine/admission.mjs';
-import { EVENTS as PRODUCT_EVENTS } from '../product-worktree.mjs';
+import { CHECKPOINT_EVENTS, checkpointOp, preserveAndReset } from '../workflow-checkpoint.mjs';
+import { workflowWorktreeOf } from '../workflow-worktree.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf, jobPayloadOf, jobRowOf } from '../api-lib/rows.mjs';
@@ -84,7 +85,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProductLand, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -101,14 +102,6 @@ export default {
         throw Object.assign(new Error(`job ${jobId} is ${settling.status}: it was never dispatched, so there is no attempt to settle; drop it with api reconcile --job ${jobId} --drop`), { code: 'job-not-dispatched', status: settling.status });
       }
     }
-  }
-
-  const acceptForeign = typeof args['accept-foreign'] === 'string' ? args['accept-foreign'].split(',').map((p) => p.trim()).filter(Boolean) : [];
-  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, null, acceptForeign, null) : null;
-  if (landed?.checked && !landed.ok) {
-    const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
-    emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} â€” ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
-    process.exit(1);
   }
 
   const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
@@ -180,22 +173,26 @@ export default {
     process.exit(1);
   }
 
-  // The op's land into main, LAST (DESIGN §16.7): every settle refusal above passed, so main never moves for a job that
-  // does not settle. Rebase onto main, land gate, CAS fast-forward, push (product-worktree.mjs integrateOp).
-  if (landed?.productLand) {
-    const land = settleProductLand(landed);
-    const integ = land.integration ?? {};
-    if (!land.ok || !integ.already) {
-      const settlingJob = db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(jobId);
-      if (settlingJob) ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: land.ok ? PRODUCT_EVENTS.landed : PRODUCT_EVENTS.landRefused,
-        payload: land.ok ? integ : { reason: land.reason, conflicts: (integ.conflicts ?? []).map((c) => c.file), gate: integ.gate ?? null, continuation: integ.continuation ?? null } }));
+  let checkpoint = null;
+  // The workflow worktree (WFWT, scripts/kernel/workflow-checkpoint.mjs), LAST: every settle refusal above passed. A green
+  // op's side is committed on the workflow branch as the workflow's checkpoint; a failed or blocked op's side is preserved to
+  // preserved/<wf>/<op> and reset to the last checkpoint. main is never touched here: it moves only at api finish.
+  {
+    const settlingJob = db.prepare('SELECT workflow_id, kind FROM jobs WHERE job_id=?').get(jobId);
+    const wfCtx = { db, ledger, repo, env: process.env };
+    if (settlingJob?.kind === 'op' && workflowWorktreeOf(wfCtx, settlingJob.workflow_id)) {
+      try {
+        checkpoint = verdict === 'pass'
+          ? { kind: CHECKPOINT_EVENTS.checkpoint, ...checkpointOp(wfCtx, { workflowId: settlingJob.workflow_id, opId: jobId }) }
+          : { kind: CHECKPOINT_EVENTS.preserved, ...preserveAndReset(wfCtx, { workflowId: settlingJob.workflow_id, opId: jobId }) };
+      } catch (error) {
+        const reason = error?.code ?? 'workflow-checkpoint-failed';
+        emit({ ok: false, jobId, reason, code: reason, detail: String(error?.message ?? error) },
+          `settle REFUSED for ${jobId}: ${reason} - ${String(error?.message ?? error)}; the job stays unsettled and main is untouched. Fix the workflow worktree, then settle again`, args.json);
+        process.exit(1);
+      }
+      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: checkpoint.kind, payload: checkpoint }));
     }
-    if (!land.ok) {
-      emit({ ok: false, jobId, op: landed.op, reason: land.reason, detail: { ...landed.detail, integration: integ }, ...(land.hint ? { hint: land.hint } : {}) },
-        `settle REFUSED for ${jobId} (${landed.op}): ${land.reason} - ${JSON.stringify({ conflicts: (integ.conflicts ?? []).map((c) => c.file), gate: integ.gate ? { exit: integ.gate.exit, findings: (integ.gate.findings ?? []).length, errors: (integ.gate.errors ?? []).slice(0, 2) } : null })}; the job stays ${landed.status}; main untouched. ${land.hint ?? ''}`, args.json);
-      process.exit(1);
-    }
-    landed.detail = { ...landed.detail, integration: integ };
   }
 
   let released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null, settledAttemptId = null, filedReport = null, citations = null;
@@ -219,7 +216,7 @@ export default {
     const measurementLeg = isMeasurementLeg(db, job, { buildOps: buildOpsOf() });
     const recordedChecks = (Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : []).map((check) => (measurementLeg ? markMeasured(check) : check));
     checkEvidence = summarizeCheckEvidence(Array.isArray(checksEnvelope?.checks) ? { ...checksEnvelope, checks: recordedChecks } : checksEnvelope);
-    const result = { verdict, report: null, at: payload.settledAt, checkEvidence, ...(landed?.checked ? { landed: landed.detail } : {}) };
+    const result = { verdict, report: null, at: payload.settledAt, checkEvidence, ...(checkpoint ? { checkpoint } : {}) };
     // Every red check was a peer's change (api check peerBlocked): the attempt is the peer's to
     // unblock, not this op's failure - retry accounting spends no business attempt on it
     // (engine/admission.mjs retryDisposition) and the routes hand it to the peer.
@@ -524,7 +521,7 @@ export default {
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).

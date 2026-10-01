@@ -44,7 +44,7 @@ test('a manifest that holds the shape produces no finding', () => {
 
 test('an unknown top-level key, a missing section and a wrong id are SCHEMA_INVALID', () => {
   const stray = validOp();
-  stray.commitPolicy = { mode: 'one-commit' };
+  stray.strayKey = { mode: 'one-commit' };
   assert.ok(codes(checkFixture(stray)).includes('SCHEMA_INVALID'));
 
   const bare = validOp();

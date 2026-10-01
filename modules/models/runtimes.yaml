@@ -248,12 +248,8 @@ allocation:
   # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
   liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
     kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
-  # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
-  # commitPolicy needs before origin/<branch> can be read.
-  settleGit: {commandMs: 15000, fetchMs: 60000}
-  # settle's push-gate half (scripts/kernel/push-gate.mjs): one run of the target repository's own
-  # declared pre-push lint over the files the job changed (type-aware rules make it the slow step).
-  pushGate: {lintMs: 300000}
+  # one local git read over a job's owned paths (scripts/kernel/settle-landed.mjs ownedPathEffects, job-artifacts.mjs).
+  settleGit: {commandMs: 15000}
   # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
   # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
   # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json

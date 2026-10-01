@@ -281,9 +281,7 @@ fields:
       starci/op-report@1 JSON envelope and the reports row
       (UNIQUE(workflow_id, dispatch_id)) is the durable verdict, the file is
       the bound artifact, the Orca message only the wake-up
-      (verdict-contract.yaml envelope). An op whose commitPolicy commits puts
-      `git rev-parse HEAD` of the checkout holding its owned paths into the
-      envelope's `head` on done|partial. The kernel then consumes the row
+      (verdict-contract.yaml envelope). The kernel then consumes the row
       (`api consume-report`),
       re-runs the checks (`api check`) and settles. The op's terminal dies
       when its verdict settles — `api settle` closes the worker terminal
@@ -318,7 +316,7 @@ preflight:
   context.product_worktree:
     meaning: >-
       Where an isolated op works (DESIGN §16.7; scripts/kernel/product-worktree.mjs). An op whose brief sets
-      policy.isolation: worktree (default: modules/kernel/product-land.yaml defaultIsolation) and whose owned
+      policy.isolation: worktree and whose owned
       paths land in ONE bound product repository other than the Work owner gets exactly ONE git worktree
       <repo>/.starciwork/worktrees/<op> on branch op/<op>, cut from the product's main. `api dispatch --spawn`
       creates it through the one worktree API (scripts/lib/worktrees.mjs createWorktree: registered in
@@ -330,17 +328,20 @@ preflight:
       (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing run against the live
       checkout (main), where every op lands. A dry-run shows the planned paths (preview: true).
     settle: >-
-      settle --verdict pass proves the commit clean in the op worktree, then - as its LAST step, once every other
-      settle refusal passed - lands it into main (scripts/kernel/product-worktree.mjs integrateOp, per-repository
-      lock): the merge guard over the op's history (scripts/checks/gate.mjs mergeGuard), op/<op> rebased onto main's
-      tip (main's side is never overwritten), the land gate over exactly the tree that lands, the pre-land verify (the
-      op's re-runnable declared checks, land.checks, the import check), main compare-and-swap fast-forwarded, main
-      pushed; a product-op-landed event per op. Refusals: land-merge-dropped-main, product-land-conflict (files +
-      hunks) and product-integrate-red (a continuation on the new main, never a failure), land-gate-red,
-      land-gate-unavailable, op-worktree-dirty, land-main-refused; main is untouched on every refusal. The worktree
-      and its branch are removed right after the worker is released (released -> worktree-removed, verified,
-      SLA worktrees.opRemoveSlaMs; a failed or blocked op's work is preserved to preserved/<job> first); the
-      reconciler GC (key gc:worktrees, always active) removes whatever outlives its op.
+      settle never lands an op into main (WFWT, scripts/kernel/workflow-checkpoint.mjs). In a workflow worktree, as
+      its LAST step once every other settle refusal passed, a pass commits the op's side (be/ or fe/, from its owned
+      paths; the whole tree for both) on the workflow branch as the workflow's checkpoint (checkpointOp, event
+      workflow-checkpoint), and the next op's gate measures against it (gateBaseOf); a fail or blocked verdict keeps
+      the side's work as preserved/<workflowId>/<op> and resets the side to the last checkpoint (preserveAndReset,
+      event workflow-op-preserved). Only the runtime commits on the workflow branch: the op owes no commit, the branch
+      head must be the last checkpoint, and a commit checkpointOp did not make refuses a pass (workflow-foreign-commit;
+      a failed op's foreign commits are folded into its preserved ref). The op's gate JSON must measure against
+      gateBaseOf (op-gate-base-mismatch). Other refusals: workflow-worktree-missing, workflow-branch-mismatch,
+      workflow-checkpoint-failed, workflow-snapshot-failed, workflow-preserve-failed, workflow-reset-failed. main
+      moves only at api finish (finishWorkflow: the full gate, the merge guard, review.verify of the exact head that
+      lands, the rebase - a moved head forces a re-review, workflow-finish-verify-stale - main fast-forwarded and
+      pushed, then the worktree marked release-pending; part A's GC removes it and the workflow branch; event
+      workflow-landed).
     refusals:
       product-worktree-unavailable: the worktree or its node_modules overlay could not be made (reason in detail); the job stays queued
       worktree-cap: the product repository holds worktrees.capPerRepo live worktrees; the dispatch waits (the job stays queued, no attempt spent)

@@ -106,8 +106,13 @@ retired:
   - {path: tests/agent-readiness-pattern.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs'}
   - {path: tests/codex-unattended-ops.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs (Orca applies the per-agent default args)'}
   - {path: tests/guard-shim-reentry.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'the command-guard hook specs'}
-  - {path: scripts/kernel/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/product-worktree.mjs integrateOp: each op lands into main at its green settle (rebase, land gate, CAS fast-forward, push); no workflow branch, no _wf worktree'}
-  - {path: scripts/kernel/api-verbs/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: the settle lands each op into main; there is no workflow branch to land'}
+  - {path: scripts/kernel/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at api finish (full gate, merge guard, review.verify, rebase, CAS fast-forward, push)'}
+  - {path: scripts/kernel/api-verbs/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at api finish'}
+  - {path: scripts/kernel/push-gate.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: no op commits; the runtime commits each green op as its workflow checkpoint (scripts/kernel/workflow-checkpoint.mjs) and the workflow lands through the full gate at api finish'}
+  - {path: tests/push-gate.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: scripts/kernel/push-gate.mjs is retired'}
+  - {path: tests/settle-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (only the runtime commits: checkpoint, foreign commit and foreign change)'}
+  - {path: tests/work-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (a Work-owner ops .starciwork records are its checkpoint)'}
+  - {path: tests/work-debt-adopt.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: no op commits, so no Work debt exists'}
   - {path: modules/kernel/api-commands/product-land.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: the settle lands each op into main'}
   - {path: scripts/kernel/api-verbs/product-deps.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: a dependency manifest change lands into main with its op; the settle names the install the live checkout owes'}
   - {path: modules/kernel/api-commands/product-deps.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: no workflow deps unit without a workflow worktree'}

@@ -157,12 +157,12 @@ proofs:
         custody present. A service the declaration omits is named as a declaration gap for the follow-up,
         not asked of the owner when the stack already holds it.
     check: scripts/checks/check-starcistacks.mjs
-  - id: landed
+  - id: checkpointed
     requirement:
-      en: Every Work record file this operation wrote under its owned paths is committed with exact
-        pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
-        refuses not-landed while one of them is untracked or dirty; authored Work never settles
-        outside the repository history.
+      en: Every Work record file this operation wrote under its owned paths is committed by the runtime
+        as its workflow's checkpoint when the operation settles green (scripts/kernel/workflow-checkpoint.mjs
+        checkpointOp). The operation never commits and changes nothing outside its owned paths; settle
+        refuses workflow-foreign-commit or workflow-foreign-change otherwise.
 blockers:
   - code: QUESTION_UNCLEAR
     condition:
@@ -188,13 +188,6 @@ placeholders:
   slug: Stable identity custody slug
 layoutPolicy:
   checks: [starci-validate, starci-starcistacks-check]
-policy:
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    noChange: return-existing-verified-commit-no-empty-commit
 route:
   nodeKinds: [business]
   phase: [decide, cross-cutting]

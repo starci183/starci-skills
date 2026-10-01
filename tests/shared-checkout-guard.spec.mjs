@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
+import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList } from '../scripts/guards/git-policy.mjs';
 import { classifyNpm, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch, bindGuardTerminal } from '../scripts/guards/install.mjs';
 import { commandVerdict } from '../scripts/guards/command-guard.mjs';
@@ -328,7 +328,7 @@ test('guardLaunch writes the job guard file the launch binds to the worker termi
 });
 
 
-// nivo inc-d1833bc89c1f: the commit-only (Work debt) packet commits a long owned list with
+// nivo inc-d1833bc89c1f: a long owned list is committed with
 // --pathspec-from-file, which the guard refused (COMMIT_NOT_SCOPED), so the batched repair could never
 // commit. The list's entries are pathspecs: every one inside owned_paths passes, one outside refuses.
 test('a --pathspec-from-file list is scoped line by line like named pathspecs', (t) => {
@@ -377,23 +377,6 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   assert.equal(classifyGit(['add', '--', ':(literal)src/app/[id]/page.tsx'], ctx).allow, true, ':(literal) names exactly that path');
 });
 
-test('the commit-only packet\'s pathspec-list commands are the ones the guard passes', (t) => {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pathspec-packet-'));
-  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
-  const owned = [path.join(cwd, 'src/features/collab/chat')];
-  fs.writeFileSync(path.join(cwd, 'list.txt'), 'src/features/collab/chat/a.ts\nsrc/features/collab/chat/b.ts\n');
-  fs.writeFileSync(path.join(cwd, 'foreign.txt'), 'src/features/collab/chat/a.ts\nsrc/features/login/x.ts\n');
-  const argvOf = (cmd, list) => cmd.replace(/^git /, '').replace('<list>', list).match(/"[^"]*"|\S+/g).map((w) => w.replace(/^"|"$/g, ''));
-  assert.equal(PATHSPEC_LIST_COMMIT.length, 2);
-  for (const cmd of PATHSPEC_LIST_COMMIT) {
-    assert.match(cmd, /--pathspec-from-file=<list>/);
-    assert.equal(classifyGit(argvOf(cmd, 'list.txt'), { cwd, owned, top: cwd }).allow, true, `the packet's \`${cmd}\` passes the guard`);
-    assert.equal(classifyGit(argvOf(cmd, 'foreign.txt'), { cwd, owned, top: cwd }).code, 'PATH_NOT_OWNED', `\`${cmd}\` with a foreign line refuses`);
-  }
-  const prompt = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'op-prompt.mjs'), 'utf8');
-  assert.match(prompt, /commit_only: this attempt authors nothing[^\n]*\$\{PATHSPEC_LIST_COMMIT\.join\('; '\)\}/, 'the packet renders the commands the guard is tested against');
-});
-
 test('through the command guard, a pathspec list file of owned paths commits and a foreign or stdin one is refused', async (t) => {
   const repo = initRepo(t);
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
@@ -423,7 +406,7 @@ test('through the command guard, a pathspec list file of owned paths commits and
   assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
   const add = await run(['add', `--pathspec-from-file=${mine}`]);
   assert.equal(add.status, 0, add.stderr);
-  const commit = await run(['commit', '-q', '-m', 'commit-only: work debt', `--pathspec-from-file=${mine}`]);
+  const commit = await run(['commit', '-q', '-m', 'a long owned list', `--pathspec-from-file=${mine}`]);
   assert.equal(commit.status, 0, commit.stderr);
   assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt', 'src/mine/c.txt']);
   assert.equal(sh(repo, ['status', '--porcelain', '--', 'src/peer']).stdout.trim(), 'M src/peer/b.txt', 'the peer\'s change stays uncommitted');

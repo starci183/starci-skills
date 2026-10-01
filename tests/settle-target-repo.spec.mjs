@@ -4,16 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {writeGreenProofs} from './helpers/sonar-scan.mjs';
-import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,insertGoal} from '../engine/ledger-db.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
 // `git init` re-inited the live .claude repo core.bare=true (2026-09-29, tests/live-core-bare.spec.mjs).
 for(const key of ['GIT_DIR','GIT_COMMON_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_IMPLICIT_WORK_TREE','GIT_PREFIX','GIT_CONFIG','GIT_CONFIG_PARAMETERS','GIT_CONFIG_COUNT','GIT_GRAFT_FILE','GIT_NO_REPLACE_OBJECTS','GIT_REPLACE_REF_BASE','GIT_SHALLOW_FILE']) delete process.env[key];
 
-// settle's landed proof resolves each owned path against the job's target
-// repository (scripts/kernel/target-repo.mjs): one app checkout with be/ and fe/
+// each owned path resolves against the job's target repository
+// (scripts/kernel/target-repo.mjs): one app checkout with be/ and fe/
 // sides under a tmp Source, cloned from a local bare origin, the ledger at the
 // app root. STARCI_SOURCE_ROOT points the registry lookup at the tmp Source.
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -73,93 +72,9 @@ const project=t=>{
   return {be,fe,api};
 };
 
-// A running job on a running workflow with a contract-bound open attempt whose
-// contract worktree is the ledger repo (where the kernel placed the worker), a
-// filed done report naming `head`, and a green independent check_runs row:
-// everything a pass needs except the landed proof.
-const seedJob=(repo,{op,owned,head,repository,jobId='op-target-1',wf='wf-target'})=>{
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{
-    const at=Date.now();
-    ledger.transaction(db=>{
-      ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'target',by:'test-fixture',reason:'seed',at});
-      insertGoal(db,{workflowId:wf,revision:1,goalIdentity:`goal-${wf}`,markdown:'# goal',goal:{job:op},createdAt:at});
-      changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
-      createUnit(db,{workflowId:wf,unitId:`unit-${jobId}`,opId:op,subjectKey:`unit-${jobId}`,goalRevision:1,createdAt:at});
-      enqueueJob(db,{jobId,workflowId:wf,unitId:`unit-${jobId}`,opId:op,kind:'op',payload:{
-        opId:op,owned_paths:owned,...(repository?{repository}:{}),orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
-      },createdAt:at});
-      setJobStatus(db,{jobId,to:'ready',reason:'seed',at});
-      setJobStatus(db,{jobId,to:'leased',reason:'seed',at});
-      const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId:`ctx-${jobId}`,
-        terminalHandle:`term-${jobId}`,repoRoot:repo,dispatchedAt:at,startedAt:at,at});
-      writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{worktree:repo},createdAt:at});
-      setJobStatus(db,{jobId,to:'running',reason:'seed',at});
-      fileReport(db,{attemptId:attempt.attempt_id,outcome:'done',
-        report:{outcome:'done',summary:'landed',head,branch:'main',files:[...writeGreenProofs(path.join(repo,'..','sonar-'+jobId))],dispatch:`ctx-${jobId}`,from:jobId},fromTerminal:`term-${jobId}`,createdAt:at});
-      recordCheckRun(db,{attemptId:attempt.attempt_id,name:'unit',phase:'verify',runner:'kernel',authority:'runtime',
-        status:'pass',exitCode:0,command:'unit',createdAt:at});
-    });
-  }finally{ledger.close();}
-  return jobId;
-};
-const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;}finally{l.close();}};
-const repoEntry=(detail,root)=>detail.repos.find(r=>real(r.repo)===root);
 
-// Every owned path of a bound app is app-relative (be/…, fe/…, .starciwork/…): the landed proof checks it in the app
+// Every owned path of a bound app is app-relative (be/…, fe/…, .starciwork/…): it resolves in the app
 // checkout, under the same spelling gate.mjs and every finding use.
-test('an fe/ owned path lands in the app checkout: clean, it settles pass',t=>{
-  const {be,fe,api}=project(t);
-  const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src','.starciwork/features/shop/impl'],head});
-  const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
-  assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.equal(body.ok,true);
-  assert.equal(real(body.landed.repo),be.repo,'head is verified in the app checkout');
-  assert.equal(body.landed.headCheck,'verified');
-  assert.deepEqual(repoEntry(body.landed,be.repo),{repo:repoEntry(body.landed,be.repo).repo,role:'fe',
-    paths:['fe/apps/app/src','.starciwork/features/shop/impl'],dirty:[]});
-  assert.equal(statusOf(be.repo,jobId),'succeeded');
-});
-
-test('a dirty file under an fe/ owned path refuses not-landed naming the app checkout',t=>{
-  const {be,fe,api}=project(t);
-  const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  fs.writeFileSync(path.join(fe.repo,'apps','app','src','extra.tsx'),'export const Extra = 1;\n');
-  fs.mkdirSync(path.join(be.side,'apps','app','src'),{recursive:true});
-  const jobId=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src'],head});
-  const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
-  assert.equal(r.status,1,r.stderr||r.stdout);
-  assert.equal(body.reason,'not-landed');
-  assert.deepEqual(body.detail.dirty,['fe/apps/app/src/extra.tsx']);
-  const entry=repoEntry(body.detail,be.repo);
-  assert.equal(entry.role,'fe');
-  assert.deepEqual(entry.dirty,['fe/apps/app/src/extra.tsx']);
-  assert.equal(statusOf(be.repo,jobId),'running','a refused settle writes nothing');
-});
-
-test('a be/ owned path is the backend side only: fe noise under the same relative path is outside the grant',t=>{
-  const {be,fe,api}=project(t);
-  const head=be.commit('src/a.ts','export const a = 2;\n');
-  fs.mkdirSync(path.join(fe.repo,'src'));
-  fs.writeFileSync(path.join(fe.repo,'src','noise.ts'),'export const n = 1;\n');
-  const clean=seedJob(be.repo,{op:'backend.implement',owned:['be/src/'],head});
-  const ok=api('settle','--repo',be.repo,'--job',clean,'--verdict','pass','--json');
-  assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);
-  assert.deepEqual(ok.body.landed.repos.map(e=>real(e.repo)),[be.repo]);
-  assert.deepEqual(repoEntry(ok.body.landed,be.repo).paths,['be/src']);
-});
-
-test('a job whose owned path is not app-relative is unverifiable, never proven at a guessed root',t=>{
-  const {be,fe,api}=project(t);
-  const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  const sideRelative=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'fe'});
-  const c=api('settle','--repo',be.repo,'--job',sideRelative,'--verdict','pass','--json');
-  assert.equal(c.r.status,1,c.r.stdout);
-  assert.equal(c.body.reason,'landed-unverifiable');
-  assert.equal(c.body.detail.step,'repository');
-});
-
 test('api enqueue records the side the app-relative paths name; any other spelling is refused path-not-app-relative',t=>{
   const {be,api}=project(t);
   const ledger=openLedger({file:ledgerFileFor(be.repo)});
@@ -204,16 +119,4 @@ test('ownedPathPlacements: a contract worktree of the app is its checkout; no bi
   const [plain]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['apps/app/src'],repo:be.repo,worktree:child,timeoutMs:30000});
   assert.equal(plain.base,child);
   assert.equal(plain.via,'placement','no binding: the dispatch placement is the target, as before');
-});
-
-test('an owned path spelled be/… is checked at the backend side',t=>{
-  const {be,api}=project(t);
-  const head=be.commit('src/a.ts','export const a = 2;\n');
-  fs.writeFileSync(path.join(be.side,'src','b.ts'),'export const b = 1;\n');
-  const jobId=seedJob(be.repo,{op:'backend.implement',owned:['be/src'],head});
-  const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
-  assert.equal(r.status,1,r.stdout);
-  assert.equal(body.reason,'not-landed');
-  assert.deepEqual(body.detail.dirty,['be/src/b.ts']);
-  assert.equal(repoEntry(body.detail,be.repo).role,'be');
 });

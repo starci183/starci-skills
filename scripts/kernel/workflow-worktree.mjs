@@ -88,6 +88,21 @@ export function workflowWorktreeOf(ctx, workflowId) {
 }
 
 /**
+ * The live workflow worktree whose directory is `dir` (or holds it), or null: how a tool run inside a worktree
+ * (scripts/checks/gate.mjs) finds its workflow through the registry, never by parsing a branch or folder name.
+ */
+export function workflowWorktreeAt(ctx, dir) {
+  const { env } = ctxOf(ctx);
+  const at = path.resolve(dir);
+  const key = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; };
+  try {
+    const rows = withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC").all(), { env });
+    const row = rows.find((r) => key(r.path) === key(at)) ?? rows.find((r) => insidePath(key(at), key(r.path)));
+    return recordOf(row ?? null);
+  } catch { return null; }
+}
+
+/**
  * Register a workflow worktree Orca created (a row keyed by its Orca id, kind workflow, uncapped: the slot is taken by
  * ensureWorkflowWorktree before the creation). {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}
  */

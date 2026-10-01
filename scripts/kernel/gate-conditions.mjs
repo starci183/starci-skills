@@ -20,11 +20,11 @@
 //   --until-incident <incidentId>[:resolved]   that incident is no longer open
 //   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
 //                                              --land; scripts/kernel/foundations.mjs)
-//   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it is
-//                                              finished, or one of its ops product-landed there (product-op-landed:
-//                                              every op lands into main at its settle) and none of its code-writing
-//                                              legs is still open (a cross-workflow hold on a restructure, e.g.
-//                                              nivo FE legs held until wf-nivo-fe-canon lands into nivo-fe)
+//   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it
+//                                              landed there at its finish (workflow-landed: a workflow lands
+//                                              into main once, at api finish, workflow-checkpoint.mjs) (a
+//                                              cross-workflow hold on a restructure, e.g. nivo FE legs held until
+//                                              wf-nivo-fe-canon lands into nivo-fe)
 //
 // Owner-only conditions (an ask answered, a consent given) have no typed form: the owner drives them.
 
@@ -35,13 +35,10 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
-import { JOB_STATUSES, resolveIncident } from '../../engine/ledger-db.mjs';
+import { resolveIncident } from '../../engine/ledger-db.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
-// The legs of a workflow that write product code: while one is open its restructure is not over.
-export const CODE_WRITING_OPS = Object.freeze(['code.refactor', 'interface.implement', 'interface.scaffold', 'backend.implement', 'backend.scaffold', 'package.scaffold', 'task.execute']);
-const OPEN_JOB_STATUSES = [...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced];
 const repoMatches = (repoRoot, want) => {
   if (!repoRoot || !want) return false;
   const norm = (p) => path.resolve(String(p)).replace(/[\\/]+$/, '').toLowerCase();
@@ -315,15 +312,10 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       const wf = db.prepare('SELECT phase,archived_at FROM workflows WHERE workflow_id=?').get(cond.workflowId);
       if (!wf) return { met: false, unmeetable: `workflow ${cond.workflowId} is gone`, evidence: `${cond.workflowId} absent` };
       if (wf.phase === 'finished') return { met: true, evidence: `${cond.workflowId} finished` };
-      const lands = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind='product-op-landed' ORDER BY seq DESC").all(cond.workflowId)
-        .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), at: row.created_at }))
-        .filter((payload) => repoMatches(payload.repoRoot, cond.repository));
-      if (!lands.length) return { met: false, evidence: `${cond.workflowId} has not product-landed into ${cond.repository} yet (phase ${wf.phase ?? '-'})` };
-      const last = lands[0];
-      const writing = db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IN (${CODE_WRITING_OPS.map(() => '?').join(',')}) AND status IN (${OPEN_JOB_STATUSES.map(() => '?').join(',')})`)
-        .all(cond.workflowId, ...CODE_WRITING_OPS, ...OPEN_JOB_STATUSES);
-      if (writing.length) return { met: false, evidence: `${cond.workflowId} landed into ${cond.repository} at ${iso(last.at)} but ${writing.length} code-writing leg(s) are still open (${writing.slice(0, 3).map((j) => `${j.job_id} ${j.status}`).join(', ')})` };
-      return { met: true, evidence: `${cond.workflowId} product-landed into ${cond.repository} main at ${iso(last.at)} (${String(last.head ?? '').slice(0, 12) || '-'}), no code-writing leg open` };
+      const land = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind='workflow-landed' ORDER BY seq DESC").all(cond.workflowId)
+        .find((row) => repoMatches(parseJson(row.payload_json, {})?.repoRoot, cond.repository));
+      if (!land) return { met: false, evidence: `${cond.workflowId} has not landed into ${cond.repository} yet (phase ${wf.phase ?? '-'})` };
+      return { met: true, evidence: `${cond.workflowId} landed into ${cond.repository} main at ${iso(land.created_at)} (${String(parseJson(land.payload_json, {})?.head ?? '').slice(0, 12) || '-'})` };
     }
     if (cond.type === 'foundation') {
       const foundation = readFoundation(db, cond.name);

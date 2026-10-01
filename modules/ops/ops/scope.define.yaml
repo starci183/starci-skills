@@ -183,12 +183,12 @@ proofs:
       en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
-  - id: landed
+  - id: checkpointed
     requirement:
-      en: Every Work record file this operation wrote under its owned paths is committed with exact
-        pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
-        refuses not-landed while one of them is untracked or dirty; authored Work never settles
-        outside the repository history.
+      en: Every Work record file this operation wrote under its owned paths is committed by the runtime
+        as its workflow's checkpoint when the operation settles green (scripts/kernel/workflow-checkpoint.mjs
+        checkpointOp). The operation never commits and changes nothing outside its owned paths; settle
+        refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
       en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
@@ -220,13 +220,6 @@ placeholders:
   bound-paths: Inspected source read set
 layoutPolicy:
   checks: [starci-validate]
-policy:
-  commitPolicy:
-    mode: scoped-local-commit
-    ownership: exact-selected-paths
-    verify: git-readback-full-sha-and-diff
-    push: false
-    noChange: return-existing-verified-commit-no-empty-commit
 route:
   nodeKinds: [operations]
   phase: [scope, pre-implementation]

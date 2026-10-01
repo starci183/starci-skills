@@ -72,9 +72,13 @@ export function readAttached(files, schema, accept = () => true) {
  * What the attached gate JSON and READ digest say, as a settle judgment {status, code, detail, findings[]}. `kinds` is
  * [{path, slot}] of the gate's changed files as the runtime resolved them.
  */
-export function judgeLoop({ gate, digest, kinds, doc = loadOpGate() }) {
+export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), expectedBase = null }) {
   if (!gate || gate.schema !== GATE_SCHEMA)
     return { status: 'missing', code: 'op-gate-proof-missing', detail: `no gate JSON (schema ${GATE_SCHEMA}) is attached to the report: run node scripts/checks/gate.mjs --changed ... --out gate.json and attach it`, findings: [] };
+  // In a workflow worktree the gate must measure against the workflow's previous checkpoint (workflow-checkpoint.mjs
+  // gateBaseOf): a gate over another base judges other findings than the op's own.
+  if (expectedBase && gate.base !== expectedBase)
+    return { status: 'red', code: 'op-gate-base-mismatch', detail: `the gate measured against ${String(gate.base ?? 'no base').slice(0, 12)}, not the workflow checkpoint ${expectedBase.slice(0, 12)}: run node scripts/checks/gate.mjs again without --base in the workflow worktree and attach it`, findings: [] };
   if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length)
     return { status: 'unavailable', code: 'op-gate-tool-failed', detail: `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, findings: (gate.errors ?? []).map(String) };
   const fresh = Array.isArray(gate.findings) ? gate.findings : [];
@@ -95,7 +99,7 @@ export const enforcesLoop = (op, doc = loadOpGate()) => loopOps(doc).has(op);
  * The judgment of a job's files: {op, judged, gateFile, digestFile} - null when the op is not held to the loop. `roots` are the
  * job's placement roots: the kinds are resolved in the gate's root when it is one of them (else the first root).
  */
-export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate() }) {
+export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), expectedBase = null }) {
   if (!enforcesLoop(op, doc)) return null;
   const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g));
   const digest = readAttached(files, DIGEST_SCHEMA);
@@ -105,7 +109,7 @@ export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate() }
     const gateRoot = gate.doc.root && known.some((r) => r.toLowerCase() === path.resolve(gate.doc.root).toLowerCase()) ? path.resolve(gate.doc.root) : known[0] ?? (gate.doc.root ? path.resolve(gate.doc.root) : null);
     kinds = gateRoot && fs.existsSync(gateRoot) ? await kindsOf(gateRoot, gate.doc.changed) : gate.doc.changed.map((p) => ({ path: p, slot: null }));
   }
-  return { op, judged: judgeLoop({ gate: gate?.doc ?? null, digest: digest?.doc ?? null, kinds, doc }), gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
+  return { op, judged: judgeLoop({ gate: gate?.doc ?? null, digest: digest?.doc ?? null, kinds, doc, expectedBase }), gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
 }
 
 /** Record the judgment on the attempt as the runtime check op-gate. Each call adds one check run; the latest decides. */

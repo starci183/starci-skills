@@ -319,10 +319,7 @@ status:
       frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp, detail, after}] -
       for each `reach: follow-up` change in modules/kernel/contract-changes/, the newest leg of
       its followUp.ops (per cut ordinal) that was admitted before the change, runs or succeeded,
-      and has no follow-up recorded yet (the key is present only while one is owed). A commit-only leg
-      (payload.commitOnly) is never that newest leg while the group has a leg that did the op's work, and
-      never records a follow-up; a group of commit-only legs alone is judged by the earliest admission of
-      the legs whose Work it committed (commitOnly.of, any workflow of the ledger; unknown reads older).
+      and has no follow-up recorded yet (the key is present only while one is owed).
       Each owed leg is rework: its followUpOp leg reads red in `legs`, the work-graph nodes it covers
       read red, and nextActions carries a dispatch {op: followUpOp, jobId, change, nodes?} naming the
       enqueue. Any entry makes the frontier actionable: the Kernel

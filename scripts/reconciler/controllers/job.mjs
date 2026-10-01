@@ -80,7 +80,6 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
       WORKER_RELEASE_LEAK: num(sla.WORKER_RELEASE_LEAK, 60_000),
       WORKTREE_REMOVE_OVERDUE: num(sla.WORKTREE_REMOVE_OVERDUE, num(doc.worktreeRemoveSlaMs, 60_000)),
     },
-    continuationCap: num(doc.continuationCap, 2),
     worktreeRemoveSlaMs: num(doc.worktreeRemoveSlaMs, 60_000),
     health: Object.fromEntries(Object.entries(HEALTH_DEFAULTS).map(([k, v]) => [k, num(doc.health?.[k], v)])),
     allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
@@ -88,9 +87,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
 }
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
   'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK', 'WORKTREE_REMOVE_OVERDUE']);
-/** Settle refusals of an isolated op's land into main that a continuation answers (product-worktree.mjs integrateOp). */
-export const LAND_REFUSALS = Object.freeze(['product-land-conflict', 'land-gate-red', 'product-integrate-red']);
-export const PRODUCT_EVENTS = Object.freeze({ landRefused: 'product-land-refused', worktreeRemoved: 'job-worktree-removed' });
+export const PRODUCT_EVENTS = Object.freeze({ worktreeRemoved: 'job-worktree-removed' });
 
 /* ------------------------------------------------------------------------------------------------ keys */
 
@@ -124,17 +121,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
   const reported = reportedJobs(db, { jobId })[0] ?? null;
   const handover = reported ? kernelHandoverOf(db, reported) : null;
   const released = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(SETTLE_EVENTS.released, jobId) != null;
-  const lastEvent = (kind) => { const r = db.prepare('SELECT payload_json, created_at FROM events WHERE entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(jobId, kind); return r ? { ...(parse(r.payload_json) ?? {}), at: Number(r.created_at) } : null; };
-  const refused = reported ? lastEvent(PRODUCT_EVENTS.landRefused) : null;
   const releasedAt = Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE kind=? AND entity_id=?').get(SETTLE_EVENTS.released, jobId)?.at) || null;
-  const successor = db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND json_extract(payload_json,'$.retry.retryOf')=? LIMIT 1").get(row.workflow_id, jobId)?.job_id ?? null;
-  // Continuations already in this job's lineage (each a retry carrying params.resumeFrom), for the cap.
-  let continuations = 0;
-  for (let cur = payload, i = 0; cur && i < 12; i += 1) {
-    if (String(cur.params?.resumeFrom ?? '')) continuations += 1;
-    const prev = cur.retry?.retryOf;
-    cur = prev ? parse(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(prev)?.payload_json) : null;
-  }
   const lastEventAt = (kind) => Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind=?').get(jobId, kind)?.at) || null;
   return {
     jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, status: row.status, workerId: row.worker_id,
@@ -142,9 +129,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
     handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
-    landRefused: refused && (!reported || refused.at >= reported.filedAt) ? { reason: refused.reason, conflicts: refused.conflicts ?? null, continuation: refused.continuation ?? null, at: refused.at } : null,
-    head: reported?.report?.head ?? null,
-    successor, continuations, releasedAt,
+    releasedAt,
     worktree: payload.productWorktree?.op?.path ? (() => {
       const event = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(PRODUCT_EVENTS.worktreeRemoved, jobId) != null;
       const gone = !fs.existsSync(payload.productWorktree.op.path);
@@ -198,12 +183,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   if (live && f.report) {
     // Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no
     // separate CONSUME_OVERDUE clock.
-    const refusal = f.handover && f.landRefused ? f.landRefused.reason : null;
-    if (refusal && LAND_REFUSALS.includes(refusal) && !f.successor && f.continuations < settings.continuationCap) {
-      // A continuation on the new main, never a failure (product-worktree.mjs integrateOp).
-      clock('DECISION_OVERDUE', f.handover.at);
-      set({ kind: 'continuation', concern: 'job.settle', reason: refusal, resumeFrom: f.landRefused.continuation?.resumeFrom ?? f.head ?? null });
-    } else if (f.handover) {
+    if (f.handover) {
       clock('DECISION_OVERDUE', f.handover.at);
       set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
     } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
@@ -261,18 +241,6 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
     evidence: [{ ref: `report:${f.report?.dispatchId}` }, ...(f.handover ? [{ ref: `event:${SETTLE_EVENTS.needsKernel}` }] : []), ...(f.handover?.detail ?? []).slice(0, 6).map((d) => ({ ref: String(d) }))],
     allowedVerbs: settings.allowedVerbs, dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now,
   };
-}
-
-/**
- * The enqueue argv of a continuation (product-land-conflict / land-gate-red: the same op, same owned paths and cut, from
- * the refused head on the new main). Pure.
- */
-export function enqueueArgvOf(f, step) {
-  const cut = f.payload.cut;
-  const cutArgs = cut?.id ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : [];
-  const params = { ...(f.payload.params ?? {}), ...(step.resumeFrom ? { resumeFrom: String(step.resumeFrom) } : {}) };
-  return ['--workflow', f.workflowId, '--op', f.op, '--paths', (f.payload.owned_paths ?? []).join(','), '--retry-of', f.jobId,
-    '--params', JSON.stringify(params), ...(f.payload.repository ? ['--repository', String(f.payload.repository)] : []), ...cutArgs];
 }
 
 /* ------------------------------------------------------------------------------------------------ the [Worker] sweep */
@@ -357,8 +325,6 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api check + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
-    case 'continuation':
-      return { action: s.kind, reason: s.reason, ...(await ctx.api(ledgerId, 'enqueue', enqueueArgvOf(f, s))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
@@ -526,7 +492,7 @@ export default {
   timeoutMs: 960_000,
   routes: {
     'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
-    'op-auto-settled': jobRoute, 'product-land-refused': jobRoute, 'job-worktree-removed': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
+    'op-auto-settled': jobRoute, 'job-worktree-removed': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {
     const settings = jobSettings();

@@ -1,6 +1,5 @@
-// interface.draw acceptance judges EVERY asset a pass binds, adopted ones included, and a commit-only adoption never
-// stands for a redraw a contract change owes (scripts/checks/draw-acceptance.mjs, scripts/kernel/contract-version.mjs).
-// Reproduces nivo wf-nivo-app-auth-mujek72s op-interface.draw-7c2821e002: a commit-only work-debt leg adopted from a
+// interface.draw acceptance judges EVERY asset a pass binds, adopted ones included (scripts/checks/draw-acceptance.mjs).
+// Reproduces nivo wf-nivo-app-auth-mujek72s op-interface.draw-7c2821e002: a leg adopted from a
 // finished workflow committed 40 image-gen files (whole-screen ui-mockup prompts, an imagegen-provenance evidence
 // record) of three pre-token-render draws unchanged, settled pass on 3/3 git checks, and the draw node went green.
 import test from 'node:test';
@@ -16,7 +15,7 @@ import {sha256} from '../engine/digest.mjs';
 import {
   DATA_STATUS_DRAWN,DRAW_ACCEPTANCE_CHANGE,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
 } from '../scripts/checks/draw-acceptance.mjs';
-import {committedWorkAdmissionOf,contractFollowUpsOf,loadContractChanges} from '../scripts/kernel/contract-version.mjs';
+import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 import {colorsFromJobs} from '../scripts/work/work-graph-store.mjs';
 import { withRationale } from './_draw-rationale-fixture.mjs';
 import { seedWorkflow } from './_ledger-fixture.mjs';
@@ -160,64 +159,6 @@ test('api settle refuses an adopting interface.draw pass draw-not-accepted; a le
   const legacy=seedDraw(repo,{jobId:'op-interface.draw-old',wf:'wf-draw-old',files,admittedAt:at-1000});
   const old=settle(repo,legacy);
   assert.equal(old.r.status,0,old.r.stderr||old.r.stdout);
-});
-
-// Ledger fixture for the follow-up rule: a finished workflow's pre-contract draws, adopted by a live one's commit-only leg.
-const followUpWorld=t=>{
-  const repo=tmp(t);
-  const redo=effectiveOf('draw-redo-token-render-shapes');
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  const job=(wf,jobId,{status='succeeded',admittedAt,payload={}})=>{
-    seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId:'interface.draw',dispatchId:`ctx-${jobId}`,status,
-      payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],...payload}}]});
-    if(admittedAt!=null){
-      const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
-      ledger.transaction(db=>writeContract(db,{attemptId,markdown:'#',context:{},createdAt:admittedAt}));
-    }
-  };
-  seedWorkflow(ledger,{id:'wf-old',state:{phase:'running',job:'old'}});
-  seedWorkflow(ledger,{id:'wf-live',state:{phase:'running',job:'live'}});
-  ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-    .run('wf-live',0,'g0','# goal',json({derivedPlan:{legs:[{op:'interface.draw'}]}}),Date.now());
-  const day=24*3600*1000;
-  job('wf-old','op-draw-old-2',{attempt:2,admittedAt:redo-6*day});
-  job('wf-old','op-draw-old-6',{attempt:6,admittedAt:redo-4*day});
-  job('wf-live','op-draw-adopt',{admittedAt:redo+3600*1000,payload:{commitOnly:{of:['op-draw-old-2','op-draw-old-6'],batch:'work-debt',adoptedFrom:'wf-old',outOfScope:0}}});
-  return {repo,ledger,job,redo};
-};
-
-test('a commit-only adoption of pre-contract draws still owes the redo follow-up; only a real follow-up leg satisfies it',t=>{
-  const {repo,ledger,job,redo}=followUpWorld(t);
-  try{
-    const adopt=ledger.db.prepare("SELECT * FROM jobs WHERE job_id='op-draw-adopt'").get();
-    assert.ok(committedWorkAdmissionOf(ledger.db,{...adopt,payload:JSON.parse(adopt.payload_json)}).at<redo,'its work carries the admission of the draws it committed');
-    const owedItems=()=>contractFollowUpsOf(ledger.db,'wf-live',registry).owed.filter(o=>o.followUpOp==='interface.draw');
-    const owed=()=>owedItems().map(o=>o.jobId);
-    assert.deepEqual(owed(),['op-draw-adopt'],'admitted after the change, yet it drew nothing: the redo is owed');
-    const item=owedItems()[0];
-    assert.ok([item.change,...(item.alsoCovers??[])].includes('draw-redo-token-render-shapes'),'one follow-up, under the newest draw change, covers the redo');
-
-    job('wf-live','op-draw-adopt-again',{attempt:2,admittedAt:redo+7200*1000,payload:{commitOnly:{of:['op-draw-adopt']},contractChange:{id:'draw-redo-token-render-shapes',followUpOf:'op-draw-adopt'}}});
-    assert.equal(owed().length,1,'a commit-only leg marked as the follow-up does not satisfy it');
-  }finally{ledger.close();}
-
-  const r=spawnSync(process.execPath,[API,'status','--repo',repo,'--workflow','wf-live','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
-  assert.equal(r.status,0,r.stderr);
-  const s=JSON.parse(r.stdout);
-  assert.equal(s.frontier.actionable,true);
-  assert.equal(s.frontier.contractFollowUps.filter(f=>f.followUpOp==='interface.draw').length,1,'one follow-up per leg, however many draw changes owe it');
-  assert.equal(s.legs.find(l=>l.op==='interface.draw').color,'red','a leg owed a redo is rework, never green');
-  const action=s.nextActions.find(a=>a.kind==='dispatch'&&a.change);
-  assert.ok(action,'nextActions names the follow-up enqueue');
-  assert.match(action.reason,new RegExp(`--contract-change ${action.change} --follow-up-of op-draw-adopt`));
-
-  const l2=openLedger({file:ledgerFileFor(repo)});
-  try{
-    const newest=registry.changes.filter(c=>c.reach==='follow-up'&&c.followUp.op==='interface.draw').sort((a,b)=>b.effectiveAt-a.effectiveAt)[0].id;
-    seedWorkflow(l2,{id:'wf-live',jobs:[{jobId:'op-draw-redo',opId:'interface.draw',dispatchId:'ctx-op-draw-redo',status:'running',
-      payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],contractChange:{id:newest,followUpOf:'op-draw-adopt-again'}}}]});
-    assert.deepEqual(contractFollowUpsOf(l2.db,'wf-live',registry).owed.filter(o=>o.followUpOp==='interface.draw'),[],'a real redraw leg under the newest draw change is the follow-up for every older one');
-  }finally{l2.close();}
 });
 
 test('a succeeded leg owed a follow-up colours its work-graph nodes as rework',()=>{

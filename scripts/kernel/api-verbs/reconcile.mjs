@@ -12,16 +12,15 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   validate(args, need) {
-    need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'],
-      'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
+    need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'],
+      'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks)');
   },
   run({ ledger, args, repo, emit, internals }) {
-    const { reconcileOrphanKernelJobs, reconcileOrcaTasks, reconcileWorkDebt,
-      reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker, reconcileDebris,
+    const { reconcileOrphanKernelJobs, reconcileOrcaTasks,
+      reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker,
       observeOperationWorker, reserveOpLeases, opLeaseRequests, cleanupManagedWorker } = internals;
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
   if (args['orca-tasks']) return reconcileOrcaTasks(ledger, args);
-  if (args['work-debt']) return reconcileWorkDebt(ledger, args, repo);
   const db = ledger.db, jobId = args.job;
   const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -29,7 +28,6 @@ export default {
   if (args.reap) return reconcileReap(ledger, args, job);
   if (args['release-worker']) return reconcileReleaseWorker(ledger, args, job, repo);
   if (args['dead-worker']) return reconcileDeadWorker(ledger, args, job, repo);
-  if (args.debris) return reconcileDebris(ledger, args, job, repo);
   if (job.status === 'effect_unknown' && parseJson(job.result_json ?? '', {})?.reason === 'dead-worker-fenced') {
     throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and api settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }

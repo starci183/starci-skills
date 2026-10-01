@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import job, { planJob, planWorkflow, parseKey, jobFacts, jobSettings, enqueueArgvOf, settleDecision, drySweep, dryLedger, listKeysOf, SETTLER_SCRIPT } from '../scripts/reconciler/controllers/job.mjs';
+import job, { planJob, planWorkflow, parseKey, jobFacts, jobSettings, settleDecision, drySweep, dryLedger, listKeysOf, SETTLER_SCRIPT } from '../scripts/reconciler/controllers/job.mjs';
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 import { openLedger } from '../engine/ledger-db.mjs';
 import { EVENTS } from '../scripts/reconcile/job-settle.mjs';
@@ -61,7 +61,6 @@ test('keys parse and route', () => {
   assert.equal(parseKey('nonsense'), null);
   assert.deepEqual(job.routes['op-reported']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
   assert.equal(job.routes['worker-*']({ ledgerId: 'supervisor', entityType: 'job', entityId: 'sup-1' }), 'workers:supervisor');
-  assert.deepEqual(job.routes['product-land-refused']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
   assert.equal(parseKey('overlap:n:42'), null, 'no workflow branch, no overlap key');
   assert.deepEqual(job.concerns, ['job.settle', 'job.worker', 'job.dispatch', 'job.consume-check', 'job.close-verify']);
 });
@@ -167,37 +166,14 @@ test('worktree-removed: the clock runs while the folder exists, the reap retries
   } finally { done.close(); }
 });
 
-test('product-land-conflict -> a continuation enqueued from the refused head; the cap hands it to the Kernel', async () => {
-  const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'product-land-conflict' },
-    events: [{ kind: 'product-land-refused', payload: { reason: 'product-land-conflict', continuation: { base: 'main', resumeFrom: 'def456' } } }] });
+test('a handed-over settle refusal goes to the Kernel as settle-nongreen: no op lands into main, so no land continuation exists', async () => {
+  const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'op-gate-new-findings' } });
   try {
     const ctx = ctxFor(fx);
     const r = await job.reconcile('job:nivo-backend:op-a', ctx);
-    assert.equal(r.action, 'continuation');
-    const call = ctx.calls.api[0];
-    assert.equal(call.verb, 'enqueue');
-    const argv = call.argv;
-    assert.equal(argv[argv.indexOf('--retry-of') + 1], 'op-a');
-    assert.equal(JSON.parse(argv[argv.indexOf('--params') + 1]).resumeFrom, 'def456');
-    assert.equal(argv[argv.indexOf('--cut-ordinal') + 1], '2');
-    assert.equal(ctx.calls.decisions.length, 0);
-    const f = jobFacts(fx.db, 'op-a', { now: NOW, settings });
-    const capped = planJob({ ...f, continuations: settings.continuationCap }, { settings });
-    assert.equal(capped.step.kind, 'settle-nongreen');
-    assert.equal(planJob({ ...f, successor: 'op-b' }, { settings }).step.kind, 'settle-nongreen', 'an enqueued continuation is not enqueued again');
+    assert.equal(r.action, 'settle-nongreen');
+    assert.equal(ctx.calls.api.filter((c) => c.verb === 'enqueue').length, 0, 'nothing is enqueued for a settle refusal');
   } finally { fx.close(); }
-});
-
-test('land-gate-red -> a continuation of the same op from its head; a refusal no continuation answers goes to the Kernel', () => {
-  const base = { jobId: 'op-a', workflowId: 'wf-x', op: 'code.refactor', status: 'running', payload: { owned_paths: ['nivo-fe/src/a'] }, report: { outcome: 'done', filedAt: NOW - 1000 },
-    handover: { reason: 'settle-refused', at: NOW - 500 }, head: 'abc123', successor: null, continuations: 0, now: NOW, updatedAt: NOW - 1000, windowMs: settings.settledWindowMs };
-  const red = planJob({ ...base, landRefused: { reason: 'land-gate-red', continuation: null, at: NOW - 500 } }, { settings });
-  assert.equal(red.step.kind, 'continuation');
-  assert.equal(red.step.resumeFrom, 'abc123');
-  const argv = enqueueArgvOf(base, red.step);
-  assert.equal(argv[argv.indexOf('--paths') + 1], 'nivo-fe/src/a');
-  assert.equal(JSON.parse(argv[argv.indexOf('--params') + 1]).resumeFrom, 'abc123');
-  assert.equal(planJob({ ...base, landRefused: { reason: 'land-gate-unavailable', at: NOW - 500 } }, { settings }).step.kind, 'settle-nongreen');
 });
 
 test('the workflow pass: dispatch-ready when below allowedParallel, at most once per window; broken imports hold it', async () => {

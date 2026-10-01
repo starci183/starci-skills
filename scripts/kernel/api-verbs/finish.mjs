@@ -6,6 +6,8 @@ import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
 import { closeHeldTasks, closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from '../api-lib/workflow-end.mjs';
 import { handoverGateOf } from '../handover.mjs';
 import { closeWorkflowDecisions } from '../../reconciler/decisions.mjs';
+import { CHECKPOINT_EVENTS, finishWorkflow } from '../workflow-checkpoint.mjs';
+import { workflowWorktreeOf } from '../workflow-worktree.mjs';
 
 export default {
   verb: 'finish',
@@ -40,6 +42,18 @@ export default {
   }
   const handoverFinish = handoverGate ? { via: handoverGate.via, approvedSeq: handoverGate.approvedSeq ?? null, answeredBy: handoverGate.approval?.answeredBy ?? null } : null;
 
+  // The workflow's single land into main (WFWT, scripts/kernel/workflow-checkpoint.mjs finishWorkflow): the full gate,
+  // the merge guard, review.verify of the exact head, the rebase, main fast-forwarded and pushed, the worktree marked
+  // release-pending (part A's GC removes it and the workflow branch; the finish runs inside it and never removes it). A refusal keeps
+  // the workflow running; the finish runs again once its cause is fixed.
+  const wfCtx = { db, ledger, env: process.env };
+  const land = !already && workflowWorktreeOf(wfCtx, workflowId) ? finishWorkflow(wfCtx, { workflowId }) : null;
+  if (land && !land.ok) {
+    throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${land.refusal.code} at ${land.refusal.step} - ${land.refusal.detail}`), {
+      code: land.refusal.code, step: land.refusal.step, steps: land.steps,
+    });
+  }
+
   // Finish ≠ erase: goals/events/jobs history stays. Live Kernel custody does
   // not: release the singleton signal and settle its job before asking Orca
   // to close the exact terminal.
@@ -63,6 +77,7 @@ export default {
       finished: { finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) } });
     ({ kernelSignalsReleased, kernelJobsSettled } = releaseKernelSeat(db, workflowId, seat,
       { status: 'succeeded', result: { verdict: 'pass', reason: 'workflow-finished', at: now }, stamp: { finishedAt: now }, now }));
+    if (land) ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: CHECKPOINT_EVENTS.landed, payload: { head: land.head, main: land.main, repoRoot: land.repoRoot, steps: land.steps } });
     ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
       kind: 'workflow-finished', payload: { inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
@@ -73,7 +88,7 @@ export default {
 
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
-    tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}) };
+    tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}), ...(land ? { landed: { head: land.head, releasePending: land.releasePending, steps: land.steps.map((st) => st.step) } } : {}) };
   emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 
