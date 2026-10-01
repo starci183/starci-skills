@@ -1,5 +1,3 @@
-import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
-import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import type { CartData, PlaceOrderData, AccountData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
@@ -18,7 +16,7 @@ import { useTestWorld } from "../../world/use-test-world"
  * Run: npm run test:e2e -- order-lifecycle/cross-service-identity
  */
 describe("order lifecycle: identity to order boundary", () => {
-    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
+    const world = useTestWorld({ apps: ["identity", "order"] })
 
     beforeAll(async () => {
         await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })

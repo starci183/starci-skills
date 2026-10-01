@@ -1,5 +1,3 @@
-import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
-import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type {
@@ -30,7 +28,7 @@ import { useTestWorld } from "../../world/use-test-world"
  * Run: npm run test:e2e -- order-lifecycle/order-history
  */
 describe("order lifecycle: order history", () => {
-    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
+    const world = useTestWorld({ apps: ["identity", "order"] })
 
     beforeAll(async () => {
         await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })

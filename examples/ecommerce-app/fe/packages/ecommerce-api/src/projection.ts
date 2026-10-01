@@ -41,9 +41,7 @@ const findMetadataFile = (injected: string | undefined): string => {
         if (fs().existsSync(candidate)) return candidate
         const parent = path().dirname(dir)
         if (parent === dir) {
-            throw new Error(
-                `no ${PROJECTION_REL.join("/")} found from ${process.cwd()} upward; inject its path.`,
-            )
+            throw new Error(`no ${PROJECTION_REL.join("/")} found from ${process.cwd()} upward; inject its path.`)
         }
         dir = parent
     }

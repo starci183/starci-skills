@@ -1,5 +1,3 @@
-import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
-import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { readCount } from "../../fixtures/persistence/e2e-verification.rows"
 import { PRODUCT_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
@@ -10,12 +8,12 @@ import { useTestWorld } from "../../world/use-test-world"
  * intact and the public doors working again.
  *  - the cache (the real Redis, `world.infra.redis` cut and restored): identity reports its cache unreachable and order cascades through the
  *    identity health it probes;
- *  - the order database (`world.interruptDatabase`): order reports its database unreachable, identity stays healthy;
+ *  - the order database (`world.infra.postgresql.connection("order")`): order reports its database unreachable, identity stays healthy;
  *  - the identity database: identity reports 503 and so does order, whose probe of identity fails.
  */
 describe("resilience: infra recovery", () => {
     const world = useTestWorld({
-        apps: { identity: { module: IdentityApp }, order: { module: OrderApp } },
+        apps: ["identity", "order"],
         testTimeoutMs: 900_000,
     })
 
@@ -37,7 +35,7 @@ describe("resilience: infra recovery", () => {
         expect(await status("identity")).toBe(200)
         expect(await status("order")).toBe(200)
 
-        world.infra.redis.cut()
+        await world.infra.redis.cut()
         try {
             await answers("identity", 503, 90_000)
             await answers("order", 503, 90_000)
@@ -53,10 +51,10 @@ describe("resilience: infra recovery", () => {
     it("an order database outage takes order down, not identity, and order recovers with the database", async () => {
         const seeded = await productsSeeded()
 
-        await world.interruptDatabase(async () => {
+        await world.infra.postgresql.connection("order").during(async () => {
             await answers("order", 503, 90_000)
             expect(await status("identity")).toBe(200)
-        }, "order")
+        })
 
         await answers("order", 200, 180_000)
         expect(await productsSeeded()).toBe(seeded)
@@ -66,10 +64,10 @@ describe("resilience: infra recovery", () => {
     })
 
     it("an identity database outage takes identity and, through its probe, order down; both recover", async () => {
-        await world.interruptDatabase(async () => {
+        await world.infra.postgresql.connection("identity").during(async () => {
             await answers("identity", 503, 90_000)
             await answers("order", 503, 90_000)
-        }, "identity")
+        })
 
         await answers("identity", 200, 180_000)
         await answers("order", 200, 180_000)

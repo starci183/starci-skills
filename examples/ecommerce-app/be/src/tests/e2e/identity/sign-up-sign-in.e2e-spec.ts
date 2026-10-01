@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto"
-import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
-import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { present } from "../../fixtures/present.mapper"
 import type {
     AccountData,
@@ -25,7 +23,7 @@ describe("identity sign-up and sign-in journey", () => {
     const email = `e2e-${randomUUID()}@ecommerce.dev`
     const password = "e2e-journey-pass-1"
 
-    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
+    const world = useTestWorld({ apps: ["identity", "order"] })
 
     it("registers a person, issues and verifies a session, then revokes it", async () => {
         const anonymous = world.apps.identity.api
@@ -81,7 +79,7 @@ describe("identity sign-up and sign-in journey", () => {
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
         expect(await readRows(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
-        expect(world.infra.redis.keyCount()).toBeGreaterThan(0)
+        expect(await world.infra.redis.size()).toBeGreaterThan(0)
         const identityTables = await readRows(world.db.identity, PUBLIC_TABLES, [])
         const orderTables = await readRows(world.db.order, PUBLIC_TABLES, [])
         expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(

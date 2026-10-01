@@ -1,5 +1,3 @@
-import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
-import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
@@ -23,7 +21,7 @@ import { useTestWorld } from "../../world/use-test-world"
 describe("checkout journey", () => {
     let personId = ""
 
-    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
+    const world = useTestWorld({ apps: ["identity", "order"] })
 
     beforeAll(async () => {
         await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })

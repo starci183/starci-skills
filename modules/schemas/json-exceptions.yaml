@@ -23,9 +23,6 @@ directories:
   - path: examples/ecommerce-app/fe/packages/ecommerce-ui
     reason: >
       npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
-  - path: examples/todo-app/be/src/tests/world/fakes/sepay/payloads
-    reason: >
-      Recorded SePay API responses and webhook deliveries the todo-app back end's test-world fake serves at the network edge; JSON is SePay's wire format, and a new payload needs no new line here.
   - path: packages/test-world
     reason: >
       The @starci/test-world package: its package.json, package-lock.json and tsconfig.json are toolchain config npm and tsc read as JSON.

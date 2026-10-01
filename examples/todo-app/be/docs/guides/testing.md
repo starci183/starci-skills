@@ -8,12 +8,14 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 | e2e      | `npm run test:e2e`      | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`.                                                                                                                        |
 | contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`.                                                                    |
 
-`src/tests/world/` is the only test infrastructure. The integration, e2e and contract projects share its jest
-`global-setup.ts` / `global-teardown.ts` (the services `.starcistacks/dev` declares, real: one Postgres container and one
-Keycloak importing the stack's `realm-todo.json`; `apps/migrate`'s exported `bootstrap` once; the network-edge fakes of the
-external providers, the mail host and the payment gateway, under `src/tests/world/fakes/<provider>/`) and run one worker.
-`use-test-world.ts` exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared
-EntityManager), `world.infra.keycloak` (the real Keycloak: `person()`, `events()`, `sessions()`, `cut()` freezes it, `restore()` thaws it) and `world.fake.<provider>`.
+`src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
+(`export const { useTestWorld, useSandbox } = defineTestWorld({...})`). The jest `global-setup.ts` / `global-teardown.ts`
+re-export the library's hooks: the library runs the services `.starcistacks/dev` declares, real and behind toxiproxy (Postgres,
+and Keycloak importing the stack's `realm-todo.json`), runs `apps/migrate`'s exported `bootstrap` once, and serves the
+library's network-edge fakes of the external providers (the mail host and the payment gateway). `use-test-world.ts`
+re-exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager),
+`world.keycloak` (the real realm: `person()`, `events()`, `sessions()`), `world.infra.<service>` (`cut()`, `restore()`,
+`during()`; `world.infra.postgresql.connection("primary")` takes one database down) and `world.fake.<provider>`.
 Nothing under `src/tests/` overrides a provider and nothing of the stack is faked; shared test data lives in
 `src/tests/fixtures/`.
 
@@ -64,18 +66,18 @@ npm run test:e2e -- flows/task-lifecycle         # one spec by path fragment
 npm run test:contract                            # provider sandboxes (skipped without sandbox config)
 ```
 
-- The world is started once per run: every host port is allocated by the OS on `127.0.0.1`, every secret is generated per
-  run, and the teardown removes the container, the upload directory and the state file, then verifies nothing survived.
+- The world attaches to the shared warm stack (`npm run test:stack -- up|down|status`) or starts it; every app port is
+  reserved on `127.0.0.1`, every secret is generated per run, and the teardown drops what the run provisioned (its
+  databases, realm and run directory); the shared containers stay warm.
 - A spec never creates schema, starts a container or writes `process.env`: that is the world's job.
 
 ## Writing an e2e spec
 
 ```ts
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 describe("area flow (e2e)", () => {
-  const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+  const world = useTestWorld({ apps: ["todo", "worker"] })
 
   it("runs the journey end to end", async () => {
     const person = await world.signedInPerson("flow")
