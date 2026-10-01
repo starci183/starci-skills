@@ -11,7 +11,7 @@ refs: [br.audit.append-only, br.audit.retention]
 dependsOn: [contract.login.identity-for-task]
 subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 owners:
-  - {role: module, path: src/modules/domain/audit}
+  - {role: module, path: be/src/modules/domain/audit}
 
 stateMachine:
   states: [open, appended]

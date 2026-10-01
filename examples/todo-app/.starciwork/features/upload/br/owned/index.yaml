@@ -20,4 +20,4 @@ acceptance:
     when: A request presents a wrong or already-consumed token on the content door
     then:
       - The fulfilment is refused and nothing is stored.
-module: src/modules/integrations/upload
+module: be/src/modules/integrations/upload

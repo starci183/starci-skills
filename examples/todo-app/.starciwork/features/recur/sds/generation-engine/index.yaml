@@ -3,7 +3,7 @@ id: sds.recur.generation-engine
 title: How a rule's due dates are computed and resolved to instants
 state: done
 owners:
-  - {role: module, path: src/modules/domain/recur}
+  - {role: module, path: be/src/modules/domain/recur}
 responsibility: "Walks a rule's real calendar dates one by one between its last-generated date and now,
   selecting the ones the rule fires on, and resolves each to a UTC instant from the rule's declared time
   zone. Owns every decision this feature made about time: decision.recur.timezone.anchor,

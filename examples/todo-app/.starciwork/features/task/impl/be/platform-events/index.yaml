@@ -4,7 +4,7 @@ title: The platform events module (typed in-process event bus)
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/platform/events}
+  - {role: module, path: be/src/modules/platform/events}
 # Shared like platform-database: this is the seam event.task.created/completed/deleted and
 # event.login.signed-in/signed-out are typed against, and every producer (task's and login's use cases
 # alike) depends on it. Recorded once, here under task, for the same reason platform-database is.

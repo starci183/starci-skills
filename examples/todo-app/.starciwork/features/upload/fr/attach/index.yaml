@@ -14,8 +14,8 @@ exceptionFlows:
 postconditions:
   - The upload's taskId names the task.
 composes:
-  - {rule: br.upload.owned, module: src/modules/integrations/upload}
-  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+  - {rule: br.upload.owned, module: be/src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: be/src/modules/integrations/upload}
 refs: [br.task.single-owner]
 
 requiresProof:

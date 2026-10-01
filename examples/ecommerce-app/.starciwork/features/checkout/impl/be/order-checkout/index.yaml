@@ -4,12 +4,12 @@ title: The checkout modules of the order service
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/order}
-  - {role: module, path: src/modules/domain/cart}
-  - {role: module, path: src/modules/domain/catalog}
-  - {role: module, path: src/modules/domain/payment}
-  - {role: module, path: src/modules/integrations/identity}
-  - {role: feature, path: src/features/checkout}
+  - {role: module, path: be/src/modules/domain/order}
+  - {role: module, path: be/src/modules/domain/cart}
+  - {role: module, path: be/src/modules/domain/catalog}
+  - {role: module, path: be/src/modules/domain/payment}
+  - {role: module, path: be/src/modules/integrations/identity}
+  - {role: feature, path: be/src/features/checkout}
 proves: [br.checkout.place-order, fr.checkout.place-order, sds.checkout.order-flow, contract.checkout.order-for-identity, contract.identity.internal.sessions, contract.identity.health]
 
 change:

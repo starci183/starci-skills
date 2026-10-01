@@ -15,7 +15,7 @@ acceptance:
     then:
       - No reader recovers the person's identity from any line they produced.
       - "The lines themselves are unchanged: same bytes, same position, same hash chain."
-module: src/modules/domain/audit
+module: be/src/modules/domain/audit
 refs: [decision.audit.erasure-method, br.audit.retention]
 
 change:

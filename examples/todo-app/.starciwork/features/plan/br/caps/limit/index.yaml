@@ -17,7 +17,7 @@ acceptance:
       - Creation is refused.
       - Nothing is written.
       - The refusal names the cap of 20 and the upgrade path.
-module: src/modules/domain/plan
+module: be/src/modules/domain/plan
 change:
   rev: 3
   kind: editorial

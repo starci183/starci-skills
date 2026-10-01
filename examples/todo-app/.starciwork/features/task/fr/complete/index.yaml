@@ -10,9 +10,9 @@ mainFlow:
 exceptionFlows:
   - A task the actor neither owns nor holds an accepted editor invitation on is refused.
 composes:
-  - {rule: br.task.single-owner, module: src/modules/domain/task}
-  - {rule: br.task.complete.once, module: src/modules/domain/task}
-  - {rule: br.share.role.permissions, module: src/modules/domain/share}
+  - {rule: br.task.single-owner, module: be/src/modules/domain/task}
+  - {rule: br.task.complete.once, module: be/src/modules/domain/task}
+  - {rule: br.share.role.permissions, module: be/src/modules/domain/share}
 refs: [contract.share.completion-guard-for-task]
 blockedBy:
   - {record: br.task.single-owner, rev: 4, because: "br.task.single-owner is still todo at rev 4: its evidence.yaml is stale: true - the captured run proves the delete half and the stranger negatives but never exercises the accepted-editor complete arm this flow composes (that absence is now named by gap.task.single-owner-editor-arm, which the rule's own blockedBy points at). A composed flow does not outrun a rule that is not yet done."}

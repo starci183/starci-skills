@@ -13,7 +13,7 @@ postconditions:
   - The person's cart holds no lines; the lines of nobody else were touched.
 composes:
   - rule: br.checkout.cart
-    module: src/modules/domain/cart
+    module: be/src/modules/domain/cart
 
 requiresProof:
   unit:

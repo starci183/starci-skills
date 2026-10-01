@@ -21,7 +21,7 @@ acceptance:
         validity are unchanged. A separate case must advance to well past the window with an active
         erasure against the line's subject and assert the line still exists but no longer decrypts -
         proving retention and erasure are independent axes, not one flag."
-module: src/modules/domain/audit
+module: be/src/modules/domain/audit
 
 change:
   rev: 3

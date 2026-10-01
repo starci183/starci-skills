@@ -18,7 +18,7 @@ acceptance:
     then:
       - The task reads incomplete.
       - Its completion timestamp is cleared.
-module: [src/modules/domain/task]
+module: [be/src/modules/domain/task]
 change:
   rev: 3
   kind: editorial

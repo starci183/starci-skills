@@ -20,4 +20,4 @@ acceptance:
     when: The scan throws the rejection
     then:
       - The object is deleted and the row stays pending.
-module: src/modules/integrations/upload
+module: be/src/modules/integrations/upload

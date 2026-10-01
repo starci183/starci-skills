@@ -7,7 +7,7 @@ refs: [br.task.complete.once]
 dependsOn: [integration.login.postgres]
 
 owners:
-  - {role: module, path: src/modules/domain/task}
+  - {role: module, path: be/src/modules/domain/task}
 
 stateMachine:
   states: [open, complete]

@@ -4,8 +4,8 @@ title: The erasure-request module
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/audit}
-  - {role: module, path: src/features/todo/transport/graphql/mutations/audit}
+  - {role: module, path: be/src/modules/domain/audit}
+  - {role: module, path: be/src/features/todo/transport/graphql/mutations/audit}
 proves: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
 
 change:

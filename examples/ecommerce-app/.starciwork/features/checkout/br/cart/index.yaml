@@ -25,7 +25,7 @@ acceptance:
     when: They clear the cart
     then:
       - A later read answers no lines, and the lines of nobody else were touched.
-module: src/modules/domain/cart
+module: be/src/modules/domain/cart
 change:
   rev: 2
   kind: breaking

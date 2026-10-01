@@ -10,7 +10,7 @@ interfaces:
 refs: [br.audit.erasure.right, br.audit.erasure.logged]
 dependsOn: [sds.audit.log-chain]
 owners:
-  - {role: module, path: src/modules/domain/audit}
+  - {role: module, path: be/src/modules/domain/audit}
 
 stateMachine:
   states: [requested, verified, executing, complete, refused]

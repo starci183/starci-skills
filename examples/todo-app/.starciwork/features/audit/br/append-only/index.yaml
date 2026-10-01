@@ -23,7 +23,7 @@ acceptance:
         rogue admin or a compromised disk would), and asserts the recomputed break index equals the
         mutated line's index. A test that only calls the module's own append/verify pair without an
         out-of-band mutation does not prove tamper-evidence; it proves the happy path."
-module: src/modules/domain/audit
+module: be/src/modules/domain/audit
 
 change:
   rev: 3

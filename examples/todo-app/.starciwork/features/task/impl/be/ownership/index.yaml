@@ -4,7 +4,7 @@ title: Ownership binding and its guard
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/task}
+  - {role: module, path: be/src/modules/domain/task}
 proves: [sds.task.ownership-guard]
 
 # gap.task.collaborator-completion closed (lane be-share), and this lane - the task lane those notes

@@ -4,8 +4,8 @@ title: The create-task feature
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/task}
-  - {role: module, path: src/features/todo/transport/graphql/mutations/task/create-task}
+  - {role: module, path: be/src/modules/domain/task}
+  - {role: module, path: be/src/features/todo/transport/graphql/mutations/task/create-task}
 revision: 750bd4b1502aa47f44462f16e68a693c0a7d3803
 proves: [fr.task.create, br.task.title.required]
 change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):

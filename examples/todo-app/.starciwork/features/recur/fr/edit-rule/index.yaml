@@ -13,7 +13,7 @@ exceptionFlows:
 postconditions:
   - The rule reflects the new schedule, and no already-materialised occurrence is rewritten to match it.
 composes:
-  - {rule: br.recur.occurrence.owned-by-rule-owner, module: src/modules/domain/recur}
+  - {rule: br.recur.occurrence.owned-by-rule-owner, module: be/src/modules/domain/recur}
 refs: [data.recur.rule]
 
 requiresProof:

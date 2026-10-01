@@ -4,7 +4,7 @@ title: The completion and deletion guards sharing adds
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/share}
+  - {role: module, path: be/src/modules/domain/share}
 proves: [br.share.role.permissions, br.share.editor.no-delete]
 change:
   rev: 2

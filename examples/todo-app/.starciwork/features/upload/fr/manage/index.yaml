@@ -14,8 +14,8 @@ exceptionFlows:
 postconditions:
   - After delete, neither the row nor the stored object remains.
 composes:
-  - {rule: br.upload.owned, module: src/modules/integrations/upload}
-  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+  - {rule: br.upload.owned, module: be/src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: be/src/modules/integrations/upload}
 
 requiresProof:
   unit:

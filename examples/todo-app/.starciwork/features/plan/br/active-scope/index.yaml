@@ -20,7 +20,7 @@ acceptance:
     then:
       - The count is 19.
       - Creating one more task is allowed.
-module: src/modules/domain/plan
+module: be/src/modules/domain/plan
 change:
   rev: 3
   kind: editorial

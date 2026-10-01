@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - No row owned by another person appears in the list or moves the counts.
 composes:
-  - {rule: br.task.list.owned, module: src/modules/domain/task}
+  - {rule: br.task.list.owned, module: be/src/modules/domain/task}
 refs: [decision.task.list.scope, contract.task.list-for-dashboard]
 
 requiresProof:

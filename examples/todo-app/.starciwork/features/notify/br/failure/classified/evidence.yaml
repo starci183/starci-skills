@@ -7,67 +7,67 @@ recordDigest: 6c1e19f90aeafc376e5c3c269ed9f554176e2eea95784e29432072d91174a301
 codeDigest:
   algorithm: sha256
   files:
-    - path: src/modules/domain/notify/dedupe.service.spec.ts
+    - path: be/src/modules/domain/notify/dedupe.service.spec.ts
       sha256: e2879a39b7ed85c025354251631f18d0b55de12332f62e8cc5846438672ca76e
-    - path: src/modules/domain/notify/dedupe.service.ts
+    - path: be/src/modules/domain/notify/dedupe.service.ts
       sha256: 1c008c411947acf12034cb0f619a8663179b4de117cee10a1d65cec328d5df77
-    - path: src/modules/domain/notify/delivery.service.spec.ts
+    - path: be/src/modules/domain/notify/delivery.service.spec.ts
       sha256: c1f98d0e29d35e488624dd502ed5d6f52da28625d4a32b4a314aae5f92a04e23
-    - path: src/modules/domain/notify/delivery.service.ts
+    - path: be/src/modules/domain/notify/delivery.service.ts
       sha256: 10c57729f6a8c052a167a795929e734aadef2e782eab276b6668cec0acbbf7cb
-    - path: src/modules/domain/notify/digest.service.spec.ts
+    - path: be/src/modules/domain/notify/digest.service.spec.ts
       sha256: 6d3d7f3ae134f1628580bb09336a9dfa799c1f1e7a935908a57889cf4f854b30
-    - path: src/modules/domain/notify/digest.service.ts
+    - path: be/src/modules/domain/notify/digest.service.ts
       sha256: 4491071e581a3b53f5c0dcfee42aed69973a0ca772f3b0071ca44f324c5613bb
-    - path: src/modules/domain/notify/notification-preferences.handler.spec.ts
+    - path: be/src/modules/domain/notify/notification-preferences.handler.spec.ts
       sha256: 36f4820462b5de6f26cf69db553a674c0e1519919c7cfbd16ded00c42ea38f3c
-    - path: src/modules/domain/notify/notification-preferences.handler.ts
+    - path: be/src/modules/domain/notify/notification-preferences.handler.ts
       sha256: 356c2645d53faa082028a3827655cbaf5ac76b8802dcf5ba0744a8acada28e0d
-    - path: src/modules/domain/notify/notification-preferences.query.ts
+    - path: be/src/modules/domain/notify/notification-preferences.query.ts
       sha256: c9bfc67bda50d02687d9a59166d23b01df039ee6f68cbe1edc38753e92ac08e0
-    - path: src/modules/domain/notify/notify-event.subscriber.spec.ts
+    - path: be/src/modules/domain/notify/notify-event.subscriber.spec.ts
       sha256: 516b76aa7a7f9f43fd3f02d3a7cf63252a486853c23c054f47935609189da4bd
-    - path: src/modules/domain/notify/notify-event.subscriber.ts
+    - path: be/src/modules/domain/notify/notify-event.subscriber.ts
       sha256: 0ae37949da97df08cb21beb8f0e1db508d36108d0b6a796f5184dc8a1ba3dcc1
-    - path: src/modules/domain/notify/notify.module-definition.ts
+    - path: be/src/modules/domain/notify/notify.module-definition.ts
       sha256: 3c0cb2ebafc3b145eded5bceecfb2101cf57c6fbaa881403a89a16b4822ade4b
-    - path: src/modules/domain/notify/notify.module.ts
+    - path: be/src/modules/domain/notify/notify.module.ts
       sha256: f79cc0664688fc5906d2e5390f9f740875d6d941fc085debbb8c856a73760cba
-    - path: src/modules/domain/notify/notify.scheduler.spec.ts
+    - path: be/src/modules/domain/notify/notify.scheduler.spec.ts
       sha256: 40443b0072bffe01264e07274a66847983abf961fd7eac9d95a374401e3d0b2b
-    - path: src/modules/domain/notify/notify.scheduler.ts
+    - path: be/src/modules/domain/notify/notify.scheduler.ts
       sha256: 6b6170aa257745b60b52f5131fec716f553d01758df27771e4cc73b3857475af
-    - path: src/modules/domain/notify/notify.service.spec.ts
+    - path: be/src/modules/domain/notify/notify.service.spec.ts
       sha256: 0c1451b59973cf80a1a49588a1dcf9535d81e568e4c24ff07be50c534c90f71c
-    - path: src/modules/domain/notify/notify.service.ts
+    - path: be/src/modules/domain/notify/notify.service.ts
       sha256: c47497c0378ee9fdddc9b8546699efa9f533d596fa58af29bf82db13ddf72889
-    - path: src/modules/domain/notify/preferences.service.spec.ts
+    - path: be/src/modules/domain/notify/preferences.service.spec.ts
       sha256: 6de004a2c16467e291c40305f7ae09625a236a5b9eb57000d7cc2a8e435b83db
-    - path: src/modules/domain/notify/preferences.service.ts
+    - path: be/src/modules/domain/notify/preferences.service.ts
       sha256: 3afffd8b107e2aca496cb2f0f502cd94f04727144bb64e4fbb4eb343f0816bc3
-    - path: src/modules/domain/notify/testing/fake-notify-entity-manager.ts
+    - path: be/src/modules/domain/notify/testing/fake-notify-entity-manager.ts
       sha256: 53bd50911490ce97ffe5d1d1fe57c5f8b245f6e79e0f0a98e0f603010fbb27d3
-    - path: src/modules/domain/notify/types/delivery-attempt-record.ts
+    - path: be/src/modules/domain/notify/types/delivery-attempt-record.ts
       sha256: 6f5294a31089ba905479b86761b2da7c78e0327c8e07c147bb2407e336601d43
-    - path: src/modules/domain/notify/types/digest-window-record.ts
+    - path: be/src/modules/domain/notify/types/digest-window-record.ts
       sha256: 9213805745c80602a57f0a1e0a4489d5a99cbbc639664bfe37cfb4389fb61974
-    - path: src/modules/domain/notify/types/notification-record.ts
+    - path: be/src/modules/domain/notify/types/notification-record.ts
       sha256: 9dae1165afdd3902d7a97ca1a75ddb0653dcc1a6d368b103e7723a5777cbfec2
-    - path: src/modules/domain/notify/types/preference-patch.ts
+    - path: be/src/modules/domain/notify/types/preference-patch.ts
       sha256: 7e0d35c2949bc14faef18181f7c800d864273206f601bc14a777fb54b6c254e4
-    - path: src/modules/domain/notify/types/preference-record.ts
+    - path: be/src/modules/domain/notify/types/preference-record.ts
       sha256: 54dc2b24f3d0ea8ce2ce281125bab92d9ba1be4539f9c539916cf931ca40dc0f
-    - path: src/modules/domain/notify/unsubscribe.command.ts
+    - path: be/src/modules/domain/notify/unsubscribe.command.ts
       sha256: e93a4fe23ffc26db89835e8ff8f545a6205fc581fa6c7013a55f67d2e150bcc4
-    - path: src/modules/domain/notify/unsubscribe.handler.spec.ts
+    - path: be/src/modules/domain/notify/unsubscribe.handler.spec.ts
       sha256: a18c2e861171872e5ef44b99145b3a0fac73bfea982c71d4dd07aaa786fd2ef0
-    - path: src/modules/domain/notify/unsubscribe.handler.ts
+    - path: be/src/modules/domain/notify/unsubscribe.handler.ts
       sha256: e76f4d9f1c0552eace872d3e1e695848bc4fb2c220406b658a29c5f4a04aa882
-    - path: src/modules/domain/notify/update-notification-preferences.command.ts
+    - path: be/src/modules/domain/notify/update-notification-preferences.command.ts
       sha256: b4cd66fd5fcea3a841c8b2d6b09e37c4d58cc78bbaed0530abcc572169634718
-    - path: src/modules/domain/notify/update-notification-preferences.handler.spec.ts
+    - path: be/src/modules/domain/notify/update-notification-preferences.handler.spec.ts
       sha256: 53a64661c87bd932e22689eca05746899a292f00f858ca8892a522b81cf540d4
-    - path: src/modules/domain/notify/update-notification-preferences.handler.ts
+    - path: be/src/modules/domain/notify/update-notification-preferences.handler.ts
       sha256: 7b30887dfaba380024c4ab64b2f2d70284391aedc259469d64234706fa783751
   digest: a219c7ba4ca0758c6d41b7bf081ac68fba1052be1f42a97fd38fbaa0ead46ea6
 outcome: pass

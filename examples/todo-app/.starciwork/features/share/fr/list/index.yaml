@@ -12,8 +12,8 @@ exceptionFlows:
 postconditions:
   - The returned status for each row is computed at read time, never cached from an earlier read.
 composes:
-  - {rule: br.share.revoke.on-read, module: src/modules/domain/share}
-  - {rule: br.share.invite.expiry, module: src/modules/domain/share}
+  - {rule: br.share.revoke.on-read, module: be/src/modules/domain/share}
+  - {rule: br.share.invite.expiry, module: be/src/modules/domain/share}
 
 requiresProof:
   unit:

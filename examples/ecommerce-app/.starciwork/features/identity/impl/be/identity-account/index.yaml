@@ -4,10 +4,10 @@ title: The account and session modules of the identity service
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/account}
-  - {role: module, path: src/modules/domain/session}
-  - {role: module, path: src/modules/integrations/order}
-  - {role: feature, path: src/features/identity}
+  - {role: module, path: be/src/modules/domain/account}
+  - {role: module, path: be/src/modules/domain/session}
+  - {role: module, path: be/src/modules/integrations/order}
+  - {role: feature, path: be/src/features/identity}
 proves: [br.identity.sign-in, fr.identity.sign-in, contract.identity.internal.sessions, contract.identity.health]
 
 change:

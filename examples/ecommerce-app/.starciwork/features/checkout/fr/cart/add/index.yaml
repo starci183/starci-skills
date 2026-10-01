@@ -16,7 +16,7 @@ postconditions:
   - The person's cart holds the accumulated line; no other person's cart changes.
 composes:
   - rule: br.checkout.cart
-    module: src/modules/domain/cart
+    module: be/src/modules/domain/cart
 
 requiresProof:
   unit:

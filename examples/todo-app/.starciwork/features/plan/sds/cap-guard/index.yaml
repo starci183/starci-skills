@@ -10,7 +10,7 @@ interfaces:
     subclass) is registered into the existing TaskCreationPolicyRegistry seam by
     PlanModule.onModuleInit; see appliesTo below and owners.
 owners:
-  - {role: module, path: src/modules/domain/plan}
+  - {role: module, path: be/src/modules/domain/plan}
 refs: [br.plan.caps.limit, br.plan.active-scope]
 dependsOn: [sds.plan.subscription-lifecycle, contract.plan.create-precondition]
 appliesTo: [fr.task.create]

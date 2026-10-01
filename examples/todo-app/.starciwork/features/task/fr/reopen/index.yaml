@@ -10,7 +10,7 @@ mainFlow:
 exceptionFlows:
   - A task the actor does not own is refused.
 composes:
-  - {rule: br.task.complete.once, module: src/modules/domain/task}
+  - {rule: br.task.complete.once, module: be/src/modules/domain/task}
 
 requiresProof:
   unit:

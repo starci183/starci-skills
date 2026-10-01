@@ -21,7 +21,7 @@ acceptance:
     then:
       - The acceptance succeeds.
       - The collaborator's role becomes active immediately.
-module: src/modules/domain/share
+module: be/src/modules/domain/share
 change:
   rev: 3
   kind: editorial

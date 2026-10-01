@@ -4,9 +4,9 @@ title: The invitation store and its lifecycle
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/share}
-  - {role: module, path: src/features/todo/transport/graphql/mutations/share}
-  - {role: module, path: src/features/todo/transport/graphql/queries/share}
+  - {role: module, path: be/src/modules/domain/share}
+  - {role: module, path: be/src/features/todo/transport/graphql/mutations/share}
+  - {role: module, path: be/src/features/todo/transport/graphql/queries/share}
 proves: [br.share.invite.expiry, br.share.revoke.on-read, sds.share.invitation-lifecycle]
 change:
   rev: 3

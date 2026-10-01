@@ -11,7 +11,7 @@ interfaces:
 refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
 dependsOn: [integration.login.postgres]
 owners:
-  - {role: module, path: src/modules/domain/share}
+  - {role: module, path: be/src/modules/domain/share}
 
 stateMachine:
   states: [requested, pending, accepted, expired, revoked]

@@ -4,8 +4,8 @@ title: The fail-closed operator check and the filtered whole-chain read
 repository: be
 state: done
 owners:
-  - {role: module, path: src/modules/domain/audit}
-  - {role: module, path: src/features/todo/transport/graphql/queries/audit/audit-log}
+  - {role: module, path: be/src/modules/domain/audit}
+  - {role: module, path: be/src/features/todo/transport/graphql/queries/audit/audit-log}
 proves: [fr.audit.log.read]
 change:
   rev: 3

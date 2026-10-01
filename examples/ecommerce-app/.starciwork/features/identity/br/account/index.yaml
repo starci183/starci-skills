@@ -25,8 +25,8 @@ acceptance:
     then:
       - The second read reflects the change live, without anyone updating the identity store.
 module:
-  - src/modules/domain/account
-  - src/modules/integrations/order
+  - be/src/modules/domain/account
+  - be/src/modules/integrations/order
 change:
   rev: 2
   kind: breaking

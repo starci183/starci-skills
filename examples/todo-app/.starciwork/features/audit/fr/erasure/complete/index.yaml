@@ -15,8 +15,8 @@ postconditions:
   - No reader, including export, can resolve the subject's identity from any line they produced.
   - Every line's bytes, position and hash are unchanged from before the request.
 composes:
-  - {rule: br.audit.erasure.right, module: src/modules/domain/audit}
-  - {rule: br.audit.erasure.logged, module: src/modules/domain/audit}
+  - {rule: br.audit.erasure.right, module: be/src/modules/domain/audit}
+  - {rule: br.audit.erasure.logged, module: be/src/modules/domain/audit}
 
 requiresProof:
   unit:

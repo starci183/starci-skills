@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - No message on that channel is sent to that person until they re-subscribe.
 composes:
-  - {rule: br.notify.unsubscribe.honored, module: src/modules/domain/notify}
+  - {rule: br.notify.unsubscribe.honored, module: be/src/modules/domain/notify}
 
 requiresProof:
   unit:

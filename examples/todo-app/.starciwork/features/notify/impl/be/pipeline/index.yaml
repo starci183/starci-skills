@@ -4,13 +4,13 @@ title: The notify pipeline module
 state: done
 repository: be
 owners:
-  - {role: module, path: src/modules/domain/notify}
-  - {role: module, path: src/modules/integrations/notify-smtp}
-  - {role: module, path: src/modules/integrations/notify-queue}
-  - {role: module, path: src/modules/integrations/notify-smtp/errors}
-  - {role: module, path: src/modules/integrations/notify-queue/errors}
-  - {role: module, path: src/features/todo/transport/graphql/mutations/notify}
-  - {role: module, path: src/features/todo/transport/graphql/queries/notify}
+  - {role: module, path: be/src/modules/domain/notify}
+  - {role: module, path: be/src/modules/integrations/notify-smtp}
+  - {role: module, path: be/src/modules/integrations/notify-queue}
+  - {role: module, path: be/src/modules/integrations/notify-smtp/errors}
+  - {role: module, path: be/src/modules/integrations/notify-queue/errors}
+  - {role: module, path: be/src/features/todo/transport/graphql/mutations/notify}
+  - {role: module, path: be/src/features/todo/transport/graphql/queries/notify}
 proves: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified,
   br.notify.unsubscribe.honored, sds.notify.delivery-lifecycle]
 

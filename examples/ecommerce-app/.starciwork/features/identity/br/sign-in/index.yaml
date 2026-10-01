@@ -20,8 +20,8 @@ acceptance:
     then:
       - The refusal is one status and one body, indistinguishable whether the email is unknown or the password is wrong.
 module:
-  - src/modules/domain/account
-  - src/modules/domain/session
+  - be/src/modules/domain/account
+  - be/src/modules/domain/session
 change:
   rev: 2
   kind: breaking

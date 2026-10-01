@@ -14,7 +14,7 @@ exceptionFlows:
 postconditions:
   - The log line and the metrics labels agree on the same request id, route template and status.
 composes:
-  - {rule: br.observability.access-log-shape, module: src/modules/platform/observability}
+  - {rule: br.observability.access-log-shape, module: be/src/modules/platform/observability}
 
 requiresProof:
   unit:

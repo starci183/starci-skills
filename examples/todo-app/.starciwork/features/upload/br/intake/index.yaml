@@ -21,4 +21,4 @@ acceptance:
     when: The declared or received size exceeds the configured ceiling
     then:
       - The upload is refused.
-module: src/modules/integrations/upload
+module: be/src/modules/integrations/upload

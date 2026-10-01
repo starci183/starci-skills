@@ -8,9 +8,9 @@ repository: fe
 # unchanged - this record owns both notify routes, as its rev-1 reason already says. Quoted because
 # core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "apps/web/src/app/[lang]/notify"}
-  - {role: block, path: apps/web/src/components/blocks/notify-preferences}
-  - {role: block, path: apps/web/src/components/blocks/notify-unsubscribe}
+  - {role: route, path: "fe/apps/web/src/app/[lang]/notify"}
+  - {role: block, path: fe/apps/web/src/components/blocks/notify-preferences}
+  - {role: block, path: fe/apps/web/src/components/blocks/notify-unsubscribe}
 proves: [ui.notify.preferences]
 change:
   rev: 3

@@ -14,8 +14,8 @@ exceptionFlows:
 postconditions:
   - Within the owner's digest window after completion, one message names the task, unless suppressed.
 composes:
-  - {rule: br.notify.delivery.once, module: src/modules/domain/notify}
-  - {rule: br.notify.digest.window, module: src/modules/domain/notify}
+  - {rule: br.notify.delivery.once, module: be/src/modules/domain/notify}
+  - {rule: br.notify.digest.window, module: be/src/modules/domain/notify}
 refs: [contract.notify.task-completion-feed]
 subscribes: [event.task.completed]
 

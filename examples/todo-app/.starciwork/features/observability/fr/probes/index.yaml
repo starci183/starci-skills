@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - A scrape of /metrics shows the probes themselves counted under their route labels.
 composes:
-  - {rule: br.observability.probe-answers, module: src/modules/platform/observability}
+  - {rule: br.observability.probe-answers, module: be/src/modules/platform/observability}
 
 requiresProof:
   unit:

@@ -13,7 +13,7 @@ postconditions:
   - Nothing shown as "upcoming" implies a row exists yet; a preview is not a promise the generator has
     already kept.
 composes:
-  - {rule: br.recur.impossible-date.skips, module: src/modules/domain/recur}
+  - {rule: br.recur.impossible-date.skips, module: be/src/modules/domain/recur}
 refs: [data.recur.rule, data.recur.occurrence]
 
 requiresProof:

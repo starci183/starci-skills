@@ -18,8 +18,8 @@ exceptionFlows:
 postconditions:
   - A ready upload row exists whose storage object holds exactly the received bytes.
 composes:
-  - {rule: br.upload.intake, module: src/modules/integrations/upload}
-  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+  - {rule: br.upload.intake, module: be/src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: be/src/modules/integrations/upload}
 refs: [br.upload.owned]
 
 requiresProof:

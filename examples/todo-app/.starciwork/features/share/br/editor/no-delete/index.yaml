@@ -15,7 +15,7 @@ acceptance:
     then:
       - The attempt is refused.
       - The task still exists afterward.
-module: src/modules/domain/share
+module: be/src/modules/domain/share
 change:
   rev: 3
   kind: editorial

@@ -7,19 +7,19 @@ recordDigest: 423ab1390ae06fcc31e7a4b3378204907101a9de2fbabe2af84de7f9d6a0f2d7
 codeDigest:
   algorithm: sha256
   files:
-    - path: src/modules/platform/events/event-bus.providers.spec.ts
+    - path: be/src/modules/platform/events/event-bus.providers.spec.ts
       sha256: 43292d8c0c3ff55a27b600965dd103c48f72ff1f330490f3a81bbe5819041d49
-    - path: src/modules/platform/events/event-bus.providers.ts
+    - path: be/src/modules/platform/events/event-bus.providers.ts
       sha256: 3f75d352a8d2c5e4bd11924d507181cdc542a59a75c14a99e159357977726609
-    - path: src/modules/platform/events/events.module-definition.ts
+    - path: be/src/modules/platform/events/events.module-definition.ts
       sha256: 3c0cb2ebafc3b145eded5bceecfb2101cf57c6fbaa881403a89a16b4822ade4b
-    - path: src/modules/platform/events/events.module.spec.ts
+    - path: be/src/modules/platform/events/events.module.spec.ts
       sha256: 280dd16cff7cff5ab546e6206356e294da72804eb0824226d572ecab09c83d7a
-    - path: src/modules/platform/events/events.module.ts
+    - path: be/src/modules/platform/events/events.module.ts
       sha256: b7e77ea220ae21ef248f2ba9e37b90288496128aa7bdccc54ed9fa381caf0302
-    - path: src/modules/platform/events/events.types.spec.ts
+    - path: be/src/modules/platform/events/events.types.spec.ts
       sha256: bf153673dbe03bd2e5d6951e052be533e58c136d0eb8f7f72dfb404153f95ff6
-    - path: src/modules/platform/events/events.types.ts
+    - path: be/src/modules/platform/events/events.types.ts
       sha256: 9234eccd67b4e04e91ce2a4ac233b76b364abc3b0d1546c11bbb8c8f700cfa11
   digest: d2261dbdf66a80597ccfd48bcffbaf30325c7dbe7e6953e143dd24e653319cc2
 outcome: pass

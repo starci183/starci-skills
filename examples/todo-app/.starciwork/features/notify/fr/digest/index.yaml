@@ -14,7 +14,7 @@ exceptionFlows:
 postconditions:
   - No person receives more than one message per open-then-closed window per channel.
 composes:
-  - {rule: br.notify.digest.window, module: src/modules/domain/notify}
+  - {rule: br.notify.digest.window, module: be/src/modules/domain/notify}
 
 requiresProof:
   unit:

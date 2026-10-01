@@ -9,7 +9,7 @@ interfaces:
   - Runs on a schedule against every pending intent older than a short grace window, and may also be
     triggered by the owner from the usage screen ("check my payment").
 owners:
-  - {role: module, path: src/modules/domain/plan}
+  - {role: module, path: be/src/modules/domain/plan}
 refs: [br.plan.payment.idempotent, fr.plan.reconcile]
 dependsOn: [sds.plan.subscription-lifecycle, integration.plan.sepay]
 

@@ -14,7 +14,7 @@ postconditions:
   - No response ever includes a sealed actor blob or a keyId a reader could use to correlate lines
     across an erasure.
 composes:
-  - {rule: br.audit.append-only, module: src/modules/domain/audit}
+  - {rule: br.audit.append-only, module: be/src/modules/domain/audit}
 
 requiresProof:
   unit:

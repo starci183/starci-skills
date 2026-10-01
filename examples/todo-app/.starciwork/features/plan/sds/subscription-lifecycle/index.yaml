@@ -11,7 +11,7 @@ interfaces:
   - Every reader of "is this person paid" calls the t-revert-on-read function
     (SubscriptionService.readEffectivePlan), never the stored column.
 owners:
-  - {role: module, path: src/modules/domain/plan}
+  - {role: module, path: be/src/modules/domain/plan}
 refs: [br.plan.caps.limit, br.plan.downgrade.freeze, br.plan.lapse.reverts-on-read, decision.plan.downgrade.policy]
 dependsOn: [integration.plan.sepay, integration.login.postgres]
 

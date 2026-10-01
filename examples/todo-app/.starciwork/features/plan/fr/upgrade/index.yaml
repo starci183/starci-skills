@@ -18,7 +18,7 @@ postconditions:
     redirect back to the app alone.
   - Exactly one activation is recorded per payment intent, per br.plan.payment.idempotent.
 composes:
-  - {rule: br.plan.caps.limit, module: src/modules/domain/plan}
+  - {rule: br.plan.caps.limit, module: be/src/modules/domain/plan}
 refs: [sds.plan.subscription-lifecycle, integration.plan.sepay]
 
 requiresProof:

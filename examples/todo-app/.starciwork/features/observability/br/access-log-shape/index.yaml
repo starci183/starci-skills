@@ -22,4 +22,4 @@ acceptance:
     when: The api answers it
     then:
       - A fresh id is minted, echoed on the response and carried on the access line.
-module: src/modules/platform/observability
+module: be/src/modules/platform/observability

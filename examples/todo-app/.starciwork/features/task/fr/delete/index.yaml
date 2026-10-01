@@ -14,8 +14,8 @@ exceptionFlows:
 postconditions:
   - event.task.deleted is published, and only after the row is gone.
 composes:
-  - {rule: br.task.delete.final, module: src/modules/domain/task}
-  - {rule: br.task.single-owner, module: src/modules/domain/task}
+  - {rule: br.task.delete.final, module: be/src/modules/domain/task}
+  - {rule: br.task.single-owner, module: be/src/modules/domain/task}
 refs: [event.task.deleted]
 
 blockedBy:

@@ -23,7 +23,7 @@ acceptance:
     then:
       - All 40 tasks still exist, unowned change, uncompleted change, untouched.
       - Only the subscription row changes.
-module: src/modules/domain/plan
+module: be/src/modules/domain/plan
 change:
   rev: 3
   kind: editorial

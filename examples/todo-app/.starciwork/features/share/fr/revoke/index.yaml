@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - The collaborator's next read of the task finds their access gone, with no sweep in between.
 composes:
-  - {rule: br.share.revoke.on-read, module: src/modules/domain/share}
+  - {rule: br.share.revoke.on-read, module: be/src/modules/domain/share}
 
 requiresProof:
   unit:

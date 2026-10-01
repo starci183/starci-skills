@@ -17,7 +17,7 @@ acceptance:
     then:
       - The attempt is refused.
       - The task is unchanged, now and after a restart.
-module: [src/modules/domain/task]
+module: [be/src/modules/domain/task]
 blockedBy:
   - {record: gap.task.single-owner-editor-arm, because: "The rule's own evidence.yaml is stale: true over exactly this absence - its one captured run proves the delete half and the stranger negatives but never exercises the accepted-editor complete arm, and contract.share.completion-guard-for-task's provider/consumer proof is still todo. The gap names that absence."}
 change:

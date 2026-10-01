@@ -10,7 +10,7 @@ interfaces:
 refs: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified, br.notify.unsubscribe.honored]
 dependsOn: [integration.notify.smtp, integration.notify.queue]
 owners:
-  - {role: module, path: src/modules/domain/notify}
+  - {role: module, path: be/src/modules/domain/notify}
 
 stateMachine:
   states: [queued, sending, delivered, bounced, suppressed]

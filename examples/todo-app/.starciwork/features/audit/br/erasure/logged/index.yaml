@@ -15,7 +15,7 @@ acceptance:
     then:
       - An erasure-requested line and an erasure-completed line both exist, in that order.
       - Neither line's actor field resolves to the erased person; both name only the request.
-module: src/modules/domain/audit
+module: be/src/modules/domain/audit
 
 change:
   rev: 3

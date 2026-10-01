@@ -16,9 +16,9 @@ postconditions:
   - The token verifies over HTTP for as long as its TTL lives, and only the identity service reads the store.
 composes:
   - rule: br.identity.sign-in
-    module: src/modules/domain/session
+    module: be/src/modules/domain/session
   - rule: br.identity.sign-in
-    module: src/modules/domain/account
+    module: be/src/modules/domain/account
 
 requiresProof:
   unit:
