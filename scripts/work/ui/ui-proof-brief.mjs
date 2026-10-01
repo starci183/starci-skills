@@ -32,7 +32,7 @@ import {
 } from './grammar-geometry.mjs';
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
-import { collapse as oneLine } from '../../lib/terminal-liveness.mjs';
+import { collapse as oneLine } from '../../lib/terminal-liveness.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge', 'ui');
@@ -881,7 +881,7 @@ export async function uiProofBriefMain(argv = []) {
   return { exitCode: 0, text: json ? `${JSON.stringify(plainBrief(brief), null, 2)}\n` : briefText(brief) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = await uiProofBriefMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

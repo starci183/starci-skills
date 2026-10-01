@@ -38,7 +38,7 @@
 // cycle against the listing it already fetches.
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll } from '../api/orca/worker-list.mjs';
@@ -99,4 +99,4 @@ function main(argv) {
   process.exit(findings.length ? 1 : 0);
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) main(process.argv.slice(2));
+if (isMain(import.meta.url)) main(process.argv.slice(2));

@@ -57,7 +57,7 @@ import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { gitResult } from '../api/git/lib.mjs';
-import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs';
+import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -662,6 +662,6 @@ async function main(argv) {
   return result.ok ? 0 : result.entry ? 1 : 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { console.error(e?.stack ?? e); process.exitCode = 1; });
 }

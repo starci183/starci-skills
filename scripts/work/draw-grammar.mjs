@@ -24,6 +24,7 @@ import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-source.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
 export const PREFERENCES = Object.freeze(['auto', ...GRAMMAR_SOURCES]);
@@ -149,6 +150,6 @@ async function main(argv) {
   return r.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-grammar: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

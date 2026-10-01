@@ -13,7 +13,7 @@
 // own, so it never changes the graph. Exit 0 ok, 1 refused or invalid, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { JOB_STATUSES, inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -149,4 +149,4 @@ export function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();
+if (isMain(import.meta.url)) process.exitCode = main();

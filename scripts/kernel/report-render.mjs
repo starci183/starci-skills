@@ -6,7 +6,7 @@
 //   node scripts/kernel/report-render.mjs <report.json>
 
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 
 const checkToken = (c) =>
   `${c?.name ?? '?'} ${Number(c?.exitCode) === 0 ? 'ok' : `fail(${c?.exitCode ?? '?'})`}`;
@@ -25,7 +25,7 @@ export function renderReportBlock(report = {}) {
   return lines.join('\n');
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isMain(import.meta.url)) {
   const file = process.argv[2];
   if (!file) { console.error('use: node scripts/kernel/report-render.mjs <report.json>'); process.exit(2); }
   console.log(renderReportBlock(JSON.parse(fs.readFileSync(file, 'utf8'))));

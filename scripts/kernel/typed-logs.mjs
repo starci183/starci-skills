@@ -34,7 +34,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
@@ -550,4 +550,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); });
+if (isMain(import.meta.url)) main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); });

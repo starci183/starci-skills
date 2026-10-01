@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256} from '../../../engine/digest.mjs';
 import { gitOutput } from '../../api/git/lib.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../record-ownership.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:
@@ -449,7 +450,7 @@ function writeBaseline(workRoot) {
 }
 
 // ---------- main ----------
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const doBaseline = args.includes('--write-baseline');
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;

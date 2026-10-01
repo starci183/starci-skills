@@ -1,4 +1,4 @@
-import { Worker } from 'node:worker_threads';
+import { startWorker } from '../../scripts/api/node/start-worker.mjs';
 
 const MAX_PATTERN = 200;
 const MAX_HITS = 500;
@@ -21,7 +21,7 @@ const regexWorker = `
 
 function regexHits(lines, pattern) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(regexWorker, { eval: true, execArgv: [], workerData: { lines, pattern } });
+    const worker = startWorker(regexWorker, { eval: true, execArgv: [], workerData: { lines, pattern } });
     const timer = setTimeout(() => { worker.terminate(); reject(Object.assign(new Error('Regex search timed out'), { code: 'REGEX_TIMEOUT' })); }, REGEX_TIMEOUT_MS);
     worker.once('message', value => {
       clearTimeout(timer);

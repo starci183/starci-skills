@@ -20,7 +20,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { extractUsage, costOfRow, loadPrices, sumRows, promptTokens, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
 import { sessionHomes, sessionAgentOf } from './op-session.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
@@ -370,7 +370,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
   return out;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const arg = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   if (argv[0] !== 'sweep') {

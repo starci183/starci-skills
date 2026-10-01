@@ -126,7 +126,7 @@ writes:
         observed result in evidence/result.md - report per assertion pass, fail with the observed response,
         or not-run with the reason. An unrun, skipped or partial scenario stays not-run outside the
         pass column, a green run whose stack never started is recorded as a spec defect, and
-        credentials or personal data are redacted before the assets are hashed. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
+        credentials or personal data are redacted before the assets are hashed. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/uat/test-secret.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
   - id: read-digest
     path: STARCI_JOB_SCRATCH/read-digest.json
     schema: starci/read-digest@1

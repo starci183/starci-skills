@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
 import { safeRemoveTree } from '../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
@@ -261,6 +261,6 @@ async function main(argv) {
   return red.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

@@ -32,7 +32,7 @@
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import {
@@ -258,4 +258,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

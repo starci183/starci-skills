@@ -22,7 +22,7 @@
 // options are mutually exclusive.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256} from '../../engine/digest.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -127,9 +127,9 @@ const workRoot = project ? project.workRoot : path.join(repo, '.starciwork');
 // advisory only; the kernel re-derives at boot and diffs, never trusts blindly.
 function deriveOpChain(prompt) {
   const work = fs.existsSync(workRoot) ? ['--work', workRoot, '--state', workRoot] : [];
-  const r = spawnSync(process.execPath,
+  const r = runNode(
     [path.join(skillRoot, 'scripts', 'route', 'route-plan.mjs'), '--text', prompt, '--json', ...work],
-    { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
+    { timeout: 60000, cwd: skillRoot });
   if (r.status !== 0) return null;
   return parseJson(r.stdout);
 }
@@ -140,9 +140,9 @@ function deriveOpChain(prompt) {
 function assessRepos(repos) {
   const script = path.join(skillRoot, 'scripts', 'goal', 'assess.mjs');
   if (!fs.existsSync(script)) return { available: false, note: 'assess unavailable', data: null };
-  const r = spawnSync(process.execPath,
+  const r = runNode(
     [script, ...repos.flatMap(p => ['--repo', p.path]), '--json'],
-    { encoding: 'utf8', timeout: 120000, cwd: skillRoot });
+    { timeout: 120000, cwd: skillRoot });
   if (r.status !== 0 || !(r.stdout ?? '').trim()) {
     return { available: false, note: 'assess unavailable', data: null, stderr: (r.stderr ?? '').trim().slice(0, 300) || undefined };
   }

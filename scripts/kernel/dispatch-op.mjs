@@ -33,6 +33,7 @@ import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-own
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
 import { buildOpPrompt } from './op-prompt.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -300,4 +301,4 @@ function main() {
   for (const line of prompt.split('\n')) console.log(`  | ${line}`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

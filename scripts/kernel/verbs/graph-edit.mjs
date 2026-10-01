@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import { RETRYABLE_JOB_STATUSES } from '../../../engine/admission.mjs';
 import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
 import { ownedPathPlacements } from '../target-repo.mjs';
 import {
@@ -225,8 +225,8 @@ export default {
       const file = path.join(dir, `${editId}.json`);
       const log = fs.openSync(`${file}.log`, 'a');
       const out = fs.openSync(file, 'w');
-      const child = spawn(process.execPath, [path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
-        { cwd: skillRoot, detached: true, stdio: ['ignore', out, log], windowsHide: true });
+      const child = spawnNode([path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
+        { cwd: skillRoot, detached: true, stdio: ['ignore', out, log] });
       child.unref();
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
       human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: api graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;

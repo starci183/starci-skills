@@ -26,8 +26,8 @@ import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const ACTION_KIND = 'supervisor-action';
 export const OWED_ACTIONS_KIND = 'supervisor-owed-actions';
 export const DIGEST_KIND = 'supervisor-owner-digest';
@@ -259,7 +259,7 @@ export async function ownerDigest({ env = process.env, now = Date.now(), languag
   return { ok: true, sent: false, text };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const verb = argv[0];
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

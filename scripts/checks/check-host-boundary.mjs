@@ -16,7 +16,7 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import {spawnCalls} from '../lib/spawn-calls.mjs';
 import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
@@ -175,7 +175,7 @@ export function hostBoundaryMain(argv=[]){
   return {exitCode:result.ok?0:1,report:{schema:'starci/host-boundary-check-report@1',...result}};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const result=hostBoundaryMain(process.argv.slice(2));
   process.stdout.write(result.report.help?`${result.report.help}\n`:`${JSON.stringify(result.report,null,2)}\n`);
   process.exitCode=result.exitCode;

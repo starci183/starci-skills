@@ -51,7 +51,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -370,8 +370,8 @@ const jsonFrom = (stdout) => {
 export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   const env = { ...process.env };
   delete env.ORCA_TERMINAL_HANDLE;
-  const r = spawnSync(process.execPath, [API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
-    { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
+  const r = runNode([API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
+    { cwd: skillRoot, timeout: timeoutMs, env });
   const value = jsonFrom(r.stdout);
   if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
   return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, kernelRev: value.kernelRev ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],

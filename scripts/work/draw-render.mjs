@@ -62,7 +62,7 @@ import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
-import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs';
+import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
@@ -685,4 +685,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();

@@ -100,7 +100,7 @@ test('gate.mjs --profile docs runs every docChecks script: exit 1 is a finding, 
   const checks = [{ id: 'a', script: 'a.mjs', tree: false }, { id: 'b', script: 'b.mjs', tree: true }];
   const seen = [];
   const answers = { 'a.mjs': { status: 0, stdout: 'ok' }, 'b.mjs': { status: 1, stdout: 'REFUSE docs/x.md:4 a refusal\n1 refused' } };
-  const spawn = (node, args) => { seen.push(args.slice(1)); return { ...answers[path.basename(args[0])], stderr: '' }; };
+  const spawn = (args) => { seen.push(args.slice(1)); return { ...answers[path.basename(args[0])], stderr: '' }; };
   const red = runDocGate({ tree: ROOT, checks, spawn });
   assert.equal(red.profile, DOC_PROFILE);
   assert.equal(red.exit, 1);
@@ -136,7 +136,7 @@ function worldApp(t, specs, { preset = true, declaration = true } = {}) {
   for (const [rel, body] of Object.entries(specs)) put(app, rel, body);
   return app;
 }
-const jestRun = (over = {}) => (cmd, args) => {
+const jestRun = (over = {}) => (args) => {
   const out = args.find((a) => a.startsWith('--outputFile=')).slice('--outputFile='.length);
   fs.writeFileSync(out, JSON.stringify({ numTotalTests: 2, numPassedTests: 2, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0, numTotalTestSuites: 1, numFailedTestSuites: 0, testResults: [], ...over }));
   return { status: over.numFailedTests ? 1 : 0, stdout: '', stderr: '' };
@@ -145,7 +145,7 @@ const jestRun = (over = {}) => (cmd, args) => {
 test('test-world: missing is op-test-world-proof-missing, a hand-rolled world op-test-world-hand-rolled, a red run op-test-world-run-red', (t) => {
   assert.equal(codeOf(judgeTestWorld(null)), 'op-test-world-proof-missing');
   const good = { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { todo: true } })') };
-  const green = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, spawn: jestRun() });
+  const green = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, npm: jestRun() });
   assert.equal(green.schema, TEST_WORLD_RUN_SCHEMA);
   assert.equal(green.exit, 0);
   assert.equal(judgeTestWorld(green).status, 'pass');
@@ -156,17 +156,17 @@ test('test-world: missing is op-test-world-proof-missing, a hand-rolled world op
     ['docker', worldApp(t, { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { todo: true } })\nexecSync("docker run postgres")') }), 'e2e'],
     ['no specs', worldApp(t, {}), 'e2e'],
   ]) {
-    const summary = buildTestWorldRun({ root: app, project, rules: RULES, spawn: jestRun() });
+    const summary = buildTestWorldRun({ root: app, project, rules: RULES, npm: jestRun() });
     assert.equal(codeOf(judgeTestWorld(summary)), 'op-test-world-hand-rolled', label);
   }
   // A summary whose findings list was emptied by hand is judged from its recorded specs, not from its findings field.
   const doctored = { ...greenTestWorldRun(), specs: [{ path: 'be/src/tests/e2e/a.e2e-spec.ts', useTestWorld: false, modes: [], outage: 0, forbidden: [] }], findings: [] };
   assert.equal(codeOf(judgeTestWorld(doctored)), 'op-test-world-hand-rolled');
-  const failed = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, spawn: jestRun({ numFailedTests: 1, numPassedTests: 1 }) });
+  const failed = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, npm: jestRun({ numFailedTests: 1, numPassedTests: 1 }) });
   assert.equal(codeOf(judgeTestWorld(failed)), 'op-test-world-run-red');
-  const skipped = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, spawn: jestRun({ numPendingTests: 1, numPassedTests: 1 }) });
+  const skipped = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, npm: jestRun({ numPendingTests: 1, numPassedTests: 1 }) });
   assert.equal(codeOf(judgeTestWorld(skipped)), 'op-test-world-run-red', 'a skipped scenario is never green');
-  const none = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, spawn: () => ({ status: 1, stdout: '', stderr: 'jest: not found' }) });
+  const none = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, npm: () => ({ status: 1, stdout: '', stderr: 'jest: not found' }) });
   assert.equal(none.exit, 2);
   assert.equal(codeOf(judgeTestWorld(none)), 'op-test-world-run-red');
 });
@@ -290,7 +290,7 @@ test('release: missing, a missing or skipped step and a red step refuse; release
   assert.equal(codeOf(judgeRelease({ ...green, steps: green.steps.map((s) => (s.id === 'app-installs' ? { ...s, status: 'skipped' } : s)) })), 'op-release-step-skipped');
   assert.equal(codeOf(judgeRelease({ ...green, steps: green.steps.map((s) => (s.id === 'check' ? { ...s, status: 'red' } : s)) })), 'op-release-step-red');
   assert.equal(codeOf(judgeRelease({ ...green, steps: green.steps.map((s) => (s.id === 'canon-pins' ? { ...s, status: 'tool-failed' } : s)) })), 'op-release-step-red');
-  const skip = appInstallsStep({ runtime: ROOT, spawn: () => ({ status: 0, stdout: 'SKIPPED: no installs - lint: no node_modules\n', stderr: '' }) });
+  const skip = appInstallsStep({ runtime: ROOT, node: () => ({ status: 0, stdout: 'SKIPPED: no installs - lint: no node_modules\n', stderr: '' }) });
   assert.equal(skip.status, 'skipped', 'a skipped proof with exit 0 is still a skip');
   // The whole proof over a repository: every step is present, in order, and a red check makes it red.
   const repo = tmp(t, 'starci-op-proof-release-');
@@ -299,13 +299,14 @@ test('release: missing, a missing or skipped step and a red step refuse; release
   for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['commit.gpgsign', 'false']]) git('config', k, v);
   put(repo, 'a.txt', 'a\n'); git('add', '-A'); git('commit', '-q', '-m', 'a');
   put(repo, 'b.txt', 'b\n'); git('add', '-A'); git('commit', '-q', '-m', 'b');
-  const spawn = (cmd, args) => {
+  const node = (args) => {
     const joined = args.join(' ');
     if (joined.includes('check-canon-pins')) return { status: 0, stdout: JSON.stringify({ ok: true, errors: [], pins: 3, profiles: 2 }), stderr: '' };
     if (joined.includes('release-app-installs')) return { status: 0, stdout: 'release-app-installs: OK', stderr: '' };
-    return { status: 1, stdout: 'check-op-manifest: 1 finding', stderr: '' };
+    return { status: 1, stdout: '', stderr: '' };
   };
-  const proof = buildReleaseProof({ repo, base: 'HEAD~1', runtime: ROOT, spawn });
+  const npm = () => ({ status: 1, stdout: 'check-op-manifest: 1 finding', stderr: '' });
+  const proof = buildReleaseProof({ repo, base: 'HEAD~1', runtime: ROOT, node, npm });
   assert.equal(proof.schema, RELEASE_PROOF_SCHEMA);
   assert.deepEqual(proof.steps.map((s) => s.id), [...RELEASE_STEPS]);
   assert.deepEqual(proof.steps.map((s) => s.status), ['pass', 'pass', 'pass', 'red']);

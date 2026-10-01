@@ -52,7 +52,7 @@
 import fs from 'node:fs';
 import { capturesOf } from '../impl-captures.mjs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from '../ui/render.mjs';
 import { decodePng, keyRect } from '../png.mjs';
@@ -469,7 +469,7 @@ async function main(argv) {
   return { exitCode: 2, text: 'Usage: node scripts/work/brand/brand-palette.mjs --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = await main(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

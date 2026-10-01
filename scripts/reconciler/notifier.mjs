@@ -23,8 +23,8 @@ import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const JUDGEMENT_KIND = 'supervisor-judgement';
 export const DIGEST_SENT_KIND = 'notifier-digest-sent';
 export const URGENT_SENT_KIND = 'notifier-urgent-sent';
@@ -201,7 +201,7 @@ export async function urgent(items, { send = false, env = process.env, now = Dat
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const flag = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const json = argv.includes('--json');

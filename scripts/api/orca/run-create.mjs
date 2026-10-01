@@ -5,6 +5,7 @@
 // Returns {ok, runId, result, request} — runId is result.run.id. `request` is the caller's ledger identity: calls.yaml
 // declares run-create replay: request, so the first issue carries the --retry-request id derived from it.
 import { orcaCall, arg } from './lib.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export function runCreate({ objective, from, request }) {
   const r = orcaCall('run-create', { objective, from }, { request });
@@ -17,7 +18,7 @@ export function runCreate({ objective, from, request }) {
   return { ok: r.exitCode === 0 && Boolean(runId), runId, result, error, outcome: r.outcome, request: r.request, hostUnavailable: r.hostUnavailable === true };
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('run-create.mjs')) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const out = runCreate({ objective: arg(argv, 'objective'), from: arg(argv, 'from'), request: JSON.parse(arg(argv, 'request') ?? 'null') });
   console.log(JSON.stringify(out, null, 2));

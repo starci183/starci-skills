@@ -5,7 +5,7 @@ import {agentContext} from '../api/orca/agent-context.mjs';
 import {missingFrom} from '../api/orca/lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 
 
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
@@ -205,7 +205,7 @@ export function providersMain(argv=[]){
     report:{schema:'starci/providers-check-report@1',ok:result.ok&&live.ok,errors:result.errors,live}};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const result=providersMain(process.argv.slice(2));
   process.stdout.write(result.report.help?`${result.report.help}\n`:`${JSON.stringify(result.report,null,2)}\n`);
   process.exitCode=result.exitCode;

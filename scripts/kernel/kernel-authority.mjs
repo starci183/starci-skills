@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -49,7 +49,7 @@ const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').re
 /** Run one api verb against the same repo: {ok, status, json, out, err}. The caller's env (Kernel identity) passes. */
 export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = {}) {
   // CHILD_ENV: a child of a resolving verb (graph-edit, redesign) passes the decisions-first guard (scripts/machine/decisions.mjs).
-  const r = spawnSync(process.execPath, [API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
+  const r = runNode([API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   const text = String(r.stdout ?? '').trim();
   try { json = JSON.parse(text); } catch { const i = text.indexOf('{'); if (i >= 0) { try { json = JSON.parse(text.slice(i)); } catch { json = null; } } }

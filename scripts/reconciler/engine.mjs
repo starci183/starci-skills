@@ -52,7 +52,7 @@ import { CONCERN_OWNER } from './owns.mjs';
 import {
   CONTROLLER_NAMES, LEADER_NAME, MODES, SKILL_ROOT, START_REASON_ENV, configuredMode, controllerModule, reconcilerConfig, reconcilerNumbers,
 } from './state.mjs';
-import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs';
+import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
@@ -647,4 +647,4 @@ async function main(argv = process.argv.slice(2)) {
   process.exit(r.exitCode ?? 0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) await main();
+if (isMain(import.meta.url)) await main();

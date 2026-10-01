@@ -45,6 +45,7 @@ import { findPackage, requirePackage } from '../../lib/package-at.mjs';
 import { list } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from './draw-dna.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export { DRAW_OFF_GRAMMAR_COMPONENT };
 export const DRAW_TYPECHECK_FAILED = 'DRAW_TYPECHECK_FAILED';
@@ -359,6 +360,6 @@ async function main(argv) {
   return out.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

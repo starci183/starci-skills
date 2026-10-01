@@ -52,8 +52,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import cp, { spawn, spawnSync } from 'node:child_process';
-import { syncBuiltinESMExports } from 'node:module';
+import { spawnSyncOverride } from '../api/process/spawn-sync-override.mjs';
+import { runNode } from '../api/node/run-node.mjs';
+import { execAsSpawnSync } from '../api/process/exec-as-spawn-sync.mjs';
 import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
   startAttempt, writeContract, updateContractContext, updateAttempt, endRejectedAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
@@ -802,8 +803,7 @@ function askFormAlive(payload, { probeMs = 1500 } = {}) {
   }
   const port = Number(/^https?:\/\/(?:127\.0\.0\.1|localhost):(\d+)\//.exec(String(payload?.url ?? ''))?.[1]);
   if (!Number.isInteger(port)) return null;
-  const probe = spawnSync(process.execPath, ['-e', `const s=require('net').connect(${port},'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),${probeMs})`],
-    { windowsHide: true, timeout: probeMs + 2000 });
+  const probe = runNode(['-e', `const s=require('net').connect(${port},'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),${probeMs})`], { timeout: probeMs + 2000 });
   return probe.status === 0;
 }
 
@@ -1587,8 +1587,13 @@ const spawnKeyOf = (command, argv) => JSON.stringify([String(command), (Array.is
  * memoising read-only git reads (see above); the original is restored after.
  */
 function withStatusSpawnMemo(fn, { prefetched = new Map(), env = process.env } = {}) {
-  if (env.STARCI_STATUS_MEMO === 'off' || cp.spawnSync.statusMemo) return fn();
-  const original = cp.spawnSync, dir = gitMemoDirOf(env), seen = new Map();
+  if (env.STARCI_STATUS_MEMO === 'off') return fn();
+  return spawnSyncOverride((original) => (original.statusMemo ? null : statusMemoOf(original, { prefetched, dir: gitMemoDirOf(env) })), fn);
+}
+
+/** The memoising spawnSync over `original` (withStatusSpawnMemo). */
+function statusMemoOf(original, { prefetched, dir }) {
+  const seen = new Map();
   const memoised = function spawnSyncStatusMemo(command, argv, options) {
     const ahead = spawnKeyOf(command, argv);
     if (prefetched.has(ahead)) { const result = prefetched.get(ahead); prefetched.delete(ahead); return result; }
@@ -1610,9 +1615,7 @@ function withStatusSpawnMemo(fn, { prefetched = new Map(), env = process.env } =
     return result;
   };
   memoised.statusMemo = true;
-  cp.spawnSync = memoised;
-  syncBuiltinESMExports();
-  try { return fn(); } finally { cp.spawnSync = original; syncBuiltinESMExports(); }
+  return memoised;
 }
 
 /** The jobs whose worker status observes: open, and running, leased or bound to a terminal. */
@@ -1623,27 +1626,14 @@ const statusWorkerRowsOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FRO
 
 /** The spawns `fn` makes, recorded instead of run (each answers a spawn error, which the wrappers absorb). */
 const recordSpawns = (fn) => {
-  const calls = [], original = cp.spawnSync;
-  cp.spawnSync = function spawnSyncRecorder(command, argv, options) {
+  const calls = [];
+  spawnSyncOverride(() => function spawnSyncRecorder(command, argv, options) {
     calls.push({ command, argv: Array.isArray(argv) ? argv : [], options: (Array.isArray(argv) ? options : argv) ?? {} });
     const error = Object.assign(new Error('recorded, not run'), { code: 'ERECORDED' });
     return { pid: 0, output: [null, '', ''], stdout: '', stderr: '', status: null, signal: null, error };
-  };
-  syncBuiltinESMExports();
-  try { fn(); } catch { /* a wrapper that throws records what it reached */ } finally { cp.spawnSync = original; syncBuiltinESMExports(); }
+  }, () => { try { fn(); } catch { /* a wrapper that throws records what it reached */ } });
   return calls;
 };
-
-/** One recorded spawn run asynchronously, as spawnSync would answer it; null when it did not exit on its own. */
-const spawnAsyncOf = ({ command, argv, options }) => new Promise((resolve) => {
-  try {
-    cp.execFile(command, argv, { encoding: options.encoding ?? 'buffer', timeout: options.timeout ?? 0, maxBuffer: options.maxBuffer ?? 1024 * 1024,
-      windowsHide: options.windowsHide ?? true, ...(options.cwd ? { cwd: options.cwd } : {}), ...(options.env ? { env: options.env } : {}) }, (error, stdout, stderr) => {
-      if (error && typeof error.code !== 'number') return resolve(null);
-      resolve({ pid: 0, output: [null, stdout, stderr], stdout, stderr, status: error ? error.code : 0, signal: null });
-    });
-  } catch { resolve(null); }
-});
 
 const STATUS_PREFETCH_CONCURRENCY = 8;
 /**
@@ -1660,7 +1650,7 @@ async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
   const calls = recordSpawns(() => {
     for (const terminal of handles) { terminalShow({ terminal }); terminalRead({ terminal, screen: true }); }
   });
-  const results = await mapConcurrent(calls, STATUS_PREFETCH_CONCURRENCY, spawnAsyncOf);
+  const results = await mapConcurrent(calls, STATUS_PREFETCH_CONCURRENCY, execAsSpawnSync);
   calls.forEach((call, index) => { if (results[index]) prefetched.set(spawnKeyOf(call.command, call.argv), results[index]); });
   return prefetched;
 }
@@ -2266,8 +2256,8 @@ function environmentPreStep(repo, payload) {
   const script = path.join(skillRoot, 'scripts', 'uat', 'env-health.mjs');
   const paths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
   const env = typeof payload.params?.environment === 'string' ? ['--env', payload.params.environment] : [];
-  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, '--restart', '--json'],
-    { encoding: 'utf8', windowsHide: true, timeout: 300000 });
+  const r = runNode([script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, '--restart', '--json'],
+    { timeout: 300000 });
   try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return null; }
 }
 /** One open [environment] incident per workflow and environment state; refreshed, never duplicated. */
@@ -2684,8 +2674,8 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       const roots = jobPlacements(db, job, repo).filter((p) => !p.unresolved).map((p) => path.resolve(p.base, String(p.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
       const candidates = unfiledReportCandidates({ roots, sinceMs: contract?.created_at ?? job.created_at, jobId, dispatchId: reportDispatchIdOf(db, job) });
       return salvageUnfiledReport({ candidates, fileReport: (file) => {
-        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'report', '--repo', repo, '--job', jobId, '--report', file, '--json'],
-          { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+        const r = runNode([fileURLToPath(import.meta.url), 'report', '--repo', repo, '--job', jobId, '--report', file, '--json'],
+          { timeout: 120_000 });
         return { ok: r.status === 0, error: (r.stderr || r.stdout || '').trim().split(/\r?\n/).pop() };
       } });
     });

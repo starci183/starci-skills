@@ -36,7 +36,7 @@ import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';
 import { productRepos } from '../../machine/home.mjs';
-import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs';
+import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -490,7 +490,7 @@ export function dryCtx({ repos = productRepos(), now = Date.now() } = {}) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [path.resolve(argv[i + 1])] : []));
   const only = argv.flatMap((a, i) => (a === '--workflow' && argv[i + 1] ? [argv[i + 1]] : []));

@@ -14,7 +14,7 @@
 // never broken here (the package manager owns them). Pure reads; no writes.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { isWorktreesPath } from '../lib/worktree-exclude.mjs';
 
 export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
@@ -53,10 +53,10 @@ export function specifiersOf(text) {
 }
 
 /** Tracked source files of `root` (posix, relative), never under the worktrees dir or node_modules. */
-export function trackedSources(root, { run = spawnSync } = {}) {
-  const r = run('git', ['-C', root, 'ls-files', '-z', '--cached'], { encoding: 'utf8', windowsHide: true, maxBuffer: 256 * 1024 * 1024 });
-  if (r.status !== 0) throw Object.assign(Error(`git ls-files failed in ${root}: ${String(r.stderr ?? '').trim().slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
-  return String(r.stdout).split('\0').filter(Boolean).map(posix)
+export function trackedSources(root, { list = lsFiles } = {}) {
+  const r = list(root);
+  if (!r.ok) throw Object.assign(Error(`git ls-files failed in ${root}: ${String(r.error ?? '').slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
+  return r.files.map(posix)
     .filter((f) => !isWorktreesPath(f) && !f.includes('node_modules/') && SOURCE_EXT.some((e) => f.endsWith(e)) && !f.endsWith('.d.ts'));
 }
 
@@ -151,8 +151,8 @@ export function matchAlias(pattern, spec) {
  * One pass over a repository working tree: {files, edges: [{from, spec, kind, file?}]}. `only` limits the files
  * READ (their imports) to that set; resolution still sees every file on disk. `readFile(rel)` is a seam.
  */
-export function scanImports(root, { only = null, run = spawnSync, readFile = null } = {}) {
-  const files = trackedSources(root, { run });
+export function scanImports(root, { only = null, list = lsFiles, readFile = null } = {}) {
+  const files = trackedSources(root, { list });
   const onDisk = (rel) => { try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; } };
   const isDir = (rel) => { try { return fs.statSync(path.join(root, rel)).isDirectory(); } catch { return false; } };
   const scopes = aliasScopes(root);

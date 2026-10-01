@@ -49,10 +49,10 @@ import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
 import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export { LESSONS_FILE, lessonsForChecks, parseLessonsFile };
 
-const selfFile = fileURLToPath(import.meta.url);
 export const KINDS = Object.freeze({
   hypothesis: 'supervisor-hypothesis', experiment: 'supervisor-experiment', result: 'supervisor-experiment-result',
   lesson: 'supervisor-lesson', proposal: 'supervisor-proposal',
@@ -375,7 +375,7 @@ export function learningDigest(state, { since = 0 } = {}) {
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const verb = argv[0];
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

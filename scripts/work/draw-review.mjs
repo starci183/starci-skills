@@ -48,7 +48,7 @@ import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
@@ -561,7 +561,7 @@ export function drawReviewsOwed(repo, files) {
   return { owed, unjudged: unjudged.filter((u) => !seen.has(u.path) && seen.add(u.path)) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = drawReviewMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

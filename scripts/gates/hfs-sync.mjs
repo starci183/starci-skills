@@ -23,7 +23,7 @@
 // Exit 0 clean, 1 findings, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadHfs, SyncError } from '../../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
@@ -68,4 +68,4 @@ async function main(argv) {
   return result.ok ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) process.exitCode = await main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

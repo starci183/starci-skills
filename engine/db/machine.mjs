@@ -36,7 +36,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { sleepSync as scaledSleepSync } from '../../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from './blob.mjs';
-import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs';
+import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -1486,7 +1486,7 @@ export function machineLog(row, { env = process.env } = {}) {
 // ---------------------------------------------------------------------------------------------------------------------
 // CLI: node engine/db/machine.mjs <init|status|ledgers|register|resolve> [--file <machine.sqlite>] [--json]
 // ---------------------------------------------------------------------------------------------------------------------
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const flag = (name) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : null; };
   const cmd = args[0] ?? 'status';

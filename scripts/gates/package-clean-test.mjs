@@ -30,7 +30,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
 import { loadPins } from './canon-pins.mjs';
@@ -155,9 +155,7 @@ export function cleanEnv(env = process.env) {
 }
 
 const npmRun = (args, { cwd, env, timeout }) => {
-  // The args are this script's own literals; Windows starts npm.cmd through the shell, as one command line (DEP0190).
-  const options = { cwd, env, encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 256 * 1024 * 1024 };
-  const r = process.platform === 'win32' ? spawnSync(['npm', ...args].join(' '), { ...options, shell: true }) : spawnSync('npm', args, options);
+  const r = runNpm(args, { cwd, env, timeout, maxBuffer: 256 * 1024 * 1024 });
   return { status: r.status, error: r.error ?? null, timedOut: r.error?.code === 'ETIMEDOUT' || (r.signal && r.status === null), output: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 

@@ -60,7 +60,7 @@ import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
-import { startWorkerAgent } from '../agent/start-worker.mjs';
+import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -83,7 +83,6 @@ export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = 
   } catch (error) { return { receipt: { error: String(error?.message ?? error) } }; }
 }
 
-const selfFile = fileURLToPath(import.meta.url);
 export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
 export const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
 export const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
@@ -678,4 +677,4 @@ async function main() {
   } finally { m.close(); }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) main();
+if (isMain(import.meta.url)) main();

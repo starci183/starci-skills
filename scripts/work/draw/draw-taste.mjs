@@ -19,7 +19,7 @@
 //   node scripts/work/draw/draw-taste.mjs --html <render.html> [--png <part.png>]... [--json]
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { decodePng } from '../png.mjs';
 import { parseColor, parseCssCustomProperties } from '../brand/brand.mjs';
@@ -222,6 +222,6 @@ async function main(argv) {
   return findings.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; });
 }

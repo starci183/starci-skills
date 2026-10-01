@@ -7,7 +7,7 @@
 // file bound to its Orca terminal, <guards root>/terminals/<handle>.json) in STARCI_GUARD_FILE for this one call.
 // Fail-open on the check's OWN faults: a bug here must never block a commit, so an internal error lets it land.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
@@ -56,7 +56,7 @@ export function verifyCommit(oldSha, newSha, guard, { cwd = process.cwd() } = {}
   return 3;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const [oldSha, newSha] = process.argv.slice(2);
   const guard = process.env.STARCI_GUARD_FILE ? readJsonFile(process.env.STARCI_GUARD_FILE) : null;
   process.exit(verifyCommit(oldSha, newSha, guard));

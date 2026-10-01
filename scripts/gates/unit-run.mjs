@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -87,12 +87,12 @@ export function unitFindings(summary) {
 }
 
 /** Run the managed `npm test` with jest's JSON report and a json-summary coverage report: {command, exit, ...totals, coverage, error}. */
-export function runUnit(root, { spawn = spawnSync } = {}) {
+export function runUnit(root, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unit-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const covDir = path.join(outDir, 'coverage');
   const args = ['test', '--', '--json', `--outputFile=${outFile}`, '--coverageReporters=json-summary', '--coverageReporters=text-summary', `--coverageDirectory=${covDir}`];
-  const run = spawn('npm', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, shell: process.platform === 'win32' });
+  const run = npm(args, { cwd: root, maxBuffer: 512 * 1024 * 1024 });
   let report = null, coverage = null;
   try { report = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { report = null; }
   try { coverage = JSON.parse(fs.readFileSync(path.join(covDir, 'coverage-summary.json'), 'utf8')); } catch { coverage = null; }
@@ -103,9 +103,9 @@ export function runUnit(root, { spawn = spawnSync } = {}) {
     error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
 }
 
-export function buildUnitRun({ root, rules = unitKitRules(), spawn = spawnSync }) {
+export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const abs = path.resolve(root);
-  const { coverage, ...run } = runUnit(abs, { spawn });
+  const { coverage, ...run } = runUnit(abs, { npm });
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };
   summary.findings = unitFindings(summary);
   const red = run.error || run.exit !== 0 || run.failed > 0 || run.total === 0;

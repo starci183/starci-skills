@@ -26,13 +26,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, register } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { startWorker } from '../api/node/start-worker.mjs';
+import { workerContext } from '../api/node/worker-context.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from '../hfs/architecture/index.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 import { emitCheckOutput } from './output.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -287,7 +289,7 @@ async function lintRepository(root, options, canon, relative) {
 
 function architectureInWorker(input) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL(import.meta.url), { workerData: { architecture: input } });
+    const worker = startWorker(new URL(import.meta.url), { workerData: { architecture: input } });
     let settled = false;
     worker.once('message', result => { settled = true; resolve(result); });
     worker.once('error', reject);
@@ -403,5 +405,6 @@ export async function canonScanMain(argv, { write = (text) => process.stdout.wri
   return report.status === 'ok' ? 0 : report.status === 'findings' ? 1 : 3;
 }
 
-if (!isMainThread && workerData?.architecture) parentPort.postMessage(checkArchitecture(workerData.architecture));
-else if (isMainThread && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await canonScanMain(process.argv.slice(2));
+const thread = workerContext();
+if (!thread.isMainThread && thread.workerData?.architecture) thread.parentPort.postMessage(checkArchitecture(thread.workerData.architecture));
+else if (thread.isMainThread && isMain(import.meta.url)) process.exitCode = await canonScanMain(process.argv.slice(2));

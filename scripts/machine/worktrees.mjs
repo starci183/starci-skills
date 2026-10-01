@@ -44,6 +44,7 @@ import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { pidAlive, machineLog } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -325,4 +326,4 @@ function main(argv) {
   console.error('use: worktrees.mjs counts [--json] | gc [--plan] [--json] | resume');
   return 2;
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

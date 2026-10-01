@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../record-ownership.mjs';
@@ -11,7 +11,7 @@ import { walkFiles } from '../../lib/walk.mjs';
 import {blobPath} from '../../../engine/db/blob.mjs';
 import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
 import { runGit } from '../../api/git/lib.mjs';
-import {sealedLocationProblem} from './check-work-artifacts.mjs';
+import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -889,7 +889,7 @@ export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'modul
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const problems = [];
   const warnings = [];
   const infos = [];

@@ -22,7 +22,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { flag as argOf } from '../work-io.mjs';
-import { walkFiles } from '../../lib/walk.mjs';
+import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
@@ -1164,7 +1164,7 @@ export async function grammarGeometryMain(argv = []) {
   return { exitCode: 2, text: USAGE };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = await grammarGeometryMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

@@ -43,12 +43,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
-import { setPriority } from '../api/process/set-priority.mjs';
+import { setPriority } from '../api/process/set-priority.mjs'; import { runNode } from '../api/node/run-node.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -183,7 +183,7 @@ function runHfsLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
     const chunk = files.slice(i, i + LINT_CHUNK);
-    const run = spawnSync(process.execPath, [hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true });
+    const run = runNode([hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
     if (report?.schema !== LINT_SCHEMA) { errors.push(`hfs lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
@@ -287,7 +287,7 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
 
 /* ------------------------------------------------------------------------------------ codegen + build */
 
-const npm = (cwd, script) => spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', script], { cwd, encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+const npm = (cwd, script) => runNpm(['run', script], { cwd, maxBuffer: 256 * 1024 * 1024 });
 const readManifest = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; } };
 /** A stamp of what `paths` hold in this worktree: their index entries plus their uncommitted state. */
 const inputStamp = (root, paths) => sha256(`${gitText(root, ['ls-files', '-s', '--', ...paths]) ?? ''}\0${gitText(root, ['status', '--porcelain', '--', ...paths]) ?? ''}`);
@@ -500,7 +500,7 @@ function runTests(root, pattern, cache) {
   const outputFile = path.join(cache.worktree, 'jest.json');
   fs.rmSync(outputFile, { force: true });
   const started = Date.now();
-  const run = spawnSync(process.execPath, [bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const run = runNode([bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, maxBuffer: 256 * 1024 * 1024 });
   const result = readCache(outputFile);
   if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').slice(-1)[0]}` };
   const findings = [];
@@ -770,7 +770,7 @@ function refusalLines(output) {
  * The document profile: each docChecks script run from the runtime root (`tree` ones with --tree when given). Exit 1 of a check
  * is its findings, any other exit (or a spawn error) a tool that could not run. The same starci/gate@1 envelope, profile docs.
  */
-export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChecksOf(runtime), spawn = spawnSync } = {}) {
+export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChecksOf(runtime), spawn = runNode } = {}) {
   const report = { schema: GATE_SCHEMA, profile: DOC_PROFILE, at: new Date().toISOString(), root: posixPath(path.resolve(runtime)), tree: tree ? posixPath(path.resolve(tree)) : null,
     base: null, head: gitText(runtime, ['rev-parse', 'HEAD'])?.trim() ?? null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
     steps: { docs: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
@@ -780,7 +780,7 @@ export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChe
   for (const check of checks) {
     const args = [path.join(runtime, check.script), ...(check.tree && tree ? ['--tree', path.resolve(tree)] : [])];
     const started = Date.now();
-    const run = spawn(process.execPath, args, { cwd: runtime, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+    const run = spawn(args, { cwd: runtime, maxBuffer: 256 * 1024 * 1024 });
     report.steps.docs.push({ id: check.id, command: `node ${check.script}${check.tree && tree ? ' --tree <tree>' : ''}`, exit: run.status ?? null, ms: Date.now() - started });
     // An uncaught exception also exits 1: a stack trace on stderr is a check that could not run, never its findings.
     const crashed = run.status === 1 && /^\s+at .+[:(]\d+:\d+\)?$/m.test(String(run.stderr ?? ''));

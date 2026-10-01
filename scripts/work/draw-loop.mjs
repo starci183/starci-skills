@@ -71,7 +71,7 @@ import { criticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
-import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -817,6 +817,6 @@ export async function drawLoopMain(argv) {
   return { code: 2, text: USAGE };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   drawLoopMain(process.argv.slice(2)).then((r) => { process.stdout.write(r.text); process.exitCode = r.code; }, (error) => { process.stderr.write(`draw-loop: ${error?.message ?? error}\n`); process.exitCode = 2; });
 }

@@ -17,10 +17,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../../api/git/lib.mjs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../../lib/secret-patterns.mjs';
 import { scopeToOwned, validateWork } from './work-validate.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -216,8 +217,7 @@ export function formatFindings(result, { limit = 30 } = {}) {
   return lines.join('\n');
 }
 
-const isMain = () => import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
-if (isMain()) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const mode = argv[0];
   const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };

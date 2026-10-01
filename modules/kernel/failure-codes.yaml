@@ -4199,6 +4199,17 @@ RECURSIVE_DELETE:
   owner: op-retry
   kind: verb-refusal
 
+REDIRECT_INVALID:
+  title: "A probed endpoint redirected to an invalid location"
+  title_vi: "Endpoint được probe chuyển hướng tới địa chỉ không hợp lệ"
+  meaning_vi: "Khi theo chuyển hướng HTTP, header Location của endpoint không phải một URL hợp lệ nên probe dừng và báo lỗi thay vì đoán."
+  causes_vi:
+    - "Dịch vụ trả Location rỗng hoặc sai cú pháp"
+    - "Proxy hoặc tunnel phía trước dịch vụ cấu hình sai"
+  nextStep_vi: "Kiểm tra cấu hình chuyển hướng của dịch vụ được probe rồi chạy lại."
+  owner: runtime-core
+  kind: runtime-fault
+
 REF_MALFORMED:
   title: "Malformed parent#criterion ref"
   title_vi: "Tham chiếu cha#tiêu chí sai dạng"
@@ -5211,6 +5222,17 @@ SLICE_ROOT:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải sửa slice của nút gốc thành chính mã nút."
   owner: other-op:work.author
   kind: check-finding
+
+SOPS_MISSING:
+  title: "sops is not installed"
+  title_vi: "Chưa cài sops"
+  meaning_vi: "Không tìm thấy chương trình sops (PATH, rồi thư mục WinGet Links/Packages) nên không giải mã được tệp .enc của custody hay test credential."
+  causes_vi:
+    - "Máy chưa cài Mozilla SOPS"
+    - "sops đã cài nhưng không nằm trên PATH của tiến trình"
+  nextStep_vi: "Cài sops (Windows: winget install Mozilla.SOPS) rồi chạy lại."
+  owner: owner
+  kind: blocker
 
 STACKS_CI_CONTRADICTION:
   title: "Stack says service off but CI calls it"

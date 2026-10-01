@@ -51,7 +51,7 @@ import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';
 import { guardsRoot } from './guards-root.mjs';
 import { launchVerdict } from './launch-verdict.mjs';
-import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
+import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -499,7 +499,7 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   let raw = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => { raw += chunk; });

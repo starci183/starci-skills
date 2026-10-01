@@ -61,7 +61,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -85,9 +84,8 @@ import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
@@ -870,7 +868,7 @@ export function parseArgs(argv = []) {
   return { ok: true, apply: argv.includes('--apply'), plan: argv.includes('--plan'), only, json: argv.includes('--json'), holder: value('--holder'), trigger: value('--trigger') };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   let language = 'vi';

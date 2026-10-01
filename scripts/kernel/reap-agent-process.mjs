@@ -24,7 +24,6 @@
 // agent the host's ledgers know (running/answering/leased ops, running
 // kernels), and a candidate that started inside the window of one of them may
 // be that agent's. Without that census nothing is stopped.
-import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
 import { listHostProcesses } from '../api/process/process-list.mjs';
@@ -38,7 +37,7 @@ const AGENT_IMAGE = { claude: /(^|[\\/])claude\.exe$/i, codex: /(^|[\\/])codex\.
 const NOT_A_WORKER = /--type=|WindowsApps\\Claude_|--output-format stream-json/i;
 
 /** Agent processes on this host: [{pid, image, commandLine, startedAt}]. Windows only; elsewhere []. */
-export function listAgentProcesses({ platform = process.platform, run = spawnSync } = {}) {
+export function listAgentProcesses({ platform = process.platform, run = undefined } = {}) {
   if (platform !== 'win32') return [];
   const rows = listHostProcesses({ where: "Name='claude.exe' OR Name='codex.exe'", run, platform, timeoutMs: 30000 }) ?? [];
   return rows.map((p) => ({ pid: p.pid, image: String(p.exe ?? ''), commandLine: p.cmd, startedAt: Number(p.created) }));
@@ -69,8 +68,8 @@ export function matchAgentProcess(processes, { agent, dispatchedAt, windowMs = R
  * is required: null (the census could not be read) stops nothing. A spec run
  * (NODE_TEST_CONTEXT) never reads or stops the host's real processes.
  */
-export function reapAgentProcess({ agent, dispatchedAt, windowMs = REAP_WINDOW_MS, otherLaunches = null, list = listAgentProcesses, run = spawnSync, platform = process.platform, env = process.env } = {}) {
-  if (env.NODE_TEST_CONTEXT && (list === listAgentProcesses || run === spawnSync)) return { reaped: false, reason: 'test context: the host process table is never read or stopped', candidates: [] };
+export function reapAgentProcess({ agent, dispatchedAt, windowMs = REAP_WINDOW_MS, otherLaunches = null, list = listAgentProcesses, run = undefined, platform = process.platform, env = process.env } = {}) {
+  if (env.NODE_TEST_CONTEXT && (list === listAgentProcesses || run === undefined)) return { reaped: false, reason: 'test context: the host process table is never read or stopped', candidates: [] };
   if (!Array.isArray(otherLaunches)) return { reaped: false, reason: 'live launch census unavailable: another live agent may own every candidate', candidates: [] };
   const match = matchAgentProcess(list({ platform }), { agent, dispatchedAt, windowMs, otherLaunches });
   if (!match.pid) return { reaped: false, reason: match.reason, candidates: match.candidates, ...(match.rival ? { rival: match.rival } : {}) };

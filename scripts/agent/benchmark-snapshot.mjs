@@ -12,7 +12,7 @@
 // nothing. benchmark/README.md owns the update process.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { scorecardFor, UNROUTED, localDay, shortPool, pctText } from './model-scorecard.mjs';
@@ -143,4 +143,4 @@ function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

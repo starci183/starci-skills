@@ -21,7 +21,7 @@
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -41,6 +41,7 @@ const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { readJsonFile } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -76,10 +77,8 @@ const jsonFrom = stdout => {
 };
 
 const runNodeJson = (file, args) => {
-  const result = spawnSync(process.execPath, [file, ...args], {
+  const result = runNode([file, ...args], {
     cwd: skillRoot,
-    encoding: 'utf8',
-    windowsHide: true,
     timeout: 120_000,
   });
   return {
@@ -480,7 +479,7 @@ const print = result => {
 };
 
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
     console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);

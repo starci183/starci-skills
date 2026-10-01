@@ -134,14 +134,11 @@ test('a recorded ask-serving-expired tags the ask dead without touching the netw
       {kind:'ask-serving-expired'},
     ]});
 
-    const saved=globalThis.fetch;
-    globalThis.fetch=()=>{throw new Error('the digest probed a URL the ledger already called dead');};
-    try{
-      const asks=await openAsks(ledger.db);
-      assert.equal(asks.length,1);
-      assert.equal(asks[0].liveness,'dead');
-      assert.equal(asks[0].url,'http://127.0.0.1:1/dead-form','a dead ask still shows what it served');
-    }finally{globalThis.fetch=saved;}
+    const probe=()=>{throw new Error('the digest probed a URL the ledger already called dead');};
+    const asks=await openAsks(ledger.db,new Set(),{probe});
+    assert.equal(asks.length,1);
+    assert.equal(asks[0].liveness,'dead');
+    assert.equal(asks[0].url,'http://127.0.0.1:1/dead-form','a dead ask still shows what it served');
   });
 });
 

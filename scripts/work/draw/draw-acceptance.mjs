@@ -38,7 +38,7 @@
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { sha256File } from '../../../engine/digest.mjs';
 import { isFile, isDir } from '../../lib/fs-kind.mjs';
@@ -333,6 +333,6 @@ async function main(argv) {
   return out.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
 }

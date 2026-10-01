@@ -41,7 +41,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runGit } from '../api/git/lib.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
@@ -537,7 +537,7 @@ send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'starci-launch
  * {error}). Codex computes the hash it trusts a hook by; the runtime asks it, the way Orca trusts its own hooks.
  */
 export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
-  const r = spawnSync(process.execPath, ['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
+  const r = runNode(['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { timeout: timeoutMs,
     env: { ...process.env, CODEX_HOME: home } });
   const results = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
   if (!Array.isArray(results)) throw new Error(`codex app-server answered nothing (exit ${r.status}${r.error ? `: ${r.error.message}` : ''})`);

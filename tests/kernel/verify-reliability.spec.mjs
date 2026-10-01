@@ -16,7 +16,8 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {classifyFailure,measurementCheckClass,resolveRootOwner,failureSignature} from '../../scripts/kernel/verify-failure.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
+import {probe} from '../../scripts/api/http/probe.mjs';
+import {checkEnvironments,discoverHealth,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
 import {recordEnvelopeChecks} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
 
 // These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot-run.mjs)
@@ -257,8 +258,8 @@ test('env-health: ready, probe-drift with a discovered health endpoint, down, hu
   t.after(()=>hung.close());
   const deadPort=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p));});});
 
-  assert.equal((await probeHttp(`http://127.0.0.1:${deadPort}/`,{timeoutMs:2000})).state,'down');
-  assert.equal((await probeHttp(`http://127.0.0.1:${hungPort}/`,{timeoutMs:800})).state,'hung');
+  assert.equal((await probe(`http://127.0.0.1:${deadPort}/`,{timeoutMs:2000})).state,'down');
+  assert.equal((await probe(`http://127.0.0.1:${hungPort}/`,{timeoutMs:800})).state,'hung');
   assert.deepEqual(await discoverHealth(`http://127.0.0.1:${apiPort}`,{timeoutMs:2000}),{method:'POST',url:`http://127.0.0.1:${apiPort}/graphql`,status:200});
 
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-health-'));
@@ -352,7 +353,7 @@ test('api dispatch runs the environment pre-step for a walk: a foreign hung port
   const {spawn}=await import('node:child_process');
   const web=spawn(process.execPath,['-e',`require('http').createServer((q,s)=>{s.writeHead(200);s.end('ok')}).listen(${webPort},'127.0.0.1')`],{stdio:'ignore',windowsHide:true});
   t.after(()=>{try{web.kill();}catch{}});
-  for(let i=0;i<50&&(await probeHttp(`http://127.0.0.1:${webPort}/`,{timeoutMs:500})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
+  for(let i=0;i<50&&(await probe(`http://127.0.0.1:${webPort}/`,{timeoutMs:500})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
   const writeEnv=port=>{
     const dir=path.join(repo,'.starciwork','_resources','environments','login-local');fs.mkdirSync(dir,{recursive:true});
     fs.writeFileSync(path.join(dir,'resource.yaml'),`schema: work/resource@1\nid: environment.t.login-local\nkind: environment\ntarget:\n  origins:\n    web: http://127.0.0.1:${port}\nconfiguration:\n  ports:\n    web: ${port}\nprobes:\n  - {id: web-ready, method: http-get, target: 'http://127.0.0.1:${port}/', expect: 200}\n`);

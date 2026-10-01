@@ -37,7 +37,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
 import { readContractChangesDoc } from '../../machine/contract-changes-store.mjs';
 import { list } from '../../lib/list.mjs';
-import { isFile } from '../../lib/fs-kind.mjs';
+import { isFile } from '../../lib/fs-kind.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
 export const RATIONALE_KINDS = Object.freeze(['element', 'layout', 'spacing', 'type', 'radius', 'colour', 'art']);
@@ -677,6 +677,6 @@ async function main(argv) {
   return findings.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; });
 }

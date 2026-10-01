@@ -24,7 +24,7 @@
 import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -42,8 +42,8 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 import { supervisorDecisions } from '../machine/decisions.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
 export const INBOX_REWAKE_MS = 10 * 60_000;
 export const WAKE_TAG = '[Supervisor watchdog]';
@@ -188,7 +188,7 @@ async function hostDeps() {
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
     replace: () => {
-      const r = spawnSync(process.execPath, [START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
+      const r = runNode([START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, timeout: 600_000 });
       try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
     },
     sleep: sleepSync,
@@ -365,7 +365,7 @@ export function noteInputOutcome(terminal, action, { env = process.env } = {}) {
   catch (error) { return { failures: 0, since: null, replace: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   if (!process.argv.includes('--once')) {
     console.error('use: node scripts/supervisor/supervisor-watchdog.mjs --once [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);

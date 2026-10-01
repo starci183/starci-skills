@@ -25,7 +25,7 @@
 // Exit 0 is clean; any finding exits 1.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
@@ -105,6 +105,6 @@ export function canonPinsMain(argv = []) {
   return result.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exitCode = canonPinsMain(process.argv.slice(2));
 }

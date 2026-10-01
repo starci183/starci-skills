@@ -1,7 +1,6 @@
 // api dispatch: admit and launch an operation from its persisted route.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { transitionWorkflowToRunning, updateJob } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { admitOpSlot } from '../../../engine/admission.mjs';

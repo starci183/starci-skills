@@ -13,7 +13,7 @@
 // Owner asks still reach Telegram only from the kernel (api serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
@@ -272,4 +272,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

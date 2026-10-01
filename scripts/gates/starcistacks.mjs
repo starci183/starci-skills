@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import { repositoryName, repositoryHome } from '../hfs/repo-identity.mjs';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -515,7 +515,7 @@ export async function checkStarciStacksMain(argv = []) {
   return { exitCode: result.ok ? 0 : 1, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${result.ok ? 'OK' : 'FAIL'}: starcistacks ${result.repository} - ${result.refused.length} refused, ${result.suspect.length} suspect, services: ${Object.keys(result.services).join(', ') || 'none declared'}.\n` };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   checkStarciStacksMain(process.argv.slice(2)).then(({ exitCode, text: out }) => { process.stdout.write(out); process.exitCode = exitCode; },
     (error) => { process.stderr.write(`check-starcistacks: ${error?.stack ?? error}\n`); process.exitCode = 2; });
 }

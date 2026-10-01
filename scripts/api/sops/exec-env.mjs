@@ -4,8 +4,7 @@
 // (decrypt.mjs). The plaintext stays in this process's memory; the document's top-level scalar keys become the map.
 // The operator's helper that runs a command with it is scripts/gates/custody-exec.mjs.
 import { sopsDecrypt } from './decrypt.mjs';
-import { custodyInputType } from './lib.mjs';
-import { resolveSops } from '../../lib/test-secrets.mjs';
+import { custodyInputType, resolveSops } from './lib.mjs';
 
 /** Decrypts a custody file into a `{ NAME: string }` map held in memory only (top-level scalars). */
 export function execEnv(file, { inputType, env = process.env, sops = null } = {}) {

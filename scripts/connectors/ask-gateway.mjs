@@ -19,13 +19,15 @@
 // is true: the owner answers those on the machine through the localhost link.
 // Binds 127.0.0.1 only; cloudflared connects from this host.
 import '../api/process/hide-child-windows.mjs';
-import http from 'node:http';
+import { serve } from '../api/http/serve.mjs';
+import { request } from '../api/http/request.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { pidAlive } from '../../engine/db/machine.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const GATEWAY_FILE = fileURLToPath(import.meta.url);
 
@@ -62,7 +64,7 @@ export function ledgerResolver({ repos, now = Date.now } = {}) {
  * `exposeCredentialAsks()` is read per request so a config change needs no restart.
  */
 export function createGateway({ resolve, exposeCredentialAsks = () => false, language = () => 'en' } = {}) {
-  return http.createServer((req, res) => {
+  return serve((req, res) => {
     const t = { notFound: 'not found', credential: 'This question asks for credentials, so it is not served over the public link. Answer it on the machine through the localhost link.', upstream: 'The form for this question is not answering right now.' };
     const tr = translator(language());
     for (const key of Object.keys(t)) t[key] = tr(t[key]);
@@ -82,7 +84,7 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
     const headers = {};
     for (const [key, value] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(key)) headers[key] = value;
     headers.host = target.host;
-    const upstream = http.request({ host: target.hostname, port: target.port, method: req.method, path: `${pathname}${search}`, headers, timeout: 30000 }, (up) => {
+    const upstream = request({ host: target.hostname, port: target.port, method: req.method, path: `${pathname}${search}`, headers, timeout: 30000 }, (up) => {
       const out = { ...PAGE_HEADERS };
       for (const [key, value] of Object.entries(up.headers)) if (!HOP_BY_HOP.has(key)) out[key] = value;
       // A redirect to the form's own loopback origin becomes a path on the public host.
@@ -164,4 +166,4 @@ function main() {
   console.error('usage: ask-gateway.mjs start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

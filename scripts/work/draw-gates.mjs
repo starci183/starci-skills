@@ -28,7 +28,7 @@
 import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readJsonFile } from '../lib/json.mjs';
@@ -37,6 +37,7 @@ import { livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
 import { layerFindingsForParts } from './draw/draw-layer.mjs';
 import { slash } from './work-io.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
 export const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
@@ -60,7 +61,7 @@ export function refusalsOf(lines, cwd, repo) {
 }
 
 const spawnJson = (script, args, cwd) => {
-  const r = spawnSync(process.execPath, [path.join(SKILL_ROOT, script), ...args], { cwd, encoding: 'utf8', windowsHide: true, timeout: 600_000, maxBuffer: 64 * 1024 * 1024 });
+  const r = runNode([path.join(SKILL_ROOT, script), ...args], { cwd, timeout: 600_000, maxBuffer: 64 * 1024 * 1024 });
   let doc = null;
   try { doc = JSON.parse(r.stdout); } catch { doc = null; }
   return { exitCode: r.status ?? 2, doc, stderr: String(r.stderr ?? '').replace(/\(node:\d+\) ExperimentalWarning[^\n]*\n?|\(Use `node --trace-warnings[^\n]*\n?/g, '').trim() };
@@ -161,6 +162,6 @@ async function main(argv) {
   return r.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-gates: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

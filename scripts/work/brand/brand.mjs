@@ -3,7 +3,7 @@ import path from 'node:path';
 import {openLedgerReader,ledgerFileFor} from '../../../engine/db/ledger.mjs';
 import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../../machine/ask-receipts.mjs';
 import {sha256} from '../../../engine/digest.mjs';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from '../../gates/grammar-dist.mjs';
@@ -1049,7 +1049,7 @@ export function brandMain(argv=[]){
   }catch(error){return {exitCode:1,text:`brand check: ${String(error?.message??error)}\n`};}
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const {exitCode,text}=brandMain(process.argv.slice(2));
   (exitCode?process.stderr:process.stdout).write(text);
   process.exitCode=exitCode;

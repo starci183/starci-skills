@@ -43,7 +43,7 @@
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
@@ -611,7 +611,7 @@ async function main() {
   process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();
 
 /**
  * The owner push. One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or

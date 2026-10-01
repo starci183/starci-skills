@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { readOnly } from '../../scripts/api/git/read-only.mjs';
 import { existsSync, statSync } from 'node:fs';
 import { decodeText, publicText, publicJson } from './redact-read.mjs';
 
@@ -17,13 +17,8 @@ const remember = (key, value) => {
   return value;
 };
 
-// Never a shell; every argument is a validated hex head or a validated repo-relative path.
-function git(repo, args, { max = 4 * 1024 * 1024 } = {}) {
-  return new Promise(resolve => {
-    execFile('git', ['-c', 'core.quotepath=off', '-C', repo, ...args], { cwd: repo, timeout: 5000, maxBuffer: max, encoding: 'buffer', windowsHide: true },
-      (error, stdout) => resolve({ ok: !error, overflow: error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', out: Buffer.from(stdout ?? Buffer.alloc(0)), error }));
-  });
-}
+// Every argument is a validated hex head or a validated repo-relative path.
+const git = (repo, args, options) => readOnly(repo, args, options);
 
 /** null when the stored report path is safe to hand to git, else the refusal reason. */
 export function refusePath(repo, value) {

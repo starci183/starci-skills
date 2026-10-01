@@ -23,6 +23,7 @@ import { workerOutput } from '../api/orca/worker-read.mjs';
 import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from '../machine/evidence-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { operationDispatchOf } from './verbs/shared/rows.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /** The header line that keeps Orca's completeness verdict with the stored output. */
 export const outputHeader = (out) => `[worker-read dispatch=${out.dispatch} source=${out.source}${out.fallbackReason ? ` fallback=${out.fallbackReason}` : ''}`
@@ -109,7 +110,7 @@ export function snapshotSeats(machine, { now = Date.now(), everyMs = TRANSCRIPT_
   return out;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const arg = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   const [cmd] = argv;

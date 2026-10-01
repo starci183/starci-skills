@@ -47,9 +47,8 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
-import { clipLine } from '../lib/clip.mjs';
+import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
 export const METRICS_KIND = 'op-health';
@@ -500,7 +499,7 @@ export function healthTable(rows, { label = 'op' } = {}) {
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const asJson = argv.includes('--json');
   const { inspectLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');

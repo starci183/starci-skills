@@ -56,9 +56,10 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
@@ -80,9 +81,8 @@ import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
-import { withoutGitLocalEnv } from '../lib/git.mjs';
+import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
 export const MAX_MAIN_RETRIES = 3;
@@ -238,10 +238,8 @@ function pickConflicts(dir, commit = null) {
 
 /* ------------------------------------------------------------ scratch */
 
-const run = (cmd, args, { cwd, timeout = 1_200_000, env = process.env } = {}) => {
-  const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, timeout, env, maxBuffer: 64 * 1024 * 1024 });
-  return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null };
-};
+const outcome = (r) => ({ ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null });
+const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env, maxBuffer: 64 * 1024 * 1024 }));
 /** The env the gate's spec run gets: no test-runner channel, no git repository-local variables. */
 export function specRunEnv(parent = process.env) {
   const env = withoutGitLocalEnv(parent);
@@ -303,7 +301,7 @@ function makeScratch({ root, base, env }) {
 /* ------------------------------------------------------------ checks */
 function treeCheck(dir, script) {
   if (!fs.existsSync(path.join(dir, script))) return { ok: true, skipped: true };
-  const r = run(process.execPath, [script], { cwd: dir, timeout: 600_000 });
+  const r = node([script], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
   return { ok: r.ok, output: tail(full, 15), full };
 }
@@ -372,7 +370,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
     // ledger on this host's registry (a tree from before the preload runs without it).
     const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
     const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
-    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', '--test-reporter-destination=stdout',
+    const r = node([...importArgs, '--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', '--test-reporter-destination=stdout',
       `--test-reporter=${pathToFileURL(reporter).href}`, `--test-reporter-destination=${out}`, ...files], { cwd: dir, timeout, env: specRunEnv() });
     let failures = null;
     try {
@@ -429,7 +427,7 @@ export const MIRROR_FIX = 'run node scripts/hfs/sync-runtime.mjs and include the
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return { ok: true, skipped: true };
-  const r = run(process.execPath, [MIRROR_CHECK, '--check'], { cwd: dir, timeout: 600_000 });
+  const r = node([MIRROR_CHECK, '--check'], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
   return { ok: r.ok, output: tail(full, 15), full };
 }
@@ -442,7 +440,7 @@ export function mirroredFiles(dir) {
   const href = pathToFileURL(path.join(dir, MIRROR_CHECK)).href;
   const script = `const m = await import(${JSON.stringify(href)}); const specs = Object.values(m.BUNDLES);
 process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [...new Set([...specs.flatMap((s) => [...s.files]), ...(specs.some((s) => s.catalog) && m.CATALOG ? [m.CATALOG] : [])])] }));`;
-  const r = run(process.execPath, ['--input-type=module', '-e', script], { cwd: dir, timeout: 120_000 });
+  const r = node(['--input-type=module', '-e', script], { cwd: dir, timeout: 120_000 });
   try { return r.ok ? JSON.parse(r.stdout) : null; } catch { return null; }
 }
 
@@ -470,9 +468,9 @@ export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
  * or not run (2) refuses; a land that changes no published package passes it without an install. null when the candidate
  * has no such script.
  */
-export function packageProofCheck({ dir, base, runner = run }) {
+export function packageProofCheck({ dir, base, runner = node }) {
   if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
-  const r = runner(process.execPath, [PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
+  const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
   return { name: 'package-clean-test', ok: r.ok, output: tail(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
 }
 
@@ -510,7 +508,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const changed = rows.map((r) => normPath(r[r.length - 1]));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   for (const f of present.filter((x) => x.endsWith('.mjs'))) {
-    const r = run(process.execPath, ['--check', f], { cwd: dir, timeout: 60_000 });
+    const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
     checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tail(r.stderr, 10) }) });
   }
   for (const f of present.filter((x) => /\.(ya?ml|json)$/i.test(x))) {
@@ -594,7 +592,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
 
 /** The gate-stability report run from the candidate's own script (scripts/supervisor/gate-stability.mjs --base --head). */
 function spawnGateStability({ runner, base, head, family }) {
-  const r = run(process.execPath, [runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
+  const r = node([runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
   if (!r.ok) return { error: tail(r.stderr || r.stdout, 6) };
   try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
@@ -605,18 +603,15 @@ export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
   const packageRoot = path.join(root, 'packages', 'grammar');
   const fail = (step, detail) => ({ ok: false, step, detail, owed: ['grammar-dist-rebuild'] });
   try {
-    const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-    const npm = process.platform === 'win32' ? (fs.existsSync(npmCli) ? { file: process.execPath, prefix: [npmCli] } : null) : { file: 'npm', prefix: [] };
-    if (!npm) return fail('npm ci', `npm CLI is missing at ${npmCli}`);
     const modules = path.join(packageRoot, 'node_modules');
     if (!unlinkNodeModulesLink(packageRoot)) return fail('npm ci', `cannot unlink ${modules} junction`);
-    const install = run(npm.file, [...npm.prefix, 'ci'], { cwd: packageRoot, timeout: 900_000 });
-    if (!install.ok) return fail('npm ci', `exit ${install.status ?? 'unknown'}${install.error ? ` (${install.error})` : ''}`);
-    const build = run(npm.file, [...npm.prefix, 'run', 'build'], { cwd: packageRoot, timeout: 900_000 });
+    const install = ci(packageRoot, { timeout: 900_000 });
+    if (!install.ok) return fail('npm ci', `exit ${install.status ?? 'unknown'}${install.stderr ? ` (${install.stderr.slice(0, 200)})` : ''}`);
+    const build = outcome(runNpm(['run', 'build'], { cwd: packageRoot, timeout: 900_000 }));
     if (!build.ok) return fail('npm run build', `exit ${build.status ?? 'unknown'}${build.error ? ` (${build.error})` : ''}`);
     const dist = grammarDistStatus(packageRoot);
     if (!dist.ok || dist.state !== 'fresh') return fail('grammar-dist', dist.detail);
-    const knowledge = run(process.execPath, [path.join(root, 'scripts', 'work', 'ui', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
+    const knowledge = node([path.join(root, 'scripts', 'work', 'ui', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
     return { ok: true, state: dist.state, knowledge: knowledge.ok ? 'fresh' : 'owed',
       owed: knowledge.ok ? [] : ['grammar-knowledge-snapshots'], ...(knowledge.ok ? {} : { knowledgeDetail: `exit ${knowledge.status ?? 'unknown'}` }) };
   } catch (error) { return fail('exception', String(error?.message ?? error)); }
@@ -939,7 +934,7 @@ export function describe(r, { jobId = null } = {}) {
   return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   setPriority();
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);

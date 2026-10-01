@@ -25,7 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/db/ledger.mjs';
 import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipRead } from '../api/fs/zip-read.mjs';
@@ -138,6 +138,6 @@ function main() {
   if (!out.ok) process.exitCode = 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   try { main(); } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); }
 }

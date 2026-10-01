@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { mainRootOf } from '../machine/worktree-git.mjs';
@@ -271,7 +271,7 @@ export function rebaseWorkflow(ctx, { workflowId }) {
 
 /** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
 export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
-  const run = spawnSync(process.execPath, [GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const run = runNode([GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
 }
 

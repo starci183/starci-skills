@@ -29,7 +29,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnCapture } from '../api/process/spawn-capture.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineLog } from '../../engine/db/machine.mjs';
 import { LOG_KINDS } from '../kernel/typed-logs.mjs';
@@ -109,26 +109,10 @@ export function lastJsonLine(stdout) {
  * Run `cmd args` as a child with a timeout; resolves {ok, code, value, stdout, stderr, timedOut, error?}. Never rejects.
  * ok = exit 0 and (no JSON, or JSON whose ok is not false).
  */
-export function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-  return new Promise((resolve) => {
-    let child;
-    try { child = spawn(cmd, args, { cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
-    catch (error) { resolve({ ok: false, code: null, value: null, stdout: '', stderr: '', error: String(error?.message ?? error) }); return; }
-    let stdout = '', stderr = '', timedOut = false, settled = false;
-    const cap = 4 * 1024 * 1024;
-    child.stdout.on('data', (d) => { if (stdout.length < cap) stdout += d; });
-    child.stderr.on('data', (d) => { if (stderr.length < cap) stderr += d; });
-    const timer = setTimeout(() => { timedOut = true; try { child.kill(); } catch { /* gone */ } }, timeoutMs);
-    const finish = (code, error = null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      const value = lastJsonLine(stdout);
-      resolve({ ok: !timedOut && !error && code === 0 && value?.ok !== false, code, value, stdout, stderr, timedOut, ...(error ? { error } : {}) });
-    };
-    child.on('error', (error) => finish(null, String(error?.message ?? error)));
-    child.on('close', (code) => finish(code));
-  });
+export async function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const r = await spawnCapture(cmd, args, { cwd, env, timeoutMs });
+  const value = lastJsonLine(r.stdout);
+  return { ok: !r.timedOut && !r.error && r.code === 0 && value?.ok !== false, ...r, value };
 }
 
 /**

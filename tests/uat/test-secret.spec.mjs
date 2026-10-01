@@ -1,11 +1,12 @@
-// test-secrets.spec.mjs — test credentials follow the product repo's .starcistacks + sops convention, and the push
+// test-secret.spec.mjs — test credentials follow the product repo's .starcistacks + sops convention, and the push
 // scan stays strict on plaintext (owner ruling push-scan-test-secrets-encrypted, 2026-09-28).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { testSecret, testSecretPaths, isSopsEnvelope, setCommand, sopsFormatFor } from '../../scripts/lib/test-secrets.mjs';
+import { testSecret } from '../../scripts/uat/test-secret.mjs';
+import { testSecretPaths, isSopsEnvelope, setCommand, sopsFormatFor } from '../../scripts/lib/sops-envelope.mjs';
 import { scanDiff, diffScanner, scanHint, TEST_SECRET_HINT } from '../../scripts/supervisor/push-mains.mjs';
 
 const sandbox = (t) => {

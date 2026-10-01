@@ -40,6 +40,7 @@ import { listHostProcesses } from '../api/process/process-list.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const VERIFY_MS = 6000;
@@ -206,7 +207,7 @@ export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = pro
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   if (value('dispatch')) {

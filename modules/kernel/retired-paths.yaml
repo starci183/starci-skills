@@ -207,6 +207,7 @@ retired:
   - {path: scripts/housekeeping/ledger-throughput.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off load test with no reader'}
   - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
   - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
+  - {path: ui/run-cloudflared.ps1, retiredAt: 2026-10-02, removedIn: C2b, replacedBy: 'node ui/start.mjs --tunnel (the harness named tunnel through scripts/api/cloudflared/tunnel-run.mjs), registered as its scheduled task by scripts/reconciler/tunnel-task.mjs --install-task'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
@@ -729,7 +730,7 @@ moved:
   - {from: tests/terminal-dedupe.spec.mjs, to: tests/kernel/terminal-dedupe.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/terminal-ledger.spec.mjs, to: tests/machine/terminal-ledger.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/terminal-send-blocked.spec.mjs, to: tests/api-orca/terminal-send-blocked.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/test-secrets.spec.mjs, to: tests/lib/test-secrets.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: tests/test-secrets.spec.mjs, to: tests/uat/test-secret.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/typed-logs.spec.mjs, to: tests/kernel/typed-logs.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/typescript-programs.spec.mjs, to: tests/hfs-architecture/typescript-programs.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/uat-module-cycle.spec.mjs, to: tests/repo/uat-module-cycle.spec.mjs, movedIn: C7, quiesced: false}
@@ -962,6 +963,7 @@ moved:
   - {from: scripts/kernel/verbs/shared/lifecycle.mjs, to: scripts/kernel/verbs/shared/workflow-transitions.mjs, movedIn: C6, quiesced: false}
   - {from: scripts/kernel/verbs/shared/messages.mjs, to: scripts/kernel/verbs/shared/worker-messages.mjs, movedIn: C6, quiesced: false}
   - {from: scripts/kernel/verbs/shared/peers.mjs, to: scripts/kernel/verbs/shared/peer-waits.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/lib/test-secrets.mjs, to: scripts/uat/test-secret.mjs + scripts/lib/sops-envelope.mjs + scripts/api/sops/lib.mjs, movedIn: C2a, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}

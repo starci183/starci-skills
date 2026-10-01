@@ -25,7 +25,7 @@
 //       --workflow <id> --job <id> --attempt <n> --op <op> --verdict pass|fail|blocked [--dispatch <id>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot } from '../../engine/config.mjs';
@@ -551,7 +551,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
  * media to send and Telegram is on, and return at once. Synchronous and never throws, so the settle
  * is never slowed or failed by Telegram; a launch failure is one stderr line.
  */
-export function queueSettleMedia(job, { env = process.env, config = undefined, spawnImpl = spawn, script = SELF } = {}) {
+export function queueSettleMedia(job, { env = process.env, config = undefined, spawnImpl = spawnNode, script = SELF } = {}) {
   try {
     const kind = mediaKindOf(job?.op);
     if (!kind) return { queued: false, skipped: 'not a media op' };
@@ -565,7 +565,7 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,
       '--attempt', String(job.attempt), '--op', job.op, '--verdict', job.verdict, ...(job.dispatchId ? ['--dispatch', String(job.dispatchId)] : [])];
     // The sender logs to machine_logs itself (actor connector, kind telegram-media.*): no output is kept.
-    const child = spawnImpl(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true, env });
+    const child = spawnImpl(args, { detached: true, stdio: 'ignore', env });
     child?.on?.('error', (error) => { try { process.stderr.write(`telegram-media: sender not started: ${redact(error?.message ?? error)}\n`); } catch { /* nothing */ } });
     child?.unref?.();
     return { queued: true, pid: child?.pid ?? null };

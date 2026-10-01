@@ -22,13 +22,14 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
 import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../../api/git/lib.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -270,7 +271,7 @@ export function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = pr
   const file = path.join(dir, `parity-lint-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(file, JSON.stringify({ root, files, base }));
   try {
-    const r = spawnSync(process.execPath, [selfFile, '--lint-child', file], { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
+    const r = runNode([selfFile, '--lint-child', file], { timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
     const line = String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '';
     try { return JSON.parse(line); } catch { return { exit: 2, findings: [], errors: [`the parity lint child printed no result: ${String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300)}`] }; }
   } finally { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
@@ -330,7 +331,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   for (const c of covered.syntax) {
     const argv = String(c.command).trim().split(/\s+/).slice(1);
     const syntaxStarted = now();
-    const r = spawnSync(process.execPath, argv, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+    const r = runNode(argv, { cwd: root, timeout: 60_000 });
     await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
       exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
     if (r.status == null || r.error) return unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`);
@@ -475,7 +476,7 @@ export async function parityFingerprint(item, { repo, resolveRoot = resolveOwned
   return h.digest('hex').slice(0, 16);
 }
 // The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile && process.argv[2] === '--lint-child') {
+if (isMain(import.meta.url) && process.argv[2] === '--lint-child') {
   const job = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
   const { runLintGate } = await import('../../gates/gate.mjs');
   const out = await runLintGate({ root: job.root, base: job.base, files: job.files });

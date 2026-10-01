@@ -15,8 +15,9 @@
 // 2 on bad arguments or an unreadable source.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const HELP = `Usage: node scripts/checks/check-api-surface.mjs [--root <tree>] [--json]
 
@@ -160,7 +161,7 @@ export function checkApiSurfaceMain(argv) {
   return { exitCode: 1, text: `${lines.join('\n')}\n` };
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+if (isMain(import.meta.url)) {
   const result = checkApiSurfaceMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

@@ -26,6 +26,7 @@ import { machineFileFor, openMachine, readMachine, withMachine } from '../../eng
 import { allocationSettings } from '../../engine/config.mjs';
 import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -446,7 +447,7 @@ export const openViolations = ({ env = process.env, limit = 2000 } = {}) => read
   return [...seen.values()].filter(Boolean);
 }, [], { env });
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const json = argv.includes('--json');
   const ctx = { mode: 'shadow', now: () => Date.now(), env: process.env,

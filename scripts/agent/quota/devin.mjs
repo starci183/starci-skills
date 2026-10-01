@@ -13,7 +13,7 @@
 // argv or in env, and is scrubbed out of anything the result reports.
 //
 // The probe stays SYNCHRONOUS (workers.mjs and route-model.mjs call it without
-// awaiting), so the HTTP call runs in a `node -e` child under spawnSync.
+// awaiting), so the HTTP call (scripts/api/windsurf/seat-quota.mjs) runs as a node child under spawnSync.
 // Endpoint and credentials file are injectable for the spec's fake server;
 // STARCI_DEVIN_SEAT_ENDPOINT overrides the endpoint too. Any endpoint other than
 // DEFAULT_ENDPOINT must be a loopback http(s) URL, so neither the environment
@@ -29,10 +29,11 @@
 //   any API or credential failure        -> 'unknown' (NEVER dead)
 // Results are cached cacheMs (default 5 min) so a route storm does not hammer
 // the seat API; cacheMs: 0 disables.
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_ENDPOINT = 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus';
 const DEFAULT_CACHE_MS = 5 * 60 * 1000;
@@ -53,27 +54,9 @@ export function allowedEndpoint(url) {
   return h === 'localhost' || h === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
 }
 
-// The child's one job: read {endpoint, payload, timeoutMs} on stdin, POST the
-// Connect-JSON call, print {status, body} (or {status:0, error}) as JSON on
-// stdout. It never echoes the request, so the apiKey cannot reach our logs.
-const CHILD = `
-let raw = '';
-process.stdin.on('data', (c) => { raw += c; }).on('end', async () => {
-  try {
-    const { endpoint, payload, timeoutMs } = JSON.parse(raw);
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'connect-protocol-version': '1' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const text = await res.text();
-    process.stdout.write(JSON.stringify({ status: res.status, body: text.slice(0, 65536) }));
-  } catch (error) {
-    process.stdout.write(JSON.stringify({ status: 0, error: String((error && error.message) || error) }));
-  }
-});
-`;
+// The child is scripts/api/windsurf/seat-quota.mjs: it reads {endpoint, payload, timeoutMs} on stdin and prints
+// {status, body} (or {status:0, error}) as JSON on stdout. It never echoes the request, so the apiKey cannot reach our logs.
+const SEAT_QUOTA_FILE = fileURLToPath(new URL('../../api/windsurf/seat-quota.mjs', import.meta.url));
 
 /** Where the Devin desktop app keeps its CLI credentials. */
 export const devinCredentialsFile = (env = process.env) =>
@@ -162,7 +145,7 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   };
   let r;
   try {
-    r = spawnSync(process.execPath, ['-e', CHILD], {
+    r = runNode([SEAT_QUOTA_FILE], {
       input: JSON.stringify({ endpoint: url, payload, timeoutMs }),
       encoding: 'utf8', timeout: timeoutMs + 8000, maxBuffer: 1 << 20, windowsHide: true,
     });

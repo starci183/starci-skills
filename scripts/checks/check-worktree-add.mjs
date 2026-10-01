@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 /** The one function of WORKTREE_API that may run `git worktree add`. */
@@ -106,4 +107,4 @@ function main(argv) {
   return r.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

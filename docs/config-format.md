@@ -11,10 +11,8 @@ StarCi keeps **local runtime preferences** in ignored `config.yaml` at the skill
 
 ## Init copy policy
 
-`engine/config.mjs` `loadConfig(root, {initialize:true})`:
-
-1. With `initialize`, copy `config.example.yaml` verbatim to `config.yaml` under `root` when `config.yaml` is absent (best effort).
-2. Read `config.yaml` if present; otherwise read `config.example.yaml`.
+1. The installer (`scripts/install/install.mjs` seedConfig) copies `config.example.yaml` verbatim to `config.yaml` when it is absent; nothing else writes it.
+2. `engine/config.mjs` `loadConfig(root)` reads `config.yaml` if present, otherwise `config.example.yaml`.
 3. Validate the result and refuse an unknown key; an existing owner file is never rewritten by example updates.
 
 ## Shape

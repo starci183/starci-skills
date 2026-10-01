@@ -24,11 +24,12 @@
 //   node scripts/machine/decisions.mjs supervisor --ring [--json]
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { execFile, spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
+import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
-import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs';
+import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -468,7 +469,7 @@ export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.no
 
 /** Run `api decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
 export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
-  const r = spawnSync(process.execPath, [API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
+  const r = runNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env });
   let json = null;
   for (const text of [r.stdout, String(r.stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
   return { ok: r.status === 0 && json?.ok !== false, status: r.status, json, err: String(r.stderr ?? '').slice(0, 1000) };
@@ -479,13 +480,11 @@ export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60
  * timeoutMs there stops every timer (the lease and the heartbeat) for that long (ENGINE-STALL).
  */
 export function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
-  return new Promise((resolve) => {
-    execFile(process.execPath, [API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
-      const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
-      let json = null;
-      for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
-      resolve({ ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) });
-    });
+  return execNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }).then(({ error, stdout, stderr }) => {
+    const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
+    let json = null;
+    for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
+    return { ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) };
   });
 }
 
@@ -780,7 +779,7 @@ export async function escalateDue({ now = Date.now(), apply = false, repos = nul
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

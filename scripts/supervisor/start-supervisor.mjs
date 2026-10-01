@@ -29,7 +29,6 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine, pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
@@ -40,8 +39,8 @@ import {
 } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const EXIT_HOST_UNAVAILABLE = 75;
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervisor-prompt.md');
 const DOCTRINE_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervise.yaml');
@@ -349,4 +348,4 @@ async function main() {
   return out(r);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) main();
+if (isMain(import.meta.url)) main();

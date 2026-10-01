@@ -3,7 +3,7 @@
 // install/update/doctor/version are the installer (scripts/install/install.mjs); api is the kernel
 // agent's mutation gate; start boots a workflow kernel; goal defines one; check judges this runtime tree (npm run check).
 // Anything else is the help.
-import { spawnSync } from 'node:child_process';
+import { runScript } from '../scripts/api/node/run-script.mjs';
 import { fileURLToPath } from 'node:url';
 
 const ROUTES = {
@@ -40,8 +40,7 @@ if (!verb || verb === 'help' || verb === '--help' || verb === '-h') {
   const script = fileURLToPath(new URL(ROUTES[verb], import.meta.url));
   // The installer expects its verb as argv[0]; api/start/goal take their own arguments only.
   const args = INSTALL_VERBS.has(verb) ? [verb, ...rest] : rest;
-  const result = spawnSync(process.execPath, [script, ...args], { stdio: 'inherit', windowsHide: true });
-  process.exitCode = result.status ?? 1;
+  process.exitCode = runScript(script, args);
 } else {
   process.stderr.write(`starci: unknown command ${command}\n`);
   process.stdout.write(HELP);

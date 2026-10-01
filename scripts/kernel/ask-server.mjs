@@ -50,12 +50,12 @@
 import '../api/process/hide-child-windows.mjs';
 import { writeAskReceipt } from '../machine/ask-receipts.mjs';
 import fs from 'node:fs';
-import http from 'node:http';
+import { serve } from '../api/http/serve.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { runNode } from '../api/node/run-node.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
@@ -358,7 +358,7 @@ const writeCustody = (repo, name, value) => {
   try {
     fs.writeFileSync(tmp, value, { mode: 0o600 });
     if (fs.existsSync(tool)) {
-      const r = spawnSync(process.execPath, [tool, 'set', `dev/runtime/files/${name}`, '--from-file', tmp], { cwd: repo });
+      const r = runNode([tool, 'set', `dev/runtime/files/${name}`, '--from-file', tmp], { cwd: repo });
       if (r.status === 0) return { ok: true, via: 'stack-secret' };
       return { ok: false, error: String(r.stderr || r.stdout || 'stack-secret set failed').slice(0, 300) };
     }
@@ -389,11 +389,11 @@ const appEnvUpsert = (repo, key, value) => {
   if (!fs.existsSync(tool)) return false;
   const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
   try {
-    spawnSync(process.execPath, [tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
+    runNode([tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
     const cur = [path.join(repo, '.starcistacks', APP_ENV_REL)].find(fs.existsSync);
     if (!cur) return false;
     fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
-    return spawnSync(process.execPath, [tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
+    return runNode([tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
   } finally {
     try { fs.unlinkSync(tmp); } catch { /* best effort */ }
   }
@@ -838,7 +838,7 @@ const main = async () => {
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
   let done = false;
-  const server = http.createServer((req, res) => {
+  const server = serve((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (req.method === 'GET' && url.pathname === `/${nonce}`) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -902,7 +902,7 @@ const main = async () => {
         let bridge = null;
         const devEnv = path.join(repo, 'scripts', 'dev-env.mjs');
         if (pointersWritten.length && fs.existsSync(devEnv)) {
-          const r = spawnSync(process.execPath, [devEnv], { cwd: repo, stdio: 'ignore' });
+          const r = runNode([devEnv], { cwd: repo, stdio: 'ignore' });
           bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
         }
         const mirror = mirroredPick(question, pickGroupsOf(question, images));
@@ -1014,4 +1014,4 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   }, ttl).unref();
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

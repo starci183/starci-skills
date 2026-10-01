@@ -27,7 +27,7 @@
 //   node scripts/work/asset-slot.mjs check <file|dir>... [--json]   exit 1 when a slot has no request
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from './draw/draw-dna.mjs';
 import { isDir, isFile, slash } from './work-io.mjs';
@@ -256,4 +256,4 @@ function main(argv) {
   return cmd === 'check' && unrequested.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

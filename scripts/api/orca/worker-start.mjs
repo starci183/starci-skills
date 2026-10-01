@@ -10,6 +10,7 @@
 // Outcome and effectState come from the calls.yaml classify block; returns
 // {ok, outcome, effectState, dispatchId, taskId, runId, agentTerminalHandle, state, launch, result, request}.
 import { orcaCall, arg } from './lib.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export function workerStart({ spec, taskTitle, worktree, agent, model, effort, name, repo, baseBranch, displayName, setup, timeoutMs, run, from, request }) {
   const r = orcaCall('worker-start', {
@@ -38,7 +39,7 @@ export function workerStart({ spec, taskTitle, worktree, agent, model, effort, n
   };
 }
 
-if (process.argv[1]?.endsWith('worker-start.mjs')) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const out = workerStart({
     spec: arg(argv, 'spec'),

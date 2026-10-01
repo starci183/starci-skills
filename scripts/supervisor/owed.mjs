@@ -58,7 +58,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { logSince } from '../api/git/log-since.mjs'; import { revParse } from '../api/git/rev-parse.mjs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
@@ -73,7 +73,7 @@ import { readSupervisor, supervisorEvent, withSupervisor } from '../machine/home
 import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
-import { minutes } from '../lib/time.mjs';
+import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -236,17 +236,16 @@ let gitMemo = null;
  * The .claude commits since `since` (ms): [{sha, at, subject, message, lower}], newest first. One
  * `git log` per minute per root; an unreadable repository is [].
  */
-export function gitCommits({ root = SKILL_ROOT, since = 0, run = spawnSync, memoMs = 60_000, now = Date.now() } = {}) {
-  if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && run === spawnSync) return gitMemo.commits.filter((c) => c.at >= since);
-  const r = run('git', ['-C', root, 'log', `--since=${new Date(Math.max(0, since - 60_000)).toISOString()}`, '--format=%H%x1f%ct%x1f%s%x1f%b%x1e'],
-    { encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 * 1024 });
-  if (r.status !== 0) return [];
+export function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_000, now = Date.now() } = {}) {
+  if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && log === logSince) return gitMemo.commits.filter((c) => c.at >= since);
+  const r = log(root, new Date(Math.max(0, since - 60_000)).toISOString(), '%H%x1f%ct%x1f%s%x1f%b%x1e');
+  if (!r.ok) return [];
   const commits = String(r.stdout ?? '').split('\x1e').map((rec) => rec.replace(/^\s+/, '')).filter(Boolean).map((rec) => {
     const [sha, ct, subject = '', body = ''] = rec.split('\x1f');
     const message = `${subject}\n${body}`;
     return { sha, at: Number(ct) * 1000, subject, message, lower: message.toLowerCase() };
   }).filter((c) => /^[0-9a-f]{7,40}$/.test(c.sha));
-  if (run === spawnSync) gitMemo = { root, since, at: now, commits };
+  if (log === logSince) gitMemo = { root, since, at: now, commits };
   return commits;
 }
 
@@ -659,12 +658,11 @@ function collect(repos, { wanted = new Set(), now = Date.now(), acks = undefined
 }
 
 /** Full shas of `list` in the runtime's git, or {bad} naming one that is no commit. */
-export function resolveCommits(list, { root = SKILL_ROOT, run = spawnSync } = {}) {
+export function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
   const out = [];
   for (const sha of list) {
-    const r = run('git', ['-C', root, 'rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
-    const full = String(r.stdout ?? '').trim();
-    if (r.status !== 0 || !/^[0-9a-f]{40}$/.test(full)) return { bad: sha };
+    const full = String(resolve(root, sha) ?? '');
+    if (!/^[0-9a-f]{40}$/.test(full)) return { bad: sha };
     out.push(full);
   }
   return { commits: out };
@@ -722,4 +720,4 @@ function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

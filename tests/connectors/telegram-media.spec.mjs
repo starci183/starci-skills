@@ -254,8 +254,7 @@ test('off: Telegram disabled, connectors off, a spec run, a non-media op or a dr
     assert.equal(spawned.length,0);
     const queued=queueSettleMedia({...UAT,ledgerFile,repo:repoRoot},{env,config:ON,spawnImpl});
     assert.deepEqual([queued.queued,queued.pid],[true,4242],'a UAT settle queues whatever the verdict');
-    const [exe,args,options]=spawned[0];
-    assert.equal(exe,process.execPath);
+    const [args,options]=spawned[0];
     assert.match(args[0],/telegram-media\.mjs$/);
     assert.deepEqual(args.slice(1),['settle','--ledger',ledgerFile,'--repo',repoRoot,'--workflow','wf-shop-x1','--job','job-uat-1','--attempt','1','--op','uat.verify','--verdict','fail','--dispatch','ctx_uat']);
     assert.equal(options.detached,true,'the sender outlives the settle process');

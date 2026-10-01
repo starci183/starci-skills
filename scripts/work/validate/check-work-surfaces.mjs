@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {isLocaleSegment} from '../layout-tree.mjs';
 import {createRequire} from 'node:module';
-import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
+import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
  * The audits' sharpest surface complaint was the `/buyers` vs `/internal/buyers` class: a done contract
@@ -759,7 +759,7 @@ export function checkWorkSurfaces(workRoot, out) {
 }
 
 // ---------- main ----------
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]

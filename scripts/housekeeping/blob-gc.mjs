@@ -28,7 +28,7 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { artifactRoot } from '../../engine/db/blob.mjs';
 import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipRead } from '../api/fs/zip-read.mjs';
@@ -284,7 +284,7 @@ function describe(r) {
   return L.join('\n');
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const archiveAt = argv.indexOf('--archive-root');
   runBlobGc({ apply: argv.includes('--apply'), ...(archiveAt >= 0 ? { archiveRoot: argv[archiveAt + 1] } : {}) }).then((r) => {

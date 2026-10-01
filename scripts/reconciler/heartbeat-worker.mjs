@@ -15,7 +15,8 @@
 //   - every stall that lasts STALL_LOG_MS gets one reconciler.loop-stalled row (machine_logs actor reconciler) with the
 //     phase the main thread entered last, the duties running, the process CPU / RSS / fault deltas (spinning vs starved vs
 //     paged out), and a resume row when it ends. That is the evidence the 14:10 stall did not leave behind.
-import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { startWorker } from '../api/node/start-worker.mjs';
+import { workerContext } from '../api/node/worker-context.mjs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { openMachine } from '../../engine/db/machine.mjs';
@@ -49,7 +50,7 @@ export function startHeartbeatWorker({ file, leaseMs, renewMs, stallMaxMs = DEFA
     const t0 = Date.now();
     const sab = new SharedArrayBuffer(4);
     const stamp = new Int32Array(sab);
-    const worker = new Worker(selfFile, { workerData: { heartbeat: true, file, leaseMs, renewMs, stallMaxMs, t0, sab }, env, name: 'reconciler-heartbeat-worker' });
+    const worker = startWorker(selfFile, { workerData: { heartbeat: true, file, leaseMs, renewMs, stallMaxMs, t0, sab }, env, name: 'reconciler-heartbeat-worker' });
     worker.unref();
     let dead = false;
     const exited = new Promise((resolve) => { worker.on('exit', () => { dead = true; resolve(); }); });
@@ -76,7 +77,7 @@ export function startHeartbeatWorker({ file, leaseMs, renewMs, stallMaxMs = DEFA
 
 /* ------------------------------------------------------------ the worker side */
 
-function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }) {
+function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort) {
   const stamp = new Int32Array(sab);
   let m = null;
   const machine = () => { if (!m) m = openMachine({ file, env: process.env }); return m; };
@@ -145,4 +146,5 @@ function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }) {
   setInterval(() => {}, 1 << 30);
 }
 
-if (!isMainThread && workerData?.heartbeat) workerMain(workerData);
+const thread = workerContext();
+if (!thread.isMainThread && thread.workerData?.heartbeat) workerMain(thread.workerData, thread.parentPort);

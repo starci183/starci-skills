@@ -50,14 +50,13 @@ import { git } from './workers.mjs';
 import { projectBinding } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from '../machine/home.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
-import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs';
+import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -72,7 +71,7 @@ export function scanDiff({ diff = '', files = [] } = {}) {
 
 /** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates.
  *  A `*.enc` file is held back until its diff ends and passes only when it is a sops-encrypted file with no
- *  plaintext value (scripts/lib/test-secrets.mjs isSopsEnvelope) - judged on the whole file at the pushed commit
+ *  plaintext value (scripts/lib/sops-envelope.mjs isSopsEnvelope) - judged on the whole file at the pushed commit
  *  when `encText(file)` can read it (a --unified=0 diff of an edited sops YAML holds only its changed lines), else
  *  on its added lines. Anything else in a `.enc` file is scanned like any other file, and a `.enc` under
  *  `.starcistacks/` that is not a sops envelope refuses the push by itself (sops-not-envelope). */
@@ -112,7 +111,7 @@ export function diffScanner(files = [], { encText = null } = {}) {
 
 /** The one fix a refused plaintext test credential gets (owner ruling push-scan-test-secrets-encrypted): the product
  *  repository's own .starcistacks + sops convention, or a value generated per run. */
-export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/lib/test-secrets.mjs) or generate it per run; never a plaintext literal`;
+export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/uat/test-secret.mjs) or generate it per run; never a plaintext literal`;
 export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
 
 /** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
@@ -519,7 +518,7 @@ export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env
 
 export const describePush = (r) => `${path.basename(r.repo)}: ${r.hooksOnly ? `pre-push hook on main ${r.hooks === 'green' ? 'green' : `${String(r.hooks).toUpperCase()} ${r.error ?? ''}`} (${r.linked?.length ?? 0} local-state link(s))` : r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}${r.hint ? ` - ${r.hint}` : ''}` : `FAILED ${r.error ?? ''}`}`;
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
   const results = pushMains({ repos: repos.length ? repos : null, dryRun: argv.includes('--dry-run'), hooksOnly: argv.includes('--hooks-only') });

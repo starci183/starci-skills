@@ -35,7 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
@@ -259,9 +259,9 @@ async function resolveKernelRoute(db) {
   // Unpinned: route-model resolves the think group quota-aware (selection.yaml
   // decisionFlow kernel-function + kernel-availability) and reads this repo's
   // provider-health circuit; its pick and fallbackChain are the members.
-  const r = spawnSync(process.execPath,
+  const r = runNode(
     [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--repo', repo, '--json'],
-    { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
+    { timeout: 60000, cwd: skillRoot });
   const result = parseJson(r.stdout);
   const pick = result?.pick ?? null;
   if (r.error || r.status !== 0 || !pick?.target) {

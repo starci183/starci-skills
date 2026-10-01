@@ -9,16 +9,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import {spawn, spawnSync} from 'node:child_process';
+import {runProgram} from '../api/process/run-program.mjs';
+import {startProgram} from '../api/process/start-program.mjs';
 import {sha256, sha256File} from '../../engine/digest.mjs';
-import {fileURLToPath} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {renameOver} from '../api/fs/rename-over.mjs';
+import {spawnNode} from '../api/node/spawn-node.mjs';
 import {packageAt} from '../lib/package-at.mjs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {acquireUatSlot} from './uat-slots.mjs';
 import {launchFor} from './launch.mjs';
 import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
@@ -245,7 +248,7 @@ const runCommand=(prepared,item,defaultCwd)=>{
   const cwd=resolveCwd(prepared.root,item.cwd??defaultCwd);
   const env=launchEnv(prepared);
   const launch=launchFor(command);
-  const result=spawnSync(launch.file,launch.args,{cwd,env,encoding:'utf8',timeout:prepared.request.limits.timeoutMs,windowsHide:true});
+  const result=runProgram(launch.file,launch.args,{cwd,env,timeout:prepared.request.limits.timeoutMs});
   return {id:item.id??'command',command:sanitizer(prepared)(commandLabel(command)),exitCode:Number.isInteger(result.status)?result.status:1,evidenceRefs:[]};
 };
 const policyCommands=(file,key)=>{const value=readYaml(file)??{};const list=value[key];return Array.isArray(list)?list:[];};
@@ -315,7 +318,7 @@ const runSession=async(prepared,state,slot)=>{
   // The owner's headed session keeps its console. Under node --test that console is a Windows Terminal
   // default-terminal handoff per run: a tab left open, and a handoff WT stalls under suite load, so the
   // driver never starts and the run times out.
-  const child=spawn(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(process.env.NODE_TEST_CONTEXT)});
+  const child=startProgram(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(process.env.NODE_TEST_CONTEXT)});
   const childExit=new Promise(resolve=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
     child.once('error',error=>{protocolError=error;resolve(1);});
@@ -376,7 +379,7 @@ export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={})
   const state={schema:'starci/assisted-uat-run-state@1',runId:prepared.runId,request:prepared.requestFile,requestDigest:prepared.requestDigest,sessionManifest:prepared.sessionFile,sessionDigest:prepared.sessionDigest,receipt:prepared.receiptFile,runDir:prepared.runDir,phase:'starting',revision:0,pid:null,pendingGate:null,event:null,startedAt:iso(),updatedAt:iso()};
   writeState(prepared,state);
   const log=fs.openSync(path.join(prepared.runDir,'control','runner.log'),'a');
-  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'_worker','--request',prepared.requestFile,'--receipt',prepared.receiptFile],{detached:true,stdio:['ignore',log,log],windowsHide:true});
+  const child=spawnNode([fileURLToPath(import.meta.url),'_worker','--request',prepared.requestFile,'--receipt',prepared.receiptFile],{detached:true,stdio:['ignore',log,log]});
   state.pid=child.pid;writeState(prepared,state);child.unref();fs.closeSync(log);
   return publicState(state);
 }
@@ -459,4 +462,4 @@ async function main(){
   }catch(error){console.error(JSON.stringify({ok:false,code:error?.code??'assisted-uat-error',error:String(error?.message??error)}));process.exit(1);}
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
+if(isMain(import.meta.url))await main();

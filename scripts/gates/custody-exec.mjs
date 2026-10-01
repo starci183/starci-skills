@@ -19,7 +19,7 @@
 // The age identity is SOPS_AGE_KEY_FILE, default ~/.starci/master.identity. The decryption is scripts/api/sops/exec-env.mjs
 // execEnv, the child process scripts/api/process/run-shell.mjs runShellInherit.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { execEnv } from '../api/sops/exec-env.mjs';
 import { runShellInherit } from '../api/process/run-shell.mjs';
 
@@ -48,7 +48,7 @@ function main(argv) {
   return execWithCustody(file, command.join(' '), { inputType });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
   catch (error) { process.stderr.write(`custody-exec: ${error.message}\n`); process.exitCode = 1; }
 }

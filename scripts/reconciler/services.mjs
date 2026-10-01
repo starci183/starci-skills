@@ -30,11 +30,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile, spawnSync } from 'node:child_process';
+import { execCapture } from '../api/process/exec-capture.mjs'; import { runPowershell } from '../api/process/run-powershell.mjs'; import { schtasks } from '../api/process/schtasks.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine } from '../../engine/db/machine.mjs';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
+import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } from '../api/node/run-node.mjs';
+import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
@@ -137,14 +137,7 @@ export function servicePorts({ allocation = null, config = null, harnessYml = nu
 /* ------------------------------------------------------------ probes (read-only, async) */
 
 /** One async child: {status, stdout, stderr, timedOut}. Never throws. */
-export function runChild(cmd, args, { timeoutMs = 60_000, env = process.env, cwd = SKILL_ROOT } = {}) {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, env, timeout: timeoutMs, windowsHide: true, maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-      const timedOut = Boolean(error?.killed && error?.signal) || error?.code === 'ETIMEDOUT';
-      resolve({ status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (error && !timedOut ? String(error.message) : ''), timedOut });
-    });
-  });
-}
+export const runChild = (cmd, args, { timeoutMs = 60_000, env = process.env, cwd = SKILL_ROOT } = {}) => execCapture(cmd, args, { timeoutMs, env, cwd });
 
 /** The last JSON line of a child's stdout, or null. */
 export const lastJson = (text) => {
@@ -434,14 +427,13 @@ export function orcaRestartScript({ app, closeWaitMs }) {
   ].join('\n');
 }
 
-const sync = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 120_000, cwd: SKILL_ROOT, ...opts });
 const connectorStart = (script, env) => {
-  const r = sync(process.execPath, [path.join(SKILL_ROOT, 'scripts', 'connectors', script), 'start'], { env });
+  const r = runNode([path.join(SKILL_ROOT, 'scripts', 'connectors', script), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
   return { ok: r.status === 0, answer: lastJson(r.stdout), stderr: String(r.stderr ?? '').trim().slice(0, 300) };
 };
 
-/** Start one service now. Only ever reached through ctx.run in active mode (or by hand). */
-export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, run = sync } = {}) {
+/** Start one service now. Only ever reached through ctx.run in active mode (or by hand). Seams: powershell, tasks. */
+export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, powershell = runPowershell, tasks = schtasks } = {}) {
   const clean = await cleanEnv(env);
   const s = settings.services[name] ?? {};
   switch (name) {
@@ -449,19 +441,18 @@ export async function startService(name, { settings = hostSettings(), ports = se
       const { orcaAppExe } = await import('../api/orca/lib.mjs');
       const app = orcaAppExe();
       if (!app) return { ok: false, error: 'no Orca app beside the orca CLI' };
-      const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 })],
-        { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
+      const r = powershell(orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 }), { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
       return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
-      const task = s.task;
-      run('schtasks.exe', ['/End', '/TN', task]);
+      const task = s.task; // what harness-tunnel's task runs is registered by tunnel-task.mjs (node ui/start.mjs --tunnel)
+      tasks(['/End', '/TN', task]);
       if (name === 'harness-ui' && ports.harnessPort) {
         // A listener that holds the port but does not answer blocks the new server: stop it first.
-        run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-          `Get-NetTCPConnection -LocalPort ${Number(ports.harnessPort)} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`]);
+        powershell(
+          `Get-NetTCPConnection -LocalPort ${Number(ports.harnessPort)} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`);
       }
-      const r = run('schtasks.exe', ['/Run', '/TN', task]);
+      const r = tasks(['/Run', '/TN', task]);
       return { ok: r.status === 0, task, output: String(r.stdout || r.stderr || '').trim().slice(0, 300) };
     }
     case 'ask-gateway': return connectorStart('ask-gateway.mjs', clean);
@@ -618,4 +609,4 @@ async function main() {
   process.exitCode = 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();

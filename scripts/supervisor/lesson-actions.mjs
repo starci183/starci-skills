@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { createScratchWorktree, removeScratchWorktree } from '../machine/worktree-git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { entryFileOf } from '../lib/contract-changes-path.mjs';
@@ -107,7 +107,7 @@ export async function propose({ title, evidence, options, recommendation, send =
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const verb = argv[0];
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

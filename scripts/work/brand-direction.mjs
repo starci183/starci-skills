@@ -28,7 +28,7 @@
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import {
   DIRECTION_ARCHETYPES, DIRECTION_DECISIONS, DIRECTION_REVIEW_KIND, DIRECTION_REVIEW_SCHEMA, OWNER_ANSWER_SCHEMA, readBrandRecord,
@@ -281,7 +281,7 @@ export function brandDirectionMain(argv = []) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { exitCode, text } = brandDirectionMain(process.argv.slice(2));
   (exitCode ? process.stderr : process.stdout).write(text);
   process.exitCode = exitCode;

@@ -1,6 +1,5 @@
 // api status: workflow projection, action frontier, and bounded host reads.
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { sameUnit } from '../../../engine/admission.mjs';
 import { runtimeProfile } from '../../../engine/config.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../../machine/owner-claim.mjs';

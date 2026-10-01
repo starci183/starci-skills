@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
@@ -463,15 +463,11 @@ export function claudeDebugSettings(config=loadConfig()){
   validateClaudeDebug(block);
   return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
 }
-export function loadConfig(root=configRoot,{initialize=false}={}){
-  const yaml=path.join(root,'config.yaml');
-  if(initialize&&!fs.existsSync(yaml)){
-    const exampleFile=path.join(root,'config.example.yaml');
-    if(fs.existsSync(exampleFile)){try{fs.copyFileSync(exampleFile,yaml);}catch{/* best effort */}}
-  }
+/** The owner config of `root` (config.yaml), else the shipped example. The installer seeds config.yaml (scripts/install/install.mjs seedConfig); this reader never writes. */
+export function loadConfig(root=configRoot){
   return readOwnerConfig(root)??readExample(root);
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{process.stdout.write(JSON.stringify(loadConfig(configRoot,{initialize:true}))+'\n');}catch(error){process.stderr.write(error.message+'\n');process.exitCode=1;}}
+
 /** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
 export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}
 

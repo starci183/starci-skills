@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CHECK_CODES } from './check.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The runtime files the slot resolver needs; both bundles carry them. */
@@ -112,7 +113,7 @@ export function driftOfRuntime() {
   return problems;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const problems = driftOfRuntime();
     for (const p of problems) process.stderr.write(`${GENERATED_DRIFT} runtime copy drift: ${p} (run node scripts/hfs/sync-runtime.mjs)\n`);

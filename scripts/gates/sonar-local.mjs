@@ -2,13 +2,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn,spawnSync} from 'node:child_process';
+import {sopsDecrypt} from '../api/sops/decrypt.mjs';import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShellInherit} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
+import {safeRemoveTree} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
 import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from './runtime-host.mjs';
@@ -281,8 +281,7 @@ export function readCustody(cfg,ref){
     else if(!fs.existsSync(cfg.identity))reasons.push(`master identity ${cfg.identity} is missing`);
     else{
       const [bin,args]=launcher(sops,['--decrypt','--input-type','binary','--output-type','binary',enc]);
-      const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],
-        env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+      const result=sopsDecrypt(bin,args,{env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
       const value=result.status===0?String(result.stdout??'').trim():'';
       if(value)return {present:true,value:remember(value),via:'sops',name};
       reasons.push(result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
@@ -330,7 +329,7 @@ function writeCustody(cfg,ref,value){
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
-    const result=spawnSync(process.execPath,[tool,'set',target,'--from-file',tmp],{cwd:path.dirname(stacksRoot),encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']});
+    const result=runNode([tool,'set',target,'--from-file',tmp],{cwd:path.dirname(stacksRoot),stdio:['ignore','pipe','pipe']});
     return result.status===0?{ok:true}:{ok:false,reason:scrub(`stack-secret set ${target} exited ${result.status}: ${String(result.stderr||result.stdout).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
   }finally{
     try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
@@ -483,8 +482,7 @@ async function call(cfg,method,pathname,{token,form,timeoutMs}={}){
 
 /** docker inspect of the SonarQube container: state/health, or why docker could not say. */
 export function containerState(cfg){
-  const result=spawnSync(cfg.docker,['inspect','--format','{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}',cfg.container],
-    {encoding:'utf8',windowsHide:true,timeout:15000});
+  const result=containerInspect(cfg.container,'{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}',{docker:cfg.docker,timeout:15000});
   if(result.error)return {container:cfg.container,state:'docker-unavailable',detail:String(result.error.code??result.error.message)};
   if(result.status!==0)return {container:cfg.container,state:'missing',detail:String(result.stderr||'').trim().split(/\r?\n/)[0]||'no such container'};
   const [state,health]=String(result.stdout).trim().split('|');
@@ -618,18 +616,10 @@ export function scannerCommand({pkg,props,host,key,workDir,extra=[]}){
   return {runner:'npx @sonar/scan',command:'npx',args:['--yes','@sonar/scan',...defines]};
 }
 
-function runScanner(cwd,{command,args},env,timeoutMs){
-  return new Promise(resolve=>{
-    const started=Date.now();
-    const line=[command,...args].map(quote).join(' ');
-    const child=spawn(line,{cwd,env,shell:true,windowsHide:true});
-    let log='';
-    const take=chunk=>{if(log.length<LOG_CAP)log+=chunk.toString('utf8');};
-    child.stdout.on('data',take);child.stderr.on('data',take);
-    const timer=setTimeout(()=>{log+=`\n[sonar-local] scanner exceeded ${Math.round(timeoutMs/1000)}s and was stopped\n`;child.kill();},timeoutMs);
-    child.on('error',error=>{log+=`\n[sonar-local] scanner failed to start: ${error.message}\n`;});
-    child.on('close',code=>{clearTimeout(timer);resolve({exitCode:code??1,durationMs:Date.now()-started,log:scrub(log),display:line});});
-  });
+async function runScanner(cwd,{command,args},env,timeoutMs){
+  const line=[command,...args].map(quote).join(' ');
+  const run=await scanRun(line,{cwd,env,timeoutMs,logCap:LOG_CAP});
+  return {...run,log:scrub(run.log),display:line};
 }
 
 const git=(cwd,args)=>runGit(['-c','core.quotepath=off',...args],{cwd,maxBuffer:64*1024*1024});
@@ -816,7 +806,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
   try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
   catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
   const collect=files.flatMap(file=>['--collectCoverageFrom',file]);
-  const run=spawnSync(process.execPath,[bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:64*1024*1024});
+  const run=runNode([bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,timeout:timeoutMs,maxBuffer:64*1024*1024});
   return {exitCode:run.status,error:run.error?String(run.error.message):null};
 }
 
@@ -1277,8 +1267,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
     if(!child.ok||!args.rest?.length)report={schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'};
     else{
       // A shell resolves npm/npx .cmd shims on Windows; each argument is quoted so paths with spaces survive.
-      const result=spawnSync(args.rest.map(quote).join(' '),{stdio:'inherit',env:child.env,shell:true,windowsHide:true});
-      return {exitCode:result.status??1};
+      return {exitCode:runShellInherit(args.rest.map(quote).join(' '),child.env)};
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
@@ -1293,7 +1282,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
   return {exitCode:exitFor(report.outcome),report:safeReport,...(blob?{blob}:{})};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   sonarLocalMain(process.argv.slice(2)).then(({exitCode,report,text,blob})=>{
     if(text)process.stdout.write(`${text}\n`);
     if(blob)process.stdout.write(`${JSON.stringify(blob)}\n`);

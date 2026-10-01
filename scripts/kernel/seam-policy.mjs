@@ -23,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
@@ -514,4 +514,4 @@ async function main(argv) {
   console.error('use: cut-seam.mjs canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
   return 2;
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
+if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; });

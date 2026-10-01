@@ -22,9 +22,9 @@ import { isLinkLike } from '../api/fs/safe-remove.mjs';
 import { foldCase } from '../lib/path-key.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(here, '..', '..');
 export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
 export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
@@ -103,7 +103,7 @@ export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultR
   }, { env });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (name) => { const index = argv.indexOf(`--${name}`); return index >= 0 ? argv[index + 1] : null; };
   const result = await runFootprintScan({ ...(value('root') ? { root: value('root') } : {}), ...(value('depth') ? { depth: Number(value('depth')) } : {}) });

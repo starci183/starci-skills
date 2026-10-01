@@ -11,7 +11,7 @@
 // kind the generated modules/ops/registry.yaml indexes.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -116,7 +116,7 @@ export function schemaCatalogMain(argv = []) {
   return { exitCode: result.ok ? 0 : 1, text };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = schemaCatalogMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

@@ -532,7 +532,7 @@ sections:
         randomBytes); a credential that must stay stable across runs lives at
         `.starcistacks/<stack>/secrets/test/<name>` in the product repo - the plaintext git-ignored, stored
         with the repo's own stack-secret set command (npm run secret:set -- <stack>/secrets/test/<name>) so only the sops
-        `.enc` twin is committed - and is read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs:
+        `.enc` twin is committed - and is read with testSecret(<name>, {repo}) (scripts/uat/test-secret.mjs:
         the local plaintext when present, else sops-decrypted with the shared age identity). The push secret
         scan refuses a plaintext test password in any file."
   - title: Bounded finish and blockers

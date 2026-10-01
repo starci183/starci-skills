@@ -9,6 +9,7 @@ import { runGit } from '../api/git/lib.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
 const norm = (p) => String(p ?? '').replaceAll('\\', '/').replace(/^\.\//, '');
@@ -71,7 +72,7 @@ export function readContractChangesDocAt(cwd, rev) {
   return mergeContractChanges({ entries: rels.map((rel, i) => ({ rel, text: texts[i] })).filter((e) => e.text != null) });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const { doc, problems } = readContractChangesDoc(root);
   console.log(JSON.stringify({ changes: doc.changes.length, problems }));

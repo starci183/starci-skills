@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {runCommand} from '../api/process/run-command.mjs';
 import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {safeRemoveWorktree,createScratchWorktree} from '../machine/worktree-git.mjs';
@@ -93,26 +93,25 @@ const empty=(mode,baseHead,opHead,commands,reason)=>({schema:VERIFY_PROOF,mode,s
  * the operation's own worktree at `opHead`. `proven` needs a discriminating failure at base and a green head;
  * `weak` means the spec passes at base too (a finding, not a hard failure); `contradiction` means the head is red.
  */
-export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],git=spawnSync,exec=spawnSync,
+export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],git=null,exec=runCommand,
   timeoutMs=PROOF_TIMEOUT_MS,tmpRoot=os.tmpdir()}={}){
   const plan=unique((specs??[]).map(normalize)).filter(Boolean);
   if(!plan.length||!commands.length)
     return empty('checks-only',baseHead,opHead,commands,!plan.length?'no changed spec to contrast':'no check command runs the changed spec');
   if(!worktree||!baseHead)return empty('checks-only',baseHead,opHead,commands,'the proof needs both a worktree and a base head');
-  const run=args=>git('git',args,{cwd:worktree,encoding:'utf8',windowsHide:true,maxBuffer:16*1024*1024});
   const parent=fs.mkdtempSync(path.join(tmpRoot,'starci-proof-'));
   const scratch=path.join(parent,'base');
   const cleanup=()=>{
     // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch
     // (a dependency link) would be followed into its target. safeRemoveTree never
     // descends into a link; prune drops the registration.
-    try{safeRemoveWorktree(scratch,{repo:worktree,git:args=>run(args)});}catch{/* the temporary worktree is best-effort */}
+    try{safeRemoveWorktree(scratch,{repo:worktree,git});}catch{/* the temporary worktree is best-effort */}
     try{safeRemoveTree(parent, { hold: artifactHoldReason });}catch{/* nothing to keep */}
     if(!fs.existsSync(scratch))markRemoved(scratch);
   };
   try{
     // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed in the finally below.
-    const added=createScratchWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git:args=>run(args)});
+    const added=createScratchWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git});
     if(!added.ok)
       return {...empty('fail-before',baseHead,opHead,commands,`the base worktree of ${short(baseHead)} could not be created: ${tail(added.detail??added.reason,200)}`),
         specs:plan,verdict:'weak',error:tail(added.detail??added.reason,200)||'git worktree add failed'};
@@ -210,7 +209,7 @@ const classifyBase=(result,oracle)=>{
 };
 
 /** Run protected commands against immutable base/candidate roots. Only a discriminating, candidate-green result passes. */
-export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=spawnSync,timeoutMs=PROOF_TIMEOUT_MS}={}){
+export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=runCommand,timeoutMs=PROOF_TIMEOUT_MS}={}){
   if(plan?.schema!==CANDIDATE_PROOF||!plan.ready)return {schema:CANDIDATE_PROOF,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
   if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:CANDIDATE_PROOF,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
   const results=[];

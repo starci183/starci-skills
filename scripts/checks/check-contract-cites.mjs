@@ -24,10 +24,11 @@
 // Exit 0 clean, 1 lists every dead cite as file:line, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { movedTo } from '../hfs/runtime-rules/retired.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -241,7 +242,7 @@ export function checkContractCitesMain(argv) {
   return { exitCode: 1, text: `${lines.join('\n')}\n` };
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+if (isMain(import.meta.url)) {
   const result = checkContractCitesMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

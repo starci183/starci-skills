@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isIP } from 'node:net';
 import { gitOutput } from '../../api/git/lib.mjs';
 import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
@@ -181,11 +180,12 @@ function treeView(root) {
   };
 }
 
+// `hostname` is a WHATWG URL hostname: a name never holds ':', so after the brackets go only an IPv6 literal does.
 function privateHost(hostname) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (host === 'localhost' || host === '::1' || host === '0.0.0.0' ||
       /(?:\.localhost|\.local|\.internal|\.lan)$/u.test(host)) return true;
-  if (isIP(host) === 6) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
+  if (host.includes(':')) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
   if (!host.includes('.')) return true;
   const octets = host.split('.');
   if (octets.length !== 4 || !octets.every(part => /^\d{1,3}$/u.test(part) && Number(part) <= 255)) return false;
