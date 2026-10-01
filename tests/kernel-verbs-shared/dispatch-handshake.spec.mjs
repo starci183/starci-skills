@@ -73,6 +73,17 @@ const jobRow=(fx,jobId)=>{
   finally{ledger.close();}
 };
 
+test('the dispatch preview prints the worker-start flags the spawn sends: devin gets no --model',t=>{
+  const fx=fixture(t).make('healthy');
+  const r=spawnSync(process.execPath,[API,'dispatch','--repo',fx.repo,'--job',fx.jobId,'--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:fx.env});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const plan=JSON.parse(r.stdout);
+  const start=plan.orca.commands.find(c=>c.step==='worker-start')?.cli??'';
+  assert.match(start,/--agent devin(\s|$)/);
+  assert.doesNotMatch(start,/--model|--effort/,'start.modelArgument is false for devin: the preview must not claim a --model the spawn never sends');
+});
+
 test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   const fx=fixture(t).make('healthy');
   const r=runDispatch(fx);
