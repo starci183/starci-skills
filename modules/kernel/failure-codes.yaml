@@ -10164,6 +10164,17 @@ unknown-option:
   owner: runtime-core
   kind: verb-refusal
 
+unstamped-orphan:
+  title: "An unstamped orphan worktree awaits the owner's review"
+  title_vi: "Cây làm việc mồ côi không có dấu sở hữu đang chờ chủ xem xét"
+  meaning_vi: "Có một cây làm việc không mang dấu sở hữu của runtime (cây Orca không có comment starci:<kind>:<slot>, hoặc cây git dưới .starciwork/worktrees mà nhánh không ghi job nào), không có dòng registry, không còn terminal sống và đã quá thời gian chờ của chủ. GC không bao giờ tự gỡ cây này vì có thể đó là việc tay của chủ; nó ghi đúng một sự cố cho mỗi cây (machine_logs kind worktree.orphan-review) và báo lại ở mỗi lượt như một mục review."
+  causes_vi:
+    - "Cây do người hoặc công cụ ngoài runtime tạo rồi bị bỏ lại"
+    - "Cây của runtime bị mất dấu sở hữu hoặc nhánh mất mô tả job"
+  nextStep_vi: "Chủ xem sự cố worktree.orphan-review trong machine_logs rồi tự gỡ cây (còn việc chưa commit thì lấy ra trước) hoặc nhận lại nó; GC không làm thay."
+  owner: owner
+  kind: runtime-fault
+
 unread-peer:
   title: "Peer message unread"
   title_vi: "Tin nhắn đồng nghiệp chưa đọc"

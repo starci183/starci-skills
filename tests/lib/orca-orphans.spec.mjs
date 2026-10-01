@@ -179,7 +179,7 @@ test('a creation still in flight (a fresh pending slot) and an unknown owner wit
 
 /* ------------------------------------------------------------ Orca tree without a row */
 
-test('an Orca tree with no row: runtime-owned is reclaimed, foreign is never touched, and nothing is judged when ps cannot be read', (t) => {
+test('an Orca tree with no row: runtime-owned is reclaimed, foreign is only listed for review and never touched, and nothing is judged when ps cannot be read', (t) => {
   const { repo, env, orca } = fixture(t);
   const critic = orca.create({ repo: `path:${posix(repo)}`, name: 'draw-critic-old', baseBranch: 'main', comment: runtimeStampOf({ kind: 'critic', slot: 'draw-critic-old', owner: {} }) }).worktree;
   const lane = orca.create({ repo: `path:${posix(repo)}`, name: 'lane/human', baseBranch: 'main' }).worktree;
@@ -194,12 +194,50 @@ test('an Orca tree with no row: runtime-owned is reclaimed, foreign is never tou
   assert.deepEqual(at(items, critic.path).map((i) => [i.reason, i.owner, i.ok]), [['orca-orphan', 'unknown', true]], JSON.stringify(items));
   assert.ok(!fs.existsSync(critic.path));
   for (const foreign of [lane, noted]) {
-    assert.deepEqual(at(items, foreign.path), [], `${foreign.path} is foreign`);
+    assert.deepEqual(at(items, foreign.path).map((i) => [i.action, i.reason, i.ok]), [['review', 'unstamped-orphan', true]], `${foreign.path} is only listed for the owner's review`);
     assert.ok(fs.existsSync(foreign.path));
     assert.equal(rowsAt(env, foreign.path).length, 0, 'no row is ever made for a foreign tree');
   }
   assert.ok(!orca.calls.some(([verb, a]) => verb === 'remove' && [lane.id, noted.id].includes(String(a.worktree).replace(/^id:/, ''))));
   assert.equal(fs.readFileSync(path.join(lane.path, 'src', 'human.ts'), 'utf8'), 'export const h = 1;\n');
+});
+
+// 3.8: an unstamped orphan tree (no runtime stamp, no registry row, no live terminal, owner grace spent) is an owner-reviewed
+// incident list, never auto-removed: ONE worktree.orphan-review incident per tree for good, a `review` item on every pass.
+const reviews = (env) => withMachine((m) => m.db.prepare("SELECT level, msg, data_json FROM machine_logs WHERE kind='worktree.orphan-review' ORDER BY at, rowid").all(), { env });
+
+test('an unstamped orphan tree becomes one owner-review incident and is never removed, however many passes run', (t) => {
+  const { repo, env, orca } = fixture(t);
+  const lane = orca.create({ repo: `path:${posix(repo)}`, name: 'lane/unstamped', baseBranch: 'main' }).worktree;
+  const fresh = orca.create({ repo: `path:${posix(repo)}`, name: 'lane/fresh', baseBranch: 'main' }).worktree;
+  write(lane.path, 'src/work.ts', 'export const w = 1;\n');
+  const pass = (now, apply = true) => gcWorktrees({ env, now, apply, repos: [repo], jobStatusOf: phases({}), orca });
+  // Within the owner grace nothing is an orphan yet (passing).
+  assert.deepEqual(at(pass(Date.now()), lane.path), []);
+  assert.deepEqual(reviews(env), []);
+  // A plan logs nothing; the real pass logs one incident; a second pass lists it again and logs nothing more.
+  assert.deepEqual(at(pass(Date.now() + 9 * HOUR, false), lane.path).map((i) => i.action), ['review']);
+  assert.deepEqual(reviews(env), [], 'a plan writes no incident');
+  for (let n = 0; n < 3; n += 1) assert.deepEqual(at(pass(Date.now() + (10 + n) * HOUR), lane.path).map((i) => [i.action, i.home]), [['review', 'orca']]);
+  const rows = reviews(env).map((r) => ({ ...r, data: JSON.parse(r.data_json) }));
+  assert.equal(rows.length, 2, 'one incident per tree, however many passes: the two idle unstamped trees');
+  assert.deepEqual(new Set(rows.map((r) => path.resolve(r.data.path))), new Set([path.resolve(lane.path), path.resolve(fresh.path)]));
+  assert.ok(rows.every((r) => r.level === 'warn' && /never removed/.test(r.msg)));
+  // Never removed, never given a row, never touched.
+  for (const tree of [lane, fresh]) { assert.ok(fs.existsSync(tree.path)); assert.equal(rowsAt(env, tree.path).length, 0); }
+  assert.ok(!orca.calls.some(([verb]) => verb === 'remove'));
+  assert.equal(fs.readFileSync(path.join(lane.path, 'src', 'work.ts'), 'utf8'), 'export const w = 1;\n');
+});
+
+test('a tree with a live terminal, and a stamped tree, are not on the review list (passing)', (t) => {
+  const { repo, env, orca } = fixture(t);
+  const busy = orca.create({ repo: `path:${posix(repo)}`, name: 'lane/busy', baseBranch: 'main' }).worktree;
+  const stamped = orca.create({ repo: `path:${posix(repo)}`, name: 'draw-critic-x', baseBranch: 'main', comment: runtimeStampOf({ kind: 'critic', slot: 'draw-critic-x', owner: {} }) }).worktree;
+  const live = { ...orca, ps: () => { const page = orca.ps(); return { ...page, worktrees: page.worktrees.map((w) => (w.id === busy.id ? { ...w, liveTerminalCount: 1 } : w)) }; } };
+  const items = gcWorktrees({ env, now: Date.now() + 9 * HOUR, repos: [repo], jobStatusOf: phases({}), orca: live });
+  assert.deepEqual(at(items, busy.path), [], 'an agent works in it');
+  assert.deepEqual(at(items, stamped.path).map((i) => i.reason), ['orca-orphan'], 'a stamped tree follows the stamped rules, not the review list');
+  assert.deepEqual(reviews(env).filter((r) => JSON.parse(r.data_json).path.includes('draw-critic-x')), []);
 });
 
 /* ------------------------------------------------------------ registry row without an Orca tree */

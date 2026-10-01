@@ -1,0 +1,16 @@
+id: worktree-gc-unstamped-review
+effectiveAt: '2026-10-02T08:00:00+07:00'
+summary: >-
+  UNSTAMPED ORPHAN TREES ARE AN OWNER-REVIEW LIST, NEVER REMOVED (lane GUARDS under C0, 3.8). The worktree GC
+  (scripts/machine/worktrees.mjs gcWorktrees) no longer removes a git tree under <repo>/.starciwork/worktrees whose branch
+  names no job, and no longer ignores an unstamped Orca tree: a tree with no runtime stamp (Orca) or no job (git), no registry
+  row, no live terminal and the owner grace spent is reported as a `review` item on every pass and logged ONCE per tree as a
+  machine_logs incident (kind worktree.orphan-review, level warn, deduplicated by path). The GC controller records a review
+  item as `keep`, never as a removal. Stamped orphans keep their adopt-or-preserve-and-remove rules.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/worktree-gc-unstamped-review.yaml
+  - modules/kernel/failure-codes.yaml
+  - tests/lib/orca-orphans.spec.mjs
+  - scripts/machine/worktrees.mjs
+  - scripts/reconciler/controllers/gc.mjs
