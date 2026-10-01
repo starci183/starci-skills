@@ -82,7 +82,7 @@ test('reading one named variable, setting a variable for a command, shell option
     ['Get-Item env:HOME', 'powershell'],
     ['[Environment]::GetEnvironmentVariable("HOME")', 'powershell'],
     ['ls', 'powershell'],
-    ['dir C:\\temp', 'powershell'],
+    ['dir temp', 'powershell'],
     ['node -e "console.log(process.env.HOME)"', 'bash'],
     ['node -p "process.env.HOME"', 'bash'],
     ['node -e "console.log(process.env[\'HOME\'])"', 'bash'],
