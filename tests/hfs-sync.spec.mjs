@@ -381,6 +381,14 @@ describe('the package.json scripts of the app', () => {
     assert.match(scripts['build:fe'], /^npm run codegen --silent && cd fe && next build apps\/app && next build apps\/admin$/);
     assert.doesNotMatch(Object.values(scripts).join('\n'), /--rule|--no-inline-config|--no-eslintrc|--ignore-pattern|vitest|playwright|scripts\/check-/);
   });
+  it('typecheck builds the fe workspace packages before it type-checks the fe apps that import them from dist/', () => {
+    const withPackages = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck.split(' && ');
+    const build = withPackages.indexOf('npm run build --workspaces --if-present');
+    assert.ok(build > 0, `the typecheck of an app with fe packages builds them: ${withPackages.join(' && ')}`);
+    assert.ok(build < withPackages.indexOf('tsc -p fe/apps/app/tsconfig.json --noEmit'), 'the packages are built before the fe app is type-checked');
+    const without = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck;
+    assert.equal(without, 'npm run codegen --silent && tsc -p be/tsconfig.json && tsc -p fe/apps/app/tsconfig.json --noEmit', 'an app without fe packages builds nothing');
+  });
   it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
     assert.equal(one['dev:fe'], 'npm run codegen --silent && cd fe && next dev apps/web');
