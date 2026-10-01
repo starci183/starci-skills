@@ -402,7 +402,7 @@ allocation:
   # hairline bands one card splits into, badgesPerEntityMax the most badges one entity carries. critic is the fresh,
   # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: started
   # through orchestration worker-start --agent <provider> --model --effort (scripts/agent/lib.mjs startAgent) on a
-  # clean temp dir holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
+  # runtime worktree detached at the empty tree (draw-critic.mjs criticWorkspace; Orca refuses a bare temp dir) holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
   # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27
   # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's provider, bound to its
   # terminal - scripts/kernel/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is

@@ -12,6 +12,16 @@ npm test        # node --test tests/*.spec.mjs
 
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
+## Pre-workflow readiness
+
+Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:
+
+```sh
+node scripts/kernel/launch-smoke.mjs --out /absolute/launch-smoke.json
+```
+
+It starts five no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It always stops and releases every agent it started and prints one `starci/launch-smoke@1` JSON result; exit 0 means both paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
+
 ## Make an archive
 
 ```sh

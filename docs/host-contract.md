@@ -155,6 +155,22 @@ least 2 when the owner's chat starts the Kernel (chat → Kernel → Op), and 3 
 `[Supervisor]` does (chat → Supervisor → Kernel → Op); the owner runs it at 4. Below
 that, a worker-start from a worker is refused `nested_worker_depth_exceeded`.
 
+## Pre-workflow launch smoke
+
+`scripts/kernel/launch-smoke.mjs` (`starci/launch-smoke@1`, contract change `launch-smoke`) is the live proof of
+every nesting path, run by hand from a plain Orca shell before a workflow run (docs/releasing.md "Pre-workflow
+readiness"). It starts no-op agents through the runtime's own launchers and checks the depth and creator Dispatch
+`worker-show` reports:
+
+| Path | Chain (depth) | Child launcher |
+|---|---|---|
+| `supervisor-worker` | entry (0) -> `[Supervisor]` (1) -> `[Worker]` (2) | `workers.mjs startWorkerAgent`, from the Supervisor's terminal |
+| `op-critic` | entry (0) -> `[Kernel]` (1) -> `[Op]` (2) -> critic (3) | `startAgent` from the Kernel's terminal; `draw-critic.mjs launchCriticWorker` from the Op's |
+
+Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
+placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker
+only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`.
+
 ## Checklist for a new agent card
 
 1. Add `modules/models/agents/<name>.yaml` with `start` (worker-start,

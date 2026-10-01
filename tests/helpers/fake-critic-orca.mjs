@@ -8,7 +8,10 @@
 //   ended            writes nothing; worker-show reports the worker failed after its attestation
 //   silent           never answers (the critic's timeout)
 //   launch-failed    worker-start refuses before any effect
+// The placement (draw-critic criticWorkspace) is a plain temp directory under `placement.tmpRoot` (default the OS temp
+// dir): a spec creates no git worktree; tests/draw-critic-worker-start.spec.mjs proves the real placement on its own.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null } = {}) {
@@ -20,6 +23,8 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
   const client = {
     calls,
     names: () => calls.map((c) => c[0]),
+    criticWorkspace: rec('critic-workspace', (p) => ({ ok: true, dir: fs.mkdtempSync(path.join(p?.tmpRoot ?? os.tmpdir(), 'starci-draw-critic-')), repoRoot: null })),
+    removeCriticWorkspace: rec('critic-workspace-remove', ({ dir }) => { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); return { ok: true }; }),
     runShow: rec('run-show', () => ({ ok: false })),
     runCreate: rec('run-create', () => ({ ok: true, runId: 'run_critic' })),
     taskCreate: rec('task-create', () => ({ ok: true, taskId: `task_critic_${n + 1}` })),

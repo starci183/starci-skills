@@ -187,6 +187,13 @@ calls:
     flags: [dispatch]
     required: [dispatch]
     receipt: [result.dispatch.id, result.worker.state]
+  worker-read:
+    command: orchestration worker-read
+    kind: read
+    flags: [dispatch, source, cursor, limit]
+    required: [dispatch]
+    receipt: [result]
+    note: Bounded worker output (hook transcript or labelled terminal output). Read it before worker-release; a Dispatch released without a preserved output archive has none.
   worker-stop:
     command: orchestration worker-stop
     kind: mutation

@@ -368,6 +368,17 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
 }
 
 /**
+ * Start one [Worker] agent: a worker of its own Run, which the Supervisor's terminal `entry` creates and coordinates
+ * (scripts/agent/lib.mjs startAgent: run-create --from entry, task-create, worker-start --agent --model --effort,
+ * worker-show attestation). `route` {agent, model, effort} from routeWorker; `worktree` its placement (a staging
+ * checkout); `start` replaces startAgent (specs). The startAgent receipt.
+ */
+export async function startWorkerAgent({ route, worktree, title, prompt, specFile = null, objective, entry = null, onCreated = null, start = null }) {
+  const launch = start ?? (await import('../agent/lib.mjs')).startAgent;
+  return launch({ provider: route.agent, model: route.model, effort: route.effort, worktree, title, prompt, specFile, objective, entry, onCreated });
+}
+
+/**
  * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
  * leases, [Worker] worker. The worker starts through worker-start ON its staging checkout (scripts/agent/lib.mjs
  * startAgent): a staging checkout is a git worktree of the runtime repository, which Orca resolves under the runtime's
@@ -413,9 +424,10 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
     if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
-    const spawned = (deps.start ?? (await import('../agent/lib.mjs')).startAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: staging.path,
-      title, prompt, specFile: path.join(root, 'runtime', 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
-      onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); } });
+    const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
+      specFile: path.join(root, 'runtime', 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
+      onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
+      start: deps.start ?? null });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,
       ...(spawned?.ok ? { dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId } : {}) };
