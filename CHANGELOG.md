@@ -23,6 +23,20 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
   - the machine gives each file to the deepest tsconfig project that holds it, so an app's `@/` alias resolves (the `route-files-thin` "0 feature owners" false positive);
   - a route file binding a declaration to a Next.js segment export (`generateMetadata`, ...) is not an `HFS_ALIAS_REEXPORT`.
   Contract change `hfs-app-monorepo`.
+- The runtime's examples are apps of the hfs 4 shape. `examples/todo-app-backend` and `examples/todo-app-frontend` became
+  `examples/todo-app`, and `examples/ecommerce-app-be` and `examples/ecommerce-app-fe` became `examples/ecommerce-app`.
+  Each app has its back end in `be/` and its front end in `fe/`, and its root holds:
+  - one `package.json` and lockfile for both sides, with every dependency at its canon pin and the choices recorded in `knowledge/hfs/canon-pins.yaml`;
+  - the `hfs.json` of kind `app`;
+  - the managed root files;
+  - the `.starciwork`.
+  The old folders are deleted with no aliases. Implementation records name the side their code lives in (`impl/be`, `impl/fe`, `repository: be|fe`), and a `.starciwork` at an app root resolves those sides to its side folders (`repoRootFor`, `frontendOf`). Both sides of each app type-check and the unit suites stay green. The examples gate `scripts/checks/check-example-architecture.mjs` now runs `hfs lint`, because the machine's source rules sit on the lint surface. Every reference moved with the folders:
+  - specs, including `tests/canon-packed-load.spec.mjs`;
+  - CI workflows;
+  - docs and knowledge;
+  - `modules/schemas/json-exceptions.yaml`;
+  - `packages/fe-kit/scripts/link-peers.mjs`.
+
 - The orphaned code-pattern checkers are settled. `scripts/checks/code-patterns/` lost its runner when `check-scoped-lint` was removed; the folder, its 8 docs, 11 specs and 24 failure codes are deleted and listed in `modules/kernel/retired-paths.yaml`. The 24 codes went three ways:
   - 15 were already enforced by a canon rule or an hfs check (R38, R39, R43, R47, R49, R51, R53, R56, R65, R85, R89, R90, R102, base-props-atom);
   - 2 were contradicted by the convention (import formatting belongs to Prettier; the test-title verb list);
