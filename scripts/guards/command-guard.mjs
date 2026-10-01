@@ -18,6 +18,9 @@
 //    is leased on the ledger (peerLeasedJobs).
 //  - links: `ln`, `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and [IO.Directory]::Create*Link - an
 //    op never creates a link (nivo-fe inc-c8fbf76aa499).
+//  - processes: a kill by image name or pattern (taskkill /IM or /FI, pkill, killall, Stop-Process -Name, wmic process
+//    where name=...), which also ends Orca and every other agent's processes of that name (a lane's taskkill of node.exe
+//    restarted Orca, 2026-10-01); an agent ends only the PIDs it started.
 // Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/lib/git-index-lock.mjs).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
@@ -220,6 +223,25 @@ const linkVerdict = (program, args, word) => {
     remedy: 'work in your dispatched checkout with its own node_modules; a need for another tree or a linked dependency is reported (report blocked environment), never made' };
 };
 
+// A kill that selects processes by image name or pattern ends every process of that name on the machine: Orca, other
+// agents' workers, other lanes' test runs (a lane's `taskkill /F /IM node.exe` restarted Orca, 2026-10-01). An agent ends
+// only the PIDs it started: `taskkill /PID <pid>`, `kill <pid>`, `Stop-Process -Id <pid>`.
+const TASKKILL_SELECTOR = /^(?:\/\/?|-)(?:im|fi)$/i;
+const NAME_PARAMETER = /^-(?:n|na|nam|name|processname)(?::.*)?$/i;
+const POWERSHELL_STOP = new Set(['stop-process', 'spps']);
+const killVerdict = (program, args) => {
+  let how = null;
+  if (program === 'taskkill' && args.some((a) => TASKKILL_SELECTOR.test(a))) how = 'taskkill by image name or filter (/IM, /FI)';
+  else if (program === 'pkill' || program === 'killall') how = `${program}, which selects processes by name or pattern`;
+  // PowerShell's kill alias takes the full -Name/-ProcessName; a POSIX `kill -n <signal>` is not a name.
+  else if ((POWERSHELL_STOP.has(program) && args.some((a) => NAME_PARAMETER.test(a))) || (program === 'kill' && args.some((a) => /^-(?:name|processname)(?::.*)?$/i.test(a)))) how = 'Stop-Process -Name';
+  else if (program === 'wmic' && args.some((a) => /^process$/i.test(a)) && args.some((a) => /\bname\s*=|^name$/i.test(a))) how = 'wmic process selected by name';
+  if (!how) return null;
+  return { code: 'PROCESS_KILL_BY_NAME', command: [program, ...args].join(' ').slice(0, 200),
+    reason: `${how} ends every process of that name on the machine, including Orca and other agents' workers (a lane's taskkill of node.exe restarted Orca, 2026-10-01)`,
+    remedy: 'end only a PID you started yourself (taskkill /PID <pid>, kill <pid>, Stop-Process -Id <pid>); a process you did not start is reported, never killed' };
+};
+
 // git reads an App Router segment ([locale], [...slug]) in a pathspec as a character class. The policy scopes it as the
 // literal path admission granted, so the command is refused only when git's glob reading reaches a path the literal
 // reading does not (a sibling like src/app/l/ another workflow owns; nivo-fe inc-21f76abb6d10): the files each reading
@@ -306,6 +328,8 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
   for (const c of commandsOf(command, { cwd, env, dialect })) {
     const link = linkVerdict(c.program, c.args, c.word);
     if (link) return { tool: c.program, ...link };
+    const kill = killVerdict(c.program, c.args);
+    if (kill) return { tool: c.program, ...kill };
     if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }
     if (c.program === 'npm') { const v = await npmVerdict({ args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
   }

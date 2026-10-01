@@ -3653,6 +3653,17 @@ PRIMARY_ABSENT:
   owner: other-op:interface.draw
   kind: check-finding
 
+PROCESS_KILL_BY_NAME:
+  title: "Kill by process name refused"
+  title_vi: "Không được dừng tiến trình theo tên"
+  meaning_vi: "Lệnh bị chặn vì nó dừng tiến trình theo tên hoặc mẫu (taskkill /IM hay /FI, pkill, killall, Stop-Process -Name), tức là dừng cả Orca và tiến trình của mọi agent khác trên máy."
+  causes_vi:
+    - "Dùng taskkill /IM node.exe, pkill hoặc killall để dọn một lần chạy bị treo"
+    - "Dùng Stop-Process -Name hoặc wmic process where name=... thay vì PID của chính mình"
+  nextStep_vi: "Lệnh không được chạy; chỉ dừng PID do chính mình khởi động (taskkill /PID, kill <pid>, Stop-Process -Id), tiến trình không phải của mình thì báo lại, không bao giờ dừng."
+  owner: op-retry
+  kind: verb-refusal
+
 PROFILE_UNKNOWN:
   title: "Cannot tell next from nest"
   title_vi: "Không xác định được hồ sơ next hay nest"

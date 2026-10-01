@@ -431,7 +431,12 @@ sections:
         worktree beside nivo-fe with node_modules junctions into the live checkout was removed with
         `git worktree remove --force`, which followed the junctions and deleted 674 live files
         (inc-c8fbf76aa499); a need for another revision, a clean build tree or a linked dependency is
-        reported (blocked environment), never made. The runtime enforces this: an op's git and npm are the guard
+        reported (blocked environment), never made. Never kill processes by image name or pattern
+        (`taskkill /IM` or `/FI`, `pkill`, `killall`, `Stop-Process -Name`, `wmic process where name=...`): the
+        machine is shared with Orca and every other agent, and a lane's `taskkill` of node.exe restarted Orca
+        (2026-10-01). End only a PID you started yourself (`taskkill /PID <pid>`, `kill <pid>`,
+        `Stop-Process -Id <pid>`); a process you did not start is reported, never killed. The command guard
+        refuses a kill by name (PROCESS_KILL_BY_NAME). The runtime enforces this: an op's git and npm are the guard
         (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,
         never work around it. A logical piece can require multiple
         commits or repositories; record them all rather than inventing one universal SHA. When
