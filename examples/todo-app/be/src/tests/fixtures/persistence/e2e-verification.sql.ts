@@ -41,9 +41,13 @@ export const AUDIT_LINE_COUNT_UNDER_KEY = sql`SELECT count(*)::int AS count FROM
 /** The log lines stored under one key ($1) in append order. */
 export const AUDIT_LINES_UNDER_KEY = sql`SELECT action, target, key_id, actor FROM audit_log_lines WHERE key_id = $1 ORDER BY id LIMIT 500`
 
-/** The system erasure lines that name one request ($1) in append order. */
+/**
+ * The system erasure lines that name one request ($1), in the order the transitions happened (`at`, the instant each
+ * line records). Append order (`id`) is not that order: the lines arrive through the outbox, which delivers each message
+ * at least once but in no promised order, so two transitions close together can be appended either way round.
+ */
 export const AUDIT_ERASURE_LINES_OF_REQUEST = sql`SELECT action, target, key_id, actor FROM audit_log_lines
-    WHERE action IN ('audit.erasure.requested', 'audit.erasure.completed') AND target = $1 ORDER BY id LIMIT 10`
+    WHERE action IN ('audit.erasure.requested', 'audit.erasure.completed') AND target = $1 ORDER BY at, id LIMIT 10`
 
 /** The hash chain of the whole log in append order. */
 export const AUDIT_CHAIN = sql`SELECT id, prev_hash, hash FROM audit_log_lines ORDER BY id LIMIT 1000`

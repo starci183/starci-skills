@@ -138,7 +138,8 @@ describe("erasure journey (e2e)", () => {
         }
 
         // br.audit.erasure.logged: both transitions appended lines naming the requestId, sealed under the system key, which
-        // survives so the audit trail itself never orphans. The lines arrive through the outbox, so they are awaited.
+        // survives so the audit trail itself never orphans. The lines arrive through the outbox, so they are awaited, and are
+        // read in the order the transitions happened (their `at`), which the outbox does not promise to append them in.
         const systemLines = await world.waitUntil(
             "the two system erasure lines of the request",
             (): Promise<Array<AuditLineRow>> => world.db.primary.query(AUDIT_ERASURE_LINES_OF_REQUEST, [requestId]),
