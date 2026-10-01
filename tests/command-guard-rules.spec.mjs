@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { commandVerdict, simpleCommands } from '../scripts/guards/command-guard.mjs';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // The command guard refuses, through every wrapper it opens (bash -c, cmd /c and //c, powershell -Command, chains):
 // a raw git worktree add/remove (WORKTREE_NOT_OPS), a recursive delete (RECURSIVE_DELETE), a kill by image name
@@ -16,6 +20,8 @@ const refusedAll = async (code, remedy, cases) => {
     const v = await verdict(command, dialect);
     assert.equal(v?.code, code, `${command} (${dialect}) -> ${v?.code ?? 'passed'}`);
     assert.match(v.remedy, remedy, `${command}: the remedy names the sanctioned API`);
+    // Every runtime file the remedy names exists: a remedy pointing at a moved or deleted file sends the agent nowhere.
+    for (const named of v.remedy.match(/scripts\/[\w./-]+\.mjs/g) ?? []) assert.ok(fs.existsSync(path.join(ROOT, named)), `${command}: the remedy names ${named}, which does not exist`);
   }
 };
 const passedAll = async (cases) => {
@@ -26,7 +32,7 @@ const passedAll = async (cases) => {
 };
 
 test('a raw git worktree add or remove is refused with the runtime worktree API as the remedy', async () => {
-  await refusedAll('WORKTREE_NOT_OPS', /scripts\/lib\/worktrees\.mjs.*safeRemoveWorktree/, [
+  await refusedAll('WORKTREE_NOT_OPS', /runtime worktree API \(scripts\/.*safeRemoveWorktree/, [
     ['git worktree add ../wt HEAD', 'bash'],
     ['git worktree add -b lane/x ../wt main', 'bash'],
     ['git -C D:/repo worktree add --detach D:/repo-wt HEAD', 'bash'],

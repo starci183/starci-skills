@@ -8,6 +8,7 @@ import { parseYaml } from '../engine/yaml.mjs';
 import { dispatchDepthOf, launchDepth, depthVerdict, compareMeasuredDepth, isOrcaDepthRefusal, WORKER_DEPTH_EXCEEDED, dispatchOfTerminal } from '../scripts/lib/worker-depth.mjs';
 import { spawnAgent, startAgent, depthPreflight, entryDispatchOf } from '../scripts/agent/lib.mjs';
 import { probeWorkerDepth } from '../scripts/agent/depth-probe.mjs';
+import { guardsRoot } from '../scripts/guards/guards-root.mjs';
 import { depthItems } from '../scripts/reconciler/start.mjs';
 import { DEFAULT_RUBRIC, runCritic } from '../scripts/work/draw-critic.mjs';
 import { fakeCriticOrca } from './helpers/fake-critic-orca.mjs';
@@ -174,6 +175,8 @@ test('start --check: the orca-depth row reports the config, and with STARCI_ORCA
 test('api dispatch refuses an op whose Kernel already sits at orca.maxWorkerDepth, before its Task exists, and spends no try', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-depth-dispatch-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  // api dispatch prepares the op's job scratch under the temp root (op-prompt JOB_SCRATCH_ROOT).
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   const ownerRoot = path.join(root, 'owner');
@@ -195,7 +198,7 @@ test('api dispatch refuses an op whose Kernel already sits at orca.maxWorkerDept
   assert.equal(started.status, 0, started.stderr);
   const kernelDispatch = JSON.parse(started.stdout).dispatch;
   const handle = JSON.parse(started.stdout).terminal;
-  t.after(() => { for (const f of [path.join(ROOT, 'runtime', 'guards', 'terminals', `${handle}.json`), path.join(ROOT, 'runtime', 'guards', 'jobs', `kernel-${workflowId}.json`)]) fs.rmSync(f, { force: true }); });
+  t.after(() => { for (const f of [path.join(guardsRoot(ROOT), 'terminals', `${handle}.json`), path.join(guardsRoot(ROOT), 'jobs', `kernel-${workflowId}.json`)]) fs.rmSync(f, { force: true }); });
   // Orca reports the Kernel at depth 4, the default orca.maxWorkerDepth: its op would be depth 5.
   const s = JSON.parse(fs.readFileSync(state, 'utf8'));
   fs.writeFileSync(state, JSON.stringify({ ...s, dispatchDepths: { [kernelDispatch]: 4 } }));
@@ -262,7 +265,7 @@ test('start-workflow from a worker terminal at the depth limit refuses the Kerne
   const defined = run(['scripts', 'goal', 'define-goal.mjs'], '--repo', repo, '--text', 'kernel from a deep worker', '--json');
   assert.equal(defined.status, 0, defined.stderr);
   const workflowId = JSON.parse(defined.stdout).workflowId;
-  t.after(() => fs.rmSync(path.join(ROOT, 'runtime', 'guards', 'jobs', `kernel-${workflowId}.json`), { force: true }));
+  t.after(() => fs.rmSync(path.join(guardsRoot(ROOT), 'jobs', `kernel-${workflowId}.json`), { force: true }));
   const started = run(['scripts', 'kernel', 'start-workflow.mjs'], '--repo', repo, '--goal', workflowId, '--json');
   assert.equal(started.status, 1, started.stdout);
   const failure = JSON.parse(started.stderr.trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop());

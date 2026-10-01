@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { hookDecision, boundGuard } from '../scripts/guards/command-guard.mjs';
-import { guardLaunch, bindGuardTerminal, ensureHistoryHook, writeJobGuard, guardReceiptErrors, HOOK_VERSION } from '../scripts/guards/install.mjs';
+import { guardsRoot, guardLaunch, bindGuardTerminal, ensureHistoryHook, writeJobGuard, guardReceiptErrors, HOOK_VERSION } from '../scripts/guards/install.mjs';
 import { inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
@@ -132,8 +132,8 @@ test('start-workflow binds the Kernel guard to the terminal worker-start names a
   const started = run(['kernel', 'start-workflow.mjs'], '--repo', repo, '--goal', workflowId, '--json');
   assert.equal(started.status, 0, started.stderr);
   const out = JSON.parse(started.stdout);
-  const terminalFile = path.join(ROOT, 'runtime', 'guards', 'terminals', `${out.terminal.replace(/[^A-Za-z0-9._-]/g, '_')}.json`);
-  t.after(() => { fs.rmSync(terminalFile, { force: true }); fs.rmSync(path.join(ROOT, 'runtime', 'guards', 'jobs', `kernel-${workflowId}.json`), { force: true }); });
+  const terminalFile = path.join(guardsRoot(ROOT), 'terminals', `${out.terminal.replace(/[^A-Za-z0-9._-]/g, '_')}.json`);
+  t.after(() => { fs.rmSync(terminalFile, { force: true }); fs.rmSync(path.join(guardsRoot(ROOT), 'jobs', `kernel-${workflowId}.json`), { force: true }); });
   const guard = boundGuard(out.terminal, { root: ROOT });
   assert.ok(guard, 'the guard is bound to the Kernel terminal');
   assert.equal(guard.role, 'kernel');
