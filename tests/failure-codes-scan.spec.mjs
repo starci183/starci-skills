@@ -8,8 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { emittedCodes } from '../scripts/checks/failure-codes.mjs';
 
-function fixture(source) {
+// Each fixture is removed when its test ends: under the suite's isolated-temp preload a leftover temp dir fails the spec file.
+function fixture(t, source) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'failure-codes-scan-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
   write('scripts/checks/failure-codes.not-codes', '# none\n');
   write('scripts/land.mjs', source);
@@ -17,10 +19,10 @@ function fixture(source) {
   write('engine/migrations/runtime/0001-init.sql', '');
   return base;
 }
-const codes = (lines) => emittedCodes(fixture(lines.join('\n'))).map((e) => e.code);
+const codes = (t, lines) => emittedCodes(fixture(t, lines.join('\n'))).map((e) => e.code);
 
-test('a computed member access with a constant key is not an emitted code', () => {
-  const found = codes([
+test('a computed member access with a constant key is not an emitted code', (t) => {
+  const found = codes(t, [
     "export const MIRROR_CHECK = 'packages/hfs/scripts/sync-runtime.mjs';",
     'export function verdict(baseline, r) {',
     '  baseline[MIRROR_CHECK] = r;',
@@ -30,16 +32,16 @@ test('a computed member access with a constant key is not an emitted code', () =
   assert.ok(!found.includes('MIRROR_CHECK'), found.join(', '));
 });
 
-test('an array literal or a computed key holding one constant is not an emitted code', () => {
-  const found = codes([
+test('an array literal or a computed key holding one constant is not an emitted code', (t) => {
+  const found = codes(t, [
     "export const SKILL_ROOT = 'D:/runtime';",
     'export const plan = { repos: [SKILL_ROOT], byRoot: { [SKILL_ROOT]: true } };',
   ]);
   assert.ok(!found.includes('SKILL_ROOT'), found.join(', '));
 });
 
-test('a bracketed code in a message, a multi-line template or a comment is still an emitted code', () => {
-  const found = codes([
+test('a bracketed code in a message, a multi-line template or a comment is still an emitted code', (t) => {
+  const found = codes(t, [
     'export const fail = (detail) => { throw new Error(`[TARGET_MISSING] ${detail}`); };',
     'export const explain = (n) => `refused because',
     '  the record is ${n} days old [PLAN_STALE]`;',
