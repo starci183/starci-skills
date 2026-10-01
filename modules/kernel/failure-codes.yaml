@@ -9478,6 +9478,15 @@ reason-missing:
   nextStep_vi: "Không đổi gì. Gửi lại kèm --reason ghi rõ lý do."
   owner: supervisor
   kind: input-invalid
+rebase-conflict:
+  title: "A mid-workflow rebase conflicts with main"
+  title_vi: "Rebase giữa workflow xung đột với main"
+  meaning_vi: "Sau một checkpoint xanh, main đã đi đủ xa nên runtime rebase nhánh workflow lên main nhưng gặp xung đột; rebase đã huỷ, nhánh giữ nguyên và head được giữ ở preserved/<workflow>/rebase-<main>."
+  causes_vi:
+    - "main đã sửa cùng tệp mà workflow cũng sửa"
+  nextStep_vi: "Kernel (hoặc Supervisor nếu được đẩy lên) giao một op giải xung đột trên worktree của workflow trước khi finish; finish vẫn từ chối khi còn xung đột."
+  owner: supervisor
+  kind: blocker
 record-change-not-owner:
   title: "Workflow does not own the record"
   title_vi: "Luồng không sở hữu hồ sơ này"

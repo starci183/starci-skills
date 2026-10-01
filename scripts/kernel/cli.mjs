@@ -62,7 +62,7 @@ import {
 } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachine } from '../../engine/db/machine.mjs';
 import { recordWhy } from './why-record.mjs';
-import { gateBaseOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { opGateBasesOf } from './workflow-checkpoint.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
@@ -3573,10 +3573,9 @@ async function settleOpGate(db, jobId, repo) {
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
   const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
-  // A workflow-worktree op is gated against its workflow's previous checkpoint (op-gate-base-mismatch otherwise).
-  const wfCtx = { db, env: process.env };
-  const expectedBase = workflowWorktreeOf(wfCtx, job.workflow_id) ? gateBaseOf(wfCtx, job.workflow_id) : null;
-  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo], expectedBase });
+  // A workflow-worktree op is gated against a checkpoint its side has not moved since (op-gate-base-mismatch otherwise).
+  const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: job.workflow_id, opId: job.job_id });
+  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo], gateBases });
   return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
 }
 // The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):

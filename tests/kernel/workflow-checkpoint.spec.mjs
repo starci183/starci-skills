@@ -12,7 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveGateBase, GATE_SCHEMA } from '../../scripts/gates/gate.mjs';
 import { judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
-import { gateBaseAt, gateBaseOf } from '../../scripts/machine/workflow-tree.mjs';
+import { gateBaseAt, gateBaseOf, gateBasesOf } from '../../scripts/machine/workflow-tree.mjs';
 import { checkpointOp, preserveAndReset, finishWorkflow, rebaseWorkflow, reviewVerifiedOf, FINISH_STEPS } from '../../scripts/kernel/workflow-checkpoint.mjs';
 
 const WF = 'wf-nivo-checkpoint-k1';
@@ -246,14 +246,35 @@ test('the default review.verify: the last settled op is a passing review.verify 
   assert.equal(reviewVerifiedOf({}, { workflowId: WF, head }).ok, false);
 });
 
-test('settle refuses a gate JSON whose base is not the workflow checkpoint (op-gate-base-mismatch)', () => {
-  const cp = 'c'.repeat(40);
+test('settle refuses a gate JSON whose base is not an accepted workflow checkpoint (op-gate-base-mismatch)', () => {
+  const cp = 'c'.repeat(40), older = 'e'.repeat(40);
   const gate = (base) => ({ schema: GATE_SCHEMA, base, exit: 0, counts: { new: 0 }, findings: [], errors: [] });
-  const off = judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [], expectedBase: cp });
+  const off = judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [], gateBases: [cp, older] });
   assert.deepEqual([off.status, off.code], ['red', 'op-gate-base-mismatch']);
-  assert.equal(judgeLoop({ gate: gate(undefined), digest: null, kinds: [], expectedBase: cp }).code, 'op-gate-base-mismatch');
-  assert.notEqual(judgeLoop({ gate: gate(cp), digest: null, kinds: [], expectedBase: cp }).code, 'op-gate-base-mismatch', 'the checkpoint base passes on to the rest of the loop');
+  assert.match(off.detail, /cccccccccccc/, 'the refusal names the current checkpoint');
+  assert.equal(judgeLoop({ gate: gate(undefined), digest: null, kinds: [], gateBases: [cp] }).code, 'op-gate-base-mismatch');
+  assert.notEqual(judgeLoop({ gate: gate(cp), digest: null, kinds: [], gateBases: [cp] }).code, 'op-gate-base-mismatch', 'the checkpoint base passes on to the rest of the loop');
+  assert.notEqual(judgeLoop({ gate: gate(older), digest: null, kinds: [], gateBases: [cp, older] }).code, 'op-gate-base-mismatch', 'an older checkpoint its side has not moved since passes');
   assert.notEqual(judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [] }).code, 'op-gate-base-mismatch', 'outside a workflow worktree any base is the op\'s own');
+});
+
+test('per-side gate bases: an fe op gated before a be checkpoint keeps its base; its own side moving drops it', (t) => {
+  const fx = fixture(t, { jobs: [job('op-be-1', 'code.refactor', ['be']), job('op-fe-1', 'code.refactor', ['fe']), job('op-be-2', 'code.refactor', ['be'])] });
+  const start = git(fx.dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [start], 'no checkpoint yet: the merge-base only');
+  write(fx.dir, 'be/a.ts', 'export const a = 2;\n');
+  const c1 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-be-1' }).sha;
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [c1, start], 'a be checkpoint never forces the fe op to re-gate');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['be'] }), [c1], 'the be side moved at c1');
+  write(fx.dir, 'fe/b.ts', 'export const b = 2;\n');
+  const c2 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-fe-1' }).sha;
+  write(fx.dir, 'be/a.ts', 'export const a = 3;\n');
+  const c3 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-be-2' }).sha;
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [c3, c2], 'the fe side moved at c2: c1 and the merge-base are gone');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['be'] }), [c3]);
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['.'] }), [c3], 'an op owning the whole tree gets the current checkpoint only');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: [] }), [c3], 'an op with no known paths gets the current checkpoint only');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['docs'] }), [c3, c2, c1, start], 'an untouched side walks back to the merge-base');
 });
 
 test('finish refused at each step with its typed code; main moves at none of the refusals before fast-forward', (t) => {

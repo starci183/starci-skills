@@ -8,6 +8,7 @@ worktrees:
   ownerGoneMs: 1800000          # the GC removes a tree whose owner has been gone this long (after preserving it)
   gcEveryMs: 300000             # the reconciler GC controller's worktree pass (key gc:worktrees, always active)
   commandMs: 300000
+  rebaseMilestoneBehind: 20     # a workflow branch is rebased mid-workflow once main is this many commits past its merge-base (scripts/lib/rebase-milestone.mjs)
 
 invariant:
   importsCacheMs: 300000        # api status importsBroken: one scan per tree state within this window
