@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP W2, W7, M6: the effective launch, the seat liveness and the Dispatch heartbeat are Orca's; the route-versus-effective policy, the seat state machine and lease renewal stay the runtime's.
 // worker-show.mjs — the calls.yaml `worker-show` call as a callable function.
 //   node scripts/api/orca/worker-show.mjs --dispatch <dispatch_id>
 // Returns {ok, state, dispatch, effective, hostUnavailable} — state is result.worker.state; hostUnavailable is an Orca that

@@ -159,3 +159,9 @@ test('closeOperationTerminal reads no output: the transcript is the caller\'s wo
   assert.equal(closed.ok, true);
   assert.equal('transcript' in closed, false);
 });
+
+test('a worker without a PTY reads unverified, never gone: terminal_unsupported_for_agent_session is no gone code', async () => {
+  const { TERMINAL_GONE_CODES } = await import('../scripts/api/orca/terminal-show.mjs');
+  assert.equal(TERMINAL_GONE_CODES.has('terminal_unsupported_for_agent_session'), false);
+  assert.equal(TERMINAL_GONE_CODES.has('terminal_handle_stale'), true);
+});

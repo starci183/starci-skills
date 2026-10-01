@@ -42,7 +42,7 @@ export default {
   const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-not-found' });
   if (job.kind !== 'op') throw Object.assign(new Error(`job ${jobId} is not an operation`), { code: 'job-not-operation' });
-  let lines = OBSERVE_SCREEN_LINES;
+  let lines = OBSERVE_OUTPUT_LINES;
   if (args.lines != null) {
     const n = Number(args.lines);
     need(Number.isInteger(n) && n > 0, `observe --lines must be a positive integer, got '${args.lines}'`);

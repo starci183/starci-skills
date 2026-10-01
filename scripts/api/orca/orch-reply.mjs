@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP M2: the reply is Orca's; the ledger disposition of the worker question stays the runtime's.
 // orch-reply.mjs — the calls.yaml `reply` call as a callable function.
 //   node scripts/api/orca/orch-reply.mjs --id <msg_id> --body <text> [--run <run_id>]
 // Answers one worker `question` message; the worker's blocking

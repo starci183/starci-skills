@@ -193,7 +193,7 @@ calls:
     flags: [dispatch, source, cursor, limit]
     required: [dispatch]
     receipt: [result]
-    note: Bounded worker output (hook transcript or labelled terminal output). Read it before worker-release; a Dispatch released without a preserved output archive has none.
+    note: Bounded worker output by Dispatch, the one read of a worker's output (deep map T1; terminal verbs do not accept every worker handle). --source auto serves the exact hook transcript when there is one, else labelled terminal output with a fallbackReason. Follow the top-level cursor unchanged; error source_changed means start a fresh read without it. contentComplete false or a clipping list means older output was left out. A released worker reads from its archive.
   worker-list:
     command: orchestration worker-list
     kind: read
