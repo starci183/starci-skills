@@ -103,9 +103,6 @@ exceptions:
     reason: npm package manifest for the shape-slot example; the npm toolchain requires JSON.
   - path: examples/shape-slot/tsconfig.json
     reason: TypeScript config for the shape-slot example; tsc requires JSON.
-  - path: examples/todo-app/.starciwork/features/task/ui/list/assets/grammar-reference-review.json
-    reason: >
-      Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
   - path: examples/todo-app/.starcistacks/dev/environment.json
     reason: >
       Rendered dev environment for the todo-app application stack (be side);
@@ -120,6 +117,9 @@ exceptions:
       Rendered vps environment for the todo-app application stack (be side);
       starci/rendered-environment output of application-stacks.yaml, JSON by
       the rendering contract.
+  - path: examples/todo-app/.starciwork/features/task/ui/list/assets/grammar-reference-review.json
+    reason: >
+      Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
   - path: examples/todo-app/be/nest-cli.json
     reason: Nest CLI configuration for the todo-app example (be side); the nest toolchain reads JSON.
   - path: examples/todo-app/be/src/tests/tsconfig.json
