@@ -7,7 +7,7 @@ purpose: |
   (scripts/supervisor/home.mjs supervisorMode):
     chat (default; owner, 2026-09-25: "move the supervisor into the chat so it is persistent - return the supervisor into
       chat") - the owner's desktop Claude chat session is the Supervisor again, as before 2026-09-24
-      (chatSeat). It owns channel 'main', handles its Decision Items and fixes through Opus lanes that land through
+      (chatSeat). It owns channel 'main', handles its Decision Items and fixes through its own staged lanes that land through
       the land gate. Nothing starts a [Supervisor] kernel in this mode.
     kernel (optional) - one long-lived [Supervisor] kernel (owner, 2026-09-24: "just 1 [Supervisor] but with
       many [Worker]s ... spawned when needed"): a durable Orca terminal "[Supervisor] main" started by
@@ -130,7 +130,7 @@ mission:
   classes:
     progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its api status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
     kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lessons.mjs land; IMPORTANT -> lessons.mjs propose to the owner; record the result."
-    runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
+    runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - your own staged lane (workers.mjs stage --self --name <slug> --files <csv> makes the checkout through the runtime worktree API; commit there and land with land.mjs --commit <sha> --lane <slug>, which removes the checkout) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
     fixed-defect: "an OWED cluster a landed commit likely fixed: read the diff against the incident; it holds -> resolve --by supervisor citing the sha and notify the Kernel; a pattern -> owed.mjs ack --item <key> --commits <sha>; it does not hold -> runtime-defect."
     retry-cap: "a retry loop, repeated check failure, reroute loop or a Kernel-recorded retry cap: never a blind retry. Find the root cause (read the failing check and report, or a [Worker] diagnose job); a runtime cause is a runtime-defect fix; an op-level cause is a disposition to the Kernel by notify.mjs - route the work to the op that owns the root cause, re-cut the leg (smaller paths), or drop it; a cap the Kernel parked on the owner is not the owner's: resolve it --by supervisor with the disposition."
     stale-gate: "STALE-GATE / STALE-WAIT: the reason is gone. The Workflow controller already opened it as a Kernel Decision Item; an escalated DI means the Kernel did not fix it: still open past the SLA -> resolve it yourself, api incident --resolve <inc> --by supervisor --detail '<evidence>', and notify the Kernel."
@@ -233,7 +233,7 @@ chatSeat:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
     - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (land-gate) is answered locally; Fleet owed work arrives as Decision Items"
     - reads its Decision Items (node scripts/reconciler/decisions.mjs supervisor --list) and the poll digest (poll.mjs --once, owed.mjs) on each wake while the chat lives - the deterministic duties are the reconciler controllers' (scheduledTick) - and closes every OWED cluster it finds
-    - "fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), commits there, lands with land.mjs --commit <sha>[,<sha>] --lane <name> --specs <csv>, then removes the worktree and branch"
+    - "fixes through its own staged lanes: workers.mjs stage --self --name <slug> --files <csv> makes an ephemeral checkout on sup/<job> under <lanesRoot>/staging through the runtime worktree API (<lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), it commits there and lands with land.mjs --commit <sha>[,<sha>] --lane <slug> --specs <csv>; the land removes the checkout and its branch (never a raw git worktree command or a recursive delete)"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
     - releases @starci/grammar to npm when its source moves ahead of the registry (grammarRelease), without asking the owner first
   never:
@@ -343,7 +343,7 @@ landGate:
        runs the whole suite: `--specs all` is refused unless specs.harness is true or the push-git flow passes
        --full-by-push-git; `--specs none` needs an explicit `--reason` and records it (specReason). The full suite
        runs only in /push-git (scripts/supervisor/push-git.mjs) before a main is pushed.
-    3. Fast-forward live main by compare-and-swap (git update-ref main <new> <base>) and update the working
+    3. land.mjs fast-forwards live main by compare-and-swap (git update-ref main <new> <base>) and updates the working
        tree and index of exactly the changed paths, which must be clean; main moved -> the gate reruns on the new
        main (3 times at most); a failed tree update rolls the ref and the paths back.
     4. Push main (secret scan of origin/main..main first, hooks on) unless config supervisor.landGate.push is false.
@@ -364,7 +364,8 @@ grammarRelease:
     (kernelSeat grant, channel authority). Consumers pin registry semver - never a `file:` link - so a
     release is how grammar source reaches products.
   steps: |
-    1. Bump the version in an Opus lane (packages/grammar/package.json and package-lock.json) by semver:
+    1. Bump the version in your own staged lane (workers.mjs stage --self): packages/grammar/package.json and
+       package-lock.json, by semver:
        additive -> minor or patch, fix -> patch, breaking -> major.
     2. Build (`npm run build` in packages/grammar, deps from `npm ci` in a real directory, never a
        node_modules junction) and verify the stamp: `node scripts/checks/grammar-dist.mjs` is fresh.

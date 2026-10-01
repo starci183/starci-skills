@@ -46,14 +46,17 @@ attempt spent, nothing waits on it), and `api run-deferred-tests --kind integrat
 
 `runAtBase` builds the "before" out of git, not out of a stash:
 
-1. `git worktree add --detach <tmp> <baseHead>` into a fresh `mkdtemp` directory, so the base is a real
+1. The runtime worktree API (`createWorktree` in `scripts/lib/worktrees.mjs`, kind `land-scratch`) adds a detached
+   worktree at `<baseHead>` in a fresh `mkdtemp` directory, so the base is a real
    checkout of the commit the operation started from, beside the live worktree rather than inside it.
 2. Only the changed **spec** files are copied into it - the new tests against the pre-change code. Nothing else from the
    operation's work crosses over; a spec that no longer exists is recorded in `missing`.
 3. The proof commands run there (cwd = the temporary worktree), then the same commands run in the operation's
    worktree at `opHead`. Each result carries `exitCode`, a `tail` of the output and `timedOut`; `timeoutMs`
    defaults to 20 minutes per command.
-4. `git worktree remove --force` plus a prune in a `finally`, whatever happened above.
+4. In a `finally`, whatever happened above, `safeRemoveWorktree` (`scripts/lib/safe-remove.mjs`) removes every link
+   inside the temporary worktree as a link, then the tree, and prunes its registration; never a forced `git worktree remove`,
+   which would follow a junction into the live tree.
 
 Paths are normalized with forward slashes and rejoined natively, so the same code drives Windows and POSIX.
 

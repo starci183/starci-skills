@@ -129,13 +129,17 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 
 1. Reproduce from evidence (section 3) and name the root cause; contain with the smallest lever (a controller `off` in
    `config.yaml`) only when the engine is being harmed, and record it.
-2. One lane per disjoint file set. Worktree under `D:/starci-lanes/<lane>`:
-   `git -C D:/Repositories/starci-academy-backend/.claude worktree add D:/starci-lanes/<lane> -b lane/<lane> origin/main`;
-   junction `node_modules` (and package `node_modules`) with `cmd /c mklink /J`, copy `packages/grammar/dist` from the
-   live checkout.
-3. Spawn a Claude Sonnet agent per lane with a self-contained prompt: the evidence, the scope (files it may touch), the
-   hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec counts, `npm run check` exit 0, a
-   report). Lanes never edit the same file.
+2. One lane per disjoint file set, each a staged checkout made by the runtime worktree API: from the live `.claude`,
+   `node scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
+   `sup/<job>` under `<lanesRoot>/staging` (default `D:/starci-lanes/staging`) with its `node_modules` link and
+   `config.yaml` already in place, and prints its path; copy `packages/grammar/dist` from the live checkout. A lane never
+   makes its own worktree or link and never deletes a tree recursively; a missing `packages/node_modules` is reported as
+   a blocked environment.
+3. Start one Claude Sonnet worker per lane through Orca:
+   `orca orchestration worker-start --agent claude --model <Sonnet model id> --worktree path:<staged path> --spec "<brief>" --task-title "sonnet · .claude · <lane>"`,
+   supervised with worker-show / worker-read / worker-stop / worker-release. The brief is self-contained: the evidence,
+   the scope (files it may touch), the hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec
+   counts, `npm run check` exit 0, a report). Lanes never edit the same file.
 4. Land as soon as a lane's touching specs are green; never hold a ready lane waiting for others (owner 2026-09-29:
    held lanes keep the kernels on the broken core and collide with each other). Commits that are ready at the same
    moment go in one land (each land re-execs the engine); a busy gate is the only reason to wait, and the land runs
@@ -154,8 +158,9 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   <specs>`), never the full suite (the full suite runs only in `/push-git`). e2e is manual only.
 - Never `git stash` (it is shared across worktrees). Never delete a `node_modules` junction recursively; remove it with
   `cmd /c rmdir <junction>`.
-- Never `git worktree remove --force` a worktree with a node_modules junction inside; `cmd /c rmdir` the junction first (git
-  deletes through junctions; the live node_modules was emptied twice on 2026-09-29).
+- Never run `git worktree add` or `git worktree remove` (with or without `--force`), and never delete a tree recursively:
+  git deletes through junctions (the live node_modules was emptied twice on 2026-09-29). A staged lane's checkout is
+  removed by its land, or by `workers.mjs cancel` / `cleanup`, which unlink every junction first.
 - Live databases are read-only except through their runtime writers (`engine/ledger-db.mjs`, `engine/machine-db.mjs`);
   never edit `machine.sqlite` or a `runtime.sqlite` by hand.
 - Every probe or debug script that creates a throwaway repo or ledger (a `repro`, a fake terminal, a one-off `api`/`kernel`

@@ -4353,6 +4353,18 @@ RT_DEAD_SCRIPT:
   owner: supervisor
   kind: check-finding
 
+RT_GUIDANCE_REFUSED_COMMAND:
+  title: "Agent guidance tells an agent to run a refused command"
+  title_vi: "Hướng dẫn cho agent bảo chạy một lệnh mà guard chặn"
+  meaning_vi: "Một trường hướng dẫn trong modules/**/*.yaml, một prompt modules/**/*.md hoặc một skills/**/SKILL.md bảo agent chạy một lệnh mà command guard (scripts/guards/command-guard.mjs) từ chối: git worktree add hoặc remove, xóa đệ quy, dừng tiến trình theo tên, orca terminal create, CLI agent chạy headless, tạo liên kết hay một lệnh git bị chính sách chặn. Agent làm theo hướng dẫn sẽ bị guard chặn giữa chừng. Lệnh nằm trong một câu cấm (never, do not, không bao giờ) hoặc câu mô tả việc runtime tự làm hay sự cố đã xảy ra thì không tính."
+  causes_vi:
+    - "Hướng dẫn cũ còn bảo mở lane bằng git worktree add thay vì workers.mjs stage --self"
+    - "Một bước hướng dẫn dọn dẹp bằng rm -rf hoặc Remove-Item -Recurse thay vì safeRemoveTree"
+    - "Một bước giao việc cho agent khác bằng codex exec, claude -p hoặc orca terminal create thay vì worker-start"
+  nextStep_vi: "Người giám sát sửa câu hướng dẫn sang đường được phép (API worktree của runtime, workers.mjs stage --self, safeRemoveTree hoặc safeRemoveWorktree, worker-start và worker-release) qua một lane đã land; nếu câu chỉ mô tả việc runtime tự làm thì viết lại để chủ ngữ là runtime."
+  owner: supervisor
+  kind: check-finding
+
 RT_HELPER_REDEFINED:
   title: "Shared helper redefined"
   title_vi: "Hàm dùng chung bị viết lại"

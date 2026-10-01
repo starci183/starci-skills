@@ -52,8 +52,9 @@ nothing is ahead.
    or clean to make it pass.
 
 3. If a suite is red, start one fixer agent per failing group (one spec file or one source file, exactly the groups the
-   run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own lane worktree, writes or
-   updates the specs of the code it repairs, runs only those specs and lands with
+   run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own staged lane (made first with
+   `node .claude/scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>`, which prints the path the worker
+   starts in: `--worktree path:<staged path>`), writes or updates the specs of the code it repairs, runs only those specs and lands with
    `node .claude/scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
    a workflow op: its green settle lands it into the app's main through the op worktree landing (rebase, `gate.mjs`,
    fast-forward; `docs/workflow-kernel.md`). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`
