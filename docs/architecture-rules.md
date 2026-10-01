@@ -54,9 +54,9 @@ These obligations scale with the actual scope. A pure formatter does not need a 
 
 The owning design records the trigger and invariant, then chooses the smallest mechanism that satisfies them. Do not generate all mechanisms in every project. Do not select a weaker mechanism merely because its narrow unit test is easier to pass.
 
-## Fixed stack and repository profiles
+## Fixed stack and the app shape
 
-Every project in this standard uses Next.js and NestJS and follows the one HFS tree (`knowledge/patterns/repo/folder.yaml`): an `apps/<app>/` monorepo on both profiles, with backend shared source at root `src/` and frontend source inside `apps/<app>/src`. Backend composition maps to the real Nest `main.ts`/`app.module.ts` boundaries inside `apps/<app>/src`; frontend composition maps to Next route/layout/provider boundaries inside `apps/<app>/src/app`. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
+Every project in this standard uses Next.js and NestJS and follows the one HFS tree (`knowledge/patterns/repo/folder.yaml`): one app repository with one root `package.json` and `hfs.json`, its back end in `be/` and its front end in `fe/`, each an `apps/<app>/` monorepo, with back-end shared source in `be/src/` and front-end source inside `fe/apps/<app>/src`. Backend composition maps to the real Nest `main.ts`/`app.module.ts` boundaries inside `be/apps/<app>/src`; frontend composition maps to Next route/layout/provider boundaries inside `fe/apps/<app>/src/app`. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
 
 Similarly:
 
@@ -64,7 +64,7 @@ Similarly:
 - A configuration/lifetime contract is common: options are parsed once in `main.ts` and each capability's representative module is registered once per app (R43, R45), not another registration architecture.
 - Transaction/connection identity is common: one connection per database, its named `Inject<Conn>EntityManager()` injector and the shared EntityManager called directly (R83, R84). Any purposeful boundary abstraction must preserve that identity and must not bypass the pattern.
 - Frontend composition follows the owner's patterns and verified Grammar public APIs. Never invent package exports or component props.
-- A `packages/<pkg>` package and a separate source repository preserve the same owner graph. Paths and build tools follow the fixed profile; npm (`package-lock.json`, npm workspaces) is the package manager, not a discovery outcome.
+- A `be/packages/<pkg>` or `fe/packages/<pkg>` package preserves the same owner graph as the source it was split from. Paths and build tools follow the fixed profile; npm (one root `package-lock.json`, npm workspaces) is the package manager, not a discovery outcome.
 
 Existing historical Academy topics remain useful only within their stated profile. Current common rules and adopted boundary rules take precedence over historical wrapper, global-registration, deep-import or test-shape examples. A conflicting installed lint rule must be updated coherently within authorized scope; turning it off to claim conformance is not an update.
 

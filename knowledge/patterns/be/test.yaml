@@ -493,8 +493,8 @@ rules:
       team does not operate at the network edge (`world.fake.<provider>`), fails a real service on purpose through
       `world.infra.<service>.latency(ms)`, `.cut()` and `.restore()` (toxiproxy), overrides no provider or DI token and never a
       guard, authenticates through an identity fixture that issues real tokens, asserts persisted state and waits with `waitFor`
-      deadlines. That e2e boot is also the proof that an app composes: it fails when a module or provider is missing, so an app has
-      no composition spec. Database doubles establish local behavior only; transaction, lock and crash claims need the real store
+      deadlines. That e2e boot is also the one proof that an app composes: it fails when a module or provider is missing, and an app
+      has no spec of its own. Database doubles establish local behavior only; transaction, lock and crash claims need the real store
       (an integration spec). Configuration is substituted at the owned config boundary by passing options, never by patching
       `process.env`.
     rationale: |-
