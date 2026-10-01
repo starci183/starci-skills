@@ -16,7 +16,8 @@
 //   doc-gate        op-doc-gate-missing, op-doc-gate-tool-failed, op-doc-gate-red (gate.mjs --profile docs)
 //   test-world      op-test-world-proof-missing, op-test-world-hand-rolled, op-test-world-run-red (test-world-run.mjs)
 //   unit-kit        op-unit-proof-missing, op-unit-run-red, op-unit-coverage-below, op-unit-kit-violation (unit-run.mjs)
-//   security-lint,
+//   security-lint   op-lint-proof-missing, op-lint-tool-failed, op-security-findings-missing, op-security-finding-unreported
+//                   (hfs lint --format json, and every security canon finding carried by rule in security-findings.json)
 //   fe-lint         op-lint-proof-missing, op-lint-tool-failed, op-lint-findings (hfs lint --format json)
 //   review-gate     op-gate-proof-missing, op-gate-tool-failed, op-gate-new-findings (gate.mjs over the reviewed range)
 //   review-defects  op-review-defects-missing, op-review-defect-unclassified, op-review-missing-check-unrecorded
@@ -38,6 +39,7 @@ export const OP_GATE_CHECK = 'op-gate';
 export const OP_PROOF_CHANGE = 'op-mechanism-proofs';
 export const OP_PROOF_CHECK = 'op-proof';
 export const REVIEW_DEFECTS_SCHEMA = 'starci/review-defects@1';
+export const SECURITY_FINDINGS_SCHEMA = 'starci/security-findings@1';
 export const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
 const DOC_MAX_BYTES = 16 * 1024 * 1024;
 const FINDINGS_LISTED = 40;
@@ -203,6 +205,26 @@ export const securityRelevant = (doc = loadOpGate()) => {
 };
 export const feRelevant = (f) => String(f.path ?? '').replace(/\\/g, '/').startsWith('fe/');
 
+const posixOf = (p) => String(p ?? '').replace(/\\/g, '/');
+/**
+ * The security verdict: the lint ran, and every security canon finding it reports is carried in the op's own findings
+ * (starci/security-findings@1 {findings: [{rule, code, path, line, severity, reachability}]}) by path and by code or rule. A
+ * security verdict may carry findings - they go to a separate repair - but it may never drop one the canon reported.
+ */
+export function judgeSecurityLint(report, findingsDoc, relevant) {
+  const ran = judgeLint(report, () => false, 'security');
+  if (ran.status !== 'pass') return ran;
+  if (!findingsDoc || findingsDoc.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings))
+    return refused({ status: 'missing', code: 'op-security-findings-missing' }, `no typed security findings (schema ${SECURITY_FINDINGS_SCHEMA}, findings[] by rule, empty when there are none) are attached beside lint.json`);
+  const carried = findingsDoc.findings.map((f) => ({ path: posixOf(f?.path), code: f?.code ?? null, rule: ruleName(f?.rule) }));
+  const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
+    const p = posixOf(f.path);
+    return !carried.some((c) => c.path === p && ((f.code && c.code === f.code) || (c.rule && c.rule === ruleName(f.rule))));
+  });
+  if (dropped.length) return refused({ status: 'red', code: 'op-security-finding-unreported' }, `${dropped.length} security canon finding(s) of the lint are missing from the report's findings; first: ${listed(dropped)[0]}`, listed(dropped));
+  return pass();
+}
+
 export function judgeReviewGate(gate) {
   if (!gate || gate.schema !== GATE_SCHEMA || isDocGate(gate)) return refused({ status: 'missing', code: 'op-gate-proof-missing' }, `no gate JSON (schema ${GATE_SCHEMA}) over the reviewed range is attached: run node scripts/checks/gate.mjs --root <app> --base <first reviewed commit>^ --out gate.json`);
   if (gate.exit === GATE_EXIT.toolFailed || (gate.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-gate-tool-failed' }, `the gate could not run a tool: ${oneLine((gate.errors ?? []).join('; ') || `exit ${gate.exit}`)}`, (gate.errors ?? []).map(String));
@@ -240,7 +262,7 @@ export function judgeProof(proof, files, doc = loadOpGate()) {
     case 'doc-gate': return judgeDocGate(read(GATE_SCHEMA, isDocGate));
     case 'test-world': return judgeTestWorld(read(TEST_WORLD_RUN_SCHEMA));
     case 'unit-kit': return judgeUnitRun(read(UNIT_RUN_SCHEMA));
-    case 'security-lint': return judgeLint(read(LINT_SCHEMA), securityRelevant(doc), 'security');
+    case 'security-lint': return judgeSecurityLint(read(LINT_SCHEMA), read(SECURITY_FINDINGS_SCHEMA), securityRelevant(doc));
     case 'fe-lint': return judgeLint(read(LINT_SCHEMA), feRelevant, 'fe/');
     case 'review-gate': return judgeReviewGate(read(GATE_SCHEMA, (g) => !isDocGate(g)));
     case 'review-defects': return judgeReviewDefects(read(REVIEW_DEFECTS_SCHEMA));

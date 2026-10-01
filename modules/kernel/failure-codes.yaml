@@ -12053,13 +12053,35 @@ op-lint-tool-failed:
   kind: settle-reason
 
 op-lint-findings:
-  title: "hfs lint reports findings the verdict ignores"
-  title_vi: "hfs lint báo lỗi mà kết luận bỏ qua"
-  meaning_vi: "Báo cáo lint còn lỗi thuộc phạm vi op: luật bảo mật (R41, R42, R44, R49, R71, R90, R107) với security.verify, hoặc lỗi dưới fe/ với interface.audit, interface.draw, interface.asset; op không thể chốt done khi các lỗi đó còn."
+  title: "hfs lint reports fe/ findings under an interface verdict"
+  title_vi: "hfs lint báo lỗi dưới fe/ mà op giao diện vẫn chốt done"
+  meaning_vi: "Báo cáo lint của interface.audit, interface.draw hoặc interface.asset còn lỗi dưới fe/ (canon FE, stylelint, ngữ pháp thương hiệu); op không thể chốt done khi các lỗi đó còn."
   causes_vi:
-    - "Cửa xác thực thiếu RateTier.Strict hoặc lỗi chứa bí mật"
-    - "Mã giao diện vi phạm canon FE, stylelint hoặc ngữ pháp thương hiệu"
-  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed nêu từng lỗi theo luật để op sở hữu sửa, hoặc sửa phần mình tạo ra rồi chạy lại lint."
+    - "Mã giao diện vi phạm canon FE hoặc stylelint"
+    - "Tệp vẽ hoặc tài sản mới sai ngữ pháp thương hiệu"
+  nextStep_vi: "Việc chốt done bị từ chối; op sửa phần mình tạo ra rồi chạy lại lint, hoặc chốt failed nêu từng lỗi theo luật để op sở hữu sửa."
+  owner: op-retry
+  kind: settle-reason
+
+op-security-findings-missing:
+  title: "The security verdict carries no typed findings"
+  title_vi: "Kết luận bảo mật không kèm danh sách lỗi có kiểu"
+  meaning_vi: "security.verify đính kèm lint.json nhưng không đính kèm security-findings.json (schema starci/security-findings@1) liệt kê từng lỗi theo luật; danh sách rỗng khi không có lỗi."
+  causes_vi:
+    - "Op chỉ viết kết luận dạng văn bản"
+    - "Tệp security-findings.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op ghi security-findings.json với từng lỗi (rule, code, path, line, severity, reachability) rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+op-security-finding-unreported:
+  title: "The security verdict drops a canon finding"
+  title_vi: "Kết luận bảo mật bỏ sót lỗi do canon báo"
+  meaning_vi: "hfs lint báo lỗi thuộc luật bảo mật (R41, R42, R44, R49, R71, R90, R107) mà security-findings.json không mang theo đúng đường dẫn và luật; kết luận có thể kèm lỗi nhưng không được bỏ sót."
+  causes_vi:
+    - "Op lọc bớt lỗi canon khi viết kết luận"
+    - "Op chạy lint trên phạm vi khác với phạm vi báo cáo"
+  nextStep_vi: "Việc chốt bị từ chối; op thêm mọi lỗi bảo mật của lint.json vào security-findings.json theo luật rồi nộp lại."
   owner: op-retry
   kind: settle-reason
 

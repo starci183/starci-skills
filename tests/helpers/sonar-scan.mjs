@@ -12,7 +12,7 @@ import { DIGEST_SCHEMA } from '../../scripts/checks/read-digest.mjs';
 import { TEST_WORLD_RUN_SCHEMA } from '../../scripts/checks/test-world-run.mjs';
 import { UNIT_RUN_SCHEMA } from '../../scripts/checks/unit-run.mjs';
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS } from '../../scripts/checks/release-proof.mjs';
-import { REVIEW_DEFECTS_SCHEMA } from '../../scripts/kernel/gate-settle.mjs';
+import { REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA } from '../../scripts/kernel/gate-settle.mjs';
 
 export const greenSonarScan = () => ({
   schema: 'starci/sonar-local-scan@3', at: new Date().toISOString(), scope: 'slice', outcome: 'pass',
@@ -33,15 +33,16 @@ export const greenTestWorldRun = () => ({ schema: TEST_WORLD_RUN_SCHEMA, at: at(
 export const greenUnitRun = () => ({ schema: UNIT_RUN_SCHEMA, at: at(), root: '.',
   run: { command: 'npm test -- --json', exit: 0, total: 1, passed: 1, failed: 0, skipped: 0, files: 1, failedFiles: 0, failures: [], error: null }, services: [], findings: [], exit: 0 });
 export const greenLint = () => ({ schema: 'starci/lint@1', findings: [], errors: [] });
+export const greenSecurityFindings = () => ({ schema: SECURITY_FINDINGS_SCHEMA, at: at(), findings: [] });
 export const greenReviewDefects = () => ({ schema: REVIEW_DEFECTS_SCHEMA, at: at(), defects: [] });
 export const greenReleaseProof = () => ({ schema: RELEASE_PROOF_SCHEMA, at: at(), repo: '.', base: 'HEAD~1', ok: true, exit: 0,
   steps: RELEASE_STEPS.map((id) => ({ id, command: id, exit: 0, status: 'pass', detail: '' })) });
 
 /** The file names writeGreenProofs writes, in order. */
-export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json', 'doc-gate.json', 'test-world-run.json', 'unit-run.json', 'lint.json', 'review-defects.json', 'release-proof.json']);
+export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json', 'doc-gate.json', 'test-world-run.json', 'unit-run.json', 'lint.json', 'security-findings.json', 'review-defects.json', 'release-proof.json']);
 /** Write every green proof into <dir>; their absolute paths, ready for a report's `files`. */
 export const writeGreenProofs = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
-  const docs = [greenSonarScan(), greenGate(), greenReadDigest(), greenDocGate(), greenTestWorldRun(), greenUnitRun(), greenLint(), greenReviewDefects(), greenReleaseProof()];
+  const docs = [greenSonarScan(), greenGate(), greenReadDigest(), greenDocGate(), greenTestWorldRun(), greenUnitRun(), greenLint(), greenSecurityFindings(), greenReviewDefects(), greenReleaseProof()];
   return GREEN_PROOF_FILES.map((name, i) => { const file = path.join(dir, name); fs.writeFileSync(file, JSON.stringify(docs[i])); return file; });
 };

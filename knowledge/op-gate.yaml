@@ -148,9 +148,12 @@ proofs:
   security-lint:
     schema: starci/lint@1
     attach: lint.json
+    findings: starci/security-findings@1
     purpose: >-
-      `hfs lint --format json` at the app root: no finding of a securityCodes code may stand under a done security verdict, and
-      a lint that could not run is never a pass.
+      `hfs lint --format json` at the app root plus the op's security-findings.json (starci/security-findings@1, every finding
+      by rule): a lint that could not run is never a pass, and every finding of a securityCodes code or securityRules rule must
+      appear in the report's findings by rule and path. The verdict may carry findings (they go to a separate repair); it may
+      never drop one.
   fe-lint:
     schema: starci/lint@1
     attach: lint.json

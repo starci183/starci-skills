@@ -16,8 +16,8 @@ import { TEST_WORLD_RUN_SCHEMA, buildTestWorldRun, judgeSpec, testWorldRules } f
 import { UNIT_RUN_SCHEMA, judgeServices, unitFindings, unitKitRules } from '../scripts/checks/unit-run.mjs';
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, appInstallsStep, buildReleaseProof } from '../scripts/checks/release-proof.mjs';
 import {
-  OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
-  judgeReviewGate, judgeTestWorld, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
+  OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
+  judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
 } from '../scripts/kernel/gate-settle.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { readCatalog } from '../scripts/checks/failure-codes.mjs';
@@ -207,18 +207,30 @@ test('unit-kit: missing, red run, coverage below 100, spec missing and an off-ki
 
 // ---- lint ----
 
-test('security-lint and fe-lint: missing, a lint that could not run, and a relevant finding each refuse; an irrelevant one does not', () => {
+test('security-lint: missing lint, a lint that could not run, no typed findings and a dropped canon finding each refuse', () => {
   const security = securityRelevant(loadOpGate());
-  assert.equal(codeOf(judgeLint(null, security, 'security')), 'op-lint-proof-missing');
-  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [], errors: ['eslint could not load the canon'] }, security, 'security')), 'op-lint-tool-failed');
   const byCode = { engine: 'eslint', rule: 'starci-be/auth-door-strict-rate-tier', code: 'BE_INPUT_BOUNDED', path: 'be/src/features/auth/auth.controller.ts', line: 4, message: '[BE_INPUT_BOUNDED] strict tier' };
   const byRule = { engine: 'eslint', rule: 'starci-fe/response-cookie-attributes', code: null, path: 'fe/apps/web/src/route.ts', line: 2, message: 'httpOnly' };
   const naming = { engine: 'eslint', rule: 'starci-be/file-naming', code: 'BE_NAMING', path: 'be/src/a.ts', line: 1, message: 'naming' };
-  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [byCode], errors: [] }, security, 'security')), 'op-lint-findings');
-  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [byRule], errors: [] }, security, 'security')), 'op-lint-findings');
-  assert.equal(judgeLint({ schema: LINT_SCHEMA, findings: [naming], errors: [] }, security, 'security').status, 'pass', 'a non-security finding is not the security verdict');
-  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [byRule], errors: [] }, feRelevant, 'fe/')), 'op-lint-findings');
-  assert.equal(judgeLint({ schema: LINT_SCHEMA, findings: [naming], errors: [] }, feRelevant, 'fe/').status, 'pass', 'a be/ finding is not an interface op verdict');
+  const lint = (findings, errors = []) => ({ schema: LINT_SCHEMA, findings, errors });
+  const typed = (findings) => ({ schema: SECURITY_FINDINGS_SCHEMA, findings });
+  assert.equal(codeOf(judgeSecurityLint(null, typed([]), security)), 'op-lint-proof-missing');
+  assert.equal(codeOf(judgeSecurityLint(lint([], ['eslint could not load the canon']), typed([]), security)), 'op-lint-tool-failed');
+  assert.equal(codeOf(judgeSecurityLint(lint([byCode]), null, security)), 'op-security-findings-missing');
+  assert.equal(codeOf(judgeSecurityLint(lint([byCode, byRule]), typed([{ code: 'BE_INPUT_BOUNDED', path: byCode.path, line: 4, severity: 'high' }]), security)), 'op-security-finding-unreported', 'the cookie finding (matched by rule) was dropped');
+  assert.equal(judgeSecurityLint(lint([byCode, byRule, naming]), typed([
+    { code: 'BE_INPUT_BOUNDED', path: byCode.path, line: 4, severity: 'high' },
+    { rule: 'response-cookie-attributes', path: byRule.path, line: 2, severity: 'medium' },
+  ]), security).status, 'pass', 'a verdict may carry findings; a non-security finding is not owed');
+});
+
+test('fe-lint: missing, a lint that could not run, and an fe/ finding refuse; a be/ finding is not an interface verdict', () => {
+  const fe = { engine: 'stylelint', rule: 'declaration-no-important', code: null, path: 'fe/apps/web/src/a.css', line: 2, message: '!important' };
+  const be = { engine: 'eslint', rule: 'starci-be/file-naming', code: 'BE_NAMING', path: 'be/src/a.ts', line: 1, message: 'naming' };
+  assert.equal(codeOf(judgeLint(null, feRelevant, 'fe/')), 'op-lint-proof-missing');
+  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [], errors: ['stylelint could not run'] }, feRelevant, 'fe/')), 'op-lint-tool-failed');
+  assert.equal(codeOf(judgeLint({ schema: LINT_SCHEMA, findings: [fe], errors: [] }, feRelevant, 'fe/')), 'op-lint-findings');
+  assert.equal(judgeLint({ schema: LINT_SCHEMA, findings: [be], errors: [] }, feRelevant, 'fe/').status, 'pass');
   assert.equal(judgeLint(greenLint(), feRelevant, 'fe/').status, 'pass');
 });
 
