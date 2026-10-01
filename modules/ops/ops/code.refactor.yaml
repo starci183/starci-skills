@@ -49,7 +49,7 @@ nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - owned source edits that restructure without changing observable behavior
-  - scoped local commits when authorized
+  - no commits of its own - the runtime commits a green settle as the workflow's checkpoint
   - the declared regression and architecture checks run before and after in their declared sandbox
 graphPolicy:
   mode: read-only
@@ -313,9 +313,9 @@ steps:
     writes: [node, evidence]
     action:
       en: Review the actual diff and verify no unrelated or behavior-changing edit slipped in - the
-        mapping of moved symbols to destinations must account for the whole change. Commit only when
-        authorized, read back the full SHA/diff and prove the tested tree corresponds to that
-        commit; otherwise report uncommitted honestly. Sonar gates every refactor - after the AFTER
+        mapping of moved symbols to destinations must account for the whole change. Never commit - the
+        runtime commits your green settle as the workflow's checkpoint; prove the tested tree is the
+        working tree you report. Sonar gates every refactor - after the AFTER
         regression run, run Sonar only
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository
         root> --wait --isolate --base <source commit recorded before
@@ -384,8 +384,9 @@ proofs:
         binding delta while preserving all other behavior and custody invariants.
   - id: commit
     requirement:
-      en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and
-        separately retain integration/tested mappings. Report uncommitted or no-change honestly.
+      en: Never commit or stage. Inspect the exact working-tree diff and actual tests, report the changed paths and the
+        tested tree per repository, and separately retain integration/tested mappings; the runtime commits a green
+        settle as this op's checkpoint on wf-<workflowId>. Report no-change honestly.
   - id: op-gate
     requirement:
       en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
@@ -450,9 +451,10 @@ placeholders:
 layoutPolicy:
   checks: [starci-validate]
 policy:
-  # isolation: worktree - every code.refactor job runs in its OWN git worktree of the product repository, off the
-  # workflow's integration branch, and lands there at settle (DESIGN §16.7, scripts/kernel/product-worktree.mjs):
-  # parallel slices never share checker inputs (fe-canon INPUTS_CHANGED_DURING_CHECK, 2026-09-28).
+  # isolation: worktree - every code.refactor job runs in its workflow's one worktree of the product repository (Orca
+  # creates it at Kernel start; no worktree per op). Ops of the same side (be/ or fe/) run serially there and across
+  # sides in parallel, so slices never share checker inputs (fe-canon INPUTS_CHANGED_DURING_CHECK, 2026-09-28); a green
+  # settle commits the op's checkpoint on wf-<workflowId>, and main moves only at the workflow's finish.
   isolation: worktree
   # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/kernel/spec-deferral.mjs):
   # defer-leg = never dispatched, settled deferred; skip = runs without that class of test or coverage; not-counted = the gate does not demand it.

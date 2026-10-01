@@ -63,7 +63,6 @@ placeholders: {feature: Selected feature slug}   # the <tokens> the paths use
 layoutPolicy: {...}              # where artifacts land, which validator refuses
 
 policy:                          # ONE map for everything op-specific
-  commitPolicy: {mode: scoped-local-commit, push: false}
   qualityPolicy: {checks: [lint, typecheck, unit], requiredResult: pass}
 
 route:                           # the resolver index — route-op.mjs reads ONLY this
@@ -74,7 +73,7 @@ route:                           # the resolver index — route-op.mjs reads ONL
   riskHints: [source-edits]
 ```
 
-No other top-level key exists. A manifest that declares `commitPolicy`,
+No other top-level key exists. A manifest that declares
 `executionModes`, `findingSchema`, `proposalAuthority` or any other invented key
 beside `id:` is refused; those go under `policy:`.
 
@@ -136,16 +135,16 @@ on any finding.
 
 ```text
 kernel: api enqueue --op <id> --paths <csv> [--params '<json>']
-      → api dispatch --job <id> --spawn      (op worktree created; worker-start; packet = {op, brief, params, context, constraints, returns})
+      → api dispatch --job <id> --spawn      (the workflow worktree resolved, no worktree per op; worker-start; packet = {op, brief, params, context, constraints, returns})
       → [Op] agent runs the op loop inside owned_paths: READ (read-digest.mjs) → CODE → gate.mjs → FIX → REPORT
       → api report --job <id> --report <file>  (starci/op-report@1 envelope, gate.json and read-digest.json attached)
       → api consume-report → api check → api settle --job <id> --verdict <v>
-                                           (op-gate enforcement; a green op lands into main; worker released; worktree removed)
+                                           (op-gate enforcement; a green op is a checkpoint on wf-<workflowId>, a failed one is preserved and reset; worker released)
 ```
 
 The packet fields and lease semantics are `modules/kernel/dispatch.yaml`; what
 `settle` accepts is `modules/kernel/verdict-contract.yaml`; the op loop, the merge guard and
-the op worktree's create, land and delete are in [workflow-kernel](workflow-kernel.md). The Job controller
+the workflow worktree, its checkpoints and the finish that alone touches main are in [workflow-kernel](workflow-kernel.md). The Job controller
 handles eligible green reports and dispatch mechanics; the Kernel makes
 non-green decisions through `modules/kernel/driver-loop.yaml`
 ([workflow-kernel](workflow-kernel.md)).

@@ -17,10 +17,10 @@ Review source changes and test failures. Do not weaken validators to produce a g
 Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:
 
 ```sh
-node scripts/kernel/launch-smoke.mjs --out /absolute/launch-smoke.json
+node scripts/kernel/launch-smoke.mjs --app-repo <scratch app main checkout> --out /absolute/launch-smoke.json
 ```
 
-It starts five no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It always stops and releases every agent it started and prints one `starci/launch-smoke@1` JSON result; exit 0 means both paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
+It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It also proves the workflow worktree on the scratch app: the Kernel's worktree in `orca worktree list`, a be op and an fe op in parallel in it, a failing op preserved and reset to its checkpoint, and a finish that fast-forwards main and marks the worktree release-pending, after which the host-side controller removes it, with main byte-identical but for the two green files. Run it with the reconciler running, since its controller removes the worktree. The scratch app must be registered in Orca, and its main receives those two files and is pushed. It always stops and releases every agent it started and prints one `starci/launch-smoke@2` JSON result; exit 0 means all three paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
 
 ## Make an archive
 

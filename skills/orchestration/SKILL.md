@@ -30,6 +30,13 @@ Nested Runs: an agent that starts agents (the Kernel starting its [Op]s) binds i
 terminal>`. Never pass `--parent`: Orca takes a parent only from the same Run, and a Task in the Run the agent is
 a worker of is refused `consumer_fenced`.
 
+Worktrees: before a StarCi Kernel starts, the runtime has Orca create the ONE worktree of that workflow (`worktree create
+--name wf-<workflowId> --base-branch main --setup run`, a real `npm ci`, no junctions) and starts the Kernel with
+`worker-start --worktree <its path>`; the workflow branch is Orca's `wf-<workflowId>`; its
+[Op]s start with `--worktree <that worktree>` and never get a worktree of their own. The workflow's finish marks it
+release-pending and the runtime's host-side controller removes it once its terminals are released (link check first);
+never remove it, nor run `git worktree remove`, from this chat.
+
 The usage guide is served by the `orca` binary itself (see shared setup below). Routing to `orca-cli` and Computer
 Use is in the description above. Coordination requires real Orca runtime state; never substitute
 a non-Orca subagent tool.

@@ -23,6 +23,12 @@
 //    restarted Orca, 2026-10-01); an agent ends only the PIDs it started.
 //  - deletes: a recursive delete (rm -r, rmdir|rd /s, del /s, robocopy /MIR|/PURGE, Remove-Item -Recurse and its
 //    aliases), which follows a junction into the live tree (inc-c8fbf76aa499); trees go through safeRemoveTree.
+//  - workflow history: inside the workflow worktree its guard names (guard.workflowWorktree, contract change
+//    workflow-worktree), a git command that changes history or a ref, or discards tracked work (commit, merge, rebase,
+//    push, pull, cherry-pick, revert, am, reset to a revision or with a mode, checkout of a branch or a path, switch,
+//    restore of the working tree, stash, tag/branch writes, update-ref, filter-branch, replace, reflog expire|delete,
+//    notes writes) - ops never commit: the runtime checkpoints a green op at settle (WORKFLOW_HISTORY_CHANGE). Reads
+//    (status, diff, log, show, ...) pass, and nothing changes outside that worktree.
 //  - launches: `orca terminal create` and a headless agent CLI (codex exec, claude|cursor-agent|devin -p/--print,
 //    gemini -p, opencode run) - an agent Orca does not supervise; every agent starts through orca orchestration
 //    worker-start. A heredoc body, an echo or a commit message that only mentions a command runs nothing and passes.
@@ -32,6 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathKey } from '../lib/path-key.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -311,6 +318,52 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
     remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/lib/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
 };
 
+// Ops never commit (contract change workflow-worktree): inside a workflow worktree the runtime is the only writer of
+// history - checkpointOp commits a green op at settle, preserveAndReset keeps a failed op's work and resets it. The
+// guard bound to an op terminal names that worktree (guard.workflowWorktree); a git command whose directory (cwd, then
+// every -C) lies inside it may read, never change history or a ref, and never discard tracked work.
+const WORKFLOW_HISTORY_VERBS = new Set(['commit', 'merge', 'rebase', 'push', 'pull', 'cherry-pick', 'revert', 'am', 'update-ref', 'switch', 'filter-branch', 'replace']);
+const RESET_MODES = new Set(['--hard', '--soft', '--mixed', '--merge', '--keep']);
+const BRANCH_WRITES = /^(?:-[dDmMcCfu]|--delete|--move|--copy|--force|--set-upstream-to(?:=.*)?|--unset-upstream|--edit-description|--track(?:=.*)?|--no-track)$/;
+const BRANCH_READS = /^(?:-[avrl]+|--list|--all|--remotes|--show-current|--contains|--no-contains|--merged|--no-merged|--points-at|--sort(?:=.*)?|--format(?:=.*)?|--color(?:=.*)?|--no-color|--column(?:=.*)?|--no-column|-vv|--verbose)$/;
+const insideDir = (dir, root) => { const d = pathKey(dir); const r = pathKey(root); return d === r || d.startsWith(`${r}/`); };
+
+/** Why `git <sub> <rest>` changes history, a ref or tracked work, or null when it only reads. */
+export function workflowHistoryChange(sub, rest) {
+  const dd = rest.indexOf('--');
+  const before = dd === -1 ? rest : rest.slice(0, dd);
+  const options = before.filter((a) => a.startsWith('-'));
+  const words = before.filter((a) => !a.startsWith('-'));
+  if (WORKFLOW_HISTORY_VERBS.has(sub)) return `git ${sub} writes history or a ref`;
+  if (sub === 'reset') {
+    if (options.some((o) => RESET_MODES.has(o)) || words.length) return 'git reset to a revision or with a mode moves HEAD or discards tracked work';
+    return null;
+  }
+  if (sub === 'checkout') return before.length || dd !== -1 ? 'git checkout switches the branch or discards tracked work' : null;
+  if (sub === 'restore') return options.some((o) => o === '--worktree' || o === '-W') || !options.some((o) => o === '--staged' || o === '-S') ? 'git restore discards tracked work in the working tree' : null;
+  if (sub === 'stash') return ['list', 'show'].includes(words[0]) ? null : 'git stash takes tracked work out of the tree';
+  if (sub === 'tag') return words.length && !options.some((o) => o === '-l' || o === '--list') ? 'git tag writes a ref' : options.some((o) => o === '-d' || o === '--delete' || o === '-f' || o === '--force') ? 'git tag writes a ref' : null;
+  if (sub === 'branch') {
+    if (options.some((o) => BRANCH_WRITES.test(o))) return 'git branch writes a ref';
+    return words.length && !options.some((o) => BRANCH_READS.test(o)) ? 'git branch creates a ref' : null;
+  }
+  if (sub === 'reflog') return ['expire', 'delete'].includes(words[0]) ? `git reflog ${words[0]} rewrites ref history` : null;
+  if (sub === 'notes') return !words[0] || ['list', 'show'].includes(words[0]) ? null : 'git notes writes a ref';
+  return null;
+}
+
+/** The WORKFLOW_HISTORY_CHANGE refusal for one git call inside the guard's workflow worktree, or null. */
+export function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
+  if (!guard?.workflowWorktree) return null;
+  const parsed = parseGitArgv(args, cwd);
+  if (!parsed.sub || !insideDir(parsed.cwd, guard.workflowWorktree)) return null;
+  const why = workflowHistoryChange(parsed.sub, parsed.rest);
+  if (!why) return null;
+  return { tool: 'git', code: 'WORKFLOW_HISTORY_CHANGE', command: args.join(' ').slice(0, 200),
+    reason: `${why}, inside the workflow worktree ${pathKey(guard.workflowWorktree)}: ops never commit, move a ref or discard tracked work there`,
+    remedy: 'leave your changes in the working tree and report: the runtime checkpoints your work at settle (a failed op\'s work is preserved and reset by the runtime)' };
+}
+
 // An agent launch outside Orca is invisible to it: no liveness, no stop, no release, and a dead worker sits unnoticed
 // (owner rule 2026-10-01). Every agent and every worker terminal starts through `orca orchestration worker-start`.
 const WORKER_START = '`orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec "<task>" --task-title "<title>"`, supervised with worker-show / worker-read / worker-stop / worker-release';
@@ -446,6 +499,7 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
     if (del) return { tool: c.program, ...del };
     const launch = launchVerdict(c.program, c.args);
     if (launch) return { tool: c.program, ...launch };
+    if (c.program === 'git') { const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: d.policy.parseGitArgv }); if (h) return h; }
     if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }
     if (c.program === 'npm') { const v = await npmVerdict({ args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
   }

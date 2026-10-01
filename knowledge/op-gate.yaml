@@ -2,7 +2,9 @@ schema: starci/op-gate@1
 # The READ-CODE-CHECK-FIX-REPORT loop every code-writing op follows (owner 2026-10-01), as data. Three readers use it:
 #   scripts/checks/read-digest.mjs   prints what a slice must READ before coding (the pattern files of its file kinds, the
 #                                    matching example files, the slot map) and records the READ digest with each file's sha256
-#   scripts/checks/gate.mjs          the one gate the op forces every round and the Kernel re-runs at landing
+#   scripts/checks/gate.mjs          the one gate the op forces every round (its base is the workflow's previous checkpoint,
+#                                    the merge-base with main for the first op) and the workflow's finish runs over the
+#                                    whole branch against main's merge-base
 #   scripts/kernel/gate-settle.mjs   re-reads the attached gate JSON and READ digest at `api settle` and refuses a done that
 #                                    is red, could not run, or skipped READ
 # The round bound is each op's `params.gateRounds`; nothing here restates it.
@@ -10,7 +12,11 @@ purpose: >-
   The loop an op runs: READ only what the slice needs (the pattern files of the file kinds it will touch, the example files of
   the same slots, the slot map of its folders from `hfs explain`), CODE, FORCE THE CHECKS with gate.mjs, FIX and repeat up to
   params.gateRounds rounds, REPORT with the gate JSON and the READ digest attached. Still red after the last round is
-  `blocked` with the exact findings; `done` while red is refused at settle.
+  `blocked` with the exact findings; `done` while red is refused at settle. The op works in its workflow's one worktree
+  (serially with the other ops of its side, in parallel with the other side); the gate's base is the previous
+  checkpoint, so only the op's own new findings block. A green settle commits the op's checkpoint on wf-<workflowId>; a
+  failed or blocked op is preserved to preserved/<workflowId>/<op> and the worktree reset to the last checkpoint. Main is
+  touched only at the workflow's finish.
 enforcedOps:
   - backend.scaffold
   - backend.implement

@@ -63,6 +63,20 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   worker; the Kernel creates its own workflow Run (it coordinates it) and
   starts every op there as a worker-start worker from its own terminal, with
   no --parent (the nested Run rule). Nothing is launched with terminal create.
+- **One worktree per workflow**: before the Kernel starts, the boot has
+  Orca create the workflow worktree (Orca's worktree create call, name and
+  branch `wf-<workflowId>`, a real `npm ci` at the app root, no
+  `node_modules` junctions), then starts the Kernel in it with `worker-start
+  --worktree <its path>`. Every op of the workflow runs in it: serially per side (`be/`,
+  `fe/`), in parallel across sides. Ops never commit: a green op is a
+  checkpoint commit the runtime makes on the branch, gated against the previous
+  checkpoint; a failed or blocked op is preserved to
+  `preserved/<workflowId>/<op>` and the worktree reset to the last checkpoint.
+  Main is touched only at the finish: full gate against main's merge-base,
+  merge guard, `review.verify` of the exact head that lands, rebase,
+  fast-forward and push; the worktree is then `release-pending` and the
+  host-side controller removes it once its terminals are released. Never make
+  or remove that worktree by hand.
 - **Identity**: `agent` means execution adapter (`codex|claude|devin`),
   `model` means a concrete model id, `profile` means a StarCi routing target,
   and `runtimePool` means a quota/capacity window. Do not call all four a provider.

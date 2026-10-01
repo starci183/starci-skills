@@ -18,7 +18,7 @@ completionProfile: implementation
 sideEffects:
   - owned source edits
   - new source tree creation inside the bound repository at the declared path
-  - scoped local commits when authorized
+  - no commits of its own - the runtime commits a green settle as the workflow's checkpoint
   - toolchain install/build in the declared sandbox
   - no production deployment, no package publication, no external service registration
 graphPolicy:

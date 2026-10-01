@@ -5935,6 +5935,17 @@ WORKER_START_STUCK:
   owner: runtime-core
   kind: runtime-fault
 
+WORKFLOW_HISTORY_CHANGE:
+  title: "History change inside the workflow worktree refused"
+  title_vi: "Không được đổi lịch sử git trong worktree của workflow"
+  meaning_vi: "Lệnh git bị chặn vì nó đổi lịch sử hoặc một ref (commit, merge, rebase, push, reset, checkout, switch, stash, tag, branch...) hoặc bỏ thay đổi đã theo dõi trong worktree của workflow; op không bao giờ commit, runtime tự tạo checkpoint khi settle."
+  causes_vi:
+    - "Op định commit phần việc của mình trước khi báo cáo"
+    - "Op định reset, checkout hoặc stash để làm sạch cây trước khi chạy lại"
+  nextStep_vi: "Lệnh không được chạy; để nguyên thay đổi trong cây làm việc và báo cáo, runtime sẽ tạo checkpoint khi settle (op lỗi thì runtime giữ phần việc vào preserved/<workflowId>/<op> rồi đưa cây về checkpoint trước)."
+  owner: op-retry
+  kind: verb-refusal
+
 WORKFLOW_MISMATCH:
   title: "Work graph belongs to other workflow"
   title_vi: "Đồ thị Work thuộc quy trình khác"
@@ -5953,7 +5964,7 @@ WORKTREE_NOT_OPS:
   causes_vi:
     - "Worker muốn dựng bản sao mã ở nơi khác để đo hoặc build"
     - "Worker nhầm mình được quản lý thư mục làm việc"
-  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao. Worktree chỉ được tạo và gỡ qua API worktree của runtime (scripts/lib/worktrees.mjs, safeRemoveWorktree, vòng đời worktree của op); cần bản khác thì báo là một nhu cầu (report blocked environment)."
+  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao. Worktree chỉ được tạo và gỡ qua API worktree của runtime (scripts/lib/worktrees.mjs, safeRemoveWorktree, và worktree của workflow do Orca tạo khi Kernel khởi động); cần bản khác thì báo là một nhu cầu (report blocked environment)."
   owner: op-retry
   kind: dispatch-refusal
 

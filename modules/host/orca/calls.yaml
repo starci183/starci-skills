@@ -332,7 +332,7 @@ calls:
     kind: read
     flags: [repo, limit]
     receipt: [result.worktrees]
-    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/lib/worktrees.mjs reads it to find the worktree a Kernel worker-start --worktree new-child created when the start receipt does not name it.
+    note: Every worktree Orca knows (of one repository with --repo), each with its id (<repo-id>::<path>), path, branch ref and displayName; scripts/lib/worktrees.mjs (orcaWorktreeClient) reads it to find a workflow worktree Orca created, and the launch smoke (scripts/kernel/launch-smoke.mjs) to prove the workflow worktree is listed while the workflow runs and gone after the host-side release.
   worktree-set:
     command: worktree set
     kind: mutation

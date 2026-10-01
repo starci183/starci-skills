@@ -55,8 +55,9 @@ nothing is ahead.
    run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own lane worktree, writes or
    updates the specs of the code it repairs, runs only those specs and lands with
    `node .claude/scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
-   a workflow op: its green settle lands it into the app's main through the op worktree landing (rebase, `gate.mjs`,
-   fast-forward; `docs/workflow-kernel.md`). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`
+   a workflow op in the workflow's worktree: its green settle is a checkpoint on `wf-<workflowId>`, and the app's main
+   moves only at the workflow's finish (full `gate.mjs`, merge guard, `review.verify`, rebase, fast-forward and push;
+   `docs/workflow-kernel.md`). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`
    again from the top.
 
 4. If the push is refused (secret scan, pre-push hook, remote), report the reason as printed; never retry with force
