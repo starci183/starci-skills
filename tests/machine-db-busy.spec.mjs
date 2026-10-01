@@ -9,7 +9,8 @@ import { openMachine, withMachine, isMachineBusy, MACHINE_BUSY_CODE } from '../e
 import { acquireLand } from '../scripts/supervisor/land.mjs';
 
 const ENGINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../engine/machine-db.mjs');
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'starci-busy-'));
+/** A fresh temp dir removed when the test ends (retries: Windows may hold the sqlite file briefly after the holder exits). */
+const tmp = (t) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-busy-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })); return dir; };
 /** sleep-sync reads process.env, so the scale is set there for the test's duration (busy backoff is the wait under test). */
 const withScale = async (scale, fn) => { const saved = process.env.STARCI_SLEEP_SCALE; process.env.STARCI_SLEEP_SCALE = scale; try { return await fn(); } finally { if (saved === undefined) delete process.env.STARCI_SLEEP_SCALE; else process.env.STARCI_SLEEP_SCALE = saved; } };
 const envFor = (file) => ({ ...process.env, STARCI_TEST_MACHINE_FILE: file, STARCI_MACHINE_BUSY_TIMEOUT_MS: '50', });
@@ -25,8 +26,8 @@ function holdWriteLock(file, holdMs) {
   return { held, exited };
 }
 
-test('claimLandGate waits out a write lock held by another connection and then succeeds', () => withScale('1', async () => {
-  const file = path.join(tmp(), 'machine.sqlite');
+test('claimLandGate waits out a write lock held by another connection and then succeeds', (t) => withScale('1', async () => {
+  const file = path.join(tmp(t), 'machine.sqlite');
   const env = envFor(file);
   const ticketId = withMachine((m) => m.enqueueLand({ lane: 'a', commitSha: 'abc', commits: 1 }), { env, file });
   const holder = holdWriteLock(file, 1200);
@@ -39,8 +40,8 @@ test('claimLandGate waits out a write lock held by another connection and then s
   await holder.exited;
 }));
 
-test('claimLandGate past the busy budget throws the coded busy error and claims nothing', () => withScale('0.01', async () => {
-  const file = path.join(tmp(), 'machine.sqlite');
+test('claimLandGate past the busy budget throws the coded busy error and claims nothing', (t) => withScale('0.01', async () => {
+  const file = path.join(tmp(t), 'machine.sqlite');
   const env = { ...envFor(file) };
   const ticketId = withMachine((m) => m.enqueueLand({ lane: 'a', commitSha: 'abc', commits: 1 }), { env, file });
   const holder = holdWriteLock(file, 2500);
@@ -55,8 +56,8 @@ test('claimLandGate past the busy budget throws the coded busy error and claims 
   try { assert.equal(rows.landQueue()[0].state, 'queued', 'no half-claimed gate'); } finally { rows.close(); }
 }));
 
-test('acquireLand never throws on a busy database: it reports gate-busy with why db-busy and leaves no running ticket', () => withScale('0.01', async () => {
-  const file = path.join(tmp(), 'machine.sqlite');
+test('acquireLand never throws on a busy database: it reports gate-busy with why db-busy and leaves no running ticket', (t) => withScale('0.01', async () => {
+  const file = path.join(tmp(t), 'machine.sqlite');
   const env = { ...envFor(file) };
   withMachine(() => {}, { env, file });
   const holder = holdWriteLock(file, 2500);
@@ -69,8 +70,8 @@ test('acquireLand never throws on a busy database: it reports gate-busy with why
   try { assert.deepEqual(m.landQueue().filter((t) => t.state === 'running'), []); } finally { m.close(); }
 }));
 
-test('acquireLand waits through a lock held by another process and wins the gate once it is released', () => withScale('1', async () => {
-  const file = path.join(tmp(), 'machine.sqlite');
+test('acquireLand waits through a lock held by another process and wins the gate once it is released', (t) => withScale('1', async () => {
+  const file = path.join(tmp(t), 'machine.sqlite');
   const env = envFor(file);
   withMachine(() => {}, { env, file });
   const holder = holdWriteLock(file, 1000);

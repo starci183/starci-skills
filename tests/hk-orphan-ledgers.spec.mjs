@@ -104,6 +104,7 @@ test('sourceRootsOf unions machine.sqlite repositories rows with the ledger\'s o
 test('orphanLedgerFindings: a temp/missing-repo ledger is reported, a good one and a retired one are not', (t) => {
   const { env } = sandbox(t);
   const orphanTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-orphan-repo-'));
+  t.after(() => fs.rmSync(orphanTemp, { recursive: true, force: true }));
   const orphanMissing = path.join(REPO_ROOT, 'no-such-dir-hk-orphan-ledgers-spec'); // not under temp: exercises the "gone", not the "temp", branch
   makeLedger(env, { ledgerId: 'orphan-temp', repoRoot: orphanTemp });
   makeLedger(env, { ledgerId: 'orphan-missing', repoRoot: orphanMissing });
@@ -213,6 +214,7 @@ test('boundRepoRoots lists every distinct repository root the registry knows', (
 test('sweepOrphanLedgers dry run only reports; --apply moves the ledger directory (never deletes) and retires the row', async (t) => {
   const { root, env } = sandbox(t);
   const orphanRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-orphan-repo-'));
+  t.after(() => fs.rmSync(orphanRepo, { recursive: true, force: true }));
   const file = makeLedger(env, { ledgerId: 'probe-one', repoRoot: orphanRepo });
   const from = path.dirname(file);
 
