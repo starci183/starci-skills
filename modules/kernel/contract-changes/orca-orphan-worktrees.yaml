@@ -21,7 +21,7 @@ summary: >-
   core-watch WORKTREE fact reads ps: per repository the count, trees whose directory is gone and stamped trees with no
   registry row; `worktrees:orca` alerts when ps itself fails. Live specs that `repo add` a throwaway repository remove it
   in teardown through the new `project setup-delete` call (scripts/api/orca/project-setup-delete.mjs; a repo-backed
-  setup's id is the repo id), and tests/orca-worktree-rm-live.spec.mjs is now opt-in (STARCI_ORCA_LIVE=1). Adds the
+  setup's id is the repo id); the three leaked fake-main registrations were removed once. Adds the
   codes orca-orphan, orca-orphan-adopted and orca-tree-unlisted.
 reach: new-legs
 paths:
