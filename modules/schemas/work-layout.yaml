@@ -50,12 +50,11 @@ shape:
     parent with `frontend/`/`backend/` children, which no example tree or gate ever used. `owners: [{role,
     path}]` names one or more module-root directories, never individual files: `path` (and
     `work/business-rule@1.module`, and `work/sds-component@1.owners[].path` above) is the directory a reader
-    would call the module's root - `src/modules/domain/task`, not
-    `src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
-    itself, a broken reference. An owner path resolves against the side folder the record's `repository`
-    field names (the be side when the field is absent); to point at another side bound
-    in workspace.yaml, prefix the path `repository:<side>/` - `repository:fe/apps/landing` -
-    the same convention implementation `files[]` carries. A done
+    would call the module's root - `be/src/modules/domain/task`, not
+    `be/src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
+    itself, a broken reference. Every owner path is app-relative - `be/<path>`, `fe/<path>` (`fe/apps/landing`)
+    or a directory of the app root - the one form a job's owned_paths, gate.mjs and every finding use; a
+    `repository:<id>/` prefix or a side-relative path is refused (OWNER_PATH_NOT_APP_RELATIVE). A done
     implementation's every owner directory must exist on disk
     (OWNER_PATH_MISSING otherwise refuses it); a todo one is warned, not refused. A done implementation
     whose `proves` names a record that is not itself `state: done` is refused (PROVES_TARGET_NOT_DONE) -

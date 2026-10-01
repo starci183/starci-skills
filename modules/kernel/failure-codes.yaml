@@ -3446,6 +3446,18 @@ OWNER_DEVIATION_DECISION_REQUIRED:
   owner: owner
   kind: settle-reason
 
+OWNER_PATH_NOT_APP_RELATIVE:
+  title: "Owner path is not app-relative"
+  title_vi: "Đường dẫn sở hữu không tính từ gốc app"
+  meaning_vi: "Đường dẫn owners[].path, module hoặc composes[].module của bản ghi phải tính từ gốc app: be/..., fe/... hoặc một thư mục ở gốc app."
+  causes_vi:
+    - "Dùng tiền tố repository:<id>/ kiểu cũ"
+    - "Thiếu tiền tố be/ hay fe/ (đường dẫn tính từ một phía)"
+    - "Đường dẫn tuyệt đối hoặc có ../"
+  nextStep_vi: "Bị từ chối; op ghi lại bản ghi sửa đường dẫn thành dạng tính từ gốc app (ví dụ be/src/... thay cho src/...)."
+  owner: other-op:work.author
+  kind: check-finding
+
 OWNER_PATH_MISSING:
   title: "Owner directory not on disk"
   title_vi: "Thư mục của bên sở hữu không có trên đĩa"

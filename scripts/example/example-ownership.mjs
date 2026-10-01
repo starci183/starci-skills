@@ -50,13 +50,9 @@ export function isWorkRecordSchema(schema, workspaceDoc) {
 }
 
 /**
- * The real directory `repositoryName` (a `work/implementation@1.repository` / logical workspace name) names,
- * resolved against `workspace.yaml`'s `repositories: [{role, name}]`. The backend role always resolves to
- * the repository that owns this `.starciwork` (its parent directory); any other role is a sibling
- * directory beside it, named for the workspace entry - the two-repository topology
- * schemas/work-layout.yaml documents (`examples/todo-app-backend` paired with `examples/todo-app-frontend`).
- * With no workspace.yaml, no repositories list, or no matching entry, the backend root is the only honest
- * guess (a single-repository product has no other repository to name anyway).
+ * The real directory `repositoryName` (a `work/implementation@1.repository`: the side a record is delivered on, where its
+ * proof commands run) names: the side folder the app binding gives that role or name, else the app root. Owner paths do
+ * not use it: they are app-relative (ownerPathProblem) and resolve under the app root.
  */
 function mainCheckoutRoot(repoRoot) {
   try {
@@ -82,10 +78,10 @@ export function repoRootFor(workRoot, repositoryName, workspaceDoc) {
   if (!bindingByBackend.has(backendMain)) bindingByBackend.set(backendMain, projectBinding(backendMain, {sourceRoot}));
   const bound = bindingRepo(bindingByBackend.get(backendMain), repositoryName);
   if (bound) return bound.root;
+  // Unbound: the workspace names the side; a side is the folder of its role under the app root.
   const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
-  const entry = repos.find(r => r?.name === repositoryName);
-  if (!entry || entry.role === 'be') return backendRoot;
-  return path.join(path.dirname(backendRoot), repositoryName);
+  const role = repos.find(r => r?.name === repositoryName)?.role ?? repositoryName;
+  return ['be', 'fe'].includes(role) && fs.existsSync(path.join(backendRoot, role)) ? path.join(backendRoot, role) : backendRoot;
 }
 
 function ownedRelPaths(data) {
@@ -100,27 +96,57 @@ export function declaresOwnPaths(data) {
   return ownedRelPaths(data).length > 0;
 }
 
+/** The app root a Work tree belongs to: .starciwork sits at the app root, beside hfs.json and the be/ and fe/ sides. */
+export const appRootOf = workRoot => path.dirname(path.resolve(workRoot));
+
+/** The sides of an app: every owner path of a code record starts with one of them (or names an app-root directory). */
+export const APP_SIDES = Object.freeze(['be', 'fe']);
+
+/**
+ * Why one owner path (`owners[].path`, `module`, `composes[].module`) is not app-relative, or null when it is. An owner
+ * path is app-relative - be/<path>, fe/<path> or a directory of the app root - the one form gate.mjs, a job's owned_paths
+ * and every finding use. Refused: a `repository:<id>/` prefix, an absolute or ../ path, and a side-relative path (src/x
+ * where be/src/x exists): OWNER_PATH_NOT_APP_RELATIVE.
+ */
+export function ownerPathProblem(rawPath, appRoot) {
+  const rel = String(rawPath).replaceAll('\\', '/');
+  const hint = 'an owner path is app-relative: be/<path>, fe/<path> or a directory of the app root';
+  if (/^repository:/.test(rel)) return `${rawPath} names a repository; ${hint}`;
+  if (path.isAbsolute(rawPath) || /^[A-Za-z]:/.test(rel)) return `${rawPath} is absolute; ${hint}`;
+  if (rel === '..' || rel.startsWith('../') || rel.startsWith('./')) return `${rawPath} is relative to another directory; ${hint}`;
+  const head = moduleRootOf(rel).split('/')[0];
+  if (APP_SIDES.includes(head) || fs.existsSync(path.join(appRoot, head))) return null;
+  const sides = APP_SIDES.filter(side => fs.existsSync(path.join(appRoot, side, head))).map(side => `${side}/${moduleRootOf(rel)}`);
+  return sides.length ? `${rawPath} is side-relative (it means ${sides.join(' or ')}); ${hint}` : null;
+}
+
+/** Every owner path of `data` that is not app-relative, as {path, problem}. */
+export function ownerPathProblems(data, appRoot) {
+  const raw = [
+    ...(Array.isArray(data?.owners) ? data.owners.map(o => o?.path).filter(p => typeof p === 'string') : []),
+    ...(typeof data?.module === 'string' ? [data.module] : Array.isArray(data?.module) ? data.module.filter(m => typeof m === 'string') : []),
+    ...(Array.isArray(data?.composes) ? data.composes.map(c => c?.module).filter(m => typeof m === 'string') : []),
+  ];
+  return raw.map(p => ({path: p, problem: ownerPathProblem(p, appRoot)})).filter(x => x.problem);
+}
+
 /**
  * Every `{rel, abs}` directory `record` (an entry from check-example-work.mjs's own `records` map, or the
- * lightweight equivalent `loadRecords` below builds) owns, resolved to an absolute path under the right
- * repository: directly from its own `owners`/`module`, or - only when it declares neither - from every
+ * lightweight equivalent `loadRecords` below builds) owns, resolved under the app root (every owner path is
+ * app-relative; one that is not is left out here and refused by the checks as OWNER_PATH_NOT_APP_RELATIVE):
+ * directly from its own `owners`/`module`, or - only when it declares neither - from every
  * `work/implementation@1` whose `proves` names this record's id (the layout's resolution for a specification
  * that owns no code itself but is demonstrated by an implementation that does). Deduplicated by `abs`.
  * `recordsById` maps id -> {schema, data} (or richer; only those two fields are read).
  */
 export function resolveOwnedDirs(id, record, recordsById, workspaceDoc, workRoot) {
+  const appRoot = appRootOf(workRoot);
   const out = new Map(); // abs -> {rel, abs, via}
   const add = (data, via) => {
-    const defaultRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
     for (const rel of ownedRelPaths(data)) {
-      // `repository:<name>/<path>` pins one owner path to a bound sibling
-      // repository — the same prefix convention implementation files[] and job
-      // owned_paths already carry in a multi-repo workspace.
-      const prefixed = /^repository:([^/]+)\/(.+)$/.exec(rel);
-      const repoRoot = prefixed ? repoRootFor(workRoot, prefixed[1], workspaceDoc) : defaultRoot;
-      const relPath = prefixed ? prefixed[2] : rel;
-      const abs = path.join(repoRoot, relPath);
-      if (!out.has(abs)) out.set(abs, {rel: prefixed ? rel : relPath, abs, via});
+      if (ownerPathProblem(rel, appRoot)) continue;
+      const abs = path.join(appRoot, rel);
+      if (!out.has(abs)) out.set(abs, {rel, abs, via});
     }
   };
   add(record.data, 'self');

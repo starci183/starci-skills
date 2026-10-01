@@ -48,7 +48,7 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
     fs.mkdirSync(path.join(work,'features','login','impl','nivo-backend','session-custody'),{recursive:true});
     fs.writeFileSync(path.join(work,'workspace.yaml'),'schema: work/workspace@1\nid: t\nrepositories:\n  - {role: be, name: nivo-backend}\n  - {role: fe, name: nivo-fe}\n');
     fs.writeFileSync(path.join(work,'features','login','impl','nivo-backend','session-custody','index.yaml'),
-      'schema: work/implementation@1\nid: impl.login.nivo-backend.session-custody\nrepository: nivo-backend\nowners:\n  - {role: refresh-session, path: src/auth/refresh-session}\n  - {role: sign-out, path: src/auth/sign-out}\n');
+      'schema: work/implementation@1\nid: impl.login.nivo-backend.session-custody\nrepository: nivo-backend\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
   }
   const wf='wf-verify-rel';
   const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
@@ -130,7 +130,7 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(classifyFailure({op:'docs.author',report:red,prior:{report:red}}).class,'deterministic','the same red at the same HEAD twice');
   assert.equal(failureSignature({head:'x',checks:[]}),'','nothing to compare');
   // The envelope takes the new fields.
-  assert.equal(validateOpReport({outcome:'failed',summary:'s',failureClass:'product',rootCause:{...UAT_ROOT_CAUSE,op:'backend.implement',files:['src/auth/refresh-session']}}).ok,true);
+  assert.equal(validateOpReport({outcome:'failed',summary:'s',failureClass:'product',rootCause:{...UAT_ROOT_CAUSE,op:'backend.implement',files:['be/src/auth/refresh-session']}}).ok,true);
   assert.equal(validateOpReport({outcome:'failed',summary:'s',failureClass:'flaky'}).ok,false);
   assert.equal(validateOpReport({outcome:'done',summary:'s',failureClass:'product'}).ok,false);
 });
@@ -140,8 +140,8 @@ test('a Work record id resolves to the build op of its repository role, with the
   const owner=resolveRootOwner({repo:w.repo,rootCause:UAT_ROOT_CAUSE,kinds:KINDS});
   assert.equal(owner.op,'backend.implement');
   assert.equal(owner.record,'.starciwork/features/login/impl/nivo-backend/session-custody');
-  assert.deepEqual(owner.ownedPaths,['src/auth/refresh-session','src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
-  assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,op:'interface.implement',files:['repository:nivo-fe/apps/app/src/session.tsx']},kinds:KINDS}).op,'interface.implement','an explicit rootCause.op wins');
+  assert.deepEqual(owner.ownedPaths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
+  assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,op:'interface.implement',files:['fe/apps/app/src/session.tsx']},kinds:KINDS}).op,'interface.implement','an explicit rootCause.op wins');
   assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,node:'impl.login.nowhere.x'},kinds:KINDS}),null,'an unresolvable record names no owner');
 });
 
@@ -149,7 +149,7 @@ test('a Work record id resolves to the build op of its repository role, with the
 
 test('a red UAT naming a backend record repairs that record with a fresh backend.implement job, then walks again behind it - never the same walk again',t=>{
   const w=world(t,{legs:['uat.verify']});
-  w.job('uat1','uat.verify',{paths:['.starciwork/features/login/uat/password-sign-in','src/auth/sign-in','repository:nivo-fe/apps/app/src/auth'],extra:{repository:'fe'}});
+  w.job('uat1','uat.verify',{paths:['.starciwork/features/login/uat/password-sign-in','be/src/auth/sign-in','fe/apps/app/src/auth'],extra:{repository:'fe'}});
   w.report('uat1','failed',{head:'f09c641',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test e2e/login.spec.mjs',exitCode:1,evidence:'6/9 pass'}]});
   const r=w.api(['settle','--job','uat1','--verdict','fail']);
   assert.equal(r.status,0,r.stderr||r.stdout);
@@ -160,7 +160,7 @@ test('a red UAT naming a backend record repairs that record with a fresh backend
   const repair=w.row(repairId),rerun=w.row(rerunId);
   assert.equal(repair.op_id,'backend.implement');
   assert.equal(repair.status,'queued');
-  assert.deepEqual(repair.payload.owned_paths,['src/auth/refresh-session','src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
+  assert.deepEqual(repair.payload.owned_paths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
   assert.deepEqual(repair.payload.records,['.starciwork/features/login/impl/nivo-backend/session-custody']);
   assert.equal(repair.payload.repository,undefined,'a backend repair is not placed in the fe checkout the UAT ran from');
   assert.equal(repair.payload.repairFor.rootCause.claim,UAT_ROOT_CAUSE.claim);

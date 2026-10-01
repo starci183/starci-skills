@@ -28,7 +28,7 @@ function write(root, rel, content) {
   return file;
 }
 
-/** A two-repository tree: be owns .starciwork plus a controller, two graphql op dirs and two event
+/** One app: .starciwork at the app root, be/ holds a controller, two graphql op dirs and two event
  * classes; fe owns three page routes. The records deliberately disagree with the code in every
  * direction - a done contract route nobody serves, a done ui-screen no route reaches, a done event
  * nothing emits - so each refused code has to prove it fires, and the honest neighbours (served and
@@ -37,7 +37,7 @@ function makeFixture() {
   const root = freshDir();
   const be = path.join(root, 'be');
   const fe = path.join(root, 'fe');
-  const workRoot = path.join(be, '.starciwork');
+  const workRoot = path.join(root, '.starciwork');
 
   write(workRoot, 'workspace.yaml', 'repositories:\n  - {role: be, name: be}\n  - {role: fe, name: fe}\n');
   write(workRoot, 'features/f/contract/orders/index.yaml', [
@@ -59,7 +59,7 @@ function makeFixture() {
     '',
   ].join('\n'));
   write(workRoot, 'features/f/fr/orders/index.yaml',
-    'schema: work/functional-requirement@1\nid: fr.f.orders\nstate: done\nmodule: src/features/f\n');
+    'schema: work/functional-requirement@1\nid: fr.f.orders\nstate: done\nmodule: be/src/features/f\n');
   write(workRoot, 'features/f/impl/be/orders/index.yaml', [
     'schema: work/implementation@1',
     'id: impl.f.be.orders',

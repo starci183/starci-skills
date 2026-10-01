@@ -39,9 +39,9 @@ properties:
     $ref: "#/$defs/activity"
   repository:
     $ref: "#/$defs/slug"
-    description: The repository this module lives in, by the name the workspace record gives it. It is named
-      rather than pathed so the record stays valid on any machine that has the workspace's repositories,
-      and every `owners[].path` below resolves against it unless that path pins another one itself.
+    description: The side this module is delivered on (be or fe), by the name the workspace record gives it -
+      where its proof commands run. It is named rather than pathed so the record stays valid on any machine;
+      the `owners[].path` below are app-relative and carry their side themselves.
   owners:
     type: array
     minItems: 1
@@ -49,7 +49,7 @@ properties:
     description: "The artifacts this record owns, each with the role it plays. There is more than one
       because one unit of delivered behaviour routinely spans several: a route adapter, a feature entry, a
       connected block. Every path is a module-root directory a reader would call the module's root -
-      src/modules/domain/task, never src/modules/domain/task/ownership.guard.ts - so a file moving inside
+      be/src/modules/domain/task, never be/src/modules/domain/task/ownership.guard.ts - so a file moving inside
       it during a refactor is not, by itself, a broken reference."
     items:
       type: object
@@ -65,9 +65,9 @@ properties:
             produces are the stack's business, and a role nobody can name gets written as a comment instead.
         path:
           $ref: "#/$defs/prose"
-          description: "The module-root directory, relative to the record's own repository. To point at a
-            sibling repository bound in workspace.yaml, the path carries the prefix
-            `repository:<repo-name>/` - the same convention a job's owned_paths already uses. A done
+          description: "The module-root directory, app-relative - be/<path>, fe/<path> or a directory of the
+            app root - the one form a job's owned_paths, gate.mjs and every finding use; a
+            `repository:<id>/` prefix or a side-relative path is refused (OWNER_PATH_NOT_APP_RELATIVE). A done
             record's every owner directory must exist on disk, which the gate refuses otherwise
             (OWNER_PATH_MISSING); a todo one is warned, because the module a todo record targets may not
             have been built yet."
