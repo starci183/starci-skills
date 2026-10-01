@@ -19,6 +19,7 @@ import { HttpModule } from "@modules/platform/http"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
+import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
@@ -29,7 +30,10 @@ const RATE_LIMIT_HIGH = 100_000
 const CALL_DEADLINE_MS = 5000
 const ALLOWED_ORIGINS: ReadonlyArray<string> = ["http://localhost:4069"]
 
-/** The confidential client of the realm whose service account reads the members (realm-ecommerce.json). */
+/** The public client of the realm shoppers sign in through with the password grant (realm-ecommerce.json). */
+export const KEYCLOAK_SIGN_IN_CLIENT = "identity-api"
+
+/** The confidential client of the realm whose service account creates the shoppers (realm-ecommerce.json). */
 export const KEYCLOAK_ADMIN_CLIENT = "identity-admin"
 
 /** The wiring of the ecommerce world: its two apps and its two connections. */
@@ -55,9 +59,19 @@ const orderDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
     parseOrderDatabaseConfig(new EnvSource({ ORDER_DB_URL: w.db.order.url }))
 
 /** The Redis of the run, the store of the identity app's cache. */
-export const cacheOptionsOf = (w: EcommerceWiring): CacheOptions => ({ url: new Secret(w.redis.url) })
+export const cacheOptionsOf = (w: EcommerceWiring): CacheOptions => ({
+    url: new Secret(w.redis.url),
+    timeoutMs: CALL_DEADLINE_MS,
+})
 
-/** The realm of the run, read through the service account of the confidential admin client. */
+/** The realm of the run, as shoppers sign in to it. */
+export const keycloakOptionsOf = (w: EcommerceWiring): KeycloakOptions => ({
+    tokenUrl: w.keycloak.tokenUrl,
+    clientId: w.keycloak.clientId,
+    timeoutMs: CALL_DEADLINE_MS,
+})
+
+/** The realm of the run, written through the service account of the confidential admin client. */
 export const keycloakAdminOptionsOf = (w: EcommerceWiring): KeycloakAdminOptions => ({
     url: w.keycloak.baseUrl,
     realm: w.keycloak.realm,
@@ -103,6 +117,7 @@ export const identityOptions = (w: EcommerceWiring): IdentityAppOptions => ({
     database: identityDatabase(w),
     cache: cacheOptionsOf(w),
     orderApi: orderApiOptionsOf(w),
+    keycloak: keycloakOptionsOf(w),
     keycloakAdmin: keycloakAdminOptionsOf(w),
     httpSecurity,
 })

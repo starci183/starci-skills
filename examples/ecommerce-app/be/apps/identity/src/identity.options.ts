@@ -1,7 +1,9 @@
 import type { CacheOptions } from "@modules/integrations/cache"
+import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import { parseCacheConfig } from "@modules/integrations/cache"
+import { parseKeycloakConfig } from "@modules/integrations/keycloak"
 import { parseKeycloakAdminConfig } from "@modules/integrations/keycloak-admin"
 import { parseOrderApiConfig } from "@modules/integrations/order-api"
 import type { EnvSource } from "@modules/platform/config"
@@ -18,6 +20,8 @@ export interface IdentityAppOptions {
     readonly database: DatabaseConnectionConfig
     /** The Redis session store. */
     readonly cache: CacheOptions
+    /** The realm's password grant shoppers sign in with. */
+    readonly keycloak: KeycloakOptions
     /** The Keycloak admin API the member profiles are read from. */
     readonly keycloakAdmin: KeycloakAdminOptions
     /** Where the order service answers. */
@@ -31,6 +35,7 @@ export const parseIdentityAppOptions = (env: EnvSource): IdentityAppOptions => (
     port: env.int("IDENTITY_API_PORT"),
     database: parseIdentityDatabaseConfig(env),
     cache: parseCacheConfig(env),
+    keycloak: parseKeycloakConfig(env),
     keycloakAdmin: parseKeycloakAdminConfig(env),
     orderApi: parseOrderApiConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),

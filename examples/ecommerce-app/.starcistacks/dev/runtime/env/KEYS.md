@@ -11,9 +11,13 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `IDENTITY_API_PORT` | Port the api listens on | none |
 | `IDENTITY_DB_URL` | Postgres URL of the `identity` connection (secret: may embed credentials) | none |
 | `CACHE_REDIS_URL` | Redis URL of the session store (secret) | none |
-| `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server the member profiles are read from | none |
-| `KEYCLOAK_ADMIN_REALM` | Realm the members live in | none |
-| `KEYCLOAK_ADMIN_CLIENT_ID` | Confidential client whose service account reads the realm's users (`identity-admin`) | none |
+| `CACHE_TIMEOUT` | Deadline of one Redis command (`250`, `2s`) | `2s` |
+| `KEYCLOAK_TOKEN_URL` | Token endpoint of the realm shoppers sign in to (password grant) | none |
+| `KEYCLOAK_CLIENT_ID` | Public client of that grant (`identity-api`) | none |
+| `KEYCLOAK_TIMEOUT` | Deadline of a sign-in or sign-out call to Keycloak | `10s` |
+| `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server shoppers are created on | none |
+| `KEYCLOAK_ADMIN_REALM` | Realm the shoppers live in | none |
+| `KEYCLOAK_ADMIN_CLIENT_ID` | Confidential client whose service account creates the realm's users (`identity-admin`) | none |
 | `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of that client (secret, sealed in `secrets/keycloak-env.enc`) | none |
 | `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |

@@ -5,13 +5,17 @@ state: done
 actors: [person]
 trigger: The person submits an email and a password, or registers a new pair.
 mainFlow:
-  - The pair is checked against the stored hash.
+  - A registration creates the shopper in the Keycloak realm, which keeps the password; the person row is keyed by the
+    subject the realm gives.
+  - A sign-in is the realm's password grant; the session keeps the realm's refresh token so sign-out ends the realm
+    session too.
   - A live session is issued and returned as an opaque bearer token.
 exceptionFlows:
   - A registration needs a plausible email and a password of at least 8 characters; anything less is refused before any account work.
   - A wrong pair is refused without naming which half was wrong.
   - A request missing a half is refused before any credential check.
   - A registration with a taken email is refused as a conflict.
+  - A realm that cannot be reached refuses sign-in and registration as provider-unavailable; nothing is written.
 postconditions:
   - The token verifies over HTTP for as long as its TTL lives, and only the identity service reads the store.
 composes:
@@ -27,11 +31,9 @@ requiresProof:
     command: npm run test:e2e -- identity/sign-up-sign-in
 
 change:
-  rev: 2
-  kind: clarifying
-  at: 2026-09-19T14:00:00.000Z
+  rev: 3
+  kind: breaking
+  at: 2026-10-02T10:00:00.000Z
   reason: >-
-    The register door enforces an input precondition the record omitted - a plausible email
-    and a password of at least 8 characters, refused as REQUEST_INVALID before AccountService
-    runs - and the same rule is reached through the account module on the credential check,
-    not only through the session module.
+    Credentials moved to the stack's Keycloak realm: the main flow names the realm's user creation and password grant,
+    and the provider-unavailable refusal is new.

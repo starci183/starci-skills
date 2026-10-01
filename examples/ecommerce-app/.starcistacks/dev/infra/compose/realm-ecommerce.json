@@ -12,8 +12,18 @@
   ],
   "clients": [
     {
+      "clientId": "identity-api",
+      "name": "identity api (shopper sign-in)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false
+    },
+    {
       "clientId": "identity-admin",
-      "name": "identity api (member profiles)",
+      "name": "identity api (creates shoppers)",
       "enabled": true,
       "publicClient": false,
       "secret": "${KEYCLOAK_ADMIN_CLIENT_SECRET}",
@@ -25,14 +35,43 @@
   ],
   "users": [
     {
+      "id": "4f1c2b7e-8a3d-4e5f-9b6a-0c1d2e3f4a5b",
+      "username": "demo@ecommerce.dev",
+      "email": "demo@ecommerce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ecommerce-demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
       "username": "service-account-identity-admin",
       "enabled": true,
       "serviceAccountClientId": "identity-admin",
       "clientRoles": {
         "realm-management": [
+          "manage-users",
           "view-users"
         ]
       }
     }
-  ]
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false}],\"groups\":[]}"
+          ]
+        }
+      }
+    ]
+  }
 }

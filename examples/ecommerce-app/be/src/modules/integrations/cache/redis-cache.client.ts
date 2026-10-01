@@ -18,7 +18,11 @@ export class RedisCacheClient implements Cache, Probe, OnApplicationShutdown {
     private readonly redis: Redis
 
     constructor(@InjectCacheOptions() options: CacheOptions) {
-        this.redis = new Redis(options.url.reveal(), { lazyConnect: true, maxRetriesPerRequest: 1 })
+        this.redis = new Redis(options.url.reveal(), {
+            lazyConnect: true,
+            maxRetriesPerRequest: 1,
+            commandTimeout: options.timeoutMs,
+        })
     }
 
     /** The stored value, or null when the entry is absent, expired or not a value of the declared shape. */

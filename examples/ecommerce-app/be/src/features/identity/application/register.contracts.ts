@@ -9,5 +9,8 @@ export interface RegisterRequest {
     readonly password: string
 }
 
-/** The new person, or the refusal of a taken email. */
-export type RegisterResult = Outcome<AccountPersonView, AccountErrorCode.EmailTaken>
+/** The new person, or the refusal of a taken email or an unreachable identity provider. */
+export type RegisterResult = Outcome<
+    AccountPersonView,
+    AccountErrorCode.EmailTaken | AccountErrorCode.ProviderUnavailable
+>

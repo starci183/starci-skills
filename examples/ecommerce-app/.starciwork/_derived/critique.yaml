@@ -24,10 +24,11 @@ findings:
       - ui.checkout.shop-browse
       - ui.checkout.stock-refused
     because: A breaking change to br.checkout.place-order sends 16 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 11 code path(s) (be/src/features/checkout,
+      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
       be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
+      be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,
       be/src/modules/integrations/order-api, be/src/modules/integrations/receipt-storage) - this is
       the number a reviewer wants before approving the change.
   - id: blast-radius:br.identity.sign-in
@@ -44,20 +45,22 @@ findings:
       - impl.identity.be.identity-account
       - integration.checkout.postgres
       - integration.checkout.redis
+      - integration.identity.keycloak
       - sds.checkout.order-flow
       - uat.identity.sign-in
       - ui.identity.sign-in
-    because: A breaking change to br.identity.sign-in sends 12 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 12 code path(s) (be/src/features/checkout,
+    because: A breaking change to br.identity.sign-in sends 13 other record(s) back to todo, would stale
+      9 evidence file(s), and touches 14 code path(s) (be/src/features/checkout,
       be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/domain/session,
-      be/src/modules/integrations/identity-api, be/src/modules/integrations/order-api,
+      be/src/modules/integrations/identity-api, be/src/modules/integrations/keycloak,
+      be/src/modules/integrations/keycloak-admin, be/src/modules/integrations/order-api,
       be/src/modules/integrations/receipt-storage) - this is the number a reviewer wants before
       approving the change.
   - id: blast-radius:br.identity.account
     kind: blast-radius
-    severity: critical
+    severity: warn
     records:
       - br.identity.account
       - contract.checkout.order-for-identity
@@ -68,13 +71,13 @@ findings:
       - impl.identity.be.identity-account
       - integration.checkout.postgres
       - integration.checkout.redis
-      - integration.identity.keycloak
       - sds.checkout.order-flow
-    because: A breaking change to br.identity.account sends 10 other record(s) back to todo, would stale
-      5 evidence file(s), and touches 11 code path(s) (be/src/features/checkout,
+    because: A breaking change to br.identity.account sends 9 other record(s) back to todo, would stale
+      5 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
       be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
+      be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,
       be/src/modules/integrations/order-api, be/src/modules/integrations/receipt-storage) - this is
       the number a reviewer wants before approving the change.
   - id: blast-radius:br.checkout.cart

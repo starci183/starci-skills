@@ -72,7 +72,10 @@ export const notifySmtpOptionsOf = (w: TodoWiring): NotifySmtpOptions => ({
 })
 
 /** The run's own Redis DB, where the rate limiter counts. */
-export const cacheOptionsOf = (w: TodoWiring): CacheOptions => ({ url: new Secret(w.redis.url) })
+export const cacheOptionsOf = (w: TodoWiring): CacheOptions => ({
+    url: new Secret(w.redis.url),
+    timeoutMs: CALL_DEADLINE_MS,
+})
 
 /** The bucket of the run's MinIO that holds the uploads (declared in `stacks.minio.buckets`). */
 export const UPLOADS_BUCKET = "uploads"

@@ -1,11 +1,9 @@
 /** The columns of a registered person row. */
 export interface PersonRow {
-    /** The person id. */
+    /** The person id: the identity provider's subject. */
     id: string
     /** The sign-in email. */
     email: string
-    /** The stored password hash. */
-    passwordHash: string
     /** When the person registered. */
     createdAt: Date
 }
@@ -14,7 +12,6 @@ export interface PersonRow {
 export const personRow = (overrides: Partial<PersonRow> = {}): PersonRow => ({
     id: "p-1",
     email: "an@shop.test",
-    passwordHash: "hash-of-the-password",
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
 })

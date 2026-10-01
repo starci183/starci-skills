@@ -12,8 +12,8 @@ export interface AccountView {
     readonly email: string
 }
 
-/** What checking credentials needs. */
-export interface VerifyCredentialsParams {
+/** The pair a shopper registers or signs in with; the password goes to the identity provider and is never stored. */
+export interface AccountCredentials {
     /** The email. */
     readonly email: string
     /** The plain password. */

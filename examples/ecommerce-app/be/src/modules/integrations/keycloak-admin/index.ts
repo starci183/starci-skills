@@ -1,6 +1,5 @@
 export { KEYCLOAK_ADMIN_ERROR_KINDS, KeycloakAdminErrorCode } from "./errors/keycloak-admin.error"
 export { parseKeycloakAdminConfig } from "./keycloak-admin.config"
-export type { KeycloakMember } from "./keycloak-admin.contracts"
 export { KEYCLOAK_ADMIN, InjectKeycloakAdmin } from "./keycloak-admin.decorators"
 export { KeycloakAdminModule } from "./keycloak-admin.module"
 export type { KeycloakAdminOptions } from "./keycloak-admin.options"

@@ -16,7 +16,11 @@ export class RedisCacheClient implements RateLimitStore, OnApplicationShutdown {
     private readonly redis: Redis
 
     constructor(@InjectCacheOptions() options: CacheOptions) {
-        this.redis = new Redis(options.url.reveal(), { lazyConnect: true, maxRetriesPerRequest: 1 })
+        this.redis = new Redis(options.url.reveal(), {
+            lazyConnect: true,
+            maxRetriesPerRequest: 1,
+            commandTimeout: options.timeoutMs,
+        })
     }
 
     /** Counts one request in the key's current window (the window starts with its first request) and answers the count. */
