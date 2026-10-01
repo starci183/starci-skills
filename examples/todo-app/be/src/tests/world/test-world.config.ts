@@ -14,6 +14,7 @@ import * as migrateMain from "../../../apps/migrate/src/main"
 import { primaryConnectionOf } from "../../../apps/migrate/src/migrate.options"
 import type { SignInData } from "@tests/fixtures/views/e2e-views.contracts"
 import { testOptions } from "./test-apps.options"
+import { platformBase } from "./test-capabilities.options"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { TODO_KEYCLOAK_CLIENT } from "./todo-identity.contracts"
 import { TODO_OPERATIONS } from "./todo-operations.contracts"
@@ -64,5 +65,6 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
             return observed.data.signIn
         },
     },
+    modules: { base: platformBase },
     sandbox: { base: () => [HttpModule.register({ isGlobal: true })] },
 })

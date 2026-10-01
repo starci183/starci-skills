@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common"
+import { isRecord } from "@modules/platform/primitives"
 import { HttpError, HttpErrorCode } from "./errors/http.error"
 import type { HttpClient, HttpRequest, HttpResponse } from "./http.port"
 
@@ -26,7 +27,8 @@ export class FetchHttpClient implements HttpClient {
                 signal,
             })
         } catch (cause) {
-            const timedOut = cause instanceof Error && cause.name === "TimeoutError"
+            // The deadline rejects with a DOMException from the runtime's own realm: compare its name, never its prototype chain.
+            const timedOut = isRecord(cause) && cause.name === "TimeoutError"
             throw new HttpError({ code: timedOut ? HttpErrorCode.Timeout : HttpErrorCode.Network, cause })
         }
     }

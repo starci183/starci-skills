@@ -2,11 +2,12 @@
 
 One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestConfig()`) with four projects:
 
-| Project  | Command                 | What it is                                                                                                                                                                                                                                      |
-| -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| unit     | `npm test`              | In-process specs of the `*.service.ts` files only, `<name>.service.spec.ts` beside the service, built with `Test.createTestingModule`. Doubles come from `@starci/jest-preset`: no docker, no network. Runs with per-file 100 percent coverage. |
-| e2e      | `npm run test:e2e`      | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`.                                                                                                                        |
-| contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`.                                                                    |
+| Project     | Command                    | What it is                                                                                                                                                                                                                                                                                |
+| ----------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unit        | `npm test`                 | In-process specs of the `*.service.ts` files only, `<name>.service.spec.ts` beside the service, built with `Test.createTestingModule`. Doubles come from `@starci/jest-preset`: no docker, no network. Runs with per-file 100 percent coverage.                                           |
+| integration | `npm run test:integration` | `src/tests/integration/<integration>/*.integration-spec.ts`: each integration client (keycloak, notify-smtp, sepay, upload-storage) through `useTestWorld({ modules })` against the real realm or the library fake at the network edge: success, the refusal mapping and the outage path. |
+| e2e         | `npm run test:e2e`         | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`.                                                                                                                                                                  |
+| contract    | `npm run test:contract`    | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`.                                                                                                              |
 
 `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
 (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`). The jest `global-setup.ts` / `global-teardown.ts`
@@ -61,6 +62,7 @@ They run by hand, never in a hook or the default CI job. Each script type-checks
 (`npm run typecheck:tests`, `src/tests/tsconfig.json`). Integration and e2e need a running Docker daemon (`docker info`).
 
 ```bash
+npm run test:integration                         # every integration client
 npm run test:e2e                                 # every journey, one worker
 npm run test:e2e -- flows/task-lifecycle         # one spec by path fragment
 npm run test:contract                            # provider sandboxes (skipped without sandbox config)
