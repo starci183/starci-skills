@@ -164,7 +164,7 @@ export const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
  * Drain every Run of the workflow into the ledger (see the header). `rebind(runId)` re-binds the Kernel's own Run to
  * the current Kernel terminal after a consumer_fenced answer (api.mjs bindRunToKernel); a Run that is not the Kernel's
  * is never re-bound. `check` replaces the Orca wrapper (specs).
- * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[], error}.
+ * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[{runId, code, error}], error}.
  */
 export function drainWorkflowMessages(ledger, workflowId, { check = orchCheck, rebind = null, maxDeliveries = MAX_DELIVERIES_PER_DRAIN } = {}) {
   const db = ledger.db;
@@ -173,8 +173,8 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orchCheck, r
   const kernelJob = latestKernelJobOf(db, workflowId);
   const terminal = kernelJob?.worker_id ?? null;
   const kernelRunId = jobPayloadOf(kernelJob)?.orca?.runId ?? null;
-  const fail = (runId, error) => out.errors.push({ runId, error: String(error ?? 'orchestration check failed') });
-  if (runIds.length && !terminal) fail(null, 'no Kernel terminal to name as the Runs\' consumer');
+  const fail = (entry) => out.errors.push(entry);
+  if (runIds.length && !terminal) fail({ runId: null, code: 'orchestration-no-kernel-terminal', error: 'no Kernel terminal to name as the Runs\' consumer' });
   for (const runId of terminal ? runIds : []) {
     const call = (ack = null) => { try { return check({ run: runId, terminal, ...(ack ? { ack } : {}) }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
     let r = call();
@@ -182,7 +182,9 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orchCheck, r
     for (let n = 0; ; n += 1) {
       if (!r.ok) {
         // A Run Orca lost has nothing left to deliver (bindWorkflowRun replaces it).
-        if (r.errorCode !== 'run_not_found') fail(runId, r.error ?? r.errorCode);
+        if (r.errorCode === 'run_not_found') break;
+        fail(r.fenced ? { runId, code: 'orchestration-consumer-fenced', error: r.error }
+          : { runId, code: 'orchestration-check-failed', error: r.error ?? r.errorCode });
         break;
       }
       if (!r.deliveryId || !r.messages.length || n >= maxDeliveries) break;
@@ -194,6 +196,6 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orchCheck, r
   }
   out.closed = ledger.transaction(() => closeStaleQuestions(db, workflowId));
   out.ok = out.errors.length === 0;
-  out.error = out.ok ? null : out.errors.map((e) => `${e.runId ?? '-'}: ${e.error}`).join('; ');
+  out.error = out.ok ? null : out.errors.map((e) => `${e.runId ?? '-'}: ${e.code}: ${e.error}`).join('; ');
   return out;
 }

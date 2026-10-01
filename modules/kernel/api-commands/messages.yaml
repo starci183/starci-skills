@@ -1,12 +1,23 @@
 messages:
-  args: '--workflow <id> [--all]'
+  args: '--workflow <id>'
   reads: >-
-    every orchestration message of the workflow's Orca Runs through scripts/api/orca/orch-inbox.mjs (the
-    same non-consuming read `questions` uses; heartbeat and progress rows dropped unless --all), joined to
-    the job whose dispatch or terminal sent it; the ids the Kernel already read (events
-    orchestration-messages-read)
-  writes: "one event 'orchestration-messages-read' {ids} naming the messages this read showed for the first time; nothing in Orca is acknowledged or marked read"
-  returns: '{ok, workflowId, runs[], count, new, messages:[{id, type, subject, body<=600, from, to, runId, threadId, createdAt, jobId, opId, attempt, jobStatus, new, handle}], error?}'
+    the drain of scripts/kernel/api-lib/messages.mjs: each Run of the workflow (payload orca/managed/hierarchy
+    runId of its jobs) through scripts/api/orca/orch-check.mjs (calls.yaml `check`, Orca's consuming FIFO
+    Delivery, --run <run> --terminal <Kernel terminal>; a consumer_fenced answer on the Kernel's own Run re-binds it
+    once with run-use); then every bridged message of the workflow (the worker-question inbox rows and the
+    orchestration-message events, oldest first) joined to the job whose dispatch or terminal sent it; the ids the
+    Kernel already read (events orchestration-messages-read)
+  writes: >-
+    per Delivery, in one transaction committed before the Delivery is acknowledged (check --ack): an
+    inbox row kind worker-question per new question or escalation {key: <message id>, payload {messageId, type,
+    runId, jobId, opId, attempt, dispatchId, taskId, question, options[], subject, askedAt, from}} with event
+    'worker-question-bridged'; an event 'orchestration-message' per other message (worker_done, status, handoff,
+    ...; worker_done is settlement's hand-off, api-lib/messages.mjs workerDoneOf); heartbeats counted on the event
+    'orchestration-delivery-bridged' {runId, deliveryId, count, types, heartbeats}; a replayed Delivery writes
+    nothing twice (keyed by message id). Then a pending question whose job settled or reported, that got a reply
+    threaded in Orca, or that matches no job is closed status done {reason}; one event 'orchestration-messages-read' {ids} naming the messages this read showed for the
+    first time
+  returns: '{ok, workflowId, runs[], count, new, heartbeats, messages:[{id, type, subject, body<=600, from, to, runId, threadId, createdAt, jobId, opId, attempt, jobStatus, new, handle}], error?}'
   refuses:
     - workflow-unknown
   why: >-

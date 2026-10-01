@@ -1,0 +1,51 @@
+id: orca-mailbox-consuming-check
+effectiveAt: '2026-10-02T20:00:00+07:00'
+summary: >-
+  WORKER QUESTIONS THROUGH A CONSUMING ORCHESTRATION CHECK WITH --ACK (lane MAILC under C0; deep map REPLACE #7 M1).
+  The non-consuming host inbox read is deleted: scripts/api/orca/orch-inbox.mjs, its calls.yaml `inbox` entry, the
+  INBOX_NOISE_TYPES heartbeat filter, ORCHESTRATION_INBOX_LIMIT and the inbox prefetch of api status. The new wrapper
+  scripts/api/orca/orch-check.mjs issues calls.yaml `check` (orchestration check --run <run> --terminal <handle>
+  [--ack <delivery>]): Orca's FIFO Delivery of up to 50 messages of every type, replayed until acknowledged.
+  scripts/kernel/api-lib/messages.mjs drainWorkflowMessages drains every Orca Run of a workflow naming the Kernel
+  terminal: each Delivery is written into the ledger in ONE transaction and acknowledged only after that commit (the ack
+  call returns the next Delivery). Questions and escalations become inbox rows kind worker-question (as before); every
+  other message type is one event 'orchestration-message' keyed by its Orca id, and worker_done rows are settlement's
+  hand-off through workerDoneOf (lane SETTLED's trigger); heartbeats are counted on the event
+  'orchestration-delivery-bridged' (Orca keeps lastHeartbeatAt). A replayed Delivery writes nothing twice. A
+  consumer_fenced answer on the Kernel's own Run re-binds it once (bindRunToKernel); another Run is never taken over.
+  api status (unless the workflow finished), api questions, api messages and api reply drain first and then read only
+  the ledger; status therefore writes the bridge. api messages lists the bridged rows and loses --all; status
+  workerQuestions and the questions verb lose the `bridged` field (every listed question is bridged). The drain closes
+  a pending question whose job settled or reported, that got a reply threaded in Orca, or that matches no job. The draw
+  critic waits through the consuming check of its own Run (named by its coordinator, the op's terminal) and acks each
+  Delivery once read; the launch smoke reads worker_done from the settled Dispatch (worker-show status) and no longer
+  reads any mailbox. Smoke E2 (2026-10-01, Orca 1.4.209, no-op Claude and Codex workers started and released by the
+  lane): a check from a process outside any Orca terminal naming the Kernel terminal is accepted, replays until --ack,
+  the ack is idempotent, and only a terminal that is no longer the Run's coordinator is refused consumer_fenced. Adds
+  the codes orchestration-check-failed, orchestration-consumer-fenced and orchestration-no-kernel-terminal.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/orca-mailbox-consuming-check.yaml
+  - scripts/api/orca/orch-check.mjs
+  - scripts/api/orca/lib.mjs
+  - scripts/kernel/api-lib/messages.mjs
+  - scripts/kernel/api-verbs/questions.mjs
+  - scripts/kernel/api-verbs/messages.mjs
+  - scripts/kernel/api-verbs/reply.mjs
+  - scripts/kernel/api-verbs/status.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/launch-smoke.mjs
+  - scripts/work/draw-critic.mjs
+  - modules/host/orca/calls.yaml
+  - modules/host/orca/api.yaml
+  - modules/kernel/api-commands/questions.yaml
+  - modules/kernel/api-commands/messages.yaml
+  - modules/kernel/api-commands/status.yaml
+  - modules/kernel/failure-codes.yaml
+  - CHANGELOG.md
+  - tests/orchestration-question-bridge.spec.mjs
+  - tests/orchestration-check-drain.spec.mjs
+  - tests/helpers/fake-orca.mjs
+  - tests/helpers/fake-critic-orca.mjs
+  - tests/draw-critic-worker-start.spec.mjs
+  - tests/launch-smoke.spec.mjs

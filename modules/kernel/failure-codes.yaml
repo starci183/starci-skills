@@ -8447,6 +8447,35 @@ op-rev-drift:
   nextStep_vi: "Chỉ là cảnh báo, không chặn chốt; Kernel xem có cần chạy lại theo hợp đồng mới không."
   owner: supervisor
   kind: settle-reason
+orchestration-check-failed:
+  title: "Orca's orchestration check of a workflow Run failed"
+  title_vi: "Lệnh orchestration check của Orca cho một Run của workflow bị lỗi"
+  meaning_vi: "Runtime đọc hộp thư của Run qua orchestration check (đọc có tiêu thụ, nhận từng lô tối đa 50 tin) để chép mọi câu hỏi, leo thang và worker_done vào sổ ledger, nhưng Orca không trả lời được. Không có tin nào bị mất: một lô chưa được xác nhận (--ack) sẽ được Orca gửi lại ở lần đọc sau."
+  causes_vi:
+    - "Orca đang khởi động lại hoặc đang tự cập nhật (runtime_unavailable)"
+    - "Lệnh xác nhận (--ack) sau khi ghi sổ không tới được Orca"
+  nextStep_vi: "Không cần làm gì: lần api status, api questions hoặc api messages kế tiếp đọc lại lô đó và không ghi trùng. Nếu lỗi kéo dài, kiểm tra Orca có đang chạy không."
+  owner: runtime-core
+  kind: runtime-fault
+orchestration-consumer-fenced:
+  title: "The Kernel terminal is not the consumer of a workflow Run"
+  title_vi: "Terminal của Kernel không phải bên nhận của một Run của workflow"
+  meaning_vi: "Orca từ chối orchestration check với consumer_fenced vì terminal của Kernel không còn là coordinator của Run đó (đã có một run-use mới hơn). Run của chính Kernel được gắn lại một lần rồi đọc lại; một Run khác của workflow (Run cũ) không bao giờ bị giành lại."
+  causes_vi:
+    - "Kernel đã được thay bằng terminal mới và việc gắn lại Run bị từ chối"
+    - "Một Run cũ của workflow nay thuộc về coordinator khác"
+  nextStep_vi: "Xem api status: nếu Kernel vừa được thay, lần đọc sau sẽ gắn lại Run của nó; nếu đó là Run cũ, tin trên Run đó cần người có quyền coordinator đọc."
+  owner: runtime-core
+  kind: runtime-fault
+orchestration-no-kernel-terminal:
+  title: "No Kernel terminal to read the workflow Runs"
+  title_vi: "Không có terminal của Kernel để đọc các Run của workflow"
+  meaning_vi: "Workflow có Run trong Orca nhưng sổ ledger không ghi terminal nào cho job kernel, nên không thể gọi orchestration check thay mặt coordinator. Tin của worker vẫn nằm trong Orca cho tới khi Kernel có terminal."
+  causes_vi:
+    - "Kernel chưa khởi động hoặc đang được khởi động lại"
+  nextStep_vi: "Supervisor khởi động lại Kernel; lần đọc đầu tiên sau đó chép mọi tin còn chờ vào sổ ledger."
+  owner: supervisor
+  kind: runtime-fault
 orphan-kernel-job:
   title: "Orphaned Kernel job cancelled"
   title_vi: "Việc Kernel mồ côi bị hủy"

@@ -104,7 +104,7 @@ test("a consumer_fenced Kernel Run is re-bound once and checked again; another R
   const fenced = drainWorkflowMessages(ledger, WF, { check: fakeCheck([], [], { fenceFor: { run: 'run-other', terminal: KERNEL } }), rebind: (runId) => { others.push(runId); return { ok: true }; } });
   assert.deepEqual(others, []);
   assert.equal(fenced.ok, false);
-  assert.match(fenced.error, /run-other: consumer_fenced/);
+  assert.deepEqual(fenced.errors.map((e) => [e.runId, e.code]), [['run-other', 'orchestration-consumer-fenced']]);
 });
 
 test('an unmatched question is closed by the drain; a matched one stays pending', (t) => {
