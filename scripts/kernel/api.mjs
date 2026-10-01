@@ -185,6 +185,7 @@ import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-se
 import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
 import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
+import { judgeJobLoop, OP_GATE_CHANGE } from './gate-settle.mjs';
 import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../checks/work-hygiene.mjs';
 import { taskSpecOf } from './task-spec.mjs';
@@ -3300,7 +3301,7 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
     repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
   return created?.jobId ? { jobId: created.jobId, created: true } : wire;
 }
-// The admission commit a slice's scoped lint measured against (`check-scoped-lint.mjs ... --base <sha>` in its report's checks).
+// The admission commit a slice's gate measured against (`gate.mjs ... --base <sha>` in its report's checks).
 const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
   .map((check) => /--base\s+([0-9a-f]{7,40})/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
 function canonSettleFollowUp(ledger, job, payload, envelope) {
@@ -4158,6 +4159,25 @@ function settleSonarGate(db, jobId, repo) {
   const judgment = judgeJob({ op, files });
   return judgment ? { ...judgment, workflowId: job.workflow_id, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
 }
+// The op loop a code-writing op's settle owes (scripts/kernel/gate-settle.mjs over knowledge/op-gate.yaml): the runtime re-reads
+// the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own hfs explain. Read-only
+// here - api settle records the judgment. A leg admitted before the op-gate-loop change settles on its old contract. Null when
+// the op is not held to the loop.
+async function settleOpGate(db, jobId, repo) {
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
+  const op = jobOpOf(job);
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), OP_GATE_CHANGE);
+  if (admittedBeforeChange(admitted, change)) return null;
+  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  if (filed.attemptId == null || filed.reportId == null) return null; // no filed report: pass-report-missing owns the refusal
+  let roots = [];
+  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
+  const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
+  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo] });
+  return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
+}
 // The draw acceptance an interface.draw pass owes (scripts/checks/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
@@ -4710,7 +4730,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

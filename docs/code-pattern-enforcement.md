@@ -4,16 +4,13 @@
 
 ## Command and operation
 
-Run `node scripts/checks/check-scoped-lint.mjs --profile nest --root <repository> --all`
-for a Nest source repository; use `--profile next` for a Next repository. The
-layout and public owners come from `hfs.json` and the slot manifest. Ops name this check `starci-code-patterns-check`.
-
-The command prints one `starci/code-pattern-check@1` JSON report. Exit `0` means
-complete clean declared coverage, `1` means measured findings, and `2` means
-invalid or unavailable coverage. Explicit file arguments remain available after
-`--`, but omitting an applicable file fails completeness rather than certifying a
-partial sample. `review.verify` in `lint` mode invokes this aggregate plus the
-selected Work/stack checks and any additional project checks. Finding an issue
+The lint of a repository is `hfs lint` (the ESLint canon plus `hfs check`, one `starci/lint@1` report); a code-writing op
+runs it over its changed files through `node scripts/checks/gate.mjs --root <app> --changed <files...>` (ops name it
+`starci-gate`). The layout and public owners come from `hfs.json` and the slot manifest. The gate prints one
+`starci/gate@1` JSON report: exit `0` clean, `1` findings new against the base, `2` a tool could not run.
+`review.verify` in `lint` mode runs the whole-repository `hfs lint --format json` plus the selected Work/stack checks and
+any additional project checks. The manifest `modules/models/code-patterns.yaml` is the rule inventory the check-hfs-rules
+parity gate and canon-scan read. Finding an issue
 settles only a measurement; repairing source and completing delivery retain their
 own authority and evidence.
 
@@ -119,9 +116,8 @@ unavailable, not permission to accept arbitrary thrown values. See
 Declaring which inputs are required remains a reviewed domain decision; for
 each selected binding, the machine checks that absence reaches a real Error
 before unsafe continuation. An empty declaration does not certify completeness
-of the domain decision. Source adapters and the heuristics-off guard use the
-[source/input distinction](architecture-input-scope.md), retaining configuration
-bytes in evidence without treating them as application contracts.
+of the domain decision. Source adapters and the heuristics-off guard retain configuration bytes in
+evidence without treating them as application contracts.
 
 ## Evidence limits
 

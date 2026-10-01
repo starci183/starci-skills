@@ -84,156 +84,6 @@ ARCHETYPE_MISSING:
   owner: other-op:brand.decide
   kind: check-finding
 
-ARCHITECTURE_DATA_LIFECYCLE_UNAVAILABLE:
-  title: "Architecture data lifecycle unavailable"
-  title_vi: "Chưa kiểm được vòng đời dữ liệu giao diện"
-  meaning_vi: "Bộ kiểm tra không kiểm được luật vòng đời dữ liệu SWR nên còn nợ phần chứng minh."
-  causes_vi:
-    - "Cấu hình starci.codePatterns.next.dataLifecycle thiếu hoặc sai"
-    - "Bộ kiểm tra không xác định được SWR đã cài"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_FILE_COVERAGE_UNAVAILABLE:
-  title: "Architecture file coverage unavailable"
-  title_vi: "Bộ kiểm tra kiến trúc chưa phủ hết tệp"
-  meaning_vi: "Có tệp cần kiểm nhưng bộ kiểm tra kiến trúc không xem tới."
-  causes_vi:
-    - "Tệp nằm ngoài các dự án TypeScript được chọn"
-    - "Kết quả phủ tệp bị thiếu"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_GRAMMAR_CONTRACT_UNAVAILABLE:
-  title: "Architecture grammar contract unavailable"
-  title_vi: "Chưa kiểm được hợp đồng Grammar"
-  meaning_vi: "Bộ kiểm tra không đọc được hợp đồng Grammar của giao diện nên luật liên quan chưa được kiểm."
-  causes_vi:
-    - "Gói Grammar chưa khai báo hay không tìm thấy"
-    - "Hợp đồng frontend.grammar bị lỗi"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_INPUT_UNAVAILABLE:
-  title: "Architecture input unavailable"
-  title_vi: "Đầu vào kiểm tra kiến trúc không có"
-  meaning_vi: "Bộ kiểm tra kiến trúc báo lỗi đầu vào nên không thể đưa ra kết luận."
-  causes_vi:
-    - "Cấu hình kiến trúc sai"
-    - "Dự án TypeScript không đọc được"
-    - "Không có mã nguồn để kiểm"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_MODULE_REGISTRATION_UNAVAILABLE:
-  title: "Architecture module registration unavailable"
-  title_vi: "Chưa kiểm được đăng ký module"
-  meaning_vi: "Bộ kiểm tra không chọn được cách kiểm việc đăng ký handler vào module."
-  causes_vi:
-    - "Cấu hình không chọn kiểu đăng ký module"
-    - "Không tìm thấy module gốc"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_OWNER_PUBLIC_API_UNAVAILABLE:
-  title: "Architecture owner public api unavailable"
-  title_vi: "Chưa kiểm được API công khai của chủ sở hữu"
-  meaning_vi: "Bộ kiểm tra chưa chứng minh được luật về xuất công khai của module chủ sở hữu."
-  causes_vi:
-    - "Khai báo owners trong cấu hình thiếu hoặc lỗi"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_PROFILE_UNAVAILABLE:
-  title: "Architecture profile unavailable"
-  title_vi: "Hồ sơ kiểm tra kiến trúc không khả dụng"
-  meaning_vi: "Hồ sơ kiến trúc của dự án không dùng được nên bộ kiểm tra không chạy đủ."
-  causes_vi:
-    - "Dự án chưa có hồ sơ nest hoặc next hợp lệ"
-    - "Kết quả không đúng loại backend hoặc frontend mong đợi"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_PUBLIC_CONTRACT_UNAVAILABLE:
-  title: "Architecture public contract unavailable"
-  title_vi: "Chưa kiểm được dạng hợp đồng công khai"
-  meaning_vi: "Bộ kiểm tra chưa chứng minh được luật về dạng khai báo hợp đồng công khai của backend."
-  causes_vi:
-    - "Bộ kiểm tra không phân giải được kiểu khai báo"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_READONLY_BOUNDARY_UNAVAILABLE:
-  title: "Architecture readonly boundary unavailable"
-  title_vi: "Chưa kiểm được ranh giới chỉ-đọc"
-  meaning_vi: "Bộ kiểm tra chưa chứng minh được luật thông điệp và phụ thuộc phải chỉ-đọc."
-  causes_vi:
-    - "Không phân giải được lớp thông điệp từ decorator"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_RESULT_INVALID:
-  title: "Architecture result malformed"
-  title_vi: "Kết quả kiểm tra kiến trúc sai định dạng"
-  meaning_vi: "Bộ kiểm tra kiến trúc trả về kết quả không đúng khuôn nên bị coi là chưa kiểm."
-  causes_vi:
-    - "Lỗi trong chính bộ kiểm tra"
-    - "Tiến trình kiểm tra bị ngắt giữa chừng"
-  nextStep_vi: "Mọi nghĩa vụ kiến trúc bị đánh dấu chưa phủ; cần sửa bộ kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_RULE_COVERAGE_UNAVAILABLE:
-  title: "Architecture rule coverage unavailable"
-  title_vi: "Chưa phủ hết luật kiến trúc"
-  meaning_vi: "Có luật kiến trúc bắt buộc mà bộ kiểm tra không báo là đã chạy."
-  causes_vi:
-    - "Hồ sơ đòi luật mà bộ kiểm tra chưa hỗ trợ"
-    - "Kết quả thiếu danh sách luật đã kiểm"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_SOURCE_LAYOUT_UNAVAILABLE:
-  title: "Architecture source layout unavailable"
-  title_vi: "Chưa kiểm được bố cục mã nguồn"
-  meaning_vi: "Bộ kiểm tra không chứng minh được bố cục thư mục của mã nguồn backend."
-  causes_vi:
-    - "Không phân loại được thư mục nguồn"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_SOURCE_NAMING_UNAVAILABLE:
-  title: "Architecture source naming unavailable"
-  title_vi: "Chưa kiểm được cách đặt tên mã nguồn"
-  meaning_vi: "Bộ kiểm tra không chứng minh được quy ước đặt tên tệp nguồn backend."
-  causes_vi:
-    - "Không phân loại được vai trò của tệp"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-ARCHITECTURE_VIOLATION:
-  title: "Architecture rule violated"
-  title_vi: "Vi phạm luật kiến trúc"
-  meaning_vi: "Bộ kiểm tra kiến trúc tìm thấy mã vi phạm một luật, có nêu tệp và dòng."
-  causes_vi:
-    - "Import sai lớp hoặc sai ranh giới"
-    - "Đặt mã sai thư mục hay sai vai trò"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 ARCH_COMPILER_FAILURE:
   title: "Compiler failed during architecture check"
   title_vi: "Trình biên dịch lỗi khi kiểm kiến trúc"
@@ -436,17 +286,6 @@ ARCH_TYPESCRIPT_MISSING:
   nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `hfs check`."
   owner: op-retry
   kind: check-finding
-
-ARGUMENT_INVALID:
-  title: "Scoped lint arguments invalid"
-  title_vi: "Tham số lệnh lint không hợp lệ"
-  meaning_vi: "Lệnh kiểm tra lint theo phạm vi được gọi thiếu hoặc sai tham số."
-  causes_vi:
-    - "Thiếu giá trị cho --base hoặc --out"
-    - "Thiếu hồ sơ nest hoặc next hay gốc kho"
-  nextStep_vi: "Lệnh in cách dùng đúng; bên gọi phải chạy lại với tham số đúng."
-  owner: op-retry
-  kind: input-invalid
 
 ASSET_DIGEST:
   title: "Asset citation hash mismatch"
@@ -983,99 +822,6 @@ BRAND_UNREADABLE:
   owner: other-op:brand.decide
   kind: check-finding
 
-CANON_CONTENT_MISMATCH:
-  title: "Canon package content differs"
-  title_vi: "Nội dung gói canon không khớp"
-  meaning_vi: "Băm hoặc số tệp của gói canon cài trong dự án khác với giá trị đã khai."
-  causes_vi:
-    - "Gói canon bị sửa tay"
-    - "Cài nhầm phiên bản"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-CANON_DIGEST_POLICY_INVALID:
-  title: "Canon digest policy unsupported"
-  title_vi: "Chính sách băm gói canon không hỗ trợ"
-  meaning_vi: "Chính sách băm nội dung gói canon không dùng sha256 hay khung được hỗ trợ."
-  causes_vi:
-    - "Chính sách trong gói canon sai khuôn"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_CHANGED_DURING_CHECK:
-  title: "Inputs changed during check"
-  title_vi: "Đầu vào đổi trong lúc kiểm"
-  meaning_vi: "Tệp đầu vào thay đổi giữa lúc bắt đầu và kết thúc kiểm tra nên kết quả không tin được."
-  causes_vi:
-    - "Có tiến trình khác sửa mã khi kiểm tra đang chạy"
-  nextStep_vi: "Kết quả bị bỏ; chạy lại kiểm tra khi không còn ai sửa tệp."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_METADATA_UNAVAILABLE:
-  title: "Canon package metadata missing"
-  title_vi: "Thiếu siêu dữ liệu gói canon"
-  meaning_vi: "Không tìm thấy package.json của gói canon đúng tên."
-  causes_vi:
-    - "Gói canon chưa cài hoặc cài sai chỗ"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_TOO_LARGE:
-  title: "Canon package too large"
-  title_vi: "Gói canon quá lớn"
-  meaning_vi: "Gói canon vượt giới hạn số tệp hoặc dung lượng được kiểm."
-  causes_vi:
-    - "Gói chứa quá nhiều tệp hay tệp lớn"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_UNAVAILABLE:
-  title: "Canon package not installed"
-  title_vi: "Chưa cài gói canon"
-  meaning_vi: "Không tìm thấy gói canon trong dự án mục tiêu."
-  causes_vi:
-    - "Chưa cài gói"
-    - "Sai tên gói trong hồ sơ"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_UNSAFE:
-  title: "Canon package unsafe"
-  title_vi: "Gói canon không an toàn"
-  meaning_vi: "Gói canon chứa liên kết tượng trưng hoặc vượt giới hạn cho phép nên không được đọc."
-  causes_vi:
-    - "Có symlink trong gói"
-  nextStep_vi: "Việc kiểm tra gói canon chưa hoàn tất nên bị coi là chưa kiểm; cần sửa môi trường hoặc gói rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
-CANON_PACKAGE_WRONG:
-  title: "Wrong canon package"
-  title_vi: "Sai gói canon"
-  meaning_vi: "Gói canon tìm được có tên khác với tên hồ sơ yêu cầu."
-  causes_vi:
-    - "Cài nhầm gói"
-  nextStep_vi: "Op dựng khung cần cài đúng gói canon rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-CANON_RULE_UNAVAILABLE:
-  title: "Canon lint rule unavailable"
-  title_vi: "Không có quy tắc lint chuẩn"
-  meaning_vi: "Bộ kiểm lint không tìm thấy quy tắc chuẩn mà hồ sơ yêu cầu nên không thể đo được."
-  causes_vi:
-    - "Gói quy tắc chuẩn (canon) của dự án không xuất ra quy tắc cần thiết"
-    - "Phiên bản canon và hồ sơ lint không khớp nhau"
-  nextStep_vi: "Kết quả lint được đánh dấu không khả dụng; cần sửa gói canon hoặc hồ sơ lint phía lõi rồi chạy lại kiểm tra."
-  owner: runtime-core
-  kind: check-finding
-
 CANON_SCAN_UNAVAILABLE:
   title: "Canon scan unavailable"
   title_vi: "Không quét được canon"
@@ -1096,17 +842,6 @@ CANON_SOURCE_UNAVAILABLE:
     - "Tên gói trong hồ sơ sai"
   nextStep_vi: "Bộ quét dừng với trạng thái không khả dụng; cần khôi phục hoặc khai báo lại gói canon rồi quét lại."
   owner: runtime-core
-  kind: check-finding
-
-CANON_VERSION_MISMATCH:
-  title: "Canon version differs from profile"
-  title_vi: "Phiên bản canon lệch hồ sơ"
-  meaning_vi: "Phiên bản gói canon đang dùng khác với phiên bản mà hồ sơ lint đã khai báo."
-  causes_vi:
-    - "Gói canon được nâng cấp nhưng hồ sơ chưa cập nhật"
-    - "Cài nhầm phiên bản canon"
-  nextStep_vi: "Kiểm tra bị từ chối; op cần chỉnh hồ sơ hoặc gói canon cho khớp rồi chạy lại."
-  owner: op-retry
   kind: check-finding
 
 CAPABILITY_WITHOUT_FR:
@@ -1272,27 +1007,6 @@ COMMIT_NOT_SCOPED:
   owner: op-retry
   kind: dispatch-refusal
 
-CONFIG_DEPENDENCY_UNAVAILABLE:
-  title: "Lint config dependency unreadable"
-  title_vi: "Không đọc được phụ thuộc cấu hình lint"
-  meaning_vi: "Bộ kiểm lint không theo dõi được một tệp mà cấu hình ESLint phụ thuộc vào, nên không chắc kết quả đúng."
-  causes_vi:
-    - "Cấu hình import động, không phải chuỗi cố định"
-    - "Tệp phụ thuộc không phải tệp thường"
-  nextStep_vi: "Kết quả lint chuyển sang không khả dụng; cần sửa cấu hình cho tĩnh hoặc sửa bộ kiểm phía lõi."
-  owner: runtime-core
-  kind: check-finding
-
-CONFIG_FORMAT_UNAVAILABLE:
-  title: "Lint config format unsupported"
-  title_vi: "Định dạng cấu hình lint chưa hỗ trợ"
-  meaning_vi: "Cấu hình ESLint dùng định dạng YAML mà bộ kiểm chưa hỗ trợ theo dõi phụ thuộc."
-  causes_vi:
-    - "Dùng tệp .eslintrc dạng YAML"
-  nextStep_vi: "Kết quả lint không khả dụng; đổi sang định dạng được hỗ trợ hoặc mở rộng bộ kiểm."
-  owner: runtime-core
-  kind: check-finding
-
 CONFIG_GUARDED:
   title: "Git config change refused"
   title_vi: "Không được đổi cấu hình git"
@@ -1302,47 +1016,6 @@ CONFIG_GUARDED:
   nextStep_vi: "Cổng bảo vệ từ chối; worker để yên git config và báo nhu cầu nếu thật sự cần hook hoặc remote khác."
   owner: op-retry
   kind: dispatch-refusal
-
-CONFIG_INPUT_UNAVAILABLE:
-  title: "Lint config input unavailable"
-  title_vi: "Đầu vào cấu hình lint không khả dụng"
-  meaning_vi: "Bộ kiểm lint không đọc được một tệp đầu vào của cấu hình."
-  causes_vi:
-    - "Tệp cấu hình bị hỏng hoặc bị khóa"
-    - "Lỗi khi phân tích cấu hình"
-  nextStep_vi: "Kết quả lint không khả dụng, tệp lỗi được ghi kèm; sửa tệp hoặc bộ kiểm rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-CONFIG_PATH_OUTSIDE_REPOSITORY:
-  title: "Config path points outside repository"
-  title_vi: "Đường dẫn cấu hình nằm ngoài kho"
-  meaning_vi: "Một đường dẫn cấu hình được khai báo nằm ngoài thư mục gốc của kho."
-  causes_vi:
-    - "Dùng đường dẫn tuyệt đối hoặc ../ trỏ ra ngoài"
-  nextStep_vi: "Bộ kiểm từ chối tệp đó; op đổi sang đường dẫn nằm trong kho rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-CONFIG_PATH_UNSAFE:
-  title: "Config path is unsafe"
-  title_vi: "Đường dẫn cấu hình không an toàn"
-  meaning_vi: "Một tệp cấu hình nằm sau liên kết tượng trưng nên không được tin cậy để đo."
-  causes_vi:
-    - "Tệp hoặc thư mục cấu hình là symlink"
-  nextStep_vi: "Bộ kiểm đánh dấu tệp không an toàn và từ chối; op thay liên kết bằng tệp thật rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-CONFIG_SOURCE_INVALID:
-  title: "Config source cannot be parsed"
-  title_vi: "Không phân tích được mã cấu hình"
-  meaning_vi: "Tệp mã cấu hình của công cụ lint có lỗi cú pháp nên không đọc được."
-  causes_vi:
-    - "Lỗi cú pháp trong eslint.config hoặc tsconfig"
-  nextStep_vi: "Kết quả lint không khả dụng; op sửa lỗi cú pháp rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
 
 CONFLICT_WITHOUT_DECISION:
   title: "Conflict has no policy decision"
@@ -2089,17 +1762,6 @@ DRAW_TYPECHECK_FAILED:
   owner: op-retry
   kind: check-finding
 
-DUPLICATE_FILE_INPUT:
-  title: "Same file listed twice"
-  title_vi: "Cùng một tập tin được liệt kê hai lần"
-  meaning_vi: "Lệnh kiểm tra lint theo phạm vi nhận danh sách tập tin có hai mục trỏ về cùng một tập tin."
-  causes_vi:
-    - "Truyền cùng một đường dẫn hai lần"
-    - "Hai đường dẫn khác nhau nhưng cùng trỏ về một tập tin"
-  nextStep_vi: "Bên gọi bỏ bản trùng rồi chạy lại; kiểm tra bị từ chối trước khi đọc tập tin nào."
-  owner: op-retry
-  kind: input-invalid
-
 DUPLICATE_KERNEL:
   title: "More than one live kernel terminal"
   title_vi: "Một workflow có nhiều hơn một terminal Kernel"
@@ -2133,28 +1795,6 @@ DUPLICATE_NODE:
   owner: op-retry
   kind: check-finding
 
-DUPLICATE_RESULT:
-  title: "Lint returned the same file twice"
-  title_vi: "Công cụ lint trả kết quả trùng cho một tập tin"
-  meaning_vi: "Kết quả lint có hai kết quả cho cùng một tập tin nên không tin cậy được."
-  causes_vi:
-    - "Công cụ ESLint của sản phẩm chạy lỗi"
-    - "Cấu hình lint chọn cùng một tập tin hai lần"
-  nextStep_vi: "Lần chạy lint bị coi là không đáng tin; cần kiểm tra ESLint cục bộ của sản phẩm rồi chạy lại, nếu lặp lại thì báo lỗi công cụ cho lõi runtime."
-  owner: runtime-core
-  kind: runtime-fault
-
-EFFECTIVE_CONFIG_UNAVAILABLE:
-  title: "Effective ESLint config unavailable"
-  title_vi: "Không lấy được cấu hình ESLint đang có hiệu lực"
-  meaning_vi: "Công cụ không đọc được cấu hình lint thực tế của một tập tin nên không đo được phạm vi kiểm tra."
-  causes_vi:
-    - "Cấu hình ESLint của sản phẩm bị lỗi"
-    - "ESLint không tính được cấu hình cho tập tin đó"
-  nextStep_vi: "Lần kiểm tra được đánh dấu là chưa dùng được (unavailable); sản phẩm cần sửa cấu hình ESLint rồi chạy lại, nếu cấu hình đúng mà vẫn lỗi thì cần lõi runtime sửa."
-  owner: runtime-core
-  kind: runtime-fault
-
 EFFECT_UNKNOWN_STUCK:
   title: "Job stuck in effect-unknown state"
   title_vi: "Công việc kẹt ở trạng thái chưa rõ kết quả"
@@ -2164,17 +1804,6 @@ EFFECT_UNKNOWN_STUCK:
     - "Hệ thống bên ngoài không phản hồi nên chưa xác nhận được"
   nextStep_vi: "Runtime tự chạy đối soát (api reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
   owner: supervisor
-  kind: runtime-fault
-
-ESLINT_RULE_INVENTORY_UNAVAILABLE:
-  title: "ESLint builtin rule list unavailable"
-  title_vi: "Không lấy được danh sách luật có sẵn của ESLint"
-  meaning_vi: "Không đọc được danh sách luật gốc của ESLint cài trong sản phẩm nên không kiểm tra phạm vi lint được."
-  causes_vi:
-    - "Bản ESLint cài trong sản phẩm quá cũ hoặc hỏng"
-    - "Chưa cài đủ phụ thuộc của sản phẩm"
-  nextStep_vi: "Lần kiểm tra bị coi là chưa dùng được; cần cài lại hoặc nâng ESLint của sản phẩm, nếu lặp lại thì báo lõi runtime."
-  owner: runtime-core
   kind: runtime-fault
 
 ESLINT_UNAVAILABLE:
@@ -2350,17 +1979,6 @@ EVIDENCE_STALE_UNMARKED:
     - "Quên đánh dấu stale khi sửa nội dung quan trọng"
     - "Chưa chạy lại kiểm chứng"
   nextStep_vi: "Op sửa bản ghi đánh dấu stale kèm lý do nêu rõ bản sửa và mệnh đề bị mất, hoặc chạy lại kiểm chứng."
-  owner: op-retry
-  kind: check-finding
-
-EXTERNAL_MACHINE_RESULT_UNBOUND:
-  title: "External checker result not bound"
-  title_vi: "Kết quả của công cụ kiểm tra ngoài chưa gắn được"
-  meaning_vi: "Một nghĩa vụ kiểm tra dùng công cụ ngoài nhưng kết quả của nó chưa được gắn vào lần kiểm tra lint này."
-  causes_vi:
-    - "Nghĩa vụ dùng máy kiểm tra không phải ESLint và chưa có kết quả đi kèm"
-    - "Chưa chạy công cụ ngoài đó"
-  nextStep_vi: "Nghĩa vụ này được xếp là chưa phủ; cần chạy công cụ ngoài và nộp kết quả riêng."
   owner: op-retry
   kind: check-finding
 
@@ -2731,94 +2349,6 @@ FE_WRITE_FEEDBACK_OWNER:
     - "Phản hồi có nhưng chưa được gọi"
   nextStep_vi: "Op interface.implement chỉ định và nối nơi báo phản hồi cho thao tác ghi."
   owner: other-op:interface.implement
-  kind: check-finding
-
-FILES_REQUIRED:
-  title: "Explicit file paths required"
-  title_vi: "Cần nêu rõ danh sách tập tin"
-  meaning_vi: "Lệnh kiểm tra lint theo phạm vi không nhận được danh sách tập tin nguồn cụ thể."
-  causes_vi:
-    - "Gọi lệnh mà không truyền tập tin nào"
-    - "Danh sách tập tin rỗng"
-  nextStep_vi: "Bên gọi truyền danh sách tập tin cụ thể rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-
-FILE_IGNORED:
-  title: "Required file is ignored by ESLint"
-  title_vi: "Tập tin cần kiểm bị ESLint bỏ qua"
-  meaning_vi: "Một tập tin cần được kiểm tra nhưng cấu hình ESLint của sản phẩm lại loại nó ra."
-  causes_vi:
-    - "Tập tin nằm trong danh sách bỏ qua của ESLint"
-    - "Cấu hình ignore quá rộng"
-  nextStep_vi: "Sản phẩm sửa cấu hình ESLint để tập tin này không bị bỏ qua, rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-FILE_INPUT_INVALID:
-  title: "File input is not a plain path"
-  title_vi: "Đầu vào tập tin không phải đường dẫn thường"
-  meaning_vi: "Một mục trong danh sách tập tin trống hoặc chứa ký tự mẫu (glob) mà lệnh không hỗ trợ."
-  causes_vi:
-    - "Truyền mẫu như *.ts thay vì đường dẫn thật"
-    - "Có mục rỗng trong danh sách"
-  nextStep_vi: "Bên gọi liệt kê từng đường dẫn tập tin cụ thể rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-
-FILE_OUTSIDE_PROFILE_SOURCE:
-  title: "File outside the profile source set"
-  title_vi: "Tập tin nằm ngoài tập nguồn của hồ sơ"
-  meaning_vi: "Danh sách tập tin có một tập tin không thuộc nhóm mã nguồn mà hồ sơ quy chuẩn quy định."
-  causes_vi:
-    - "Đưa tập tin cấu hình hoặc kiểm thử vào danh sách nguồn"
-    - "Hồ sơ không phủ loại tập tin này"
-  nextStep_vi: "Bên gọi bỏ tập tin đó khỏi danh sách hoặc điều chỉnh hồ sơ cho đúng."
-  owner: op-retry
-  kind: check-finding
-
-FILE_OUTSIDE_REPOSITORY:
-  title: "File path escapes the repository"
-  title_vi: "Đường dẫn tập tin thoát ra ngoài kho mã"
-  meaning_vi: "Đường dẫn tập tin trỏ ra ngoài thư mục kho mã nên bị từ chối."
-  causes_vi:
-    - "Dùng .. hoặc đường dẫn tuyệt đối ngoài kho"
-    - "Truyền nhầm kho"
-  nextStep_vi: "Bên gọi truyền đường dẫn nằm trong kho mã rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-
-FILE_UNAVAILABLE:
-  title: "File missing or unreadable"
-  title_vi: "Tập tin không có hoặc không đọc được"
-  meaning_vi: "Một tập tin trong danh sách không tồn tại hoặc không đọc được."
-  causes_vi:
-    - "Tập tin đã bị xóa hoặc đổi tên"
-    - "Sai đường dẫn"
-  nextStep_vi: "Bên gọi sửa lại danh sách cho đúng tập tin hiện có rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-
-FILE_UNSAFE:
-  title: "File is not a plain repository file"
-  title_vi: "Tập tin không phải tập tin thường trong kho"
-  meaning_vi: "Tập tin là liên kết tượng trưng, thư mục, hoặc trỏ ra ngoài kho nên không được kiểm tra."
-  causes_vi:
-    - "Truyền symlink hoặc thư mục"
-    - "Liên kết dẫn ra ngoài kho mã"
-  nextStep_vi: "Bên gọi chỉ đưa các tập tin thường nằm trong kho rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-
-FOREIGN_RESIDUE:
-  title: "Lint residue from someone else's files"
-  title_vi: "Tồn dư lint thuộc về tập tin của người khác"
-  meaning_vi: "Đây là ghi chú cho biết lỗi nằm ngoài phạm vi các tập tin mà công việc này sở hữu, nên không tính cho công việc này."
-  causes_vi:
-    - "Lỗi lint nằm ở tập tin thuộc lượt làm trước hoặc nơi khác"
-    - "Kho có sẵn tồn dư từ trước"
-  nextStep_vi: "Runtime bỏ qua ghi chú này khi chấm việc hiện tại; phần tồn dư cần được dọn bởi op làm lại mã (code.refactor)."
-  owner: other-op:code.refactor
   kind: check-finding
 
 FR_UNCOVERED:
@@ -3540,28 +3070,6 @@ IMPORT_SCAN_UNAVAILABLE:
   owner: runtime-core
   kind: runtime-fault
 
-INLINE_CONFIG_NOT_REFUSED:
-  title: "Inline lint config comments allowed"
-  title_vi: "Cho phép cấu hình lint ngay trong mã"
-  meaning_vi: "Cấu hình lint của tệp này vẫn cho phép chú thích trong mã bật tắt luật, nên có thể né kiểm tra."
-  causes_vi:
-    - "Cấu hình ESLint thiếu tùy chọn cấm cấu hình nội tuyến"
-    - "Cấu hình bị ghi đè cục bộ"
-  nextStep_vi: "Bộ kiểm lint xếp phạm vi kiểm là chưa đầy đủ; op phải sửa cấu hình để cấm chú thích cấu hình nội tuyến rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-INPUTS_CHANGED_DURING_CHECK:
-  title: "Inputs changed while lint ran"
-  title_vi: "Đầu vào đổi trong lúc đang kiểm lint"
-  meaning_vi: "Các tệp mà bộ kiểm lint đọc đã bị thay đổi trong lúc nó đang chạy nên kết quả không đáng tin."
-  causes_vi:
-    - "Một worker khác sửa cùng cây mã khi đang kiểm"
-    - "Tệp cấu hình hoặc công cụ bị đổi giữa chừng"
-  nextStep_vi: "Kết quả bị xem là không dùng được; cần chạy lại kiểm lint khi các tệp đã ổn định."
-  owner: op-retry
-  kind: check-finding
-
 INPUT_BYTES_MOVED:
   title: "Input file no longer matches stamp"
   title_vi: "Tệp đầu vào không còn khớp dấu vết"
@@ -3572,17 +3080,6 @@ INPUT_BYTES_MOVED:
   nextStep_vi: "Bộ kiểm tra tài sản Work nghi ngờ; op tạo bản vẽ hoặc tài sản phải làm lại từ tệp hiện tại để cập nhật dấu vết."
   owner: op-retry
   kind: check-finding
-
-INPUT_INVALID:
-  title: "Scoped lint input is invalid"
-  title_vi: "Đầu vào của bộ kiểm lint không hợp lệ"
-  meaning_vi: "Bộ kiểm lint không đọc được hồ sơ hoặc danh sách tệp được yêu cầu nên trả về trạng thái không hợp lệ."
-  causes_vi:
-    - "Tên hồ sơ kiểm không tồn tại"
-    - "Đường dẫn tệp sai hoặc dùng ký tự đại diện"
-  nextStep_vi: "Bộ kiểm không chạy; người gọi phải sửa tham số rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
 
 INTEGRATION_ENDPOINT_REMOTE:
   title: "Integration endpoint not served locally"
@@ -3826,28 +3323,6 @@ LINK_STUCK:
   owner: runtime-core
   kind: runtime-fault
 
-LINT_EXECUTION_UNAVAILABLE:
-  title: "Lint execution failed"
-  title_vi: "Không chạy được bước lint"
-  meaning_vi: "Trình lint khởi động được nhưng gặp lỗi khi đang chạy trên các tệp nên không có kết quả."
-  causes_vi:
-    - "Lỗi cấu hình hoặc plugin lint khi chạy"
-    - "Tệp nguồn khiến trình lint bị lỗi"
-  nextStep_vi: "Bộ kiểm lint trả trạng thái không khả dụng kèm thông điệp lỗi; cần sửa nguyên nhân rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
-
-LINT_RUNTIME_UNAVAILABLE:
-  title: "Lint runtime cannot load"
-  title_vi: "Không nạp được môi trường chạy lint"
-  meaning_vi: "Bộ kiểm lint không nạp được trình lint của repo đích nên không kiểm được gì."
-  causes_vi:
-    - "Repo chưa cài đủ phụ thuộc hoặc thiếu ESLint"
-    - "Phiên bản công cụ không tương thích"
-  nextStep_vi: "Bộ kiểm trả trạng thái không khả dụng; cần cài hoặc sửa môi trường lint của repo đích rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
-
 LOG_TYPED_MISSING:
   title: "Op settled without typed log rows"
   title_vi: "Op kết thúc mà thiếu dòng nhật ký bắt buộc"
@@ -3858,50 +3333,6 @@ LOG_TYPED_MISSING:
   nextStep_vi: "Chỉ là cảnh báo hiện trong trạng thái workflow; Kernel xem và có thể cho op chạy lại nếu thiếu bằng chứng."
   owner: op-retry
   kind: check-status
-
-MECHANICAL_CHECK_CONFLICT:
-  title: "Mechanical checks conflict"
-  title_vi: "Các luật kiểm máy xung đột nhau"
-  meaning_vi: "Một nghĩa vụ kiểm tra bằng máy có nhiều cách thực hiện mâu thuẫn nhau nên không rõ luật nào áp dụng."
-  causes_vi:
-    - "Hai luật lint khai báo trùng cho cùng nghĩa vụ"
-    - "Danh mục hồ sơ code-patterns bị sửa sai"
-  nextStep_vi: "Bộ kiểm lint ghi nhận nghĩa vụ chưa được phủ; cần sửa danh mục luật cho rõ ràng."
-  owner: runtime-core
-  kind: check-finding
-
-MECHANICAL_CHECK_MISSING:
-  title: "No mechanical check for obligation"
-  title_vi: "Nghĩa vụ chưa có luật kiểm bằng máy"
-  meaning_vi: "Có một yêu cầu cần kiểm bằng máy nhưng chưa có luật nào thực hiện việc đó."
-  causes_vi:
-    - "Luật lint chưa được viết hoặc chưa được cấu hình"
-    - "Danh mục hồ sơ thiếu mục"
-  nextStep_vi: "Bộ kiểm lint đánh dấu nghĩa vụ chưa được phủ; cần bổ sung luật kiểm tương ứng."
-  owner: runtime-core
-  kind: check-finding
-
-MECHANICAL_COVERAGE_INCOMPLETE:
-  title: "Lint coverage incomplete"
-  title_vi: "Phạm vi kiểm lint chưa đầy đủ"
-  meaning_vi: "Bộ kiểm lint không chứng minh được rằng mọi tệp và luật cần thiết đều đã được kiểm."
-  causes_vi:
-    - "Một số tệp hoặc luật không chạy được"
-    - "Kết quả không đủ để phủ hết yêu cầu"
-  nextStep_vi: "Kết quả bị coi là không khả dụng và chặn; cần bổ sung phạm vi kiểm rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-MISSING_RESULT:
-  title: "No lint result for a file"
-  title_vi: "Thiếu kết quả lint cho một tệp"
-  meaning_vi: "Bộ kiểm lint được yêu cầu kiểm một tệp nhưng không trả về kết quả nào cho tệp đó."
-  causes_vi:
-    - "Tệp bị bỏ qua trong lúc chạy"
-    - "Trình lint không xử lý được tệp này"
-  nextStep_vi: "Việc phủ kiểm không đầy đủ; cần chạy lại kiểm lint, nếu lặp lại thì đây là lỗi của bộ kiểm."
-  owner: runtime-core
-  kind: check-finding
 
 MULTILINE_IMPLICIT_KEY:
   title: "YAML key spans several lines"
@@ -4167,17 +3598,6 @@ NO_BASELINE:
   owner: op-retry
   kind: check-finding
 
-NO_EFFECTIVE_CONFIG:
-  title: "File has no effective lint config"
-  title_vi: "Tệp không có cấu hình lint hiệu lực"
-  meaning_vi: "Trình lint không tính ra được cấu hình có hiệu lực nào cho một tệp nên tệp đó không được kiểm."
-  causes_vi:
-    - "Cấu hình ESLint không phủ tới tệp này"
-    - "Tệp nằm ngoài các mẫu được cấu hình"
-  nextStep_vi: "Phạm vi kiểm bị coi là chưa đầy đủ; op phải sửa cấu hình lint để phủ tệp rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
 OPS_ROUTE:
   title: "Route is an ops or probe endpoint"
   title_vi: "Route là cửa kiểm tra vận hành"
@@ -4398,17 +3818,6 @@ PARITY_FIELD:
   owner: runtime-core
   kind: check-finding
 
-PARITY_LINT_CHILD_FAILED:
-  title: "Parity lint child process failed"
-  title_vi: "Tiến trình con kiểm tra đồng bộ bị lỗi"
-  meaning_vi: "Tiến trình con chạy kiểm tra lint để so sánh đồng bộ đã thất bại hoặc không trả kết quả đọc được."
-  causes_vi:
-    - "Tiến trình con thoát lỗi hoặc quá thời gian"
-    - "Đầu ra không phải JSON hợp lệ"
-  nextStep_vi: "Kết quả bị coi là không hợp lệ kèm thông báo lỗi; cần sửa lỗi hạ tầng của bộ kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-
 PARITY_SKIPPED:
   title: "Parity check skipped"
   title_vi: "Bỏ qua kiểm tra đồng bộ"
@@ -4525,94 +3934,6 @@ PRIMARY_ABSENT:
     - "Token màu chính không được dùng"
   nextStep_vi: "Bộ kiểm tra báo lỗi; op vẽ giao diện phải vẽ lại dùng màu chính."
   owner: other-op:interface.draw
-  kind: check-finding
-
-PROFILE_CATALOG_INVALID:
-  title: "Code-pattern profile catalog malformed"
-  title_vi: "Danh mục hồ sơ mẫu mã bị hỏng"
-  meaning_vi: "Danh mục hồ sơ mẫu mã bị thiếu hoặc sai cấu trúc nên lint theo phạm vi không chạy được."
-  causes_vi:
-    - "Tệp danh mục thiếu hoặc sai lược đồ"
-    - "Mục profiles không phải đối tượng"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_INVALID:
-  title: "Code-pattern profile malformed"
-  title_vi: "Hồ sơ mẫu mã bị thiếu hoặc sai"
-  meaning_vi: "Hồ sơ mẫu mã được chọn thiếu trường bắt buộc hoặc không ánh xạ đủ quy tắc nguồn."
-  causes_vi:
-    - "Thiếu canon, sourceGlobs hoặc quy tắc dự kiến"
-    - "Quy tắc nguồn không thuộc nghĩa vụ nào"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_INVENTORY_INVALID:
-  title: "Profile rule inventory inconsistent"
-  title_vi: "Danh sách quy tắc của hồ sơ không khớp"
-  meaning_vi: "Các quy tắc nguồn của hồ sơ trùng lặp hoặc không được ánh xạ chính xác vào nghĩa vụ hay soát xét."
-  causes_vi:
-    - "Có id trùng"
-    - "Có quy tắc chưa thuộc nghĩa vụ nào"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_EXPECTATION_INVALID:
-  title: "Rule expected setting invalid"
-  title_vi: "Thiết lập kỳ vọng của quy tắc không hợp lệ"
-  meaning_vi: "Một quy tắc ESLint không có cài đặt kỳ vọng chính xác hoặc mức độ nghiêm trọng hợp lệ."
-  causes_vi:
-    - "Thiếu mức severity"
-    - "Kỳ vọng không phải đối tượng"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_OBLIGATION_INVALID:
-  title: "Profile obligation malformed"
-  title_vi: "Nghĩa vụ trong hồ sơ bị sai cấu trúc"
-  meaning_vi: "Một nghĩa vụ trong hồ sơ thiếu id, trạng thái hoặc kiểu máy kiểm tra hợp lệ."
-  causes_vi:
-    - "Thiếu id hoặc trạng thái"
-    - "Kiểu máy kiểm tra không được hỗ trợ"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_SUBJECT_SELECTION_INVALID:
-  title: "Obligation subject selection invalid"
-  title_vi: "Cách chọn đối tượng của nghĩa vụ không hợp lệ"
-  meaning_vi: "Trường sourceOnly của nghĩa vụ không phải đúng/sai hoặc dùng với kiểu máy kiểm tra không hỗ trợ."
-  causes_vi:
-    - "sourceOnly sai kiểu"
-    - "Dùng sourceOnly với kiểm tra không phải eslint, architecture hay script"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_ESLINT_RULES_MISSING:
-  title: "Obligation lists no ESLint rules"
-  title_vi: "Nghĩa vụ ESLint chưa nêu quy tắc"
-  meaning_vi: "Nghĩa vụ kiểm tra bằng ESLint không nêu danh sách quy tắc hợp lệ."
-  causes_vi:
-    - "Thiếu ruleIds"
-    - "Có phần tử rỗng trong danh sách"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
-PROFILE_MACHINE_RULES_MISSING:
-  title: "Obligation lists no machine rules"
-  title_vi: "Nghĩa vụ chưa nêu quy tắc máy kiểm"
-  meaning_vi: "Nghĩa vụ kiểm tra bằng kiến trúc hoặc script không nêu danh sách quy tắc hợp lệ."
-  causes_vi:
-    - "Thiếu ruleIds"
-    - "Danh sách rỗng"
-  nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
-  owner: runtime-core
   kind: check-finding
 
 PROFILE_UNKNOWN:
@@ -4971,27 +4292,6 @@ RENDER_UI_INPUT_MISSING:
   owner: other-op:interface.draw
   kind: check-finding
 
-REPOSITORY_OBLIGATION_OWED:
-  title: "Repo obligation not yet declared"
-  title_vi: "Kho chưa khai báo nghĩa vụ"
-  meaning_vi: "Kho chưa khai báo hoặc khai báo thiếu hợp đồng mẫu mã cấp kho."
-  causes_vi:
-    - "package.json thiếu starci.codePatterns"
-  nextStep_vi: "Chỉ ghi chú với lint theo lát cắt; chủ kho cần bổ sung khai báo."
-  owner: owner
-  kind: check-finding
-
-REPOSITORY_UNAVAILABLE:
-  title: "Repository path unavailable"
-  title_vi: "Không truy cập được thư mục kho"
-  meaning_vi: "Bộ lint không phân giải được thư mục kho."
-  causes_vi:
-    - "Thư mục không tồn tại"
-    - "Không có quyền truy cập"
-  nextStep_vi: "Báo cáo không hợp lệ; cần thư mục kho đúng."
-  owner: op-retry
-  kind: input-invalid
-
 REPO_UNBOUND:
   title: "Repository resolves to nothing"
   title_vi: "Kho khai trong bản ghi không tồn tại"
@@ -5001,46 +4301,6 @@ REPO_UNBOUND:
     - "Tên kho sai"
   nextStep_vi: "Bộ kiểm tra từ chối; cần ràng buộc kho đúng."
   owner: other-op:work.author
-  kind: check-finding
-
-REQUIRED_RULE_FILE_UNCONFIGURED:
-  title: "Required file has no lint config"
-  title_vi: "Tệp bắt buộc chưa có cấu hình lint"
-  meaning_vi: "Một tệp cần kiểm tra không có cấu hình lint hiệu lực."
-  causes_vi:
-    - "Tệp bị ESLint bỏ qua"
-  nextStep_vi: "Lint theo phạm vi báo lỗi; chủ kho phải cấu hình lint cho tệp."
-  owner: owner
-  kind: check-finding
-
-REQUIRED_RULE_IMPLEMENTATION_UNAVAILABLE:
-  title: "Required rule implementation unavailable"
-  title_vi: "Không có cài đặt quy tắc bắt buộc"
-  meaning_vi: "Quy tắc lint bắt buộc không có cài đặt thật trong plugin."
-  causes_vi:
-    - "Plugin thiếu hoặc sai phiên bản"
-  nextStep_vi: "Lint báo lỗi; chủ kho phải cài đúng plugin."
-  owner: owner
-  kind: check-finding
-
-REQUIRED_RULE_MISMATCH:
-  title: "Required rule set differently"
-  title_vi: "Quy tắc bắt buộc bị đặt khác kỳ vọng"
-  meaning_vi: "Quy tắc lint bắt buộc bật nhưng cài đặt khác kỳ vọng của hồ sơ."
-  causes_vi:
-    - "Cấu hình bị chỉnh sai"
-  nextStep_vi: "Lint báo lỗi; sửa cấu hình cho khớp hồ sơ."
-  owner: owner
-  kind: check-finding
-
-REQUIRED_RULE_MISSING:
-  title: "Required rule not enabled"
-  title_vi: "Quy tắc bắt buộc chưa được bật"
-  meaning_vi: "Quy tắc lint bắt buộc không được bật cho tệp."
-  causes_vi:
-    - "Cấu hình thiếu quy tắc"
-  nextStep_vi: "Lint báo lỗi; bật quy tắc trong cấu hình."
-  owner: owner
   kind: check-finding
 
 RESOURCE_EXHAUSTION:
@@ -5260,61 +4520,6 @@ SCHEMA_VIOLATION:
   nextStep_vi: "Bản ghi bị từ chối kèm vị trí lỗi; op tạo bản ghi phải sửa đúng theo thông báo rồi chạy lại."
   owner: op-retry
   kind: check-finding
-
-SCRIPT_CHECKER_UNAVAILABLE:
-  title: "Script rule checker unavailable"
-  title_vi: "Bộ kiểm tra luật bằng script không dùng được"
-  meaning_vi: "Các luật kiểm tra mẫu mã được yêu cầu không có bộ kiểm tra phù hợp, nên không thể xác nhận chúng."
-  causes_vi:
-    - "Trộn luật của nhiều bộ kiểm tra khác nhau trong một nghĩa vụ"
-    - "Cấu hình luật không khớp bộ kiểm tra hiện có"
-  nextStep_vi: "Lần kiểm tra được xem là chưa xác nhận được; cần sửa cấu hình luật hoặc bộ kiểm tra ở phía lõi rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
-
-SCRIPT_INPUT_UNAVAILABLE:
-  title: "Script check input unavailable"
-  title_vi: "Thiếu đầu vào cho kiểm tra bằng script"
-  meaning_vi: "Kiểm tra mẫu mã không đọc được đầu vào cần thiết nên chưa kết luận được."
-  causes_vi:
-    - "Tệp hay cấu hình dự án bị thiếu hoặc không đọc được"
-    - "Tệp cần kiểm tra nằm ngoài phạm vi cho phép"
-  nextStep_vi: "Nếu lỗi nằm ở tệp của slice thì op phải sửa tệp đó; nếu không, kết quả bị coi là chưa xác nhận và cần khắc phục đầu vào rồi chạy lại."
-  owner: op-retry
-  kind: check-status
-
-SCRIPT_PATTERN_VIOLATION:
-  title: "Code pattern rule violated"
-  title_vi: "Mã vi phạm luật mẫu mã"
-  meaning_vi: "Kiểm tra bằng script tìm thấy đoạn mã vi phạm một luật mẫu mã của dự án."
-  causes_vi:
-    - "Viết mã trái quy ước của dự án"
-    - "Bỏ sót mẫu bắt buộc"
-  nextStep_vi: "Kiểm tra từ chối kèm tệp, dòng và luật; op viết mã phải sửa các chỗ đó rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-SCRIPT_PREFLIGHT_UNAVAILABLE:
-  title: "Script preflight could not run"
-  title_vi: "Bước chuẩn bị của kiểm tra script không chạy"
-  meaning_vi: "Bước chuẩn bị trước khi chạy kiểm tra script bị lỗi nên kiểm tra không thể tiến hành."
-  causes_vi:
-    - "Khám phá metadata dự án bị lỗi"
-    - "Tệp cấu hình kiểm tra hỏng"
-  nextStep_vi: "Lần kiểm tra bị coi là chưa xác nhận được; cần sửa cấu hình hoặc lỗi bộ kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
-
-SCRIPT_RESULT_INVALID:
-  title: "Script checker returned invalid result"
-  title_vi: "Bộ kiểm tra script trả kết quả sai dạng"
-  meaning_vi: "Bộ kiểm tra script trả về kết quả không đúng khuôn dạng nên không thể tin dùng."
-  causes_vi:
-    - "Bộ kiểm tra bị lỗi giữa chừng"
-    - "Kết quả thiếu trường hoặc sai lược đồ"
-  nextStep_vi: "Nghĩa vụ bị đánh dấu chưa được phủ và kiểm tra chưa xác nhận được; cần sửa bộ kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
 
 SDS_OWNERS_MISSING:
   title: "SDS component has no owners"
@@ -5712,17 +4917,6 @@ SLA_CRITICAL:
   owner: supervisor
   kind: blocker
 
-SLICE_BASE_UNAVAILABLE:
-  title: "Slice base files unreadable"
-  title_vi: "Không đọc được nền của slice"
-  meaning_vi: "Không đọc được các tệp gốc ở mốc nền của slice nên không so sánh lỗi TypeScript được."
-  causes_vi:
-    - "Mốc commit nền không có đủ tệp"
-    - "Lỗi khi lấy tệp từ git"
-  nextStep_vi: "Kiểm tra typecheck báo chưa xác nhận được; cần sửa mốc nền hoặc lỗi git rồi chạy lại."
-  owner: op-retry
-  kind: check-status
-
 SLICE_BASE_UNKNOWN:
   title: "Slice base commit unknown"
   title_vi: "Không biết commit nền của slice"
@@ -5731,17 +4925,6 @@ SLICE_BASE_UNKNOWN:
     - "Gõ sai tên nhánh hoặc mã commit"
     - "Commit chưa được tải về máy"
   nextStep_vi: "Kiểm tra từ chối; hãy chạy lại với đúng commit trước khi slice bắt đầu chỉnh sửa."
-  owner: op-retry
-  kind: check-status
-
-SLICE_DIFF_UNAVAILABLE:
-  title: "Slice diff cannot be read"
-  title_vi: "Không lấy được thay đổi của slice"
-  meaning_vi: "Không lấy được danh sách tệp đã đổi của slice so với mốc nền."
-  causes_vi:
-    - "Lệnh git diff thất bại"
-    - "Mốc nền không hợp lệ"
-  nextStep_vi: "Kiểm tra kết thúc với lỗi; cần khắc phục git hoặc mốc nền rồi chạy lại."
   owner: op-retry
   kind: check-status
 
@@ -5767,27 +4950,6 @@ SLICE_NOT_GIT:
   owner: op-retry
   kind: check-status
 
-SLICE_PREEXISTING:
-  title: "Existing TypeScript errors noted"
-  title_vi: "Ghi chú lỗi TypeScript có sẵn"
-  meaning_vi: "Ở mốc nền đã có sẵn một số lỗi TypeScript; chỉ lỗi mới của slice mới bị tính."
-  causes_vi:
-    - "Dự án còn nợ lỗi từ trước"
-  nextStep_vi: "Chỉ là ghi chú, không chặn slice; các lỗi cũ không tính vào slice này."
-  owner: op-retry
-  kind: check-finding
-
-SLICE_PREEXISTING_FINDINGS:
-  title: "Existing lint findings noted"
-  title_vi: "Ghi chú lỗi lint có sẵn"
-  meaning_vi: "Có các phát hiện lint đã tồn tại ở mốc nền trên dòng mà slice không sửa, nên không tính vào slice."
-  causes_vi:
-    - "Nợ kỹ thuật cũ trong tệp"
-    - "Lỗi nằm trên dòng slice không đụng tới"
-  nextStep_vi: "Chỉ là ghi chú; nợ này thuộc op tái cấu trúc mã, không chặn slice."
-  owner: other-op:code.refactor
-  kind: check-finding
-
 SLICE_ROOT:
   title: "Work root must name itself as slice"
   title_vi: "Nút gốc Work phải tự nêu là slice"
@@ -5798,61 +4960,6 @@ SLICE_ROOT:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải sửa slice của nút gốc thành chính mã nút."
   owner: other-op:work.author
   kind: check-finding
-
-SLICE_TYPECHECK_INPUT:
-  title: "Slice typecheck missing input"
-  title_vi: "Kiểm tra typecheck thiếu đầu vào"
-  meaning_vi: "Kiểm tra typecheck của slice thiếu mốc nền hoặc đường dẫn sở hữu."
-  causes_vi:
-    - "Không truyền --base"
-    - "Không truyền đường dẫn sở hữu"
-  nextStep_vi: "Kiểm tra báo chưa xác nhận được; hãy chạy lại kèm --base và ít nhất một đường dẫn sở hữu."
-  owner: op-retry
-  kind: check-status
-
-SLICE_TYPECHECK_UNAVAILABLE:
-  title: "Slice typecheck cannot run"
-  title_vi: "Không chạy được typecheck slice"
-  meaning_vi: "Kiểm tra typecheck của slice không chạy được hoặc không có dự án TypeScript nào phủ các đường dẫn."
-  causes_vi:
-    - "Không có tsconfig phủ đường dẫn sở hữu"
-    - "Không nạp được trình biên dịch TypeScript"
-  nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần truyền tsconfig đúng qua --project hoặc sửa môi trường."
-  owner: op-retry
-  kind: check-status
-
-SOURCE_FILE_UNCHECKED:
-  title: "Source file not covered by check"
-  title_vi: "Tệp nguồn chưa được kiểm tra"
-  meaning_vi: "Một tệp nguồn cần kiểm tra nhưng không nằm trong danh sách tệp đã được kiểm."
-  causes_vi:
-    - "Chạy kiểm tra với danh sách tệp thiếu"
-    - "Tệp mới thêm chưa được đưa vào"
-  nextStep_vi: "Kiểm tra từ chối; hãy chạy lại kiểm tra để phủ đủ mọi tệp trong phạm vi."
-  owner: op-retry
-  kind: check-finding
-
-SOURCE_INVENTORY_EMPTY:
-  title: "Source inventory is empty"
-  title_vi: "Danh sách tệp nguồn trống"
-  meaning_vi: "Kiểm tra lint theo phạm vi không tìm thấy tệp nguồn nào để kiểm."
-  causes_vi:
-    - "Cấu hình profile không khớp tệp nào"
-    - "Đường dẫn phạm vi sai"
-  nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần sửa profile hoặc phạm vi rồi chạy lại."
-  owner: runtime-core
-  kind: check-status
-
-SOURCE_PATH_UNSAFE:
-  title: "Unsafe source path"
-  title_vi: "Đường dẫn nguồn không an toàn"
-  meaning_vi: "Trong danh sách tệp nguồn có đường dẫn không an toàn để đọc, ví dụ trỏ ra ngoài kho."
-  causes_vi:
-    - "Liên kết tượng trưng ra ngoài kho"
-    - "Đường dẫn chứa ký tự nguy hiểm"
-  nextStep_vi: "Kiểm tra chặn và báo chưa xác nhận; cần loại bỏ hoặc sửa đường dẫn đó."
-  owner: op-retry
-  kind: check-status
 
 STACKS_CI_CONTRADICTION:
   title: "Stack says service off but CI calls it"
@@ -6764,17 +5871,6 @@ UNDER_DISPATCHED:
   nextStep_vi: "Chỉ là cảnh báo trạng thái tiến độ; Kernel cần giao thêm việc, nếu kéo dài sẽ thành dừng trệ."
   owner: runtime-core
   kind: check-status
-
-UNEXPECTED_FILE:
-  title: "Lint reported an unexpected file"
-  title_vi: "Lint báo cáo tệp ngoài dự kiến"
-  meaning_vi: "Kết quả lint có tệp mà lần chạy không được yêu cầu kiểm tra."
-  causes_vi:
-    - "Cấu hình lint quét thêm tệp"
-    - "Danh sách tệp cần kiểm tra không khớp"
-  nextStep_vi: "Việc kiểm tra lint theo phạm vi bị coi là không tin cậy; cần chạy lại đúng danh sách tệp."
-  owner: op-retry
-  kind: check-finding
 
 UNKNOWN_DOMAIN:
   title: "Node names undeclared domain"
@@ -9753,18 +8849,8 @@ parity-no-base:
   meaning_vi: "Bộ chốt không có mốc commit lúc nhận việc, nên không đo được sự khác biệt do thợ gây ra."
   causes_vi:
     - "Job không có params.admissionBase"
-    - "Báo cáo không khai --base cho scoped-lint"
+    - "Báo cáo không khai --base cho gate.mjs"
   nextStep_vi: "Bộ chốt không tự kết luận xanh; Kernel xử lý, hoặc thợ nộp lại báo cáo có khai mốc gốc."
-  owner: op-retry
-  kind: settle-reason
-parity-profile-unknown:
-  title: "Lint profile cannot be determined"
-  title_vi: "Không xác định được cấu hình lint"
-  meaning_vi: "Bộ chốt không biết dùng bộ quy tắc lint nào cho dự án này nên không đo lint được."
-  causes_vi:
-    - "Báo cáo không khai --profile"
-    - "Dự án không có phụ thuộc next hoặc @nestjs/core để suy ra"
-  nextStep_vi: "Bộ chốt không tự kết luận xanh; Kernel xem lại, thợ khai profile trong báo cáo khi nộp lại."
   owner: op-retry
   kind: settle-reason
 parity-rerun-red:
@@ -13015,6 +12101,107 @@ sonar-proof-missing:
   nextStep_vi: "Việc chốt bị từ chối; op chạy sonar-local scan --wait trên phần code đã sửa và đính kèm sonar.json khi nộp report."
   owner: op-retry
   kind: settle-reason
+
+op-gate-proof-missing:
+  title: "No gate result is attached"
+  title_vi: "Chưa đính kèm kết quả cổng kiểm tra"
+  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/checks/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
+  causes_vi:
+    - "Op chưa chạy gate.mjs sau khi viết code"
+    - "Tệp gate.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
+  owner: op-retry
+  kind: settle-reason
+
+op-gate-tool-failed:
+  title: "A gate tool could not run"
+  title_vi: "Một công cụ của cổng kiểm tra không chạy được"
+  meaning_vi: "gate.json báo exit 2: hfs lint, codegen, build gói, tsc hoặc jest không chạy được, nên phần code chưa được chấm. Công cụ không chạy được không bao giờ là đạt."
+  causes_vi:
+    - "Thiếu gói trong node_modules của app (eslint, typescript, prettier, jest)"
+    - "Script codegen hoặc build của gói fe bị lỗi"
+    - "Không xác định được commit gốc để so sánh"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân môi trường được nêu trong errors của gate.json rồi chạy lại cổng, hoặc chốt blocked với lỗi đó. Không bao giờ chốt done khi thiếu cổng."
+  owner: op-retry
+  kind: settle-reason
+
+op-gate-new-findings:
+  title: "The gate reports new findings"
+  title_vi: "Cổng kiểm tra báo lỗi mới"
+  meaning_vi: "gate.json còn lỗi mà commit gốc không có: lỗi lint (theo tệp và luật), lỗi tsc (theo thông điệp đã chuẩn hóa) hoặc spec thất bại. Lỗi đã có sẵn trên commit gốc không bị tính."
+  causes_vi:
+    - "Code mới vi phạm luật lint của canon BE hoặc FE"
+    - "Code mới gây lỗi kiểu TypeScript"
+    - "Spec của slice thất bại"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa đúng các lỗi liệt kê rồi chạy lại cổng, tối đa params.gateRounds vòng. Hết số vòng mà vẫn đỏ thì chốt blocked kèm danh sách lỗi, không bao giờ done."
+  owner: op-retry
+  kind: settle-reason
+
+op-read-digest-missing:
+  title: "The op skipped READ"
+  title_vi: "Op đã bỏ qua bước ĐỌC"
+  meaning_vi: "Report không đính kèm bản tóm tắt ĐỌC (read-digest.json, schema starci/read-digest@1): không có bằng chứng op đã đọc tệp pattern, ví dụ và bản đồ slot trước khi viết code."
+  causes_vi:
+    - "Op viết code ngay mà không chạy scripts/checks/read-digest.mjs"
+    - "Tệp read-digest.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy read-digest.mjs --touch <tệp> --out read-digest.json, đọc đúng các tệp nó liệt kê, kiểm lại code theo đó rồi nộp lại kèm read-digest.json."
+  owner: op-retry
+  kind: settle-reason
+
+op-read-digest-no-pattern:
+  title: "The READ digest names no pattern for a touched file kind"
+  title_vi: "Bản tóm tắt ĐỌC thiếu tệp pattern cho loại tệp đã sửa"
+  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà hfs explain trả về)."
+  causes_vi:
+    - "Op sửa thêm tệp ngoài danh sách --touch lúc đọc"
+    - "Bản tóm tắt được tạo cho slice khác"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy lại read-digest.mjs với mọi tệp đã sửa, đọc các tệp pattern còn thiếu, kiểm lại code rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+GATE_BASE_UNKNOWN:
+  title: "The gate has no base to compare with"
+  title_vi: "Cổng kiểm tra không có commit gốc để so sánh"
+  meaning_vi: "gate.mjs không tìm được commit gốc: --base không phải commit, hoặc nhánh không có upstream, main hay master để lấy merge-base."
+  causes_vi:
+    - "Truyền --base sai hoặc commit đó chưa được fetch"
+    - "Worktree không có nhánh main/master và không có upstream"
+  nextStep_vi: "Op truyền --base <commit gốc của op> rồi chạy lại cổng; cổng thiếu gốc là exit 2, không bao giờ là đạt."
+  owner: op-retry
+  kind: check-finding
+
+GATE_NOT_GIT:
+  title: "The gate root is not a git checkout"
+  title_vi: "Thư mục chạy cổng không phải kho git"
+  meaning_vi: "gate.mjs chỉ so sánh được với commit gốc khi --root nằm trong một kho git; thư mục đã cho không phải."
+  causes_vi:
+    - "--root trỏ sai thư mục"
+    - "Worktree của op đã bị xóa"
+  nextStep_vi: "Op chạy lại cổng với --root là worktree của app."
+  owner: op-retry
+  kind: check-finding
+
+GATE_MERGE_UNREADABLE:
+  title: "The merge guard could not recompute a merge"
+  title_vi: "Chốt chặn merge không tính lại được một commit merge"
+  meaning_vi: "gate.mjs tính lại mỗi commit merge trên nhánh bằng git merge-tree để xem thay đổi của main có bị bỏ không; commit này không đọc được (thiếu merge-base hoặc git merge-tree lỗi), nên cổng là exit 2."
+  causes_vi:
+    - "Hai cha của commit merge không có merge-base chung"
+    - "Bản git quá cũ, không có git merge-tree --write-tree"
+  nextStep_vi: "Sửa môi trường git (git 2.38 trở lên) hoặc làm lại nhánh không có commit merge đó, rồi chạy lại cổng; cổng không đọc được merge không bao giờ là đạt."
+  owner: op-retry
+  kind: check-finding
+
+GATE_TOOL_FAILED:
+  title: "The lint gate could not run a tool"
+  title_vi: "Cổng lint không chạy được một công cụ"
+  meaning_vi: "Phần lint của gate.mjs (hfs lint --changed so với commit gốc) mà canon parity chạy cho một slice báo exit 2: một công cụ không chạy được, nên không đo được slice. Đây là lỗi công cụ, không phải lỗi đỏ của slice."
+  causes_vi:
+    - "hfs lint không in ra báo cáo starci/lint@1"
+    - "Không đo được lint ở commit gốc"
+  nextStep_vi: "Settler chuyển slice cho Kernel dưới dạng checker không dùng được; sửa môi trường công cụ rồi đo lại."
+  owner: runtime-core
+  kind: check-finding
 
 STACKS_QUALITY_GATE_DRIFT:
   title: "Sonar quality gate name differs from the standard"

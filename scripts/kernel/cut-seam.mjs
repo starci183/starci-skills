@@ -369,7 +369,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
 /**
  * The redo of a slice that settled blocked or failed after committing: the same op, cut ordinal and owned
  * paths as a new attempt --retry-of it, with params.resumeFrom = the head its indexed patch recorded (the
- * committed work it keeps) and params.admissionBase = the first attempt's admission base (the scoped-lint
+ * committed work it keeps) and params.admissionBase = the first attempt's admission base (the gate
  * --base, so the kept commit is still measured). Null when the job indexed no committed patch.
  */
 export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {

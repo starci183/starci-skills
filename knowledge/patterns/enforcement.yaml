@@ -68,21 +68,21 @@ rules:
       Ignored files and undiscovered tests create false green results.
 
   - id: ENF-MANDATORY-5
-    title: Scoped lint helper integrity only
+    title: Gate result integrity only
     kind: mandatory
     hfsRules: [R18]
     requirement: |
-      The implemented read-only helper is
-      `node scripts/checks/check-scoped-lint.mjs <repository> <explicit-owned-file> [...]`.
-      It rejects ignored, missing, duplicate and outside-root inputs and fails reported warnings, errors and suppressed
-      violations. It reports effective rules and inline-config state without changing them. Its success means lint-result integrity
-      only: disabled rules, unused directives, TypeScript directives, semantic aliases and structural omissions still need the
-      separate config and source audit. It never grants code acceptance.
+      The implemented read-only gate is
+      `node scripts/checks/gate.mjs --root <app> --changed <file> [...]`.
+      It runs hfs lint over the changed files, tsc per owning project and the slice's tests, and blocks only on findings the
+      base does not have (exit 1); a tool that could not run is exit 2, never a pass. It changes no rule and no inline config.
+      Its success means result integrity only: disabled rules, unused directives, TypeScript directives, semantic aliases and
+      structural omissions still need the separate config and source audit. It never grants code acceptance.
     rationale: |
-      A scoped lint helper verifies reporting integrity; it is not product acceptance.
+      The gate verifies reporting integrity; it is not product acceptance.
     verification:
       automated:
-        - scripts/checks/check-scoped-lint.mjs
+        - scripts/checks/gate.mjs
       manual:
         - Audit disabled rules, aliases and structural omissions separately.
 

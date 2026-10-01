@@ -13,7 +13,7 @@ settle:
   measurementLeg: >-
     A review.verify job in mode lint is a MEASUREMENT leg unless params.lintRole says gate, or (auto)
     a build op of its workflow settled succeeded before it was enqueued. `api check` marks its checks whose
-    nonzero exit is a measured result (canon-scan 1, scoped-lint 1/2, lint 1 - not canon-scan 2/3 or a run
+    nonzero exit is a measured result (canon-scan 1, gate.mjs 1/2, lint 1 - not canon-scan 2/3 or a run
     that did not execute) as measured and they count passed; settle --verdict pass accepts its report even
     when filed `failed` for findings alone (result.measurement), and settle --verdict fail on findings alone
     is refused measurement-findings-are-the-result unless --tool-error says a checker did not run.

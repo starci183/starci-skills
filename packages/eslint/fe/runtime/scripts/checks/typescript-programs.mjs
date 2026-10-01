@@ -4,8 +4,8 @@ import path from 'node:path';
 
 // One TypeScript program per (compiler, root names, compiler options, project references) inside a program run, and
 // one value per (kind, compiler, input) for what callers derive from those programs (the architecture context).
-// check-scoped-lint opens one run around its architecture check and its script checkers and releases it before
-// ESLint and the base measurement, so nothing built here outlives the run that built it. Outside a run every call
+// A caller (canon-scan's architecture machine, a script checker) opens one run around its work and releases it after,
+// so nothing built here outlives the run that built it. Outside a run every call
 // builds afresh.
 const runs = new AsyncLocalStorage();
 

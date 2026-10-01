@@ -61,6 +61,16 @@ test('the op-label catalogue exempts only the vi field of an inline { vi, en } p
   assert.equal(documentLanguageHits('modules/ops/other.yaml', clean).length, 2);
 });
 
+test('an op manifest exempts only the vi field of its {en, vi} text objects', () => {
+  const rel = 'modules/ops/ops/backend.implement.yaml';
+  const clean = `steps:\n  - action:\n      en: READ before coding.\n      vi: ${VI}\n`;
+  assert.deepEqual(documentLanguageHits(rel, clean), []);
+  // Vietnamese under en, or a manifest-like file outside modules/ops/ops, is still refused
+  assert.deepEqual(documentLanguageHits(rel, `steps:\n  - action:\n      en: ${VI}\n`).map(hit => hit.line), [3]);
+  assert.equal(documentLanguageHits('modules/ops/ops/nested/x.yaml', clean).length, 1);
+  assert.equal(documentLanguageHits('modules/ops/registry.yaml', clean).length, 1);
+});
+
 test('the archetype lexicons exempt only their declared phrase-list keys, not the prose beside them', () => {
   const rel = 'modules/goal/archetypes.yaml';
   const clean = ['phraseSets:', `  buildIntent: [build, ${VI}]`, 'archetypes:', '  - id: backend', `    requires: [api, ${VI}]`, `    excludes: [${VI}]`, `  - phrases: [run, ${VI}]`, ''].join('\n');

@@ -10,6 +10,9 @@ import { spawnSync } from 'node:child_process';
 import { productLand, landPreflight } from '../scripts/kernel/product-land.mjs';
 import { ensureOpWorktree, integrateOp, productSettings, layoutOf } from '../scripts/kernel/product-worktree.mjs';
 
+// The land gate is judged by tests/op-gate-loop.spec.mjs; these fixtures carry no app install, so their land gate is green.
+const greenGate = () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] });
+
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
@@ -39,7 +42,7 @@ function opEdits(repo, wf, jobId, file, text) {
   assert.ok(made.ok, JSON.stringify(made));
   write(made.record.op.path, file, text);
   git(made.record.op.path, 'add', '-A'); git(made.record.op.path, 'commit', '-q', '-m', `${jobId} ${file}`);
-  const integ = integrateOp({ record: made.record });
+  const integ = integrateOp({ gate: greenGate, record: made.record });
   assert.ok(integ.ok, JSON.stringify(integ));
   return made.record;
 }
@@ -95,7 +98,7 @@ test('a red land check, or more broken imports than main had, lands nothing', (t
   const rec = ensureOpWorktree({ repoRoot: repo, workflowId: 'wf-five-eeee5555', jobId: 'op-code.refactor-5555555555' }).record;
   fs.mkdirSync(path.join(rec.op.path, 'src/core'), { recursive: true });
   git(rec.op.path, 'mv', 'src/x.ts', 'src/core/x.ts'); git(rec.op.path, 'commit', '-q', '-m', 'move x');
-  assert.ok(integrateOp({ record: rec }).ok, 'the move itself integrates: its own files import nothing broken');
+  assert.ok(integrateOp({ gate: greenGate, record: rec }).ok, 'the move itself integrates: its own files import nothing broken');
   const broken = productLand({ repoRoot: repo, workflowId: 'wf-five-eeee5555' });
   assert.equal(broken.reason, 'product-land-red');
   assert.match(broken.checks.find((c) => c.name === 'imports-broken-after-move').output, /main 0 -> candidate 1: src\/uses\.ts -> @\/x/);

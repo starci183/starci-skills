@@ -2,7 +2,7 @@ name: todo-app-example
 
 # Proves the todo-app example (examples/todo-app-backend + examples/todo-app-frontend): record layout,
 # type-check, unit tests, lint and build, on a declared GitHub-hosted runner, so the runtime's own gates
-# (record layout, scoped lint) stay green for the example at all times. See
+# (record layout, hfs lint) stay green for the example at all times. See
 # examples/todo-app-backend/README.md#continuous-verification for the job-by-job summary. The live stack and
 # Playwright UAT job is e2e and runs MANUALLY only (owner ruling 2026-09-29): see todo-app-live-e2e.yml.
 #
@@ -58,7 +58,7 @@ jobs:
       - name: Run the example Work-gate fixture suite
         run: node --test tests/example-work-gate.spec.mjs
 
-  # 2) todo-app-backend: unit tests plus the scoped-lint gate, both read-only and requiring nothing but
+  # 2) todo-app-backend: unit tests plus hfs lint, both read-only and requiring nothing but
   #    the backend's own installed dependencies (the checker loads TypeScript through the checked
   #    repository's own node_modules, never the runtime's).
   backend:
@@ -88,15 +88,14 @@ jobs:
       - name: Unit tests
         run: npx jest --selectProjects unit
 
-      # The aggregate gate for this repository. The architecture check is one of its machine kinds, so it
-      # runs here and nowhere else (docs/architecture-check.md); the layout is derived from `hfs.json` inside
-      # `--root`. The process exit code is the verdict - 0 `clean`, 1 `findings`, 2 `unavailable` - and the
-      # `starci/code-pattern-check@1` report on stdout is the detail, so no second step re-reads it.
-      - name: Scoped lint (nest profile)
+      # THE lint of this repository (the ESLint canon plus `hfs check`, which carries the architecture check,
+      # docs/architecture-check.md); the layout is derived from `hfs.json` inside `--repo`. The process exit
+      # code is the verdict - 0 no finding, 1 findings, 2 a tool could not run.
+      - name: hfs lint
         working-directory: .
-        run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --all
+        run: node packages/hfs/bin/hfs.mjs lint --repo examples/todo-app-backend
 
-  # 3) todo-app-frontend: type-check, lint, production build and the scoped-lint gate (a front end has no tests).
+  # 3) todo-app-frontend: type-check, lint, production build and hfs lint (a front end has no tests).
   frontend:
     name: frontend
     runs-on: ubuntu-latest
@@ -134,9 +133,8 @@ jobs:
       - name: Production build
         run: npx next build
 
-      # Same gate as the backend's, on the `next` profile: the architecture check is one of its machine
-      # kinds, and the exit code is the verdict (0 `clean`, 1 `findings`, 2 `unavailable`). The command is
-      # run unpiped so the runner sees that exit code rather than `tee`'s.
-      - name: Scoped lint (next profile)
+      # Same lint as the backend's; the exit code is the verdict (0 no finding, 1 findings, 2 a tool could not
+      # run). The command is run unpiped so the runner sees that exit code rather than `tee`'s.
+      - name: hfs lint
         working-directory: .
-        run: node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --all
+        run: node packages/hfs/bin/hfs.mjs lint --repo examples/todo-app-frontend

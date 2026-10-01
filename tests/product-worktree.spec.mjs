@@ -16,6 +16,9 @@ import {
 } from '../scripts/kernel/product-worktree.mjs';
 import { WORKTREES_REL } from '../scripts/lib/worktree-exclude.mjs';
 
+// The land gate is judged by tests/op-gate-loop.spec.mjs; these fixtures carry no app install, so their land gate is green.
+const greenGate = () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] });
+
 const WF = 'wf-nivo-fe-canon-mujek980';
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
@@ -140,13 +143,13 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   write(b.op.path, 'apps/app/src/i18n/request.ts', 'export const locale = "fr";\n');
   git(b.op.path, 'commit', '-qam', 'b: fr');
   const before = git(repo, 'rev-parse', 'wf/mujek980');
-  const okA = integrateOp({ record: a, head: git(a.op.path, 'rev-parse', 'HEAD') });
+  const okA = integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') });
   assert.ok(okA.ok, JSON.stringify(okA));
   assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after);
   assert.equal(fs.readFileSync(path.join(a.workflow.path, 'apps/app/src/i18n/request.ts'), 'utf8'), 'export const locale = "en";\n', 'the _wf tree moved with its branch');
   assert.equal(git(repo, 'cherry', 'wf/mujek980', git(a.op.path, 'rev-parse', 'HEAD'), before).split('\n')[0][0], '-', 'the rebased commit is patch-equivalent in wf');
-  assert.equal(integrateOp({ record: a, head: git(a.op.path, 'rev-parse', 'HEAD') }).already, true, 'idempotent');
-  const conflict = integrateOp({ record: b, head: git(b.op.path, 'rev-parse', 'HEAD') });
+  assert.equal(integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') }).already, true, 'idempotent');
+  const conflict = integrateOp({ gate: greenGate, record: b, head: git(b.op.path, 'rev-parse', 'HEAD') });
   assert.equal(conflict.ok, false);
   assert.equal(conflict.reason, 'product-integrate-conflict');
   assert.equal(conflict.conflicts[0].file, 'apps/app/src/i18n/request.ts');
@@ -156,7 +159,7 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   const c = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-cc33dd44ee' }).record;
   write(c.op.path, 'apps/app/src/c.ts', 'import { x } from "@/i18n/gone";\nexport const c = x;\n');
   git(c.op.path, 'add', '-A'); git(c.op.path, 'commit', '-qm', 'c');
-  const red = integrateOp({ record: c, head: git(c.op.path, 'rev-parse', 'HEAD') });
+  const red = integrateOp({ gate: greenGate, record: c, head: git(c.op.path, 'rev-parse', 'HEAD') });
   assert.equal(red.reason, 'product-integrate-red', JSON.stringify(red));
   assert.match(red.failures.join(' '), /IMPORTS_BROKEN_AFTER_MOVE/);
   assert.equal(red.continuation.base, okA.after);
@@ -166,7 +169,7 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   const d = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-ee55ff66aa' }).record;
   write(d.op.path, 'package.json', JSON.stringify({ name: 'nivo', private: true, workspaces: ['apps/*', 'packages/*'], dependencies: { x: '1' } }));
   git(d.op.path, 'commit', '-qam', 'deps');
-  const refused = integrateOp({ record: d });
+  const refused = integrateOp({ gate: greenGate, record: d });
   assert.equal(refused.reason, 'deps-unit-required');
   assert.match(refused.hint, /api product-deps --workflow wf-nivo-fe-canon-mujek980 --from-job op-code.refactor-ee55ff66aa/);
   // The serial deps unit: the manifests land on wf/<wf>, _wf gets a real install, the op overlays now mirror it.
@@ -178,7 +181,7 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   assert.ok(installedIn(d.workflow.path), 'the _wf holds the real install');
   assert.equal(real(path.join(d.op.path, 'node_modules', 'x')), real(path.join(d.workflow.path, 'node_modules', 'x')), 'the op overlay mirrors the workflow install');
   assert.ok(deps.rebuilt.some((r) => r.path === d.op.path && r.ok));
-  assert.equal(integrateOp({ record: d }).ok, true, 'its manifests are the workflow branch now: the op settles');
+  assert.equal(integrateOp({ gate: greenGate, record: d }).ok, true, 'its manifests are the workflow branch now: the op settles');
 });
 
 test('released -> worktree-removed: the reap records the transition once; the workflow worktree waits for its land', (t) => {

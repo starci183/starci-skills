@@ -151,7 +151,7 @@ node bin/starci.mjs validate <work-root>   # read-only Work record/layout valida
 ```
 
 Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
-directly, e.g. `node .claude/scripts/checks/check-scoped-lint.mjs`. The full surface — install verbs, the
+directly, e.g. `node .claude/scripts/checks/gate.mjs`. The full surface — install verbs, the
 api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli.md).
 
 ## Documentation

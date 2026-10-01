@@ -5,7 +5,6 @@ import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { checkNestErrors, NEST_ERROR_RULES } from '../scripts/checks/code-patterns/nest-errors.mjs';
-import { defaultScriptChecker } from '../scripts/checks/check-scoped-lint.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));
@@ -185,13 +184,6 @@ declare const app: { useGlobalFilters(...filters: unknown[]): void };
 app.useGlobalFilters(new AppErrorFilter());` } });
   result = checkNestErrors(bootstrap.input);
   assert.ok(result.errors.some(item => item.message.includes('bootstrap or dynamic')));
-});
-
-test('public aggregate script routing invokes the isolated Nest error adapter', async t => {
-  const f = fixture(t), result = await defaultScriptChecker('nest', f.input);
-  assert.equal(result.schema, 'starci/code-pattern-script@1');
-  assert.deepEqual(result.errors, []); assert.deepEqual(result.checkedRuleIds, [...NEST_ERROR_RULES].sort());
-  await assert.rejects(() => defaultScriptChecker('nest', { ...f.input, ruleIds: ['NEST_FOREIGN_ERROR_CAUSE', 'NEST_ENV_ACCESS'] }), /cannot be mixed/);
 });
 
 test('replacement throws preserve the caught input through the declared cause property', t => {

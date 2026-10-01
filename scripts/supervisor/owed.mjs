@@ -118,7 +118,7 @@ const LABEL_RULES = [
   ['runtime', (k, t) => /runtime|source|liveness|nudge|op-boundary|provider|launch|environment|api-/.test(k) || /\b(?:scripts|engine|modules|knowledge|bin)\/[\w./-]+|\.claude\b|\bSource\b/.test(t)],
   ['liveness', (k, t) => /liveness|nudge|idle/.test(k) || /\bturn-idle\b|\bnudge-ready\b|\bliveness\b/i.test(t)],
   ['worker-died', (k, t) => /died|exited|no-report|missing-report|without-report|turn-cap/.test(k) || /without (?:filing )?(?:a |an )?(?:api )?report|bare PowerShell prompt|không nộp report/i.test(t)],
-  ['checker', (k, t) => /checker|lint|quality-gate/.test(k) || /status[= ]unavailable|check-scoped-lint|code-patterns-check|\bsonar\b/i.test(t)],
+  ['checker', (k, t) => /checker|lint|quality-gate/.test(k) || /status[= ]unavailable|gate.mjs|code-patterns-check|\bsonar\b/i.test(t)],
   ['knowledge-churn', (k, t) => /stale|churn|baseline|rollout/.test(k) || /staleOperations|staleInput|knowledge\/[\w.-]+\.ya?ml/i.test(t)],
   ['contract-conflict', (k, t) => /contradict|conflict|divergence|read-race/.test(k) || /mâu thuẫn|contradict/i.test(t)],
   ['cross-workflow', (k, t) => /cross|foreign|shared|history|unowned|env-/.test(k) || /git reset|\brebase\b|\bamend\b|reflog/i.test(t)],

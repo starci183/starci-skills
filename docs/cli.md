@@ -84,11 +84,12 @@ Agent flags always come from the agent card
 Read-only machine gates; they judge bytes, not claims. Highlights:
 
 ```sh
-node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo> \
-  (--all | [--base <commit>] -- <files...>)
-                                                           # aggregate: architecture + code patterns;
-                                                           # a scoped run exits on report.slice: its NEW findings against
-                                                           # --base (owed repo contracts and debt already there at base are notes)
+node scripts/checks/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <files...>] [--tests <pattern>] [--out <file>]
+                                                           # THE op gate (starci/gate@1): merge guard, hfs lint --changed, codegen +
+                                                           # dist builds, tsc per owning tsconfig, jest --maxWorkers=2; only findings
+                                                           # new against --base block; exit 0 clean, 1 new findings, 2 a tool could not run
+node scripts/checks/read-digest.mjs --root <app> --touch <files...> --out <file>
+                                                           # the op loop's READ digest (starci/read-digest@1)
 node scripts/checks/acceptance.mjs ...                     # evidence-packet verdicts
 node scripts/checks/proof.mjs ...                          # proof verification
 node scripts/checks/check-entry.mjs <host>                 # installed-entry sanity

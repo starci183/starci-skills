@@ -248,8 +248,10 @@ $defs:
     type: object
     additionalProperties: false
     required: [en]
+    description: "English text; `vi` is the same rule in Vietnamese for the owner's reading (the op loop carries both)."
     properties:
       en: {type: string, minLength: 1}
+      vi: {type: string, minLength: 1}
   slug:
     type: string
     minLength: 1

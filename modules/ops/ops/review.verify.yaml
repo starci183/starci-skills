@@ -201,16 +201,12 @@ policy:
               scripts/checks/sonar-local.mjs with scope slice, outcome pass and revision.commit
               equal to the tested commit (the slice's new issues, hotspots and duplication;
               projectGate is whole-project debt, a note and never a finding against the slice).
-              The code-pattern proof of a slice is the producer's attached scoped-lint.json from
-              check-scoped-lint.mjs over the owned files with --base the slice's recorded base
-              commit, its slice.status clean for the tested revision (the slice's NEW findings
-              gate it, and a SLICE_PREEXISTING_FINDINGS note in slice.preexisting is repository
-              debt already there at base - record it as code.refactor's note, never a finding
-              against the slice); this op's own --all run still measures the whole repository.
-              A REPOSITORY_OBLIGATION_OWED note in slice.owed is a repo-level obligation
-              contract (named file and key) owed by the repository owner - record it as that
-              owner's note, never a finding against the slice; issues located only outside the
-              slice are not the slice's.
+              The lint, typecheck and slice-spec proof of a slice is the producer's attached gate.json
+              (starci/gate@1 from scripts/checks/gate.mjs over the slice's changed files against its
+              base) with exit 0 for the tested revision - only the slice's NEW findings gate it, and its
+              preexisting count is repository debt already there at base - record it as code.refactor's
+              note, never a finding against the slice; this op's own whole-repository hfs lint still
+              measures the repository. Issues located only outside the slice are not the slice's.
               Missing, stale, skipped or failing proof returns a finding
               to the owning implement op. Record per-required-criterion pass/fail/not-run and
               evidence references; do not weaken acceptance or complete implementation for its
@@ -816,10 +812,10 @@ policy:
             - inputs
           writes: [evidence]
           action:
-            en: Execute node scripts/checks/check-scoped-lint.mjs --profile nest or next --root ROOT --all for every selected
-              FE/BE source repository with the actual project bindings. This aggregate runs required
-              architecture and adopted code-pattern machines with exact rule/file coverage; a
-              repository's package lint cannot substitute for it. Execute starci validate for
+            en: Execute the whole-repository hfs lint (hfs lint --repo ROOT --format json, the app's own install) for every selected
+              FE/BE source repository with the actual project bindings. This one lint runs the canon's
+              per-file and project-graph rules and the repository checks with exact rule/file coverage;
+              a repository's other package lint cannot substitute for it. Execute starci validate for
               selected canonical Work and starci-stacks-check for selected materialized stack
               profiles. Inspect each repository's real package scripts and run its additional
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
@@ -839,10 +835,8 @@ policy:
               owns them (node code.refactor, backend.implement or interface.implement, files the paths),
               and the kernel routes one repair of that op - never a re-run of the same measurement at an
               unchanged HEAD.
-              Capture each original report and exit code. This --all run is the repository measurement - a repo-level obligation contract
-              the repository has not declared stays unavailable here and routes to the repository
-              owner, while a delivery slice is judged by its scoped run's slice verdict (a
-              REPOSITORY_OBLIGATION_OWED note there). Do not run fix flags, hide files, lower rules or replace machine output with
+              Capture each original report and exit code. This whole-repository hfs lint is the repository measurement, while a
+              delivery slice is judged by its own gate.json (new findings only). Do not run fix flags, hide files, lower rules or replace machine output with
               prose. An unavailable required checker or unresolved target fails the gate. Route
               measured findings to separately authorized owners; static pass never proves runtime
               dependency injection, live startup, browser UAT or business correctness.

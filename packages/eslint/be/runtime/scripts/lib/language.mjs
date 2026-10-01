@@ -39,6 +39,9 @@ export const FAILURE_CODE_VIETNAMESE_FIELDS = Object.freeze(['title_vi', 'meanin
  *  - modules/ops/_labels.yaml: the op-label catalogue, one `{ vi, en }` pair per op (the `vi` field is the localized label).
  *  - modules/goal/archetypes.yaml: the Vietnamese phrase lexicons matched against owner input (the signal phrase sets, and the
  *    phrase lists of the archetype recognisers).
+ * An op manifest (modules/ops/ops/<id>.yaml, the starci/op@1 documents check-op-manifest types) is declared by
+ * OP_MANIFEST_VIETNAMESE_FIELDS: its text objects are {en, vi} (modules/schemas/op.schema.yaml $defs text), and `vi` is the
+ * owner's reading of the same rule.
  */
 export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
   'modules/kernel/failure-codes.yaml': Object.freeze({ fields: FAILURE_CODE_VIETNAMESE_FIELDS }),
@@ -50,6 +53,13 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
     ]),
   }),
 });
+
+/** The `vi` field of an op manifest's text objects (modules/schemas/op.schema.yaml $defs text). */
+export const OP_MANIFEST_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']) });
+const OP_MANIFEST_DIR = 'modules/ops/ops/';
+/** The declared Vietnamese fields of `rel`: its own entry, or the op-manifest text field for a manifest of modules/ops/ops. */
+export const declaredVietnameseFieldsOf = (rel) => DECLARED_VIETNAMESE_FIELDS[rel]
+  ?? (rel.startsWith(OP_MANIFEST_DIR) && !rel.slice(OP_MANIFEST_DIR.length).includes('/') && /\.ya?ml$/.test(rel) ? OP_MANIFEST_VIETNAMESE_FIELDS : null);
 
 /**
  * The slots whose files may carry another language, and why: a catalog is product copy in two languages, and an i18n
@@ -86,7 +96,7 @@ export function yamlKeyOfEachLine(text) {
 
 /** The Vietnamese hits of a document, minus the declared field-level exceptions of `rel` (a repository-relative POSIX path). */
 export function documentLanguageHits(rel, text) {
-  const declared = DECLARED_VIETNAMESE_FIELDS[rel];
+  const declared = declaredVietnameseFieldsOf(rel);
   const hits = secondLanguageHits(text);
   if (!declared) return hits;
   const keys = yamlKeyOfEachLine(text);

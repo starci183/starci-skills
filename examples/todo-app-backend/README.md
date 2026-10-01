@@ -52,11 +52,10 @@ runner rather than a developer's laptop:
 
 - **records** - the runtime's own YAML loader and Work-tree layout gate over both example repositories,
   plus the fixture suite behind `scripts/checks/check-example-work.mjs`.
-- **backend** - this repository's type-check, unit tests and the `nest` scoped-lint gate
-  (`scripts/checks/check-scoped-lint.mjs`), which carries the architecture check as one of its machine
-  kinds and whose exit code is the verdict: `0` clean, `1` findings, `2` unavailable.
-- **frontend** - `examples/todo-app-frontend`'s type-check, unit tests, lint, production build and the
-  same gate on the `next` profile.
+- **backend** - this repository's type-check, unit tests and `hfs lint` (`packages/hfs/bin/hfs.mjs lint`), which
+  carries the architecture check (the canon's project-graph rules and `hfs check`) and whose exit code is the
+  verdict: `0` clean, `1` findings, `2` a tool could not run.
+- **frontend** - `examples/todo-app-frontend`'s type-check, lint, production build and the same `hfs lint`.
 - **live** (manual: `.github/workflows/todo-app-live-e2e.yml`, `workflow_dispatch` only, e2e) - brings up this example's real dev stack (Postgres + Keycloak) with the committed DEMO-ONLY
   SOPS secrets, builds and runs the real API and the real Next.js production server, proves sign-in,
   the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an

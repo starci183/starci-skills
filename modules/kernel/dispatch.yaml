@@ -303,7 +303,7 @@ preflight:
     against the target repo's declared layout and lint rules — the
     applicability/ruleIds tables in modules/models/code-patterns.yaml and
     the check surface under scripts/checks/ that enforces them
-    (code-patterns/*, check-scoped-lint). A grant that contradicts a layout
+    (code-patterns/*, gate.mjs). A grant that contradicts a layout
     rule — e.g. `src/tests/**` claimed while the repo profile enforces
     starci-be/unit-test-colocated — is `api incident --kind
     path-illegality`, never a job row that dispatches and settles red.

@@ -104,7 +104,7 @@ rules:
       Lint success is integrity of reported results, not full structural or semantic conformance.
     verification:
       automated:
-        - scripts/checks/check-scoped-lint.mjs
+        - scripts/checks/gate.mjs
       manual:
         - Audit disabled rules, unused directives, TypeScript directives and structural omissions.
   - id: REF-VERIFY-2

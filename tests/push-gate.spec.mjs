@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
-import {writeGreenSonar} from './helpers/sonar-scan.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 import {changedFilesOf,declaredPushGateLint,parseEslintCommand,patternReaches,pushGateProof,shellWords} from '../scripts/kernel/push-gate.mjs';
 
 // settle's push-gate half (modules/kernel/api.yaml commands.settle, push-gate-red): a committing
@@ -84,7 +84,7 @@ const seedJob=(repo,{head,files,admittedAt=Date.now(),jobId='op-gate-1',wf='wf-g
     ledger.transaction(db=>{
       const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
-      fileReport(db,{attemptId,outcome:'done',report:{outcome:'done',summary:'landed',head,branch:'main',files:[...(files??[]),writeGreenSonar(path.join(repo,'..','sonar-'+jobId))]},createdAt:admittedAt});
+      fileReport(db,{attemptId,outcome:'done',report:{outcome:'done',summary:'landed',head,branch:'main',files:[...(files??[]),...writeGreenProofs(path.join(repo,'..','sonar-'+jobId))]},createdAt:admittedAt});
       recordCheckRun(db,{attemptId,name:'unit',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:admittedAt});
     });
   }finally{ledger.close();}
