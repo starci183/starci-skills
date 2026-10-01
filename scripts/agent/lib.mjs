@@ -383,8 +383,8 @@ export function cleanupDeliveryArtifact(artifact) {
 // an effect is reconciled before the failure returns, so no caller ever owns a half launch.
 // `onCreated(handle, dispatchId)` runs the moment the assignee terminal is known, before attestation: the caller
 // records it durably (nivo inc-e523617a3c31).
-export function spawnAgent({ provider, model = null, effort = null, worktree, title, task, run, from = null, retryOf = null, onCreated = null,
-  io = null } = {}) {
+export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, task, run, from = null,
+  retryOf = null, onCreated = null, io = null } = {}) {
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow, assignee: io?.assignee ?? dispatchShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? workerRelease,
     trust: io?.trust ?? ensureLaunchTrust };
@@ -396,7 +396,11 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.
   try { trust = orca.trust({ agent: provider, cwd: worktree, ...(!takesModel && model ? { model } : {}) }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
-  const started = orca.start({ task, worktree, agent: card?.start?.agentArgument ?? provider,
+  // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
+  // --name, --setup); an existing worktree takes none (Orca refuses them there).
+  const creates = worktree === 'new-child' || worktree === 'new-top-level';
+  const creation = creates ? { ...(repo ? { repo } : {}), ...(baseBranch ? { baseBranch } : {}), ...(name ? { name } : {}), ...(setup ? { setup } : {}) } : {};
+  const started = orca.start({ task, worktree, ...creation, agent: card?.start?.agentArgument ?? provider,
     ...(takesModel && model ? { model, ...(effort ? { effort } : {}) } : {}), displayName: title, run, from, retryOf });
   const dispatchId = started?.dispatchId ?? null;
   // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop):
@@ -459,8 +463,8 @@ const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: f
 // Run is created (a Run's coordinator is the terminal that created it, so a relaunch from another entry cannot add
 // a Task to it). The Task spec is the prompt, spilled to `specFile` past the host's argv (task-spec.mjs).
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create'|'task-create', effectState:'none'}.
-export function startAgent({ provider, model = null, effort = null, worktree, title, prompt, specFile = null, heading = null, objective,
-  entry = null, priorRunId = null, onCreated = null, io = null } = {}) {
+export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
+  heading = null, objective, entry = null, priorRunId = null, onCreated = null, io = null } = {}) {
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate, taskCreate: io?.taskCreate ?? taskCreate };
   const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
   const from = entry ? { from: entry } : {};
@@ -480,5 +484,5 @@ export function startAgent({ provider, model = null, effort = null, worktree, ti
   }
   if (!task?.ok || !task.taskId) return { ok: false, step: 'task-create', error: task?.error ?? 'task-create returned no taskId', provider, runId, effectState: 'none',
     ...(task?.hostUnavailable ? { hostUnavailable: true } : {}) };
-  return spawnAgent({ provider, model, effort, worktree, title, task: task.taskId, run: runId, from: entry, onCreated, io: io?.spawn ?? null });
+  return spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, task: task.taskId, run: runId, from: entry, onCreated, io: io?.spawn ?? null });
 }

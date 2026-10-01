@@ -14,7 +14,7 @@ import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
-import { workflowWorktreeOf, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules } from '../workflow-worktree.mjs';
+import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent } from '../../agent/lib.mjs';
 import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from '../api-lib/rows.mjs';
@@ -212,8 +212,16 @@ export default {
   // Kernel started, and every op of the workflow launches with `--worktree <it>`; no op gets a tree of its own. Ops on
   // one side (be/ or fe/) run one at a time, across sides together (canDispatchConcurrently): a busy side is the typed
   // wait workflow-side-busy, checked with the other waits below. A workflow with no worktree (an unbound repo, the
-  // runtime repo) runs its ops on the ledger repo. --worktree overrides the placement.
+  // runtime repo included) is refused below. --worktree overrides the placement.
   const workflowTree = args.worktree ? null : workflowWorktreeOf({ env: process.env }, job.workflow_id);
+  // EVERY workflow in a git checkout has its worktree (made before its Kernel started); an op of such a workflow without
+  // one is refused, never run on the live checkout where nothing would checkpoint it. A ledger repo in no git checkout
+  // has no worktree to make and nothing to checkpoint: its ops run on it. --worktree is the explicit operator placement.
+  if (args.spawn && !args.worktree && !workflowTree && workflowAppRepo(repo)) {
+    const detail = `workflow ${job.workflow_id} has no workflow worktree in the registry; restart its Kernel (start-workflow creates it through Orca), then dispatch again. The job stays queued.`;
+    emit({ ok: false, jobId, op, reason: WORKFLOW_WORKTREE_MISSING, detail }, `dispatch REFUSED for ${jobId} (${op}): ${WORKFLOW_WORKTREE_MISSING} — ${detail}`, args.json);
+    process.exit(1);
+  }
   const opTreeArgs = workflowTree ? opWorktreeArgs({ env: process.env }, { workflowId: job.workflow_id }) : [];
   const checkoutRoot = args.worktree ?? opTreeArgs[1] ?? repo;
   // The worker starts and works ON its checkout root: the workflow worktree is a git worktree of the app repository,
@@ -341,16 +349,17 @@ export default {
   }
   // A live lease on the write set is a wait (livePathLeaseWait), checked before the provider circuit,
   // the leases and any Orca call: nothing is spawned, nothing is recorded as a rejection.
-  const sideWait = workflowTree ? workflowSideWait(db, job, payload) : null;
-  if (sideWait) {
-    emit({ ok: false, jobId, op, waiting: true, ...sideWait },
-      `dispatch WAITING for ${jobId} (${op}): ${sideWait.reason} — ${sideWait.detail}`, args.json);
-    process.exit(1);
-  }
   const leaseWait = livePathLeaseWait(db, job, payload, { repo });
   if (leaseWait) {
     emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
       `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
+    process.exit(1);
+  }
+  // A busy side of the workflow worktree is the next wait (a path conflict above is the more precise answer).
+  const sideWait = workflowTree ? workflowSideWait(db, job, payload) : null;
+  if (sideWait) {
+    emit({ ok: false, jobId, op, waiting: true, ...sideWait },
+      `dispatch WAITING for ${jobId} (${op}): ${sideWait.reason} — ${sideWait.detail}`, args.json);
     process.exit(1);
   }
   // Host resources are a launch gate on the same admission path as the provider circuit, checked before

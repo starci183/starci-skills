@@ -27,22 +27,24 @@
 // (scripts/lib/worktrees.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { runGit } from '../lib/git.mjs';
 import { withMachine } from '../../engine/machine-db.mjs';
 import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, mainRootOf, orcaWorktreeClient, TERMINAL_JOB_STATUSES } from '../lib/worktrees.mjs';
 import { projectBinding } from './target-repo.mjs';
 
-const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
 export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
+/** The typed refusal of an op whose workflow has no worktree, never a silent run outside it: {reason: 'workflow-worktree-missing'} (modules/kernel/failure-codes.yaml). */
+export const WORKFLOW_WORKTREE_MISSING = 'workflow-worktree-missing';
 const SIDES = Object.freeze(['be', 'fe']);
+/** The side of an op that writes only the workflow's Work records (app-relative .starciwork/...). */
+export const WORK_SIDE = 'work';
+const WORK_DIR = '.starciwork';
 
 const posix = (p) => String(p).replace(/\\/g, '/');
 const ctxOf = (ctx) => ({ env: ctx?.env ?? process.env, orca: ctx?.orca ?? orcaWorktreeClient, git: ctx?.git ?? null });
 const gitIn = (cwd, args) => { const r = runGit(args, { cwd, timeout: 60_000 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() }; };
-const samePath = (a, b) => { const k = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; }; return k(a) === k(b); };
 const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 
 /**
@@ -57,15 +59,18 @@ export function workflowWorktreeSpec({ workflowId, appRepo }) {
 }
 
 /**
- * The app repository a workflow of the ledger repo `repo` gets its worktree in, or null (no worktree: an unbound repo,
- * a repo that is not a git checkout, or the runtime repository itself, which changes only through its own land gate).
+ * The repository a workflow of the ledger repo `repo` gets its worktree in: EVERY workflow has one (coordinator ruling).
+ * The bound app checkout; else the git checkout `repo` is in - the runtime repository (.claude) included, its workflows
+ * (grammar.update, the runtime-repo ops) get a wf-<id> worktree of it the same way. null only when neither is a git
+ * checkout: the Kernel start then refuses workflow-worktree-missing.
  */
 export function workflowAppRepo(repo, { binding = undefined } = {}) {
   const b = binding === undefined ? (() => { try { return projectBinding(repo); } catch { return null; } })() : binding;
   const appRoot = b?.appRoot ?? null;
-  if (!appRoot || !fs.existsSync(path.join(appRoot, '.git'))) return null;
-  if (insidePath(appRoot, SKILL_ROOT) || samePath(appRoot, SKILL_ROOT)) return null;
-  return path.resolve(appRoot);
+  if (appRoot && fs.existsSync(path.join(appRoot, '.git'))) return path.resolve(appRoot);
+  if (!repo) return null;
+  const top = gitIn(path.resolve(repo), ['rev-parse', '--show-toplevel']);
+  return top.ok && top.stdout ? mainRootOf(path.resolve(top.stdout)) : null;
 }
 
 const recordOf = (row) => (row ? { workflowId: row.workflow_id, orcaWorktreeId: row.orca_id, path: path.resolve(row.path), branch: row.branch ?? null,
@@ -136,30 +141,37 @@ const ownedPathsOfRecord = (rec) => {
 };
 
 /**
- * The side of the app an op writes, from its owned paths (app-relative be/..., fe/...): 'be' | 'fe', 'both' when it
- * writes both or anything else in the app root, null when it writes nothing in the app (only the workflow's Work
- * records under .starciwork/, which the path leases already serialise).
+ * The side of the workflow worktree an op writes, from its owned paths (app-relative be/..., fe/..., .starciwork/...):
+ * 'be' | 'fe'; 'both' when it writes both or anything else in the app root; 'work' when it writes only the workflow's
+ * Work records under .starciwork/ (a Work-owner op: scope.define, work.author, the decide ops) - those records ride
+ * along with a be/fe op's side; null when it owns no path.
  */
 export function sideOf(opRecord) {
   const sides = new Set();
+  let work = false;
   for (const raw of ownedPathsOfRecord(opRecord)) {
     const p = posix(raw).replace(/^\.\//, '').replace(/^\/+/, '');
     const head = p.split('/')[0];
-    if (!head || head === '.starciwork') continue;
+    if (!head) continue;
+    if (head === WORK_DIR) { work = true; continue; }
     sides.add(SIDES.includes(head) ? head : 'both');
   }
-  if (!sides.size) return null;
   if (sides.has('both') || sides.size > 1) return 'both';
-  return [...sides][0];
+  if (sides.size) return [...sides][0];
+  return work ? WORK_SIDE : null;
 }
 
-/** Whether `next` may run while `running` ops of the same workflow work in its worktree: same side no, across sides yes, 'both' never. */
+/**
+ * Whether `next` may run while `running` ops of the same workflow work in its worktree. be/fe: same side no, across
+ * sides yes, 'both' (the whole app) never with another be/fe/both op. 'work' (Work records only) is its own side: it
+ * runs beside be/fe/both ops, and two Work ops are serialised with each other by their path leases, not by the side.
+ */
 export function canDispatchConcurrently(running, next) {
   const n = sideOf(next);
-  if (n === null) return true;
+  if (n === null || n === WORK_SIDE) return true;
   for (const r of running ?? []) {
     const s = sideOf(r);
-    if (s === null) continue;
+    if (s === null || s === WORK_SIDE) continue;
     if (s === 'both' || n === 'both' || s === n) return false;
   }
   return true;
@@ -174,7 +186,7 @@ export function workflowSideWait(db, job, payload) {
     .all(job.workflow_id, job.job_id, ...TERMINAL_JOB_STATUSES);
   if (canDispatchConcurrently(rows, payload)) return null;
   const side = sideOf(payload);
-  const busy = rows.map((r) => ({ jobId: r.job_id, op: r.op_id, side: sideOf(r) })).filter((r) => r.side && (r.side === 'both' || side === 'both' || r.side === side));
+  const busy = rows.map((r) => ({ jobId: r.job_id, op: r.op_id, side: sideOf(r) })).filter((r) => r.side && r.side !== WORK_SIDE && (r.side === 'both' || side === 'both' || r.side === side));
   return { reason: WORKFLOW_SIDE_BUSY, side, busy,
     detail: `the workflow worktree's ${side === 'both' ? 'whole app' : `${side}/ side`} is in use by ${busy.map((b) => `${b.jobId} (${b.side})`).join(', ')}; the job stays queued and reads ready when that op settles` };
 }

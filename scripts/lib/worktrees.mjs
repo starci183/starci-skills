@@ -43,6 +43,7 @@ import { WORKTREES_REL } from './worktree-exclude.mjs';
 import { worktreeCreate } from '../api/orca/worktree-create.mjs';
 import { worktreeRm } from '../api/orca/worktree-rm.mjs';
 import { worktreeList as orcaWorktreeList } from '../api/orca/worktree-list.mjs';
+import { repoAdd } from '../api/orca/repo-add.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { withMachine, pidAlive } from '../../engine/machine-db.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
@@ -138,7 +139,7 @@ export function markRemoved(dir, { error = null, preservedRef = null, env = proc
 /* ------------------------------------------------------------ orca */
 
 /** The Orca worktree calls the runtime makes (scripts/api/orca wrappers). Specs pass a fake with the same shape. */
-export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, list: orcaWorktreeList });
+export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, list: orcaWorktreeList, addRepo: repoAdd });
 /** The registry key of an Orca slot not bound yet (a row key, never a directory on disk). */
 const pendingPathOf = (home, kind, owner) => path.join(home, '.starciwork', 'orca-pending', `${kind}-${String(owner).replace(/[^A-Za-z0-9._-]/g, '_')}`);
 /** A reserved Orca slot whose worktree is not bound yet. */
@@ -210,7 +211,10 @@ export function createOrcaWorktree({ repoRoot, kind, name, base, setup = 'skip',
   orca = orcaWorktreeClient, settings = worktreeSettings() }) {
   const slot = reserveOrcaSlot({ repoRoot, kind, slotKey: name, owner, cap, env, git, settings });
   if (!slot.ok) return slot;
-  const made = orca.create({ repo: `path:${posixPath(slot.repoRoot)}`, name, baseBranch: base, setup, ...(comment ? { comment } : {}) });
+  const ask = () => orca.create({ repo: `path:${posixPath(slot.repoRoot)}`, name, baseBranch: base, setup, ...(comment ? { comment } : {}) });
+  let made = ask();
+  // A repository Orca does not know yet is registered once (idempotent), then the creation is asked again.
+  if (!made?.ok && made?.errorCode === 'repo_not_found' && orca.addRepo && orca.addRepo({ path: posixPath(slot.repoRoot) })?.ok) made = ask();
   if (!made?.ok || !made.worktree?.id || !made.worktree?.path) {
     releaseOrcaSlot(slot.pending, { env });
     return { ok: false, reason: 'orca-worktree-create-failed', detail: String(made?.error ?? made?.errorCode ?? 'no worktree in the receipt').slice(0, 400) };

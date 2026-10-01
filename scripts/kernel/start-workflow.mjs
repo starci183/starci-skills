@@ -674,7 +674,9 @@ try {
   const members = route.members?.length ? route.members : [route];
   // The workflow's ONE worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca creates it before the
   // Kernel starts - an existing worktree takes launch trust - and the Kernel and every op of the workflow work in it.
-  // A ledger repo with no bound app checkout (or the runtime repo itself) has none: the Kernel starts on the repo.
+  // EVERY workflow has one - the bound app checkout's, else the git checkout of the ledger repo (the runtime repo
+  // included). A ledger repo in no git checkout has none: the Kernel starts on it, and api dispatch refuses its ops
+  // workflow-worktree-missing.
   const appRepo = workflowAppRepo(repo);
   let workflowWorktree = null;
   if (appRepo) {

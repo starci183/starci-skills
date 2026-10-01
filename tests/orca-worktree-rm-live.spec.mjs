@@ -17,7 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { orcaRun, ORCA, ORCA_PREFIX_ARGS } from '../scripts/api/orca/lib.mjs';
+import { orcaStatus } from '../scripts/api/orca/status.mjs';
+import { repoAdd } from '../scripts/api/orca/repo-add.mjs';
 import { worktreeCreate } from '../scripts/api/orca/worktree-create.mjs';
 import { worktreeRm } from '../scripts/api/orca/worktree-rm.mjs';
 import { removeOrcaWorktree } from '../scripts/lib/worktrees.mjs';
@@ -29,12 +30,9 @@ const posix = (p) => String(p).replace(/\\/g, '/');
 /** Why the live probe cannot run here, or null. */
 function unavailable() {
   if (process.platform !== 'win32') return 'the junction probe is Windows-only (mklink /J)';
-  if (process.env.STARCI_ORCA_COMMAND || ORCA_PREFIX_ARGS.length) return 'STARCI_ORCA_COMMAND points at a stub, not the real Orca';
-  const r = orcaRun(['status', '--json'], { timeout: 20_000 });
-  if (r.spawnError) return `no orca binary (${ORCA}: ${r.spawnError})`;
-  let ok = false;
-  try { ok = JSON.parse(r.stdout ?? '{}')?.result?.runtime?.reachable === true; } catch { ok = /runtimeReachable:\s*true/.test(r.stdout ?? ''); }
-  return ok ? null : `orca runtime not reachable (${String(r.stdout ?? r.stderr ?? '').slice(0, 120)})`;
+  if (process.env.STARCI_ORCA_COMMAND || process.env.STARCI_ORCA_ARGS) return 'STARCI_ORCA_COMMAND points at a stub, not the real Orca';
+  const st = orcaStatus();
+  return st.ok && st.reachable ? null : `orca runtime not reachable (${String(st.error ?? st.state ?? 'no answer').slice(0, 120)})`;
 }
 const reason = unavailable();
 const gate = (() => {
@@ -84,8 +82,8 @@ function fakeMain() {
     fs.writeFileSync(path.join(PROBE, 'node_modules', 'left-pad', 'lib', `f${i}.js`), `module ${i}\n`);
     fs.writeFileSync(path.join(PROBE, 'packages', 'node_modules', '@x', 'y', `g${i}.js`), `pk ${i}\n`);
   }
-  const added = orcaRun(['repo', 'add', '--path', PROBE, '--json'], { timeout: 60_000 });
-  assert.equal(added.status, 0, `orca repo add: ${added.stdout} ${added.stderr}`);
+  const added = repoAdd({ path: posix(PROBE) });
+  assert.ok(added.ok, `orca repo add: ${added.error}`);
 }
 /** An Orca worktree of the fake main with node_modules and packages/node_modules junctioned into the fake main. */
 function linkedTree(name) {

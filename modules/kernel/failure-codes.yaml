@@ -8388,7 +8388,7 @@ orca-worktree-create-failed:
     - "Orca chưa chạy hoặc chưa biết repo này"
     - "Nhánh gốc (main) không có trong repo"
     - "Lỗi đĩa hoặc git phía Orca"
-  nextStep_vi: "Không có cây nào được tạo. Mở Orca, kiểm tra repo đã có trong Orca (orca repo add) rồi khởi động lại workflow."
+  nextStep_vi: "Không có cây nào được tạo. Mở Orca, kiểm tra repo đã có trong Orca (scripts/api/orca/repo-add.mjs) rồi khởi động lại workflow."
   owner: runtime-core
   kind: runtime-fault
 orca-worktree-rm-failed:
@@ -9820,7 +9820,7 @@ slot-never-bound:
   causes_vi:
     - "Tiến trình khởi động Kernel bị dừng giữa chừng"
     - "Orca không trả lời lệnh tạo cây"
-  nextStep_vi: "Chỗ đã được trả lại. Nếu Orca có tạo cây, cây đó hiện trong orca worktree list; gỡ nó bằng orca worktree rm sau khi xem nội dung."
+  nextStep_vi: "Chỗ đã được trả lại. Nếu Orca có tạo cây, cây đó hiện trong danh sách worktree của Orca (scripts/api/orca/worktree-list.mjs); gỡ nó qua scripts/api/orca/worktree-rm.mjs sau khi xem nội dung."
   owner: runtime-core
   kind: runtime-fault
 spawn-failed:
@@ -10331,6 +10331,16 @@ workflow-unknown:
   nextStep_vi: "Lệnh bị từ chối; dùng đúng mã workflow."
   owner: op-retry
   kind: input-invalid
+workflow-worktree-missing:
+  title: "The op's workflow has no worktree"
+  title_vi: "Workflow của op không có cây làm việc"
+  meaning_vi: "Mọi workflow trong một kho git làm việc trong cây làm việc riêng do Orca tạo khi Kernel khởi động. Workflow này chưa có cây trong sổ đăng ký nên op không được giao: chạy trên kho chính thì không có gì chốt lại."
+  causes_vi:
+    - "Kernel khởi động trước khi có cây làm việc của workflow"
+    - "Cây làm việc đã bị gỡ trong khi workflow còn chạy"
+  nextStep_vi: "Job vẫn xếp hàng. Khởi động lại Kernel của workflow (start-workflow tạo cây qua Orca) rồi giao lại."
+  owner: runtime-core
+  kind: dispatch-refusal
 worktree-add-failed:
   title: "Adding worktree failed"
   title_vi: "Tạo worktree thất bại"

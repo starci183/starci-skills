@@ -25,6 +25,7 @@ const git = (cwd, ...args) => {
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
+const posix = (p) => String(p).split(path.sep).join('/');
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
 
 /** An app repo on main (be/ and fe/ sides, an installed node_modules), a machine registry and a fake Orca of its own. */
@@ -185,14 +186,17 @@ test('sides: same side waits, across sides runs together, both-sides runs alone,
   const both = ['be/src/a.ts', 'fe/src/b.tsx'];
   const root = ['package.json'];
   const work = ['.starciwork/features/a.yaml'];
-  assert.deepEqual([sideOf(be), sideOf(fe), sideOf(both), sideOf(root), sideOf(work), sideOf({})], ['be', 'fe', 'both', 'both', null, null]);
+  assert.deepEqual([sideOf(be), sideOf(fe), sideOf(both), sideOf(root), sideOf(work), sideOf({})], ['be', 'fe', 'both', 'both', 'work', null]);
+  assert.equal(sideOf(['be/src/a.ts', '.starciwork/features/a.yaml']), 'be', 'Work records ride along with a be/fe op');
   assert.equal(sideOf(['./fe/x.ts', '.starciwork/y']), 'fe');
   assert.equal(canDispatchConcurrently([be], fe), true, 'across sides');
   assert.equal(canDispatchConcurrently([be], { owned_paths: ['be/src/b.ts'] }), false, 'same side');
   assert.equal(canDispatchConcurrently([be], both), false);
   assert.equal(canDispatchConcurrently([both], fe), false);
   assert.equal(canDispatchConcurrently([root], fe), false, 'the app root counts as both sides');
-  assert.equal(canDispatchConcurrently([be, fe], work), true, 'a Work-only op never waits');
+  assert.equal(canDispatchConcurrently([be, fe], work), true, 'a Work-only op is its own side: it runs beside be and fe');
+  assert.equal(canDispatchConcurrently([both], work), true);
+  assert.equal(canDispatchConcurrently([work], ['.starciwork/decisions/b.yaml']), true, 'two Work ops are serialised by their path leases, not by the side');
   assert.equal(canDispatchConcurrently([work], be), true);
   assert.equal(canDispatchConcurrently([], both), true);
 });
@@ -216,13 +220,17 @@ test('workflowSideWait reads the workflow\'s occupying jobs from the ledger and 
   assert.equal(workflowSideWait(db, job('op-both'), { owned_paths: ['package.json'] }).side, 'both');
 });
 
-test('only a bound app checkout other than the runtime repo gets a workflow worktree', (t) => {
-  const { app } = fixture(t);
+test("every workflow in a git checkout gets a worktree: the bound app, else the ledger repo's checkout, the runtime repo included", (t) => {
+  const { base, app } = fixture(t);
   assert.equal(workflowAppRepo(app, { binding: { appRoot: app } }), app);
-  assert.equal(workflowAppRepo(app, { binding: null }), null, 'an unbound ledger repo');
-  assert.equal(workflowAppRepo(app, { binding: { appRoot: path.join(app, 'missing') } }), null, 'not a git checkout');
+  assert.equal(workflowAppRepo(path.join(app, 'be'), { binding: null }), app, 'an unbound ledger repo inside a git checkout: that checkout');
+  assert.equal(workflowAppRepo(app, { binding: { appRoot: path.join(app, 'missing') } }), app, 'a binding that is no checkout falls back to the repo checkout');
+  const plain = path.join(base, 'not-git');
+  fs.mkdirSync(plain);
+  assert.equal(workflowAppRepo(plain, { binding: null }), null, 'no git checkout: no worktree (the Kernel starts on it; nothing to checkpoint)');
   const runtime = path.resolve(import.meta.dirname, '..');
-  assert.equal(workflowAppRepo(runtime, { binding: { appRoot: runtime } }), null, 'the runtime repo changes only through its own land gate');
+  const runtimeMain = git(runtime, 'worktree', 'list', '--porcelain').split(/\r?\n/)[0].slice('worktree '.length);
+  assert.equal(workflowAppRepo(runtime, { binding: null }), path.resolve(runtimeMain), 'the runtime repo gets a wf-<id> worktree of its main checkout too');
 });
 
 test('release is host-side: a release-pending worktree with live terminals stays; once they are released the GC removes it, then branch -d', (t) => {
@@ -249,4 +257,38 @@ test('release is host-side: a release-pending worktree with live terminals stays
   assert.ok(!fs.existsSync(rec.path));
   assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`], { cwd: app }).status, 1, 'the merged workflow branch is deleted (branch -d)');
   assert.equal(workflowWorktreeOf(ctx, 'wf-fin'), null);
+});
+
+test('an app repository Orca does not know yet is registered once, then the worktree is created', (t) => {
+  const { app, orca, ctx } = fixture(t, { unknownRepo: true });
+  const made = ensureWorkflowWorktree(ctx, { workflowId: 'wf-new-repo', appRepo: app });
+  assert.ok(made.ok, JSON.stringify(made));
+  assert.deepEqual(orca.names(), ['create', 'addRepo', 'create']);
+  assert.equal(orca.calls[1][1].path, app.split(path.sep).join('/'));
+});
+
+test('startAgent threads a new worktree\'s creation flags to worker-start, and none for an existing worktree', async () => {
+  const { startAgent } = await import('../scripts/agent/lib.mjs');
+  const starts = [];
+  const io = {
+    runShow: () => ({ ok: false }), runCreate: () => ({ ok: true, runId: 'run_1' }), taskCreate: () => ({ ok: true, taskId: 'task_1' }),
+    spawn: {
+      trust: () => ({ status: 'skipped', paths: [] }),
+      start: (a) => { starts.push(a); return { ok: true, outcome: 'ok', dispatchId: `ctx_${starts.length}` }; },
+      assignee: () => ({ ok: true, assigneeHandle: 'term_1' }),
+      rename: () => ({ ok: true }),
+      show: () => ({ ok: true, state: 'ready', effective: { agent: 'claude', model: 'claude-opus-5-5' } }),
+      stop: () => ({ ok: true }), release: () => ({ ok: true }),
+    },
+  };
+  const spec = workflowWorktreeSpec({ workflowId: 'wf-k', appRepo: path.resolve('/apps/k') });
+  const kernel = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: 'new-child', repo: `path:${posix(path.resolve('/apps/k'))}`, baseBranch: spec.baseBranch, name: spec.name, setup: 'run',
+    title: '[Kernel] k', prompt: 'go', objective: 'k', io });
+  assert.ok(kernel.ok, JSON.stringify(kernel));
+  assert.deepEqual({ worktree: starts[0].worktree, repo: starts[0].repo, baseBranch: starts[0].baseBranch, name: starts[0].name, setup: starts[0].setup },
+    { worktree: 'new-child', repo: `path:${posix(path.resolve('/apps/k'))}`, baseBranch: 'main', name: 'wf-wf-k', setup: 'run' });
+  const op = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: path.resolve('/orca/k/wf-wf-k'), repo: 'path:/ignored', name: 'ignored', title: '[Op] x', prompt: 'go', objective: 'x', io });
+  assert.ok(op.ok, JSON.stringify(op));
+  assert.equal(starts[1].worktree, path.resolve('/orca/k/wf-wf-k'));
+  for (const k of ['repo', 'baseBranch', 'name', 'setup']) assert.equal(starts[1][k], undefined, `an existing worktree takes no --${k}`);
 });

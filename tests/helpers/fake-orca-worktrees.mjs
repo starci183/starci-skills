@@ -3,7 +3,7 @@
 // goes under its own workspace root `<root>/<repo name>/<name>`, the branch is the name with '/' turned into '-' and a
 // -2, -3 suffix when taken, the id is `<repo-id>::<path>`; rm removes the tree and its registration (a spec's git does it
 // here) and deletes the branch only when it is merged into main. Every call is recorded. `failCreate` / `failRemove`
-// make the next calls refuse before any effect.
+// make the next calls refuse before any effect; `unknownRepo` answers repo_not_found until addRepo registers it.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,7 +15,8 @@ const git = (cwd, ...args) => {
 };
 const posix = (p) => String(p).replace(/\\/g, '/');
 
-export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-fake-orca-')), failCreate = false, failRemove = false } = {}) {
+export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-fake-orca-')), failCreate = false, failRemove = false, unknownRepo = false } = {}) {
+  let known = !unknownRepo;
   const calls = [];
   const trees = new Map(); // id -> {id, path, branch, repo}
   const repoOf = (selector) => path.resolve(String(selector).replace(/^path:/, ''));
@@ -26,7 +27,7 @@ export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(),
     names: () => calls.map((c) => c[0]),
     create(args) {
       calls.push(['create', args]);
-      if (failCreate) return { ok: false, outcome: 'failed', worktree: null, errorCode: 'repo_not_found', error: 'repo_not_found' };
+      if (failCreate || !known) return { ok: false, outcome: 'failed', worktree: null, errorCode: 'repo_not_found', error: 'repo_not_found' };
       const repo = repoOf(args.repo);
       let branch = String(args.name).replace(/\//g, '-');
       for (let n = 2; git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`).ok; n += 1) branch = `${String(args.name).replace(/\//g, '-')}-${n}`;
@@ -51,6 +52,11 @@ export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(),
       if (tip.ok && git(t.repo, 'merge-base', '--is-ancestor', tip.stdout, 'main').ok) git(t.repo, 'branch', '-D', t.branch);
       trees.delete(id);
       return { ok: true, outcome: 'ok', removed: true };
+    },
+    addRepo(args) {
+      calls.push(['addRepo', args]);
+      known = true;
+      return { ok: true, repoId: `repo-${path.basename(String(args.path))}` };
     },
     list(args = {}) {
       calls.push(['list', args]);

@@ -8,6 +8,7 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {findOwnedPathLeaseConflicts,leaseCompareForm} from '../engine/admission.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {leaseCanonicalizer} from '../scripts/kernel/lease-canon.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 
 // nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: Modules enqueued `apps/app/src/messages/vi.json` bare
 // (--repository fe) while fe-debt enqueued `fe/apps/app/src/messages` prefixed with the side
@@ -120,7 +121,7 @@ test('api: dispatch takes the app-relative lease, a parent of the same catalog w
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
     LOCALAPPDATA:path.join(dir,'localappdata')};
   const api=(...args)=>{
-    const r=spawnSync(process.execPath,[API,...args,'--repo',be,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
+    const r=spawnSync(process.execPath,[API,...placeOnRepo(args,be),'--repo',be,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {r,body};
   };

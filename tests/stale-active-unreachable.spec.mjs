@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,bindKernelJob,createUnit,enqueueJob} from '../engine/ledger-db.mjs';
 import {allocationMs} from '../engine/config.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 
 // nivo inc-f1b576fb6006 (2026-09-25, wf-nivo-collab-group-chat-mudqjp5g): Codex op
 // op-interface.implement-2face44a5b froze its frame at "Working (5m 30s • esc to interrupt)" for 50
@@ -55,7 +56,7 @@ const fixture=t=>{
   t.after(()=>{if(savedRegistry===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedRegistry;});
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_TEST_MACHINE_FILE:machineFile};
-  const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const api=args=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-stale-unreachable',jobId='job-stale-unreachable';

@@ -288,6 +288,15 @@ calls:
     required: [subject]
     receipt: [result]
     note: scripts/api/orca/ has no wrapper for it, so StarCi does not issue it; an op reports through `api report`.
+  repo-add:
+    command: repo add
+    kind: mutation
+    replay: none
+    timeoutMs: 60000
+    note: Registers a git repository with Orca by its path; idempotent (the same path answers the same repo id). scripts/lib/worktrees.mjs createOrcaWorktree issues it once when worktree-create answers repo_not_found, then creates again.
+    flags: [path]
+    required: [path]
+    receipt: [result.repo.id]
   worktree-create:
     command: worktree create
     kind: mutation
