@@ -21,7 +21,7 @@ export function workerRead({ dispatch, source = null, cursor = null, limit = nul
   };
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\', '/')}`).href || process.argv[1]?.endsWith('worker-read.mjs')) {
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('worker-read.mjs')) {
   const argv = process.argv.slice(2);
   const out = workerRead({ dispatch: arg(argv, 'dispatch'), source: arg(argv, 'source'), cursor: arg(argv, 'cursor'), limit: arg(argv, 'limit') });
   console.log(JSON.stringify(out, null, 2));

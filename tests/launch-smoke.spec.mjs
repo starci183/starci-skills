@@ -198,3 +198,11 @@ test('a parent spec runs its stage then worker_done; a leaf spec marks its line 
   for (const s of [parent, leaf]) assert.match(s, /report worker_done exactly once/);
   assert.doesNotMatch(leaf, / stage /);
 });
+
+test('the live client loads every runtime launcher and wrapper the smoke calls (no call is made)', async () => {
+  const { defaultClient } = await import('../scripts/kernel/launch-smoke.mjs');
+  const client = await defaultClient();
+  for (const k of ['startAgent', 'startWorkerAgent', 'criticWorkspace', 'removeCriticWorkspace', 'launchCriticWorker', 'workerShow', 'workerRead', 'workerStop', 'workerRelease', 'taskUpdate', 'inbox']) {
+    assert.equal(typeof client[k], 'function', k);
+  }
+});
