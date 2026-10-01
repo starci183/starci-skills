@@ -1,5 +1,5 @@
 /**
- * The rules that hold `testing.md` (catalog R47 `BE_TEST_TOPOLOGY` and R48 `BE_SPEC_QUALITY`).
+ * The rules that hold `knowledge/patterns/be/test.yaml` (catalog R47 `BE_TEST_TOPOLOGY` and R48 `BE_SPEC_QUALITY`).
  *
  * MOST OF THAT LAW IS NOT MACHINE-CHECKABLE, and pretending otherwise would be worse than checking nothing. No rule
  * can tell whether a file represents a business flow, whether the unhappy path it covers drags a critical flow
@@ -8,7 +8,7 @@
  *
  *   - a spec whose every assertion is about a call rather than a result (`no-call-only-spec`);
  *   - a unit spec of anything but a service, a service with no `<name>.service.spec.ts` beside it, a service spec with no
- *     service beside it, and a file of a kind the convention bans (`.test.ts`, `int-spec`, `harness-spec`)
+ *     service beside it, and a file of a kind the convention bans (`.test.ts`, `.int-spec.ts`, `.harness-spec.ts`)
  *     (`unit-test-colocated`);
  *   - an e2e that never reads persisted state back, and an e2e that reaches a model provider
  *     (`e2e-asserts-persisted-state`, `no-model-call-in-e2e`);
@@ -31,10 +31,10 @@ import { isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit
 /** The file name of a linted path, in forward-slash form. */
 const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
 
-/** Test kind 1 of exactly two: a unit spec, `<name>.spec.ts` beside its subject. */
+/** Test kind `spec`: a unit spec, `<name>.service.spec.ts` beside its service. */
 const isUnitSpec = (filename) => /\.spec\.ts$/.test(baseOf(filename))
 
-/** Test kind 2 of exactly two: `*.e2e-spec.ts`. */
+/** Test kind `e2e-spec`: `*.e2e-spec.ts` under `src/tests/e2e/` (`integration-spec` and `contract-spec` are the other two kinds of the tests slots). */
 const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(baseOf(filename))
 
 /**
@@ -121,12 +121,12 @@ const exists = (path) => {
   }
 }
 
-/** Kinds of test file the convention bans: `.test.ts`, `*.int-spec.ts`, `*.harness-spec.ts` (any spec kind other than `spec` and `e2e-spec`). */
+/** Kinds of test file the convention bans: `.test.ts`, `*.int-spec.ts`, `*.harness-spec.ts` (any spec kind other than `spec`, `e2e-spec`, `integration-spec` and `contract-spec`). */
 const BANNED_TEST_FILE = /(?:\.test|\.int-spec|\.harness-spec)\.[cm]?[jt]sx?$/
 
 /**
  * Unit specs are for services only: every `<name>.service.ts` has its `<name>.service.spec.ts` beside it, every unit spec is
- * one of those, and there are no other kinds of test file.
+ * one of those, and there are no kinds of test file beyond `spec`, `e2e-spec`, `integration-spec` and `contract-spec`.
  */
 export const unitTestColocated = {
   meta: {
@@ -134,7 +134,7 @@ export const unitTestColocated = {
     docs: { description: "Only a `<name>.service.ts` is unit-tested: it has its `<name>.service.spec.ts` beside it, any other unit spec is a finding, and there are only the spec kinds `spec`, `e2e-spec`, `integration-spec` and `contract-spec`." },
     schema: [],
     messages: {
-      suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.service.spec.ts` unit beside its service or a `*.e2e-spec.ts` flow under `src/tests/e2e/`; there is no `.test.ts`, `int-spec` or `harness-spec`.",
+      suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.service.spec.ts` unit beside its service, or a `*.e2e-spec.ts`, `*.integration-spec.ts` or `*.contract-spec.ts` under its `src/tests/` folder; there is no `.test.ts`, `.int-spec.ts` or `.harness-spec.ts`.",
       notService: "`{{name}}` is a unit spec of something that is not a service. Only `<name>.service.ts` is unit-tested; a handler, resolver, controller, consumer, mapper, entity, guard, module, policy, helper or composition is covered through the service tests and the e2e flows. Delete this spec and move any business rule it checks into a service.",
       orphan: "`{{name}}` has no service beside it. A unit spec is `<name>.service.spec.ts` next to `<name>.service.ts` and tests that one service; move it beside its service, or rename it after the service it tests.",
       missing: "This service has no spec. Add `{{spec}}` beside it: it builds the service with `Test.createTestingModule`, provides only its constructor dependencies as typed doubles and asserts results or state.",
