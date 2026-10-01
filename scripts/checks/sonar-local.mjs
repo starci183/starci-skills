@@ -18,6 +18,7 @@ import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
+import {extSecretsDir,launcher,resolveCommand,sealExtCustody} from './sonar-ext-custody.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 
@@ -94,7 +95,6 @@ export const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
 /** The Supervisor audit event (sup_events) a re-mint of a token the server rejected records. */
 export const REMINT_EVENT='sonar-token-reminted';
 const MASTER_IDENTITY=path.join(os.homedir(),'.starci','master.identity');
-const IS_WINDOWS=process.platform==='win32';
 const LOG_CAP=4*1024*1024;
 
 // ---- secrets never leave this module in the clear -------------------------------------------------------
@@ -258,32 +258,6 @@ export function resolveConfig(options={},env=process.env){
 
 // ---- custody --------------------------------------------------------------------------------------------
 
-/** PATH lookup with PATHEXT and the winget package tree, the way scripts/stack-secret.mjs finds sops. */
-function resolveCommand(command){
-  const dirs=(process.env.PATH||'').split(IS_WINDOWS?';':':').filter(Boolean);
-  if(IS_WINDOWS&&process.env.LOCALAPPDATA){
-    const winget=path.join(process.env.LOCALAPPDATA,'Microsoft','WinGet');
-    dirs.push(path.join(winget,'Links'));
-    const packages=path.join(winget,'Packages');
-    try{
-      for(const entry of fs.readdirSync(packages)){
-        const dir=path.join(packages,entry);
-        dirs.push(dir);
-        try{for(const nested of fs.readdirSync(dir,{withFileTypes:true}))if(nested.isDirectory())dirs.push(path.join(dir,nested.name));}catch{/* unreadable */}
-      }
-    }catch{/* no winget packages */}
-  }
-  const exts=IS_WINDOWS?(process.env.PATHEXT||'.EXE;.CMD;.BAT').split(';').filter(Boolean):[''];
-  for(const dir of dirs)for(const ext of exts){
-    const candidate=path.join(dir,`${command}${ext}`);
-    if(fs.existsSync(candidate))return candidate;
-  }
-  return null;
-}
-
-/** A .mjs/.js "binary" (the specs' fake sops) runs under this node; anything else runs directly. */
-const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...args]]:[bin,args];
-
 /**
  * Read one custody member into memory. Returns {present, value?, via?, reason?}; `value` is for a child
  * env or a header only. The .enc member decrypted by sops wins; the materialized sibling is the fallback.
@@ -336,48 +310,6 @@ const stackRootOf=file=>{
   return at?file.slice(0,at.index+at[0].length):null;
 };
 
-/** A runtime extension's custody directory: <runtime>/ext/<service>/secrets, a host tree no stack-secret tool manages. */
-const extSecretsDir=file=>{
-  const dir=path.dirname(file);
-  if(path.basename(dir)!=='secrets')return null;
-  const ext=path.dirname(path.dirname(dir));
-  return path.basename(ext)==='ext'&&(path.dirname(ext)===skillRoot||path.basename(path.dirname(ext))==='.claude')?dir:null;
-};
-
-/** The one age recipient the sealed members of an extension custody directory share; null when there is none or they differ. */
-function extRecipient(dir){
-  const recipients=new Set();
-  for(const name of fs.existsSync(dir)?fs.readdirSync(dir):[]){
-    if(!name.endsWith('.enc'))continue;
-    try{for(const r of JSON.parse(fs.readFileSync(path.join(dir,name),'utf8')).sops?.age??[])if(typeof r.recipient==='string')recipients.add(r.recipient);}catch{/* not a sops json member */}
-  }
-  return recipients.size===1?[...recipients][0]:null;
-}
-
-/**
- * Seal a value as a member of a runtime extension's custody (ext/<service>/secrets) with sops, to the recipient its
- * sealed siblings already share: the same recipient, never a new key. Only the .enc twin is written. The value
- * travels through a 0600 temp file read by sops - never argv.
- */
-function sealExtCustody(cfg,file,value){
-  const dir=extSecretsDir(file);
-  const recipient=extRecipient(dir);
-  if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
-  const sops=cfg.sops??resolveCommand('sops');
-  if(!sops)return {ok:false,reason:'sops is not installed'};
-  const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
-  try{
-    fs.writeFileSync(tmp,value,{mode:0o600});
-    const [bin,args]=launcher(sops,['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp]);
-    const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
-    if(result.status!==0||!String(result.stdout??'').trim())return {ok:false,reason:scrub(`sops --encrypt of ${path.basename(file)} exited ${result.status}: ${String(result.stderr).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
-    fs.writeFileSync(`${file}.enc`,result.stdout);
-    return {ok:true};
-  }finally{
-    try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
-  }
-}
-
 /**
  * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
  * through that repository's own tool (scripts/stack-secret.mjs; an absolute reference names that tree directly - a project
@@ -387,7 +319,7 @@ function sealExtCustody(cfg,file,value){
  */
 function writeCustody(cfg,ref,value){
   const file=path.resolve(cfg.stackDir,ref);
-  if(extSecretsDir(file))return sealExtCustody(cfg,file,value);
+  if(extSecretsDir(file))return sealExtCustody(cfg,file,value,{scrub});
   const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
   const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
