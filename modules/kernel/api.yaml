@@ -137,8 +137,10 @@ conventions:
     current value, as husky's install does, passes), update-ref and filter-branch, and a hooked write
     (commit, merge, push, reset, checkout, ...) with core.hooksPath overridden by -c, --config-env or
     GIT_CONFIG_* (HOOKS_BYPASS), and an App Router pathspec git would read as a glob (APP_ROUTER_GLOB);
-    deps-guard.mjs refuses an install-family npm command through a linked node_modules
-    (DEPS_THROUGH_LINK) and npm ci while a job of ANOTHER workflow of the ledger is leased; `ln`,
+    deps-guard.mjs refuses an install-family npm, pnpm or yarn command whose package root (cwd, --prefix,
+    -C/--dir, --cwd) has a linked node_modules - its own, one it sits inside, or its workspace root's -
+    (DEPS_THROUGH_LINK; this one rule holds with no guard file too, contract change install-through-link),
+    a raw orca orchestration check from the Kernel (KERNEL_ORCA_CHECK), and npm ci while a job of ANOTHER workflow of the ledger is leased; `ln`,
     `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and Create*Link are refused (LINK_CREATE)
     - the hook blocks the command (exit 2) with a typed code and the remedy; (2)
     runtime/guards/jobs/<job>.json names the job's owned paths as absolute paths, bound to the agent's

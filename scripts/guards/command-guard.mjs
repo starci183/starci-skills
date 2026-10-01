@@ -10,14 +10,22 @@
 // .codex/config.toml, .devin/config.local.json), never a user-global settings file. The Kernel's launch binds a guard
 // of role 'kernel' the same way (scripts/kernel/start-workflow.mjs, contract change kernel-guard-file): its raw shell
 // commands meet every rule below, and its `node api.mjs <verb>` calls pass. A session with no Orca terminal, or whose
-// terminal has no guard bound (the [Supervisor], the owner's own sessions), passes untouched.
+// terminal has no guard bound (the [Supervisor], a lane, the owner's own sessions), meets ONE rule only, wherever this
+// hook is registered: an install through a linked node_modules (below), which no caller ever means to run.
 //
 // What it refuses, each from a real incident:
 //  - git: the shared-checkout policy (git-policy.mjs classifyGit - history rewrites, sweeping discards, foreign
 //    pathspecs, worktrees, hook bypasses); an App Router pathspec whose glob reading reaches another path.
-//  - npm: an install-family command through a linked node_modules, which empties the live tree it links to
-//    (deps-guard.mjs linkedNodeModulesOf; node-modules-link-wipe), and a clean install while another workflow's job
-//    is leased on the ledger (peerLeasedJobs).
+//  - installs: an install-family command of npm, pnpm or yarn (ci, install/i, add, uninstall, prune, ...; yarn alone)
+//    whose package root (cwd, --prefix, -C/--dir, --cwd) has a node_modules - its own, one it sits inside, or its
+//    workspace root's - that is a junction or symlink: it empties the live tree the link points to (deps-guard.mjs
+//    linkedNodeModulesOf; DEPS_THROUGH_LINK, contract change install-through-link; the third wipe, 2026-10-01, emptied
+//    main's packages/grammar/node_modules). Guard file or not. With a guard, also an npm clean install while another
+//    workflow's job is leased on the ledger (peerLeasedJobs).
+//  - the Kernel's mailbox: `orca orchestration check` from a guard of role kernel (KERNEL_ORCA_CHECK): its --ack
+//    consumes deliveries before the ledger records them; the Kernel reads through `api messages` / `api questions`
+//    and the runtime drains. Ops and [Worker]s keep it: Orca's worker protocol (modules/host/orca/api.yaml
+//    operationAgent) has them check their own Run's deliveries, which no ledger record depends on.
 //  - links: `ln`, `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and [IO.Directory]::Create*Link - an
 //    op never creates a link (nivo-fe inc-c8fbf76aa499).
 //  - processes: a kill by image name or pattern (taskkill /IM or /FI, pkill, killall, Stop-Process -Name, wmic process
@@ -213,8 +221,9 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
       } else if (program === 'xargs') {
         w = w.slice(1);
         while (w.length && /^-/.test(w[0])) { const takesValue = /^-(?:[IdEnLPs]|-(?:replace|delimiter|eof|max-args|max-lines|max-procs|max-chars|arg-file))$/.test(w[0]); w.shift(); if (takesValue) w.shift(); }
-      } else if (program === 'npx' || program === 'bunx') {
-        // npx [-y] [--package <pkg>] <bin> args: the package's bin is the program (@openai/codex -> codex).
+      } else if (program === 'npx' || program === 'bunx' || program === 'corepack') {
+        // npx [-y] [--package <pkg>] <bin> args: the package's bin is the program (@openai/codex -> codex); corepack
+        // <pnpm|yarn> args runs that package manager.
         w = w.slice(1);
         while (w.length && /^-/.test(w[0])) { const takesValue = /^(?:-p|--package)$/.test(w[0]); w.shift(); if (takesValue) w.shift(); }
       } else break;
@@ -224,7 +233,8 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
     if (!w.length) continue;
     const args = w.slice(1);
     if (['cd', 'set-location', 'sl', 'chdir', 'pushd', 'push-location'].includes(program)) {
-      const target = args.find((a) => !/^-/.test(a));
+      // cmd's `cd /d <dir>` switches the drive too: /d is a switch there, not the target.
+      const target = args.find((a) => !/^-/.test(a) && !(dialect === 'cmd' && /^\/d$/i.test(a)));
       if (target) dir = path.resolve(dir, target);
       continue;
     }
@@ -462,15 +472,23 @@ async function gitVerdict({ args, cwd, env, guard, deps }) {
   return null;
 }
 
-async function npmVerdict({ args, cwd, guard, deps }) {
-  const { classifyNpm, linkedNodeModulesOf, peerLeasedJobs } = deps.npm;
-  const kind = classifyNpm(args).kind;
+/** The install-through-link refusal of one npm/pnpm/yarn command (no guard needed), or null. `npm`: deps-guard.mjs. */
+export function installLinkVerdict({ program, args, cwd, npm }) {
+  if (npm.classifyInstall(program, args).kind === 'pass') return null;
+  const linked = npm.linkedNodeModulesOf(program, args, cwd);
+  if (!linked) return null;
+  return { tool: program, code: 'DEPS_THROUGH_LINK', command: `${program} ${args.join(' ')}`.slice(0, 200),
+    reason: `${linked.nodeModules} is a link to ${linked.target ?? 'another tree'}: ${program} would empty that live node_modules`,
+    remedy: 'node_modules here is a link to another checkout: unlink it first (cmd /c rmdir) and install for real' };
+}
+
+async function installVerdict({ program, args, cwd, guard, deps }) {
+  const { classifyInstall, peerLeasedJobs } = deps.npm;
+  const kind = classifyInstall(program, args).kind;
   if (kind === 'pass') return null;
-  const command = `npm ${args.join(' ')}`.slice(0, 200);
-  const linked = linkedNodeModulesOf(args, cwd);
-  if (linked) return { tool: 'npm', code: 'DEPS_THROUGH_LINK', command,
-    reason: `${linked.nodeModules} is a link to ${linked.target ?? 'another tree'}: npm would empty that live node_modules`,
-    remedy: 'never install here; a dependency change goes to the workflow serial deps unit, or report blocked environment' };
+  const command = `${program} ${args.join(' ')}`.slice(0, 200);
+  const linked = installLinkVerdict({ program, args, cwd, npm: deps.npm });
+  if (linked) return linked;
   if (kind !== 'clean-install' || !guard?.ledgerRepo) return null;
   let peers;
   try { peers = await peerLeasedJobs({ ledgerRepo: guard.ledgerRepo, workflowId: guard.workflowId }); }
@@ -504,9 +522,38 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
     if (launch) return { tool: c.program, ...launch };
     if (c.program === 'git') { const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: d.policy.parseGitArgv }); if (h) return h; }
     if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }
-    if (c.program === 'npm') { const v = await npmVerdict({ args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
+    const mailbox = kernelMailboxVerdict(c.program, c.args, guard);
+    if (mailbox) return { tool: c.program, ...mailbox };
+    if (d.npm.PACKAGE_MANAGERS.includes(c.program)) { const v = await installVerdict({ program: c.program, args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
   }
   return null;
+}
+
+/**
+ * The rules that hold with no guard file (a terminal no launch bound, a lane, the owner's own session): an install
+ * through a linked node_modules only. Loads nothing but deps-guard.mjs.
+ */
+export async function unguardedVerdict({ command, cwd, env = process.env, dialect = 'bash', npm = null }) {
+  const deps = npm ?? await import('./deps-guard.mjs');
+  for (const c of commandsOf(command, { cwd, env, dialect })) {
+    if (!deps.PACKAGE_MANAGERS.includes(c.program)) continue;
+    const v = installLinkVerdict({ program: c.program, args: c.args, cwd: c.cwd, npm: deps });
+    if (v) return v;
+  }
+  return null;
+}
+
+// The Kernel never reads Orca's mailbox itself: `orchestration check --ack` consumes deliveries before the ledger records
+// them, so it reads through `api messages` / `api questions` and the runtime's api drains (lane MAILC). Ops and
+// [Worker]s keep `check`: Orca's worker protocol has them read their own Run's deliveries (modules/host/orca/api.yaml
+// operationAgent), and no ledger record depends on those.
+export function kernelMailboxVerdict(program, args, guard) {
+  if (program !== 'orca' || guard?.role !== 'kernel') return null;
+  const words = args.filter((a) => !/^-/.test(a));
+  if (words[0] !== 'orchestration' || words[1] !== 'check') return null;
+  return { code: 'KERNEL_ORCA_CHECK', command: ['orca', ...args].join(' ').slice(0, 200),
+    reason: 'the Kernel never runs orca orchestration check: its --ack consumes deliveries before the ledger records them',
+    remedy: 'read messages with `node <api> messages --repo <repo> --workflow <id>` and questions with `api questions`; the runtime drains the mailbox' };
 }
 
 /** The shell text of one hook input: Claude's Bash/PowerShell, Codex's Bash and Devin's exec all carry `command`. */
@@ -517,12 +564,19 @@ export function shellCallOf(input) {
   return { command, cwd: path.resolve(cwd), dialect: /^powershell$/i.test(String(input.tool_name ?? '')) ? 'powershell' : 'bash' };
 }
 
-/** The hook's decision for one input: {verdict, guard} to refuse, else null. */
+// A cheap first look for the unguarded case: only a command naming a package manager can be refused without a guard.
+const NAMES_PACKAGE_MANAGER = /\b(?:npm|pnpm|yarn)\b/i;
+
+/** The hook's decision for one input: {verdict, guard} to refuse (guard null for an unguarded session), else null. */
 export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null } = {}) {
   const guard = boundGuard(env.ORCA_TERMINAL_HANDLE, { root });
-  if (!guard) return null;
   const call = shellCallOf(input);
   if (!call) return null;
+  if (!guard) {
+    if (!NAMES_PACKAGE_MANAGER.test(call.command)) return null;
+    const verdict = await unguardedVerdict({ ...call, env, npm: deps?.npm ?? null });
+    return verdict ? { verdict, guard: null, cwd: call.cwd } : null;
+  }
   const verdict = await commandVerdict({ ...call, guard, env, deps });
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
@@ -533,14 +587,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   process.stdin.on('data', (chunk) => { raw += chunk; });
   process.stdin.on('end', async () => {
     try {
-      // The common case - no guard bound to this terminal - exits before anything heavier than one file read.
-      if (!boundGuard(process.env.ORCA_TERMINAL_HANDLE)) process.exit(0);
+      // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
+      if (!boundGuard(process.env.ORCA_TERMINAL_HANDLE) && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
       const decision = await hookDecision(JSON.parse(raw));
       if (!decision) process.exit(0);
       const { refusalLines, logRefusal } = await import('./refusals.mjs');
       const { tool, ...verdict } = decision.verdict;
       process.stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
-      logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard.jobId ?? null, workflowId: decision.guard.workflowId ?? null, cwd: decision.cwd });
+      logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
       process.exit(2);
     } catch (e) {
       process.stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);
