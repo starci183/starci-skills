@@ -26,6 +26,14 @@
 // changed files from the base. No worktree, no checkout and no junction is ever created for it (node_modules incident
 // 2026-09-30). A finding the base already has is counted as preexisting, never a finding of the op. Failing specs always block.
 // Exit 0 clean, 1 new findings, 2 a tool could not run (never a pass). stdout is the one JSON document.
+//
+//   node scripts/checks/gate.mjs --profile docs [--tree <app>/.starciwork] [--out <file>]
+//
+// The DOCUMENT profile (knowledge/op-gate.yaml docChecks, owed by docs.author, knowledge.repair and work.author): every document
+// check runs from the runtime root - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites,
+// check-json-exceptions - the `tree` ones over the Work root --tree names (else the runtime's examples). A check that exits 1 is a
+// finding (engine doc, rule the check id, its refusal lines); any other exit is a tool that could not run. The report carries
+// `profile: docs`; `api settle` refuses a documenting op's done on a red or unrunnable document gate.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -49,21 +57,25 @@ const ESLINT_CONFIGS = ['eslint.config.mjs', 'eslint.config.js', 'eslint.config.
 const JEST_CONFIGS = ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs', 'jest.config.json'];
 const LINT_CHUNK = 150;
 const LISTED_MAX = 500;
-const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]';
+const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | gate.mjs --profile docs [--tree <work root>] [--out <file>]';
+export const DOC_PROFILE = 'docs';
+export const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
 /** The flags; `--changed` takes every argument up to the next flag (an empty list is an empty slice). */
 export function parseGateArgs(argv) {
-  const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null };
+  const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null, profile: 'code', tree: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--main', '--tests', '--out'].includes(arg)) {
+    } else if (['--root', '--base', '--main', '--tests', '--out', '--profile', '--tree'].includes(arg)) {
       if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
+  if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--profile must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
+  if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --profile ${DOC_PROFILE}; ${USAGE}`);
   return opts;
 }
 
@@ -651,10 +663,60 @@ function finish(report) {
   return report;
 }
 
+/** The document checks of op-gate.yaml docChecks: [{id, script, tree}]. */
+export function docChecksOf(runtime = runtimeRoot) {
+  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
+  return (doc?.docChecks ?? []).map((c) => ({ id: String(c.id), script: String(c.script), tree: c.tree === true }));
+}
+
+const DOC_PATH = /^(?:REFUSED?\s+)?([^\s:]+\.(?:md|ya?ml|mjs|json)):(\d+)/;
+/** The lines a document check prints for its refusals: REFUSE/REFUSED or file:line lines when it has them, else its last lines. */
+function refusalLines(output) {
+  const all = String(output ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const refused = all.filter((l) => /^REFUSED?\b/.test(l) || DOC_PATH.test(l));
+  return (refused.length ? refused : all.slice(-5)).slice(0, 50);
+}
+
+/**
+ * The document profile: each docChecks script run from the runtime root (`tree` ones with --tree when given). Exit 1 of a check
+ * is its findings, any other exit (or a spawn error) a tool that could not run. The same starci/gate@1 envelope, profile docs.
+ */
+export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChecksOf(runtime), spawn = spawnSync } = {}) {
+  const report = { schema: GATE_SCHEMA, profile: DOC_PROFILE, at: new Date().toISOString(), root: posixPath(path.resolve(runtime)), tree: tree ? posixPath(path.resolve(tree)) : null,
+    base: null, head: gitText(runtime, ['rev-parse', 'HEAD'])?.trim() ?? null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
+    steps: { docs: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
+  if (tree && !fs.existsSync(path.resolve(tree))) { report.errors.push(`--tree ${tree} does not exist`); return finish(report); }
+  if (!checks.length) { report.errors.push('knowledge/op-gate.yaml names no docChecks'); return finish(report); }
+  const fresh = [];
+  for (const check of checks) {
+    const args = [path.join(runtime, check.script), ...(check.tree && tree ? ['--tree', path.resolve(tree)] : [])];
+    const started = Date.now();
+    const run = spawn(process.execPath, args, { cwd: runtime, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+    report.steps.docs.push({ id: check.id, command: `node ${check.script}${check.tree && tree ? ' --tree <tree>' : ''}`, exit: run.status ?? null, ms: Date.now() - started });
+    // An uncaught exception also exits 1: a stack trace on stderr is a check that could not run, never its findings.
+    const crashed = run.status === 1 && /^\s+at .+[:(]\d+:\d+\)?$/m.test(String(run.stderr ?? ''));
+    if (run.error || crashed || (run.status !== 0 && run.status !== 1)) {
+      const reason = String(run.stderr ?? '').split(/\r?\n/).find((l) => /Error/.test(l))?.trim() ?? '';
+      report.errors.push(`${check.id} could not run (exit ${run.status ?? run.error?.message})${reason ? `: ${reason}` : ''}`);
+      continue;
+    }
+    if (run.status === 1) {
+      for (const message of refusalLines(`${run.stdout ?? ''}\n${run.stderr ?? ''}`)) {
+        const at = DOC_PATH.exec(message);
+        fresh.push({ engine: 'doc', rule: check.id, path: at?.[1] ?? null, line: at ? Number(at[2]) : null, message });
+      }
+    }
+  }
+  report.counts = { new: fresh.length, preexisting: 0 };
+  report.findings = fresh.slice(0, LISTED_MAX);
+  return finish(report);
+}
+
 export async function gateMain(argv, { stdout = (s) => process.stdout.write(s) } = {}) {
   let opts;
   try { opts = parseGateArgs(argv); } catch (error) { stdout(`${JSON.stringify({ schema: GATE_SCHEMA, ok: false, exit: GATE_EXIT.toolFailed, errors: [error.message] })}\n`); return GATE_EXIT.toolFailed; }
-  const report = await runGate({ root: opts.root ?? process.cwd(), base: opts.base, main: opts.main, changed: opts.changed, tests: opts.tests });
+  const report = opts.profile === DOC_PROFILE ? runDocGate({ tree: opts.tree })
+    : await runGate({ root: opts.root ?? process.cwd(), base: opts.base, main: opts.main, changed: opts.changed, tests: opts.tests });
   const text = `${JSON.stringify(report, null, 2)}\n`;
   if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
   stdout(text);

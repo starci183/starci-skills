@@ -108,3 +108,131 @@ kinds:
       app.starcistacks: [repo/starcistacks.yaml]
       app.sops: [repo/secrets.yaml]
       app.plaintext-env: [repo/secrets.yaml]
+# The mechanism proofs of the ops beyond the code loop (contract change op-mechanism-proofs, owner 2026-10-01). Every op named
+# under opProofs runs the mechanism its job touches and attaches the document it prints; `api settle` re-reads each document
+# itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and
+# opProofs owes the code loop AND its proofs. A proof listed with `modes` is owed only by a dispatch whose params.mode is one of
+# them (`select` included, since the request may pick any mode).
+proofs:
+  read-knowledge:
+    schema: starci/read-digest@1
+    attach: read-digest.json
+    script: scripts/checks/read-digest.mjs
+    purpose: >-
+      The READ step of a deciding or authoring op: the knowledge/patterns files of the kinds it touches, the knowledge files its
+      decision cites (--knowledge), and the hfs slot map of the records it writes, each with its sha256. A done whose digest names
+      no knowledge file is refused.
+  doc-gate:
+    schema: starci/gate@1
+    profile: docs
+    attach: doc-gate.json
+    script: scripts/checks/gate.mjs
+    purpose: >-
+      The document gate (gate.mjs --profile docs): the docChecks below over the runtime documents and, with --tree, the Work
+      records the op wrote. A red or unrunnable document gate is never done.
+  test-world:
+    schema: starci/test-world-run@1
+    attach: test-world-run.json
+    script: scripts/checks/test-world-run.mjs
+    purpose: >-
+      The test-world run summary: the app runs its world projects on @starci/jest-preset's world runner, the specs use
+      useTestWorld and the outage API and hand-roll no docker, container, DataSource or process.env, and the run of the selected
+      project is green with at least one test.
+  unit-kit:
+    schema: starci/unit-run@1
+    attach: unit-run.json
+    script: scripts/checks/unit-run.mjs
+    purpose: >-
+      The unit run summary: the whole unit project ran green, every *.service.ts reaches 100 on lines, branches, functions and
+      statements on its own, and every service spec builds its subject with Test.createTestingModule over the kit doubles.
+  security-lint:
+    schema: starci/lint@1
+    attach: lint.json
+    purpose: >-
+      `hfs lint --format json` at the app root: no finding of a securityCodes code may stand under a done security verdict, and
+      a lint that could not run is never a pass.
+  fe-lint:
+    schema: starci/lint@1
+    attach: lint.json
+    purpose: >-
+      `hfs lint --format json` at the app root (the FE canon, stylelint and the brand grammar): no finding under fe/ may stand
+      under a done interface audit, drawing or asset.
+  review-gate:
+    schema: starci/gate@1
+    attach: gate.json
+    script: scripts/checks/gate.mjs
+    purpose: >-
+      gate.mjs read-only over the reviewed range (--base <first reviewed commit>^), merge guard included: a review cannot pass a
+      range the gate finds red or could not judge.
+  review-defects:
+    schema: starci/review-defects@1
+    attach: review-defects.json
+    purpose: >-
+      Every defect the review found, classified business or non-business. A non-business defect no check caught carries a
+      missingCheck for .claude (owner rule): the check that should have caught it.
+  release:
+    schema: starci/release-proof@1
+    attach: release-proof.json
+    script: scripts/checks/release-proof.mjs
+    purpose: >-
+      The release proof: release-app-installs (fresh installs, lint, typecheck, api boot, a skip is never a pass), check-canon-pins
+      with the canon content digest, the merge guard over the release range and a green npm run check. Every step is required.
+opProofs:
+  e2e.verify: [test-world]
+  integration.verify: [test-world]
+  unit.verify: [unit-kit]
+  security.verify: [security-lint]
+  review.verify:
+    - {proof: review-gate, modes: [select, delivery, workflow, api, lint]}
+    - review-defects
+  release.deliver:
+    - {proof: release, modes: [select, publish, deploy]}
+  docs.author: [read-knowledge, doc-gate]
+  knowledge.repair: [read-knowledge, doc-gate]
+  work.author: [read-knowledge, doc-gate]
+  interface.audit: [fe-lint]
+  interface.draw: [fe-lint]
+  interface.asset: [fe-lint]
+  architecture.decide: [read-knowledge]
+  scope.define: [read-knowledge]
+  scope.finish: [read-knowledge]
+  business.decide: [read-knowledge]
+  decision.prepare: [read-knowledge]
+  brand.decide: [read-knowledge]
+# The document checks `gate.mjs --profile docs` runs, each from the runtime root. `tree: true` checks also take --tree <the Work
+# root the op wrote> when the gate is given one (else they judge the runtime's examples).
+docChecks:
+  - {id: doc-language, script: scripts/checks/check-doc-language.mjs}
+  - {id: check-work-surfaces, script: scripts/checks/check-work-surfaces.mjs, tree: true}
+  - {id: check-work-deep, script: scripts/checks/check-work-deep.mjs, tree: true}
+  - {id: check-example-work, script: scripts/checks/check-example-work.mjs}
+  - {id: check-contract-cites, script: scripts/checks/check-contract-cites.mjs}
+  - {id: check-json-exceptions, script: scripts/checks/check-json-exceptions.mjs}
+# The finding codes of the authentication and security canon (lane AUTHCHK and its neighbours) a security verdict is judged on.
+securityCodes:
+  - BE_DEFAULT_DENY       # R41 default deny, typed bodies, timing-safe secret compare (secret-compare-timing-safe)
+  - BE_INPUT_BOUNDED      # R42 bounded input, auth-door strict rate tier (auth-door-strict-rate-tier)
+  - BE_SECRET_DEFAULT     # R44 no secret default
+  - BE_LOG_SECRET         # R71 no secret in a log or an error (no-secret-in-error)
+  - BE_INFRA_OWNER        # R90 HttpClient only in integrations (http-client-only-in-integrations)
+  - FE_ENV_OWNER          # the FE environment owner (no secret read outside it)
+  - FE_COOKIE_ATTRIBUTES  # R107 FE response cookie attributes
+# The ESLint rules of the same canon, by rule name (a finding whose message carries no code is matched by its rule).
+securityRules:
+  - secret-compare-timing-safe
+  - public-needs-reason
+  - auth-door-strict-rate-tier
+  - input-bounded
+  - no-secret-in-error
+  - no-secret-in-log
+  - http-client-only-in-integrations
+  - response-cookie-attributes
+# The unit kit: a service spec must build its subject this way (packages/jest-preset README, knowledge/patterns/be/test.yaml).
+unitKit:
+  required: ['Test.createTestingModule']
+  forbidden: ['jest.mock(', 'overrideProvider(', 'Date.now()', 'process.env']
+# What a world spec may never hand-roll (packages/test-world README, Hard rule): the library is the only place for infrastructure.
+testWorld:
+  required: ['useTestWorld']
+  forbidden: ['testcontainers', 'dockerode', 'docker run', 'docker compose', 'new DataSource(', 'process.env', 'setTimeout(']
+  outage: ['.cut(', '.restore(', '.during(', '.latency(', 'interruptDatabase(']

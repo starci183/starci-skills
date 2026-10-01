@@ -63,7 +63,7 @@ function appFixture(t, { baseFiles = {} } = {}) {
 
 test('the gate flags', () => {
   assert.deepEqual(parseGateArgs(['--root', 'r', '--changed', 'a.ts', 'b.ts', '--tests', 'x', '--main', 'trunk']),
-    { root: 'r', base: null, main: 'trunk', changed: ['a.ts', 'b.ts'], tests: 'x', out: null });
+    { root: 'r', base: null, main: 'trunk', changed: ['a.ts', 'b.ts'], tests: 'x', out: null, profile: 'code', tree: null });
   assert.throws(() => parseGateArgs(['--base']), /needs a value/);
   assert.throws(() => parseGateArgs(['--nope']), /unknown argument/);
 });

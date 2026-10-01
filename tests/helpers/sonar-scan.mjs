@@ -1,5 +1,7 @@
-// The green proofs a fixture that settles a code-writing op attaches: the sonar-local scan summary (knowledge/sonar-gate.yaml
-// enforcedOps) and the op loop's gate.json and read-digest.json (knowledge/op-gate.yaml enforcedOps). The settle reads what
+// The green proofs a fixture that settles an op attaches: the sonar-local scan summary (knowledge/sonar-gate.yaml
+// enforcedOps), the op loop's gate.json and read-digest.json (knowledge/op-gate.yaml enforcedOps) and the mechanism proofs of
+// knowledge/op-gate.yaml opProofs (the document gate, the test-world and unit run summaries, the hfs lint report, the review
+// defect classes and the release proof). The settle reads what
 // the op attached and refuses a pass without them. These fixtures test other behaviour, so what they attach is the honest
 // "slice meets the gate, READ done" record.
 import fs from 'node:fs';
@@ -7,6 +9,10 @@ import path from 'node:path';
 import { loadSonarGate, thresholdsOf } from '../../scripts/checks/sonar-gate.mjs';
 import { GATE_SCHEMA } from '../../scripts/checks/gate.mjs';
 import { DIGEST_SCHEMA } from '../../scripts/checks/read-digest.mjs';
+import { TEST_WORLD_RUN_SCHEMA } from '../../scripts/checks/test-world-run.mjs';
+import { UNIT_RUN_SCHEMA } from '../../scripts/checks/unit-run.mjs';
+import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS } from '../../scripts/checks/release-proof.mjs';
+import { REVIEW_DEFECTS_SCHEMA } from '../../scripts/kernel/gate-settle.mjs';
 
 export const greenSonarScan = () => ({
   schema: 'starci/sonar-local-scan@3', at: new Date().toISOString(), scope: 'slice', outcome: 'pass',
@@ -18,11 +24,24 @@ export const greenGate = () => ({ schema: GATE_SCHEMA, at: new Date().toISOStrin
 export const greenReadDigest = () => ({ schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: '.', touched: [], slotMap: [],
   files: [{ path: 'knowledge/patterns/be/service.yaml', role: 'pattern', sha256: 'a'.repeat(64) }] });
 
+const at = () => new Date().toISOString();
+export const greenDocGate = () => ({ ...greenGate(), profile: 'docs', steps: { docs: [] } });
+export const greenTestWorldRun = () => ({ schema: TEST_WORLD_RUN_SCHEMA, at: at(), root: '.', project: 'e2e', tests: null,
+  harness: { jestConfig: 'be/jest.config.js', preset: true, declaration: 'be/src/tests/world/test-world.config.ts', defineTestWorld: true },
+  specs: [{ path: 'be/src/tests/e2e/a.e2e-spec.ts', useTestWorld: true, modes: ['apps', 'modules'], outage: 0, forbidden: [] }], outageCalls: 0,
+  run: { command: 'npm run test:e2e -- --json', exit: 0, total: 1, passed: 1, failed: 0, skipped: 0, files: 1, failedFiles: 0, failures: [], error: null }, findings: [], exit: 0 });
+export const greenUnitRun = () => ({ schema: UNIT_RUN_SCHEMA, at: at(), root: '.',
+  run: { command: 'npm test -- --json', exit: 0, total: 1, passed: 1, failed: 0, skipped: 0, files: 1, failedFiles: 0, failures: [], error: null }, services: [], findings: [], exit: 0 });
+export const greenLint = () => ({ schema: 'starci/lint@1', findings: [], errors: [] });
+export const greenReviewDefects = () => ({ schema: REVIEW_DEFECTS_SCHEMA, at: at(), defects: [] });
+export const greenReleaseProof = () => ({ schema: RELEASE_PROOF_SCHEMA, at: at(), repo: '.', base: 'HEAD~1', ok: true, exit: 0,
+  steps: RELEASE_STEPS.map((id) => ({ id, command: id, exit: 0, status: 'pass', detail: '' })) });
+
 /** The file names writeGreenProofs writes, in order. */
-export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json']);
-/** Write the green sonar.json, gate.json and read-digest.json into <dir>; their absolute paths, ready for a report's `files`. */
+export const GREEN_PROOF_FILES = Object.freeze(['sonar.json', 'gate.json', 'read-digest.json', 'doc-gate.json', 'test-world-run.json', 'unit-run.json', 'lint.json', 'review-defects.json', 'release-proof.json']);
+/** Write every green proof into <dir>; their absolute paths, ready for a report's `files`. */
 export const writeGreenProofs = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
-  const docs = [greenSonarScan(), greenGate(), greenReadDigest()];
+  const docs = [greenSonarScan(), greenGate(), greenReadDigest(), greenDocGate(), greenTestWorldRun(), greenUnitRun(), greenLint(), greenReviewDefects(), greenReleaseProof()];
   return GREEN_PROOF_FILES.map((name, i) => { const file = path.join(dir, name); fs.writeFileSync(file, JSON.stringify(docs[i])); return file; });
 };

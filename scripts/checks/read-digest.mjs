@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // read-digest.mjs - the READ step of the op loop (knowledge/op-gate.yaml) and its digest (schema starci/read-digest@1).
 //
-//   node scripts/checks/read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--out <file>]
+//   node scripts/checks/read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]
 //
 // For the files a slice will touch it prints, and records with their sha256, exactly what the slice must read before coding:
 //   - the slot map: `hfs explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
 //   - the pattern files (knowledge/patterns/...) of each file kind, from op-gate.yaml `kinds` (family `always` plus the longest
 //     listed slot prefix);
 //   - the example files of the same slots in the example app (op-gate.yaml `examples`), matched by the slot's explain pattern.
-// `--read` adds any other file the slice read. The op attaches the digest to its report; `api settle` re-reads it
+// `--read` adds any other file the slice read (app-relative); `--knowledge` adds runtime knowledge files (knowledge/..., a
+// deciding or authoring op's READ: the patterns, catalogs and rules its decision cites), role `knowledge`. A deciding op that
+// writes no file yet may give --knowledge alone. The op attaches the digest to its report; `api settle` re-reads it
 // (scripts/kernel/gate-settle.mjs) and refuses a done whose digest is missing or names no pattern file for a touched kind.
 // Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
 import fs from 'node:fs';
@@ -28,7 +30,8 @@ export const PATTERN_ROOT = 'knowledge/patterns';
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const EXAMPLES_PER_SLOT = 2;
 const firstLine = (text) => String(text ?? '').trim().split(/\r?\n/)[0];
-const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--out <file>]';
+const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
+export const KNOWLEDGE_ROOT = 'knowledge';
 
 let cache = null;
 /** The op-gate document, read once per process; `file` bypasses the cache (a spec's own document). */
@@ -85,6 +88,22 @@ export function judgeReadDigest(digest, kinds, doc = loadOpGate()) {
 }
 
 /**
+ * Whether a deciding or authoring op's digest proves its READ (op-gate.yaml proofs.read-knowledge): {status: 'pass'|'missing'|
+ * 'no-knowledge', detail}. It needs at least one knowledge file (a pattern or a --knowledge file) with a well-formed sha256, and
+ * every file it touched carries an entry of the slot map (the hfs slot of each written record).
+ */
+export function judgeKnowledgeDigest(digest) {
+  if (!digest || digest.schema !== DIGEST_SCHEMA || !Array.isArray(digest.files))
+    return { status: 'missing', detail: `no READ digest (schema ${DIGEST_SCHEMA}) is attached to the report` };
+  const read = digest.files.filter((f) => typeof f?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.sha256) && posixPath(String(f.path ?? '')).startsWith(`${KNOWLEDGE_ROOT}/`));
+  if (!read.length) return { status: 'no-knowledge', detail: 'the READ digest names no knowledge file (knowledge/patterns/** or a --knowledge file) with its sha256: the decision cites no standard' };
+  const mapped = new Set((Array.isArray(digest.slotMap) ? digest.slotMap : []).map((m) => posixPath(String(m?.path ?? ''))));
+  const unmapped = (Array.isArray(digest.touched) ? digest.touched : []).map((t) => posixPath(String(t))).filter((t) => !mapped.has(t));
+  if (unmapped.length) return { status: 'no-knowledge', detail: `the READ digest has no hfs slot entry for ${unmapped.slice(0, 5).join(', ')}` };
+  return { status: 'pass', detail: null };
+}
+
+/**
  * `hfs explain` of each path through the app's own hfs: in-process through its hfs-check library when it loads, else one
  * `hfs explain <path> --json` per path. A path hfs cannot explain answers {path, status: 'unexplained'} (slot null).
  */
@@ -124,8 +143,8 @@ export function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoo
 }
 
 /** The digest of a slice: what it must read, each file with its sha256. */
-export async function buildReadDigest({ root, touch, read = [], doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
-  const touched = [...new Set(touch.map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort();
+export async function buildReadDigest({ root, touch, read = [], knowledge = [], doc = loadOpGate(), hfs = hfsEntry(root), base = runtimeRoot }) {
+  const touched = [...new Set((touch ?? []).map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f)))].sort();
   const explained = await explainPaths(root, touched, hfs);
   const slotMap = touched.map((file, i) => {
     const e = explained[i] ?? {};
@@ -138,25 +157,30 @@ export async function buildReadDigest({ root, touch, read = [], doc = loadOpGate
     for (const example of examplesForSlot(kind, doc, base)) add(example, 'example', base);
   }
   for (const extra of read) add(posixPath(extra), 'read', path.isAbsolute(extra) ? '' : root);
+  for (const rel of knowledge) {
+    const clean = posixPath(path.isAbsolute(rel) ? path.relative(base, rel) : rel);
+    if (!clean.startsWith(`${KNOWLEDGE_ROOT}/`) || !fs.existsSync(path.join(base, clean))) throw new Error(`--knowledge ${rel} is not a file under the runtime's ${KNOWLEDGE_ROOT}/`);
+    add(clean, clean.startsWith(`${PATTERN_ROOT}/`) ? 'pattern' : 'knowledge', base);
+  }
   return { schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: posixPath(path.resolve(root)), touched, slotMap, files: [...files.values()] };
 }
 
 export function parseDigestArgs(argv) {
-  const opts = { root: null, touch: [], read: [], out: null };
+  const opts = { root: null, touch: [], read: [], knowledge: [], out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--touch' || arg === '--read') { while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts[arg.slice(2)].push(argv[++i]); }
+    if (arg === '--touch' || arg === '--read' || arg === '--knowledge') { while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts[arg.slice(2)].push(argv[++i]); }
     else if (arg === '--root' || arg === '--out') { if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value; ${USAGE}`); opts[arg.slice(2)] = argv[++i]; }
     else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
-  if (!opts.touch.length) throw new Error(`--touch names at least one file; ${USAGE}`);
+  if (!opts.touch.length && !opts.knowledge.length) throw new Error(`--touch or --knowledge names at least one file; ${USAGE}`);
   return opts;
 }
 
 if (isMain(import.meta.url)) {
   try {
     const opts = parseDigestArgs(process.argv.slice(2));
-    const digest = await buildReadDigest({ root: path.resolve(opts.root ?? process.cwd()), touch: opts.touch, read: opts.read });
+    const digest = await buildReadDigest({ root: path.resolve(opts.root ?? process.cwd()), touch: opts.touch, read: opts.read, knowledge: opts.knowledge });
     const text = `${JSON.stringify(digest, null, 2)}\n`;
     if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
     process.stdout.write(text);

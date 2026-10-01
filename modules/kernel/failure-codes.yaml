@@ -11909,6 +11909,225 @@ op-read-digest-no-pattern:
   owner: op-retry
   kind: settle-reason
 
+op-read-digest-no-knowledge:
+  title: "The READ digest cites no standard"
+  title_vi: "Bản tóm tắt ĐỌC không dẫn chuẩn nào"
+  meaning_vi: "Op quyết định hoặc viết tài liệu nhưng bản tóm tắt ĐỌC không nêu tệp knowledge nào (knowledge/patterns hay tệp --knowledge) kèm sha256, hoặc có bản ghi đã viết không có mục slot của hfs; quyết định không dẫn được chuẩn."
+  causes_vi:
+    - "Op chạy read-digest.mjs mà không có --knowledge cho các tệp chuẩn nó dựa vào"
+    - "Op viết thêm bản ghi ngoài danh sách --touch lúc đọc"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy lại read-digest.mjs với --knowledge <các tệp knowledge đã dựa vào> và --touch <mọi bản ghi đã viết>, đọc lại rồi nộp kèm read-digest.json."
+  owner: op-retry
+  kind: settle-reason
+
+op-doc-gate-missing:
+  title: "No document gate is attached"
+  title_vi: "Chưa đính kèm cổng kiểm tra tài liệu"
+  meaning_vi: "Op viết tài liệu, knowledge hoặc bản ghi Work nhưng report không đính kèm gate.json hồ sơ docs (gate.mjs --profile docs), nên runtime không chấm được tài liệu."
+  causes_vi:
+    - "Op chưa chạy gate.mjs --profile docs sau khi viết"
+    - "Tệp doc-gate.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/gate.mjs --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
+  owner: op-retry
+  kind: settle-reason
+
+op-doc-gate-tool-failed:
+  title: "A document check could not run"
+  title_vi: "Một bộ kiểm tra tài liệu không chạy được"
+  meaning_vi: "Cổng tài liệu báo exit 2: một trong các bộ kiểm tra (doc-language, work-surfaces, work-deep, example-work, contract-cites, json-exceptions) bị lỗi khi chạy, nên tài liệu chưa được chấm. Không chạy được không bao giờ là đạt."
+  causes_vi:
+    - "Thiếu gói trong node_modules của runtime"
+    - "Đường dẫn --tree không tồn tại"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân được nêu trong errors của doc-gate.json rồi chạy lại, hoặc chốt blocked với lỗi đó."
+  owner: op-retry
+  kind: settle-reason
+
+op-doc-gate-red:
+  title: "The document gate reports findings"
+  title_vi: "Cổng kiểm tra tài liệu báo lỗi"
+  meaning_vi: "Cổng tài liệu còn lỗi: tài liệu không phải tiếng Anh, bản ghi Work sai bề mặt hay lỗi thời, trích dẫn tới tệp không tồn tại hoặc ngoại lệ JSON sai."
+  causes_vi:
+    - "Tài liệu mới viết có câu không phải tiếng Anh"
+    - "Bản ghi Work nêu bề mặt hay tệp không tồn tại"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa đúng các lỗi liệt kê rồi chạy lại cổng, tối đa params.gateRounds vòng; hết vòng mà vẫn đỏ thì chốt blocked kèm danh sách lỗi."
+  owner: op-retry
+  kind: settle-reason
+
+op-test-world-proof-missing:
+  title: "No test-world run summary is attached"
+  title_vi: "Chưa đính kèm tóm tắt lần chạy test-world"
+  meaning_vi: "Op e2e hoặc integration không đính kèm test-world-run.json (schema starci/test-world-run@1), nên runtime không biết bộ test đã chạy trên test world thật hay chưa."
+  causes_vi:
+    - "Op chạy jest trực tiếp mà không qua scripts/checks/test-world-run.mjs"
+    - "Tệp test-world-run.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/test-world-run.mjs --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
+  owner: op-retry
+  kind: settle-reason
+
+op-test-world-hand-rolled:
+  title: "The test world is hand-rolled"
+  title_vi: "Test world tự dựng thay vì dùng thư viện"
+  meaning_vi: "Tóm tắt test-world cho thấy app không chạy dự án world bằng world runner của @starci/jest-preset, thiếu khai báo defineTestWorld, hoặc có spec không gọi useTestWorld đúng tầng (apps cho e2e, modules cho integration) hay tự dựng docker, container, DataSource, process.env hoặc sleep."
+  causes_vi:
+    - "Spec tự khởi động docker hoặc tự mở kết nối cơ sở dữ liệu"
+    - "Spec integration gọi useTestWorld với apps thay vì modules"
+  nextStep_vi: "Việc chốt bị từ chối; op viết lại spec qua useTestWorld và API outage của @starci/test-world, chạy lại test-world-run.mjs rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+op-test-world-run-red:
+  title: "The test-world run is not green"
+  title_vi: "Lần chạy test-world chưa xanh"
+  meaning_vi: "Lần chạy dự án e2e hoặc integration trong tóm tắt có test thất bại, test bị bỏ qua, không có test nào, hoặc jest không ghi được báo cáo."
+  causes_vi:
+    - "Kịch bản thất bại trên stack thật"
+    - "Spec bị skip hoặc lọc mất"
+  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed với kịch bản và phản hồi quan sát được, hoặc sửa spec rồi chạy lại; không bao giờ done khi lần chạy đỏ."
+  owner: op-retry
+  kind: settle-reason
+
+op-unit-proof-missing:
+  title: "No unit run summary is attached"
+  title_vi: "Chưa đính kèm tóm tắt lần chạy unit"
+  meaning_vi: "unit.verify không đính kèm unit-run.json (schema starci/unit-run@1), nên runtime không chấm được độ phủ từng service và cách dựng spec."
+  causes_vi:
+    - "Op chạy npm test trực tiếp mà không qua scripts/checks/unit-run.mjs"
+    - "Tệp unit-run.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/unit-run.mjs --root <app> --out unit-run.json và đính kèm khi nộp."
+  owner: op-retry
+  kind: settle-reason
+
+op-unit-run-red:
+  title: "The unit run is not green"
+  title_vi: "Lần chạy unit chưa xanh"
+  meaning_vi: "Toàn bộ dự án unit trong tóm tắt có test thất bại, không có test nào, hoặc jest không ghi được báo cáo."
+  causes_vi:
+    - "Spec unit thất bại trên mã đã giao"
+    - "Lệnh test của app không chạy được"
+  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed nêu các tệp spec thất bại, hoặc blocked khi bộ test không chạy được."
+  owner: op-retry
+  kind: settle-reason
+
+op-unit-coverage-below:
+  title: "A service is below full unit coverage"
+  title_vi: "Có service chưa đạt độ phủ unit 100"
+  meaning_vi: "Ít nhất một tệp *.service.ts chưa đạt 100 ở lines, branches, functions hoặc statements, hoặc không có tệp <name>.service.spec.ts bên cạnh."
+  causes_vi:
+    - "Service mới chưa có spec"
+    - "Spec thiếu nhánh lỗi hoặc nhánh rẽ"
+  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed nêu các service thiếu độ phủ để một test.author bổ sung spec."
+  owner: op-retry
+  kind: settle-reason
+
+op-unit-kit-violation:
+  title: "A service spec is off the unit kit"
+  title_vi: "Spec service không theo bộ công cụ unit"
+  meaning_vi: "Spec của service không dựng đối tượng bằng Test.createTestingModule, tự new service, hoặc dùng jest.mock, overrideProvider, Date.now() hay process.env thay cho bộ đôi của @starci/jest-preset."
+  causes_vi:
+    - "Spec tự new service thay vì lấy từ testing module"
+    - "Spec dùng jest.mock thay cho mock<T>() của bộ công cụ"
+  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed nêu các spec sai chuẩn để một test.author viết lại theo knowledge/patterns/be/test.yaml."
+  owner: op-retry
+  kind: settle-reason
+
+op-lint-proof-missing:
+  title: "No hfs lint report is attached"
+  title_vi: "Chưa đính kèm báo cáo hfs lint"
+  meaning_vi: "Op bảo mật hoặc giao diện không đính kèm lint.json (schema starci/lint@1) do hfs lint --format json in ra, nên runtime không chấm được các luật canon."
+  causes_vi:
+    - "Op chưa chạy hfs lint ở gốc app"
+    - "Tệp lint.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy hfs lint --format json ở gốc app, lưu lint.json và đính kèm khi nộp."
+  owner: op-retry
+  kind: settle-reason
+
+op-lint-tool-failed:
+  title: "hfs lint could not run"
+  title_vi: "hfs lint không chạy được"
+  meaning_vi: "Báo cáo lint có errors: ESLint, stylelint hoặc kiểm tra app không chạy được, nên mã chưa được chấm. Không chạy được không bao giờ là đạt."
+  causes_vi:
+    - "Thiếu canon hoặc gói lint trong node_modules của app"
+    - "hfs.json của app không đọc được"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân môi trường rồi chạy lại hfs lint, hoặc chốt blocked với lỗi đó."
+  owner: op-retry
+  kind: settle-reason
+
+op-lint-findings:
+  title: "hfs lint reports findings the verdict ignores"
+  title_vi: "hfs lint báo lỗi mà kết luận bỏ qua"
+  meaning_vi: "Báo cáo lint còn lỗi thuộc phạm vi op: luật bảo mật (R41, R42, R44, R49, R71, R90, R107) với security.verify, hoặc lỗi dưới fe/ với interface.audit, interface.draw, interface.asset; op không thể chốt done khi các lỗi đó còn."
+  causes_vi:
+    - "Cửa xác thực thiếu RateTier.Strict hoặc lỗi chứa bí mật"
+    - "Mã giao diện vi phạm canon FE, stylelint hoặc ngữ pháp thương hiệu"
+  nextStep_vi: "Việc chốt done bị từ chối; op chốt failed nêu từng lỗi theo luật để op sở hữu sửa, hoặc sửa phần mình tạo ra rồi chạy lại lint."
+  owner: op-retry
+  kind: settle-reason
+
+op-review-defects-missing:
+  title: "The review classifies no defects"
+  title_vi: "Bản review chưa phân loại lỗi"
+  meaning_vi: "review.verify không đính kèm review-defects.json (schema starci/review-defects@1) liệt kê mọi lỗi tìm thấy kèm loại business hay non-business; danh sách rỗng khi không có lỗi."
+  causes_vi:
+    - "Op chỉ viết kết luận dạng văn bản"
+    - "Tệp review-defects.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op ghi review-defects.json với từng lỗi, loại và check đã bắt được (hoặc missingCheck) rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+op-review-defect-unclassified:
+  title: "A review defect is not classified"
+  title_vi: "Có lỗi review chưa được phân loại"
+  meaning_vi: "Ít nhất một lỗi trong review-defects.json không mang class business hoặc non-business."
+  causes_vi:
+    - "Op bỏ trống class của lỗi"
+    - "Op dùng loại khác hai loại đã định"
+  nextStep_vi: "Việc chốt bị từ chối; op phân loại từng lỗi là business hoặc non-business rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+op-review-missing-check-unrecorded:
+  title: "An uncaught non-business defect records no missing check"
+  title_vi: "Lỗi non-business không check nào bắt mà chưa ghi check còn thiếu"
+  meaning_vi: "Theo luật của chủ sở hữu, lỗi non-business mà không check nào bắt được phải ghi missingCheck cho .claude (check lẽ ra phải bắt nó); review-defects.json có lỗi như vậy mà thiếu caughtBy lẫn missingCheck."
+  causes_vi:
+    - "Op ghi lỗi mà không xét check nào lẽ ra phải bắt"
+  nextStep_vi: "Việc chốt bị từ chối; op ghi missingCheck.check (và luật hoặc chi tiết) cho từng lỗi đó rồi nộp lại, để .claude bổ sung check."
+  owner: op-retry
+  kind: settle-reason
+
+op-release-proof-missing:
+  title: "No release proof is attached"
+  title_vi: "Chưa đính kèm bằng chứng phát hành"
+  meaning_vi: "release.deliver publish hoặc deploy không đính kèm release-proof.json (schema starci/release-proof@1) do scripts/checks/release-proof.mjs in ra."
+  causes_vi:
+    - "Op phát hành mà không chạy release-proof.mjs"
+    - "Tệp release-proof.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/release-proof.mjs --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
+  owner: op-retry
+  kind: settle-reason
+
+op-release-step-skipped:
+  title: "A release step was skipped"
+  title_vi: "Một bước phát hành bị bỏ qua"
+  meaning_vi: "Bằng chứng phát hành thiếu một bước bắt buộc (app-installs, canon-pins, merge-guard, check) hoặc có bước bị skip, như spec scaffold in SKIPPED vì không có bản cài đặt."
+  causes_vi:
+    - "Spec scaffold chạy mà không có bản cài từ npm registry"
+    - "Op chỉnh tay release-proof.json bỏ bớt bước"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy lại release-proof.mjs đầy đủ; một bước không chạy được thì chốt blocked, không bao giờ done."
+  owner: op-retry
+  kind: settle-reason
+
+op-release-step-red:
+  title: "A release step is red"
+  title_vi: "Một bước phát hành đang đỏ"
+  meaning_vi: "Bằng chứng phát hành có bước không đạt: cài mới, lint, typecheck hay khởi động api thất bại, canon pins hoặc digest nội dung canon lệch, merge guard thấy merge làm mất thay đổi của main, hoặc npm run check đỏ."
+  causes_vi:
+    - "Gói đã publish không khớp canon pin"
+    - "Một merge trong dải phát hành giữ bản của lane thay cho main"
+  nextStep_vi: "Việc chốt bị từ chối; op chốt failed nêu bước đỏ để op sở hữu sửa; không phát hành khi bằng chứng còn đỏ."
+  owner: op-retry
+  kind: settle-reason
+
 GATE_BASE_UNKNOWN:
   title: "The gate has no base to compare with"
   title_vi: "Cổng kiểm tra không có commit gốc để so sánh"
