@@ -1,10 +1,11 @@
-// The runtime owns the git worktree lifecycle (owner order lane WT, 2026-10-01: 600+ orphan worktrees had piled up; the
+// The runtime owns the worktree lifecycle (owner order lane WT, 2026-10-01: 600+ orphan worktrees had piled up; the
 // .claude incident: a cleanup that listed links with `dir /AL /S` and deleted with robocopy /MIR followed lane junctions
-// into the main checkout and deleted 490 tracked files). scripts/lib/worktrees.mjs is the one creator (registered in
-// machine.sqlite, capped per repository), scripts/kernel/product-worktree.mjs lands an op into main at its settle and
-// removes its tree and branch, the GC reclaims whatever outlives its owner, and every removal goes through
-// scripts/lib/safe-remove.mjs safeRemoveWorktree: links found without following one, removed as links, zero asserted,
-// only then `git worktree remove`, and the main checkout asserted untouched.
+// into the main checkout and deleted 490 tracked files). scripts/lib/worktrees.mjs is the one home: an agent's workspace
+// (the workflow worktree, the critic) is created and removed by Orca (tests/workflow-worktree.spec.mjs), a runtime
+// scratch tree by createScratchWorktree, the GC reclaims whatever outlives its owner through the home that made it, and
+// every git removal goes through scripts/lib/safe-remove.mjs safeRemoveWorktree: links found without following one,
+// removed as links, zero asserted, only then `git worktree remove`, and the main checkout asserted untouched. The per-op
+// land (integrateOp, the reap) is exercised on a tree the spec makes itself until part B deletes it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -15,9 +16,11 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { withMachine } from '../engine/machine-db.mjs';
-import { ensureOpWorktree, integrateOp, reapJobWorktree, productSettings, preservedOpRef, EVENTS } from '../scripts/kernel/product-worktree.mjs';
+import { integrateOp, reapJobWorktree, productSettings, preservedOpRef, EVENTS } from '../scripts/kernel/product-worktree.mjs';
 import { evaluateCondition } from '../scripts/kernel/gate-conditions.mjs';
-import { createWorktree, removeWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit } from '../scripts/lib/worktrees.mjs';
+import { createScratchWorktree, removeScratchWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit, reserveOrcaSlot } from '../scripts/lib/worktrees.mjs';
+import { ensureWorkflowWorktree } from '../scripts/kernel/workflow-worktree.mjs';
+import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 import { linksUnder, mainCheckoutDamage } from '../scripts/lib/safe-remove.mjs';
 import { scanWorktreeAdd, strayLines } from '../scripts/checks/check-worktree-add.mjs';
 import { collectLanes, readLaneCursor, writeLaneCursor } from '../scripts/supervisor/gc.mjs';
@@ -77,17 +80,23 @@ function ledgerWith(t, base, record, jobId, status) {
   return { ledger, ledgerRepo, now };
 }
 const liveRows = (env) => withMachine((m) => m.liveWorktrees(), { env });
+/** The per-op tree the per-op land (part B's, until it is deleted) works on, made by the spec: <repo>/.starciwork/worktrees/<short> on op/<short>. */
+function opTree(repo, jobId) {
+  const short = jobId.split('-').pop().slice(-8);
+  const dir = path.join(worktreesRootOf(repo), short);
+  const branch = `op/${short}`;
+  const baseSha = git(repo, 'rev-parse', 'main');
+  fs.mkdirSync(path.dirname(dir), { recursive: true });
+  git(repo, 'worktree', 'add', '-q', '-b', branch, dir, baseSha);
+  git(repo, 'config', `branch.${branch}.description`, jobId);
+  return { repoRoot: repo, workflowId: WF, jobId, main: 'main', op: { short, branch, path: dir }, baseSha, createdAt: Date.now() };
+}
 const green = () => ({ exit: 0, findings: [], errors: [], counts: { new: 0 } });
 
 test('an op settles: rebased onto main, gated, main fast-forwarded and pushed; then no worktree and no branch are left', (t) => {
   const { base, repo, origin, env } = fixture(t);
   const jobId = 'op-code.refactor-a1b2c3d4e5';
-  const made = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId, env });
-  assert.ok(made.ok, JSON.stringify(made));
-  const rec = made.record;
-  assert.equal(rec.op.path, path.join(worktreesRootOf(repo), 'a1b2c3d4'));
-  assert.equal(liveRows(env).length, 1, 'the worktree is registered');
-  assert.equal(liveRows(env)[0].job_id, jobId);
+  const rec = opTree(repo, jobId);
   write(rec.op.path, 'src/a.ts', 'export const a = 2;\n');
   git(rec.op.path, 'commit', '-qam', 'op: a = 2');
   // main moved meanwhile (another op landed): the land rebases, main's change is kept.
@@ -126,10 +135,10 @@ test('an op settles: rebased onto main, gated, main fast-forwarded and pushed; t
 });
 
 test('the land refuses before main moves: a merge that dropped main\'s change, a red pre-land verify, a dirty op tree', (t) => {
-  const { repo, env } = fixture(t);
+  const { repo } = fixture(t);
   const base = productSettings();
   // 1. a merge on the op branch that kept the lane side over main's change of src/b.ts.
-  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-9e1d000001', env }).record;
+  const rec = opTree(repo, 'op-code.refactor-9e1d000001');
   write(rec.op.path, 'src/b.ts', 'export const b = "lane";\n');
   git(rec.op.path, 'commit', '-qam', 'lane: b');
   write(repo, 'src/b.ts', 'export const b = "main";\n');
@@ -143,7 +152,7 @@ test('the land refuses before main moves: a merge that dropped main\'s change, a
   assert.deepEqual(dropped.dropped, ['src/b.ts']);
   assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'main untouched');
   // 2. a land check red on the rebased tree: product-integrate-red with a continuation; the op tree is back on its head.
-  const two = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-9e1d000002', env }).record;
+  const two = opTree(repo, 'op-code.refactor-9e1d000002');
   write(two.op.path, 'src/c.ts', 'export const c = 1;\n');
   git(two.op.path, 'add', '-A'); git(two.op.path, 'commit', '-qm', 'c');
   const own = git(two.op.path, 'rev-parse', 'HEAD');
@@ -162,9 +171,9 @@ test('the land refuses before main moves: a merge that dropped main\'s change, a
   assert.equal(integrateOp({ record: two, gate: green, settings: redSettings }).reason, 'op-worktree-dirty');
 });
 
-test('snapshotCommit preserves tracked and untracked work and never the node_modules overlay', (t) => {
-  const { repo, env } = fixture(t);
-  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-5aa0000001', env }).record;
+test('snapshotCommit preserves tracked and untracked work and never a node_modules entry', (t) => {
+  const { repo } = fixture(t);
+  const rec = opTree(repo, 'op-code.refactor-5aa0000001');
   write(rec.op.path, 'src/a.ts', 'export const a = 7;\n');
   write(rec.op.path, 'notes/todo.md', 'todo\n');
   fs.mkdirSync(path.join(rec.op.path, 'packages', 'x'), { recursive: true });
@@ -174,7 +183,7 @@ test('snapshotCommit preserves tracked and untracked work and never the node_mod
   assert.ok(snap.ok && snap.dirty, JSON.stringify(snap));
   const files = git(repo, 'ls-tree', '-r', '--name-only', snap.sha).split(/\r?\n/);
   assert.ok(files.includes('src/a.ts') && files.includes('notes/todo.md'));
-  assert.ok(!files.some((f) => f.includes('node_modules')), 'no overlay entry is ever preserved');
+  assert.ok(!files.some((f) => f.includes('node_modules')), 'no node_modules entry is ever preserved');
   assert.equal(git(rec.op.path, 'status', '--porcelain', '--', 'src/a.ts'), 'M src/a.ts', 'the worktree index is untouched');
   assert.equal(snapshotCommit(repo, git(repo, 'rev-parse', 'HEAD'), 'clean').dirty, false);
 });
@@ -196,7 +205,7 @@ test('a per-op product-op-landed event is what --until-landed reads', (t) => {
 test('a failed op: its uncommitted work is preserved to preserved/<job>, and its worktree and branch are removed', (t) => {
   const { base, repo, env } = fixture(t);
   const jobId = 'op-code.refactor-f00dfeed01';
-  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId, env }).record;
+  const rec = opTree(repo, jobId);
   write(rec.op.path, 'src/a.ts', 'export const a = 99;\n');
   write(rec.op.path, 'src/new.ts', 'export const fresh = true;\n');
   const { ledger, ledgerRepo, now } = ledgerWith(t, base, rec, jobId, 'failed');
@@ -213,12 +222,13 @@ test('a failed op: its uncommitted work is preserved to preserved/<job>, and its
   assert.equal(liveRows(env).length, 0);
 });
 
-test('the GC reclaims orphans: a settled owner op, an unregistered tree, a scratch whose owner process is gone', (t) => {
-  const { repo, env } = fixture(t);
+test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unregistered tree, a scratch whose owner is gone, a slot never bound', (t) => {
+  const { base, repo, env } = fixture(t);
+  const orca = fakeOrcaWorktrees({ root: path.join(base, 'orca') });
   const now = Date.now() + 2 * HOUR;
-  // 1. a registered op tree whose owner op settled (failed): preserved, removed.
-  const settled = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-5e771ed000', env }).record;
-  write(settled.op.path, 'src/wip.ts', 'export const wip = 1;\n');
+  // 1. the workflow worktree of a workflow that finished: preserved, removed through Orca.
+  const ended = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-nivo-fe-ended-1a', appRepo: repo }).record;
+  write(ended.path, 'src/wip.ts', 'export const wip = 1;\n');
   // 2. a tree under the worktrees root the registry never knew (made before the registry, or by a crashed run).
   const orphan = path.join(worktreesRootOf(repo), 'legacy', '_wf');
   fs.mkdirSync(path.dirname(orphan), { recursive: true });
@@ -228,51 +238,37 @@ test('the GC reclaims orphans: a settled owner op, an unregistered tree, a scrat
   git(orphan, 'add', '-A'); git(orphan, 'commit', '-qm', 'unlanded work');
   // 3. a land scratch whose creating process is gone.
   const scratch = path.join(worktreesRootOf(repo), 'scratch-dead');
-  assert.ok(createWorktree({ repoRoot: repo, dir: scratch, kind: 'land-scratch', detach: true, base: 'main', ownerPid: 2 ** 22 + 12345, env }).ok);
-  // 4. a live op keeps its tree.
-  const live = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-11fe000000', env }).record;
-  const status = { 'op-code.refactor-5e771ed000': 'failed', 'op-code.refactor-11fe000000': 'running' };
-  const items = gcWorktrees({ env, now, repos: [repo], jobStatusOf: (_, id) => status[id] ?? null, ownerAlive: () => false });
+  assert.ok(createScratchWorktree({ repoRoot: repo, dir: scratch, kind: 'land-scratch', detach: true, base: 'main', ownerPid: 2 ** 22 + 12345, env }).ok);
+  // 4. a running workflow keeps its tree.
+  const live = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-nivo-fe-live-2b', appRepo: repo }).record;
+  // 5. an Orca slot whose creator died before Orca answered.
+  const slot = reserveOrcaSlot({ repoRoot: repo, kind: 'workflow', slotKey: 'wf-crashed', owner: { workflowId: 'wf-crashed' }, env });
+  assert.ok(slot.ok);
+  withMachine((m) => m.db.prepare('UPDATE worktrees SET created_at=? WHERE path=?').run(1, slot.pending), { env });
+  const phase = { 'wf-nivo-fe-ended-1a': 'finished', 'wf-nivo-fe-live-2b': 'running' };
+  const lookup = Object.assign(() => null, { workflowPhase: (_, id) => phase[id] ?? null });
+  const items = gcWorktrees({ env, now, repos: [repo], jobStatusOf: lookup, ownerAlive: () => false, orca });
   const by = (p) => items.find((i) => i.path && path.resolve(i.path) === path.resolve(p));
-  assert.equal(by(settled.op.path)?.reason, 'owner-settled', JSON.stringify(items));
-  assert.equal(by(settled.op.path)?.ok, true);
-  assert.equal(by(settled.op.path)?.preserved, 'refs/heads/preserved/op-code.refactor-5e771ed000');
+  assert.equal(by(ended.path)?.reason, 'owner-settled', JSON.stringify(items));
+  assert.equal(by(ended.path)?.home, 'orca');
+  assert.equal(by(ended.path)?.ok, true);
+  assert.equal(by(ended.path)?.preserved, 'refs/heads/preserved/wf-nivo-fe-ended-1a/gc');
+  assert.ok(orca.calls.some(([verb, a]) => verb === 'remove' && a.worktree === `id:${ended.orcaWorktreeId}`), 'Orca removed it');
   assert.equal(by(orphan)?.reason, 'orphan');
   assert.equal(by(orphan)?.ok, true);
   assert.equal(by(orphan)?.preserved, 'refs/heads/preserved/wf-nivo-fe-legacy-9z', 'the unlanded commit is preserved');
   assert.equal(git(repo, 'show', 'preserved/wf-nivo-fe-legacy-9z:src/unlanded.ts'), 'export const u = 1;');
   assert.equal(by(scratch)?.reason, 'owner-gone');
-  assert.equal(by(live.op.path), undefined, 'a running op is never collected');
-  for (const p of [settled.op.path, orphan, scratch]) assert.ok(!fs.existsSync(p), `${p} removed`);
+  assert.equal(by(scratch)?.home, 'git');
+  assert.equal(by(slot.pending)?.reason, 'slot-never-bound');
+  assert.equal(by(live.path), undefined, 'a running workflow is never collected');
+  for (const p of [ended.path, orphan, scratch]) assert.ok(!fs.existsSync(p), `${p} removed`);
   assert.ok(!fs.existsSync(path.dirname(orphan)), 'the empty legacy <wf> directory goes too');
-  assert.ok(fs.existsSync(live.op.path));
-  assert.deepEqual(branches(repo, 'wf/*'), []);
-  assert.equal(trees(repo), 2, 'main + the live op');
-  const counts = worktreeCounts({ env, repos: [repo] }).find((c) => c.repoRoot === repo);
+  assert.ok(fs.existsSync(live.path));
+  assert.deepEqual(branches(repo, 'wf/legacy'), []);
+  assert.equal(trees(repo), 2, 'main + the live workflow');
+  const counts = worktreeCounts({ env, repos: [repo], now }).find((c) => c.repoRoot === repo);
   assert.deepEqual({ live: counts.live, cap: counts.cap, orphans: counts.orphans.length, over: counts.over }, { live: 1, cap: 10, orphans: 0, over: false });
-});
-
-test('the cap blocks dispatch: a full repository refuses worktree-cap and creates nothing; a freed slot admits the op', (t) => {
-  const { repo, env } = fixture(t);
-  const base = productSettings();
-  const settings = { ...base, worktrees: { ...base.worktrees, capPerRepo: 2 } };
-  const one = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-c0a1000000', env, settings });
-  const two = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-c0a2000000', env, settings });
-  assert.ok(one.ok && two.ok);
-  const three = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-c0a3000000', env, settings });
-  assert.equal(three.ok, false);
-  assert.equal(three.reason, 'worktree-cap');
-  assert.deepEqual({ live: three.live, cap: three.cap }, { live: 2, cap: 2 });
-  assert.ok(!fs.existsSync(path.join(worktreesRootOf(repo), 'c0a30000')), 'nothing created');
-  assert.equal(trees(repo), 3);
-  assert.deepEqual(branches(repo, 'op/*').length, 2, 'no branch for the waiting op');
-  const counts = worktreeCounts({ env, repos: [repo], settings: { capPerRepo: 2, ownerGoneMs: HOUR, gcEveryMs: 1, gcBudgetMs: 1 } }).find((c) => c.repoRoot === repo);
-  assert.equal(counts.live, 2);
-  // A requeued attempt of a live op reuses its tree: never capped.
-  assert.equal(ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-c0a1000000', env, settings }).created, false);
-  assert.ok(removeWorktree({ repoRoot: repo, dir: one.record.op.path, branch: one.record.op.branch, deleteBranch: 'merged', env }).ok);
-  const again = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-c0a3000000', env, settings });
-  assert.ok(again.ok, JSON.stringify(again));
 });
 
 test('the ban check fires on a stray `git worktree add` and on nothing else', (t) => {
@@ -284,13 +280,14 @@ test('the ban check fires on a stray `git worktree add` and on nothing else', (t
     'scripts/tool.ps1': 'git worktree add $dir main\n',
     'scripts/message.mjs': "return { ok: false, error: added.stderr || 'git worktree add failed' };\n",
     'scripts/prose.mjs': "const rule = 'never create a worktree (git worktree add, mklink): report a need';\n// git(['worktree', 'add', x]) in a comment\n",
-    'scripts/lib/worktrees.mjs': "run(['worktree', 'add', target, branch]);\n",
+    'scripts/lib/worktrees.mjs': "export function createScratchWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\nexport function createOrcaWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\n",
     'tests/fixture.spec.mjs': "git(root, 'worktree', 'add', lane);\ngit(['worktree', 'add', lane]);\n",
   };
   for (const [rel, text] of Object.entries(files)) write(root, rel, text);
   const r = scanWorktreeAdd(root, { files: Object.keys(files) });
   assert.equal(r.ok, false);
-  assert.deepEqual(r.hits.map((h) => h.file).sort(), ['scripts/shell.mjs', 'scripts/stray.mjs', 'scripts/tool.ps1']);
+  assert.deepEqual(r.hits.map((h) => h.file).sort(), ['scripts/lib/worktrees.mjs', 'scripts/shell.mjs', 'scripts/stray.mjs', 'scripts/tool.ps1']);
+  assert.deepEqual(r.hits.filter((h) => h.file === 'scripts/lib/worktrees.mjs').map((h) => h.line), [5], 'the worktree API itself: only its one home may hold the invocation');
   assert.deepEqual(strayLines("git(repoRoot, ['worktree',\t'add', dir])"), [{ line: 1, text: "git(repoRoot, ['worktree',\t'add', dir])" }]);
   const live = scanWorktreeAdd(SKILL_ROOT);
   assert.equal(live.ok, true, `the runtime itself is clean: ${JSON.stringify(live.hits.slice(0, 3))}`);
@@ -325,7 +322,7 @@ test('a worktree with nested junctions into a fake main is removed and the fake 
   // main's own internal link: the kind `dir /AL /S` from inside a lane listed through a junction and deleted.
   fs.symlinkSync(path.join(main, 'packages', 'eslint', 'be'), path.join(main, 'node_modules', 'eslint-be'), LINK);
   const lane = path.join(base, 'lanes', 'wt');
-  assert.ok(createWorktree({ repoRoot: main, dir: lane, kind: 'lane', branch: 'lane/wt', newBranch: true, base: 'main', owner: { lane: 'wt' }, env }).ok);
+  assert.ok(createScratchWorktree({ repoRoot: main, dir: lane, kind: 'lane', branch: 'lane/wt', newBranch: true, base: 'main', owner: { lane: 'wt' }, env }).ok);
   fs.symlinkSync(path.join(main, 'node_modules'), path.join(lane, 'node_modules'), LINK);
   fs.symlinkSync(path.join(main, 'packages', 'node_modules'), path.join(lane, 'packages', 'node_modules'), LINK);
   fs.mkdirSync(path.join(lane, 'deep', 'a'), { recursive: true });
@@ -335,7 +332,7 @@ test('a worktree with nested junctions into a fake main is removed and the fake 
   assert.deepEqual(found, ['deep/a/packages', 'node_modules', 'packages/node_modules'], 'the lane\'s own links only, none of main\'s behind them');
   const before = picture(main);
   assert.ok(Object.keys(before).includes('node_modules/eslint-be'));
-  const r = removeWorktree({ repoRoot: main, dir: lane, branch: 'lane/wt', deleteBranch: 'force', env });
+  const r = removeScratchWorktree({ repoRoot: main, dir: lane, branch: 'lane/wt', deleteBranch: 'force', env });
   assert.ok(r.ok, JSON.stringify(r));
   assert.equal(r.links, 3);
   assert.ok(!fs.existsSync(lane));
@@ -346,29 +343,31 @@ test('a worktree with nested junctions into a fake main is removed and the fake 
 
 test('a removal that changes the main checkout stops the GC, and it stays stopped until resumed', (t) => {
   const { repo, env } = fixture(t);
-  const rec = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-bad1000000', env }).record;
-  ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-bad2000000', env });
+  const dead = 2 ** 22 + 12345;
+  const later = Date.now() + 2 * HOUR;
+  const one = path.join(worktreesRootOf(repo), 'bad1');
+  for (const dir of [one, path.join(worktreesRootOf(repo), 'bad2')]) assert.ok(createScratchWorktree({ repoRoot: repo, dir, kind: 'land-scratch', detach: true, base: 'main', ownerPid: dead, env }).ok);
   // A git whose worktree removal also deletes a tracked file of main: the damage the guard must catch.
   const hostile = (args, opts) => {
     const r = spawnSync('git', args, { cwd: opts?.cwd, encoding: 'utf8', windowsHide: true, env: opts?.env ?? process.env });
     if (args[0] === 'worktree' && args[1] === 'remove') fs.rmSync(path.join(repo, 'src', 'b.ts'));
     return r;
   };
-  const items = gcWorktrees({ env, repos: [repo], jobStatusOf: () => 'failed', git: hostile });
+  const items = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false, git: hostile });
   const bad = items.find((i) => i.fatal);
   assert.ok(bad, JSON.stringify(items));
   assert.match(bad.damage.join(' '), /tracked file deleted: src\/b\.ts/);
   assert.equal(items.at(-1).action, 'stopped');
   assert.equal(items.filter((i) => i.action === 'remove').length, 1, 'nothing after the violation is touched');
   assert.equal(withMachine((m) => m.worktreeGcStop(), { env }).path, bad.path);
-  const next = gcWorktrees({ env, repos: [repo], jobStatusOf: () => 'failed' });
+  const next = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false });
   assert.deepEqual(next.map((i) => i.action), ['stopped'], 'a later pass refuses to remove anything');
-  assert.ok(fs.existsSync(path.join(worktreesRootOf(repo))) && liveRows(env).length >= 1, 'the other op tree is still there');
+  assert.ok(fs.existsSync(path.join(worktreesRootOf(repo))) && liveRows(env).length >= 1, 'the other scratch tree is still there');
   withMachine((m) => m.setWorktreeGcStop(null), { env });
   git(repo, 'checkout', '--', 'src/b.ts');
-  const resumed = gcWorktrees({ env, repos: [repo], jobStatusOf: () => 'failed' });
+  const resumed = gcWorktrees({ env, now: later, repos: [repo], ownerAlive: () => false });
   assert.ok(resumed.every((i) => i.ok !== false), JSON.stringify(resumed));
-  assert.ok(!fs.existsSync(rec.op.path));
+  assert.ok(!fs.existsSync(one));
   assert.deepEqual(mainCheckoutDamage({ ok: true, deleted: new Set(), nodeModules: 3, packagesNodeModules: null }, { ok: true, deleted: new Set(['x']), nodeModules: 2, packagesNodeModules: null }),
     ['tracked file deleted: x', 'node_modules entries 3 -> 2']);
 });

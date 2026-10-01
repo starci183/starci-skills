@@ -8,6 +8,7 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withMachine} from '../engine/machine-db.mjs';
 import {publishThrottle} from '../scripts/lib/ram-throttle.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -59,7 +60,7 @@ const fixture=t=>{
     LOCALAPPDATA:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
-  const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
+  const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
     // Every unit belongs to an approved goal revision. LIGHT_WORKFLOW holds the light op: the fake Orca answers one

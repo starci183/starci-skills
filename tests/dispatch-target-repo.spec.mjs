@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -48,7 +49,7 @@ const fixture=(t,{bound=true}={})=>{
     LOCALAPPDATA:path.join(dir,'localappdata'),STARCI_PROJECTS_ROOT:path.join(dir,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
   const api=(...args)=>{
-    const r=spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+    const r=spawnSync(process.execPath,[API,...placeOnRepo(args,args[args.indexOf('--repo')+1])],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {r,body};
   };

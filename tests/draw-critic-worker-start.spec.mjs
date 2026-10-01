@@ -9,6 +9,7 @@ import { withMachine } from '../engine/machine-db.mjs';
 import { allocationSettings } from '../engine/config.mjs';
 import { agentCliSpawns } from '../scripts/checks/check-host-boundary.mjs';
 import { fakeCriticOrca, passingVerdict } from './helpers/fake-critic-orca.mjs';
+import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 
 // The draw loop's independent critic is an Orca worker started through orchestration worker-start with the provider,
 // model and effort of runtimes.yaml allocation.drawLoop.critic (modules/kernel/contract-changes/
@@ -115,9 +116,10 @@ test('the critic runs no agent CLI as a child process', () => {
 });
 
 // Orca places a worker only on a worktree it resolves: a bare temp directory is refused selector_not_found (live launch
-// smoke 2026-10-01, scripts/kernel/launch-smoke.mjs). The placement is a runtime worktree of the repository the loop runs
-// in, detached at the empty tree, registered like every runtime worktree and removed through the same API.
-test('the critic placement is a registered runtime worktree at the empty tree, and is removed through worktrees.mjs', (t) => {
+// smoke 2026-10-01, scripts/kernel/launch-smoke.mjs). The placement is an Orca worktree of the repository the loop runs
+// in (an agent's workspace is Orca's, owner decision WFWT), at the empty tree, registered by its Orca id and removed
+// through Orca.
+test('the critic placement is an Orca worktree at the empty tree, registered by its Orca id, and removed through Orca', (t) => {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-critic-place-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(base, 'product');
@@ -131,21 +133,26 @@ test('the critic placement is a registered runtime worktree at the empty tree, a
   git('commit', '-q', '-m', 'init');
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite') };
   const op = { workflowId: 'wf-critic-place', jobId: 'job-draw-1' };
-  const placed = criticWorkspace({ repoRoot: repo, context: op, env });
+  const orca = fakeOrcaWorktrees({ root: path.join(base, 'orca') });
+  const placed = criticWorkspace({ repoRoot: repo, context: op, env, orca });
   assert.equal(placed.ok, true, placed.error);
   assert.deepEqual(fs.readdirSync(placed.dir), ['.git'], 'the placement holds no file of the repository');
-  assert.equal(path.relative(path.join(repo, '.starciwork', 'worktrees'), placed.dir).startsWith('..'), false, 'under the runtime worktrees root');
+  assert.deepEqual(orca.names(), ['create'], 'Orca created it');
+  assert.equal(orca.calls[0][1].setup, 'skip');
+  assert.match(placed.orcaId, /::/);
   const listed = git('worktree', 'list', '--porcelain').split(/\r?\n\r?\n/).find((b) => b.includes('draw-critic-'));
-  assert.ok(listed && path.resolve(listed.split(/\r?\n/)[0].slice('worktree '.length)) === path.resolve(placed.dir) && /\ndetached/.test(listed), 'a detached git worktree Orca resolves');
+  assert.ok(listed && path.resolve(listed.split(/\r?\n/)[0].slice('worktree '.length)) === path.resolve(placed.dir), 'a git worktree of the repository Orca resolves');
   assert.equal(spawnSync('git', ['ls-tree', '-r', 'HEAD'], { cwd: placed.dir, encoding: 'utf8' }).stdout.trim(), '', 'its HEAD is the empty tree');
   const row = withMachine((m) => m.worktreeRow(placed.dir), { env });
-  assert.deepEqual([row.kind, row.job_id, row.workflow_id, row.removed_at], ['op', 'job-draw-1', 'wf-critic-place', null], 'registered, owned by the op job (the worktree GC reclaims it after the op settles)');
-  const removed = removeCriticWorkspace({ dir: placed.dir, repoRoot: placed.repoRoot, env });
+  assert.deepEqual([row.kind, row.orca_id, row.job_id, row.workflow_id, row.removed_at], ['critic', placed.orcaId, 'job-draw-1', 'wf-critic-place', null], 'registered by its Orca id, owned by the op job (the worktree GC reclaims it after the op settles)');
+  const removed = removeCriticWorkspace({ dir: placed.dir, repoRoot: placed.repoRoot, orcaId: placed.orcaId, branch: placed.branch, env, orca });
   assert.equal(removed.ok, true, removed.reason);
+  assert.deepEqual(orca.calls.at(-1), ['remove', { worktree: `id:${placed.orcaId}`, force: true }], 'Orca removed it');
   assert.equal(fs.existsSync(placed.dir), false);
   assert.doesNotMatch(git('worktree', 'list', '--porcelain'), /draw-critic-/);
+  assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${placed.branch}`], { cwd: repo }).status, 1, 'its branch is gone too');
   assert.notEqual(withMachine((m) => m.worktreeRow(placed.dir), { env }).removed_at, null);
-  const nowhere = criticWorkspace({ repoRoot: null, context: null, env });
+  const nowhere = criticWorkspace({ repoRoot: null, context: null, env, orca });
   assert.equal(nowhere.ok, false, 'no repository, no placement - the critic is launch-failed, never placed in a bare directory');
 });
 

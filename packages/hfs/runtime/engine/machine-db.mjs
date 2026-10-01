@@ -43,9 +43,9 @@ import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
-export const MACHINE_VERSION = 2;
+export const MACHINE_VERSION = 3;
 /** Forward migrations after 0001-init, in order; each bumps user_version to its `version` (migrateMachine). */
-export const MACHINE_MIGRATIONS = Object.freeze([{ version: 2, name: '0002-worktrees-no-workflow-kind' }]);
+export const MACHINE_MIGRATIONS = Object.freeze([{ version: 2, name: '0002-worktrees-no-workflow-kind' }, { version: 3, name: '0003-worktrees-workflow-orca' }]);
 export const MACHINE_BUSY_TIMEOUT_MS = 15000;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 export const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };

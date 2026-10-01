@@ -8,6 +8,7 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,releaseTwoPhase,reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {isLeaseOverlapRefusal,patternFindings} from '../scripts/supervisor/owed.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 
 // nivo wf-nivo-modules-agentos-mudqjov6 (repeat-reject cae2e44b): the Kernel dispatched a devin job
 // twice and both were rejected at step `reserve` — "resource path:apps/app/src/messages/en.json
@@ -59,7 +60,7 @@ const fixture=t=>{
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
-  const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
+  const run=(...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
     seedWorkflow(l,{id:WORKFLOW,state:{phase:'queued',job:'lease wait'},goal:{revision:1,json:{}}});

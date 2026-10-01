@@ -12,9 +12,9 @@ import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../supervisor/lessons-file.mjs';
 import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
-import { enqueueRepository, ownedPathPlacements, projectBinding } from '../target-repo.mjs';
+import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
-import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules } from '../product-worktree.mjs';
+import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent } from '../../agent/lib.mjs';
 import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from '../api-lib/rows.mjs';
@@ -208,43 +208,25 @@ export default {
   const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
-  // Product worktrees (DESIGN §16.7, scripts/kernel/product-worktree.mjs): an op whose policy.isolation is `worktree` and
-  // whose owned paths land in the bound app repository runs in exactly ONE app worktree
-  // <repo>/.starciwork/worktrees/<op> on op/<op>, off the app's main. Only a --spawn makes it (reused by a requeued
-  // attempt; a continuation starts from its predecessor's preserved work). The worktree API caps each repository
-  // (worktrees.capPerRepo): a full repository refuses worktree-cap and the job stays queued until the GC or a settle
-  // frees a slot.
-  const productIsolation = (() => {
-    if (args.worktree) return { isolate: false, reason: 'worktree-flag' };
-    try {
-      const bare = ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: null, timeoutMs: allocationMs('settleGit.commandMs') });
-      return planIsolation({ brief: briefDoc, placements: bare, binding: projectBinding(repo) });
-    } catch (error) { return { isolate: false, reason: 'plan-error', detail: String(error?.message ?? error).slice(0, 200) }; }
-  })();
-  if (payload.productWorktree && payload.productWorktree.jobId !== jobId) delete payload.productWorktree; // a retry's copy of its predecessor's
-  let productWorktree = null;
-  if (productIsolation.isolate && args.spawn) {
-    const handFrom = [payload.retry?.retryOf, payload.retry?.resumeOf, payload.kernelEdit?.continuationOf].filter(Boolean);
-    const made = ensureOpWorktree({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId, handFrom, ledgerId: ledger.ledgerId ?? null,
-      onEvent: (kind, p) => ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind, payload: p })) });
-    if (!made.ok) {
-      const full = made.reason === 'worktree-cap';
-      const detail = { reason: made.reason, detail: made.detail ?? null, repoRoot: productIsolation.repoRoot, ...(full ? { live: made.live, cap: made.cap } : {}) };
-      const out = full ? { ok: false, jobId, op, reason: 'worktree-cap', waiting: true, detail } : { ok: false, jobId, op, reason: 'product-worktree-unavailable', detail };
-      emit(out, full ? `dispatch WAITS for ${jobId} (${op}): worktree-cap — ${productIsolation.repoRoot} holds ${made.live} live worktree(s), cap ${made.cap}; the job stays queued and costs no attempt until a settle or the GC frees a slot`
-        : `dispatch REFUSED for ${jobId} (${op}): product-worktree-unavailable — ${made.reason}${made.detail ? ` ${JSON.stringify(made.detail).slice(0, 300)}` : ''}; job stays queued`, args.json);
-      process.exit(1);
-    }
-    productWorktree = made.record;
-    payload.productWorktree = productWorktree;
-    ledger.transaction((tx) => updateJob(tx, { jobId, payload }));
-  } else if (productIsolation.isolate) {
-    productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
+  // The workflow worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca created it before the
+  // Kernel started, and every op of the workflow launches with `--worktree <it>`; no op gets a tree of its own. Ops on
+  // one side (be/ or fe/) run one at a time, across sides together (canDispatchConcurrently): a busy side is the typed
+  // wait workflow-side-busy, checked with the other waits below. A workflow with no worktree (an unbound repo, the
+  // runtime repo included) is refused below. --worktree overrides the placement.
+  const workflowTree = args.worktree ? null : workflowWorktreeOf({ env: process.env }, job.workflow_id);
+  // EVERY workflow in a git checkout has its worktree (made before its Kernel started); an op of such a workflow without
+  // one is refused, never run on the live checkout where nothing would checkpoint it. A ledger repo in no git checkout
+  // has no worktree to make and nothing to checkpoint: its ops run on it. --worktree is the explicit operator placement.
+  if (args.spawn && !args.worktree && !workflowTree && workflowAppRepo(repo)) {
+    const detail = `workflow ${job.workflow_id} has no workflow worktree in the registry; restart its Kernel (start-workflow creates it through Orca), then dispatch again. The job stays queued.`;
+    emit({ ok: false, jobId, op, reason: WORKFLOW_WORKTREE_MISSING, detail }, `dispatch REFUSED for ${jobId} (${op}): ${WORKFLOW_WORKTREE_MISSING} — ${detail}`, args.json);
+    process.exit(1);
   }
-  const checkoutRoot = args.worktree ?? productWorktree?.op.path ?? repo;
-  // The worker starts and works ON its checkout root: a product op worktree is a git worktree of the app repository, which
-  // Orca resolves as a worktree of that repository's project (repoId set), so the sidebar lists it under the project. Every
-  // owned path is app-relative (target-repo.mjs), so the app root is where they, gate.mjs --root and the app scripts resolve.
+  const opTreeArgs = workflowTree ? opWorktreeArgs({ env: process.env }, { workflowId: job.workflow_id }) : [];
+  const checkoutRoot = args.worktree ?? opTreeArgs[1] ?? repo;
+  // The worker starts and works ON its checkout root: the workflow worktree is a git worktree of the app repository,
+  // which Orca created and lists under the project. Every owned path is app-relative (target-repo.mjs), so the app root
+  // is where they, gate.mjs --root and the app scripts resolve.
   const worktree = checkoutRoot;
   const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
   const placements = (() => {
@@ -260,8 +242,7 @@ export default {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
-  if (productWorktree) packet.context.product_worktree = { repo: productWorktree.repoRoot, op: productWorktree.op, main: productWorktree.main ?? 'main', baseSha: productWorktree.baseSha ?? null, ...(productWorktree.preview ? { preview: true } : {}) };
-  else if (productIsolation.reason && productIsolation.reason !== 'policy-shared') packet.context.product_isolation = { isolate: false, reason: productIsolation.reason };
+  if (workflowTree) packet.context.workflow_worktree = { repo: workflowTree.repoRoot, path: workflowTree.path, branch: workflowTree.branch, checkpoint: workflowTree.checkpoint ?? null, side: sideOf(payload) };
   // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
   // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.
   if (packet.context.cut) { let manifest = null; try { manifest = cutManifestOf(db, { workflowId: job.workflow_id, op, cut: payload.cut, ownJobId: jobId }); } catch { manifest = null; } if (manifest) packet.context.cut = { ...packet.context.cut, manifest }; }
@@ -293,7 +274,7 @@ export default {
   // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and api report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + worktreePromptRules(productWorktree);
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + workflowWorktreePromptRules(workflowTree);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
   // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title
@@ -372,6 +353,13 @@ export default {
   if (leaseWait) {
     emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
       `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
+    process.exit(1);
+  }
+  // A busy side of the workflow worktree is the next wait (a path conflict above is the more precise answer).
+  const sideWait = workflowTree ? workflowSideWait(db, job, payload) : null;
+  if (sideWait) {
+    emit({ ok: false, jobId, op, waiting: true, ...sideWait },
+      `dispatch WAITING for ${jobId} (${op}): ${sideWait.reason} — ${sideWait.detail}`, args.json);
     process.exit(1);
   }
   // Host resources are a launch gate on the same admission path as the provider circuit, checked before
@@ -463,7 +451,7 @@ export default {
   if (scratchDir) ensureJobScratch({ repo, workflowId: job.workflow_id, jobId });
   // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
   // the op by its bound Orca terminal (scripts/guards/install.mjs bindGuardTerminal).
-  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd });
+  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, workflowWorktree: workflowTree?.path ?? null });
   return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, checkoutRoot, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
   },
 };

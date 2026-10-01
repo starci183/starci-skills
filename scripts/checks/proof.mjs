@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {safeRemoveTree,safeRemoveWorktree} from '../lib/safe-remove.mjs';
-import {createWorktree,markRemoved} from '../lib/worktrees.mjs';
+import {createScratchWorktree,markRemoved} from '../lib/worktrees.mjs';
 import {posixPath,slash} from '../lib/path-key.mjs';
 
 /**
@@ -111,7 +111,7 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
   };
   try{
     // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed in the finally below.
-    const added=createWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git:args=>run(args)});
+    const added=createScratchWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git:args=>run(args)});
     if(!added.ok)
       return {...empty('fail-before',baseHead,opHead,commands,`the base worktree of ${short(baseHead)} could not be created: ${tail(added.detail??added.reason,200)}`),
         specs:plan,verdict:'weak',error:tail(added.detail??added.reason,200)||'git worktree add failed'};

@@ -1,7 +1,11 @@
 #!/usr/bin/env node
-// check-worktree-add.mjs — only the runtime's worktree API creates a git worktree (owner order, lane WT: 600+ orphan
-// worktrees piled up because every script ran its own `git worktree add`). scripts/lib/worktrees.mjs createWorktree is
-// the one place: it registers the tree in machine.sqlite, enforces the per-repo cap and hands it to the GC. A land gate
+// check-worktree-add.mjs — the runtime creates a worktree in exactly one place (owner decision WFWT; lane WT before it:
+// 600+ orphan worktrees piled up because every script ran its own `git worktree add`). An agent's workspace is created
+// by Orca (`orca worktree create` through scripts/api/orca/worktree-create.mjs: the Kernel's workflow worktree, the
+// draw critic's placement), never by git. A runtime-internal scratch tree no agent works in (land/push scratch, the
+// verify-proof base tree, the revert lane, the [Worker] staging checkout) is made by git in ONE function:
+// scripts/lib/worktrees.mjs createScratchWorktree, which registers it in machine.sqlite and hands it to the GC. A
+// `git worktree add` anywhere else - another file, or the worktree API outside that function - is red. A land gate
 // tree check (scripts/supervisor/land.mjs TREE_CHECKS) and part of `npm run check`.
 //
 // It scans every tracked script outside tests/ (.mjs .js .cjs .ts .ps1 .sh; node_modules and the packages' copied
@@ -19,6 +23,8 @@ import { fileURLToPath } from 'node:url';
 import { runGit } from '../lib/git.mjs';
 
 export const WORKTREE_API = 'scripts/lib/worktrees.mjs';
+/** The one function of WORKTREE_API that may run `git worktree add`. */
+export const WORKTREE_ADD_HOME = 'createScratchWorktree';
 const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;
 const ARGV_FORM = /['"`]worktree['"`]\s*,\s*['"`]add['"`]/;
 const SHELL_FORM = /(?:^|['"`]|&&|;|\|\|)\s*git(?:\s+-C\s+(?:"[^"]*"|'[^']*'|\S+))?\s+worktree\s+add\b/;
@@ -27,12 +33,25 @@ const isComment = (line) => /^\s*(?:\/\/|\*|\/\*|#)/.test(line);
 const SHELL_CALL = /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(|\bshell\s*:/;
 const SHELL_SCRIPT = /\.(?:ps1|sh)$/;
 
-/** The stray invocations in one file's text: [{line, text}]. `file` decides whether a bare shell line counts. Pure. */
-export function strayLines(text, file = 'x.mjs') {
+/** The 1-based [first, last] lines of `export function <name>(` in a module's text (to its `}` at column 0), or null. */
+export function functionSpan(text, name) {
+  const lines = String(text).split(/\r?\n/);
+  const start = lines.findIndex((l) => l.startsWith(`export function ${name}(`));
+  if (start < 0) return null;
+  const end = lines.findIndex((l, i) => i > start && l.startsWith('}'));
+  return end < 0 ? null : [start + 1, end + 1];
+}
+
+/**
+ * The stray invocations in one file's text: [{line, text}]. `file` decides whether a bare shell line counts; `allowed`
+ * is a [first, last] line span where an invocation is the one home (WORKTREE_ADD_HOME in WORKTREE_API). Pure.
+ */
+export function strayLines(text, file = 'x.mjs', { allowed = null } = {}) {
   const out = [];
   const script = SHELL_SCRIPT.test(file);
   String(text).split(/\r?\n/).forEach((line, i) => {
     if (isComment(line)) return;
+    if (allowed && i + 1 >= allowed[0] && i + 1 <= allowed[1]) return;
     const shell = SHELL_FORM.test(line) && (script || SHELL_CALL.test(line));
     if (ARGV_FORM.test(line) || shell) out.push({ line: i + 1, text: line.trim().slice(0, 200) });
   });
@@ -47,12 +66,14 @@ export function scanWorktreeAdd(root, { files = null } = {}) {
   const hits = [];
   let count = 0;
   for (const rel of listed.map((f) => f.replace(/\\/g, '/'))) {
-    if (!scanned(rel) || rel === WORKTREE_API) continue;
+    if (!scanned(rel)) continue;
     let text;
     try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { continue; }
     count += 1;
     if (!/worktree/.test(text)) continue;
-    for (const h of strayLines(text, rel)) hits.push({ file: rel, ...h });
+    // The worktree API itself: only its one home function may hold the invocation (no home found: every line counts).
+    const allowed = rel === WORKTREE_API ? functionSpan(text, WORKTREE_ADD_HOME) : null;
+    for (const h of strayLines(text, rel, { allowed })) hits.push({ file: rel, ...h });
   }
   return { ok: hits.length === 0, hits, files: count };
 }
@@ -67,8 +88,8 @@ function main(argv) {
   const r = scanWorktreeAdd(root);
   if (asJson) console.log(JSON.stringify(r, null, 2));
   else {
-    for (const h of r.hits) console.log(`  ${h.file}:${h.line}  git worktree add outside ${WORKTREE_API} (use createWorktree): ${h.text}`);
-    console.log(r.ok ? `check-worktree-add: only ${WORKTREE_API} creates a worktree (${r.files} files)` : `check-worktree-add: red (${r.hits.length} stray)`);
+    for (const h of r.hits) console.log(`  ${h.file}:${h.line}  git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by ${WORKTREE_ADD_HOME}): ${h.text}`);
+    console.log(r.ok ? `check-worktree-add: only ${WORKTREE_API} ${WORKTREE_ADD_HOME} runs git worktree add (${r.files} files)` : `check-worktree-add: red (${r.hits.length} stray)`);
   }
   return r.ok ? 0 : 1;
 }

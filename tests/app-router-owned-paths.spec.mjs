@@ -12,6 +12,7 @@ import {resolveReadPath} from '../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {writeGreenProofs} from './helpers/sonar-scan.mjs';
+import {placeOnRepo} from './helpers/op-placement.mjs';
 
 // Next.js App Router route segments are literal directory names that look like globs
 // (inc-ed9f28ec0561 nivo Modules, inc-e3e7d183c3d5 mia base-repos: interface.scaffold/implement
@@ -194,7 +195,7 @@ const apiFixture=t=>{
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
     LOCALAPPDATA:path.join(root,'localappdata'),
   };
-  const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
+  const run=(...args)=>spawnSync(process.execPath,[API,...placeOnRepo(args,repo),'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
   // The spawned api resolves the ledger under ITS env's projects root (LOCALAPPDATA), not the test process's.
   const ledgerFile=ledgerFileFor(repo,{env});
   const ledger=openLedger({file:ledgerFile});

@@ -6281,16 +6281,6 @@ bare-shell:
   nextStep_vi: "Bộ dọn terminal sẽ đóng cửa sổ này; không cần ai làm gì."
   owner: runtime-core
   kind: runtime-fault
-base-unresolved:
-  title: "Base revision cannot be found"
-  title_vi: "Không tìm thấy bản gốc để dựng worktree"
-  meaning_vi: "Không dựng được worktree của quy trình vì không tra ra revision gốc trong kho git."
-  causes_vi:
-    - "Tên nhánh hoặc mã commit gốc sai"
-    - "Nhánh gốc chưa được lấy về"
-  nextStep_vi: "Việc dựng dừng; cần lõi runtime hoặc chủ kho kiểm tra revision gốc rồi thử lại."
-  owner: runtime-core
-  kind: runtime-fault
 branch-delete-failed:
   title: "Could not delete the branch"
   title_vi: "Xóa nhánh không thành công"
@@ -8381,15 +8371,6 @@ no-longer-reported:
   nextStep_vi: "Bỏ qua; không cần làm gì thêm."
   owner: op-retry
   kind: settle-reason
-no-project-binding:
-  title: "Repo has no project binding"
-  title_vi: "Kho chưa gắn với dự án"
-  meaning_vi: "Không biết kho nào thuộc dự án nên không tạo được cây làm việc riêng."
-  causes_vi:
-    - "dự án chưa được khai báo kho"
-  nextStep_vi: "Việc chạy chung kho thay vì cây riêng; bổ sung liên kết dự án nếu cần."
-  owner: owner
-  kind: settle-reason
 op-worktree-reset-failed:
   title: "The op worktree could not be put on the rebased head"
   title_vi: "Không đặt được worktree của op lên head đã rebase"
@@ -8397,6 +8378,27 @@ op-worktree-reset-failed:
   causes_vi:
     - "Tệp trong worktree đang bị khóa"
   nextStep_vi: "Giải phóng tệp bị khóa rồi chốt lại; main giữ nguyên."
+  owner: runtime-core
+  kind: runtime-fault
+orca-worktree-create-failed:
+  title: "Orca did not create the worktree"
+  title_vi: "Orca không tạo được cây làm việc"
+  meaning_vi: "Runtime nhờ Orca tạo cây làm việc (của workflow hoặc của người chấm bản vẽ) nhưng Orca từ chối hoặc không trả về cây nào. Chỗ đã giữ trong giới hạn của repo được trả lại."
+  causes_vi:
+    - "Orca chưa chạy hoặc chưa biết repo này"
+    - "Nhánh gốc (main) không có trong repo"
+    - "Lỗi đĩa hoặc git phía Orca"
+  nextStep_vi: "Không có cây nào được tạo. Mở Orca, kiểm tra repo đã có trong Orca (scripts/api/orca/repo-add.mjs) rồi khởi động lại workflow."
+  owner: runtime-core
+  kind: runtime-fault
+orca-worktree-rm-failed:
+  title: "Orca did not remove the worktree"
+  title_vi: "Orca không gỡ được cây làm việc"
+  meaning_vi: "Runtime đã gỡ hết liên kết trong cây làm việc rồi nhờ Orca gỡ cây, nhưng Orca từ chối. Cây và dòng đăng ký vẫn giữ nguyên để lượt sau thử lại."
+  causes_vi:
+    - "Orca chưa chạy hoặc đang khởi động lại"
+    - "Một tiến trình còn giữ thư mục của cây"
+  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/lib/worktrees.mjs gc."
   owner: runtime-core
   kind: runtime-fault
 product-integrate-red:
@@ -8409,15 +8411,6 @@ product-integrate-red:
   nextStep_vi: "main giữ nguyên; op tiếp tục trên nền main mới (continuation), không tính là thất bại."
   owner: op-retry
   kind: runtime-fault
-work-only:
-  title: "The op only touches work records"
-  title_vi: "Việc chỉ chạm hồ sơ công việc"
-  meaning_vi: "Việc không đặt tệp nào vào be/ hay fe/, chỉ ghi hồ sơ .starciwork, nên chạy trên bản chính chứ không cần cây làm việc riêng."
-  causes_vi:
-    - "việc chỉ viết hoặc sửa hồ sơ công việc"
-  nextStep_vi: "Không cần làm gì; nếu việc phải sửa mã thì khai báo vị trí tệp trong be/ hoặc fe/."
-  owner: owner
-  kind: settle-reason
 no-typescript:
   title: "TypeScript not found"
   title_vi: "Không tìm thấy TypeScript"
@@ -8573,16 +8566,6 @@ outcome-mismatch:
   nextStep_vi: "Lệnh nộp bị từ chối, chưa ghi gì. Op nộp lại với outcome khớp với nội dung file báo cáo (hoặc bỏ cờ)."
   owner: op-retry
   kind: verb-refusal
-overlay-link-stuck:
-  title: "Dependency overlay link cannot be removed"
-  title_vi: "Không gỡ được liên kết thư viện của cây làm việc"
-  meaning_vi: "Runtime không dọn được lớp liên kết node_modules cũ trong cây làm việc riêng của sản phẩm nên không dựng lại được."
-  causes_vi:
-    - "Một tiến trình khác đang giữ file trong node_modules"
-    - "Liên kết cũ bị hỏng hoặc bị khóa bởi hệ điều hành"
-  nextStep_vi: "Việc tạo cây làm việc dừng lại, job vẫn xếp hàng. Cần sửa hạ tầng (đóng tiến trình đang giữ file) rồi runtime thử lại."
-  owner: runtime-core
-  kind: runtime-fault
 override-invalid:
   title: "Op override value is invalid"
   title_vi: "Giá trị ghi đè op không hợp lệ"
@@ -9016,16 +8999,6 @@ plan-edges-missing:
   owner: supervisor
   kind: verb-refusal
 
-plan-error:
-  title: "Isolation planning failed"
-  title_vi: "Lỗi khi lập kế hoạch cây làm việc riêng"
-  meaning_vi: "Runtime gặp lỗi khi tính xem job có nên chạy trong cây làm việc riêng, nên bỏ qua việc cô lập."
-  causes_vi:
-    - "Lỗi khi phân giải vị trí các đường dẫn giao"
-    - "Cấu hình dự án không đọc được"
-  nextStep_vi: "Job vẫn được xử lý nhưng không dùng cây làm việc riêng; lỗi chi tiết nằm trong thông báo, nếu lặp lại cần sửa runtime."
-  owner: runtime-core
-  kind: runtime-fault
 plan-file-invalid:
   title: "Plan file has the wrong shape"
   title_vi: "File kế hoạch sai cấu trúc"
@@ -9094,16 +9067,6 @@ product-land-conflict:
   nextStep_vi: "Không land gì, main giữ nguyên; thông báo liệt kê từng file xung đột để giải quyết trên nhánh luồng rồi land lại."
   owner: supervisor
   kind: blocker
-product-worktree-unavailable:
-  title: "Product worktree could not be made"
-  title_vi: "Không tạo được cây làm việc riêng cho op"
-  meaning_vi: "Job chưa được giao vì runtime không dựng được cây làm việc riêng của sản phẩm cho nó."
-  causes_vi:
-    - "Lỗi git hoặc đĩa khi tạo worktree"
-    - "Không dựng được lớp liên kết thư viện"
-  nextStep_vi: "Job vẫn xếp hàng chờ. Lý do chi tiết nằm trong thông báo; nếu lặp lại thì cần sửa hạ tầng."
-  owner: runtime-core
-  kind: dispatch-refusal
 progress-stall:
   title: "Workflow progress has stalled"
   title_vi: "Tiến độ luồng công việc bị đứng"
@@ -9333,6 +9296,15 @@ recut-empty:
   nextStep_vi: "Không thêm job. Kernel chờ việc đang chạy xong hoặc cắt lại phạm vi rồi thử lại."
   owner: supervisor
   kind: verb-refusal
+release-from-inside:
+  title: "A workflow worktree release was asked from inside it"
+  title_vi: "Yêu cầu gỡ cây làm việc của workflow từ bên trong chính nó"
+  meaning_vi: "Cây làm việc của workflow chỉ được gỡ từ máy chủ (GC của reconciler), không bao giờ từ một tiến trình đang chạy bên trong nó. Lệnh gỡ bị từ chối và không có gì bị xoá."
+  causes_vi:
+    - "Kernel hoặc một op gọi lệnh gỡ khi đang đứng trong cây làm việc"
+  nextStep_vi: "Không có gì bị xoá. Đánh dấu cây chờ gỡ (release-pending); GC trên máy chủ gỡ nó sau khi terminal của Kernel và các op đã được giải phóng."
+  owner: runtime-core
+  kind: runtime-fault
 release-worker-not-settled:
   title: "Release on a job in wrong state"
   title_vi: "Nhả thợ khi job đang ở trạng thái không hợp lệ"
@@ -9428,16 +9400,6 @@ reply-to-unknown:
   nextStep_vi: "Tin không được gửi. Kiểm tra mã trong hộp thư rồi gửi lại."
   owner: supervisor
   kind: input-invalid
-repo-not-a-checkout:
-  title: "Bound repo is not a git checkout"
-  title_vi: "Kho đã khai không phải là bản git thật"
-  meaning_vi: "Kho được gắn vào dự án không có thư mục .git nên không dựng được cây làm việc riêng."
-  causes_vi:
-    - "Đường dẫn kho sai"
-    - "Thư mục chỉ là bản sao không có .git"
-  nextStep_vi: "Job chạy không cô lập (không có cây làm việc riêng). Sửa cấu hình để trỏ vào bản git thật."
-  owner: supervisor
-  kind: runtime-fault
 report-already-filed:
   title: "Report already filed for this dispatch"
   title_vi: "Lần giao này đã nộp báo cáo rồi"
@@ -9573,16 +9535,6 @@ rerun-red:
   nextStep_vi: "Job không được chốt xanh; Kernel giao lại cho worker sửa hoặc quyết định thất bại."
   owner: op-retry
   kind: settle-reason
-resolution-outside-worktree:
-  title: "Resolved path escapes the worktree"
-  title_vi: "Đường dẫn trỏ ra ngoài worktree"
-  meaning_vi: "Khi dựng worktree cho workflow, có đường dẫn cần liên kết lại nằm ngoài thư mục worktree."
-  causes_vi:
-    - "Cấu hình overlay trỏ ra ngoài kho"
-    - "Liên kết tượng trưng dẫn sang thư mục khác"
-  nextStep_vi: "Việc dựng worktree bị coi là chưa xong; cần sửa cấu hình overlay của dự án rồi dựng lại."
-  owner: runtime-core
-  kind: runtime-fault
 resolver-invalid:
   title: "Incident resolver not allowed"
   title_vi: "Người giải quyết sự cố không hợp lệ"
@@ -9859,6 +9811,16 @@ slicing-undeclared:
   causes_vi:
     - "modules/models/runtimes.yaml thiếu targetMinutes hoặc weights.file"
   nextStep_vi: "Bộ quét dừng; cần bổ sung khai báo trong cấu hình runtime."
+  owner: runtime-core
+  kind: runtime-fault
+slot-never-bound:
+  title: "A reserved worktree slot was never used"
+  title_vi: "Chỗ giữ cây làm việc không bao giờ được dùng"
+  meaning_vi: "Runtime đã giữ một chỗ trong giới hạn cây làm việc của repo trước khi nhờ Orca tạo cây, nhưng tiến trình tạo dừng trước khi Orca trả lời. GC trả lại chỗ đó."
+  causes_vi:
+    - "Tiến trình khởi động Kernel bị dừng giữa chừng"
+    - "Orca không trả lời lệnh tạo cây"
+  nextStep_vi: "Chỗ đã được trả lại. Nếu Orca có tạo cây, cây đó hiện trong danh sách worktree của Orca (scripts/api/orca/worktree-list.mjs); gỡ nó qua scripts/api/orca/worktree-rm.mjs sau khi xem nội dung."
   owner: runtime-core
   kind: runtime-fault
 spawn-failed:
@@ -10349,6 +10311,16 @@ workflow-open-jobs:
   nextStep_vi: "Kernel chốt hoặc huỷ các job đó rồi mới kết thúc."
   owner: op-retry
   kind: verb-refusal
+workflow-side-busy:
+  title: "The op's side of the workflow worktree is busy"
+  title_vi: "Phía của op trong cây làm việc của workflow đang bận"
+  meaning_vi: "Các op của một workflow làm chung một cây làm việc. Op cùng phía (be hoặc fe) chạy lần lượt; op ghi cả hai phía hoặc ghi ở gốc ứng dụng chạy một mình. Op này chờ op đang giữ phía đó chốt xong."
+  causes_vi:
+    - "Một op cùng phía của workflow đang chạy"
+    - "Một op ghi cả be lẫn fe đang chạy"
+  nextStep_vi: "Job vẫn xếp hàng, không tốn lượt thử, và tự sẵn sàng khi op kia chốt xong. Không giao lại bằng tay."
+  owner: runtime-core
+  kind: dispatch-refusal
 workflow-unknown:
   title: "Workflow not found"
   title_vi: "Không có workflow này"
@@ -10359,6 +10331,16 @@ workflow-unknown:
   nextStep_vi: "Lệnh bị từ chối; dùng đúng mã workflow."
   owner: op-retry
   kind: input-invalid
+workflow-worktree-missing:
+  title: "The op's workflow has no worktree"
+  title_vi: "Workflow của op không có cây làm việc"
+  meaning_vi: "Mọi workflow trong một kho git làm việc trong cây làm việc riêng do Orca tạo khi Kernel khởi động. Workflow này chưa có cây trong sổ đăng ký nên op không được giao: chạy trên kho chính thì không có gì chốt lại."
+  causes_vi:
+    - "Kernel khởi động trước khi có cây làm việc của workflow"
+    - "Cây làm việc đã bị gỡ trong khi workflow còn chạy"
+  nextStep_vi: "Job vẫn xếp hàng. Khởi động lại Kernel của workflow (start-workflow tạo cây qua Orca) rồi giao lại."
+  owner: runtime-core
+  kind: dispatch-refusal
 worktree-add-failed:
   title: "Adding worktree failed"
   title_vi: "Tạo worktree thất bại"
