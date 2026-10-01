@@ -36,7 +36,7 @@ schemas:
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
       - scripts/work/validate/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
-      - scripts/work/validate/check-work-consistency.mjs, scripts/example/work-example.mjs
+      - scripts/work/validate/check-work-consistency.mjs
     business:
       question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
       whenNeeded: Before any gate that walks Work records, and whenever a workflow creates a new node/family folder.

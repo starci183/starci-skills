@@ -2,8 +2,7 @@
 // modules/schemas/work-layout.yaml shape.productPaths). A repository's .starciwork holds product content only:
 // the explicit path list below. Every other path is agent data (reports, checks, captures, draw rounds, UAT runs,
 // logs, caches, ledgers, worktrees), which lives in runtime.sqlite rows and content-addressed blobs outside
-// every repository. STARCIWORK_GITIGNORE is the .starciwork/.gitignore content of a product repository (the
-// example trees write it through scripts/example/work-example.mjs).
+// every repository. STARCIWORK_GITIGNORE is the .starciwork/.gitignore content of a product repository.
 //
 // Paths are relative to the .starciwork root, '/'-separated.
 import fs from 'node:fs';

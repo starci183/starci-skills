@@ -198,6 +198,9 @@ retired:
   - {path: ui/public/logos/qwen.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: Qwen is not a provider'}
   - {path: ui/public/logos/starci-next-blue.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'ui/public/logos/starci-blue.png'}
   - {path: modules/supervisor/push-scan-allow.yaml, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: scripts/supervisor/push-mains.mjs has no scan exemption; test credentials are generated per run or kept as .starcistacks sops twins'}
+  - {path: scripts/example/work-example.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
+  - {path: scripts/housekeeping/ledger-throughput.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off load test with no reader'}
+  - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
