@@ -69,7 +69,7 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 | `world.services.<name>.api`, `world.http(url)` | REST clients. |
 | `world.waitFor(label, check, opts?)`, `world.waitUntil(label, observe, ready, opts?)` | state pollers; no sleeps. |
 | `world.signedInPerson(label)`, `world.registerPerson(label)`, `world.signIn(email, pw)`, `world.actAs(person, app?)`, `world.scratchDir(name)` | through the doors `identity` declares. |
-| `world.commandBus`, `world.queryBus`, `world.resolve(Class)`, `world.context` | `{ modules }` mode. |
+| `world.commandBus`, `world.queryBus`, `world.resolve(token)`, `world.context` | `{ modules }` mode; `resolve` (and `scope.resolve`) takes any Nest token: a class, or the string or symbol a provider is bound to. |
 | `world.interruptDatabase(fn, connection?)` | `infra.postgresql.during(fn)`, or `infra.postgresql.connection(name).during(fn)` with a connection. |
 | `useSandbox({ provider, keys, module, client })` | contract layer: the real client against a provider sandbox; the library reads the keys and skips when absent. |
 

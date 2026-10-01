@@ -11,6 +11,9 @@ import type { ClusterClient, ProxyToxics } from "../stack/contracts"
 import type { TestApi, TestCaller, TestHttp } from "./api"
 import type { KeycloakEvent, KeycloakSession } from "./keycloak"
 
+/** A Nest provider token: its class, or the string or symbol it is bound to (`{ provide: SEPAY, useClass: SepayClient }`). */
+export type ProviderToken<TProvider> = Type<TProvider> | string | symbol
+
 /** How `waitFor` polls. */
 export interface WaitForOptions {
     /** The deadline in milliseconds (default 30000). */
@@ -175,7 +178,7 @@ export interface WorldRequestScope {
     /** Executes a query in this request scope. */
     readonly queryBus: WorldQueryBus
     /** Resolves a request-scoped provider in this request scope. */
-    resolve<TProvider>(token: Type<TProvider>): Promise<TProvider>
+    resolve<TProvider>(token: ProviderToken<TProvider>): Promise<TProvider>
 }
 
 /** The query bus of a `{ modules }` world. */
@@ -222,7 +225,7 @@ export interface TestWorld<
     /** Runs `work` in a real Nest request scope of a `{ modules }` world; `request` (principal, locale, plan, ...) is what request-scoped providers read from `REQUEST`. */
     withRequest<T>(request: Readonly<Record<string, unknown>>, work: (scope: WorldRequestScope) => Promise<T>): Promise<T>
     /** Resolves a provider of a `{ modules }` world by its class. */
-    resolve<TProvider>(token: Type<TProvider>): TProvider
+    resolve<TProvider>(token: ProviderToken<TProvider>): TProvider
     /** Registers a new person through the doors `identity` declares and signs them in. */
     signedInPerson(label: string): Promise<SignedInPerson>
     /** The origin (`scheme://host:port`) of a booted app (the first listening one by default), for a correct `Origin` header. */

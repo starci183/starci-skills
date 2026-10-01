@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Changed: `world.resolve(token)` and `scope.resolve(token)` take any Nest provider token (`ProviderToken<T>`: a class, a
+  string or a symbol), so a modules spec resolves an integration client bound to a symbol (`{ provide: SEPAY, useClass:
+  SepayClient }`) through the world instead of reaching into `world.context`. `ProviderToken` is exported.
+
 ## 1.0.3
 
 - Fixed: the globalSetup registers the path aliases of the declaration exactly as TypeScript resolves them. It walks the

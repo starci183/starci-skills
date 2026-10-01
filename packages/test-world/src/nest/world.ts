@@ -34,7 +34,7 @@ import { freePorts } from "./ports"
 import { redisSize } from "./redis-probe"
 import { buildWiring, RUN_DIRECTORY } from "./wiring"
 import { WorldLock } from "./world-lock"
-import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
+import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, ProviderToken, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
 
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
@@ -469,13 +469,13 @@ export class World {
             request: scoped,
             commandBus: busOf("CommandBus"),
             queryBus: busOf("QueryBus"),
-            resolve: <TProvider>(token: Type<TProvider>) => (root as unknown as { resolve(t: Type<TProvider>, id: unknown, o: object): Promise<TProvider> }).resolve(token, scoped.id, { strict: false }),
+            resolve: <TProvider>(token: ProviderToken<TProvider>) => (root as unknown as { resolve(t: ProviderToken<TProvider>, id: unknown, o: object): Promise<TProvider> }).resolve(token, scoped.id, { strict: false }),
         })
     }
 
-    /** Resolves a provider of a modules world by its class. */
-    resolve<TProvider>(token: Type<TProvider>): TProvider {
-        return this.context.get(token, { strict: false })
+    /** Resolves a provider of a modules world by its token: its class, or the string or symbol it is bound to. */
+    resolve<TProvider>(token: ProviderToken<TProvider>): TProvider {
+        return this.context.get<TProvider, TProvider>(token, { strict: false })
     }
 
     /** Cuts the database, runs `during`, restores it; with `connection`, only that connection's database goes down. */

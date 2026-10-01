@@ -293,6 +293,32 @@ test("withRequest runs commands, queries and providers in a real request scope t
     }
 })
 
+test("resolve answers a provider of a modules world by its class, its symbol or its string token", async () => {
+    await publish()
+    const { Injectable } = await import("@nestjs/common")
+    const SYMBOL_TOKEN = Symbol("gateway")
+    @Injectable()
+    class Gateway {
+        readonly name = "gateway"
+    }
+    @Module({
+        providers: [Gateway, { provide: SYMBOL_TOKEN, useClass: Gateway }, { provide: "GATEWAY", useValue: { name: "by-string" } }],
+        exports: [Gateway, SYMBOL_TOKEN, "GATEWAY"],
+    })
+    class Capability {}
+
+    const config = { ...declaration([]), modules: { base: () => [] } } as unknown as AnyTestWorldConfig
+    const world = new World(config, { modules: [() => ({ module: Capability })] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        assert.equal(world.resolve(Gateway).name, "gateway")
+        assert.equal(world.resolve<Gateway>(SYMBOL_TOKEN).name, "gateway")
+        assert.equal(world.resolve<{ readonly name: string }>("GATEWAY").name, "by-string")
+    } finally {
+        await world.stop()
+    }
+})
+
 /** A toxiproxy API that records every call and answers what the client expects. */
 const fakeToxiproxy = async (): Promise<{ readonly url: string; readonly calls: Array<string> }> => {
     const calls: Array<string> = []
