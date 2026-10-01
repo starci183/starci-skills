@@ -35,7 +35,7 @@ function Body({ file, query, blob }: { file: EvidenceFile; query: string; blob: 
   }
   if (blob.status === 'loading' || blob.status === 'idle') return <div className="space-y-2" role="status" aria-label={t('Loading')}>
     {[80, 60, 90, 45, 70].map((w, i) => <div key={i} className="h-3 rounded bg-muted" style={{ width: `${w}%` }} />)}</div>;
-  if (blob.status === 'error') return <Note tone="failed">{t('Could not load the content ({error}).', { error: blob.error })} <a className="underline" href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</a></Note>;
+  if (blob.status === 'error') return <Note tone="failed">{t('Could not load the content ({error}).', { error: blob.error ?? '' })} <a className="underline" href={file.href} target="_blank" rel="noreferrer">{t('Open raw ↗')}</a></Note>;
   if (blob.text.trim() === '') return <Note>{t('Empty file (no content).')}</Note>;
   const { text } = blob;
   const searching = query.trim() !== '';

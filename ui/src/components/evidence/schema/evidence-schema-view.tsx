@@ -40,7 +40,7 @@ export function schemaOf(file: EvidenceFile & { schema?: string | null }, text: 
 export function EvidenceSchemaView({ file, authorOp = '' }: { file: EvidenceFile & { schema?: string | null }; authorOp?: string }) {
   const blob = useBlobText(file);
   if (blob.status === 'idle' || blob.status === 'loading') return <p className="p-3 text-sm text-muted-foreground">{t('Reading {name}…', { name: file.base })}</p>;
-  if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">{t('Could not read {name}: {error}', { name: file.base, error: blob.error })}</p>;
+  if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">{t('Could not read {name}: {error}', { name: file.base, error: blob.error ?? '' })}</p>;
   const schema = schemaOf(file, blob.text);
   const note = blob.truncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Large file: only the first 2000 lines are shown.')}</p> : null;
   if (schema && file.kind === 'json' && !blob.truncated) {
