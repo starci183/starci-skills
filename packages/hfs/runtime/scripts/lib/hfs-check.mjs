@@ -452,7 +452,9 @@ export function explainPath({ repoRoot, input, root = skillRoot, declaration, ma
   const slot = resolver.slot(c.slot);
   const tier = resolver.tierOf(c.path);
   const owner = resolver.ownerOf(c.path);
-  const mayImport = tier && tier !== 'none' ? resolver.allowedImports(tier) : null;
+  // A path of a side imports by its side's direction matrix; the app root has none of its own.
+  const scope = c.side ? resolver.sides[c.side] : resolver;
+  const mayImport = tier && tier !== 'none' ? scope.allowedImports(tier) : null;
   return {
     path: c.path,
     status: c.status,
