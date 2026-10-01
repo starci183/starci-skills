@@ -135,11 +135,39 @@ const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? `:${f.line}
 const isDocGate = (doc) => doc?.profile === DOC_PROFILE;
 const nameOfDefect = (d) => oneLine(d?.id ?? d?.title ?? JSON.stringify(d), 160);
 
-/** The proofs an op owes for this dispatch: the proof ids of op-gate.yaml opProofs, a `modes` entry kept only for its modes. */
-export function proofsOf(op, { mode = null, doc = loadOpGate() } = {}) {
+/** The proof entries an op owes for this dispatch ([{proof, projects}]): op-gate.yaml opProofs, a `modes` entry kept only for its modes. */
+export function proofEntriesOf(op, { mode = null, doc = loadOpGate() } = {}) {
   const entries = doc.opProofs?.[op] ?? [];
-  return entries.map((e) => (typeof e === 'string' ? { proof: e, modes: null } : { proof: String(e.proof), modes: e.modes ?? null }))
-    .filter((e) => !e.modes || !mode || e.modes.includes(mode)).map((e) => e.proof);
+  return entries.map((e) => (typeof e === 'string' ? { proof: e, modes: null, projects: [] } : { proof: String(e.proof), modes: e.modes ?? null, projects: e.projects ?? [] }))
+    .filter((e) => !e.modes || !mode || e.modes.includes(mode)).map(({ proof, projects }) => ({ proof, projects }));
+}
+/** The proof ids an op owes for this dispatch. */
+export const proofsOf = (op, opts = {}) => proofEntriesOf(op, opts).map((e) => e.proof);
+
+/** Every JSON document of `schema` among a job's files, newest first ([{doc, file}]). */
+export function readAllAttached(files, schema) {
+  const out = [];
+  for (const file of files ?? []) {
+    const one = readAttached([file], schema);
+    if (one) out.push(one);
+  }
+  return out.sort((a, b) => String(b.doc.at ?? '').localeCompare(String(a.doc.at ?? '')));
+}
+
+/**
+ * The test-world judgment over every attached summary: each required project has a summary (the newest of that project is
+ * judged), and every other attached summary is judged too, so a red contract run beside a green integration run still refuses.
+ */
+export function judgeTestWorlds(summaries, projects = []) {
+  const newest = new Map();
+  for (const s of summaries) if (s?.schema === TEST_WORLD_RUN_SCHEMA && !newest.has(s.project)) newest.set(s.project, s);
+  const missing = projects.filter((p) => !newest.has(p));
+  if (!newest.size || missing.length) return refused({ status: 'missing', code: 'op-test-world-proof-missing' }, `no test-world run summary (schema ${TEST_WORLD_RUN_SCHEMA}) of project ${(missing.length ? missing : projects).join(', ') || 'any'} is attached: run node scripts/checks/test-world-run.mjs --root <app> --project ${(missing[0] ?? projects[0] ?? 'e2e')} --out test-world-run.json`);
+  for (const project of [...projects, ...[...newest.keys()].filter((p) => !projects.includes(p))]) {
+    const judged = judgeTestWorld(newest.get(project));
+    if (judged.status !== 'pass') return judged;
+  }
+  return pass();
 }
 
 /** The ops held to a mechanism proof. */
@@ -255,12 +283,12 @@ export function judgeRelease(proof) {
 }
 
 /** The judgment of one proof over a job's files. */
-export function judgeProof(proof, files, doc = loadOpGate()) {
+export function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {
   const read = (schema, accept) => readAttached(files, schema, accept)?.doc ?? null;
   switch (proof) {
     case 'read-knowledge': return judgeKnowledgeRead(read(DIGEST_SCHEMA));
     case 'doc-gate': return judgeDocGate(read(GATE_SCHEMA, isDocGate));
-    case 'test-world': return judgeTestWorld(read(TEST_WORLD_RUN_SCHEMA));
+    case 'test-world': return judgeTestWorlds(readAllAttached(files, TEST_WORLD_RUN_SCHEMA).map((a) => a.doc), projects);
     case 'unit-kit': return judgeUnitRun(read(UNIT_RUN_SCHEMA));
     case 'security-lint': return judgeSecurityLint(read(LINT_SCHEMA), read(SECURITY_FINDINGS_SCHEMA), securityRelevant(doc));
     case 'fe-lint': return judgeLint(read(LINT_SCHEMA), feRelevant, 'fe/');
@@ -276,10 +304,11 @@ export function judgeProof(proof, files, doc = loadOpGate()) {
  * the op owes no proof for this mode.
  */
 export function judgeJobProofs({ op, files, mode = null, doc = loadOpGate() }) {
-  const owed = proofsOf(op, { mode, doc });
-  if (!owed.length) return null;
-  for (const proof of owed) {
-    const judged = judgeProof(proof, files, doc);
+  const entries = proofEntriesOf(op, { mode, doc });
+  if (!entries.length) return null;
+  const owed = entries.map((e) => e.proof);
+  for (const { proof, projects } of entries) {
+    const judged = judgeProof(proof, files, doc, { projects });
     if (judged.status !== 'pass') return { op, proofs: owed, proof, judged };
   }
   return { op, proofs: owed, proof: null, judged: pass() };

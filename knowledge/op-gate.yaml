@@ -112,7 +112,8 @@ kinds:
 # under opProofs runs the mechanism its job touches and attaches the document it prints; `api settle` re-reads each document
 # itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and
 # opProofs owes the code loop AND its proofs. A proof listed with `modes` is owed only by a dispatch whose params.mode is one of
-# them (`select` included, since the request may pick any mode).
+# them (`select` included, since the request may pick any mode). A test-world proof lists the `projects` whose summary must be
+# attached; every test-world summary attached (a contract run beside an integration run) must be green as well.
 proofs:
   read-knowledge:
     schema: starci/read-digest@1
@@ -135,9 +136,10 @@ proofs:
     attach: test-world-run.json
     script: scripts/checks/test-world-run.mjs
     purpose: >-
-      The test-world run summary: the app runs its world projects on @starci/jest-preset's world runner, the specs use
-      useTestWorld and the outage API and hand-roll no docker, container, DataSource or process.env, and the run of the selected
-      project is green with at least one test.
+      The test-world run summary per project: the app runs its world projects on @starci/jest-preset's world runner, the specs
+      take their world from the library in the layer's form (useTestWorld({ apps }) for e2e, useTestWorld({ modules }) for
+      integration, useSandbox for contract), use the outage API for failure paths and hand-roll no docker, container,
+      DataSource or process.env, and the run is green with at least one test and none skipped.
   unit-kit:
     schema: starci/unit-run@1
     attach: unit-run.json
@@ -181,8 +183,10 @@ proofs:
       The release proof: release-app-installs (fresh installs, lint, typecheck, api boot, a skip is never a pass), check-canon-pins
       with the canon content digest, the merge guard over the release range and a green npm run check. Every step is required.
 opProofs:
-  e2e.verify: [test-world]
-  integration.verify: [test-world]
+  e2e.verify:
+    - {proof: test-world, projects: [e2e]}
+  integration.verify:
+    - {proof: test-world, projects: [integration]}
   unit.verify: [unit-kit]
   security.verify: [security-lint]
   review.verify:

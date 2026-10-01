@@ -2,16 +2,17 @@
 // test-world-run.mjs - the test-world run summary (schema starci/test-world-run@1) e2e.verify and integration.verify attach
 // (knowledge/op-gate.yaml proofs.test-world, contract change op-mechanism-proofs).
 //
-//   node scripts/checks/test-world-run.mjs --root <app> --project e2e|integration [--tests <path pattern>] [--out <file>]
+//   node scripts/checks/test-world-run.mjs --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]
 //
 // Over the app at --root it records, and `api settle` re-reads (scripts/kernel/gate-settle.mjs):
 //   harness  the be jest config is @starci/jest-preset's starciJestConfig() (its world projects run on the preset's world
 //            runner: one file at a time, each in a fresh process) and the world declaration be/src/tests/world/test-world.config.ts
 //            calls defineTestWorld;
-//   specs    every spec of the project (be/src/tests/e2e/**/*.e2e-spec.ts, be/src/tests/integration/**/*.integration-spec.ts,
-//            narrowed by --tests) calls useTestWorld with the layer's mode - `apps` for e2e, `modules` for integration - and
-//            hand-rolls none of op-gate.yaml testWorld.forbidden (docker, testcontainers, DataSource, process.env, sleeps); the
-//            outage calls (cut, restore, during, latency) are counted;
+//   specs    every spec of the project (be/src/tests/{e2e,integration,contract}/**/*.<project>-spec.ts, narrowed by --tests)
+//            takes its world from the library in the layer's form - useTestWorld({ apps }) for e2e, useTestWorld({ modules })
+//            for integration, useSandbox(...) for contract (the real client against the provider's sandbox) - and hand-rolls
+//            none of op-gate.yaml testWorld.forbidden (docker, testcontainers, DataSource, process.env, sleeps); the outage calls
+//            (cut, restore, during, latency) are counted;
 //   run      the managed `npm run test:<project>` with jest's --json report: exit, totals, failed and skipped tests.
 // Our own stack runs real and only third-party SaaS is faked at the network edge: the library owns that, a spec never does.
 // Exit 0 green, 1 a finding or a red run, 2 the summary could not be built.
@@ -28,11 +29,12 @@ export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
 export const WORLD_PROJECTS = Object.freeze({
   e2e: { dir: 'be/src/tests/e2e', suffix: '.e2e-spec.ts', mode: 'apps' },
   integration: { dir: 'be/src/tests/integration', suffix: '.integration-spec.ts', mode: 'modules' },
+  contract: { dir: 'be/src/tests/contract', suffix: '.contract-spec.ts', mode: 'sandbox' },
 });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const JEST_CONFIGS = ['be/jest.config.js', 'be/jest.config.cjs', 'be/jest.config.ts', 'jest.config.js', 'jest.config.cjs', 'jest.config.ts'];
 const DECLARATION = 'be/src/tests/world/test-world.config.ts';
-const USAGE = 'usage: test-world-run.mjs --root <app> --project e2e|integration [--tests <path pattern>] [--out <file>]';
+const USAGE = 'usage: test-world-run.mjs --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]';
 
 /** op-gate.yaml testWorld: {required[], forbidden[], outage[]}. */
 export function testWorldRules(runtime = runtimeRoot) {
@@ -65,13 +67,15 @@ function useTestWorldArgs(text) {
   return out;
 }
 
-/** One spec judged: {path, useTestWorld, modes[], outage, forbidden[]}. */
+/** One spec judged: {path, useTestWorld, modes[], outage, forbidden[]}; `sandbox` is a mode when the spec calls useSandbox. */
 export function judgeSpec(rel, text, rules) {
   const args = useTestWorldArgs(text);
   const modes = [...new Set(args.flatMap((a) => ['apps', 'modules'].filter((k) => new RegExp(`(^|[{,\\s])${k}\\s*:`).test(a))))];
+  const sandbox = /useSandbox\s*\(/.test(text);
+  if (sandbox) modes.push('sandbox');
   // A comment may name a forbidden word to explain its absence; only code counts.
   const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  return { path: rel, useTestWorld: args.length > 0, modes, outage: rules.outage.reduce((n, needle) => n + code.split(needle).length - 1, 0),
+  return { path: rel, useTestWorld: args.length > 0 || sandbox, modes, outage: rules.outage.reduce((n, needle) => n + code.split(needle).length - 1, 0),
     forbidden: rules.forbidden.filter((needle) => code.includes(needle)) };
 }
 
@@ -119,8 +123,9 @@ export function testWorldFindings(summary) {
   if (!(summary.specs ?? []).length) out.push({ rule: 'no-specs', path: WORLD_PROJECTS[summary.project]?.dir ?? null, message: `no ${summary.project} spec was selected` });
   const mode = WORLD_PROJECTS[summary.project]?.mode;
   for (const spec of summary.specs ?? []) {
-    if (!spec.useTestWorld) out.push({ rule: 'use-test-world-missing', path: spec.path, message: 'the spec never calls useTestWorld: its world is hand-rolled' });
-    else if (mode && !spec.modes.includes(mode)) out.push({ rule: 'layer-mode', path: spec.path, message: `a ${summary.project} spec calls useTestWorld({ ${mode} }); it uses ${spec.modes.join(', ') || 'neither apps nor modules'}` });
+    const form = mode === 'sandbox' ? 'useSandbox(...)' : `useTestWorld({ ${mode} })`;
+    if (!spec.useTestWorld) out.push({ rule: 'use-test-world-missing', path: spec.path, message: 'the spec never calls useTestWorld or useSandbox: its world is hand-rolled' });
+    else if (mode && !spec.modes.includes(mode)) out.push({ rule: 'layer-mode', path: spec.path, message: `a ${summary.project} spec calls ${form}; it uses ${spec.modes.join(', ') || 'neither apps nor modules'}` });
     for (const needle of spec.forbidden) out.push({ rule: 'hand-rolled', path: spec.path, message: `the spec uses ${needle}: infrastructure belongs to @starci/test-world` });
   }
   return out;

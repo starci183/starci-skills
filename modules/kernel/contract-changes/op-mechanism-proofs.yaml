@@ -5,8 +5,9 @@ summary: >-
   knowledge/op-gate.yaml gains `proofs` and `opProofs`: an op named there attaches the document of each mechanism it owes and
   `api settle` re-reads it (scripts/kernel/gate-settle.mjs judgeJobProofs, runtime check op-proof); a done that lacks it, is red
   or could not run is refused. e2e.verify and integration.verify attach the test-world run summary (scripts/checks/test-world-run.mjs,
-  starci/test-world-run@1: the preset's world runner, useTestWorld with apps for e2e and modules for integration, no hand-rolled
-  docker, container, DataSource, process.env or sleep, the outage calls counted, a green run): op-test-world-proof-missing,
+  starci/test-world-run@1: the preset's world runner, useTestWorld with apps for e2e and modules for integration, useSandbox for
+  the live provider's contract run, no hand-rolled docker, container, DataSource, process.env or sleep, the outage calls counted, a
+  green run with nothing skipped; integration.verify owes the integration project and every attached summary is judged): op-test-world-proof-missing,
   op-test-world-hand-rolled, op-test-world-run-red. unit.verify attaches the unit run summary (scripts/checks/unit-run.mjs,
   starci/unit-run@1: the whole unit project green, every service at 100 on each metric with its spec beside it built by
   Test.createTestingModule over the kit doubles): op-unit-proof-missing, op-unit-run-red, op-unit-coverage-below,

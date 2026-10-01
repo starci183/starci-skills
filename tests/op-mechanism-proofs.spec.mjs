@@ -17,7 +17,7 @@ import { UNIT_RUN_SCHEMA, judgeServices, unitFindings, unitKitRules } from '../s
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, appInstallsStep, buildReleaseProof } from '../scripts/checks/release-proof.mjs';
 import {
   OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
-  judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
+  judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeTestWorlds, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
 } from '../scripts/kernel/gate-settle.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { readCatalog } from '../scripts/checks/failure-codes.mjs';
@@ -168,6 +168,18 @@ test('test-world: missing is op-test-world-proof-missing, a hand-rolled world op
   const none = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, spawn: () => ({ status: 1, stdout: '', stderr: 'jest: not found' }) });
   assert.equal(none.exit, 2);
   assert.equal(codeOf(judgeTestWorld(none)), 'op-test-world-run-red');
+});
+
+test('test-world over every attached summary: each required project is owed, and a red contract run beside a green integration run refuses', () => {
+  assert.equal(codeOf(judgeTestWorlds([greenTestWorldRun('e2e')], ['integration'])), 'op-test-world-proof-missing', 'an e2e run never stands in for the integration layer');
+  assert.equal(judgeTestWorlds([greenTestWorldRun('integration')], ['integration']).status, 'pass');
+  const redContract = { ...greenTestWorldRun('contract'), run: { ...greenTestWorldRun('contract').run, skipped: 2, passed: 0, total: 2 } };
+  assert.equal(codeOf(judgeTestWorlds([greenTestWorldRun('integration'), redContract], ['integration'])), 'op-test-world-run-red', 'a contract spec that skipped itself is no live proof');
+  const sandbox = judgeSpec('be/src/tests/contract/sepay/a.contract-spec.ts', 'const client = useSandbox({ provider: "sepay", keys: ["SEPAY_KEY"] })', RULES);
+  assert.deepEqual([sandbox.useTestWorld, sandbox.modes], [true, ['sandbox']]);
+  const appsInContract = judgeSpec('be/src/tests/contract/a.contract-spec.ts', 'const world = useTestWorld({ apps: { todo: true } })', RULES);
+  const summary = { ...greenTestWorldRun('contract'), specs: [appsInContract] };
+  assert.equal(codeOf(judgeTestWorld(summary)), 'op-test-world-hand-rolled', 'a contract spec takes the sandbox, not a booted app');
 });
 
 // ---- unit-kit ----
