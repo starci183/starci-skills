@@ -43,7 +43,7 @@ pins:
     source: packages/eslint/fe/package.json
     why: '8.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2 and hfs 4.0.3; no rule changed. 8.0.2: its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root (app.starcistacks, app.sops) and pin hfs 4.0.2. 8.0.1: its bundled canon-pins copy pins hfs 4.0.1. 8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
   '@starci/stylelint-canon':
-    version: 2.0.3
+    version: 2.0.4
     group: starci
     install: registry
     side: fe
@@ -56,7 +56,7 @@ pins:
     side: both
     source: packages/tsconfig/package.json
   '@starci/prettier-config':
-    version: 1.0.1
+    version: 1.0.2
     group: starci
     install: registry
     side: both

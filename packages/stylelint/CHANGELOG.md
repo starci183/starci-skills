@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.4 - 2026-10-02
+
+- Comments and the rule-catalog prose (`lib/why.mjs`) are English only. No rule changed.
+
 ## 2.0.2 - 2026-10-01
 
 - **Fix: `starci/no-class-selector` missed a compound class selector.** The pattern refused a dot after a word character, so `div.card`
