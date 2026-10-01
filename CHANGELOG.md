@@ -7,6 +7,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- eslint-canon-be 3.0.1 and eslint-canon-fe 8.0.1 republish the canons, because their bundled `canon-pins.yaml` copy now pins hfs 4.0.1. No rule changed.
 - `check-doc-language` judges only the repository's documents: tracked files and untracked files git does not ignore. The owner's git-ignored local `config.yaml` is not a repository document, and judging it made `npm run check` red only in the main checkout. Outside a git work tree every file is judged. Spec in `tests/architecture-doc-language.spec.mjs`.
 - Lane TW2: `@starci/test-world` 1.0.0 (the shared e2e library, with the run's outage lock that every outage call takes itself) and `@starci/jest-preset` 2.2.0. The integration, e2e and contract projects run on the preset's world runner: each spec file runs in a fresh worker process, so no process-global framework registry such as `@nestjs/graphql`'s type metadata leaks between files. The runner enforces ONE FILE AT A TIME, because every file shares the run's data and the test world resets it when a file boots. Contract changes `test-world-library` and `jest-preset-world-runner`.
   - Known limitation, lifted in alpha.5: world files cannot run in parallel until each worker has its own data namespace (a database schema, a Keycloak realm prefix, a Redis key prefix and its own fakes).

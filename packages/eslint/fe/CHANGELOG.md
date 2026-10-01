@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.0.1 - 2026-10-01
+
+- Changed: the bundled runtime copy of knowledge/hfs/canon-pins.yaml pins @starci/hfs 4.0.1 (the scaffold resolves a real lockfile) and this canon at 8.0.1. No rule changed.
+
 ## 8.0.0 - 2026-10-01
 
 - Breaking: the app monorepo standard (hfs 4.0.0). `loadHfs(import.meta.url)` in `fe/eslint.config.mjs` finds the app-root `hfs.json` (kind `app`) one level up and gives every linted file the view of the fe side (paths relative to `fe/`); a standalone front-end `hfs.json` (`profile: fe`) is refused. The project graph (`project-graph` law) is built per side from the side folder. The config stays the managed one-liner.

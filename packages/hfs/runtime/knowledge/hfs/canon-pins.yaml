@@ -24,19 +24,19 @@ pins:
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.8.0 (the brand layer sets `--font-sans` and `--font-mono`; the grammar reads them; 0.7.2 added the Input tel kind and IconButton disclosure props).
   '@starci/eslint-canon-be':
-    version: 3.0.0
+    version: 3.0.1
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
-    why: '3.0.0: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side; the project graph is built per side. 2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws.'
+    why: '3.0.1: its bundled canon-pins copy pins hfs 4.0.1. 3.0.0: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side; the project graph is built per side. 2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws.'
   '@starci/eslint-canon-fe':
-    version: 8.0.0
+    version: 8.0.1
     group: starci
     install: registry
     side: fe
     source: packages/eslint/fe/package.json
-    why: '8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
+    why: '8.0.1: its bundled canon-pins copy pins hfs 4.0.1. 8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
   '@starci/stylelint-canon':
     version: 2.0.1
     group: starci

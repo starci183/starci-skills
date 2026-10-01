@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 - 2026-10-01
+
+- Changed: the bundled runtime copy of knowledge/hfs/canon-pins.yaml pins @starci/hfs 4.0.1 (the scaffold resolves a real lockfile) and this canon at 3.0.1. No rule changed.
+
 ## 3.0.0 - 2026-10-01
 
 - Fixed (lane SHAPE): `source-suffix` (R89 `BE_SOURCE_FORM`) accepts `src/tests/world/fakes/<provider>/server.ts`: an allows entry of the owning slot whose last segment is the literal file name is that file's role (be.tests.world allows `fakes/<provider>/server.ts`). `fakes/<provider>/<name>.server.ts` is still refused (`server` is no role suffix).
