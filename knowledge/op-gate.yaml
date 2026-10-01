@@ -186,7 +186,7 @@ opProofs:
   e2e.verify:
     - {proof: test-world, projects: [e2e]}
   integration.verify:
-    - {proof: test-world, projects: [integration]}
+    - {proof: test-world, projects: [integration, contract]}
   unit.verify: [unit-kit]
   security.verify: [security-lint]
   review.verify:

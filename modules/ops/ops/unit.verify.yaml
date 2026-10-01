@@ -55,6 +55,11 @@ reads:
     purpose:
       en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
+  - id: unit-kit
+    path: packages/jest-preset/README.md + knowledge/patterns/be/test.yaml + <app>/be/jest.config.js
+    purpose:
+      en: "The unit standard the run is judged on: services are the unit subjects, one <name>.service.spec.ts beside each be/src/**/*.service.ts, the subject built by Test.createTestingModule over exactly its constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingOutbox, FakeClock, fakeIds, mock<T>()) and the Outcome matchers, and the preset's per-file coverage threshold of 100 on lines, branches, functions and statements for every *.service.ts."
+      vi: "Chuẩn unit mà lần chạy được chấm theo: chỉ service được test unit, mỗi be/src/**/*.service.ts có một <name>.service.spec.ts bên cạnh, đối tượng dựng bằng Test.createTestingModule trên đúng các phụ thuộc constructor với bộ đôi của @starci/jest-preset (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingOutbox, FakeClock, fakeIds, mock<T>()) và các matcher Outcome, và ngưỡng phủ theo từng tệp của preset là 100 cho lines, branches, functions và statements của mọi *.service.ts."
 writes:
   - id: node
     path: N/index.yaml
@@ -84,12 +89,18 @@ writes:
     content:
       en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
+  - id: unit-run
+    path: STARCI_JOB_SCRATCH/unit-run.json
+    schema: starci/unit-run@1
+    content:
+      en: "The unit run summary (scripts/checks/unit-run.mjs): the run's exit, totals and failures, and per service its coverage, its spec and the kit judgment of that spec."
+      vi: "Tóm tắt lần chạy unit (scripts/checks/unit-run.mjs): exit, tổng số và lỗi của lần chạy, và cho từng service độ phủ, spec và đánh giá bộ công cụ của spec đó."
 steps:
-  - reads: [op-loop]
+  - reads: [op-loop, unit-kit]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/checks/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before running (op loop, knowledge/op-gate.yaml): run node scripts/checks/read-digest.mjs --root <app> --knowledge knowledge/patterns/be/test.yaml --out $STARCI_JOB_SCRATCH/read-digest.json and read what it records - the unit standard (BE-TEST-1 to BE-TEST-15) the run is judged on. This op changes no file; a file it would have to touch is a finding for a separate operation."
+      vi: "ĐỌC trước khi chạy (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/checks/read-digest.mjs --root <app> --knowledge knowledge/patterns/be/test.yaml --out $STARCI_JOB_SCRATCH/read-digest.json và đọc những gì nó ghi - chuẩn unit (BE-TEST-1 tới BE-TEST-15) mà lần chạy được chấm theo. Op này không sửa tệp nào; tệp mà nó buộc phải sửa là một phát hiện cho op khác."
   - reads:
       - target
       - request
@@ -100,22 +111,16 @@ steps:
       en: Confirm the request asks for the full unit run and resolve the app's unit command from its
         root package.json (the managed `test`); an app without one is a blocker, never an invented runner. Resolve the
         execution profile and actual tool availability; this does not switch the model/runtime or spawn workers.
-  - reads:
-      - repo
-    writes: [evidence]
+  - reads: [repo, unit-kit]
+    writes: [evidence, unit-run]
     action:
-      en: Run the full unit command unfiltered, with coverage output (when the runner writes one) and scratch in a
-        job-private directory outside the checkout, and capture stdout, stderr, exit code and duration. Never run
-        e2e, never edit source or specs, never retry to turn a red run green; a flake is re-run once inside the
-        record and both runs are kept.
-  - reads:
-      - target
-      - repo
+      en: "Run the full unit suite through the runtime's unit runner: node scripts/checks/unit-run.mjs --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. It runs the managed npm test unfiltered (the unit project with --coverage) with jest's JSON report and a json-summary coverage report in a private temp directory, and records per service its four coverage percentages, its spec beside it and the kit judgment of that spec (Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a new of the subject forbidden). Capture stdout, stderr, exit code and duration. Never run e2e, never edit source or specs, never retry to turn a red run green; a flake is re-run once inside the record and both runs are kept."
+      vi: "Chạy toàn bộ bộ unit qua bộ chạy unit của runtime: node scripts/checks/unit-run.mjs --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. Nó chạy npm test được quản lý không lọc (dự án unit với --coverage) kèm báo cáo JSON của jest và báo cáo phủ json-summary trong thư mục tạm riêng, rồi ghi cho từng service bốn tỉ lệ phủ, spec bên cạnh và đánh giá bộ công cụ của spec đó (bắt buộc Test.createTestingModule; cấm jest.mock, overrideProvider, Date.now(), process.env và new đối tượng). Giữ stdout, stderr, exit code và thời gian. Không bao giờ chạy e2e, không sửa mã hay spec, không thử lại để biến lần chạy đỏ thành xanh; lần chập chờn được chạy lại một lần trong bản ghi và giữ cả hai lần."
+  - reads: [target, repo, unit-kit]
     writes: [node, evidence]
     action:
-      en: Read the result back - totals and failures grouped by spec file - and report done when the whole suite ran
-        and passed, failed (class product, with the failing files named) when a spec failed, blocked when the suite
-        could not run. Never self-advance and never repair the failing source here.
+      en: "Read the result back - totals and failures grouped by spec file, and per service its coverage and kit findings - and report done only when the whole suite ran and passed, every service is at 100 on each metric with its spec beside it, and every service spec is on the kit; failed (class product, with the failing files, the services below 100 and the off-kit specs named for test.author or the build op) otherwise; blocked when the suite could not run. Never self-advance and never repair the failing source or spec here."
+      vi: "Đọc lại kết quả - tổng số và lỗi theo từng tệp spec, cùng độ phủ và phát hiện bộ công cụ của từng service - và chỉ báo done khi cả bộ đã chạy và đạt, mọi service đạt 100 ở mỗi chỉ số với spec bên cạnh, và mọi spec service theo đúng bộ công cụ; ngược lại báo failed (class product, nêu tệp lỗi, service dưới 100 và spec sai chuẩn cho test.author hoặc op build); báo blocked khi bộ test không chạy được. Không tự chuyển bước và không sửa mã hay spec lỗi ở đây."
   - reads: [op-loop]
     writes: [gate-proof]
     action:
@@ -137,6 +142,11 @@ proofs:
     requirement:
       en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
       vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+  - id: unit-kit
+    requirement:
+      en: "api settle re-reads the attached unit-run.json (runtime check op-proof, proof unit-kit): a done without it (op-unit-proof-missing), with a red or empty run (op-unit-run-red), with a service below 100 on any metric or without its spec (op-unit-coverage-below) or with a service spec off the kit (op-unit-kit-violation) is refused."
+      vi: "api settle tự đọc lại unit-run.json đính kèm (check op-proof, proof unit-kit): done thiếu nó (op-unit-proof-missing), có lần chạy đỏ hoặc rỗng (op-unit-run-red), có service dưới 100 ở bất kỳ chỉ số nào hoặc thiếu spec (op-unit-coverage-below) hoặc có spec service sai bộ công cụ (op-unit-kit-violation) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: UNIT_RUNNER_MISSING
     condition:
@@ -164,6 +174,8 @@ policy:
     surface: delivered-source
     command: test
     suite: whole-unit-suite-only
+    coverage: per-service-100-on-every-metric
+    kit: Test.createTestingModule-constructor-deps-and-jest-preset-doubles
     e2e: never
     productCode: unchanged
     dispatch: only-when-the-goal-or-the-owner-asks

@@ -39,7 +39,7 @@ reads:
         manifests. The inspection binds the exact inspected tree; configuration includes declared
         deployment files inside the read set.
   - id: rules
-    path: knowledge/architecture-rules.yaml + knowledge/hfs/rules.yaml +
+    path: knowledge/architecture-rules.yaml + knowledge/hfs/rules.yaml + knowledge/op-gate.yaml (securityCodes, securityRules) +
       docs/code-pattern-enforcement.md
     purpose:
       en: Read the declared responsibility boundaries and enforcement rules the inspection measures
@@ -91,6 +91,18 @@ writes:
         are hashed; a finding never contains a usable credential. Operator-specific observed result
         in evidence/result.md: findings first, then inspected surface and not-run items - no verdict the
         evidence does not carry."
+  - id: lint
+    path: STARCI_JOB_SCRATCH/lint.json
+    schema: starci/lint@1
+    content:
+      en: "The hfs lint report of the inspected slice (hfs lint --changed <the slice's files> --format json at the app root): every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo hfs lint của slice được kiểm tra (hfs lint --changed <các tệp của slice> --format json ở gốc app): từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
+  - id: security-findings
+    path: STARCI_JOB_SCRATCH/security-findings.json
+    schema: starci/security-findings@1
+    content:
+      en: "The typed findings by rule: {schema: starci/security-findings@1, findings: [{rule, code, path, line, severity, reachability}]} - every canon finding of the security codes the lint reported plus every finding the inspection found beyond it; empty when there is none."
+      vi: "Các phát hiện có kiểu theo luật: {schema: starci/security-findings@1, findings: [{rule, code, path, line, severity, reachability}]} - mọi lỗi canon thuộc các mã bảo mật mà lint báo cùng mọi phát hiện kiểm tra tìm thêm; rỗng khi không có."
 steps:
   - reads:
       - target
@@ -144,6 +156,11 @@ steps:
         required surface could not be inspected and the evidence says so. A scanner crash, an unrun
         required check or a skipped surface stays not-run - never a clean report. Never
         self-advance.
+  - reads: [repo, rules, machines]
+    writes: [lint, security-findings, evidence]
+    action:
+      en: "Run the authentication and security canon through hfs lint at the app root over the inspected slice: hfs lint --changed <the slice's be/ and fe/ files> --format json > $STARCI_JOB_SCRATCH/lint.json. Read the report and classify every finding of the security canon - op-gate.yaml securityCodes and securityRules: the auth door's strict rate tier (R42 auth-door-strict-rate-tier), HttpClient called only in an integrations owner (R90 http-client-only-in-integrations), no secret in a log or an error (R71 no-secret-in-error, no-secret-in-log), the timing-safe secret compare and default deny (R41 secret-compare-timing-safe, public-needs-reason), no secret default (R44), the FE environment owner (R49) and the FE response cookie attributes (R107 response-cookie-attributes). Write every one of them, plus every finding the inspection found beyond the lint, into $STARCI_JOB_SCRATCH/security-findings.json grouped by rule with path, line, severity and reachability, and report the findings by rule in evidence/result.md. A lint that could not run (errors in its report) is a not-run surface, never a clean one. REPORT with lint.json and security-findings.json attached."
+      vi: "Chạy canon xác thực và bảo mật qua hfs lint ở gốc app trên slice được kiểm tra: hfs lint --changed <các tệp be/ và fe/ của slice> --format json > $STARCI_JOB_SCRATCH/lint.json. Đọc báo cáo và phân loại mọi lỗi của canon bảo mật - securityCodes và securityRules của op-gate.yaml: bậc giới hạn tốc độ nghiêm của cửa xác thực (R42 auth-door-strict-rate-tier), HttpClient chỉ được gọi trong một chủ sở hữu integrations (R90 http-client-only-in-integrations), không có bí mật trong log hay lỗi (R71 no-secret-in-error, no-secret-in-log), so sánh bí mật an toàn thời gian và mặc định từ chối (R41 secret-compare-timing-safe, public-needs-reason), không có giá trị mặc định cho bí mật (R44), chủ sở hữu môi trường FE (R49) và thuộc tính cookie phản hồi của FE (R107 response-cookie-attributes). Ghi tất cả, cùng mọi phát hiện kiểm tra tìm thêm ngoài lint, vào $STARCI_JOB_SCRATCH/security-findings.json theo luật kèm đường dẫn, dòng, mức độ và khả năng chạm tới, và báo phát hiện theo luật trong evidence/result.md. Lint không chạy được (có errors trong báo cáo) là bề mặt chưa chạy, không bao giờ là sạch. BÁO CÁO kèm lint.json và security-findings.json."
 proofs:
   - id: binding
     requirement:
@@ -166,6 +183,11 @@ proofs:
       en: The inspection changed nothing - repository status shows the inspected tree untouched, the scan
         commands stayed read-only, and no finding was repaired, hidden or re-classified to look
         cleaner.
+  - id: security-lint
+    requirement:
+      en: "api settle re-reads the attached lint.json and security-findings.json (runtime check op-proof, proof security-lint): a done without the lint (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed), without typed findings (op-security-findings-missing) or with a security canon finding of the lint that the findings drop (op-security-finding-unreported) is refused. A done may carry findings; it may never drop one."
+      vi: "api settle tự đọc lại lint.json và security-findings.json đính kèm (check op-proof, proof security-lint): done thiếu lint (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed), thiếu danh sách phát hiện có kiểu (op-security-findings-missing) hoặc bỏ sót một lỗi canon bảo mật của lint (op-security-finding-unreported) đều bị từ chối. Done có thể kèm phát hiện; không bao giờ được bỏ sót."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: INSPECTION_SURFACE_MISSING
     condition:
@@ -200,7 +222,8 @@ policy:
   securityPolicy:
     surface: code-and-config
     effects: read-only-inspection
-    findings: typed-with-evidence
+    findings: typed-with-evidence-by-rule
+    canon: hfs-lint-security-codes
     repair: never
     secretsInFindings: never
 route:

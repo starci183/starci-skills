@@ -55,16 +55,15 @@ reads:
         slice, its public entry points and its existing scenario coverage. The proof binds the exact
         tested tree, so a spec-only claim without a resolved writable repository is not a proof.
   - id: suite
-    path: <app>/<suite-paths>
+    path: <app>/be/src/tests/world/** + <app>/be/src/tests/e2e/** + <app>/be/jest.config.js
     purpose:
-      en: Inspect the existing end-to-end suite - how it starts its own dependencies as containers for the
-        run, its lifecycle hooks, isolation per run, fixtures, helpers, spec naming convention and
-        the assertions it already owns.
+      en: "The app's test world: be/src/tests/world/test-world.config.ts (export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/<env>', stacks, fakes, apps, migrate, identity, modules }) - the stack declaration at the app root names the services that run REAL, and third-party SaaS alone is faked at the network edge), use-test-world.ts (the spec entry), global-setup.ts and global-teardown.ts, the repo-specific fakes under fakes/<provider>/, be/jest.config.js (@starci/jest-preset starciJestConfig(): the world projects run on the preset's world runner, one file at a time, each in a fresh process) and packages/test-world/README.md (the frozen spec-facing API and its hard rule). Then the existing e2e specs of the slice: their naming (be/src/tests/e2e/<feature>/<name>.e2e-spec.ts), the operations registry the apps declare and the assertions they already own."
+      vi: "Test world của app: be/src/tests/world/test-world.config.ts (export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/<env>', stacks, fakes, apps, migrate, identity, modules }) - khai báo stack ở gốc app nêu các dịch vụ chạy THẬT, chỉ SaaS bên thứ ba được giả ở rìa mạng), use-test-world.ts (lối vào của spec), global-setup.ts và global-teardown.ts, các fake riêng của repo dưới fakes/<provider>/, be/jest.config.js (@starci/jest-preset starciJestConfig(): các dự án world chạy trên world runner của preset, từng tệp một, mỗi tệp trong một tiến trình mới) và packages/test-world/README.md (API cố định cho spec và luật cứng của nó). Sau đó là các spec e2e hiện có của slice: cách đặt tên (be/src/tests/e2e/<feature>/<name>.e2e-spec.ts), registry operation mà các app khai báo và các khẳng định chúng đã sở hữu."
   - id: stack
-    path: .starciwork/_resources/environments/<environment>/resource.yaml + selected request resources[]
+    path: <app>/.starcistacks/<environment>/** + .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
-      en: Resolve the end-to-end runtime this run may use - the declared container services, images and
-        configuration revision, its owner and allowed effects.
+      en: "The stack the test world runs for real: the services and image versions of the app-root .starcistacks/<environment> the declaration names (Postgres, Redis, Keycloak with its realm, ...) and the environment record that owns them. The test world attaches the one warm stack (starci-test-stack) and isolates this checkout by its namespace; no other target is a proof surface."
+      vi: "Stack mà test world chạy thật: các dịch vụ và phiên bản image của .starcistacks/<environment> ở gốc app mà khai báo nêu (Postgres, Redis, Keycloak với realm của nó, ...) và bản ghi môi trường sở hữu chúng. Test world gắn vào một stack ấm duy nhất (starci-test-stack) và cô lập checkout này theo namespace; không đích nào khác là bề mặt chứng minh."
   - id: checks
     path: selected request checks[] + <app>/<manifest-paths>
     purpose:
@@ -73,10 +72,8 @@ reads:
   - id: effects
     path: current request authorization + selected stack resource declared allowed effects
     purpose:
-      en: Bind container start/stop, scenario-owned data inside the run-owned stack and any explicitly
-        authorized external call to the selected assertions. Unauthorized effects, shared-target
-        mutation and unbounded retry are outside this op; discover an unknown external outcome by
-        read-only correlation before repeating an attempt.
+      en: "Bind the scenario-owned data inside the test world's per-checkout namespace (reset by the world when a file boots) and any explicitly authorized external call to the selected assertions. Unauthorized effects, shared-target mutation and unbounded retry are outside this op; discover an unknown external outcome by read-only correlation before repeating an attempt."
+      vi: "Gắn dữ liệu riêng của kịch bản trong namespace theo checkout của test world (world đặt lại khi một tệp khởi động) và mọi lệnh gọi ngoài được phép rõ ràng vào các khẳng định đã chọn. Hiệu ứng không được phép, sửa đích dùng chung và thử lại không giới hạn nằm ngoài op này; kết quả ngoài chưa biết được tìm bằng đối chiếu chỉ đọc trước khi thử lại."
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -142,6 +139,12 @@ writes:
     content:
       en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
+  - id: test-world-run
+    path: STARCI_JOB_SCRATCH/test-world-run.json
+    schema: starci/test-world-run@1
+    content:
+      en: "The test-world run summary of the e2e project (scripts/checks/test-world-run.mjs): the harness (preset, world runner, declaration), every selected spec with its world form, outage calls and forbidden infrastructure, and the run's exit, totals, failures and skips."
+      vi: "Tóm tắt lần chạy test-world của dự án e2e (scripts/checks/test-world-run.mjs): bộ khung (preset, world runner, khai báo), từng spec đã chọn với dạng world, số lần gọi outage và hạ tầng bị cấm, cùng exit, tổng số, lỗi và số test bị bỏ qua của lần chạy."
 steps:
   - reads: [op-loop]
     writes: [read-digest]
@@ -182,66 +185,26 @@ steps:
         model/runtime or spawn workers. Do not create a target or invent its assertions here, and
         never rewrite an assertion so an existing scenario can pass. These define, per assertion,
         the request a client sends and the effect the stack must show.
-  - reads:
-      - suite
-      - repo
-      - stack
-      - checks
+  - reads: [suite, repo, stack, checks]
     writes: [evidence]
     action:
-      en: Inspect the existing suite and the declared stack before writing anything - how the suite starts
-        its container services for the run, how it isolates and disposes them, which fixtures and
-        helpers already exist, the naming convention of its specs, and the exact listed check
-        commands with the manifest scripts behind them. Record that start path and the container
-        identities. If the suite has no way to bring the real stack up itself, that is the reported
-        blocker, not a reason to point the scenarios at a shared service. Reuse that harness; never
-        stand up a second parallel harness and never substitute a hand-started shared service for
-        the stack the suite brings up. Only the run-owned ephemeral stack may be started; a shared
-        or production target is never a proof surface for this op, and identity is validated by
-        observation rather than inferred from a hostname. A listed command that does not exist is a
-        reported blocker, never a locally invented equivalent.
-  - reads:
-      - architecture
-      - repo
-      - suite
-      - target
+      en: "Inspect the test world before writing anything: the declaration (its stack, stacks, fakes, apps and identity doors), the spec entry, the preset jest config and the existing e2e specs of the slice, and the exact listed check commands with the manifest scripts behind them (npm run test:e2e). An app without a defineTestWorld declaration or a be/jest.config.js that is not starciJestConfig() is the reported blocker, never a reason to start containers, open a DataSource or read process.env from a spec: the library is the only place allowed to do infrastructure. Never stand up a second harness and never point a scenario at a shared or production service. A listed command that does not exist is a reported blocker, never a locally invented equivalent."
+      vi: "Xem test world trước khi viết bất cứ gì: khai báo (stack, stacks, fakes, apps và các cửa identity), lối vào của spec, cấu hình jest của preset và các spec e2e hiện có của slice, cùng đúng các lệnh kiểm tra được liệt kê với script manifest phía sau (npm run test:e2e). App không có khai báo defineTestWorld hoặc be/jest.config.js không phải starciJestConfig() là blocker được báo, không bao giờ là lý do để spec tự khởi động container, mở DataSource hay đọc process.env: thư viện là nơi duy nhất được làm hạ tầng. Không dựng bộ khung thứ hai và không trỏ kịch bản vào dịch vụ dùng chung hay production. Lệnh được liệt kê mà không tồn tại là blocker được báo, không bao giờ là lệnh tự chế tương đương."
+  - reads: [architecture, repo, suite, target]
     writes: [source, evidence]
     action:
-      en: Write or extend one scenario per assertion at the allowlisted spec paths - for a todo target
-        work.author wrote in planned mode, exactly the spec paths its checks name - exercising the slice
-        only through its public API - the transport contract a client actually calls - against the
-        real stack the suite starts. Cover the positive path, the declared denial, invalid input and
-        the applicable concurrency or replay case, and read the persisted effect back through that
-        same public surface where one exists. Seed only the preconditions the scenario needs,
-        through the suite's own fixtures, and never pre-create the outcome under proof. No mock,
-        stub, fake or spy of the unit under proof and no in-process call that bypasses its entry
-        point. Product code and declared expectations stay unchanged here.
-  - reads:
-      - checks
-      - stack
-      - effects
-      - suite
+      en: "Write or extend one scenario per assertion at the allowlisted spec paths (be/src/tests/e2e/<feature>/<name>.e2e-spec.ts; for a todo target work.author wrote in planned mode, exactly the spec paths its checks name). Each file takes its world from the library - const world = useTestWorld({ apps: [...] }) through the repository's use-test-world entry - and drives the slice only through its public API, world.apps.<name>.api (graphql, get/post, as/bearing, signIn), with people from world.signedInPerson/registerPerson. Cover the positive path, the declared denial, invalid input and the applicable concurrency or replay case, and read the persisted effect back through the same public surface. A failure path of our own stack goes through the outage API - world.infra.<svc>.cut() then restore(), during(fn) or latency(ms) - and a third-party refusal through the edge fake (world.fake.<name>.failNext); state is awaited with world.waitFor, never a sleep. Seed only through the declaration's seeds and the suite's builders, never pre-create the outcome under proof. No mock, stub, fake or spy of the unit under proof, no in-process shortcut around its entry point, no docker, DataSource or process.env in a spec. Product code and declared expectations stay unchanged here."
+      vi: "Viết hoặc mở rộng một kịch bản cho mỗi khẳng định tại các đường dẫn spec được phép (be/src/tests/e2e/<feature>/<name>.e2e-spec.ts; với đích todo mà work.author viết ở chế độ planned, đúng các đường dẫn spec mà lệnh kiểm tra của nó nêu). Mỗi tệp lấy world từ thư viện - const world = useTestWorld({ apps: [...] }) qua lối vào use-test-world của repo - và chỉ đi qua API công khai của slice, world.apps.<name>.api (graphql, get/post, as/bearing, signIn), với người dùng từ world.signedInPerson/registerPerson. Phủ đường chính, lần từ chối đã khai báo, đầu vào sai và trường hợp đồng thời hoặc gửi lại khi áp dụng, rồi đọc lại hiệu ứng đã lưu qua cùng bề mặt công khai. Đường lỗi của stack của chính ta đi qua API outage - world.infra.<svc>.cut() rồi restore(), during(fn) hoặc latency(ms) - còn lần từ chối của bên thứ ba qua fake ở rìa (world.fake.<name>.failNext); trạng thái được chờ bằng world.waitFor, không bao giờ sleep. Chỉ gieo dữ liệu qua seeds của khai báo và builder của bộ test, không bao giờ tạo sẵn kết quả cần chứng minh. Không mock, stub, fake hay spy đơn vị cần chứng minh, không đường tắt trong tiến trình vòng qua lối vào của nó, không docker, DataSource hay process.env trong spec. Mã sản phẩm và kỳ vọng đã khai báo giữ nguyên ở đây."
+  - reads: [checks, stack, effects, suite]
+    writes: [evidence, test-world-run]
+    action:
+      en: "Run the e2e project through the runtime's test-world runner: node scripts/checks/test-world-run.mjs --root <app> --project e2e [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/test-world-run.json. It runs the listed npm run test:e2e verbatim on the preset's world runner (one file at a time, each in a fresh process, the test world attaching the warm stack and resetting the run's data per file) and records the harness, every spec's world form, the outage calls and the totals. Add no command, narrow no selection and skip no scenario; keep the command, cwd, tested tree/commit, exit code, counts and sanitized output, and every attempt when something was retried. A scenario that stays green with its dependencies cut is a defect of the spec, and deleting or skipping a scenario is never a route to a green run."
+      vi: "Chạy dự án e2e qua bộ chạy test-world của runtime: node scripts/checks/test-world-run.mjs --root <app> --project e2e [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/test-world-run.json. Nó chạy đúng lệnh npm run test:e2e được liệt kê trên world runner của preset (từng tệp một, mỗi tệp trong tiến trình mới, test world gắn stack ấm và đặt lại dữ liệu của lần chạy theo từng tệp) và ghi bộ khung, dạng world của từng spec, các lần gọi outage và tổng số. Không thêm lệnh, không thu hẹp phạm vi, không bỏ kịch bản nào; giữ lệnh, cwd, cây/commit đã test, exit code, số đếm và đầu ra đã làm sạch, và mọi lần thử lại. Kịch bản vẫn xanh khi phụ thuộc bị cắt là lỗi của spec, và xóa hay bỏ qua kịch bản không bao giờ là đường tới lần chạy xanh."
+  - reads: [stack, effects, suite, target]
     writes: [evidence]
     action:
-      en: Run exactly the listed check commands, verbatim, with the suite starting the real stack in this
-        run; add no command, narrow no selection and skip no scenario. Keep the command, cwd, tested
-        tree/commit, container identities, exit code, counts and sanitized output, and record every
-        attempt when something was retried. Prove the stack actually served the scenarios - a
-        scenario that stays green with its dependencies absent is a defect of the spec, and deleting
-        or skipping a scenario is never a route to a green run.
-  - reads:
-      - stack
-      - effects
-      - suite
-      - target
-    writes: [evidence]
-    action:
-      en: Read the observed responses back against the frozen expectations, assertion by assertion, and
-        keep every red scenario with the request it sent and the response it got. Then confirm the
-        suite disposed the run-owned containers, volumes and scenario data it created, that no
-        shared or production target was touched, and that no authorized external effect is left
-        open. A leftover ephemeral resource is recorded with its exact identity and a resumable
-        disposal command; unresolved effects cannot be presented as a clean run.
+      en: "Read the observed responses back against the frozen expectations, assertion by assertion, and keep every red scenario with the request it sent and the response it got. Then confirm every outage the run injected was restored (the world restores what it cut when it stops), that no shared or production target was touched and that no authorized external effect is left open. The warm stack stays up by design and the run's data is reset by the next file's boot; a leftover resource outside the world's namespace is recorded with its exact identity and a resumable disposal command."
+      vi: "Đọc lại các phản hồi quan sát được theo các kỳ vọng đã chốt, từng khẳng định một, và giữ mọi kịch bản đỏ kèm yêu cầu đã gửi và phản hồi nhận được. Sau đó xác nhận mọi outage lần chạy đã gây ra đều được khôi phục (world khôi phục những gì nó cắt khi dừng), không đích dùng chung hay production nào bị chạm và không hiệu ứng ngoài được phép nào còn mở. Stack ấm cố ý vẫn chạy và dữ liệu của lần chạy được đặt lại khi tệp kế tiếp khởi động; tài nguyên sót lại ngoài namespace của world được ghi kèm danh tính chính xác và lệnh dọn có thể chạy lại."
   - reads:
       - target
       - checks
@@ -282,10 +245,8 @@ proofs:
         never a response assertion.
   - id: stack
     requirement:
-      en: The dependencies the slice needs ran for real in this run, brought up by the suite itself as
-        run-owned containers with observed identities, and the scenarios were served by them. A
-        green result with the stack absent is a spec defect, and a shared or production target is
-        not an accepted substitute.
+      en: "The dependencies the slice needs ran for real in this run - the services of the declaration's .starcistacks/<env>, attached by the test world - and only third-party SaaS was faked at the network edge; the test-world summary shows the preset world runner, the defineTestWorld declaration and specs that hand-roll no infrastructure. A shared or production target is never an accepted substitute."
+      vi: "Các phụ thuộc slice cần đã chạy thật trong lần chạy này - các dịch vụ của .starcistacks/<env> trong khai báo, do test world gắn vào - và chỉ SaaS bên thứ ba được giả ở rìa mạng; tóm tắt test-world cho thấy world runner của preset, khai báo defineTestWorld và các spec không tự dựng hạ tầng. Đích dùng chung hay production không bao giờ là thay thế được chấp nhận."
   - id: run
     requirement:
       en: Exactly the listed check commands ran verbatim, with recorded exit codes, counts and retained
@@ -303,13 +264,17 @@ proofs:
     check: scripts/kernel/job-artifacts.mjs
   - id: teardown
     requirement:
-      en: The run-owned containers, volumes and scenario data are disposed and verified absent, no shared
-        state was mutated, and any remaining ephemeral resource is recorded with its identity and a
-        resumable disposal command.
+      en: "Every outage the run injected is restored, no shared state outside the world's namespace was mutated, and any remaining ephemeral resource is recorded with its identity and a resumable disposal command."
+      vi: "Mọi outage lần chạy gây ra đều được khôi phục, không trạng thái dùng chung nào ngoài namespace của world bị sửa, và mọi tài nguyên tạm còn lại được ghi kèm danh tính và lệnh dọn có thể chạy lại."
   - id: op-gate
     requirement:
       en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
       vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+  - id: test-world
+    requirement:
+      en: "api settle re-reads the attached test-world run summary (runtime check op-proof, proof test-world, project e2e): a done without it (op-test-world-proof-missing), with a hand-rolled world - no preset world runner, no defineTestWorld declaration, a spec outside the layer's form, docker, testcontainers, a DataSource, process.env or a sleep in a spec (op-test-world-hand-rolled) - or with a run that is not green, ran no test or skipped one (op-test-world-run-red) is refused."
+      vi: "api settle tự đọc lại tóm tắt lần chạy test-world đính kèm (check op-proof, proof test-world, dự án e2e): done thiếu nó (op-test-world-proof-missing), có world tự dựng - không có world runner của preset, không có khai báo defineTestWorld, spec sai dạng của tầng, docker, testcontainers, DataSource, process.env hoặc sleep trong spec (op-test-world-hand-rolled) - hoặc lần chạy không xanh, không chạy test nào hay bỏ qua test (op-test-world-run-red) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: ENVIRONMENT_NOT_READY
     condition:
@@ -335,9 +300,8 @@ blockers:
         driving a user interface or mocking the unit under proof.
   - code: STACK_UNAVAILABLE
     condition:
-      en: The suite cannot bring its real dependencies up in this environment - no container runtime, an
-        unavailable image, a refused host or an exhausted resource - and the cause is provably
-        unfixable from the allowlist.
+      en: "The test world cannot attach or start its warm stack in this environment - no container runtime, an unavailable image, a refused host, an exhausted resource or TEST_WORLD_NAMESPACE_BUSY from a second run of this checkout - and the cause is provably unfixable from the allowlist."
+      vi: "Test world không gắn hay khởi động được stack ấm trong môi trường này - không có container runtime, image không có, host từ chối, cạn tài nguyên hoặc TEST_WORLD_NAMESPACE_BUSY do một lần chạy khác của checkout này - và nguyên nhân chắc chắn không sửa được trong phạm vi cho phép."
   - code: CHECK_UNRUNNABLE
     condition:
       en: A listed check command does not exist or cannot execute as written; report it instead of
@@ -352,13 +316,16 @@ blockers:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
+  - code: TEST_WORLD_MISSING
+    condition:
+      en: "The app has no @starci/test-world declaration (be/src/tests/world/test-world.config.ts calling defineTestWorld) or its be/jest.config.js is not @starci/jest-preset starciJestConfig(): report the exact gap for the owning build op; a spec never hand-rolls the world instead."
+      vi: "App không có khai báo @starci/test-world (be/src/tests/world/test-world.config.ts gọi defineTestWorld) hoặc be/jest.config.js không phải starciJestConfig() của @starci/jest-preset: báo đúng khoảng trống cho op build sở hữu; spec không bao giờ tự dựng world thay vào."
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
   app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
   bound-paths: Inspected source read set
-  suite-paths: Existing end-to-end suite and fixture paths
   manifest-paths: Manifest and script files defining the listed check commands
-  write-ceiling: Explicit owned scenario spec paths
+  write-ceiling: Explicit owned scenario spec paths under be/src/tests/e2e/
   environment: Resolved end-to-end runtime label
 layoutPolicy:
   checks: [starci-validate]
@@ -370,13 +337,15 @@ policy:
   e2ePolicy:
     proofSurface: public-api-only
     interfaceDriving: false
-    stack: real-started-by-the-suite
+    stack: test-world-warm-stack-real-own-services
+    world: useTestWorld-apps
+    outage: world-infra-cut-restore
     mocks: none-for-the-unit-under-proof
     scenarios: one-per-assertion
     checks: listed-commands-verbatim
     productCode: unchanged
     environmentBlocker: provably-unfixable-only
-    teardown: run-owned-ephemeral-disposed
+    teardown: outages-restored-namespace-reset-by-the-world
 route:
   nodeKinds: [implementation]
   phase: [verify, post-implementation]
