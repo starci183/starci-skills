@@ -4,7 +4,9 @@
 //   - a dependency the root `overrides` pins to a version (a string that is not a `$name` reference) is declared at that version everywhere
 //     it is declared: an override the manifests disagree with is a second version in disguise;
 //   - the lockfile (package-lock.json, read, never installed) holds no nested copy of a dependency the workspace declares:
-//     `node_modules/<a>/node_modules/<name>` or `apps/<app>/node_modules/<name>` next to the hoisted `node_modules/<name>`.
+//     `node_modules/<a>/node_modules/<name>` or `apps/<app>/node_modules/<name>` next to the hoisted `node_modules/<name>`. A
+//     bundled copy (`inBundle`: it ships inside its parent's tarball, its bundleDependencies) is not one: no range, override or
+//     dedupe of the workspace can move it, so it is the parent's, not a second copy the workspace keeps.
 import { found, readJson } from './read.mjs';
 
 export const DEP_VERSION_SKEW = 'HFS_DEP_VERSION_SKEW';
@@ -54,7 +56,7 @@ export function depFindings({ repoRoot, files }) {
     }
     for (const [key, entry] of Object.entries(lock.packages)) {
       const nested = NESTED.exec(key);
-      if (!nested || entry.link || HOISTED.test(key) || !declared.has(nested[1])) continue;
+      if (!nested || entry.link || entry.inBundle || HOISTED.test(key) || !declared.has(nested[1])) continue;
       const name = nested[1];
       findings.push(found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${entry.version ? ` ${entry.version}` : ''}${hoisted.has(name) ? ` next to the hoisted ${hoisted.get(name)}` : ''}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version }));
     }

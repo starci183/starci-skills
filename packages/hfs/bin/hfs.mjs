@@ -215,7 +215,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       const [kind, name, ...extra] = opts.positional;
       if (kind !== 'app' || !name || extra.length || opts.repo !== undefined) throw new Error('hfs scaffold takes `app <name> [--into <dir>]`');
       const { root: created, files } = scaffoldApp({ name, into: path.resolve(opts.into ?? process.cwd()), presets: presets ?? await scaffoldPresets() });
-      stdout(`hfs scaffold app: created ${created} (${files.length} files); next: npm install, then npm run lint\n`);
+      stdout(`hfs scaffold app: created ${created} (${files.length} files); next: npm ci, then npm run lint\n`);
       return 0;
     }
     if (opts.positional.length !== 1) throw new Error('hfs explain takes exactly one path');

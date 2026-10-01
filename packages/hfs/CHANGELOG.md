@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.1 - 2026-10-01
+
+- Fixed: `hfs scaffold app` no longer writes a hand-made lockfile. The 4.0.0 stub held only the root entry, so `npm ci` in a new app failed with EUSAGE ("package.json and package-lock.json are not in sync"). Once the files are written, the scaffold runs `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` in the new app root (registry or npm cache; no node_modules, no scripts), so the lockfile resolves every dependency of the root and its workspaces and `npm ci` accepts it. If npm cannot resolve it, the scaffold exits 2 with `HFS_SCAFFOLD_LOCK_FAILED`, names the step and removes the app it began: no stub lock and no app without a lock is left. There is no switch to skip the step.
+- Fixed (false positive): R14 `HFS_DEP_VERSION_SKEW` does not report a bundled copy in the lockfile (`inBundle`, a package's bundleDependencies, e.g. the tslib inside `@tailwindcss/oxide-wasm32-wasi`): it ships inside its parent's tarball and nothing in the app can move it. A fresh scaffold's real lock has one.
+
 ## 4.0.0 - 2026-10-01
 
 - Added: the scaffolded root `package.json` (and its lockfile root entry) pins `@starci/test-world` from `knowledge/hfs/canon-pins.yaml` (1.0.0), the package whose `starci-test-stack` bin the managed `test:stack` script runs.

@@ -71,12 +71,12 @@ pins:
     source: packages/test-world/package.json
     why: 'the shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs, the outage lock and the starci-test-stack bin behind the managed test:stack script; a devDependency of every back end.'
   '@starci/hfs':
-    version: 4.0.0
+    version: 4.0.1
     group: starci
     install: registry
     side: both
     source: packages/hfs/package.json
-    why: '4.0.0: the app monorepo standard: one app repository with the root package.json, lockfile and hfs.json of kind app, and the be/ and fe/ sides; `hfs scaffold app <name>` makes it, `hfs lint` at the root lints be/** with the BE canon and fe/** with the FE canon; the standalone be/fe repository kinds and `hfs init` are deleted.'
+    why: '4.0.1: `hfs scaffold app` resolves the real lockfile with npm (`npm install --package-lock-only`) instead of writing a root-only stub that `npm ci` refuses. 4.0.0: the app monorepo standard: one app repository with the root package.json, lockfile and hfs.json of kind app, and the be/ and fe/ sides; `hfs scaffold app <name>` makes it, `hfs lint` at the root lints be/** with the BE canon and fe/** with the FE canon; the standalone be/fe repository kinds and `hfs init` are deleted.'
   # --- tooling
   typescript:
     version: 5.9.3

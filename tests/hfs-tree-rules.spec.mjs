@@ -170,6 +170,17 @@ test('HFS_DEP_VERSION_SKEW: two workspaces at two versions, and a nested lockfil
   assert.equal(copy.lockPath, 'fe/packages/web-ui/node_modules/left-pad');
 });
 
+test('HFS_DEP_VERSION_SKEW: a bundled copy inside its parent (inBundle) is not a nested copy the workspace keeps', () => {
+  // The former false positive of a fresh scaffold: @tailwindcss/oxide-wasm32-wasi bundles tslib, so npm writes
+  // node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib (inBundle) next to the hoisted tslib; nothing in the app can move it.
+  const result = checkRepo({ repoRoot: repoOf(WITH_PACKAGES, withManifests({ tslib: '2.8.1' }, { tslib: '2.8.1' }, {
+    lockfileVersion: 3,
+    packages: { '': {}, 'node_modules/tslib': { version: '2.8.1' }, 'node_modules/@tailwindcss/oxide-wasm32-wasi': { version: '4.3.3', bundleDependencies: ['tslib'] },
+      'node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib': { version: '2.8.1', inBundle: true } },
+  })) });
+  assert.deepEqual(only(result, 'HFS_DEP_VERSION_SKEW'), []);
+});
+
 test('HFS_DEP_VERSION_SKEW: one version everywhere, workspace links, and a transitive duplicate nobody declares are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(WITH_PACKAGES, withManifests({ 'left-pad': '1.3.0', '@demo/kit': 'workspace:*' }, { 'left-pad': '1.3.0', '@demo/kit': 'file:../kit' }, {
     lockfileVersion: 3,

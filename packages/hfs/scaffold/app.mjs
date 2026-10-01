@@ -11,10 +11,13 @@
 //
 // The skeleton files are written once from templates/<app|be|fe>/skeleton ({{project}}, {{app}} and {{appPascal}} filled, a
 // `__app__` folder named after the side's app); the managed files are the render of `hfs sync` (sync/index.mjs), so a fresh app
-// is in sync by construction. Nothing is installed: `npm install` completes the lockfile, which is written as the root entry only.
-// An existing directory is refused, never merged into.
+// is in sync by construction. The lockfile is never written by hand: once the files are written, npm resolves the real one
+// (`npm install --package-lock-only`, no node_modules, no scripts), so `npm ci` installs the new app as it is. When npm cannot
+// resolve it the scaffold fails (HFS_SCAFFOLD_LOCK_FAILED), names the step and removes the app it began, so no app without a lock
+// and no stub lock is ever left. An existing directory is refused, never merged into.
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR, renderTargets, writeTargets } from '../sync/index.mjs';
@@ -148,11 +151,30 @@ function skeletonOf(scope, app, vars) {
   return files;
 }
 
+/** The npm step that resolves the lockfile of a new app, exactly as the error names it. */
+export const LOCK_STEP = 'npm install --package-lock-only --ignore-scripts --no-audit --no-fund';
+
 /**
- * `hfs scaffold app <name>`: writes the new app under `into` and returns `{ root, files }` (app-relative paths, sorted). `presets`
- * is what sync loads from the installed @starci/jest-preset (the Sonar exclusions); the CLI passes the one it resolves.
+ * Resolves the real package-lock.json of the app at `root` with npm (the registry and the npm cache; no node_modules and no
+ * lifecycle script). `{ ok: true }` or `{ ok: false, detail }`.
  */
-export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest() }) {
+export function npmLock(root) {
+  // Through the shell (npm is npm.cmd on Windows, which runs only there); the command is the fixed literal LOCK_STEP.
+  const run = spawnSync(LOCK_STEP, { cwd: root, encoding: 'utf8', shell: true, windowsHide: true, timeout: 600_000 });
+  if (run.status === 0 && fs.existsSync(path.join(root, 'package-lock.json'))) return { ok: true };
+  const said = `${run.stderr ?? ''}\n${run.stdout ?? ''}`.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  // npm's own error lines (`npm error code ETARGET`, `npm error notarget No matching version found for x@1.2.3.`), without the log pointer.
+  const errors = said.filter(line => /^npm (?:error|ERR!)/i.test(line) && !/complete log/i.test(line)).map(line => line.replace(/^npm (?:error|ERR!)\s*/i, ''));
+  const reason = run.error ? String(run.error.message) : errors.slice(0, 2).join('; ') || said[0] || 'no output';
+  return { ok: false, detail: `exit ${run.status ?? 'none'}: ${reason}` };
+}
+
+/**
+ * `hfs scaffold app <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
+ * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
+ * exclusions); the CLI passes the one it resolves. A failed lock step removes the app and throws HFS_SCAFFOLD_LOCK_FAILED.
+ */
+export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest(), lock = npmLock }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.join(into, name);
   if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; hfs scaffold app never writes into an existing directory`);
@@ -163,7 +185,6 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
   const files = [
     { path: 'hfs.json', content: jsonText(declaration) },
     { path: 'package.json', content: jsonText(pkg) },
-    { path: 'package-lock.json', content: jsonText({ name, version: pkg.version, lockfileVersion: 3, requires: true, packages: { '': { name, version: pkg.version, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } } }) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
@@ -175,5 +196,10 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
   }
   const targets = renderTargets(declaration, presets, { manifest });
   writeTargets(root, targets);
-  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path)])].sort() };
+  const locked = lock(root);
+  if (!locked.ok) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}); the app was removed. Check the network and the npm registry, then run hfs scaffold app ${name} again`);
+  }
+  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), 'package-lock.json'])].sort() };
 }

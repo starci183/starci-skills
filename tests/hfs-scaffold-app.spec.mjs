@@ -4,7 +4,7 @@
 // every path a finding names, in its path and in its message, is app-relative. The scaffold also type-checks with its own root
 // `typecheck` script (after `codegen`), so every import of the skeleton is proven to resolve; an unresolvable import planted on each
 // side is reported. The be api also builds with its own build:be script and boots with start:api (GET /health/live answers 200), then stops.
-// Nothing is installed: the dependencies are linked from existing installs (tests/_hfs-app-install.mjs; STARCI_APP_INSTALLS may add
+// The scaffold resolves its lockfile with npm (network or the npm cache); nothing is installed: the dependencies are linked from existing installs (tests/_hfs-app-install.mjs; STARCI_APP_INSTALLS may add
 // a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -126,6 +126,26 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
   for (const name of ['dev:be', 'dev:fe', 'build:be', 'build:fe', 'start:api', 'lint', 'lint:fix', 'test', 'test:integration', 'test:e2e', 'test:contract', 'test:stack', 'codegen', 'contract:emit', 'typecheck']) {
     assert.ok(scripts[name], `the root package.json has the ${name} script`);
   }
+
+  // The lockfile is npm's own (the scaffold runs `npm install --package-lock-only`): it resolves every dependency of the root and
+  // of every workspace, and `npm ci` accepts it. Checked before any node_modules exists, so the dry run touches no link.
+  const manifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(app, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.lockfileVersion, 3);
+  assert.deepEqual(lock.packages[''].dependencies, manifest.dependencies, 'the lock root holds the package.json dependencies');
+  assert.deepEqual(lock.packages[''].devDependencies, manifest.devDependencies, 'the lock root holds the package.json devDependencies');
+  const workspaces = (manifest.workspaces ?? []).flatMap((pattern) => {
+    const [base, star] = pattern.split('/*');
+    return star === undefined ? [pattern] : (fs.existsSync(path.join(app, base)) ? fs.readdirSync(path.join(app, base)).map((name) => `${base}/${name}`) : []);
+  });
+  const declared = [manifest, ...workspaces.map((dir) => JSON.parse(fs.readFileSync(path.join(app, dir, 'package.json'), 'utf8')))];
+  for (const pkg of declared) {
+    for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) assert.ok(lock.packages[`node_modules/${name}`], `the lock resolves ${name}`);
+  }
+  for (const dir of workspaces) assert.ok(lock.packages[dir], `the lock holds the workspace ${dir}`);
+  const ci = spawnSync('npm ci --dry-run --ignore-scripts --no-audit --no-fund', { cwd: app, encoding: 'utf8', shell: true, windowsHide: true });
+  assert.equal(ci.status, 0, `npm ci accepts the lock: ${ci.stderr}`);
+  assert.ok(!fs.existsSync(path.join(app, 'node_modules')), 'the dry run installed nothing');
 
   links = installInto(app, installs);
   execFileSync('git', ['init', '-q'], { cwd: app });

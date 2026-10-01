@@ -10,7 +10,7 @@ import { starciworkGitignoreText } from '../scripts/lib/starciwork-boundary.mjs'
 import {
   BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../packages/hfs/sync/index.mjs';
-import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { LOCK_STEP, scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../scripts/lib/hfs-slots.mjs';
 import { declaredSonarKeys, readDeclaredSonarKey } from '../packages/hfs/sync/sonar-key.mjs';
@@ -487,24 +487,25 @@ describe('hfs scaffold app: the first tree', () => {
   const scaffold = (t, name = 'nivo') => {
     const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));
     t.after(() => fs.rmSync(into, { recursive: true, force: true }));
-    return scaffoldApp({ name, into, presets: PRESETS });
+    // The skeleton specs need no registry: the lock step is the npm run hfs-scaffold-app.spec proves; here it reports success.
+    return scaffoldApp({ name, into, presets: PRESETS, lock: () => ({ ok: true }) });
   };
   const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort();
   const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 
-  it('writes the root, the be side and the fe side, already in sync, with one package.json and one lockfile at the root', async t => {
+  it('writes the root, the be side and the fe side, already in sync, with one package.json at the root and the lockfile left to npm', async t => {
     const { root } = scaffold(t);
     const files = filesUnder(root);
-    for (const file of ['hfs.json', 'package.json', 'package-lock.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', 'scripts/codegen.mjs',
+    for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', 'scripts/codegen.mjs',
       'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/api/src/main.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/api.options.ts',
       'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package(-lock)?\.json$/.test(file)), 'no side and no app holds a package.json or lockfile');
+    assert.ok(!files.includes('package-lock.json'), 'the scaffold writes no lockfile by hand: npm resolves it');
     assert.equal(JSON.parse(read(root, 'hfs.json')).kind, 'app');
     // The managed test:stack script runs the starci-test-stack bin, so the root pins its package, @starci/test-world, at its canon pin.
     const manifest = JSON.parse(read(root, 'package.json'));
     assert.match(manifest.scripts['test:stack'], /starci-test-stack/);
     assert.equal(manifest.devDependencies['@starci/test-world'], parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins['@starci/test-world'].version);
-    assert.equal(JSON.parse(read(root, 'package-lock.json')).packages[''].devDependencies['@starci/test-world'], manifest.devDependencies['@starci/test-world']);
     // The Work tree names the two sides of the app as its repositories, the form of the examples and the work-layout contract.
     const workspace = parseYaml(read(root, '.starciwork/workspace.yaml'));
     assert.deepEqual(workspace.repositories, [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }]);
@@ -513,6 +514,15 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal((await run(['--check'], root)).code, 0, 'a fresh app is in sync by construction');
     assert.throws(() => scaffoldApp({ name: 'nivo', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_EXISTS' });
     assert.throws(() => scaffoldApp({ name: 'Nivo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
+  });
+  it('a lock step npm cannot complete fails the scaffold with HFS_SCAFFOLD_LOCK_FAILED, names the step and leaves no app behind', t => {
+    const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));
+    t.after(() => fs.rmSync(into, { recursive: true, force: true }));
+    let ran = null;
+    const failing = (root) => { ran = root; fs.writeFileSync(path.join(root, 'package-lock.json'), '{}'); return { ok: false, detail: 'exit 1: npm ERR! code ENOTFOUND' }; };
+    assert.throws(() => scaffoldApp({ name: 'nivo', into, presets: PRESETS, lock: failing }), (error) => error.code === 'HFS_SCAFFOLD_LOCK_FAILED' && error.message.includes(LOCK_STEP) && error.message.includes('ENOTFOUND'));
+    assert.equal(ran, path.join(into, 'nivo'), 'the lock step runs in the new app root, after every file is written');
+    assert.equal(fs.existsSync(path.join(into, 'nivo')), false, 'no app and no stub lock is left behind');
   });
   it('the be skeleton follows the unit standard: only services have a spec, each service has one, no composition spec', t => {
     const { root } = scaffold(t);
