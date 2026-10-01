@@ -133,8 +133,9 @@ export function enqueueRepository({ op, repository, ownedPaths, repo, siblingRep
       const existing = [...binding.repos, { role: 'app', root: binding.appRoot }].filter((r) => fs.existsSync(path.join(r.root, rel)));
       const found = [...new Set(existing.filter((r) => r.role !== 'app' || !binding.repos.some((side) => fs.existsSync(path.join(side.root, rel)))).map((r) => r.role))];
       const selected = siblings.length === 1 ? siblings[0] : found.length === 1 ? found[0] : null;
-      if (!selected) return { ok: false, reason: found.length ? 'path-repository-ambiguous' : 'path-repository-missing',
-        detail: `owned path ${owned} ${found.length ? 'exists in multiple' : 'exists in no'} bound repositories (${binding.repos.map((r) => r.role).join(', ')}); qualify its repository` };
+      const sides = binding.repos.map((r) => r.role).join(', ');
+      if (!selected && found.length) return { ok: false, reason: 'path-repository-ambiguous', detail: `owned path ${owned} exists in multiple bound repositories (${sides}); qualify its repository` };
+      if (!selected) return { ok: false, reason: 'path-repository-missing', detail: `owned path ${owned} exists in no bound repositories (${sides}); qualify its repository` };
       roles.add(selected);
     }
     if (roles.size > 1 || siblings.length > 1) return { ok: true, repository: 'app' };

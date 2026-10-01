@@ -8386,15 +8386,6 @@ model-unknown:
   nextStep_vi: "Dispatch bị từ chối; dùng tên mô hình hợp lệ."
   owner: supervisor
   kind: dispatch-refusal
-multi-repo:
-  title: "Work spans several repos"
-  title_vi: "Việc trải trên nhiều kho"
-  meaning_vi: "Việc này đụng nhiều kho nên không dùng cây làm việc riêng."
-  causes_vi:
-    - "phạm vi op bao nhiều kho khác nhau"
-  nextStep_vi: "Việc chạy chung kho thay vì cây riêng; không cần làm thêm."
-  owner: op-retry
-  kind: settle-reason
 no-budget:
   title: "No budget for scope"
   title_vi: "Không có ngân sách cho phạm vi này"
@@ -8465,6 +8456,15 @@ no-project-binding:
   causes_vi:
     - "dự án chưa được khai báo kho"
   nextStep_vi: "Việc chạy chung kho thay vì cây riêng; bổ sung liên kết dự án nếu cần."
+  owner: owner
+  kind: settle-reason
+work-only:
+  title: "The op only touches work records"
+  title_vi: "Việc chỉ chạm hồ sơ công việc"
+  meaning_vi: "Việc không đặt tệp nào vào be/ hay fe/, chỉ ghi hồ sơ .starciwork, nên chạy trên bản chính chứ không cần cây làm việc riêng."
+  causes_vi:
+    - "việc chỉ viết hoặc sửa hồ sơ công việc"
+  nextStep_vi: "Không cần làm gì; nếu việc phải sửa mã thì khai báo vị trí tệp trong be/ hoặc fe/."
   owner: owner
   kind: settle-reason
 no-typescript:
@@ -8928,6 +8928,16 @@ path-repository-ambiguous:
     - "Các lát cắt cùng cụm gắn với nhiều kho"
     - "Đường dẫn không có tiền tố kho rõ ràng"
   nextStep_vi: "Job không được dựng cây làm việc riêng; Kernel chia lại phạm vi để mỗi job chỉ thuộc một kho."
+  owner: supervisor
+  kind: dispatch-refusal
+path-repository-missing:
+  title: "An owned path is in no bound repository"
+  title_vi: "Đường dẫn giao không thuộc kho nào đã gắn"
+  meaning_vi: "Một đường dẫn giao không có trong kho nào mà dự án đã gắn nên không biết dựng cây làm việc ở đâu."
+  causes_vi:
+    - "Đường dẫn bị gõ sai hoặc thiếu tiền tố be/ hay fe/"
+    - "Tệp chưa tồn tại và không ghi rõ kho"
+  nextStep_vi: "Kernel ghi rõ kho hoặc phía (be/ hay fe/) cho đường dẫn rồi giao lại job."
   owner: supervisor
   kind: dispatch-refusal
 path-repository-unknown:

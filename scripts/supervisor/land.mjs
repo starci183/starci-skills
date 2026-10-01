@@ -452,7 +452,7 @@ process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [.
 /**
  * The mirror-drift tree check: when the candidate changes a file a sync-runtime bundle mirrors (or a bundle, or the
  * generator), `sync-runtime --check` runs in the scratch and a new drift refuses with the one fix; drift inherited from
- * main (`baseline[MIRROR_CHECK]`, same findings-based verdict as TREE_CHECKS) is advisory. null when it does not apply.
+ * main (the baseline entry of the mirror check, same findings-based verdict as TREE_CHECKS) is advisory. null when it does not apply.
  */
 export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return null;
@@ -461,7 +461,8 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   const touches = changed.map(normPath).filter((f) => !mirrored || f === MIRROR_CHECK || files.has(f) || mirrored.bundles.some((b) => f.startsWith(`${b}/`)));
   if (!touches.length) return null;
   const r = mirrorRun(dir);
-  const { ok, newFindings } = baselineVerdict(MIRROR_CHECK, baseline?.[MIRROR_CHECK], r);
+  const script = MIRROR_CHECK;
+  const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
   return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
 }
 
@@ -734,7 +735,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
     try {
       const baseline = {};
       if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
-      if (!deps.runChecks) baseline[MIRROR_CHECK] = mirrorRun(scratch.dir);
+      if (!deps.runChecks) { const script = MIRROR_CHECK; baseline[script] = mirrorRun(scratch.dir); }
       const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
       if (!pick.ok) {
         const said = pick.stderr || pick.stdout || pick.error || '';
