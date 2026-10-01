@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP T5: tab ids and titles for closing tabs Orca restored that no ledger binds; ownership of worker terminals is worker-list's.
 // terminal-list.mjs — the calls.yaml `terminal-list` call as a callable function.
 //   node scripts/api/orca/terminal-list.mjs [--worktree <sel>] [--include-visual-layouts]
 // `visualLayouts` (with includeVisualLayouts) carries each tab's own title: a

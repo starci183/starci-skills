@@ -1,0 +1,43 @@
+id: worker-output-by-dispatch
+effectiveAt: '2026-10-02T06:00:00+07:00'
+summary: >-
+  A WORKER'S OUTPUT IS READ BY DISPATCH THROUGH WORKER-READ (lane XSCRIPT under C0, deep map T1, coordinator item 11;
+  orca-overlap: replaced in alpha.4). Orca 1.4.209 states that not every worker has a terminal and that terminal verbs
+  do not accept every worker handle, while worker-read --source auto always works. scripts/api/orca/worker-read.mjs
+  reads one page (workerRead: rows as plain text, transcript messages rendered as Orca's CLI prints them, plus cursor,
+  contentComplete, clipping, warnings, fallbackReason and a typed source_changed) and every page (workerOutput: the
+  top-level cursor followed unchanged until a page is empty or MAX_PAGES; source_changed restarts once without the
+  cursor; contentComplete is true only when every page said so, and read_failed or page_cap join the clipping list).
+  api observe returns `output` ({dispatch, source, text, contentComplete, clipping, fallbackReason} or {reason}) read by
+  the job's Dispatch in place of the `screen` tail, and its op-observed receipt records dispatch, outputSource and
+  outputBytes in place of screenBytes; the turn state is still classified from the rendered frame (deep map T2, WRAP).
+  scripts/kernel/transcripts.mjs reads attempt snapshots, the final transcript and Kernel/Supervisor seat snapshots by
+  Dispatch (the job's operationDispatchOf, the seat's detail_json value.dispatch); every stored text starts with a header
+  line carrying contentComplete and clipping; redact.mjs and the blob store stay the sink. readScrollback,
+  captureTerminal, SCROLLBACK_LIMIT and finalizeTranscriptOfTerminal are deleted, and close-op-terminal.mjs and
+  quit-agent.mjs read no output (their capture option and `transcript` result are deleted). Settle captures the output
+  by Dispatch before an unmanaged worker's terminal is closed and finalizes a managed worker's transcript after its
+  release, from Orca's archive; api report finalizes by Dispatch. Every WRAP adapter in scripts/api/orca carries a
+  one-line reason naming its deep-map row, and docs/orca-boundary.md records every KEEP and WRAP row with the map's
+  reason and the census of terminal reads on worker handles (the frame reads stay: worker-read's terminal source is the
+  stream tail, not the rendered screen). Adds no finding code.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/worker-output-by-dispatch.yaml
+  - scripts/api/orca/worker-read.mjs
+  - scripts/kernel/transcripts.mjs
+  - scripts/kernel/api-verbs/observe.mjs
+  - scripts/kernel/api-verbs/settle.mjs
+  - scripts/kernel/api-verbs/report.mjs
+  - scripts/kernel/api-lib/rows.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/close-op-terminal.mjs
+  - scripts/kernel/quit-agent.mjs
+  - modules/host/orca/calls.yaml
+  - modules/kernel/driver-loop.yaml
+  - docs/orca-boundary.md
+  - docs/host-contract.md
+  - CHANGELOG.md
+  - tests/worker-output.spec.mjs
+  - tests/kernel-observe.spec.mjs
+  - tests/helpers/fake-orca.mjs

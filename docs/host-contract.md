@@ -26,6 +26,11 @@ agent-blind.
 wrapper's verb and `--flag` set is declared by a `calls:` entry, and every
 entry names a real, allowed command from `api.yaml`.
 
+Where the runtime keeps its own mechanism instead of Orca's, or wraps an Orca call
+with a policy of its own, is recorded row by row in `orca-boundary.md`. That page
+also covers why a worker's output is read by Dispatch (`worker-read`) and never
+from its terminal.
+
 ## `modules/models/agents/` — per-agent cards
 
 The contract an agent is started through is the **agent card**:

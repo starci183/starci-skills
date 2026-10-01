@@ -639,8 +639,32 @@ else if (verb === 'orchestration worker-list') {
   out({ ok: true, result: { workers: rows.slice(start, start + limit), counts: {}, scope: { source: arg('run') ? 'flag' : 'all' },
     page: { limit, total: rows.length, hasMore: more, nextCursor: more ? String(start + limit) : null } } });
 }
-else if (verb === 'orchestration worker-read')
-  out({ ok: true, result: { dispatch: arg('dispatch'), lines: [] } });
+// state.workerOutput[dispatch] seeds Orca's worker-read answer: {source: 'transcript'|'terminal', pages: [{rows,
+// contentComplete, clipping}], fallbackReason, sourceChangedOnce, fails}. A page is chosen by the opaque cursor
+// 'p<i>'; the last page answers an EOF cursor that returns no rows. sourceChangedOnce refuses the first read that
+// carries a cursor with source_changed (Orca's restart-without-cursor answer). Unseeded: one transcript message.
+// Every read is appended to state.workerReads ({dispatch, source, cursor, limit}).
+else if (verb === 'orchestration worker-read') {
+  const d = arg('dispatch'), seeded = (state.workerOutput || {})[d];
+  state.workerReads = [...(state.workerReads || []), { dispatch: d, source: arg('source') ?? null, cursor: arg('cursor') ?? null, limit: arg('limit') ?? null }]; save();
+  if (mode === 'dead-terminal' && !seeded) fail({ ok: false, error: { code: 'dispatch_not_found', message: 'no worker ' + d } });
+  if (seeded?.fails) fail({ ok: false, error: { code: seeded.fails, message: seeded.fails } });
+  if (seeded?.sourceChangedOnce && arg('cursor') && !seeded.sourceChangedTripped) {
+    seeded.sourceChangedTripped = true; save();
+    fail({ ok: false, error: { code: 'source_changed', message: 'The worker output source changed. Start a fresh worker-read without the old cursor.' } });
+  }
+  const source = seeded?.source ?? 'transcript';
+  const pages = seeded?.pages ?? [{ rows: ['fake worker output for ' + d], contentComplete: true }];
+  const index = arg('cursor') ? Number(String(arg('cursor')).slice(1)) : 0;
+  const page = pages[index] ?? { rows: [], contentComplete: true };
+  const cursor = 'p' + Math.min(index + 1, pages.length);
+  const body = source === 'transcript'
+    ? { transcript: { messages: page.rows.map((text) => ({ role: 'assistant', blocks: [{ type: 'text', text }] })), nextCursor: cursor } }
+    : { terminal: { handle: 'fake-terminal-1', tail: page.rows, truncated: page.contentComplete === false, nextCursor: cursor } };
+  out({ ok: true, result: { dispatchId: d, source, ...body, cursor, status: { worker: 'active', terminal: 'running', liveness: 'live' },
+    fallbackReason: seeded?.fallbackReason ?? null, sourceExact: source === 'transcript', contentComplete: page.contentComplete !== false,
+    ...(page.clipping ? { clipping: page.clipping } : {}), warnings: [] } });
+}
 else if (verb === 'orchestration dispatch')
   out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: process.env.STARCI_FAKE_ORCA_PREAMBLE || 'fake dispatch preamble' } });
 else if (verb === 'orchestration dispatch-show')

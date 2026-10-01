@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP T2: the PTY's connected/writable state; the death verdict belongs to worker-list, this read stays for the frame classifier and bare shells.
 // terminal-show.mjs — the calls.yaml `terminal-show` call as a callable function.
 //   node scripts/api/orca/terminal-show.mjs --terminal <handle>
 // Returns {ok, terminal, connected, writable} — the health primitives callers test.

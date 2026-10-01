@@ -14,10 +14,11 @@ const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 // `api observe` is the kernel's READ-ONLY window onto its own job's exact op
 // terminal — context for reasoning, never evidence. These specs pin:
-//   - screen tail + typed turnState on a live worker (turn-idle and active)
+//   - the worker's output tail, read by Dispatch (worker-read --source auto, deep map T1), plus a typed
+//     turnState classified from the rendered frame (turn-idle and active)
 //   - typed no-live-worker / job-not-found refusals, never a crash
 //   - a dead terminal projects 'disconnected' with ok:true, not a refusal
-//   - the 'op-observed' event is a compact receipt — never the screen bytes
+//   - the 'op-observed' event is a compact receipt — never the output bytes
 //   - jobs/contracts/reports/checks/leases rows are untouched and a filed
 //     report is never consumed or altered by observation
 
@@ -71,7 +72,7 @@ const lastEvent=(repo,wf,jobId)=>read(repo,db=>db.prepare("SELECT kind,payload_j
 
 /* ------------------------------------------------- live worker projection */
 
-test('observe on a running op returns the screen tail and typed turnState, mutating only the events receipt',t=>{
+test('observe on a running op returns the worker output by Dispatch and a typed turnState, mutating only the events receipt',t=>{
   const fx=fixture(t),wf='wf-observe-live',jobId='op-observe-live';
   seedWorkflow(fx.repo,wf);
   seedRunningOp(fx.repo,{workflowId:wf,jobId,handle:'term-observe-live',dispatchId:'ctx-observe-live'});
@@ -94,7 +95,11 @@ test('observe on a running op returns the screen tail and typed turnState, mutat
   assert.equal(body?.terminal?.connected,true);
   assert.equal(body?.terminal?.writable,true);
   assert.equal(body?.terminal?.status,'running');
-  assert.match(body?.screen??'',/Enter a prompt/,'the screen tail is the observed frame text');
+  assert.equal(body?.screen,undefined,'the frame is classified, never returned as context');
+  assert.equal(body?.output?.dispatch,'ctx-observe-live','the output is read by the job\'s Dispatch');
+  assert.equal(body?.output?.source,'transcript');
+  assert.equal(body?.output?.contentComplete,true);
+  assert.match(body?.output?.text??'',/fake worker output for ctx-observe-live/,'the output is the worker-read text');
 
   // Read-only: every durable row is identical; only the events log gains a receipt.
   assert.deepEqual(counts(),before,'observe must not touch jobs/contracts/reports/checks/leases rows');
@@ -103,23 +108,30 @@ test('observe on a running op returns the screen tail and typed turnState, mutat
   const payload=JSON.parse(event.payload_json);
   assert.equal(payload.terminal,'term-observe-live');
   assert.equal(payload.turnState,'turn-idle');
-  assert.ok(payload.screenBytes>0,'the receipt records the screen byte length');
-  assert.doesNotMatch(event.payload_json,/Enter a prompt/,'the receipt never stores screen bytes');
+  assert.ok(payload.outputBytes>0,'the receipt records the output byte length');
+  assert.equal(payload.dispatch,'ctx-observe-live');
+  assert.doesNotMatch(event.payload_json,/fake worker output/,'the receipt never stores output bytes');
 
   // The host surface stayed read-only: show+read only, never send/close/rename.
   assert.ok(fx.calls().length>0,'observe should have read the terminal through orca wrappers');
-  for(const verb of fx.calls()) assert.ok(['terminal show','terminal read'].includes(verb),`observe must not call ${verb}`);
+  for(const verb of fx.calls()) assert.ok(['terminal show','terminal read','orchestration worker-read'].includes(verb),`observe must not call ${verb}`);
 });
 
 test('observe --lines bounds the returned tail while turnState still classifies the full frame',t=>{
   const fx=fixture(t,{sends:1}),wf='wf-observe-lines',jobId='op-observe-lines';
   seedWorkflow(fx.repo,wf);
   seedRunningOp(fx.repo,{workflowId:wf,jobId,handle:'term-observe-lines',dispatchId:'ctx-observe-lines'});
+  const state=JSON.parse(fs.readFileSync(fx.stateFile,'utf8'));
+  state.workerOutput={'ctx-observe-lines':{source:'terminal',pages:[{rows:['l1','l2','l3','l4','l5'],contentComplete:true}]}};
+  fs.writeFileSync(fx.stateFile,JSON.stringify(state));
   const r=fx.run('observe','--repo',fx.repo,'--job',jobId,'--lines','2','--json');
   assert.equal(r.status,0,r.stderr||r.stdout);
   const body=out(r);
   assert.equal(body?.turnState,'active','a worker mid-turn projects active');
-  assert.ok((body?.screen??'').split('\n').length<=2,'--lines bounds the screen tail');
+  assert.equal(body?.output?.text,'l4\nl5','--lines bounds the output to its newest lines');
+  assert.equal(body?.output?.contentComplete,false,'a bounded tail never claims the whole output');
+  const reads=JSON.parse(fs.readFileSync(fx.stateFile,'utf8')).workerReads??[];
+  assert.deepEqual(reads.map(r=>[r.dispatch,r.source,r.limit]),[['ctx-observe-lines','auto','2']]);
 });
 
 /* ---------------------------------------------------------- typed states */
@@ -153,12 +165,13 @@ test('observe on a dead terminal projects disconnected — typed ok:true, never 
   assert.equal(body?.turnState,'disconnected');
   assert.equal(body?.terminal?.connected,false);
   assert.equal(body?.terminal?.writable,false);
-  assert.equal(body?.screen,null,'a dead terminal has no readable screen');
+  assert.equal(body?.output?.text,null,'a worker Orca cannot read has no output');
+  assert.equal(body?.output?.reason,'unreadable');
   const event=lastEvent(fx.repo,wf,jobId);
   assert.equal(event?.kind,'op-observed');
   const payload=JSON.parse(event.payload_json);
   assert.equal(payload.turnState,'disconnected');
-  assert.equal(payload.screenBytes,0);
+  assert.equal(payload.outputBytes,0);
 });
 
 /* ------------------------------------------- reports lifecycle untouched */

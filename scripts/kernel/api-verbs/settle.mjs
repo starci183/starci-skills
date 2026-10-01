@@ -7,7 +7,7 @@ import { CHECKPOINT_EVENTS, checkpointOp, preserveAndReset } from '../workflow-c
 import { workflowWorktreeOf } from '../workflow-worktree.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
-import { jobOpOf, jobPayloadOf, jobRowOf } from '../api-lib/rows.mjs';
+import { jobOpOf, jobPayloadOf, jobRowOf, operationDispatchOf } from '../api-lib/rows.mjs';
 import { independentChecksOf } from '../api-lib/check-evidence.mjs';
 import { WORKER_QUESTION } from '../api-lib/messages.mjs';
 import { releaseTypedWaits } from '../api-lib/peers.mjs';
@@ -22,7 +22,7 @@ import { SEAM_RECONCILED_EVENT } from '../cut-seam.mjs';
 import { PROOF_MEDIA_MISSING } from '../job-artifacts.mjs';
 import { isMeasurementLeg, measurementSplit } from '../verify-failure.mjs';
 import { citeRecords } from '../work-citations.mjs';
-import { finalizeAttemptTranscript } from '../transcripts.mjs';
+import { captureWorker, finalizeAttemptTranscript } from '../transcripts.mjs';
 import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { recordWhy } from '../why-record.mjs';
@@ -423,12 +423,13 @@ export default {
     // The agents inside Orca terminals before the close: one that lingers outside Orca afterwards ran in this one.
     let agentsBefore = null;
     try { const t = processTable(); agentsBefore = t ? orcaAgents(t) : null; } catch { agentsBefore = null; }
+    // The attempt's final output, read by Dispatch before the quit and the close (a terminal close is not a
+    // worker-release, so Orca keeps no archive of it), becomes op_attempts.transcript_sha.
+    const captured = settledAttemptId != null ? captureWorker(operationDispatchOf(settledPayload)) : null;
     const quit = quitAgent({ handle: workerHandle, agent: agentOfJob(settledPayload) });
     const closed = closeOperationTerminal(workerHandle);
     terminalClosed = { handle: workerHandle, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
-    // The attempt's final scrollback (captured before the close) becomes op_attempts.transcript_sha.
-    const captured = quit?.transcript ?? closed.transcript ?? null;
-    if (captured && settledAttemptId != null) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, captured });
+    if (captured) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, captured });
     const reaped = reapIfStillLive(db, job, settledPayload, workerHandle, repo);
     if (reaped) terminalClosed.reaped = reaped;
     terminalClosed.custody = custodyOf({ release: { ok: closed.ok === true }, agentHandle: workerHandle });
@@ -457,6 +458,8 @@ export default {
     : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
     : releaseManagedWorker(db, job, settledPayload, repo);
+  // A released worker's output stays readable from Orca's archive: the fullest read becomes op_attempts.transcript_sha.
+  if (managedWorker && !releasedEarlier && settledAttemptId != null) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, dispatch: managed.dispatchId });
   // The worker's terminal guard binding (runtime/guards/terminals/<handle>.json) dies with its
   // terminal: unbind it at settle too, not only inside the close, so a worker released while held,
   // a close that predated binding cleanup, or a failed close that still left the terminal gone never

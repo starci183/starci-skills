@@ -1,3 +1,4 @@
+// Deep map WRAP WT1: the tree is Orca's; the per-repo cap, the registry row and launch trust are the runtime's.
 // worktree-provision.mjs — an agent's workspace made by Orca and registered (owner decision WFWT: never write it
 // ourselves when Orca has it). The Kernel's workflow worktree (kind workflow) is created by Orca itself - the Kernel's
 // `orchestration worker-start --worktree new-child ...` (scripts/kernel/workflow-worktree.mjs), which binds it here - and

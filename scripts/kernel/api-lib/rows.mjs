@@ -44,6 +44,14 @@ export const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => p
   ?? (payload?.managed ? null : row?.worker_id)
   ?? null;
 
+// The Orca Dispatch that holds an op's worker, whichever launch kind opened it: the id worker-show, worker-read
+// and worker-release address (a worker is read by Dispatch, never by terminal handle; deep map T1). Null when the
+// attempt never got a Dispatch.
+export const operationDispatchOf = (payload) => payload?.managed?.dispatchId
+  ?? payload?.orca?.dispatchId
+  ?? payload?.hierarchy?.runtime?.dispatchId
+  ?? null;
+
 // The operation Task an op holds, whichever launch kind opened it, and the
 // Run/kernel-terminal identity task-update needs to address it. Returns null
 // when the attempt never got a Task — there is then nothing to close.

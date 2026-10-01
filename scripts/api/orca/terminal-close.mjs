@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP T5: closes restored tabs no ledger binds and bare shells; a worker terminal is released with worker-release (T3).
 // terminal-close.mjs — the calls.yaml `terminal-close` call as a callable function.
 //   node scripts/api/orca/terminal-close.mjs --terminal <handle> [--tab]
 // A runtime-owned background terminal has no renderer tab: Orca stops its PTY

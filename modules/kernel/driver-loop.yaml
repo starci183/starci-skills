@@ -834,11 +834,14 @@ tick:
       observe: >-
         While a running op owes a report the kernel may keep reasoning
         context on it: `api observe --job <id> [--lines <n>]` reads the exact
-        worker terminal's liveness plus a bounded screen tail, on the cadence
+        worker terminal's liveness plus a bounded tail of the worker's own output
+        (`output`: read by Dispatch, the transcript when the provider has one, else
+        terminal output; `output.contentComplete: false` means older output was left
+        out), on the cadence
         modules/models/runtimes.yaml allocation.observeCadenceMs declares and
         especially before a nudge or settle-fail
         decision — an op that dies without filing leaves `result.report:
-        null`, so the screen is how the kernel learns what the op was doing
+        null`, so that output is how the kernel learns what the op was doing
         (context, never evidence: boundary.opTerminalObservation).
       turnIdle: >-
         A connected+writable Op terminal showing its provider input prompt is

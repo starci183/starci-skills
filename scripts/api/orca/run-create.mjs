@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP R1, R2: Run creation is Orca's; which Run a workflow or seat reuses is the runtime's record.
 // run-create.mjs — the calls.yaml `run-create` call as a callable function.
 //   node scripts/api/orca/run-create.mjs --objective <text> [--from <handle>]
 // Returns {ok, runId, result} — runId is result.run.id.

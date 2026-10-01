@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP A2, W7: the live-worker count and the exited verdict are Orca's; admission policy and seat replacement stay the runtime's.
 // worker-list.mjs — the calls.yaml `worker-list` call as a callable function: Orca's supervised worker
 // terminal resource accounting (orchestration worker-list), the authority on which worker terminal is
 // active, reclaimable, retained or released, and on each worker's liveness and next action.

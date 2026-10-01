@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deep map WRAP W3, R2, RR2: the runtime runs the receipt's recovery argv and keeps the no-effect proof; --retry-of is for a same-attempt infra retry only, a semantic retry is a new Task.
 // worker-start.mjs — the calls.yaml `worker-start` call as a callable function.
 //   node scripts/api/orca/worker-start.mjs --task <task_id> --worktree <sel> --agent <agent> --run <run_id>
 //     [--model <id>] [--effort <level>] [--name <n>] [--repo <sel>] [--base-branch <ref>]

@@ -1,3 +1,4 @@
+// Deep map WRAP WT1, WT6: links first, then Orca's rm, then the registry row and the git branch -d fallback.
 // worktree-remove.mjs — the one removal of a worktree Orca made (worktree-provision.mjs): every link in the tree removed
 // as a link and zero asserted (scripts/lib/safe-remove.mjs removeLinksUnder), then `orca worktree rm` (worktree-rm.mjs),
 // the main checkout asserted untouched. Never git's worktree removal, never a raw delete.
