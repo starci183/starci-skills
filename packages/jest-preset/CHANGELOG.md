@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0 - 2026-10-01
+
+- Fixed: in one `npm run test:e2e` every e2e file after the first failed to boot with "Cannot determine a GraphQL output type":
+  `@nestjs/graphql` keeps its type registry on the process global, the test world's globalSetup loads application code in jest's
+  main process, and jest-environment-node exposes the host process's globals to every file it runs there (or in a reused worker).
+  The integration, e2e and contract projects now run on the preset's world runner (`runner: WORLD_RUNNER`, `world-runner.cjs`):
+  every spec file in a fresh worker process, `--maxWorkers` files at a time, never in band (not even with `--runInBand` or one
+  test), so each file boots clean whatever framework keeps state on a global. The runner drives the stock jest-runner of the jest
+  that loads it (jest -> @jest/core -> jest-runner), one single-worker farm per file.
+- Removed: `maxWorkers: 1` from the integration, e2e and contract projects. It is a global jest option that a project config
+  never applied; the number of files at a time is the run's `--maxWorkers`, and outage specs are serialized by the test world's
+  outage lock (`@starci/test-world` 1.0.0).
+- Added: `WORLD_RUNNER` (the runner's resolved path) on the package root.
+
 ## 2.1.1 - 2026-10-01
 
 - Fixed: a repository without its test world (`src/tests/world/global-setup.ts`) could not run its unit specs with the managed `jest.config.js`: jest validates every project's `globalSetup`, even under `--selectProjects unit`. The integration, e2e and contract projects are now declared only when the world exists.

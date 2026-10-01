@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
 import os from 'node:os';
 import path from 'node:path';
@@ -140,7 +141,8 @@ test('each test kind is its own project, matched by folder and suffix together; 
   assert.deepEqual(byName.e2e.testMatch, ['<rootDir>/src/tests/e2e/**/*.e2e-spec.ts']);
   assert.deepEqual(byName.contract.testMatch, ['<rootDir>/src/tests/contract/**/*.contract-spec.ts']);
   for (const name of ['integration', 'e2e', 'contract']) {
-    assert.equal(byName[name].maxWorkers, 1, name);
+    assert.equal(byName[name].runner, preset.WORLD_RUNNER, `${name} runs every file in a process of its own`);
+    assert.equal('maxWorkers' in byName[name], false, `${name}: maxWorkers is a global option, a project never carries it`);
     assert.equal(byName[name].transform[String.raw`^.+\.ts$`][1].tsconfig, 'src/tests/tsconfig.json', name);
     assert.equal(byName[name].globalSetup, '<rootDir>/src/tests/world/global-setup.ts', name);
     assert.equal(byName[name].globalTeardown, '<rootDir>/src/tests/world/global-teardown.ts', name);
@@ -148,6 +150,8 @@ test('each test kind is its own project, matched by folder and suffix together; 
   }
   assert.deepEqual(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, { isolatedModules: false, importHelpers: true });
   assert.equal('globalSetup' in byName.unit, false, 'unit specs need no world');
+  assert.equal('runner' in byName.unit, false, 'unit specs run on the stock runner');
+  assert.equal(path.basename(preset.WORLD_RUNNER), 'world-runner.cjs');
   assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });
 
@@ -484,10 +488,10 @@ test('toSucceedWith: matches an ok outcome by value and rejects a refusal, anoth
 test('the index exports the whole kit and the package.json declares typeorm as an optional peer only', () => {
   for (const name of ['mock', 'mockEntityManager', 'fakeTransaction', 'FakeClock', 'fakeIds', 'fakeCache', 'fakeLock', 'recordingOutbox', 'builder']) assert.equal(typeof preset[name], 'function', name);
   const pkg = require('./package.json');
-  assert.equal(pkg.version, '2.1.0');
+  assert.equal(pkg.version, '2.2.0');
   assert.equal(pkg.peerDependenciesMeta.typeorm.optional, true);
   assert.equal(Object.keys(pkg.dependencies ?? {}).length, 0);
-  for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'outbox.cjs', 'builders.cjs']) {
+  for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'outbox.cjs', 'builders.cjs', 'world-runner.cjs']) {
     assert.doesNotMatch(fs.readFileSync(new URL(file, import.meta.url), 'utf8'), /require\(["'](typeorm|@nestjs)/, `${file} pulls in no infra`);
   }
 });
@@ -510,5 +514,103 @@ test('the kit types: mockEntityManager() is assignable to EntityManager with no 
     assert.deepEqual(problems, []);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// -- e2e isolation: a real jest run of the preset's e2e project ----------------------------------------------------------
+// A stand-in for @nestjs/graphql's type registry, with its exact mechanism: the storage lives on the process global
+// (`global.GqlTypeMetadataStorage || (global.GqlTypeMetadataStorage = new Storage())`) and two different classes under one
+// type name are refused with the error a Nest boot reports. The globalSetup loads it in jest's main process, as the test
+// world's migrate step loads the application's modules there.
+const FAKE_GRAPHQL = `"use strict"
+class TypeMetadataStorageHost {
+  constructor() { this.types = new Map() }
+  add(name, target) {
+    const known = this.types.get(name)
+    if (known !== undefined && known !== target) throw new Error("Cannot determine a GraphQL output type for the \\"" + name + "\\": two classes declare it")
+    this.types.set(name, target)
+  }
+}
+const globalRef = global
+exports.TypeMetadataStorage = globalRef.GqlTypeMetadataStorage || (globalRef.GqlTypeMetadataStorage = new TypeMetadataStorageHost())
+exports.ObjectType = (name) => (target) => { exports.TypeMetadataStorage.add(name, target); return target }
+`;
+const E2E_SPEC = (label) => `const { ObjectType } = require("fake-graphql")
+class Person {}
+ObjectType("Person")(Person)
+test("${label} boots with its own Person type", () => {
+  expect(require("fake-graphql").TypeMetadataStorage.types.get("Person")).toBe(Person)
+})
+`;
+
+/** A repository with the preset's jest config, a world that loads the registry in the main process, and two e2e files. */
+function isolationRepo({ stockRunner }) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-isolation-'));
+  const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), text); };
+  put('package.json', JSON.stringify({ name: 'isolation-fixture', private: true }));
+  put('node_modules/fake-graphql/package.json', JSON.stringify({ name: 'fake-graphql', main: 'index.js' }));
+  put('node_modules/fake-graphql/index.js', FAKE_GRAPHQL);
+  // The fixture's files are plain JavaScript, so ts-jest is not needed: its preset and transform are dropped, nothing else changes.
+  put('jest.config.js', `const config = require(${JSON.stringify(require.resolve('./index.cjs'))}).starciJestConfig()
+for (const project of config.projects) {
+  delete project.preset
+  project.transform = {}
+  ${stockRunner ? 'delete project.runner' : ''}
+}
+module.exports = config
+`);
+  put('src/tests/world/global-setup.ts', 'module.exports = async () => { require("fake-graphql") }\n');
+  put('src/tests/world/global-teardown.ts', 'module.exports = async () => {}\n');
+  put('apps/.keep', ''); // the preset's roots are src/ and apps/
+  put('src/tests/e2e/people/first.e2e-spec.ts', E2E_SPEC('the first file'));
+  put('src/tests/e2e/people/second.e2e-spec.ts', E2E_SPEC('the second file'));
+  return root;
+}
+
+/** Runs the repository's jest (the preset's peer) on the e2e project and answers its JSON report. */
+function runE2e(root, extra) {
+  const jestPackage = require.resolve('jest/package.json');
+  const jestBin = path.join(path.dirname(jestPackage), 'bin', 'jest.js');
+  const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), ...extra], {
+    cwd: root,
+    encoding: 'utf8',
+    // the fixture resolves jest (and the world runner its jest-runner) from the same installation as this spec
+    env: { ...process.env, NODE_PATH: path.dirname(path.dirname(jestPackage)) },
+    timeout: 240_000,
+  });
+  const output = `${result.stdout}\n${result.stderr}${result.error ? `\n${result.error.message}` : ''}`;
+  assert.equal(fs.existsSync(path.join(root, 'report.json')), true, `jest wrote no report:\n${output}`);
+  return { status: result.status, report: JSON.parse(fs.readFileSync(path.join(root, 'report.json'), 'utf8')), output };
+}
+
+const resultsOf = (report) => Object.fromEntries(report.testResults.map((file) => [path.basename(file.name), { status: file.status, message: file.message }]));
+
+test('e2e isolation: in one preset run, two e2e files that each register a GraphQL type named Person both pass, even with --runInBand', () => {
+  const root = isolationRepo({ stockRunner: false });
+  try {
+    for (const extra of [[], ['--runInBand'], ['--maxWorkers=2']]) {
+      const { status, report, output } = runE2e(root, extra);
+      const results = resultsOf(report);
+      assert.deepEqual(Object.keys(results).sort(), ['first.e2e-spec.ts', 'second.e2e-spec.ts'], `${extra.join(' ')}\n${output}`);
+      for (const [file, result] of Object.entries(results)) assert.equal(result.status, 'passed', `${extra.join(' ') || 'default'}: ${file}: ${result.message}`);
+      assert.equal(status, 0, output);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e isolation is the runner: on the stock in-band runner the same two files collide on the process-global registry', () => {
+  const root = isolationRepo({ stockRunner: true });
+  try {
+    const { status, report } = runE2e(root, ['--runInBand']);
+    const results = resultsOf(report);
+    // jest orders the files itself: whichever runs first passes, the one after it inherits the registry and fails to boot.
+    const outcomes = Object.values(results).map((result) => result.status).sort();
+    assert.deepEqual(outcomes, ['failed', 'passed']);
+    assert.match(Object.values(results).find((result) => result.status === 'failed').message, /Cannot determine a GraphQL output type/);
+    assert.equal(status, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

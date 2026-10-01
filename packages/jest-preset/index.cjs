@@ -84,11 +84,15 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
  * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
- * run one worker; the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
+ * run each spec file in a worker process of its own (`world-runner.cjs`, `--maxWorkers` files at a time; outage specs are
+ * serialized by the test world's outage lock); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
  * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
  * statements: the `test` script runs the unit project with `--coverage` and fails below it. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
+/** The runner of the integration, e2e and contract projects: one fresh worker process per spec file. */
+const WORLD_RUNNER = require.resolve("./world-runner.cjs")
+
 /** True when the repository at `root` has the test world's global setup (`src/tests/world/global-setup.ts`). */
 function hasTestWorld(root) {
   return require("node:fs").existsSync(require("node:path").join(root, "src", "tests", "world", "global-setup.ts"))
@@ -106,7 +110,9 @@ function starciJestConfig() {
     ...shared,
     transform: transform("src/tests/tsconfig.json"),
     displayName,
-    maxWorkers: 1,
+    // Every spec file in a process of its own (never in band): nothing one file or the globalSetup put on a process global
+    // (a framework registry such as @nestjs/graphql's type metadata) reaches another file. See world-runner.cjs.
+    runner: WORLD_RUNNER,
     testMatch: [`<rootDir>/src/tests/${displayName}/**/*.${suffix}.ts`],
     // The one test world: started once per run of a project that has a test to run, torn down after it.
     globalSetup: "<rootDir>/src/tests/world/global-setup.ts",
@@ -160,4 +166,5 @@ module.exports = {
   COVERAGE_EXCLUDES,
   COVERAGE_THRESHOLD,
   UNIT_COMPILER_OPTIONS,
+  WORLD_RUNNER,
 }

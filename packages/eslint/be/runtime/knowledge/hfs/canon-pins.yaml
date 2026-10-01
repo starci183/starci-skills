@@ -57,12 +57,19 @@ pins:
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.1.1
+    version: 2.2.0
     group: starci
     install: registry
     side: be
     source: packages/jest-preset/package.json
-    why: '2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
+    why: '2.2.0: the integration, e2e and contract projects run every spec file in a worker process of its own (world-runner.cjs), so a process-global framework registry (@nestjs/graphql type metadata) never leaks between e2e files; 2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
+  '@starci/test-world':
+    version: 1.0.0
+    group: starci
+    install: registry
+    side: be
+    source: packages/test-world/package.json
+    why: 'the shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs, the outage lock and the starci-test-stack bin behind the managed test:stack script; a devDependency of every back end.'
   '@starci/hfs':
     version: 4.0.0
     group: starci

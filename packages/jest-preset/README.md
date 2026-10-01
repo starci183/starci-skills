@@ -14,8 +14,11 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
 - **Four projects, one per test kind**: `unit` (`**/*.spec.ts`, which by the unit standard means one `<name>.service.spec.ts` beside each `*.service.ts`; `clearMocks`; the Outcome matchers are installed through `setupFilesAfterEnv`; ignores
   `src/tests/{world,integration,e2e,contract}/`), `integration` (`src/tests/integration/**/*.integration-spec.ts`), `e2e`
   (`src/tests/e2e/**/*.e2e-spec.ts`) and `contract` (`src/tests/contract/**/*.contract-spec.ts`). The last three compile against
-  `src/tests/tsconfig.json`, run one worker, and start the one test world through `globalSetup`/`globalTeardown`
-  (`src/tests/world/global-setup.ts`, `global-teardown.ts`); only the unit project has a `setupFilesAfterEnv`. The managed scripts select one
+  `src/tests/tsconfig.json`, start the one test world through `globalSetup`/`globalTeardown`
+  (`src/tests/world/global-setup.ts`, `global-teardown.ts`) and run on the world runner (`world-runner.cjs`, `WORLD_RUNNER`): every
+  spec file in a worker process of its own, `--maxWorkers` files at a time, never in band, so nothing the globalSetup or another
+  file left on a process global (a framework registry such as `@nestjs/graphql`'s type metadata) reaches the file; outage specs are
+  serialized by the test world's outage lock (`@starci/test-world`). Only the unit project has a `setupFilesAfterEnv`. The managed scripts select one
   project each: `test`, `test:integration`, `test:e2e`, `test:contract`; a contract spec skips itself without sandbox config.
 - **The three path aliases** `@features/*`, `@modules/*`, `@tests/*` (`MODULE_NAME_MAPPER`), the same ones the managed `tsconfig.json` declares.
 - **ts-jest with `diagnostics: false`** in every project. `isolatedModules: true` comes from `@starci/tsconfig` (ts-jest 29.4 reads it

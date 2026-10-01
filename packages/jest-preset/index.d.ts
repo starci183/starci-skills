@@ -19,4 +19,6 @@ export declare const COVERAGE_SOURCES: string[]
 export declare const COVERAGE_EXCLUDES: string[]
 /** The compiler options the unit project overlays on the repository tsconfig so per-file 100 coverage of a decorated service is reachable. */
 export declare const UNIT_COMPILER_OPTIONS: Readonly<{ isolatedModules: false; importHelpers: true }>
+/** The runner of the integration, e2e and contract projects (`world-runner.cjs`): every spec file in a worker process of its own. */
+export declare const WORLD_RUNNER: string
 export declare const COVERAGE_THRESHOLD: Readonly<{ lines: 100; branches: 100; functions: 100; statements: 100 }>
