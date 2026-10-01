@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const keep = process.argv.includes('--keep');
@@ -45,6 +46,10 @@ try {
   console.log(exit === 0 ? 'release-app-installs: OK (scaffold lint, typecheck and api boot ran against fresh registry installs)' : `release-app-installs: FAILED (spec exit ${exit})`);
 } finally {
   if (keep) console.log(`release-app-installs: kept ${app}`);
-  else fs.rmSync(into, { recursive: true, force: true });
+  else {
+    // The fresh install is real npm output (links included): removed without ever following a link.
+    const removed = safeRemoveTree(into);
+    if (!removed.ok) console.log(`release-app-installs: could not remove ${into}: ${removed.errors.map((e) => `${e.code} ${e.path}`).join('; ')}`);
+  }
 }
 process.exit(exit);

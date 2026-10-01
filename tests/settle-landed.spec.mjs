@@ -8,7 +8,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {foreignLandedPaths,landedProof,policyCommits,policyPushes} from '../scripts/kernel/settle-landed.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
-import {greenSonarScan} from './helpers/sonar-scan.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -66,10 +66,10 @@ const seedJob=(repo,{op,head,jobId='op-landed-1',wf='wf-landed',filed=true})=>{
     const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.write.updateAttempt({attemptId,scratchDir:scratchFor(repo,jobId)});
     ledger.write.writeContract({attemptId,markdown:'# contract',context:{worktree:repo},createdAt:at});
-    // the Sonar gate reads the sonar.json the op attached: a code-writing op files a green one beside its report
-    const sonar=path.join(scratchFor(repo,jobId),'sonar.json');
-    fs.mkdirSync(path.dirname(sonar),{recursive:true});fs.writeFileSync(sonar,JSON.stringify(greenSonarScan()));
-    if(filed)ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',summary:'landed',files:[sonar],...(head?{head,branch:'main'}:{})},createdAt:at});
+    // the Sonar gate and the op loop read what the op attached: a code-writing op files a green sonar.json, gate.json and
+    // read-digest.json beside its report
+    const proofs=writeGreenProofs(scratchFor(repo,jobId));
+    if(filed)ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',summary:'landed',files:proofs,...(head?{head,branch:'main'}:{})},createdAt:at});
     ledger.write.recordCheckRun({attemptId,name:'unit',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:at});
   }finally{ledger.close();}
   return jobId;
