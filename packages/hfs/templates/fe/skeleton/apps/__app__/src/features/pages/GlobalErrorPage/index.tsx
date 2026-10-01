@@ -8,7 +8,6 @@ type GlobalErrorPageProps = { readonly onRetry: () => void }
 /** The last-resort boundary above the locale layout: it has no provider, so it reads the default catalog directly. */
 export const GlobalErrorPage = (props: GlobalErrorPageProps) => (
     <GlobalErrorPageBase
-        state="failed"
         props={{ lang: DEFAULT_LOCALE, title: messages.errors.global.title, retryLabel: messages.errors.global.retry }}
         on={{ retry: props.onRetry }}
     />

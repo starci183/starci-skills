@@ -11,5 +11,5 @@ export const homeMetadata = async (): Promise<Metadata> => {
 /** The first page of the app: a server component, so no catalog is shipped for it. */
 export const HomePage = async () => {
     const t = await getTranslations("home")
-    return <HomePageBase state="ready" props={{ title: t("title") }} on={{}} />
+    return <HomePageBase props={{ title: t("title") }} />
 }

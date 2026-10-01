@@ -2,12 +2,8 @@ import { GrammarRoot, Heading, PageContainer, WorkspaceShell } from "@starci/gra
 
 /** Props for {@link HomePageBase}. */
 export type HomePageBaseProps = {
-    /** Whole-screen situations this surface settles; the home page only ever shows its title. */
-    readonly state: "ready"
     /** The words the page shows. */
     readonly props: { readonly title: string }
-    /** What the surface reports upward; the page reports nothing. */
-    readonly on: Record<never, never>
 }
 
 /** Draw the front door of the app. */

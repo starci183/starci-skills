@@ -2,12 +2,8 @@ import { GrammarRoot, PageContainer, Text, WorkspaceShell } from "@starci/gramma
 
 /** Props for {@link LoadingPageBase}. */
 export type LoadingPageBaseProps = {
-    /** Whole-screen situations this surface settles; the loading page only ever waits. */
-    readonly state: "loading"
     /** The words the wait announces. */
     readonly props: { readonly message: string }
-    /** What the surface reports upward; a wait reports nothing. */
-    readonly on: Record<never, never>
 }
 
 /** Draw the wait as one politely announced line. */
