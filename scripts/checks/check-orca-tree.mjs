@@ -41,6 +41,7 @@ import { pathToFileURL } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll } from '../api/orca/worker-list.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { SCHEMA, readTerminals, readWorkers, ledgerRuns, orcaTreeFindings, formatFinding } from '../supervisor/orca-tree.mjs';
 
 /* ------------------------------------------------------------------- cli */
@@ -63,11 +64,11 @@ function main(argv) {
   let terminals, workers = [];
   if (file) {
     if (!fs.existsSync(file)) usage(`check-orca-tree: no terminal listing at ${file}`);
-    terminals = readTerminals(parse(fs.readFileSync(file, 'utf8')));
+    terminals = readTerminals(parseJson(fs.readFileSync(file, 'utf8')));
     if (!terminals) usage(`check-orca-tree: ${file} holds no terminal listing (expected a terminal-list --json receipt)`);
     if (workersFile) {
       if (!fs.existsSync(workersFile)) usage(`check-orca-tree: no worker listing at ${workersFile}`);
-      workers = readWorkers(parse(fs.readFileSync(workersFile, 'utf8')));
+      workers = readWorkers(parseJson(fs.readFileSync(workersFile, 'utf8')));
       if (!workers) usage(`check-orca-tree: ${workersFile} holds no worker listing (expected a worker-list --json receipt)`);
     }
   } else {

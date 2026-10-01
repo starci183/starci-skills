@@ -2,7 +2,7 @@
 // their gates, units/hour, legs done, running vs allowed parallelism, queued-ready, ETA and the stall verdict.
 // The Kernel reads it first on every wake (modules/kernel/driver-loop.yaml progress); the Supervisor backstops it.
 import { progressLine } from '../progress-rca.mjs';
-import { viewOf } from './view.mjs';
+import { viewOf } from '../verbs/shared/status-view.mjs';
 
 export default {
   key: 'progress',

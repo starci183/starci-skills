@@ -4,14 +4,12 @@
 import { workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { readSupervisor } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../machine/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
 
 
-const parse = parseJson;
 
 /**
  * The terminals of a `terminal list` receipt, whichever envelope it arrives in:

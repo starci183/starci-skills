@@ -63,12 +63,12 @@ function grammarExport(manifest, packageName, specifier) {
   const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
   const value = manifest?.exports?.[key];
   const targets = exportTargets(value);
-  return targets.length > 0 && targets.every(target => target.startsWith('../../checks/architecture/') && !target.includes('\\') && !target.split('/').includes('..'));
+  return targets.length > 0 && targets.every(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'));
 }
 
 function grammarExportTargets(manifest, packageRoot, packageName, specifier) {
   const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
-  return exportTargets(manifest?.exports?.[key]).filter(target => target.startsWith('../../checks/architecture/') && !target.includes('\\') && !target.split('/').includes('..'))
+  return exportTargets(manifest?.exports?.[key]).filter(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'))
     .map(target => canonical(path.resolve(packageRoot, target)));
 }
 

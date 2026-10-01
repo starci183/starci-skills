@@ -281,7 +281,7 @@ function workspaceSourceEntry(ts, workspace, specifier) {
   let candidates = exportCandidates(workspace, specifier);
   if (specifier === workspace.name && !workspace.exports) candidates = [workspace.manifest?.types, workspace.manifest?.typings, workspace.manifest?.module, workspace.manifest?.main].filter(item => typeof item === 'string');
   for (const target of candidates) {
-    if (!target.startsWith('../../checks/architecture/') || target.includes('..')) continue;
+    if (!target.startsWith('./') || target.includes('..')) continue;
     const source = sourceOfTarget(ts, workspace, target);
     if (source) return source;
   }
@@ -299,7 +299,7 @@ export function workspaceExportSources(ts, workspace) {
   for (const [key, value] of Object.entries(declaration)) {
     if (!key.startsWith('.') || key.includes('*')) continue;
     for (const target of exportTargetStrings(value)) {
-      if (!target.startsWith('../../checks/architecture/') || target.includes('..')) continue;
+      if (!target.startsWith('./') || target.includes('..')) continue;
       const source = sourceOfTarget(ts, workspace, target);
       if (source) sources.add(source);
     }
@@ -309,7 +309,7 @@ export function workspaceExportSources(ts, workspace) {
 
 function packageExported(ts, workspace, specifier, actualTarget) {
   return exportCandidates(workspace, specifier).some(target => {
-    if (!target.startsWith('../../checks/architecture/') || target.includes('..')) return false;
+    if (!target.startsWith('./') || target.includes('..')) return false;
     const expected = canonical(path.resolve(workspace.root, target));
     return expected === canonical(actualTarget) || sourceOfTarget(ts, workspace, target) === canonical(actualTarget);
   });

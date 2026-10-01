@@ -928,6 +928,7 @@ moved:
   - {from: scripts/kernel/owner-answers.mjs, to: scripts/machine/owner-answers.mjs, movedIn: C8, quiesced: false}
   - {from: scripts/example/example-ownership.mjs, to: scripts/work/record-ownership.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/example/example-render-proof.mjs, to: scripts/work/render-proof.mjs, movedIn: C4, quiesced: false}
+  - {from: scripts/kernel/status/view.mjs, to: scripts/kernel/verbs/shared/status-view.mjs, movedIn: C6, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
 # staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
 # deletes the symbol.

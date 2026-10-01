@@ -134,7 +134,7 @@ test('RT_SPEC_PLACEMENT: tests/<area>/<module>[.<topic>].spec.mjs, helpers, setu
 
 test('RT_SOURCE_NAME: one-off names, a non-kebab name and a basename repeated inside a tier are refused', () => {
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/tmp-quota.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  assert.deepEqual(codesOf(nameFindings('scripts/kernel/status/view.mjs', PARAMS)), ['RT_SOURCE_NAME']);
+  assert.deepEqual(codesOf(nameFindings('scripts/kernel/verbs/shared/status-view.mjs', PARAMS)), ['RT_SOURCE_NAME']);
   assert.deepEqual(codesOf(nameFindings('scripts/supervisor/why-backfill.mjs', PARAMS)), ['RT_SOURCE_NAME']);
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/camelCase.mjs', PARAMS)), ['RT_SOURCE_NAME']);
   const dup = sourceNameFindings(ctxOf({ 'scripts/agent/install.mjs': '', 'scripts/guards/hook-install.mjs': '' }));

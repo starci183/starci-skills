@@ -2,7 +2,7 @@
 // the failed/blocked attempts read together and clustered by cause, and the RANKED candidate actions, each with its
 // exact api command, expected effect, tier (light | heavy | proposal | supervisor) and whether the decision log
 // already tried it. Present when the workflow stalls or an op failed >= allocation.progress.rca.minFailures times.
-import { viewOf } from './view.mjs';
+import { viewOf } from '../verbs/shared/status-view.mjs';
 
 export default {
   key: 'rca',

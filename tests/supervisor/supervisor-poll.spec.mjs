@@ -236,7 +236,7 @@ test('the supervisor cadence has one authority, home.mjs DEFAULTS, and supervise
   assert.equal(supervisorSettings({config:{supervisor:{}}}).pollIntervalMs,DEFAULTS.pollIntervalMs,'an unset key takes the one default');
   assert.equal(supervisorSettings({config:{supervisor:{pollIntervalMs:120000}}}).pollIntervalMs,120000);
   assert.equal('DEFAULT_INTERVAL_MS' in poll,false,'poll.mjs keeps no second default');
-  for(const file of ['poll.mjs','watchdog.mjs','start-supervisor.mjs']){
+  for(const file of ['poll.mjs','supervisor-watchdog.mjs','start-supervisor.mjs']){
     const src=fs.readFileSync(path.join(ROOT,'scripts','supervisor',file),'utf8');
     assert.doesNotMatch(src,/pollIntervalMs[^\n]*\b(600_?000|180_?000)\b|INTERVAL_MS\s*=\s*\d/,`${file} restates no cadence literal`);
   }
