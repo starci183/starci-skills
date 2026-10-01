@@ -73,7 +73,7 @@
     "@starci/eslint-canon-be": "3.0.4",
     "@starci/eslint-canon-fe": "8.0.4",
     "@starci/hfs": "4.0.4",
-    "@starci/jest-preset": "2.2.1",
+    "@starci/jest-preset": "2.2.2",
     "@starci/prettier-config": "1.0.0",
     "@starci/stylelint-canon": "2.0.2",
     "@starci/test-world": "1.0.5",

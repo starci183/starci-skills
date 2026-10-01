@@ -25,6 +25,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         postgresql: { connections: [{ name: "primary" }] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-todo.json", clientId: TODO_KEYCLOAK_CLIENT },
         minio: { buckets: [UPLOADS_BUCKET] },
+        redis: {},
     },
     fakes: { smtp: smtpFake(), sepay: sepayFake({ webhookPath: "/webhooks/sepay", webhookStyle: "intent" }) },
     apps: {

@@ -24,7 +24,7 @@ A key that the declaration names and this table does not is an undocumented secr
 rather than assuming somebody knows what it unlocks.
 
 Other keys the apps read (all through `EnvSource`, see each capability `<c>.config.ts`): `PORT` (api listener), `HTTP_SECURITY_ALLOWED_ORIGINS`
-(comma separated origins, also the CORS list), `KEYCLOAK_TOKEN_URL`, `KEYCLOAK_CLIENT_ID`, `SEPAY_BASE_URL`, `UPLOAD_S3_ENDPOINT`, `UPLOAD_S3_BUCKET`, `UPLOAD_S3_ACCESS_KEY_ID` (the MinIO root user in dev), and the optional tunables
+(comma separated origins, also the CORS list), `KEYCLOAK_TOKEN_URL`, `KEYCLOAK_CLIENT_ID`, `SEPAY_BASE_URL`, `CACHE_REDIS_URL` (the Redis the rate limiter counts in, shared by every api replica), `UPLOAD_S3_ENDPOINT`, `UPLOAD_S3_BUCKET`, `UPLOAD_S3_ACCESS_KEY_ID` (the MinIO root user in dev), and the optional tunables
 `SESSION_TTL_DAYS`, `SESSION_ADMIN_SUBJECTS`, `RECUR_TICK_CRON`, `PLAN_PAID_PRICE_MINOR_UNITS`, `PLAN_PAID_CURRENCY`, `COMMISSION_BPS`, `UPLOAD_MAX_BYTES`, `UPLOAD_ALLOWED_MIMES`,
 `UPLOAD_PRESIGN_TTL_MS`, `UPLOAD_S3_REGION`, `UPLOAD_S3_TIMEOUT`, `KEYCLOAK_TIMEOUT`, `SEPAY_TIMEOUT`, `SMTP_CONNECT_TIMEOUT`, `SMTP_COMMAND_TIMEOUT`, `SCHEDULING_TICK`, `MESSAGING_POLL`,
 `MESSAGING_BATCH`, `MESSAGING_VISIBILITY`, `HTTP_SECURITY_RATE_*`. Removed: `UPLOAD_DIR` (uploads moved from the local filesystem to the stack's MinIO), `DATABASE_URL`, `REDIS_URL`, `CORS_ORIGIN`, `TODO_SESSION_TTL_DAYS`,

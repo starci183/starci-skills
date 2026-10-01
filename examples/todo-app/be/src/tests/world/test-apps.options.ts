@@ -12,6 +12,7 @@ import type { DatabaseConnectionConfig } from "@modules/platform/database"
 import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { NotifySmtpOptions } from "@modules/integrations/notify-smtp"
 import type { SepayOptions } from "@modules/integrations/sepay"
+import type { CacheOptions } from "@modules/integrations/cache"
 import type { UploadStorageOptions } from "@modules/integrations/upload-storage"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
@@ -70,6 +71,9 @@ export const notifySmtpOptionsOf = (w: TodoWiring): NotifySmtpOptions => ({
     commandTimeoutMs: CALL_DEADLINE_MS,
 })
 
+/** The run's own Redis DB, where the rate limiter counts. */
+export const cacheOptionsOf = (w: TodoWiring): CacheOptions => ({ url: new Secret(w.redis.url) })
+
 /** The bucket of the run's MinIO that holds the uploads (declared in `stacks.minio.buckets`). */
 export const UPLOADS_BUCKET = "uploads"
 
@@ -91,6 +95,7 @@ export const testOptions = (w: TodoWiring): TestOptions => ({
         allowedOrigins: ["http://localhost:4069"],
         rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
     },
+    cache: cacheOptionsOf(w),
     identity: { ttlDays: 1, adminSubjects: [] },
     keycloak: keycloakOptionsOf(w),
     sepay: sepayOptionsOf(w),
