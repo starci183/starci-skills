@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkHfs } from '../scripts/checks/architecture/hfs.mjs';
+import { checkHfs, checkHfsWithoutConfig } from '../scripts/checks/architecture/hfs.mjs';
+import { appDeclarationText, DEFAULT_APPS } from './_hfs-arch-fixture.mjs';
 import { repositoryName } from '../scripts/lib/repo-identity.mjs';
 
 const tree = (t, files) => {
@@ -26,23 +27,29 @@ test('the retired int-spec, harness and live test kinds are flagged; unit, integ
     'src/tests/e2e/lane.harness-spec.ts', 'src/tests/e2e/live/payos/hook.e2e-spec.ts', 'src/tests/harness/world.ts', 'src/tests/live/pay.e2e-spec.ts']);
 });
 
+/** A temp app (kind: app hfs.json at its root, the be side under be/) holding `files` (app-relative). */
 const withFiles = (t, files) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-e2e-manual-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const [file, content] of Object.entries(files)) {
+  for (const [file, content] of Object.entries({ 'hfs.json': appDeclarationText('be', { apps: DEFAULT_APPS.be }), ...files })) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), content);
   }
   return root;
 };
-const inAutomaticGate = (root, kinds) => checkHfs({ root, kinds }).violations.filter(item => item.ruleId === 'HFS_E2E_IN_AUTOMATIC_GATE')
+// The hooks, the root scripts, the workflows and the be side's jest configuration are the app root's (checkAppRoot); the
+// default tsconfig is the be side's own (checkHfs over be/).
+const inAutomaticGate = (root) => [
+  ...checkHfsWithoutConfig(root).violations,
+  ...checkHfs({ root: path.join(root, 'be'), kinds: ['backend'] }).violations.map(item => ({ ...item, path: `be/${item.path}` })),
+].filter(item => item.ruleId === 'HFS_E2E_IN_AUTOMATIC_GATE')
   .map(item => `${item.path}: ${item.message.replace(item.path, '~').split('. ')[0].replace(/\.$/u, '')}`).sort();
-const CLEAN_BACKEND = {
-  'src/tests/e2e/a.e2e-spec.ts': 'export {}',
-  'tsconfig.json': JSON.stringify({ include: ['src/**/*'], exclude: ['src/tests/world/**', 'src/tests/integration/**', 'src/tests/e2e/**', 'src/tests/contract/**'] }),
-  'jest.config.js': 'module.exports = { collectCoverageFrom: ["src/**/*.ts", "!src/tests/**"] }',
+const CLEAN_APP = {
+  'be/src/tests/e2e/a.e2e-spec.ts': 'export {}',
+  'be/tsconfig.json': JSON.stringify({ include: ['src/**/*'], exclude: ['src/tests/world/**', 'src/tests/integration/**', 'src/tests/e2e/**', 'src/tests/contract/**'] }),
+  'be/jest.config.js': 'module.exports = { collectCoverageFrom: ["src/**/*.ts", "!src/tests/**"] }',
   'package.json': JSON.stringify({
-    scripts: { typecheck: 'tsc --noEmit', 'typecheck:tests': 'tsc -p src/tests/tsconfig.json', 'test:unit': 'jest --selectProjects unit', 'test:integration': 'jest --selectProjects integration', 'test:e2e': 'jest --selectProjects e2e', 'test:contract': 'jest --selectProjects contract', 'lint:check': 'eslint . --ignore-pattern "src/tests/e2e/**"' },
+    scripts: { typecheck: 'cd be && tsc --noEmit', 'typecheck:tests': 'cd be && tsc -p src/tests/tsconfig.json', 'test:unit': 'cd be && jest --selectProjects unit', 'test:integration': 'cd be && jest --selectProjects integration', 'test:e2e': 'cd be && jest --selectProjects e2e', 'test:contract': 'cd be && jest --selectProjects contract', 'lint:check': 'eslint . --ignore-pattern "src/tests/e2e/**"' },
     'lint-staged': { '*.ts': "eslint --fix --ignore-pattern 'src/tests/e2e/**'" },
   }),
   '.husky/pre-push': 'npm run lint && npm run test:unit\n',
@@ -51,22 +58,22 @@ const CLEAN_BACKEND = {
 };
 
 test('integration, e2e and contract stay out of hooks, default typecheck, coverage and automatic CI (manual-only ruling)', t => {
-  assert.deepEqual(inAutomaticGate(withFiles(t, CLEAN_BACKEND), ['backend']), []);
+  assert.deepEqual(inAutomaticGate(withFiles(t, CLEAN_APP)), []);
   const dirty = withFiles(t, {
-    ...CLEAN_BACKEND,
-    'tsconfig.json': JSON.stringify({ include: ['src/**/*'] }),
-    'jest.config.js': 'module.exports = { collectCoverageFrom: ["src/**/*.ts"] }',
-    'package.json': JSON.stringify({ scripts: { typecheck: 'tsc --noEmit && npm run typecheck:tests', 'test:ci': 'jest --coverage', 'test:affected': 'jest --selectProjects unit', 'test:unit': 'jest --selectProjects unit' } }),
+    ...CLEAN_APP,
+    'be/tsconfig.json': JSON.stringify({ include: ['src/**/*'] }),
+    'be/jest.config.js': 'module.exports = { collectCoverageFrom: ["src/**/*.ts"] }',
+    'package.json': JSON.stringify({ scripts: { typecheck: 'cd be && tsc --noEmit && npm run typecheck:tests', 'test:ci': 'cd be && jest --coverage', 'test:affected': 'cd be && jest --selectProjects unit', 'test:unit': 'cd be && jest --selectProjects unit' } }),
     '.husky/pre-push': 'npm run typecheck && npm run test:e2e\n',
     '.github/workflows/ci.yml': 'on:\n  pull_request:\njobs:\n  e2e:\n    steps:\n      - run: npm run test:e2e\n',
   });
-  assert.deepEqual(inAutomaticGate(dirty, ['backend']), [
+  assert.deepEqual(inAutomaticGate(dirty), [
     '.github/workflows/ci.yml: ~ runs e2e on push or pull_request',
     '.husky/pre-push: ~ runs integration, e2e or contract',
-    'jest.config.js: collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage',
+    'be/jest.config.js: collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage',
+    'be/tsconfig.json: The default tsconfig includes src/tests/{world,integration,e2e,contract}/**',
     'package.json: Script test:ci runs jest without --selectProjects unit and would run the integration, e2e or contract project',
     'package.json: Script typecheck is run by a husky hook and touches integration, e2e or contract',
-    'tsconfig.json: The default tsconfig includes src/tests/{world,integration,e2e,contract}/**',
   ]);
 });
 
