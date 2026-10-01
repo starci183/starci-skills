@@ -159,3 +159,6 @@ retired:
   - {path: examples/ecommerce-app-be/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}
   - {path: examples/ecommerce-app-be/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/be/docs/guides/testing.md'}
   - {path: examples/ecommerce-app-fe/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}
+  - {path: .github/workflows/example-unit.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml (one root workflow, matrix derived from examples/*/hfs.json of kind app by scripts/checks/examples-ci.mjs)'}
+  - {path: .github/workflows/todo-app-example.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml (records job and the per-app matrix job)'}
+  - {path: .github/workflows/todo-app-live-e2e.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml workflow_dispatch (input layers: integration and e2e on the test world, manual only)'}

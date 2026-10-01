@@ -12,6 +12,23 @@ npm test        # node --test tests/*.spec.mjs
 
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
+## Example apps: CI and the local Sonar dashboard
+
+The root `.github/workflows/examples.yml` runs every example app (the matrix is derived from `examples/*/hfs.json` of kind app,
+`scripts/checks/examples-ci.mjs`): typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
+`codecov.yml`, one flag per app, 100 on the project and the patch), the front-end build and the Sonar gate on push and pull request;
+integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
+only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
+Actions); each product monorepo adds its own for its app-repository `codecov.yml`. Before a release, run the local dashboard gate
+per example app against the local SonarQube after `npm test` and a project scan:
+
+```sh
+node scripts/checks/sonar-local.mjs scan --cwd examples/<app> --project-gate --wait
+node scripts/checks/sonar-local.mjs dashboard --cwd examples/<app>
+```
+
+It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every service is at 100 coverage.
+
 ## Pre-workflow readiness
 
 Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:

@@ -58,24 +58,23 @@ side its code lives in (`impl.task.be.task-list` beside `impl.task.fe.task-list`
 
 ## Continuous verification
 
-`.github/workflows/todo-app-example.yml` of the runtime runs on every push/PR touching `examples/**`, `packages/**`,
-`modules/schemas/**` or `scripts/checks/**`, so the example's evidence comes from a declared GitHub-hosted
-runner rather than a developer's laptop:
+GitHub runs only the runtime repository's root workflows, so this app's own `.github/workflows/ci.yml` and `codecov.yml` (the
+app-repository form `hfs sync` renders and the scaffold teaches) do not run here. The runtime's
+`.github/workflows/examples.yml` runs every example app (its job matrix is derived from `examples/*/hfs.json` of kind app), so the
+example's evidence comes from a declared GitHub-hosted runner rather than a developer's laptop:
 
-- **records** - the runtime's own YAML loader and Work-tree layout gate over the example's `.starciwork`,
-  plus the fixture suite behind `scripts/checks/check-example-work.mjs`.
-- **app** - this app's type-check (both sides), unit tests, front-end production build and `hfs lint`
-  (`packages/hfs/bin/hfs.mjs lint`), which lints `be/` with the BE canon and `fe/` with the FE canon, runs the architecture check
-  (the canon's project-graph rules and `hfs check`) and whose exit code is the verdict: `0` clean, `1` findings, `2` a tool could
-  not run.
-- **live** (manual: `.github/workflows/todo-app-live-e2e.yml`, `workflow_dispatch` only, e2e) - brings up this example's real dev stack (Postgres + Keycloak) with the committed DEMO-ONLY
-  SOPS secrets, builds and runs the real API and the real Next.js production server, proves sign-in,
-  the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an
-  API process restart with `curl` against the running services - never a mock.
+- **records** - the runtime's own YAML loader and Work-tree layout gate over the examples' `.starciwork`, plus the fixture suite
+  behind `scripts/checks/check-example-work.mjs`.
+- **app** (push and pull request) - this app's type-check (both sides), `hfs lint` (`packages/hfs/bin/hfs.mjs lint`: `be/` with the
+  BE canon, `fe/` with the FE canon, the architecture check; exit `0` clean, `1` findings, `2` a tool could not run), the unit
+  tests with coverage, the Codecov upload under the flag `todo-app` (the runtime's root `codecov.yml`, the same services scope as
+  this app's own file, 100 on the project and the patch), the front-end production build and the Sonar gate where a server is
+  configured.
+- **integration and e2e** (manual only: `workflow_dispatch` of the same workflow, input `layers`) - the test world starts the
+  docker stack on the runner and runs `npm run test:integration` and `npm run test:e2e`.
 
 The DEMO-ONLY age identity at `.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
-custody. A local operator must provision it before decrypting the committed `.enc` examples; the live CI
-job needs the same provisioned identity before it can run. The encrypted documents hold example values
+custody. A local operator must provision it before decrypting the committed `.enc` examples. The encrypted documents hold example values
 only, and this identity must never protect a real credential (see
 `.starcistacks/dev/runtime/env/KEYS.md`).
 

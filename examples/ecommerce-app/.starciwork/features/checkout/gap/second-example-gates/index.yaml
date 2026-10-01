@@ -1,12 +1,11 @@
 schema: work/gap@1
 id: gap.checkout.second-example-gates
-title: No CI job or host port-registry entry exists for this second example yet
+title: No host port-registry entry exists for this second example yet
 state: todo
 statement: >-
-  The repository's example workflow (.github/workflows/todo-app-example.yml) builds and live-proves
-  the todo example only - its records job walks every .starciwork tree under examples/, so this
-  tree is gate-checked, but no job compiles or boots apps/identity and apps/order yet. Wiring a
-  second example into that workflow edits shared files, which this lane's boundary forbids. The
+  CI is no longer part of this gap: the root workflow .github/workflows/examples.yml derives its job
+  matrix from every examples/*/hfs.json of kind app, so this example is type-checked, linted, unit-tested
+  with coverage and built on every push, and its integration and e2e layers run on workflow_dispatch. The
   host port registry (.workspaces/ports/ on the orchestrating machine) also has no ecommerce-app
   entry at this writing: offset 69 is the orchestrating plan's assignment and this repository's
   .starcistacks/dev/infra/metadata.json carries its resolved projection, but the registry file itself is a host action
