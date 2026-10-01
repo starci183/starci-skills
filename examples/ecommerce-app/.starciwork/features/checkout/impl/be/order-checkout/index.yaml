@@ -1,0 +1,24 @@
+schema: work/implementation@1
+id: impl.checkout.be.order-checkout
+title: The checkout modules of the order service
+state: done
+repository: be
+owners:
+  - {role: module, path: src/modules/domain/order}
+  - {role: module, path: src/modules/domain/cart}
+  - {role: module, path: src/modules/domain/catalog}
+  - {role: module, path: src/modules/domain/payment}
+  - {role: module, path: src/modules/integrations/identity}
+  - {role: feature, path: src/features/checkout}
+proves: [br.checkout.place-order, fr.checkout.place-order, sds.checkout.order-flow, contract.checkout.order-for-identity, contract.identity.internal.sessions, contract.identity.health]
+
+change:
+  rev: 1
+  kind: clarifying
+  at: 2026-09-19T21:30:00.000Z
+  reason: >-
+    v10-3, first recorded rev: proves now also names
+    contract.identity.internal.sessions and contract.identity.health - this module is the
+    consumer half of both wires (src/modules/integrations/identity/identity.client.ts calls
+    them from features/checkout/transport/graphql/session.guard.ts and
+    features/checkout/transport/http/health.controller.ts).

@@ -1,0 +1,68 @@
+# Written by hand, same as the todo app's settled uat evidence files: a uat-flow's evidence is the run
+# itself - schemas/work-layout.yaml's uatRun note is what check-example-work.mjs's concept 12 actually
+# checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md whose
+# outcome is pass). Every byte named below was produced by the Playwright harness at
+# the former front-end repository's Playwright harness (no longer in the tree), which wrote runs/<runId>/ itself; this file only settles which run.
+# Two earlier run folders (runs/20260919T151633Z-5c10a673 and runs/20260919T151937Z-5c10a673) were
+# failed spec-repair history that settled nothing; they were pruned from the tree as generated
+# artifacts and remain in git history.
+schema: work/evidence@1
+record: uat.identity.sign-in
+recordDigest: 617314a75f0cf5fa89ae6b1d64b4369439019939c0d0a90756af2b9d3afd5a02
+run:
+  id: 20260919T152145Z-5c10a673
+  outcome: pass
+  bundle: 33074d60c2a26820ce2097d9025a293fcd823232b2604f1fc5e7baad4b486963
+  result: {name: result.md, sha256: 3042e5170555c6d95564474fed3bad22cf051608cc89256f0e282120d0fb0347}
+  screens:
+    - {name: screens/missing-half-refused.png, sha256: 620c91874dea15667f49250aeec711c31a302b6bdff8c073cbe0706102c97f28}
+    - {name: screens/register-pair.png, sha256: 11949c4b0c62934159a8c4d5533b61ae7cde75ae176eea510e34b0ff05ae7ca1}
+    - {name: screens/screenshot.png, sha256: 7f363c2a32bebef7349b94adbd0e2382be971e7de381998bf9eeb83a28310123}
+    - {name: screens/second-sign-in-new-session.png, sha256: 7f363c2a32bebef7349b94adbd0e2382be971e7de381998bf9eeb83a28310123}
+    - {name: screens/taken-email-conflict.png, sha256: 1fb1aba887441967fe2993247b2500635ab251f154e92b8dc32d4ad7a0fce42c}
+    - {name: screens/wrong-pair-uniform-refusal.png, sha256: ef6c4bb692cf5bda1d8945134f01d853b96c4ab4ff950a4213e2aac7bf879321}
+  videos:
+    - {name: videos/sign-in.webm, sha256: e2bdb6565f16f49afab54bea01cf6e85272050a498c57858301c58588826a85b}
+outcome: pass
+# The run's own manifest.yaml carries the full asset list with a sha256 per file; this entry repeats only
+# the recording concept 12 refuses a done record for lacking, so the video is named by the record that
+# settles on it and not only by a file inside the run it points at.
+assets:
+  - name: runs/20260919T152145Z-5c10a673/videos/sign-in.webm
+    sha256: e2bdb6565f16f49afab54bea01cf6e85272050a498c57858301c58588826a85b
+provenance:
+  # Same note as the todo evidence files: the layout's provenance.actor vocabulary has only starci-kernel
+  # and example-evidence, and neither wrote this - no kernel workflow settled it and example-evidence.mjs
+  # cannot emit a `run:` field. The value names the mechanism that actually produced the proof.
+  actor: playwright-harness
+  tool: 'npx playwright test uat.identity.sign-in, run in the former examples front-end repository with UAT_LIVE_LOGIN_AUTHORIZED=true'
+  environment: local
+  capturedAt: '2026-09-19T15:21:53.502Z'
+  stack: >-
+    The ecommerce example's own topology per examples/ecommerce-app/be/.starcistacks/dev/infra/metadata.json: identity GraphQL
+    API on 5070 (built with npm run build, started with npm run start:identity), order API on 6070, and
+    the shop served by npm run dev:shop on 4069 (Next dev, not a production build). The browser served
+    and the browser proved are the same bytes as the frontendCommit/backendCommit recorded in the run
+    manifest (5c10a673 for both). Session carrier is the product's settled handoff: the shop's
+    /api/session door calls identity's register/signIn GraphQL mutations server-side and sets the
+    httpOnly northwind-session cookie; sign-out is the product's own DELETE /api/session ->
+    internal/sessions/revoke.
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true. The run registered a fresh disposable address
+    (uat-person-20260919t152145z-5c10a673@ecommerce.dev) with the accounts.yaml throwaway password
+    pattern; no credential value is stored in this record, and session bearer values are withheld from
+    the run folder entirely (cleanup.json notes why).
+  observed_effect: >-
+    Matches the flow record's declared effects and cleanup: one disposable person row was registered in
+    the identity store and three sessions were issued across the walk. Sessions 1 and 2 were revoked by
+    the product's own sign-out (verify door read-back: SESSION_INVALID / 401 for both); session-3 stays
+    live until the identity TTL and the person row remains, exactly as the record's cleanup note states -
+    the product exposes no account deletion. cleanup.json's "unresolved owned resources" note names the
+    same two rows.
+  recording: >-
+    videos/sign-in.webm, 349,624 bytes, VP8 800x450 at 25 fps, 8.28s; verified by full remux and by
+    decoding frames with Playwright's bundled ffmpeg (ms-playwright/ffmpeg-1011/ffmpeg-win64.exe -v
+    error -i sign-in.webm -vsync 0 -frames:v 5) - zero decode errors. Password fields are masked at
+    capture time on every screenshot and video frame, so nothing secret is in the committed bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

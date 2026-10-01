@@ -1,0 +1,26 @@
+{
+  "hfs": 2,
+  "kind": "app",
+  "project": "ecommerce-app",
+  "sides": {
+    "be": {
+      "apps": [
+        { "name": "identity", "kind": "api" },
+        { "name": "order", "kind": "api" },
+        { "name": "migrate", "kind": "migrate" }
+      ],
+      "connections": [
+        { "name": "identity", "envPrefix": "IDENTITY_DB" },
+        { "name": "order", "envPrefix": "ORDER_DB" }
+      ],
+      "optionalSlots": ["repo.docs", "be.contract.graphql"]
+    },
+    "fe": {
+      "apps": [
+        { "name": "landing", "kind": "next" },
+        { "name": "shop", "kind": "next" }
+      ],
+      "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"]
+    }
+  }
+}

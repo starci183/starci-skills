@@ -1,0 +1,73 @@
+# >>> hfs sync (managed block; do not edit) >>>
+# Build output and tool output the tools need in place.
+node_modules/
+dist/
+coverage/
+reports/
+test-results/
+*.tsbuildinfo
+.scannerwork/
+.turbo/
+.tools/
+# Generated code is rebuilt by prebuild / pretypecheck, never tracked.
+__generated__/
+# Plaintext secrets never enter the tree; the sealed form is .starcistacks/<env>/secrets/<slug>.enc.
+.env
+.env.*
+!.env.example
+.secrets/
+*.pem
+# Agent output lives in the scratchpad and the blob store, never in the repository.
+report*.json
+*.tmp.json
+*-lint.json
+lf.json
+lt.json
+%*%
+nul
+.qwen*/
+.artifacts/
+.tmp-*
+# Worktrees live under D:/starci-lanes, never inside the repository.
+.worktrees/
+# StarCi runtime state of the repository (ledger), never tracked.
+.starci/
+# be: the schema Nest writes when it boots GraphQL
+schema.gql
+# fe: Next build output and its generated type file
+.next/
+next-env.d.ts
+# <<< hfs sync <<<
+
+# Render captures of scripts/verify-render.mjs: agent output, regenerated on demand.
+/captures/
+
+# .starcistacks custody: the ordered modules/schemas/stacks-layout.yaml custody.gitignoreRules, plus the
+# value-free members this kit tracks (the rendered environment.json and the resolved port projection
+# infra/metadata.json). Decrypted materializations are never the tracked record.
+be/.starcistacks/**
+!be/.starcistacks/**/
+!be/.starcistacks/**/KEYS.md
+!be/.starcistacks/**/.gitkeep
+!be/.starcistacks/application-stacks.yaml
+!be/.starcistacks/*/README.md
+!be/.starcistacks/*/environment.json
+!be/.starcistacks/*/seeds/**
+!be/.starcistacks/*/infra/metadata.json
+!be/.starcistacks/*/infra/compose/**
+!be/.starcistacks/*/infra/terraform/**
+be/.starcistacks/*/infra/**/.env
+be/.starcistacks/*/infra/**/.env.*
+be/.starcistacks/*/infra/**/*.env
+be/.starcistacks/*/infra/**/*.key
+be/.starcistacks/*/infra/**/*.pem
+be/.starcistacks/*/infra/**/*.tfvars
+be/.starcistacks/*/infra/terraform/.terraform/
+be/.starcistacks/*/infra/terraform/*.tfstate
+be/.starcistacks/*/infra/terraform/*.tfstate.*
+be/.starcistacks/*/infra/terraform/files/
+be/.starcistacks/*/infra/terraform/*.tar.gz
+!be/.starcistacks/**/*.enc
+
+# Keep the cited evidence runs already tracked; ignore fresh replay output.
+/.starciwork/features/**/uat/**/runs/
