@@ -1,7 +1,8 @@
 // install.mjs — puts the shared-checkout guard around an op or [Worker] agent.
 //
-// api dispatch (opGuardLaunch) and the [Worker] launch (workers.mjs workerGuard) call guardLaunch() for every agent
-// they start (modules/kernel/api.yaml conventions.sharedCheckout). Each layer is idempotent and best effort - a
+// api dispatch (opGuardLaunch), the [Worker] launch (workers.mjs workerGuard) and the Kernel launch
+// (scripts/kernel/start-workflow.mjs, role 'kernel') call guardLaunch() for every agent they start
+// (modules/kernel/api.yaml conventions.sharedCheckout). Each layer is idempotent and best effort - a
 // guard that cannot be installed is reported on the dispatch receipt, never a reason to refuse the launch:
 //  1. runtime/guards/jobs/<job>.json — the job's identity and owned paths as absolute paths. worker-start owns the
 //     agent's environment, so the launch binds it to the agent's Orca terminal (bindGuardTerminal ->
@@ -27,7 +28,7 @@ import { allocationMs } from '../../engine/config.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export { guardsRoot };
 export const HOOK_MARKER = 'starci-history-guard';
-export const HOOK_VERSION = 5;
+export const HOOK_VERSION = 6;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
 export const WORK_HOOK_VERSION = 1;
 
@@ -54,9 +55,18 @@ function writeGuardFile(dir, name, body) {
   return file;
 }
 
-/** runtime/guards/jobs/<job>.json — who the worker is and which absolute paths it owns. */
-export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null }) {
-  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', jobId, workflowId,
+/**
+ * The roles a job guard is written for. 'op' is an op or [Worker] agent. 'kernel' is the Kernel: its shell commands meet
+ * the same command guard (PreToolUse) as an op's, but the history hook does not apply its op rules to a kernel guard,
+ * because the runtime's own git (checkpoints, land scratch trees) runs as children of the Kernel's api calls and
+ * inherits its ORCA_TERMINAL_HANDLE (contract change kernel-guard-file).
+ */
+export const GUARD_ROLES = Object.freeze(['op', 'kernel']);
+
+/** runtime/guards/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
+export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op' }) {
+  if (!GUARD_ROLES.includes(role)) throw new Error(`unknown guard role ${role}`);
+  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId,
     ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))],
     // The workflow worktree the op works in (scripts/kernel/workflow-worktree.mjs), or null: the guard refuses git history
     // and ref changes inside it - only the runtime's checkpoint commits there.
@@ -112,6 +122,9 @@ if [ -n "\${ORCA_TERMINAL_HANDLE:-}" ]; then
   guard=${q(terminals)}/"$(printf '%s' "$ORCA_TERMINAL_HANDLE" | tr -c 'A-Za-z0-9._-' '_')".json
 fi
 [ -n "$guard" ] && [ -f "$guard" ] || guard=""
+# A kernel guard (role "kernel", writeJobGuard) is the command guard's alone: the runtime's own git under the Kernel's
+# api calls inherits its terminal, so the op rules below never read it.
+if [ -n "$guard" ] && grep -q '"role": "kernel"' "$guard"; then guard=""; fi
 status=0
 op_worktree_refused=0
 while read -r old new ref; do
@@ -267,14 +280,14 @@ const guardSettings = (config) => ({
 });
 
 /**
- * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree}) -> {receipt}
+ * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree, role}) -> {receipt}
  * receipt rides on the dispatch record. The caller binds receipt.jobFile to the agent's Orca terminal once
  * worker-start returns it (bindGuardTerminal), which is what the command guard and the history hook read.
  */
-export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null }) {
+export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null, role = 'op' }) {
   const settings = guardSettings(config);
   const receipt = { jobFile: null, hooks: [] };
-  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree }); }
+  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role }); }
   catch (e) { receipt.jobFile = { error: String(e?.message ?? e) }; }
   if (settings.historyHook) {
     for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {

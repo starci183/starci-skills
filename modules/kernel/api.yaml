@@ -152,7 +152,13 @@ conventions:
     override. Staging into a private GIT_INDEX_FILE passes. config.yaml guards.historyHook /
     guards.workHook false switch a hook layer off. Settle backs it: only the runtime commits on a workflow
     branch (workflow-checkpoint.mjs checkpointOp), and a commit or change outside an op's leases refuses
-    its pass (workflow-foreign-commit, workflow-foreign-change)
+    its pass (workflow-foreign-commit, workflow-foreign-change). The Kernel is guarded too
+    (contract change kernel-guard-file): start-workflow.mjs writes it a job guard of role kernel
+    (kernel-<workflow>, no owned path, its workflowWorktree) and binds it to the Kernel's terminal, so
+    layer (1) refuses its raw git history changes, worktree adds, recursive deletes, kills by name and
+    raw agent launches while its `node api.mjs <verb>` calls pass; layer (3) skips a kernel guard, since
+    the runtime's own git under the Kernel's api calls inherits its terminal. A guard that could not be
+    put in place rides on kernel-booted `guard` with code kernel-guard-unbound
   hierarchy: >-
     `hierarchy` projects starci/agent-hierarchy@1 from durable workflow/job
     identity. Stable nodes are workflow:<workflow>, agent:kernel:<workflow>

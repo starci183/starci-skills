@@ -7809,6 +7809,17 @@ kernel-edit-drop:
   nextStep_vi: "Việc bị hủy và ghi lý do; công việc tiếp tục theo đồ thị mới."
   owner: supervisor
   kind: settle-reason
+kernel-guard-unbound:
+  title: "Kernel started without its full command guard"
+  title_vi: "Kernel khởi động mà chưa có đủ lớp chặn lệnh"
+  meaning_vi: "Lúc khởi động Kernel, hệ thống không ghi được tệp bảo vệ của Kernel, không gắn được nó vào cửa sổ Orca của Kernel, hoặc không cài được hook git trong worktree của workflow; các lệnh shell thô của Kernel (đổi lịch sử git, git worktree add, xóa đệ quy, dừng tiến trình theo tên, khởi chạy agent ngoài Orca) có thể không bị chặn."
+  causes_vi:
+    - "Thư mục runtime/guards không ghi được"
+    - "Worker-start không trả về cửa sổ của Kernel"
+    - "Thư mục hook của worktree đang được git theo dõi hoặc có hook lạ"
+  nextStep_vi: "Kernel vẫn chạy; Supervisor đọc biên nhận guard trên sự kiện kernel-booted, sửa nguyên nhân rồi khởi động lại Kernel để guard được gắn đủ."
+  owner: supervisor
+  kind: runtime-fault
 kernel-proof-required:
   title: "Recovery needs a Kernel terminal"
   title_vi: "Cần chạy từ cửa sổ Kernel"
