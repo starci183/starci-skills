@@ -263,12 +263,17 @@ test('the one gate holds the imports at zero on the whole code, beside the new-c
   assert.deepEqual(gate.overall.issues.engines, ['starci-hfs', 'eslint', 'stylelint']);
   const conditions = serverConditions(gate);
   assert.deepEqual(conditions.filter((condition) => !condition.metric.startsWith('new_')), [
+    { metric: 'coverage', op: 'LT', error: '100' },
     { metric: 'violations', op: 'GT', error: '0' },
+    { metric: 'security_hotspots_reviewed', op: 'LT', error: '100' },
     { metric: 'duplicated_lines_density', op: 'GT', error: String(gate.overall.duplication.maxPercent) },
   ]);
   assert.ok(conditions.some((condition) => condition.metric === 'new_duplicated_lines_density'), 'the new-code conditions stay');
-  assert.equal(conditions.some((condition) => /coverage/.test(condition.metric)), false, 'Sonar holds no coverage condition');
-  assert.equal('coverage' in gate.newCode, false);
+  assert.deepEqual(conditions.filter((condition) => /coverage/.test(condition.metric)), [
+    { metric: 'new_coverage', op: 'LT', error: '100' },
+    { metric: 'coverage', op: 'LT', error: '100' },
+  ], 'coverage of the services is 100 on new code and overall');
+  assert.equal(gate.overall.coverage.perFile, true);
   assert.deepEqual(gate.enforces.map((entry) => entry.code).sort(), ['HFS_DUPLICATE_CODE', 'HFS_DUPLICATE_SYMBOL', 'HFS_SIZE_GROWTH']);
   const rules = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8')).rules;
   for (const entry of gate.enforces) assert.ok(rules.find((rule) => rule.id === entry.rule).failureCodes.includes(entry.code), `${entry.rule} lists ${entry.code}`);

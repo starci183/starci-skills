@@ -13,7 +13,8 @@ const { fakeIds, FakeIds } = require("./ids.cjs")
  * Coverage is measured on services only: the one place business logic lives (owner-locked unit standard). Handlers,
  * resolvers, controllers and consumers are thin, and helpers called by a service are covered through the service's own
  * spec, so every `*.service.ts` under `src` is the whole denominator and every file in it must reach 100 on every metric.
- * Sonar does not read coverage at all (the gate fails on imported issues only), so there is no second list to keep in step.
+ * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
+ * (`sonar.coverage.inclusions=be/src/**\/*.service.ts`) and its quality gate holds coverage at 100 on those files.
  */
 const COVERAGE_SOURCES = ["src/**/*.service.ts"]
 const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]
@@ -87,7 +88,7 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * run their spec files one at a time, each in a worker process of its own (`world-runner.cjs`; every file shares the
  * run's data, so the runner never runs two at once); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
  * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
- * statements: the `test` script runs the unit project with `--coverage` and fails below it. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
+ * statements: the `test` script runs the unit project with `--coverage`, fails below it and writes `coverage/lcov.info` for Sonar. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
 /** The runner of the integration, e2e and contract projects: one fresh worker process per spec file. */
@@ -125,7 +126,8 @@ function starciJestConfig() {
     // A glob key is applied to every matching file on its own: each service file must reach 100, not the average.
     coverageThreshold: { "./src/**/*.service.ts": { ...COVERAGE_THRESHOLD } },
     coverageDirectory: "coverage",
-    coverageReporters: ["text-summary", "text"],
+    // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads.
+    coverageReporters: ["text-summary", "text", "lcov"],
     projects: [
       {
         ...shared,

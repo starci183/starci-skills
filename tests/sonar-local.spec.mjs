@@ -31,7 +31,7 @@ const write=(root,relative,body)=>{
 
 /**
  * The source lines of the fake repository's slice files, as /api/sources/lines answers them: every line of
- * src/app.js, src/new.js and src/legacy.js exists (Sonar holds no coverage, so a line carries no hits).
+ * src/app.js, src/new.js and src/legacy.js exists (the fake repository declares no coverage scope, so a line carries no hits).
  */
 const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/legacy.js':5}}={})=>Object.fromEntries(Object.entries(lines).map(([file,count])=>
   [file,Array.from({length:count},(_,i)=>({line:i+1}))]));
@@ -42,8 +42,8 @@ const knownSources=({lines={'src/app.js':30,'src/new.js':3,'src/legacy.js':5}}={
  */
 async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownSources(),tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
-  hotspots=[{path:'src/legacy.js',line:3}],duplications={}}={}){
-  const state={gateConditions:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,tests};
+  hotspots=[{path:'src/legacy.js',line:3}],duplications={},coverage={},projectMeasures={}}={}){
+  const state={coverage,projectMeasures,gateConditions:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,tests};
   state.duplications=duplications;
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
@@ -139,7 +139,22 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
           if(!blocks)return send(200,{duplications:[],files:{}});
           return send(200,{duplications:blocks.map(b=>({blocks:[{from:b.from,size:b.size,_ref:'1'},{from:1,size:b.size,_ref:'2'}]})),files:{'1':{key:component},'2':{key:'x:src/elsewhere.js'}}});
         }
-        case '/api/measures/component':return send(200,{component:{measures:[{metric:'duplicated_lines_density',value:'4.2'},{metric:'ncloc',value:'120'}]}});
+        case '/api/measures/component':{
+          // A file component answers its imported coverage (none when the lcov does not name it); the project its own measures.
+          const component=url.searchParams.get('component')??'';
+          const asked=(url.searchParams.get('metricKeys')??'').split(',');
+          if(component.includes(':')){
+            const value=state.coverage[fileOf(component)];
+            return send(200,{component:{key:component,measures:value===undefined?[]:[{metric:'coverage',value:String(value)}]}});
+          }
+          const all={duplicated_lines_density:'4.2',ncloc:'120',...state.projectMeasures};
+          return send(200,{component:{key:component,measures:Object.entries(all).filter(([metric])=>asked.includes(metric)).map(([metric,value])=>({metric,value:String(value)}))}});
+        }
+        case '/api/measures/component_tree':{
+          const project=url.searchParams.get('component');
+          const components=Object.entries(state.coverage).map(([file,value])=>({key:`${project}:${file}`,path:file,qualifier:'FIL',measures:[{metric:'coverage',value:String(value)}]}));
+          return send(200,{paging:{total:components.length},components});
+        }
         default:return send(404,{});
       }
     });
@@ -373,10 +388,11 @@ const numbered=(count,label)=>Array.from({length:count},(_,i)=>`const ${label}${
  * A product repository with one base commit (src/legacy.js, a 5-line src/app.js) and a slice on top in
  * the working tree: src/app.js grows to 30 lines (6-30 changed) and src/new.js is added untracked.
  */
-function fakeRepo(root,{scanner=true,specFile=false}={}){
+function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
   const repo=path.join(root,'product-repo');
   write(repo,'package.json',JSON.stringify({name:'product-repo',scripts:{'sonar:check':'node scanner.mjs'}}));
-  write(repo,'sonar-project.properties','sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n');
+  // services: the repository declares the coverage scope the way the managed properties do (only *.service.js counts).
+  write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.inclusions=src/**/*.service.js\n':''}`);
   write(repo,'src/legacy.js',numbered(5,'legacy'));
   write(repo,'src/app.js',numbered(5,'app'));
   // The fake scanner echoes the token (the helper must scrub it) and writes report-task.txt into the
@@ -395,8 +411,13 @@ fs.writeFileSync(path.join(d['sonar.working.directory'],'report-task.txt'),'proj
   write(repo,'src/app.js',numbered(30,'app'));
   write(repo,'src/new.js',numbered(3,'fresh'));
   if(specFile)write(repo,'src/app.spec.js',numbered(4,'spec'));
+  if(services)for(const file of SERVICE_SLICE)write(repo,file,numbered(4,path.basename(file,'.js').replace(/\W/g,'')));
   return repo;
 }
+
+/** The slice files of a services repository: two services and a resolver (not a coverage target). */
+const SERVICE_SLICE=['src/orders/order.service.js','src/orders/payment.service.js','src/orders/order.resolver.js'];
+const serviceSources=()=>knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,...Object.fromEntries(SERVICE_SLICE.map(file=>[file,4]))}});
 
 test('--blob stores both the sanitized scanner log and the Sonar report', async t => {
   const root=temporary(t,'blob-scan');
@@ -436,7 +457,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.equal(report.ceTask.status,'SUCCESS');
   assert.equal(report.schema,'starci/sonar-local-scan@3');
   assert.equal(report.gate.name,'starci-new-code');
-  assert.deepEqual([report.gate.duplicationMaxPercent,report.gate.blockingSeverities,'coverageMinPercent' in report.gate],[3,['BLOCKER','CRITICAL'],false]);
+  assert.deepEqual([report.gate.duplicationMaxPercent,report.gate.blockingSeverities,report.gate.coverageMinPercent],[3,['BLOCKER','CRITICAL'],100]);
   assert.equal(report.qualityGate.outcome,'ok');
   assert.equal(report.scope,'slice');
   assert.equal(report.projectGate.status,'OK');
@@ -444,7 +465,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.deepEqual(report.slice.changedFiles.sort(),['src/app.js','src/new.js']);
   assert.equal(report.slice.base,'HEAD');
   assert.deepEqual([report.slice.verdict,report.slice.newIssues.total,report.slice.newHotspots.total],['pass',0,0],'debt on unchanged lines is not the slice\'s');
-  assert.equal('coverage' in report.slice,false,'the slice verdict holds no coverage');
+  assert.deepEqual([report.slice.coverage.applied,report.slice.coverage.files],[false,[]],'a repository without sonar.coverage.inclusions has no coverage target');
   assert.deepEqual([report.slice.duplication.changedLines,report.slice.duplication.duplicatedLines,report.slice.duplication.applied],[28,0,true]);
   assert.equal('coverageReport' in report,false);
   assert.equal(report.issues.total,4);
@@ -764,7 +785,7 @@ test('--isolate analyses only the slice in a throwaway project scanned with the 
   assert.equal(defines['sonar.projectKey'],sliceKey);
   assert.equal(defines['sonar.inclusions'],'src/app.js,src/new.js');
   assert.equal(defines['sonar.test.inclusions'],'__starci_no_tests__/**','no scope file is a test, so no test is indexed');
-  assert.equal('sonar.javascript.lcov.reportPaths' in defines,false,'no coverage is handed to the scanner');
+  assert.equal('sonar.javascript.lcov.reportPaths' in defines,false,'the lcov path and the coverage scope come from sonar-project.properties, never a define');
   assert.ok(state.requests.some(r=>r.path==='/api/projects/create'&&r.form.project===sliceKey&&r.auth===ADMIN));
   assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===ADMIN),'the slice project is read with the admin token');
   assert.ok(state.requests.some(r=>r.path==='/api/projects/delete'&&r.form.project===sliceKey));
@@ -828,19 +849,21 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   const first=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
   assert.equal(first.report.qualityGate.outcome,'ok',JSON.stringify(first.report.qualityGate));
   const conditions=Object.fromEntries([...state.gateConditions.values()].map(c=>[c.metric,`${c.op} ${c.error}`]));
-  assert.deepEqual(conditions,{new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0',violations:'GT 0',duplicated_lines_density:'GT 3'});
+  assert.deepEqual(conditions,{new_coverage:'LT 100',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0',coverage:'LT 100',violations:'GT 0',security_hotspots_reviewed:'LT 100',duplicated_lines_density:'GT 3'});
   assert.equal(state.gateSelected.get('product-repo'),'starci-new-code');
   assert.equal(state.newCode.get('product-repo'),'NUMBER_OF_DAYS:30');
   const made=state.requests.filter(r=>/create|update_condition|delete_condition/.test(r.path)&&r.path.includes('qualitygates')).length;
   // a gate someone edited on the server is put back, an extra condition is dropped
   state.gateConditions.set('new_duplicated_lines_density',{id:'C-9',metric:'new_duplicated_lines_density',op:'GT',error:'50'});
   state.gateConditions.set('new_coverage',{id:'C-11',metric:'new_coverage',op:'LT',error:'80'});
+  state.gateConditions.set('new_lines',{id:'C-12',metric:'new_lines',op:'GT',error:'1000'});
   state.gateConditions.set('new_violations',{id:'C-10',metric:'new_violations',op:'GT',error:'0'});
   const again=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
   assert.equal(again.report.qualityGate.outcome,'ok');
-  assert.deepEqual(again.report.qualityGate.changed.sort(),['-new_coverage','-new_violations','new_duplicated_lines_density']);
+  assert.deepEqual(again.report.qualityGate.changed.sort(),['-new_lines','-new_violations','new_coverage','new_duplicated_lines_density']);
   assert.equal(state.gateConditions.get('new_duplicated_lines_density').error,'3');
-  assert.ok(!state.gateConditions.has('new_coverage'),'a coverage condition left on a server by an older gate is dropped');
+  assert.equal(state.gateConditions.get('new_coverage').error,'100','a lowered coverage threshold is put back to 100');
+  assert.ok(!state.gateConditions.has('new_lines'),'a condition the gate does not hold is dropped');
   assert.ok(!state.gateConditions.has('new_violations'));
   const third=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
   assert.deepEqual(third.report.qualityGate.changed,[],'a matching gate is left as it is');
@@ -891,4 +914,57 @@ test('a slice its attempt did not change (already committed) is judged from the 
   gitIn(bare,'add','-A');
   gitIn(bare,'commit','-q','-m','same');
   assert.equal(sliceChanges(bare,{base:'HEAD',paths:'src'}).files.length,0);
+});
+
+test('the slice holds every service it touched at 100 coverage: one service below fails, a resolver\'s coverage is not a measure', async t => {
+  const custody=fakeCustody(temporary(t,'cov-custody'));
+  // One service at 87.5 fails although the other is at 100 and the resolver beside it sits at 10.
+  const red=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':87.5,'src/orders/order.resolver.js':10}});
+  const failed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-red'),{services:true}),'--wait'],{config:configFor(red.host,custody)});
+  assert.equal(failed.exitCode,1,JSON.stringify(failed.report.slice));
+  assert.equal(failed.report.outcome,'fail');
+  assert.deepEqual(failed.report.slice.coverage.files,[
+    {path:'src/orders/order.service.js',coverage:100,ok:true},
+    {path:'src/orders/payment.service.js',coverage:87.5,ok:false},
+  ],'only the services are coverage targets');
+  assert.deepEqual(failed.report.slice.coverage.failures,['coverage of src/orders/payment.service.js 87.5% < 100%']);
+  assert.match(failed.report.reason,/coverage of src\/orders\/payment\.service\.js 87\.5% < 100%/);
+  assert.doesNotMatch(failed.report.reason,/resolver/,'the resolver is not judged');
+  assert.ok(!red.state.requests.some(r=>r.path==='/api/measures/component'&&String(r.query.component).endsWith('order.resolver.js')),'a non-service file\'s coverage is never read');
+  // Every service at 100 passes, whatever the resolver's coverage.
+  const green=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100,'src/orders/order.resolver.js':0}});
+  const passed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-green'),{services:true}),'--wait'],{config:configFor(green.host,custody)});
+  assert.equal(passed.exitCode,0,JSON.stringify(passed.report.slice));
+  assert.deepEqual(passed.report.slice.coverage.failures,[]);
+  // A service the lcov does not name has no measure: never a pass.
+  const missing=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100}});
+  const absent=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-missing'),{services:true}),'--wait'],{config:configFor(missing.host,custody)});
+  assert.equal(absent.exitCode,1);
+  assert.match(absent.report.reason,/src\/orders\/payment\.service\.js has no coverage measure/);
+});
+
+test('dashboard prints the project numbers and fails unless bugs, smells and vulnerabilities are 0, hotspots reviewed and every service at 100', async t => {
+  const custody=fakeCustody(temporary(t,'dash-custody'));
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100};
+  const files={'src/orders/order.service.js':100,'src/orders/payment.service.js':100,'src/orders/order.resolver.js':12.5,'src/main.js':0};
+  const run=async(label,over)=>{
+    const {host}=await fakeSonar(t,over);
+    return sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,label),{services:true})],{config:configFor(host,custody)});
+  };
+  const pass=await run('dash-pass',{projectMeasures:clean,coverage:files});
+  assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
+  assert.deepEqual(pass.report.numbers,{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100});
+  assert.deepEqual(pass.report.coverage.files.map(f=>[f.path,f.coverage]),[['src/orders/order.service.js',100],['src/orders/payment.service.js',100]],'the per-file coverage lists the services only');
+  assert.deepEqual(pass.report.coverageInclusions,['src/**/*.service.js']);
+  const red=await run('dash-red',{projectMeasures:{...clean,bugs:1,code_smells:3,security_hotspots_reviewed:50,coverage:96.4},coverage:{...files,'src/orders/payment.service.js':92.9}});
+  assert.equal(red.exitCode,1);
+  assert.deepEqual(red.report.failures,['bugs 1 > 0','code_smells 3 > 0','security_hotspots_reviewed 50% < 100%','coverage of src/orders/payment.service.js 92.9% < 100%','coverage 96.4% < 100%']);
+  // No hotspot at all is fully reviewed (Sonar has no percentage to show); a project without a coverage scope cannot pass.
+  const none=await run('dash-none',{projectMeasures:{...clean,security_hotspots:0,security_hotspots_reviewed:undefined},coverage:files});
+  assert.equal(none.exitCode,0,JSON.stringify(none.report));
+  const {host}=await fakeSonar(t,{projectMeasures:clean,coverage:files});
+  const unscoped=await sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,'dash-unscoped'))],{config:configFor(host,custody)});
+  assert.equal(unscoped.exitCode,1);
+  assert.match(unscoped.report.reason,/declares no sonar\.coverage\.inclusions/);
+  assertNoSecret(red.report,'dashboard report');
 });

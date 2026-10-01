@@ -14,7 +14,7 @@ import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
-import {loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {coverageInclusionsOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
 
 /**
@@ -39,6 +39,9 @@ import {text} from '../lib/stack-declaration.mjs';
  *        [--project-gate]                    (inside --paths), not the whole project
  *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
  *        [--isolate]
+ *   dashboard --cwd REPO [--key K]           the project's dashboard numbers from its last analysis (bugs, code
+ *                                            smells, vulnerabilities, hotspots reviewed, coverage and the coverage
+ *                                            of every file inside sonar.coverage.inclusions), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
@@ -57,8 +60,9 @@ import {text} from '../lib/stack-declaration.mjs';
  * there and nowhere else; the summary copies them as `gate`): it passes when the slice introduces no open
  * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
  * on a file it added), its duplicated share of the changed source lines is within the duplication
- * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it).
- * Sonar holds no coverage condition and reads no lcov report. Lesser issues are
+ * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it),
+ * and every service it touched (a changed file inside the repository's sonar.coverage.inclusions) is at the coverage
+ * threshold on its own Sonar measure, imported from the be unit run's lcov. Lesser issues are
  * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
  * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
  * gate is recorded as `projectGate`, a note that never blocks; --project-gate makes it the verdict.
@@ -812,10 +816,20 @@ export function duplicatedLinesOf(doc,fileKey){
   return lines;
 }
 
+/** The Sonar `coverage` measure of one file, a number or null when Sonar holds none; {error} when the server cannot answer. */
+async function fileCoverage(cfg,tokens,fileKey){
+  const got=await read(cfg,tokens,`/api/measures/component?component=${encodeURIComponent(fileKey)}&metricKeys=coverage`);
+  if(got.status===404)return {coverage:null};
+  if(!got.reachable||got.status!==200)return {error:got.error??`HTTP ${got.status}`};
+  return {coverage:(got.json?.component?.measures??[]).find(m=>m.metric==='coverage')?.value??null};
+}
+
 /**
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
- * it added), and the duplicated share of its changed source lines. A changed file the server does not know (excluded, not source) is listed as not analyzed.
+ * it added), the duplicated share of its changed source lines, and the coverage of every service it touched
+ * (a changed file inside sonar.coverage.inclusions of `props`; any other file is not a coverage target).
+ * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
 export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate())}){
   const qualifierOf=fileQualifier(props,pkg);
@@ -881,12 +895,26 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
   const lesser=issues.filter(i=>!gate.blockingSeverities.includes(i.severity));
   if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
   if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
+  // Coverage: each service the slice touched, on its own measure (one service below the threshold fails the slice).
+  const inclusions=coverageInclusionsOf(props);
+  const isTarget=coverageTargetOf(inclusions);
+  const measured=[];
+  for(const fileKey of keys){
+    const file=analyzed.get(fileKey);
+    if(qualifierOf(file.path)!=='FIL'||!isTarget(file.path))continue;
+    const got=await fileCoverage(cfg,tokens,fileKey);
+    if(got.error)return {error:`coverage of ${file.path} could not be read: ${got.error}`};
+    measured.push({path:file.path,coverage:got.coverage});
+  }
+  const coverage=judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+  failures.push(...coverage.failures);
   return {error:null,result:{
     analyzedFiles:keys.length,notAnalyzed,
     newIssues:{total:issues.length,blocking:blocking.length,notBlocking:lesser.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
       items:[...blocking,...lesser].slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message,blocking:gate.blockingSeverities.includes(i.severity)}))},
     newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
     duplication,
+    coverage,
     verdict:failures.length?'fail':'pass',
     failures,
   }};
@@ -1064,7 +1092,7 @@ export async function scan(cfg,options={}){
     if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
     const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
     if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
-    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc`);
+    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc,coverage`);
     if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
     // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
     // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
@@ -1095,6 +1123,47 @@ export async function scan(cfg,options={}){
   }
 }
 
+/** The dashboard metrics of a project: the issue types, the hotspots and the coverage of knowledge/sonar-gate.yaml `overall`. */
+export const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'security_hotspots',gate.overall.hotspots.metric,gate.overall.coverage.metric];
+
+/**
+ * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and
+ * vulnerabilities 0, every hotspot reviewed, coverage at the threshold on every file inside the repository's
+ * sonar.coverage.inclusions (the services) and overall. It reads, it never scans: run `scan --project-gate --wait`
+ * first. Exit 0 pass, 1 fail, 2 blocked (server down, no token, no analysis).
+ */
+export async function dashboard(cfg,options={}){
+  const cwd=path.resolve(options.cwd??process.cwd());
+  const props=readProperties(path.join(cwd,'sonar-project.properties'));
+  const key=options.key??cfg.declaredKey??props['sonar.projectKey']??null;
+  const gate=loadSonarGate();
+  const inclusions=coverageInclusionsOf(props);
+  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageInclusions:inclusions};
+  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{})});
+  if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
+  if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
+  const server=await call(cfg,'GET','/api/system/status');
+  if(!(server.reachable&&server.json?.status==='UP'))return finish('blocked',server.reachable?`SonarQube at ${cfg.host} reports ${server.json?.status??`HTTP ${server.status}`}`:downMessage(cfg,server,containerState(cfg)));
+  const admin=readCustody(cfg,cfg.adminToken);
+  const token=await projectToken(cfg,{key,admin,tokenRef:options.tokenRef,mint:false});
+  const tokens=[...(token.present?[token.value]:[]),...(admin.present?[admin.value]:[])];
+  if(!tokens.length)return finish('blocked',`no token can read ${key} (${token.reason}); repair the source stack custody - never ask the owner for it.`);
+  const component=encodeURIComponent(key);
+  const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}`);
+  if(project.status===404)return finish('blocked',`${key} has no analysis on ${cfg.host}: run scan --project-gate --wait first`);
+  if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??`HTTP ${project.status}`}`);
+  const measures=Object.fromEntries((project.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
+  const tree=await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components');
+  if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
+  const files=tree.items.map(item=>({path:item.path,coverage:(item.measures??[]).find(m=>m.metric===gate.overall.coverage.metric)?.value??null}));
+  const judged=judgeDashboard({measures,files,inclusions},gate);
+  summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}`;
+  summary.numbers=judged.numbers;
+  summary.coverage=judged.coverage;
+  summary.failures=judged.failures;
+  return finish(judged.verdict,judged.failures.length?`the dashboard fails: ${judged.failures.join('; ')}`:null);
+}
+
 // ---- CLI ------------------------------------------------------------------------------------------------
 
 const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
@@ -1109,6 +1178,9 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--project-gate]                 (default base HEAD); --project-gate judges the whole-project gate instead
        [--out FILE.json | --blob] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
+  dashboard --cwd REPO [--key K]          the dashboard numbers of the project's last analysis: bugs, code smells,
+                                          vulnerabilities, hotspots reviewed, coverage and the coverage of every
+                                          file inside sonar.coverage.inclusions; fails unless all are at the gate
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
@@ -1168,6 +1240,9 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
       base:args.base,paths:args.paths,projectGate:args.projectGate,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
+    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
+  }else if(command==='dashboard'){
+    report=await dashboard(cfg,{cwd:args.cwd,key:args.key,tokenRef:args.tokenRef});
     if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   const safeReport=JSON.parse(scrub(JSON.stringify(report)));
