@@ -22,8 +22,8 @@
 //      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers, check-worktree-add (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
-//      the clean-install proof of every published package the change touches (packageProofCheck:
-//        scripts/gates/package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
+//      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
+//      the FULL `starci check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -79,6 +79,7 @@ import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-cha
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
+import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs';
 
@@ -524,10 +525,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
     const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
     checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
   }
-  const mirror = mirrorDriftCheck({ dir, changed, baseline });
-  if (mirror) checks.push(mirror);
-  const proof = packageProofCheck({ dir, base });
-  if (proof) checks.push(proof);
+  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir, run)]) if (step) checks.push(step);
   let coverage;
   try {
     const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
