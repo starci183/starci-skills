@@ -264,3 +264,76 @@ test('BE_INTEGRATION_SPEC_MISSING: a correct pair passes, inline or through an e
   const peer = specText({ modules: '[() => PayModule.register({})]', outage: 'await world.apps.order.during(async () => undefined)' });
   assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: peer })), []);
 });
+
+// ------------------------------------------------------------------------------------------------ R113 FE_GRAPHQL_CONTRACT
+
+const SHOP_CONTRACT = `"""The shop service."""
+scalar DateTime
+
+enum Channel {
+  EMAIL
+  PUSH
+}
+
+input AddItemInput {
+  productId: ID!
+  quantity: Int!
+  note: String
+}
+
+type ItemType {
+  productId: ID!
+  quantity: Int!
+  channel: Channel!
+  at: DateTime!
+}
+
+type Query {
+  cart: [ItemType!]!
+  item(input: ItemInput!): ItemType!
+}
+
+input ItemInput {
+  productId: ID!
+}
+
+type Mutation {
+  addItem(input: AddItemInput!): ItemType! @deprecated(reason: "kept")
+}
+`;
+const PEOPLE_CONTRACT = 'type Query {\n  me: PersonType!\n}\n\ntype PersonType {\n  personId: ID!\n}\n';
+const withDocuments = (documents) => (dir) => {
+  put(dir, 'be/contracts/shop/schema.graphql', SHOP_CONTRACT);
+  put(dir, 'be/contracts/people/schema.graphql', PEOPLE_CONTRACT);
+  for (const [name, text] of Object.entries(documents)) put(dir, `fe/apps/web/src/modules/services/${name}.graphql`, text);
+};
+const r113 = (documents) => only(checkRepo({ repoRoot: repoOf(APP, withDocuments(documents)) }), 'FE_GRAPHQL_CONTRACT');
+
+test('FE_GRAPHQL_CONTRACT: documents that match their contract pass, each judged by the contract serving its root field', () => {
+  assert.deepEqual(r113({
+    'add-item': 'mutation AddItem($input: AddItemInput!) {\n  addItem(input: $input) { productId quantity channel at }\n}\n',
+    item: 'query Item($productId: ID!) {\n  item(input: { productId: $productId }) { ...Line }\n}\nfragment Line on ItemType { productId __typename }\n',
+    me: '# the signed-in person\nquery Me { me { personId } }\n',
+    cart: '{ cart { productId } }\n',
+  }), []);
+});
+
+test('FE_GRAPHQL_CONTRACT: an argument the contract does not take, a missing input and an unused variable are named on the document', () => {
+  const findings = r113({ 'add-item': 'mutation AddItem($input: AddItemInput!) {\n  addItem(request: $input) { productId }\n}\n' });
+  assert.deepEqual(findings.map((f) => [f.path, f.operation, f.service]), [['fe/apps/web/src/modules/services/add-item.graphql', 'AddItem', 'shop']]);
+  assert.match(findings[0].message, /passes request, which Mutation\.addItem does not take \(it takes input\)/);
+  assert.match(findings[0].message, /omits input, which Mutation\.addItem requires/);
+  assert.match(findings[0].message, /declares \$input, which no argument uses/);
+});
+
+test('FE_GRAPHQL_CONTRACT: unknown fields, input fields, missing required input fields, variable types and selection shapes are refused', () => {
+  const problems = (text) => r113({ doc: text }).flatMap((f) => f.problems ?? [f.message]);
+  assert.match(problems('query Q { cart { productId sku } }\n').join(), /Q\.cart\.sku is not a field of ItemType/);
+  assert.match(problems('query Q { cart }\n').join(), /Q\.cart is a ItemType, which needs a selection/);
+  assert.match(problems('query Q { cart { quantity { value } } }\n').join(), /Q\.cart\.quantity is a Int, which selects no fields/);
+  assert.match(problems('query Q($id: String!) { item(input: { productId: $id }) { productId } }\n').join(), /takes ID!, but \$id is String!/);
+  assert.match(problems('mutation M { addItem(input: { productId: "p", colour: "red" }) { productId } }\n').join(), /names colour, which the input AddItemInput does not declare/);
+  assert.match(problems('mutation M { addItem(input: { productId: "p" }) { productId } }\n').join(), /omits quantity, which the input AddItemInput requires/);
+  assert.match(problems('query Q { orders { id } }\n').join(), /asks query orders, but no contract of .* declares query orders/);
+  assert.match(problems('query Q { cart { productId }\n').join(), /is not a GraphQL document/);
+});
