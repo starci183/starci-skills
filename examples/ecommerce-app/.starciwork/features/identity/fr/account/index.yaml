@@ -18,7 +18,7 @@ composes:
   - rule: br.identity.account
     module: be/src/modules/domain/account
   - rule: br.identity.account
-    module: be/src/modules/integrations/order
+    module: be/src/modules/integrations/order-api
 
 requiresProof:
   unit:

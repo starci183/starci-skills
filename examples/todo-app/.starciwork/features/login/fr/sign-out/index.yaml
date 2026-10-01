@@ -8,7 +8,7 @@ mainFlow:
   - The session ends and the next request is unauthenticated.
 composes:
   - rule: br.login.session.restores
-    module: be/src/modules/domain/session
+    module: be/src/modules/domain/identity
 
 requiresProof:
   unit:
