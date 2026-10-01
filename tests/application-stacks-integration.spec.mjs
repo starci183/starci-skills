@@ -54,7 +54,7 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-package-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-package-'));fs.rmSync(directory,{recursive:true,force:true});});
   // Minimal stack-kit fixture: only the authored compose input plus planted materialized/secret files.
-  const base='examples/todo-app/be/.starcistacks/dev/';
+  const base='examples/todo-app/.starcistacks/dev/';
   for(const suffix of ['infra/compose/compose.yaml','secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');

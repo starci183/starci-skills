@@ -7,6 +7,12 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane ROOT (owner correction): `.starcistacks/` and `.sops.yaml` live at the app root, beside `fe/`, `be/` and `.starciwork`, never under `be/`. Contract change `starcistacks-app-root`.
+  - hfs 4.0.2, eslint-canon-be 3.0.2, eslint-canon-fe 8.0.2 (their bundled slots, canon-pins and failure codes change), `@starci/test-world` 1.0.2. The code-patterns binding of the bumped canons is the owner's (publish, then rebind); until then `npm run check` reports `CANON_BINDING_DIGEST` for them.
+  - Slots `app.starcistacks` and `app.sops` replace `be.starcistacks` and `be.sops`; a side holding `.starcistacks/` or `.sops.yaml` is `HFS_FORBIDDEN_PRESENT` (repo.side-root-forbidden), and the machine reports `HFS_STACKS_IN_SIDE` for either side (it replaces `HFS_STACKS_IN_FE`).
+  - `custody.sealed` is `.starcistacks/<env>/secrets/<slug>.enc`, app-relative (schema pattern, `SEALED_LOCATION_RE`, check-example-work); the side form `be/.starcistacks/...` is refused by name (`SEALED_CUSTODY_LOCATION`, `HFS_IDENTITY_CUSTODY`).
+  - The managed `.gitignore` block carries the custody rules; the scaffold writes `.starcistacks/application-stacks.yaml` and `.sops.yaml` at the root; R47 `test-world-files`, R84 `connection-map`, the Sonar key and `hfs work-hygiene` read the root tree.
+  - The examples moved with `git mv` (`examples/todo-app/.starcistacks`, `examples/ecommerce-app/.starcistacks`, both `.sops.yaml`); their world setup, Keycloak realm path, port projection readers and records point at the root.
 - eslint-canon-be 3.0.1 and eslint-canon-fe 8.0.1 republish the canons, because their bundled `canon-pins.yaml` copy now pins hfs 4.0.1. No rule changed.
 - `check-doc-language` judges only the repository's documents: tracked files and untracked files git does not ignore. The owner's git-ignored local `config.yaml` is not a repository document, and judging it made `npm run check` red only in the main checkout. Outside a git work tree every file is judged. Spec in `tests/architecture-doc-language.spec.mjs`.
 - Lane DIGEST: the canon content digest is verified again (its only verifier went with `check-scoped-lint.mjs` in b0436ee93). Contract change `canon-content-digest`.

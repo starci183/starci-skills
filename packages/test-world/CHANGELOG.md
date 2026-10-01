@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Changed: every path a declaration names (`stack`, seeds, the Keycloak realm, k3d Dockerfiles) resolves from the app root: `appRootOf` finds the directory of the app's `hfs.json` from the jest rootDir (the rootDir itself or its parent, the be side's app). `.starcistacks` lives at the app root, never under `be/`. An explicit `root` still wins.
+
 ## 1.0.1
 
 - Added: `world.keycloak.events(personId)` and `world.keycloak.sessions(personId)`: the user events the repository realm

@@ -11,15 +11,14 @@ const path = () => process.getBuiltinModule("node:path")
 
 /**
  * The resolved port projection reader, mirroring the back end's AppConfigService bargain: there is
- * one runtime projection - `be/.starcistacks/dev/infra/metadata.json` of the app - and consumers READ
+ * one runtime projection - `.starcistacks/dev/infra/metadata.json` at the app root - and consumers READ
  * it instead of keeping a second copy that agrees only until somebody moves the offset.
  *
- * The projection lives in the back-end side of the app, so the upward walk from the process cwd looks
- * for `be/.starcistacks/dev/infra/metadata.json` per ancestor (the app root holds it) - the same walk as the
- * BE's own `findMetadataFile`. The caller's config module passes the file outright when a deployment or a
- * test injects it; a missing or malformed projection throws rather than guessing.
+ * The projection lives in the app root's `.starcistacks`, so the upward walk from the process cwd looks
+ * for `.starcistacks/dev/infra/metadata.json` per ancestor (the app root holds it). The caller's config
+ * module passes the file outright when a deployment or a test injects it; a missing or malformed
+ * projection throws rather than guessing.
  */
-const BACK_END_SIDE = "be"
 const PROJECTION_REL = [".starcistacks", "dev", "infra", "metadata.json"]
 
 /** The origin of each service and app of the product, as the projection allocates them. */
@@ -30,7 +29,7 @@ export interface ProjectedOrigins {
     readonly shop: string
 }
 
-/** The metadata file: the injected path when there is one, else the projection of the nearest app's back end. */
+/** The metadata file: the injected path when there is one, else the projection of the nearest app root. */
 const findMetadataFile = (injected: string | undefined): string => {
     if (injected) {
         if (!fs().existsSync(injected)) throw new Error(`the injected projection ${injected} does not exist.`)
@@ -38,12 +37,12 @@ const findMetadataFile = (injected: string | undefined): string => {
     }
     let dir = path().resolve(process.cwd())
     for (;;) {
-        const candidate = path().join(dir, BACK_END_SIDE, ...PROJECTION_REL)
+        const candidate = path().join(dir, ...PROJECTION_REL)
         if (fs().existsSync(candidate)) return candidate
         const parent = path().dirname(dir)
         if (parent === dir) {
             throw new Error(
-                `no ${BACK_END_SIDE}/${PROJECTION_REL.join("/")} found from ${process.cwd()} upward; inject its path.`,
+                `no ${PROJECTION_REL.join("/")} found from ${process.cwd()} upward; inject its path.`,
             )
         }
         dir = parent
@@ -57,7 +56,7 @@ const originOf = (ports: Readonly<Record<string, unknown>>, key: keyof Projected
 }
 
 /**
- * The projected origins of the product, read from `injected` (or the back end's metadata.json); a
+ * The projected origins of the product, read from `injected` (or the app root's metadata.json); a
  * partial projection is a broken projection. A caller's environment override is applied in its own config
  * module, never here.
  */

@@ -1,6 +1,6 @@
 // hfs work-hygiene: the guard for the two trees an app tracks besides source. A file under the app root's .starciwork must be
-// product content (the .starciwork/.gitignore allowlist admits it, so agent output is refused), and a file under the be side's
-// be/.starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
+// product content (the .starciwork/.gitignore allowlist admits it, so agent output is refused), and a file under the app root's
+// .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
 // any tree, is read from the index and judged with the one secret judgement of `hfs check` (scripts/lib/hfs-rules/secrets.mjs: a secret by
 // being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
 // .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. The pre-commit hook judges the staged
@@ -18,9 +18,9 @@ import { pathToFileURL } from 'node:url';
 import { secretFileFindings } from '../runtime/scripts/lib/hfs-rules/secrets.mjs';
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
-/** The app root's work tree and the be side's stack tree, app-relative (hfs work-hygiene runs at the app root). */
+/** The app root's work tree and stack tree, app-relative (hfs work-hygiene runs at the app root). */
 const WORK = '.starciwork/';
-const STACKS = 'be/.starcistacks/';
+const STACKS = '.starcistacks/';
 const GUARDED = file => file.startsWith(WORK) || file.startsWith(STACKS);
 
 /** The subset of `files` git ignores (as if untracked), asked in one call: a Set of paths. */
@@ -44,7 +44,7 @@ export function hygieneFindings(files, ignored) {
     }
     if (file.startsWith(STACKS) && !file.endsWith('.enc') && !file.endsWith('.env.example')) {
       if (file.includes('/secrets/')) findings.push({ file, code: 'HFS_PLAINTEXT_SECRET', message: 'sits under secrets/ but is not sealed; only <slug>.enc may be tracked' });
-      else if (PLAINTEXT_NAME.test(file)) findings.push({ file, code: 'HFS_PLAINTEXT_SECRET', message: 'is a plaintext secret; seal it to be/.starcistacks/<env>/secrets/<slug>.enc' });
+      else if (PLAINTEXT_NAME.test(file)) findings.push({ file, code: 'HFS_PLAINTEXT_SECRET', message: 'is a plaintext secret; seal it to .starcistacks/<env>/secrets/<slug>.enc' });
     }
   }
   return findings;

@@ -26,7 +26,7 @@ export interface PostgresConnectionDeclaration {
     readonly name: string
     /** The entity classes the shared `EntityManager` of this connection maps; raw `query` needs none. */
     readonly entities?: ReadonlyArray<unknown>
-    /** SQL files (relative to the repository root) applied after the migrate step, in order. */
+    /** SQL files (relative to the app root) applied after the migrate step, in order. */
     readonly seeds?: ReadonlyArray<string>
     /** Extensions created in the database before the migrate step (`vector`, `pgcrypto`, ...). */
     readonly extensions?: ReadonlyArray<string>
@@ -44,7 +44,7 @@ export interface PostgresStack {
 
 /** The `stacks` entry of Keycloak. */
 export interface KeycloakStack {
-    /** Path (relative to the repository root) of the realm import JSON; the realm is imported per repository under a prefixed name. */
+    /** Path (relative to the app root) of the realm import JSON; the realm is imported per repository under a prefixed name. */
     readonly realm: string
     /** The public client that allows the password grant; default is the first client of the realm file that enables direct access grants. */
     readonly clientId?: string
@@ -85,7 +85,7 @@ export interface StacksDeclaration {
 export interface K3dDeclaration {
     /** Whether the world starts (or attaches to) the shared cluster. */
     readonly enable: boolean
-    /** Images the repository builds itself: logical name to Dockerfile path (relative to the repository root); tagged `src-<content hash>`. */
+    /** Images the repository builds itself: logical name to Dockerfile path (relative to the app root); tagged `src-<content hash>`. */
     readonly images?: Readonly<Record<string, string>>
 }
 
@@ -210,7 +210,7 @@ export interface TestWorldConfig<
     TStacks extends StacksDeclaration = StacksDeclaration,
     TMigrate = never,
 > {
-    /** The stack definition directory, relative to the repository root (`.starcistacks/dev`); service list and image versions come from its compose files. */
+    /** The stack definition directory, relative to the app root (`.starcistacks/dev`, never under be/); service list and image versions come from its compose files. */
     readonly stack: string
     /** Selection and overrides of the infrastructure services. */
     readonly stacks: TStacks
@@ -230,7 +230,7 @@ export interface TestWorldConfig<
     readonly modules?: ModulesDeclaration
     /** The contract layer (`useSandbox`): the base modules of a provider sandbox client. */
     readonly sandbox?: SandboxDeclaration
-    /** The repository root; default `process.cwd()` of the jest run. */
+    /** The app root every declared path is relative to; default the directory of the app's hfs.json found from the jest rootDir (the rootDir itself or its parent). */
     readonly root?: string
     /** Nest logger levels of the booted apps (default `["error", "warn"]`). */
     readonly logger?: ReadonlyArray<"log" | "error" | "warn" | "debug" | "verbose" | "fatal">

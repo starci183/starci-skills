@@ -49,7 +49,7 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
   put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, dependencies: { 'next-intl': PINS['next-intl'].version } })}\n`);
   writeTargets(dir, renderTargets(declaration, PRESETS));
   // The file a rule reads the content of that the render does not write: the be side's stack declaration.
-  put('be/.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
+  put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
   const required = resolver.requiredPaths().paths.map((entry) => entry.path);
   for (const p of required) if (!p.endsWith('/')) put(p, p === 'hfs.json' ? '' : p.endsWith('.json') ? '{}\n' : /^be\/apps\/[^/]+\/src\/app\.module\.ts$/.test(p) ? 'export class AppModule {}\n' : 'export {};\n');
   for (const app of declaration.sides.fe.apps) {

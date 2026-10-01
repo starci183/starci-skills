@@ -1,14 +1,12 @@
-// The Sonar project key of an app: read from its stack declaration (be/.starcistacks/application-stacks.yaml,
+// The Sonar project key of an app: read from its stack declaration (.starcistacks/application-stacks.yaml at the app root,
 // services.sonar.projects[]) when one names the app, so there is one source of the key. Only when no declaration names the app
 // does sync derive the key from the project name.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
 
-/** The side folder that holds an app's stack declaration. */
-export const STACKS_SIDE = 'be';
-/** The stack declaration, app-relative. */
-export const DECLARATION = path.join(STACKS_SIDE, '.starcistacks', 'application-stacks.yaml');
+/** The stack declaration, app-relative: .starcistacks sits at the app root, beside be/, fe/ and .starciwork. */
+export const DECLARATION = path.join('.starcistacks', 'application-stacks.yaml');
 
 /** The repository name the declaration lists its projects under: the app package.json name, else the folder name. */
 export function repositoryName(root) {

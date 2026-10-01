@@ -40,12 +40,12 @@ test('a stray file, a file without a role suffix, an unknown folder or a role fi
   assert.match(hits(report)[0].message, /holds only/);
 });
 
-// R47 test-world-files, owner refinement 2026-09-30: every service the dev stack (.starcistacks/dev) declares runs real in the
+// R47 test-world-files, owner refinement 2026-09-30: every service the dev stack (the app root's .starcistacks/dev) declares runs real in the
 // world, so a fake of one (a fakes/<provider>/ folder or a fakes entry of the declaration) is refused; the one exception is
 // stateless GPU/model compute whose stacks entry in the declaration (test-world.config.ts) says { fakedBy, reason }. The
 // declaration is read in @starci/test-world's shape and in its one named form: export const { ... } = defineTestWorld({ ... }).
 const STACK = (services, extra = {}) => ({
-  '.starcistacks/application-stacks.yaml': [
+  '../.starcistacks/application-stacks.yaml': [
     'schema: starci/application-stacks@1',
     'components:',
     ...Object.entries(services).flatMap(([name, image]) => [`  ${name}:`, `    image: ${image}`, '    role: stateful']),
@@ -56,7 +56,7 @@ const STACK = (services, extra = {}) => ({
     '    composeFiles: [infra/compose/compose.yaml]',
     '',
   ].join('\n'),
-  '.starcistacks/dev/infra/compose/compose.yaml': `services:\n${Object.entries(services).map(([name, image]) => `  ${name}:\n    image: ${image}\n${extra[name] ?? ''}`).join('')}`,
+  '../.starcistacks/dev/infra/compose/compose.yaml': `services:\n${Object.entries(services).map(([name, image]) => `  ${name}:\n    image: ${image}\n${extra[name] ?? ''}`).join('')}`,
 });
 const STACK_SERVICES = { postgres: 'postgres:16', redis: 'redis:7', keycloak: 'quay.io/keycloak/keycloak:26.0', toxiproxy: 'ghcr.io/shopify/toxiproxy:2.9.0' };
 const runStack = (t, files, services = STACK_SERVICES, extra = {}) => runArch(archFixture(t, { files: { ...GOOD, ...STACK(services, extra), ...files }, ...DECLARE }));
@@ -137,10 +137,10 @@ test('the declaration stack names the environment the world runs: a service of a
   const files = {
     ...FAKE('cache'), ...FAKE('postgres'),
     ...CONFIG("{ stack: '.starcistacks/uat', stacks: { redis: {} } }"),
-    '.starcistacks/uat/infra/compose/compose.yaml': 'services:\n  redis:\n    image: redis:7\n',
+    '../.starcistacks/uat/infra/compose/compose.yaml': 'services:\n  redis:\n    image: redis:7\n',
   };
   const stack = STACK(STACK_SERVICES);
-  stack['.starcistacks/application-stacks.yaml'] = stack['.starcistacks/application-stacks.yaml'].replace('environments:\n', 'environments:\n  uat:\n    status: supported\n    runtime: docker-compose\n    composeFiles: [infra/compose/compose.yaml]\n');
+  stack['../.starcistacks/application-stacks.yaml'] = stack['../.starcistacks/application-stacks.yaml'].replace('environments:\n', 'environments:\n  uat:\n    status: supported\n    runtime: docker-compose\n    composeFiles: [infra/compose/compose.yaml]\n');
   const report = runArch(archFixture(t, { files: { ...GOOD, ...stack, ...files }, ...DECLARE }));
   assert.deepEqual(paths(report), ['src/tests/world/fakes/cache/server.ts']);
 });

@@ -1,8 +1,9 @@
 // hfs scaffold app <name> - the first tree of a new app, the one shape every StarCi product has:
 //
 //   <name>/            hfs.json (kind app), package.json (every dependency of both sides at its canon pin, the managed scripts),
-//                      package-lock.json, README.md, the managed root files (CI, husky, .gitignore block, Sonar, prettier) and
-//                      .starciwork; scripts/codegen.mjs, the app's own step of `npm run codegen`
+//                      package-lock.json, README.md, the managed root files (CI, husky, .gitignore block, Sonar, prettier),
+//                      .starciwork, .starcistacks/application-stacks.yaml and .sops.yaml (the stack tree lives at the app root, never
+//                      under be/); scripts/codegen.mjs, the app's own step of `npm run codegen`
 //   <name>/be/         the back-end side: the managed tool configuration and the templates/be/skeleton tree (the api app's
 //                      entrypoint, platform config/logging/errors/clock/cqrs, the liveness capability and the health feature)
 //   <name>/fe/         the front-end side: the managed tool configuration and the templates/fe/skeleton tree (the next-intl

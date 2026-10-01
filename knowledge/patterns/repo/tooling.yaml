@@ -63,7 +63,7 @@ rules:
       `packages/hfs/templates/` and hash-checked: the root `.husky/{pre-commit,pre-push}`, `.github/workflows/ci.yml` (and the
       optional `e2e.yml`), the managed block of `.gitignore`, `sonar-project.properties`, `.prettierrc`, `.prettierignore` and
       the `scripts` block of `package.json`, plus each side's tool configuration (REPO-TOOLING-1). The managed list is the
-      `managedBy` slots of `slots.yaml`. `be/.sops.yaml` and `be/nest-cli.json` are written once by `hfs scaffold app` and are
+      `managedBy` slots of `slots.yaml`. `.sops.yaml`, `.starcistacks/application-stacks.yaml` and `be/nest-cli.json` are written once by `hfs scaffold app` and are
       the app's own afterwards. Any difference from the render is a finding; the fix is to run `hfs sync --write`, never to
       edit the file. A template change is a change in `.claude`, after which each app moves to the new `@starci/hfs` pin.
     rationale: |

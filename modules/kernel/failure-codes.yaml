@@ -2808,14 +2808,14 @@ HFS_SRC_LAYOUT_INVALID:
   owner: op-retry
   kind: check-finding
 
-HFS_STACKS_IN_FE:
-  title: "Stack declarations in the front end (fe/)"
-  title_vi: "Khai báo stack nằm trong repo giao diện"
-  meaning_vi: "Repo giao diện đang chứa thư mục .starcistacks, trong khi khai báo stack chỉ được đặt ở repo backend."
+HFS_STACKS_IN_SIDE:
+  title: "Stack declarations under a side (be/ or fe/) instead of the app root"
+  title_vi: "Khai báo stack nằm trong một phía (be/ hoặc fe/) thay vì ở gốc app"
+  meaning_vi: "Một phía của app (be/ hoặc fe/) đang chứa thư mục .starcistacks, trong khi .starcistacks chỉ được đặt ở gốc app, cạnh be/, fe/ và .starciwork."
   causes_vi:
-    - "Sao chép nhầm thư mục stack từ backend sang"
-    - "Worker tạo stack ở sai repo"
-  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
+    - "Còn giữ bố cục cũ be/.starcistacks từ trước khi chuyển về gốc app"
+    - "Worker tạo stack trong một phía thay vì ở gốc app"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải dời thư mục bằng git mv về .starcistacks ở gốc app và sửa mọi đường dẫn trỏ tới nó."
   owner: op-retry
   kind: check-finding
 
@@ -10761,25 +10761,25 @@ git-failed:
   kind: verb-refusal
 
 SEALED_CUSTODY_LOCATION:
-  title: "Sealed secret path is not under be/.starcistacks"
+  title: "Sealed secret path is not under the app root .starcistacks"
   title_vi: "Đường dẫn bí mật đã mã hoá không nằm dưới .starcistacks"
-  meaning_vi: "Trường custody.sealed của bản ghi danh tính hoặc tài nguyên không trỏ tới be/.starcistacks/<môi-trường>/secrets/<slug>.enc, nơi duy nhất được phép giữ bí mật đã mã hoá."
+  meaning_vi: "Trường custody.sealed của bản ghi danh tính hoặc tài nguyên không trỏ tới .starcistacks/<môi-trường>/secrets/<slug>.enc ở gốc app, nơi duy nhất được phép giữ bí mật đã mã hoá; dạng nằm dưới một phía (be/.starcistacks/...) cũng bị từ chối."
   causes_vi:
     - "Đường dẫn trỏ vào .starciwork, ví dụ .starciwork/_resources/identities/<id>/secrets.enc.yaml"
     - "Đường dẫn dùng thư mục con hoặc đuôi khác thay vì <slug>.enc"
     - "Ghi 'none' hoặc để trống thay vì nêu đường dẫn sẽ được mã hoá"
-  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify sửa custody.sealed thành be/.starcistacks/<môi-trường>/secrets/<slug>.enc và chuyển tệp mã hoá (nếu có) tới đó bằng git mv, không đọc nội dung."
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify sửa custody.sealed thành .starcistacks/<môi-trường>/secrets/<slug>.enc và chuyển tệp mã hoá (nếu có) tới đó bằng git mv, không đọc nội dung."
   owner: other-op:work.author
   kind: check-finding
 
 SEALED_FILE_IN_WORK:
   title: "Sealed secret file kept inside .starciwork"
   title_vi: "Tệp bí mật đã mã hoá nằm trong .starciwork"
-  meaning_vi: "Cây Work chứa một tệp mã hoá (.enc); cây Work chỉ được giữ bản ghi danh tính hoặc tài nguyên, còn tệp bí mật phải nằm ở be/.starcistacks/<môi-trường>/secrets/<slug>.enc."
+  meaning_vi: "Cây Work chứa một tệp mã hoá (.enc); cây Work chỉ được giữ bản ghi danh tính hoặc tài nguyên, còn tệp bí mật phải nằm ở .starcistacks/<môi-trường>/secrets/<slug>.enc."
   causes_vi:
     - "Tệp secrets.enc.yaml được đặt cạnh resource.yaml của danh tính"
     - "Tệp mã hoá được sao vào cây Work để tiện đọc"
-  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới be/.starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới .starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
   owner: other-op:work.author
   kind: check-finding
 
@@ -10893,9 +10893,9 @@ HFS_WORK_NODE_RETIRED:
 HFS_IDENTITY_CUSTODY:
   title: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role"
   title_vi: "Bí mật của identity sai chỗ"
-  meaning_vi: "Identity `<id>` trỏ bí mật tới `<path>`; chỉ `be/.starcistacks/<env>/secrets/identity-<slug>.enc` hợp lệ. UAT chọn tài khoản theo role."
+  meaning_vi: "Identity `<id>` trỏ bí mật tới `<path>`; chỉ `.starcistacks/<env>/secrets/identity-<slug>.enc` (đường dẫn tính từ gốc app) hợp lệ; dạng `be/.starcistacks/...` bị từ chối. UAT chọn tài khoản theo role."
   causes_vi:
-    - "Vi phạm luật R09: Identity record (`_resources/identities/<slug>/resource.yaml`) trỏ `custody.sealed` tới `be/.starcistacks/<env>/secrets/identity-<slug>.enc`; UAT `accounts.yaml` chọn identity theo role, không theo flow."
+    - "Vi phạm luật R09: Identity record (`_resources/identities/<slug>/resource.yaml`) trỏ `custody.sealed` tới `.starcistacks/<env>/secrets/identity-<slug>.enc` ở gốc app; UAT `accounts.yaml` chọn identity theo role, không theo flow."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -10903,7 +10903,7 @@ HFS_IDENTITY_CUSTODY:
 HFS_STACKS_SHAPE:
   title: "`.starcistacks` has the standard shape and the host Sonar owner"
   title_vi: "Hình dạng .starcistacks sai"
-  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (danh sách allows của slot be.starcistacks, gồm cả infra/metadata.json) (hoặc còn trỏ `.stacks`)."
+  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (danh sách allows của slot app.starcistacks, gồm cả infra/metadata.json) (hoặc còn trỏ `.stacks`)."
   causes_vi:
     - "Vi phạm luật R10: `.starcistacks/<env>/` chỉ có `README.md`, `environment.json`, `infra/{compose,k8s,terraform}`, `runtime/{config,env}`, `secrets/`, `seeds/`; khối sonar là `owner: host` trỏ `.claude/ext/sonar`; không còn gốc `.stacks`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

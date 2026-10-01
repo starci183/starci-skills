@@ -45,21 +45,21 @@ test('HFS_PLAINTEXT_SECRET: a tracked env file, a key file, a secret value and a
     put(dir, '.env', 'A=1\n');
     put(dir, 'be/certs/server.pem', 'not a key\n');
     put(dir, 'be/src/features/orders/application/keys.ts', `export const key = '${AWS_KEY}';\n`);
-    put(dir, 'be/.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
+    put(dir, '.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
   }) });
   const found = only(result, 'HFS_PLAINTEXT_SECRET');
-  assert.deepEqual(found.map((f) => f.path).sort(), ['.env', 'be/.starcistacks/dev/secrets/db.enc', 'be/certs/server.pem', 'be/src/features/orders/application/keys.ts']);
+  assert.deepEqual(found.map((f) => f.path).sort(), ['.env', '.starcistacks/dev/secrets/db.enc', 'be/certs/server.pem', 'be/src/features/orders/application/keys.ts']);
   assert.deepEqual(only(result, 'HFS_FORBIDDEN_PRESENT'), [], 'a plaintext env file is one finding, under the secret rule');
   const inline = found.find((f) => f.path.endsWith('keys.ts'));
   assert.equal(inline.pattern, 'aws-access-key');
   assert.equal(inline.line, 1);
   assert.ok(!JSON.stringify(found).includes(AWS_KEY), 'a finding never carries the value');
-  assert.match(found.find((f) => f.path === 'be/.starcistacks/dev/secrets/db.enc').message, /not a sops envelope/);
+  assert.match(found.find((f) => f.path === '.starcistacks/dev/secrets/db.enc').message, /not a sops envelope/);
 });
 
 test('HFS_PLAINTEXT_SECRET: a sops envelope, a stand-in value and a spec file are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'be/.starcistacks/dev/secrets/db.enc', SOPS_ENVELOPE);
+    put(dir, '.starcistacks/dev/secrets/db.enc', SOPS_ENVELOPE);
     put(dir, 'be/src/features/orders/application/pay.ts', "export const password = 'fixture-not-a-real-secret-value';\n");
     put(dir, 'be/src/features/orders/application/pay.spec.ts', "export const password = 'a-real-looking-value-12345';\n");
   }) });
@@ -68,43 +68,58 @@ test('HFS_PLAINTEXT_SECRET: a sops envelope, a stand-in value and a spec file ar
 
 // ------------------------------------------------------------------------------------------------ R10 HFS_STACKS_SHAPE
 
-const STANDARD_TREE = ['be/.starcistacks/dev/README.md', 'be/.starcistacks/dev/environment.json', 'be/.starcistacks/dev/infra/compose/compose.yaml', 'be/.starcistacks/dev/runtime/env/KEYS.md',
-  'be/.starcistacks/dev/runtime/config/app.json', 'be/.starcistacks/dev/seeds/01-schema.sql', 'be/.starcistacks/dev/infra/metadata.json'];
+const STANDARD_TREE = ['.starcistacks/dev/README.md', '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/compose/compose.yaml', '.starcistacks/dev/runtime/env/KEYS.md',
+  '.starcistacks/dev/runtime/config/app.json', '.starcistacks/dev/seeds/01-schema.sql', '.starcistacks/dev/infra/metadata.json'];
 
 test('HFS_STACKS_SHAPE: runtime/files, a sealed file outside secrets/, DESIGN.md, a root k8s and a non-host Sonar are refused', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'be/.starcistacks/dev/runtime/files/key.enc', SOPS_ENVELOPE);
-    put(dir, 'be/.starcistacks/dev/runtime/env/app.env.enc', SOPS_ENVELOPE);
-    put(dir, 'be/.starcistacks/DESIGN.md', '# design\n');
-    put(dir, 'be/.starcistacks/k8s/pod.yaml', 'kind: Pod\n');
-    put(dir, 'be/.starcistacks/dev/infra/notes.json', '{}\n');
-    put(dir, 'be/.starcistacks/application-stacks.yaml', STACKS_DECLARATION.replace('owner: host', 'owner: repository'));
+    put(dir, '.starcistacks/dev/runtime/files/key.enc', SOPS_ENVELOPE);
+    put(dir, '.starcistacks/dev/runtime/env/app.env.enc', SOPS_ENVELOPE);
+    put(dir, '.starcistacks/DESIGN.md', '# design\n');
+    put(dir, '.starcistacks/k8s/pod.yaml', 'kind: Pod\n');
+    put(dir, '.starcistacks/dev/infra/notes.json', '{}\n');
+    put(dir, '.starcistacks/application-stacks.yaml', STACKS_DECLARATION.replace('owner: host', 'owner: repository'));
   }) });
-  assert.deepEqual(pathsOf(result, 'HFS_STACKS_SHAPE'), ['be/.starcistacks/DESIGN.md', 'be/.starcistacks/application-stacks.yaml', 'be/.starcistacks/dev/infra/notes.json',
-    'be/.starcistacks/dev/runtime/env/app.env.enc', 'be/.starcistacks/dev/runtime/files/key.enc', 'be/.starcistacks/k8s/pod.yaml']);
+  assert.deepEqual(pathsOf(result, 'HFS_STACKS_SHAPE'), ['.starcistacks/DESIGN.md', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/infra/notes.json',
+    '.starcistacks/dev/runtime/env/app.env.enc', '.starcistacks/dev/runtime/files/key.enc', '.starcistacks/k8s/pod.yaml']);
   assert.match(only(result, 'HFS_STACKS_SHAPE').find((f) => f.path.endsWith('application-stacks.yaml')).message, /not owned by the host/);
 });
 
 test('HFS_STACKS_SHAPE: a service still rooted at .stacks and a declaration with no sonar are refused', () => {
-  const stale = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'be/.starcistacks/application-stacks.yaml', `${STACKS_DECLARATION}  error-tracking:\n    provider: sentry\n    mode: local\n    stack:\n      repository: demo\n      root: .stacks\n      environment: dev\n`)) });
+  const stale = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.starcistacks/application-stacks.yaml', `${STACKS_DECLARATION}  error-tracking:\n    provider: sentry\n    mode: local\n    stack:\n      repository: demo\n      root: .stacks\n      environment: dev\n`)) });
   assert.match(only(stale, 'HFS_STACKS_SHAPE')[0].message, /retired \.stacks root/);
-  const silent = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'be/.starcistacks/application-stacks.yaml', 'schema: starci/application-stacks@1\nservices:\n  error-tracking:\n    provider: sentry\n    mode: disabled\n')) });
+  const silent = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.starcistacks/application-stacks.yaml', 'schema: starci/application-stacks@1\nservices:\n  error-tracking:\n    provider: sentry\n    mode: disabled\n')) });
   assert.match(only(silent, 'HFS_STACKS_SHAPE')[0].message, /no sonar service/);
 });
 
 test('HFS_STACKS_SHAPE: the standard tree with a host-owned Sonar is clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
     for (const file of STANDARD_TREE) put(dir, file, file.endsWith('.json') ? '{}\n' : 'x\n');
-    put(dir, 'be/.starcistacks/dev/secrets/uat.enc', SOPS_ENVELOPE);
+    put(dir, '.starcistacks/dev/secrets/uat.enc', SOPS_ENVELOPE);
   }) });
   assert.deepEqual(only(result, 'HFS_STACKS_SHAPE'), []);
   assert.equal(result.ok, true, JSON.stringify(result.findings.slice(0, 3)));
 });
 
+test('.starcistacks lives at the app root: a be/.starcistacks or be/.sops.yaml is refused (repo.side-root-forbidden), the root form is clean', () => {
+  const side = checkRepo({ repoRoot: repoOf(APP, (dir) => {
+    put(dir, 'be/.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
+    put(dir, 'be/.starcistacks/dev/secrets/uat.enc', SOPS_ENVELOPE);
+    put(dir, 'be/.sops.yaml', 'creation_rules: []\n');
+  }) });
+  const forbidden = only(side, 'HFS_FORBIDDEN_PRESENT');
+  assert.deepEqual(forbidden.map((f) => f.path).sort(), ['be/.sops.yaml', 'be/.starcistacks/application-stacks.yaml', 'be/.starcistacks/dev/secrets/uat.enc']);
+  assert.ok(forbidden.every((f) => f.slot === 'repo.side-root-forbidden'), JSON.stringify(forbidden));
+  assert.equal(side.ok, false);
+  const root = checkRepo({ repoRoot: repoOf(APP) });
+  assert.deepEqual(only(root, 'HFS_FORBIDDEN_PRESENT'), []);
+  assert.deepEqual(only(root, 'HFS_SLOT_REQUIRED_MISSING'), [], 'the app root .starcistacks/application-stacks.yaml and .sops.yaml satisfy the required slots');
+});
+
 test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (stacks-layout.yaml gitignoreRules) agree: every tracked member the shape allows is un-ignored', () => {
   const slots = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8')).slots;
   const layout = parseYaml(fs.readFileSync(path.join(root, 'modules/schemas/stacks-layout.yaml'), 'utf8'));
-  const allows = slots.find((slot) => slot.id === 'be.starcistacks').allows;
+  const allows = slots.find((slot) => slot.id === 'app.starcistacks').allows;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-stacks-ignore-'));
   made.push(dir);
   execFileSync('git', ['init', '-q'], { cwd: dir });
@@ -113,7 +128,7 @@ test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (s
   const tracked = allows.filter((entry) => !/^<env>\/(?:runtime|secrets)\//.test(entry)).flatMap((entry) => braceVariants(entry))
     .map((entry) => `.starcistacks/${entry.replace('<env>', 'dev').replace('**', 'sub/file.yaml')}`);
   assert.ok(tracked.includes('.starcistacks/dev/infra/metadata.json') && tracked.length > 5, tracked.join(', '));
-  for (const file of tracked) assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: dir }).status, 1, `${file} is allowed by the be.starcistacks slot but the custody rules ignore it`);
+  for (const file of tracked) assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: dir }).status, 1, `${file} is allowed by the app.starcistacks slot but the custody rules ignore it`);
   assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', '.starcistacks/dev/infra/compose/.env'], { cwd: dir }).status, 0, 'a value file stays ignored');
 });
 

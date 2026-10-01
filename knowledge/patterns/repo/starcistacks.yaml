@@ -1,9 +1,9 @@
 schema: starci/knowledge-source@1
 id: repo.starcistacks
-title: Back-end .starcistacks
+title: App-root .starcistacks
 purpose: |
-  Given a deployment, runtime or infrastructure declaration, what may live in the app's `be/.starcistacks`? One
-  application stack file and one folder per environment with a fixed shape. The front end has no `.starcistacks`.
+  Given a deployment, runtime or infrastructure declaration, what may live in the app's `.starcistacks` (at the app root)? One
+  application stack file and one folder per environment with a fixed shape. Neither side (`be/`, `fe/`) holds a `.starcistacks`.
 appliesTo:
   - backend
 family: repo
@@ -24,7 +24,7 @@ rules:
     kind: mandatory
     hfsRules: [R10]
     requirement: |
-      `be/.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `vps/`, ...), each holding only
+      `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `vps/`, ...), each holding only
       `README.md`, `environment.json` where the schema asks for it, `infra/{compose,k8s,terraform}/`, `runtime/{config,env}/`,
       `secrets/<slug>.enc` and `seeds/`. `runtime/env/KEYS.md` lists slug names and never values. There is no `runtime/files/`.
       A `DESIGN.md`, `deployment.json` or `k8s/` at its root does not exist; design notes go to `be/docs/` and Kubernetes
@@ -34,15 +34,16 @@ rules:
     cases:
       - id: case-1
         when: A new environment
-        write: be/.starcistacks/vps/{README.md,environment.json,infra/,runtime/,secrets/,seeds/}
+        write: .starcistacks/vps/{README.md,environment.json,infra/,runtime/,secrets/,seeds/}
       - id: case-2
         when: A Kubernetes manifest
-        write: be/.starcistacks/vps/infra/k8s/orders-deployment.yaml
+        write: .starcistacks/vps/infra/k8s/orders-deployment.yaml
     verification:
       automated:
         - HFS_STACKS_SHAPE
+        - HFS_STACKS_IN_SIDE
       manual:
-        - node scripts/checks/check-starcistacks.mjs <app>/be exits 0.
+        - node scripts/checks/check-starcistacks.mjs <app> exits 0 (the app root).
     relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied

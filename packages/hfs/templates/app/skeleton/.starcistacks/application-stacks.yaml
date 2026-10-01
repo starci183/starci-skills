@@ -1,3 +1,4 @@
+# The stack declaration of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
 schema: starci/application-stacks@1
 services:
   sonar:

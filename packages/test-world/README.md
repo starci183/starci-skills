@@ -22,7 +22,7 @@ import { openaiCompatibleFake, sepayFake, smtpFake } from "@starci/test-world/fa
 import { defineTestWorld } from "@starci/test-world"
 
 export const { useTestWorld, useSandbox } = defineTestWorld({
-    stack: ".starcistacks/dev",                       // service list and image versions come from its compose files
+    stack: ".starcistacks/dev",                       // relative to the app root (never be/); service list and image versions come from its compose files
     stacks: {
         postgresql: { connections: [{ name: "primary", seeds: [".starcistacks/dev/seeds/01.sql"] }] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-todo.json", clientId: "todo-api" },

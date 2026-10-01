@@ -1475,7 +1475,7 @@ $defs:
                     custody:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is be/.starcistacks/<env>/secrets/<slug>.enc (app-relative), outside the Work tree."
+                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc at the app root (app-relative), outside the Work tree."
   theme:
     enum:
       - light

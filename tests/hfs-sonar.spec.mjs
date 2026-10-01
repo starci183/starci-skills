@@ -221,23 +221,23 @@ test('HFS_SONAR_CONFIG: a host URL, a dropped report path or any edit of the app
 test('HFS_SONAR_CONFIG: a stack declaration that names another quality gate than the bundled gate file is a finding; the gate name, a disabled Sonar and no declaration are not', async () => {
   const gate = loadSonarGate().gate.name;
   const declare = (dir, sonar) => {
-    fs.mkdirSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'be', '.starcistacks', 'application-stacks.yaml'), `schema: starci/application-stacks@1\nservices:\n  sonar:\n${sonar}\n`);
+    fs.mkdirSync(path.join(dir, '.starcistacks'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.starcistacks', 'application-stacks.yaml'), `schema: starci/application-stacks@1\nservices:\n  sonar:\n${sonar}\n`);
   };
   const dir = repo(APP);
-  const tracked = ['be/.starcistacks/application-stacks.yaml'];
+  const tracked = ['.starcistacks/application-stacks.yaml'];
   const found = async () => (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS })).filter((f) => f.code === 'HFS_SONAR_CONFIG');
   declare(dir, `    provider: sonarqube\n    mode: local\n    qualityGate: ${gate}`);
   assert.deepEqual(await found(), []);
   declare(dir, '    provider: sonarqube\n    mode: local\n    qualityGate: my-own-gate');
   const [wrong] = await found();
-  assert.equal(wrong.path, 'be/.starcistacks/application-stacks.yaml');
+  assert.equal(wrong.path, '.starcistacks/application-stacks.yaml');
   assert.match(wrong.message, new RegExp(`my-own-gate.*${gate}`));
   declare(dir, '    provider: sonarqube\n    mode: local');
   assert.match((await found())[0].message, /is absent/);
   declare(dir, '    provider: sonarqube\n    mode: disabled\n    qualityGate: other');
   assert.deepEqual(await found(), []);
-  fs.rmSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
+  fs.rmSync(path.join(dir, '.starcistacks'), { recursive: true });
   assert.deepEqual(await found(), []);
 });
 

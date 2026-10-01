@@ -181,7 +181,7 @@ changes nothing.
 The host owns `.claude/`, the `.workspaces` project registry and the bootstrap written from
 `init/AGENTS.md`. A project is one app repository: its root owns the project's only `.starciwork` —
 product records for both `be/` and `fe/`. The runtime ledger is outside every repository, so no
-worktree can copy it and no re-clone loses it. Secrets stay in the app's `be/.starcistacks`
+worktree can copy it and no re-clone loses it. Secrets stay in the app root's `.starcistacks`
 custody, encrypted with sops; they never enter a database or a blob.
 
 ## Authorities

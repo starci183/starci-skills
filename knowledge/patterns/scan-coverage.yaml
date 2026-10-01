@@ -41,7 +41,7 @@ observations:
       - HFS_ROOT_SRC_FORBIDDEN_FE
       - HFS_MODULE_TIER_INVALID
       - HFS_WORK_IN_FE
-      - HFS_STACKS_IN_FE
+      - HFS_STACKS_IN_SIDE
       - HFS_PACKAGE_MANAGER_MIXED
   - id: be-tier-and-cycles
     lane: backend

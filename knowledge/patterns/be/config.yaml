@@ -84,7 +84,7 @@ rules:
       (timeouts, concurrency, TTLs, page sizes) may have literal defaults inside `<c>.config.ts` only. An optional integration
       is all-or-nothing: none of its keys set gives `null` and the app composes the capability's disabled variant (or does
       not compose it); some set stops boot with an error that names the missing keys, never the values. Local values live in
-      `be/.starcistacks/local/runtime/env`, never in code. No `process.cwd()` is joined with `src` or `.starcistacks`.
+      `.starcistacks/local/runtime/env`, never in code. No `process.cwd()` is joined with `src` or `.starcistacks`.
     rationale: |-
       A default secret ships to production silently, and a default address points a process at the wrong system.
     cases:
@@ -106,7 +106,7 @@ rules:
     kind: mandatory
     hfsRules: [R06, R09, R10]
     requirement: |-
-      Secrets exist only as sops `*.enc` at `be/.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value never enters the
+      Secrets exist only as sops `*.enc` at `.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value never enters the
       app tree, ignored or not, and is passed at runtime by `*_FILE` from `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`
       or memory. `runtime/env/KEYS.md` lists slug names only. An identity or provider record points at its slug and holds no
       value. Agents never read, print, generate or rotate a secret.
@@ -115,7 +115,7 @@ rules:
     cases:
       - id: case-1
         when: A database password
-        write: 'sealed at be/.starcistacks/dev/secrets/orders-db-password.enc and read by EnvSource from ORDERS_DB_PASSWORD_FILE.'
+        write: 'sealed at .starcistacks/dev/secrets/orders-db-password.enc and read by EnvSource from ORDERS_DB_PASSWORD_FILE.'
     verification:
       automated:
         - HFS_PLAINTEXT_SECRET

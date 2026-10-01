@@ -13,13 +13,13 @@ const APP_ROOT = {
   '../package-lock.json': '{}\n',
   '../sonar-project.properties': 'sonar.projectKey=fixture\n',
   '../.starciwork/.gitignore': 'runtime.sqlite\n',
+  '../.sops.yaml': 'creation_rules: []\n',
+  '../.starcistacks/application-stacks.yaml': 'environments: []\n',
 };
 const SIDE = {
   'eslint.config.mjs': 'export default [];\n',
 };
 const BACKEND = {
-  '.sops.yaml': 'creation_rules: []\n',
-  '.starcistacks/application-stacks.yaml': 'environments: []\n',
   'jest.config.js': 'module.exports = {};\n',
   'nest-cli.json': '{}\n',
 };

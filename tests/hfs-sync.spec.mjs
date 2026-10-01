@@ -165,6 +165,14 @@ describe('.gitignore', () => {
       assert.ok(text.split('\n').includes(entry), entry);
     }
   });
+  it('carries the .starcistacks custody rules of modules/schemas/stacks-layout.yaml in order, rooted at the app root and never under be/', () => {
+    const rules = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/stacks-layout.yaml'), 'utf8')).custody.gitignoreRules;
+    const lines = block().split('\n');
+    const start = lines.indexOf(rules[0]);
+    assert.ok(start > 0, 'the custody block is in the managed block');
+    assert.deepEqual(lines.slice(start, start + rules.length), rules, 'every custody rule, in the stacks-layout order');
+    assert.ok(!lines.some(line => /(^|!)be\/\.starcistacks/.test(line)), 'no rule names the side form be/.starcistacks');
+  });
 });
 
 describe('sonar-project.properties', () => {
@@ -200,15 +208,15 @@ describe('the Sonar key', () => {
   const declared = (t, name) => {
     const dir = repo(t);
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name }));
-    fs.mkdirSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'be', '.starcistacks', 'application-stacks.yaml'), 'stack');
+    fs.mkdirSync(path.join(dir, '.starcistacks'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.starcistacks', 'application-stacks.yaml'), 'stack');
     return dir;
   };
   const sync = (mode, dir, parseYaml, out = () => {}) => runSync([mode], { cwd: dir, out, presets: PRESETS, parseYaml });
   it('is derived from hfs.json when no stack declaration names one', () => {
     assert.match(rendered()['sonar-project.properties'], /^sonar.projectKey=nivo$/m);
   });
-  it('is the key services.sonar of be/.starcistacks declares for this app', async t => {
+  it('is the key services.sonar of .starcistacks declares for this app', async t => {
     const dir = declared(t, 'nivo');
     assert.equal(await sync('--write', dir, () => declaration('gh/starci-lab/nivo')), 0);
     assert.match(fs.readFileSync(path.join(dir, 'sonar-project.properties'), 'utf8'), /^sonar.projectKey=gh\/starci-lab\/nivo$/m);
@@ -233,9 +241,9 @@ describe('the Sonar key', () => {
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     const fail = message => { throw new Error(message); };
     assert.equal(await readDeclaredSonarKey(dir, { fail }), null);
-    fs.mkdirSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.starcistacks'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'nivo-backend' }));
-    fs.copyFileSync(path.join(ROOT, 'examples', 'starcistacks-services', 'nivo-backend.services.yaml'), path.join(dir, 'be', '.starcistacks', 'application-stacks.yaml'));
+    fs.copyFileSync(path.join(ROOT, 'examples', 'starcistacks-services', 'nivo-backend.services.yaml'), path.join(dir, '.starcistacks', 'application-stacks.yaml'));
     assert.equal(await readDeclaredSonarKey(dir, { fail }), 'nivo-backend');
   });
 });
@@ -422,13 +430,13 @@ describe('work-hygiene', () => {
     const ignored = new Set(['.starciwork/features/a/evidence/run.json']);
     const findings = hygieneFindings([
       '.starciwork/features/a/index.yaml', '.starciwork/features/a/evidence/run.json',
-      'be/.starcistacks/dev/secrets/db.enc', 'be/.starcistacks/dev/secrets/db.txt', 'be/.starcistacks/dev/infra/.env', 'be/.starcistacks/dev/infra/.env.example', 'be/.starcistacks/dev/infra/tls.pem',
+      '.starcistacks/dev/secrets/db.enc', '.starcistacks/dev/secrets/db.txt', '.starcistacks/dev/infra/.env', '.starcistacks/dev/infra/.env.example', '.starcistacks/dev/infra/tls.pem',
     ], ignored);
     assert.deepEqual(findings.map(finding => [finding.file, finding.code]), [
       ['.starciwork/features/a/evidence/run.json', 'HFS_WORK_AGENT_DATA'],
-      ['be/.starcistacks/dev/secrets/db.txt', 'HFS_PLAINTEXT_SECRET'],
-      ['be/.starcistacks/dev/infra/.env', 'HFS_PLAINTEXT_SECRET'],
-      ['be/.starcistacks/dev/infra/tls.pem', 'HFS_PLAINTEXT_SECRET'],
+      ['.starcistacks/dev/secrets/db.txt', 'HFS_PLAINTEXT_SECRET'],
+      ['.starcistacks/dev/infra/.env', 'HFS_PLAINTEXT_SECRET'],
+      ['.starcistacks/dev/infra/tls.pem', 'HFS_PLAINTEXT_SECRET'],
     ]);
   });
   it('is the secrets guard of the commit: a staged file of any tree with a secret value, or an .enc that is no envelope, is refused from the index, and a clean or sealed file passes', async t => {
@@ -440,17 +448,17 @@ describe('work-hygiene', () => {
     const awsKey = ['AKIA', 'ABCDEFGHIJKLMNOP'].join('');
     const sealed = 'ENC[AES256_GCM,data:YWJj,iv:ZGVm,tag:Z2hp,type:str]';
     put('be/src/config.ts', `export const key = '${awsKey}';\n`);
-    put('be/.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
+    put('.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
     put('be/src/clean.ts', 'export const a = 1;\n');
-    put('be/.starcistacks/dev/secrets/sealed.enc', JSON.stringify({ data: sealed, sops: { mac: sealed, age: [] } }));
+    put('.starcistacks/dev/secrets/sealed.enc', JSON.stringify({ data: sealed, sops: { mac: sealed, age: [] } }));
     git('add', '-A');
     put('be/src/config.ts', 'export const key = 1;\n');   // the work tree is clean; the index still holds the secret
     const lines = [];
     assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 1);
     const refused = lines.filter(line => line.startsWith('HFS_PLAINTEXT_SECRET')).map(line => line.split(' ')[1]).sort();
-    assert.deepEqual(refused, ['be/.starcistacks/dev/secrets/db.enc', 'be/src/config.ts']);
+    assert.deepEqual(refused, ['.starcistacks/dev/secrets/db.enc', 'be/src/config.ts']);
     assert.ok(!lines.join('\n').includes(awsKey), 'a finding never prints the value');
-    git('reset', '-q', 'be/src/config.ts', 'be/.starcistacks/dev/secrets/db.enc');
+    git('reset', '-q', 'be/src/config.ts', '.starcistacks/dev/secrets/db.enc');
     assert.equal(await runWorkHygiene({ cwd: dir, out: () => {} }), 0);
   });
   it('asks git which .starciwork files the generated allowlist ignores', async t => {
@@ -496,11 +504,15 @@ describe('hfs scaffold app: the first tree', () => {
   it('writes the root, the be side and the fe side, already in sync, with one package.json at the root and the lockfile left to npm', async t => {
     const { root } = scaffold(t);
     const files = filesUnder(root);
-    for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', 'scripts/codegen.mjs',
+    for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml', '.sops.yaml', 'scripts/codegen.mjs',
       'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/api/src/main.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/api.options.ts',
       'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package(-lock)?\.json$/.test(file)), 'no side and no app holds a package.json or lockfile');
     assert.ok(!files.includes('package-lock.json'), 'the scaffold writes no lockfile by hand: npm resolves it');
+    // .starcistacks and its sops rule live at the app root, beside be/, fe/ and .starciwork; no side holds either.
+    assert.ok(!files.some(file => /^(be|fe)\/(\.starcistacks\/|\.sops\.yaml$)/.test(file)), 'no side holds a .starcistacks or a .sops.yaml');
+    const stacks = parseYaml(read(root, '.starcistacks/application-stacks.yaml'));
+    assert.deepEqual([stacks.services.sonar.stack.owner, stacks.services.sonar.stack.root], ['host', '.claude/ext/sonar'], 'a host-owned Sonar, the standard shape');
     assert.equal(JSON.parse(read(root, 'hfs.json')).kind, 'app');
     // The managed test:stack script runs the starci-test-stack bin, so the root pins its package, @starci/test-world, at its canon pin.
     const manifest = JSON.parse(read(root, 'package.json'));
@@ -583,14 +595,14 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     fs.writeFileSync(path.join(dir, '.prettierignore'), '# hand written\n');
     fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence', 'run.log'), 'log\n');
-    fs.mkdirSync(path.join(dir, 'be', '.starcistacks', 'dev', 'secrets'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'be', '.starcistacks', 'dev', 'secrets', 'db.txt'), 'x\n');
+    fs.mkdirSync(path.join(dir, '.starcistacks', 'dev', 'secrets'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.starcistacks', 'dev', 'secrets', 'db.txt'), 'x\n');
     execFileSync('git', ['add', '-f', '.'], { cwd: dir });
     const result = await checkHfsSync(dir, { presets: PRESETS });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
       ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'],
-      ['HFS_PLAINTEXT_SECRET', 'be/.starcistacks/dev/secrets/db.txt'],
+      ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);
     assert.ok(result.findings.every(finding => CODES.includes(finding.code)));

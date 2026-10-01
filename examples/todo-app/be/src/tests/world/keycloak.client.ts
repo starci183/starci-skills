@@ -16,9 +16,10 @@ const ADMIN_TIMEOUT_MS = 30_000
 const HTTP_CREATED = 201
 const HTTP_OK = 200
 
-/** The realm export the dev stack imports; the world's Keycloak imports the same file. */
+/** The realm export the dev stack imports (the app root's .starcistacks); the world's Keycloak imports the same file. */
 export const REALM_FILE = join(
     __dirname,
+    "..",
     "..",
     "..",
     "..",

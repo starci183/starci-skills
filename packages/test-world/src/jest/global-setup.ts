@@ -16,7 +16,7 @@ const HANDLES_KEY = Symbol.for("@starci/test-world/setup-handles")
 /** The handles of the running setup, or null. */
 export const setupHandles = (): SetupHandles | null => ((globalThis as Record<symbol, unknown>)[HANDLES_KEY] as SetupHandles | undefined) ?? null
 
-/** The globalSetup. `projectConfig.rootDir` is the repository root; without it the working directory is. */
+/** The globalSetup. `projectConfig.rootDir` is the be side (the declaration lives under it); declared paths resolve from its app root (appRootOf). */
 export default async function globalSetup(_globalConfig?: unknown, projectConfig?: { readonly rootDir?: string }): Promise<void> {
     const root = projectConfig?.rootDir ?? process.cwd()
     registerTsPaths(root)

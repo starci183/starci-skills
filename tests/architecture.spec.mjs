@@ -86,8 +86,8 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
 `,
     'tsconfig.json': tsconfig,
     ...(kind === 'backend' ? {
-      '.sops.yaml': 'creation_rules: []\n',
-      '.starcistacks/application-stacks.yaml': 'environments: []\n',
+      '../.sops.yaml': 'creation_rules: []\n',
+      '../.starcistacks/application-stacks.yaml': 'environments: []\n',
       '../.starciwork/.gitignore': 'runtime.sqlite\n',
       'tsconfig.build.json': '{}\n',
       'jest.config.js': 'module.exports = {};\n',

@@ -41,7 +41,7 @@ rules:
       without sandbox config). `be/src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,
       and `test-world.config.ts`, the declaration of the test-world library, `export const { useTestWorld, useSandbox } = defineTestWorld({ stack, stacks, fakes, ... })`); every service of the
-      app's own stack (`be/.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
+      app's own stack (`.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
       library behind toxiproxy, with images and versions read from the stack at run time; `be/src/tests/fixtures/` holds typed
       doubles and builders. There is no `live/` folder and no `be/src/tests/e2e/world`. One `be/jest.config.js` uses the
       preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit

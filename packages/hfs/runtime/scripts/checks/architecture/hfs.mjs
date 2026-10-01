@@ -36,7 +36,7 @@ export const HFS_RULE_IDS = [
   'HFS_ROOT_MARKDOWN_FORBIDDEN',
   'HFS_ROOT_SRC_FORBIDDEN_FE',
   'HFS_SRC_LAYOUT_INVALID',
-  'HFS_STACKS_IN_FE',
+  'HFS_STACKS_IN_SIDE',
   'HFS_TEST_KIND_RETIRED',
   'HFS_WORK_IN_FE',
 ];
@@ -423,9 +423,9 @@ export function checkHfs(config) {
   const allowed = slotRootEntries(resolver, profile);
   for (const entry of [...tree.top].sort()) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
+    if (entry === '.starcistacks') { finding('HFS_STACKS_IN_SIDE', entry, `The ${profile} side must not hold .starcistacks; stack declarations and sealed custody live in the app root .starcistacks.`); continue; }
     if (frontend && !backend) {
       if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'The fe side must not hold a .starciwork tree; Work records live in the app root .starciwork.'); continue; }
-      if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'The fe side must not hold .starcistacks; stack declarations live in be/.starcistacks.'); continue; }
       if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'The fe side keeps source only under apps/<app>/src; the fe/src/ tree must move.'); continue; }
     }
     if (frontend && !backend && (isFeTestPath(entry) || isFeTestPath(`${entry}/x`))) continue;   // a test entry of a front end is FE_NO_TESTS's, the one finding of that path

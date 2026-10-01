@@ -14,7 +14,7 @@
 import { randomBytes } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { NestFactory } from "@nestjs/core"
 import { Client } from "pg"
 import { readStackDefinition, resolveInfraImages, resolveSiblingImages } from "../config/stack-file"
@@ -124,9 +124,22 @@ const attachRequest = (config: AnyTestWorldConfig, root: string, namespace: Name
     }
 }
 
-/** Starts the run and publishes its coordinates. */
+/**
+ * The app root of a jest project: the directory that holds the app's hfs.json, `projectDirectory` itself or the app whose side
+ * folder (be/) it is. Every path a declaration names (`stack`, seeds, the realm, Dockerfiles) is relative to it, because
+ * `.starcistacks` and the one package.json live at the app root, beside be/ and fe/. A directory with no hfs.json at either
+ * place is its own root.
+ */
+export const appRootOf = (projectDirectory: string): string => {
+    const own = resolve(projectDirectory)
+    if (existsSync(join(own, "hfs.json"))) return own
+    const parent = dirname(own)
+    return existsSync(join(parent, "hfs.json")) ? parent : own
+}
+
+/** Starts the run and publishes its coordinates. `rootDirectory` is the jest project's rootDir (the be side of an app). */
 export const setupWorld = async (config: AnyTestWorldConfig, rootDirectory: string): Promise<SetupHandles> => {
-    const root = resolve(config.root ?? rootDirectory)
+    const root = resolve(config.root ?? appRootOf(rootDirectory))
     const selected: ReadonlyArray<InfraName> = validateDeclaration(config, root)
     const definition = readStackDefinition(root, config.stack)
     const images = resolveInfraImages(config.stacks, definition, config.stack).filter((image) => selected.includes(image.service))

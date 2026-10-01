@@ -167,10 +167,20 @@ const RESOURCE_DECLARATIONS = [
   {trail: 'custody.sealed', base: 'repo', what: 'input', digestKey: null},
 ];
 
-// The one place a sealed secret lives (owner 2026-09-29): be/.starcistacks/<env>/secrets/<slug>.enc, a sops (age)
-// file, by app-relative path (.starcistacks is the be side's; the Work tree sits at the app root). The Work tree only holds the identity/resource record whose custody.sealed points there. The same shape
-// is the schema pattern of custody.sealed in modules/schemas/work-resource.schema.yaml.
-export const SEALED_LOCATION_RE = /^be\/\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$/;
+// The one place a sealed secret lives (owner 2026-09-29, corrected 2026-10-01): .starcistacks/<env>/secrets/<slug>.enc,
+// a sops (age) file, by app-relative path: .starcistacks sits at the app root beside be/, fe/ and .starciwork, never under a
+// side. The Work tree only holds the identity/resource record whose custody.sealed points there. The same shape is the
+// schema pattern of custody.sealed in modules/schemas/work-resource.schema.yaml.
+export const SEALED_LOCATION_RE = /^\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$/;
+// A custody path under a side folder (be/.starcistacks/..., fe/.starcistacks/...): the side form, refused by name.
+const SIDE_STACKS_RE = /^(?:be|fe)\/\.starcistacks\//;
+/** Why `sealed` (a custody.sealed text) is not the one location, in words a finding carries; null when it is. */
+export function sealedLocationProblem(sealed) {
+  const text = typeof sealed === 'string' ? sealed.trim() : '';
+  if (SEALED_LOCATION_RE.test(text)) return null;
+  if (SIDE_STACKS_RE.test(text)) return `${text} sits under the ${text.split('/')[0]}/ side; .starcistacks lives only at the app root (.starcistacks/<env>/secrets/<slug>.enc)`;
+  return `${text || '(empty)'} is not .starcistacks/<env>/secrets/<slug>.enc (app-relative)`;
+}
 // A sealed (sops) file kept inside the Work tree, in any of the retired spellings.
 const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.enc$/i;
 
@@ -178,7 +188,7 @@ const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.en
  * Every declaration in one document that the tables name, resolved to an absolute path.
  * `ctx` carries the directories the bases can point at plus the records map (for a `named-record` base).
  * Resolution is value-first: a declaration that already names the tree from its root (`examples/...`,
- * `knowledge/...`, `be/.starcistacks/...`) is read from that root, because a path written out in full is its
+ * `knowledge/...`, `.starcistacks/...` at the app root) is read from that root, because a path written out in full is its
  * own address. Only a short path (`assets/x.png`) needs the base its shape declares.
  */
 function declarationsOf(doc, table, ctx) {
@@ -198,7 +208,7 @@ function declarationsOf(doc, table, ctx) {
   };
   const resolve = (rule, text, entry) => {
     if (text.startsWith('examples/') || text.startsWith('knowledge/')) return {abs: path.join(root, text), base: 'the skill root'};
-    if (text.startsWith('be/.starcistacks/')) return {abs: path.join(ctx.repoRoot, text), base: 'the app root'};
+    if (text.startsWith('.starcistacks/')) return {abs: path.join(ctx.repoRoot, text), base: 'the app root'};
     const {dir, name} = baseFor(rule, entry);
     return {abs: path.join(dir, text), base: name};
   };
@@ -469,10 +479,10 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     return true;
   };
 
-  // ---- no sealed file inside the Work tree: custody lives under be/.starcistacks, the Work tree only points at it ----
+  // ---- no sealed file inside the Work tree: custody lives under the app root's .starcistacks, the Work tree only points at it ----
   for (const file of canonicalWalk(workRoot)) {
     if (SEALED_FILE_RE.test(path.basename(file))) {
-      wrapped.refuse(file, 'SEALED_FILE_IN_WORK', `a sealed secret file is kept under the Work tree; move it to be/.starcistacks/<env>/secrets/<slug>.enc and point custody.sealed at it`);
+      wrapped.refuse(file, 'SEALED_FILE_IN_WORK', `a sealed secret file is kept under the Work tree; move it to .starcistacks/<env>/secrets/<slug>.enc at the app root and point custody.sealed at it`);
     }
   }
 
@@ -495,7 +505,8 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
       ? (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()))
       : false;
     if (sealedMisplaced) {
-      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : '; a sealed secret lives only at be/.starcistacks/<env>/secrets/<slug>.enc (app-relative) and'} the record here names it`);
+      const why = custody.provider === 'none' || typeof sealed !== 'string' ? null : sealedLocationProblem(sealed);
+      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : `; ${why ? `${why}; ` : ''}a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc (app-relative) and`} the record here names it`);
     }
     for (const found of declarationsOf(data, table, ctx)) {
       if (sealedMisplaced && found.trail === 'custody.sealed') continue;

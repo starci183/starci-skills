@@ -28,11 +28,11 @@ reads:
         design, contracts, integrations. A decided record that already settles the question is the
         answer, named by id; the owner is not asked twice.
   - id: environment
-    path: <app>/<bound-paths> + be/.starcistacks/application-stacks.yaml + .starciwork/_resources/identities/<identity-slug>/resource.yaml
+    path: <app>/<bound-paths> + .starcistacks/application-stacks.yaml + .starciwork/_resources/identities/<identity-slug>/resource.yaml
     purpose:
       en: For a credential or configuration question, read where the code reads the value - the exact
         variable name - and which identity:<identity-slug> alias in the selected backend Stack environment
-        (be/.starcistacks/<env>/secrets/<identity-slug>.enc, app-relative) holds it. The resource metadata names the custody and variable.
+        (.starcistacks/<env>/secrets/<identity-slug>.enc, app-relative) holds it. The resource metadata names the custody and variable.
 writes:
   - id: decision
     path: .starciwork/features/<feature>/decision/<slug>/index.yaml

@@ -42,7 +42,7 @@ rules:
       stylelint.config.mjs) and apps/, may hold turbo.json, and has no src/, no test configuration and no e2e/. A side never
       holds a package.json, lockfile, hfs.json, README.md, git, CI, hook, formatter or Sonar file, scripts/ or .starciwork/:
       the root owns them. Anything else moves to its owner: infrastructure, compose, docker and environment templates, seeds
-      and database init to `be/.starcistacks/<env>/`; migrations to the owning capability's `persistence/`; product docs
+      and database init to `.starcistacks/<env>/`; migrations to the owning capability's `persistence/`; product docs
       and workflow notes to `.starciwork` records or a side's `docs/`; code generators to the root `scripts/` or a real
       `be/packages/<pkg>` or `fe/packages/<pkg>`. A missing hfs.json, or a run that analysed zero files, is a failure.
     rationale: |
@@ -125,15 +125,16 @@ rules:
         - Confirm package.json packageManager names npm and the lockfile is the one CI installs.
     relatedExamples: []
   - id: REPO-FOLDER-4
-    title: .starciwork lives at the app root, .starcistacks in be/
+    title: .starciwork and .starcistacks live at the app root
     kind: mandatory
     hfsRules: [R07, R10]
     requirement: |
-      `.starciwork/` is required at the app root: one product record tree per app, for both sides. `be/.starcistacks/` and
-      `be/.sops.yaml` are required in the back end. `fe/` holds neither a .starciwork, a .starcistacks nor a .sops.yaml. See
+      `.starciwork/` is required at the app root: one product record tree per app, for both sides. `.starcistacks/` and
+      `.sops.yaml` are required at the app root too. Neither side holds a .starcistacks or a .sops.yaml (`.starcistacks` is
+      refused, HFS_STACKS_IN_SIDE), and `fe/` holds no .starciwork. See
       starciwork.yaml and starcistacks.yaml for their contents.
     rationale: |
-      One canonical Work tree per app keeps product records authoritative, and deployment custody belongs to the back end.
+      One canonical Work tree per app keeps product records authoritative, and deployment custody is one tree per app beside it.
     cases:
       - id: case-1
         when: Front-end work needs a product record
@@ -141,11 +142,11 @@ rules:
     verification:
       automated:
         - HFS_WORK_IN_FE
-        - HFS_STACKS_IN_FE
+        - HFS_STACKS_IN_SIDE
         - HFS_FORBIDDEN_PRESENT
       manual:
         - node scripts/checks/work-validate.mjs <app>/.starciwork passes.
-        - node scripts/checks/check-starcistacks.mjs <app>/be exits 0.
+        - node scripts/checks/check-starcistacks.mjs <app> exits 0.
     relatedExamples: []
   - id: REPO-FOLDER-5
     title: Storage states, ignored and external

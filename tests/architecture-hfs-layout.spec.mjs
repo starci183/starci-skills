@@ -16,7 +16,7 @@ const APP_ROOT = {
 };
 const ROOT_FE = { ...APP_ROOT, 'eslint.config.mjs': 'export default [];\n', 'stylelint.config.mjs': 'export default {};\n' };
 const APP_FE = Object.fromEntries(['next.config.ts', 'tsconfig.json', 'postcss.config.mjs'].map(name => [`apps/web/${name}`, name.endsWith('.json') ? '{}\n' : 'export default {};\n']));
-const ROOT_BE = { ...APP_ROOT, 'eslint.config.mjs': 'export default [];\n', 'tsconfig.build.json': '{}\n', '.sops.yaml': 'creation_rules: []\n', '.starcistacks/application-stacks.yaml': 'services: {}\n', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
+const ROOT_BE = { ...APP_ROOT, 'eslint.config.mjs': 'export default [];\n', 'tsconfig.build.json': '{}\n', '../.sops.yaml': 'creation_rules: []\n', '../.starcistacks/application-stacks.yaml': 'services: {}\n', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
 const run = (t, profile, files) => runArch(archFixture(t, { profile, files }));
 /** The app-root tree findings over the app whose side folder `side` is. */
 const rootRun = (t, files) => checkHfsWithoutConfig(path.dirname(archFixture(t, { profile: 'fe', files })));

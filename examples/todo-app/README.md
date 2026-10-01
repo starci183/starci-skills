@@ -6,13 +6,13 @@ A todo app with Keycloak sign-in and a Postgres-backed task list: one StarCi app
 
 A domain-first example. The back end signs users in through Keycloak and keeps a Postgres-backed task list scoped by session
 token; the front end draws the screens with `@starci/grammar`. The app root owns the product's `.starciwork` and the back end
-owns `be/.starcistacks/dev` (Postgres + Keycloak, realm `todo`, demo user `demo@todo.dev`). The runtime's own Work-layout and
+owns `.starcistacks/dev` (Postgres + Keycloak, realm `todo`, demo user `demo@todo.dev`). The runtime's own Work-layout and
 architecture checks run directly against this tree.
 
 ## Stack
 
 TypeScript everywhere; NestJS, PostgreSQL and Keycloak in `be/`, Next.js with next-intl in `fe/`; npm with one `package.json`
-and one lockfile at the root. The development services are declared under `be/.starcistacks/dev`.
+and one lockfile at the root. The development services are declared under `.starcistacks/dev`.
 
 ## Repository layout
 
@@ -45,7 +45,7 @@ reads. The web app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL`
 
 ## Configuration and migrations
 
-Every runtime value of the back end comes from the process environment through `EnvSource` (`be/.starcistacks/dev/runtime/env/KEYS.md` lists the keys). The database is the `primary`
+Every runtime value of the back end comes from the process environment through `EnvSource` (`.starcistacks/dev/runtime/env/KEYS.md` lists the keys). The database is the `primary`
 connection: `PRIMARY_DB_URL`. Secrets and hosts have no default: a missing value stops the boot with an error that names the key. A secret may come from a
 file named by `<KEY>_FILE`. Schema changes only by migration, owned by the capability whose table it is (`be/src/modules/{domain,platform}/<c>/persistence/migrations`),
 listed by each owner index and concatenated by `be/apps/migrate` and the apps. Business code reads time through the injected `Clock` (specs use `FakeClock`),
@@ -73,11 +73,11 @@ runner rather than a developer's laptop:
   the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an
   API process restart with `curl` against the running services - never a mock.
 
-The DEMO-ONLY age identity at `be/.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
+The DEMO-ONLY age identity at `.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
 custody. A local operator must provision it before decrypting the committed `.enc` examples; the live CI
 job needs the same provisioned identity before it can run. The encrypted documents hold example values
 only, and this identity must never protect a real credential (see
-`be/.starcistacks/dev/runtime/env/KEYS.md`).
+`.starcistacks/dev/runtime/env/KEYS.md`).
 
 ## Probes and metrics
 

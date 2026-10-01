@@ -7,7 +7,7 @@ import { readProjectedOrigins } from "@ecommerce/api"
  * host is one edit here.
  *
  * The shop is this example's *own* second app, not a backend service, and its port is read from the
- * product's resolved projection (`be/.starcistacks/dev/infra/metadata.json`, `ports.shop`)
+ * product's resolved projection (`.starcistacks/dev/infra/metadata.json`, `ports.shop`)
  * exactly the way the backend services read theirs - `NEXT_PUBLIC_SHOP_URL` names it outright, the
  * projection (`ECOMMERCE_APP_METADATA` injects its path) decides otherwise. No literal port exists in
  * this repository to drift against the allocation.

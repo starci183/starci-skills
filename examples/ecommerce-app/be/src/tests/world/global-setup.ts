@@ -23,7 +23,7 @@ import type { TestDatabaseState, TestRedisState } from "./test-world-state.servi
 const DATABASE_USER = "e2e"
 const DATABASE_READY_DEADLINE_MS = 120_000
 const REDIS_READY_DEADLINE_MS = 60_000
-const SEEDS = join(__dirname, "..", "..", "..", ".starcistacks", "dev", "seeds")
+const SEEDS = join(__dirname, "..", "..", "..", "..", ".starcistacks", "dev", "seeds")
 
 const applySeed = async (url: string, file: string): Promise<void> => {
     const client = new Client({ connectionString: url })

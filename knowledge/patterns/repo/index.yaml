@@ -3,7 +3,7 @@ id: repo.index
 title: Repository patterns
 purpose: |-
   Read knowledge/hfs/README.md (HFS) first. These topics state the app-level law: the root and side map and storage states,
-  the root `.starciwork` and the back end's `be/.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
+  the root `.starciwork` and `.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
   budgets. Each rule cites the HFS rule ids it implements (hfsRules) and the finding codes that judge it
   (verification.automated). The back-end (`be/`) and front-end (`fe/`) source rules inside the tree are in patterns/be and patterns/fe.
 appliesTo:

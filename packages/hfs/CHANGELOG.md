@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.2 - 2026-10-01
+
+- Changed (owner correction): `.starcistacks/` and `.sops.yaml` live at the app root, beside `be/`, `fe/` and `.starciwork`. The slots `be.starcistacks` and `be.sops` are replaced by `app.starcistacks` and `app.sops` (profile app, required); `repo.side-root-forbidden` now lists `.starcistacks/` and `.sops.yaml`, so a side holding either is `HFS_FORBIDDEN_PRESENT`, and the architecture machine reports a `.starcistacks` in either side as `HFS_STACKS_IN_SIDE` (it replaces `HFS_STACKS_IN_FE`). R10 `HFS_STACKS_SHAPE` judges the app root's tree.
+- Changed: the managed `.gitignore` block carries the `.starcistacks` custody rules of `modules/schemas/stacks-layout.yaml` (`custody.gitignoreRules`, in order), rooted at the app root; an app keeps no hand-written custody block.
+- Changed: `hfs scaffold app` writes `.starcistacks/application-stacks.yaml` and `.sops.yaml` at the app root (they were under `be/`); `hfs work-hygiene` guards the app root's `.starcistacks/`; the Sonar key and gate are read from `.starcistacks/application-stacks.yaml` at the app root.
+- Changed: R47 `test-world-files` and R84 `connection-map` read the stack of the app root from the side they judge.
+
 ## 4.0.1 - 2026-10-01
 
 - Fixed: `hfs scaffold app` no longer writes a hand-made lockfile. The 4.0.0 stub held only the root entry, so `npm ci` in a new app failed with EUSAGE ("package.json and package-lock.json are not in sync"). Once the files are written, the scaffold runs `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` in the new app root (registry or npm cache; no node_modules, no scripts), so the lockfile resolves every dependency of the root and its workspaces and `npm ci` accepts it. If npm cannot resolve it, the scaffold exits 2 with `HFS_SCAFFOLD_LOCK_FAILED`, names the step and removes the app it began: no stub lock and no app without a lock is left. There is no switch to skip the step.

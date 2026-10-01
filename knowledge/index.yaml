@@ -41,7 +41,7 @@ branches:
     path: sonar-gate.yaml
     use: The one place the Sonar thresholds live (new code - duplication, blocker/critical issues, unreviewed hotspots, no
       coverage condition - and the overall part), the ops that must pass them and the why codes; an app only names the gate
-      in be/.starcistacks.
+      in the app root's .starcistacks.
   - id: code-examples
     title: Code examples
     path: code-examples/index.yaml
@@ -72,7 +72,7 @@ branches:
   - id: repo-patterns
     title: Repository patterns
     path: patterns/repo/index.yaml
-    use: The repository-level law - root map and storage states, backend-only .starciwork and .starcistacks, sealed
+    use: The repository-level law - root map and storage states, the app-root .starciwork and .starcistacks, sealed
       secrets, shared tooling, the formatter, version pins and size budgets.
   - id: backend-patterns
     title: Backend patterns

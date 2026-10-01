@@ -321,6 +321,27 @@ slots:
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
     forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
+  - id: app.starcistacks
+    profiles: [app]
+    # The stack declarations and the sealed custody of the app, at the app root beside be/, fe/ and .starciwork (never under a side).
+    path: ".starcistacks/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [application-stacks.yaml]
+    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
+             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
+    forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
+    rules: [HFS_STACKS_SHAPE, HFS_STACKS_IN_SIDE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
+  - id: app.sops
+    profiles: [app]
+    # The sops custody rule of .starcistacks/<env>/secrets/*.enc, at the app root beside the tree it seals.
+    path: .sops.yaml
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
   - id: app.build-output
     profiles: [app]
     path: "{**/node_modules/,coverage/,reports/,test-results/,**/*.tsbuildinfo}"
@@ -360,18 +381,18 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "be/.starcistacks/<env>/secrets/<slug>.enc; decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
+    goesTo: ".starcistacks/<env>/secrets/<slug>.enc (at the app root); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
 
   # ----- side root (both sides): what the old standalone repository root held, less the app-root files ----------
   - id: repo.side-root-forbidden
     profiles: [be, fe]
-    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,sonar-project.properties,.prettierrc,.prettierignore,scripts/}"
+    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,.starcistacks/,.sops.yaml,sonar-project.properties,.prettierrc,.prettierignore,scripts/}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar configuration, scripts/ and .starciwork per app"
+    goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar configuration, scripts/, .starciwork, .starcistacks and .sops.yaml per app"
   - id: be.tool-config
     profiles: [be]
     # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
@@ -529,7 +550,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "be/.starcistacks/<env>/secrets/<slug>.enc; decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
+    goesTo: ".starcistacks/<env>/secrets/<slug>.enc (at the app root); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
     rules: [HFS_PLAINTEXT_SECRET]
   - id: be.root-e2e
     profiles: [be]
@@ -825,7 +846,7 @@ slots:
       infrastructure (containers) and runs apps/migrate's exported bootstrap once; use-test-world.ts exports
       useTestWorld({ apps: { <name>: { module, listen? } } } | { modules: [...] }) -> world.apps.<name>.api,
       world.db.<connection> (the shared EntityManager), world.infra.<service> (latency/cut/restore on a REAL service of the repository's
-      own stack, `.starcistacks/<env>`, each behind toxiproxy), world.fake.<provider> (a network-edge fake of an external SaaS started by the world, with
+      own stack, the app root's `.starcistacks/<env>`, each behind toxiproxy), world.fake.<provider> (a network-edge fake of an external SaaS started by the world, with
       failNext/replayWebhook/delay), world.waitFor; fakes/<provider>/ holds the fake servers and payload fixtures, kit/ the inlined test helpers, and the world root may hold role-suffixed helpers (<name>.client.ts, <name>.contracts.ts, ...). Nothing is
       overridden in the DI container. It is the only test location that may import typeorm's DataSource or testcontainers,
       call migrate/runMigrations/synchronize, or write process.env.
@@ -904,27 +925,6 @@ slots:
     tier: none
     tests: none
     goesTo: "src/tests/world/ (the only test infrastructure location; e2e/<area>/ holds only *.e2e-spec.ts)"
-
-  # ----- BE: work and stacks -----------------------------------------------------------------------------
-  - id: be.starcistacks
-    profiles: [be]
-    path: ".starcistacks/"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    requires: [application-stacks.yaml]
-    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
-             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
-    forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
-    rules: [HFS_STACKS_SHAPE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
-  - id: be.sops
-    profiles: [be]
-    path: .sops.yaml
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
 
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next

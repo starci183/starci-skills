@@ -219,7 +219,7 @@ const onSide = (side, p) => (p ? path.posix.normalize(`${side}/${p}`) : p);
 
 /**
  * The findings of one scope: the app root (profile app; its own files, and the rules of the files only the root holds: the one
- * package.json and lockfile, CI, hooks, .starciwork) or one side (profile be or fe; the side folder is `repoRoot` and every path is
+ * package.json and lockfile, CI, hooks, .starciwork, .starcistacks) or one side (profile be or fe; the side folder is `repoRoot` and every path is
  * relative to it, exactly as the standalone repository root was). `files` are the scope's tracked paths; `all` (root only) every
  * tracked path of the app, for the rules that read across it (dependency skew, proof commands).
  */
@@ -269,11 +269,12 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
       ...testTopologyFindings({ repoRoot, files }),
       ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),
       ...appFrontendFindings({ repoRoot, files: all, repo }),
+      ...stacksFindings({ repoRoot, files, resolver }),
       // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );
   } else if (repo.profile === 'be') {
-    findings.push(...contractFindings({ files, repo, resolver }), ...stacksFindings({ repoRoot, files, resolver }), ...testTopologyFindings({ repoRoot, files }));
+    findings.push(...contractFindings({ files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
   } else {
     findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
   }

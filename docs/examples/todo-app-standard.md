@@ -10,7 +10,7 @@ Section 9 lists what the example deliberately leaves open.
 One app is one product. `examples/todo-app` holds the back end in `be/` and the front end in `fe/`, one
 `package.json` and lockfile at its root, and the root `hfs.json` of kind `app` that declares both sides. The app
 root owns the canonical `.starciwork` (the Work tree: business rules, flows, design, implementation records,
-UAT); the back end owns the canonical `be/.starcistacks` (the deployment declaration and its environments). The
+UAT); the app root also owns the canonical `.starcistacks` (the deployment declaration and its environments). The
 records that describe a screen name the side its code lives in (`impl.task.fe.task-list`, `ui.task.list`).
 
 This is the one topology `modules/schemas/work-layout.yaml` recognizes: `.starciwork` lives at the app root,
@@ -210,8 +210,8 @@ npm run build:fe     # codegen, then cd fe && next build apps/web
 npm run typecheck    # codegen, then tsc over be/ and fe/apps/web
 ```
 
-Infra (`be/.starcistacks/dev/README.md`): one Compose project,
-`be/.starcistacks/dev/infra/compose/compose.yaml`, one file per component. `api` and `web` are declared with
+Infra (`.starcistacks/dev/README.md`): one Compose project,
+`.starcistacks/dev/infra/compose/compose.yaml`, one file per component. `api` and `web` are declared with
 placeholder images behind the `app` Compose profile; this example instead runs both processes on the host —
 `npm run build:be && npm run start:todo` and `npm run dev:fe` at the app root —
 against the infra the compose file brings up:

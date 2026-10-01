@@ -17,7 +17,7 @@ custody:
   # which the record ids below also carry - an id segment is not a realm claim. A realm target that
   # does not exist is a silent hazard, not a loud one: see environment.todo-app.dev's probe note.
   realm: todo
-  sealed: be/.starcistacks/dev/secrets/identity-todo-app-demo.enc
+  sealed: .starcistacks/dev/secrets/identity-todo-app-demo.enc
   decryptWith: age identity declared by .starcistacks/application-stacks.yaml (DEMO-ONLY, committed for
     reader round-trip, never a real recipient)
 roles:

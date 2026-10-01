@@ -167,6 +167,9 @@ test('the app root: its own slots, a side path through the side, and the files o
   assert.equal(owner('.github/workflows/ci.yml'), 'owned:app.ci');
   assert.equal(owner('scripts/codegen.mjs'), 'owned:app.scripts');
   assert.equal(owner('.starciwork/features/index.yaml'), 'owned:app.starciwork');
+  assert.equal(owner('.starcistacks/prod/secrets/db.enc'), 'owned:app.starcistacks');                // the stack tree is the app root's
+  assert.equal(owner('.starcistacks/application-stacks.yaml'), 'owned:app.starcistacks');
+  assert.equal(owner('.sops.yaml'), 'owned:app.sops');
   assert.equal(owner('.starciwork/worktrees/x/README.md'), 'forbidden:app.worktrees');
   assert.equal(owner('.env.production'), 'forbidden:app.plaintext-env');
   assert.equal(owner('tsconfig.json'), 'forbidden:app.tool-config-local');                       // a tool config belongs to a side
@@ -179,13 +182,13 @@ test('the app root: its own slots, a side path through the side, and the files o
   assert.equal(whole.sideOf('fe/apps/web/next.config.ts'), 'fe');
   assert.equal(whole.sideOf('README.md'), null);
   // what the old repository root held besides the side's own files is the app root's: a copy in a side is forbidden
-  for (const file of ['package.json', 'package-lock.json', 'hfs.json', 'README.md', '.github/workflows/ci.yml', '.starciwork/x.yaml', '.prettierrc', 'scripts/x.mjs']) {
+  for (const file of ['package.json', 'package-lock.json', 'hfs.json', 'README.md', '.github/workflows/ci.yml', '.starciwork/x.yaml', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/secrets/db.enc', '.sops.yaml', '.prettierrc', 'scripts/x.mjs']) {
     assert.equal(owner(`be/${file}`), 'forbidden:repo.side-root-forbidden', `be/${file}`);
     assert.equal(owner(`fe/${file}`), 'forbidden:repo.side-root-forbidden', `fe/${file}`);
   }
   // required paths: the root's own, then each side's under its folder
   const paths = whole.requiredPaths().paths.map((e) => e.path);
-  for (const p of ['README.md', 'hfs.json', 'package.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', 'be/', 'fe/', 'be/tsconfig.json', 'be/apps/core/src/', 'fe/tsconfig.json', 'fe/apps/admin/src/modules/i18n/'])
+  for (const p of ['README.md', 'hfs.json', 'package.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', '.sops.yaml', '.starcistacks/application-stacks.yaml', 'be/', 'fe/', 'be/tsconfig.json', 'be/apps/core/src/', 'fe/tsconfig.json', 'fe/apps/admin/src/modules/i18n/'])
     assert.equal(paths.includes(p), true, `required path missing: ${p}`);
   // nothing crosses sides except the declared reads
   const ok = (a, b) => whole.importAllowed(a, b);
@@ -219,7 +222,7 @@ test('BE side: which slot owns a path', () => {
   assert.equal(owner('src/tests/world/use-test-world.ts'), 'owned:be.tests.world');
   assert.equal(owner('contracts/core/schema.graphql'), 'owned:be.contract.graphql');
   assert.equal(owner('contracts/core/openapi.json'), 'not-enabled:be.contract.openapi');
-  assert.equal(owner('.starcistacks/prod/secrets/db.enc'), 'owned:be.starcistacks');
+  assert.equal(owner('.starcistacks/prod/secrets/db.enc'), 'forbidden:repo.side-root-forbidden');   // be/.starcistacks: the stack tree is the app root's
   assert.equal(owner('docs/adr/0001-use-nest.md'), 'owned:repo.docs');
   assert.equal(owner('e2e/probe.spec.ts'), 'forbidden:be.root-e2e');
   assert.equal(owner('.env.production'), 'forbidden:repo.plaintext-env');
@@ -251,10 +254,10 @@ test('BE side: tracked, tier, required files', () => {
   assert.deepEqual(be.requiredFiles('src/modules/domain/orders/persistence/x.ts'), ['src/modules/domain/orders/persistence/connection.ts']);
   const { paths, minimums } = be.requiredPaths();
   const has = (p) => paths.some((e) => e.path === p);
-  for (const p of ['tsconfig.json', 'tsconfig.build.json', 'nest-cli.json', '.sops.yaml', '.starcistacks/application-stacks.yaml',
+  for (const p of ['tsconfig.json', 'tsconfig.build.json', 'nest-cli.json',
     'apps/core/src/', 'src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/errors/', 'src/modules/platform/primitives/'])
     assert.equal(has(p), true, `required path missing: ${p}`);
-  for (const p of ['README.md', 'hfs.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/']) assert.equal(has(p), false, `${p} is the app root's, not the side's`);
+  for (const p of ['README.md', 'hfs.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', '.sops.yaml', '.starcistacks/application-stacks.yaml']) assert.equal(has(p), false, `${p} is the app root's, not the side's`);
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
   assert.equal(has('jest.config.e2e.js'), false);
   assert.deepEqual(minimums.map((m) => m.slot).sort(), ['be.app.api', 'be.feature']);

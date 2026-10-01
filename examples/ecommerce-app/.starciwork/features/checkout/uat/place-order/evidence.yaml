@@ -34,7 +34,7 @@ provenance:
   environment: local
   capturedAt: '2026-09-19T15:53:21.000Z'
   stack: >-
-    The ecommerce example's own topology per examples/ecommerce-app/be/.starcistacks/dev/infra/metadata.json: identity
+    The ecommerce example's own topology per examples/ecommerce-app/.starcistacks/dev/infra/metadata.json: identity
     GraphQL API on 5070 and order API on 6070 (both already running, /health ok), ecommerce
     Postgres on 5501 and Redis on 6448. The shop under test is a fresh production build
     (next build + next start) served on the projected port 4069 via

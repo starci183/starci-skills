@@ -1,5 +1,5 @@
 // stacks.mjs - HFS_STACKS_SHAPE (R10): `.starcistacks` has the standard shape and the host Sonar owner.
-//   - every tracked path under `.starcistacks/` is one the be.starcistacks slot allows (its `allows` list is the shape:
+//   - every tracked path under the app root's `.starcistacks/` is one the app.starcistacks slot allows (its `allows` list is the shape:
 //     application-stacks.yaml and <env>/{README.md, environment.json, infra/{compose,k8s,terraform}, runtime/{config,env},
 //     secrets/<slug>.enc, seeds}); a `.enc` outside <env>/secrets/ is never allowed, `runtime/files/`, a root `DESIGN.md`,
 //     `deployment.json` and `k8s/` are not in the list, so they fall out of it;
@@ -11,7 +11,7 @@ import { declaredStack, findStackDeclaration, STACK_ROOT, text } from '../stack-
 import { found } from './read.mjs';
 
 export const STACKS_SHAPE = 'HFS_STACKS_SHAPE';
-export const STACKS_SLOT = 'be.starcistacks';
+export const STACKS_SLOT = 'app.starcistacks';
 export const HOST_SONAR_ROOT = '.claude/ext/sonar';
 const SEALED = /\.enc$/;
 const INSIDE_SECRETS = /^[^/]+\/secrets\/[^/]+\.enc$/;
@@ -22,7 +22,7 @@ const allowedExpressions = (allows) => allows.flatMap((entry) => braceVariants(e
 
 const shapeFinding = (file, message, extra) => found(STACKS_SHAPE, file, message, extra);
 
-/** The shape findings of the `.starcistacks` tree of a back-end repository. */
+/** The shape findings of the `.starcistacks` tree at the app root (`repoRoot` is the app root, `files` its own tracked paths). */
 export function stacksFindings({ repoRoot, files, resolver }) {
   const slot = resolver.slot(STACKS_SLOT);
   if (!slot) return [];

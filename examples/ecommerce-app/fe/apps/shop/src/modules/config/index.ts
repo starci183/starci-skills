@@ -6,7 +6,7 @@ import { readProjectedOrigins } from "@ecommerce/api"
  *
  * A component or page never touches `process.env` and never hardcodes a host: each service base URL is one
  * `NEXT_PUBLIC_*_API_URL` env value, and the fallback is the product's resolved projection
- * (`be/.starcistacks/dev/infra/metadata.json`, `ports.orderApi`/`ports.identityApi`) - the
+ * (`.starcistacks/dev/infra/metadata.json`, `ports.orderApi`/`ports.identityApi`) - the
  * same file the backend services boot from, so no literal port exists in this repository to drift against
  * the allocation. `ECOMMERCE_APP_METADATA` injects the projection's path when a deployment or a test
  * needs to. Point the shop at a deployed stack by setting the env vars.

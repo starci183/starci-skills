@@ -35,7 +35,7 @@ target and dependency chain.
 HFS tree violations use `HFS_ROOT_ENTRY_FORBIDDEN`, `HFS_ROOT_ENTRY_MISSING`,
 `HFS_APPS_REQUIRED`, `HFS_APP_LAYOUT_INVALID`, `HFS_ROOT_SRC_FORBIDDEN_FE`,
 `HFS_SRC_LAYOUT_INVALID`, `HFS_MODULE_TIER_INVALID`, `HFS_WORK_IN_FE`,
-`HFS_STACKS_IN_FE`, and `HFS_PACKAGE_MANAGER_MIXED`. The `coverage.hfs` object
+`HFS_STACKS_IN_SIDE`, and `HFS_PACKAGE_MANAGER_MIXED`. The `coverage.hfs` object
 records whether the tree came from the Git index or a filesystem fallback.
 
 ## Responsibility model

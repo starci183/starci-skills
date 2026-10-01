@@ -11,7 +11,7 @@ import {walkFiles} from './common.mjs';
 import {blobPath} from '../lib/artifact-store.mjs';
 import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
 import {runGit} from '../lib/git.mjs';
-import {SEALED_LOCATION_RE} from './check-work-artifacts.mjs';
+import {sealedLocationProblem} from './check-work-artifacts.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -762,16 +762,17 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
   }
 
-  // ---- an identity points its secret at be/.starcistacks/<env>/secrets/identity-<slug>.enc (R09) ----
+  // ---- an identity points its secret at .starcistacks/<env>/secrets/identity-<slug>.enc (R09) ----
   // <slug> is the folder the identity record sits in (_resources/identities/<slug>/resource.yaml); the path is app-relative
-  // (the Work tree sits at the app root, .starcistacks is the be side's), so a side-relative .starcistacks/... is refused.
+  // and .starcistacks sits at the app root beside the Work tree, so the side form be/.starcistacks/... is refused by name.
   // A provider: none identity holds no secret and carries no sealed key.
   for (const [id, rec] of records) {
     if (rec.schema !== 'work/resource@1' || rec.data?.kind !== 'identity') continue;
     const sealed = rec.data.custody?.sealed;
     if (typeof sealed !== 'string') continue;
     const slug = path.basename(rec.dir);
-    if (!SEALED_LOCATION_RE.test(sealed.trim()) || path.posix.basename(sealed.trim(), '.enc') !== `identity-${slug}`) problems.push(`${rec.shown}: identity ${id} points custody.sealed at ${sealed.trim()}; it names its secret be/.starcistacks/<env>/secrets/identity-${slug}.enc [HFS_IDENTITY_CUSTODY]`);
+    const misplaced = sealedLocationProblem(sealed);
+    if (misplaced || path.posix.basename(sealed.trim(), '.enc') !== `identity-${slug}`) problems.push(`${rec.shown}: identity ${id} points custody.sealed at ${sealed.trim()}${misplaced ? ` (${misplaced})` : ''}; it names its secret .starcistacks/<env>/secrets/identity-${slug}.enc [HFS_IDENTITY_CUSTODY]`);
   }
 
   // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----

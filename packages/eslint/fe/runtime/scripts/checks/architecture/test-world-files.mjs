@@ -1,5 +1,6 @@
 import { treeOf } from './required-files.mjs';
 import { allowsFile } from '../../lib/hfs-allows.mjs';
+import { locateDeclaration } from '../../lib/hfs-slots.mjs';
 import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, namesOfService, readStack } from '../../lib/stack-services.mjs';
 
 /**
@@ -159,7 +160,8 @@ export function checkTestWorldFiles(input) {
   const services = [];
   for (const environment of environments) {
     let stack = null;
-    try { stack = readStack({ root: config.root, environment }); } catch { stack = null; }
+    // The stack is the app root's .starcistacks: the side folder the machine judges reads its app's (locateDeclaration).
+    try { stack = readStack({ root: locateDeclaration(config.root).appRoot, environment }); } catch { stack = null; }
     for (const service of stack?.services ?? []) if (service.role !== 'service' && !services.some(known => known.name === service.name)) services.push({ ...service, environment });
   }
   const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;

@@ -31,7 +31,7 @@ const messages = (report, text) => findings(report, 'BE_CONNECTION_DUPLICATE').f
 test('BE: one connection file set per declared connection, one registration per app and distinct stack databases raise nothing', t => {
   const root = archFixture(t, {
     ...TWO_CONNECTIONS,
-    files: { ...CONNECTION, 'apps/core/src/app.module.ts': ONCE, '.starcistacks/dev/runtime/env/db.env': STACK('primary', 'agentos'), '.starcistacks/prod/runtime/env/README.md': 'no values here\n' },
+    files: { ...CONNECTION, 'apps/core/src/app.module.ts': ONCE, '../.starcistacks/dev/runtime/env/db.env': STACK('primary', 'agentos'), '../.starcistacks/prod/runtime/env/README.md': 'no values here\n' },
   });
   const report = runArch(root);
   assert.deepEqual(findings(report, 'BE_CONNECTION_DUPLICATE'), [], JSON.stringify(findings(report, 'BE_CONNECTION_DUPLICATE'), null, 1));
@@ -145,16 +145,16 @@ test('BE: two connections resolving to one host, port and database in a stack en
     files: {
       ...CONNECTION,
       'apps/core/src/app.module.ts': ONCE,
-      '.starcistacks/dev/runtime/env/db.env': STACK('shared', 'shared'),
-      '.starcistacks/prod/runtime/env/db.env': STACK('primary', 'agentos'),
-      '.starcistacks/staging/runtime/env/db.env': 'PRIMARY_HOST=only-host\n',
+      '../.starcistacks/dev/runtime/env/db.env': STACK('shared', 'shared'),
+      '../.starcistacks/prod/runtime/env/db.env': STACK('primary', 'agentos'),
+      '../.starcistacks/staging/runtime/env/db.env': 'PRIMARY_HOST=only-host\n',
     },
   });
   const report = runArch(root);
   const hits = messages(report, 'same database');
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].env, 'dev');
-  assert.equal(hits[0].path, '.starcistacks/dev/runtime/env');
+  assert.equal(hits[0].path, '../.starcistacks/dev/runtime/env', 'the app root stack, relative to the be side the machine judges');
   assert.equal(report.coverage.hfsMachine.connectionMap.stacksChecked, 2);
   assert.equal(report.coverage.hfsMachine.connectionMap.stacksSkipped, 1);
 });
@@ -165,7 +165,7 @@ test('BE: a config that reads <PREFIX>_DATABASE compares that key, not <PREFIX>_
     files: {
       ...CONNECTION,
       'src/modules/platform/database/agentos.config.ts': 'export const agentosConfig = () => ({ host: process.env.AGENTOS_HOST, port: process.env.AGENTOS_PORT, database: process.env.AGENTOS_DATABASE });\n',
-      '.starcistacks/dev/runtime/env/db.env': 'PRIMARY_HOST=h\nPRIMARY_PORT=1\nPRIMARY_NAME=x\nAGENTOS_HOST=h\nAGENTOS_PORT=1\nAGENTOS_DATABASE=x\nAGENTOS_NAME=other\n',
+      '../.starcistacks/dev/runtime/env/db.env': 'PRIMARY_HOST=h\nPRIMARY_PORT=1\nPRIMARY_NAME=x\nAGENTOS_HOST=h\nAGENTOS_PORT=1\nAGENTOS_DATABASE=x\nAGENTOS_NAME=other\n',
     },
   });
   assert.equal(messages(runArch(root), 'same database').length, 1);

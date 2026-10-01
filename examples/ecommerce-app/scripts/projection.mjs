@@ -1,15 +1,15 @@
 /**
  * The resolved port projection reader, mirroring the back end's AppConfigService bargain:
- * there is one runtime projection - `be/.starcistacks/dev/infra/metadata.json` of this app - and
+ * there is one runtime projection - `.starcistacks/dev/infra/metadata.json` at this app's root - and
  * consumers READ it instead of keeping a second copy that agrees only until somebody moves the offset.
  *
- * The projection lives in the back-end side (its metadata.json is the whole product's resolved
+ * The projection lives in the app root's .starcistacks (its metadata.json is the whole product's resolved
  * projection - its own README states the front end's ports are "declared here, consumed there").
- * Resolution order, same shape as the BE's `findMetadataFile`:
+ * Resolution order:
  *
  *   1. `ECOMMERCE_APP_METADATA` names the file outright (deployment/tests inject it).
- *   2. Otherwise each ancestor of the app root is searched for
- *      `be/.starcistacks/dev/infra/metadata.json` - the BE's upward walk.
+ *   2. Otherwise the app root and each ancestor of it is searched for
+ *      `.starcistacks/dev/infra/metadata.json`.
  *
  * A missing or malformed projection throws naming the env var; nothing here invents a number.
  */
@@ -18,8 +18,6 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_METADATA"
-/** The side folder the projection is searched under. */
-const BACK_END_SIDE = "be"
 const PROJECTION_REL = [".starcistacks", "dev", "infra", "metadata.json"]
 const REQUIRED_PORT_KEYS = ["identityApi", "orderApi", "landing", "shop"]
 
@@ -35,12 +33,12 @@ export const findMetadataFile = (startDir = repoRoot()) => {
     }
     let dir = resolve(startDir)
     for (;;) {
-        const candidate = join(dir, BACK_END_SIDE, ...PROJECTION_REL)
+        const candidate = join(dir, ...PROJECTION_REL)
         if (existsSync(candidate)) return candidate
         const parent = dirname(dir)
         if (parent === dir) {
             throw new Error(
-                `no ${BACK_END_SIDE}/${PROJECTION_REL.join("/")} found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
+                `no ${PROJECTION_REL.join("/")} found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
             )
         }
         dir = parent

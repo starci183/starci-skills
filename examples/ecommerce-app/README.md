@@ -29,7 +29,7 @@ pointers.
 
 TypeScript everywhere; NestJS 11, PostgreSQL (one database per connection: `identity`, `order`), Redis (sessions) and
 GraphQL in `be/`; Next.js, React, next-intl and `@starci/grammar` in `fe/`; npm with one `package.json` and one lockfile at
-the root, whose workspaces are the front end's packages (`fe/packages/*`). The dev stack is declared in `be/.starcistacks/dev`.
+the root, whose workspaces are the front end's packages (`fe/packages/*`). The dev stack is declared in `.starcistacks/dev`.
 
 ## Repository layout
 
@@ -49,18 +49,18 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
   Each package is built to its own `dist` and consumed by package name; `npm run build --workspaces` builds them.
 - `scripts/`: `codegen.mjs` (the step behind `npm run codegen`), `serve.mjs` and `projection.mjs` (start an app on its
   projected port), `verify-render.mjs` (the running-page render proof).
-- `.starciwork`: the product records of both sides. `be/.starcistacks`: the dev stack, env key list (`runtime/env/KEYS.md`) and seeds.
+- `.starciwork`: the product records of both sides. `.starcistacks`: the dev stack, env key list (`runtime/env/KEYS.md`) and seeds.
 
 ## Development
 
 From this directory run `npm ci` and `npm run build --workspaces` (the front-end packages are consumed from their `dist`),
 then `npm run typecheck`, `npm run lint`, `npm run build:be`, `npm run build:fe` and `npm test`. The runbook with the
-environment keys, migrations and seeds is `be/.starcistacks/dev/README.md`; `be/docs/guides/testing.md` describes the suites.
+environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `be/docs/guides/testing.md` describes the suites.
 
 The unit suite runs the service specs with coverage and fails when a `*.service.ts` file is below 100 percent lines,
 branches, functions or statements. From the parent `.claude` tree, run
 `node scripts/checks/canon-scan.mjs --root examples/ecommerce-app/be --json` and
-`node scripts/checks/check-starcistacks.mjs examples/ecommerce-app/be`.
+`node scripts/checks/check-starcistacks.mjs examples/ecommerce-app`.
 
 `npm run test:e2e` needs the declared Postgres, Redis, and application processes. The test kinds are unit
 `<name>.service.spec.ts` beside each service, integration `*.integration-spec.ts` under `be/src/tests/integration/` and e2e
@@ -72,8 +72,8 @@ evidence retains its recorded revisions; the derived index reports stale proof w
 ## Ports: there is one projection and it is read, never restated
 
 Every runtime value of the back end comes from the process environment through `EnvSource`;
-`be/.starcistacks/dev/runtime/env/KEYS.md` lists the keys. The product's resolved runtime projection is
-**`be/.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.shop`, `ports.identityApi`, `ports.orderApi`), the
+`.starcistacks/dev/runtime/env/KEYS.md` lists the keys. The product's resolved runtime projection is
+**`.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.shop`, `ports.identityApi`, `ports.orderApi`), the
 port map the front end reads. No port literal exists in the front end:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
@@ -81,7 +81,7 @@ port map the front end reads. No port literal exists in the front end:
 - `fe/packages/ecommerce-api/src/projection.ts` resolves the file for both apps' service base URLs; each app's
   `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_METADATA` names the file outright, else the
-  walk searches each ancestor for `be/.starcistacks/dev/infra/metadata.json`.
+  walk searches each ancestor for `.starcistacks/dev/infra/metadata.json`.
 - Env overrides keep the BE's precedence — `NEXT_PUBLIC_ORDER_API_URL`, `NEXT_PUBLIC_IDENTITY_API_URL`,
   `NEXT_PUBLIC_SHOP_URL` win outright; the projection is the fallback.
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineKit, pascal, upperSnake } from './machine-ast.mjs';
+import { locateDeclaration } from '../../lib/hfs-slots.mjs';
 
 /**
  * R84 `connection-map` (BE_CONNECTION_DUPLICATE), folding RED01 and RED02. One physical database is one connection, one
@@ -179,11 +180,13 @@ export function checkConnectionMap(input) {
   // 4. Stacks: two connections that resolve to one host, port and database are one database.
   let stacksChecked = 0;
   let stacksSkipped = 0;
-  const stacksRoot = path.join(config.root, '.starcistacks');
+  // .starcistacks sits at the app root: the side folder the machine judges reads its app's tree (locateDeclaration).
+  const stacksRoot = path.join(locateDeclaration(config.root).appRoot, '.starcistacks');
   let envs = [];
   try { envs = fs.readdirSync(stacksRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort(); } catch { envs = []; }
   for (const env of envs) {
-    const rel = `.starcistacks/${env}/runtime/env`;
+    // Relative to the side folder the machine judges (`../.starcistacks/...` for a side): the app-relative path once the side is prefixed.
+    const rel = path.relative(config.root, path.join(stacksRoot, env, 'runtime', 'env')).split(path.sep).join('/');
     const values = readEnvFiles(path.join(stacksRoot, env, 'runtime', 'env'));
     if (!values || values.size === 0) { stacksSkipped += 1; continue; }
     const seen = new Map();
