@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
+import {gitOutput} from '../lib/git.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 
@@ -27,6 +28,19 @@ import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, modu
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** The instant a work/evidence@1 run object was minted, from its id (`20260919T155312Z-5c10a673`); null when there is none. */
+export function runTimeOf(run) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-/.exec(run && typeof run === 'object' ? String(run.id ?? '') : '');
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
+}
+
+/** The files under `dirs` that a commit after `since` touched (repository-relative, unique); [] outside a Git work tree. */
+function committedSince(cwd, since, dirs) {
+  let out = '';
+  try { out = gitOutput(['log', `--since=${since.toISOString()}`, '--format=', '--name-only', '--', ...dirs], { cwd }); } catch { return []; }
+  return [...new Set(out.split(/\r?\n/).filter(Boolean))];
+}
 
 /** Canonical JSON with sorted keys - stable hashing regardless of yaml field order. */
 const canon = value => JSON.stringify(value, (_, v) =>
@@ -299,14 +313,14 @@ function checkTree(workRoot, out, baseline) {
       }
     }
 
-    // UAT_RUN_AGING: settled run older than the code it proves (mtime heuristic)
-    if (data.schema === 'work/uat-flow@1' && data.state === 'done' && evEntry?.ev?.run) {
-      const runDir = path.join(evEntry.dir, evEntry.ev.run);
-      if (fs.existsSync(runDir)) {
-        const runMtime = Math.max(...walk(runDir).map(f => fs.statSync(f).mtimeMs));
-        const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot);
-        const newer = dirs.flatMap(d => fs.existsSync(d.abs) ? walk(d.abs).filter(f => fs.statSync(f).mtimeMs > runMtime).map(f => path.relative(appRoot, f)) : []);
-        if (newer.length) suspect(indexFile, 'UAT_RUN_AGING', `${id}'s settled run predates ${newer.length} code file(s) that changed since (e.g. ${newer[0]}) - the pass may no longer describe the code`);
+    // UAT_RUN_AGING: settled run older than the code it proves. The run is the work/evidence@1 run object (its files
+    // are blobs, never a runs/ directory); its time is the one its id was minted at, and the code's is its commit time.
+    if (data.schema === 'work/uat-flow@1' && data.state === 'done') {
+      const runAt = runTimeOf(evEntry?.ev?.run);
+      if (runAt) {
+        const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot).filter(d => fs.existsSync(d.abs));
+        const newer = dirs.length ? committedSince(appRoot, runAt, dirs.map(d => d.abs)) : [];
+        if (newer.length) suspect(indexFile, 'UAT_RUN_AGING', `${id}'s settled run predates ${newer.length} code file(s) committed since (e.g. ${newer[0]}) - the pass may no longer describe the code`);
       }
     }
   }
