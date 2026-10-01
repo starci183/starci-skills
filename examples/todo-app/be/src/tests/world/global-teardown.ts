@@ -1,7 +1,7 @@
 /**
  * The jest globalTeardown of the test world (default export, Jest API): disposes exactly what globalSetup created and
- * verifies by observation that nothing of the run survives: the fakes host is told to shut down, the database container is
- * removed with its volume, the upload directory and the state file are deleted.
+ * verifies by observation that nothing of the run survives: the fakes host is told to shut down, the database and Keycloak
+ * containers are removed with their volumes, the upload directory and the state file are deleted.
  */
 import "tsconfig-paths/register"
 import { rmSync } from "node:fs"
@@ -16,13 +16,17 @@ export default async function globalTeardown(): Promise<void> {
         await fetch(`${state.controlUrl}/control/shutdown`, { method: "POST", signal: AbortSignal.timeout(10_000) })
     } finally {
         removeContainer(state.databaseContainer)
+        removeContainer(state.keycloakContainer)
         rmSync(state.uploadDir, { recursive: true, force: true })
         removeWorldState()
     }
-    if (containersNamed(state.databaseContainer).length > 0) {
+    const survivors = [state.databaseContainer, state.keycloakContainer].filter(
+        (name) => containersNamed(name).length > 0,
+    )
+    if (survivors.length > 0) {
         throw new TestWorldError({
             code: TestWorldErrorCode.InfrastructureFailed,
-            params: { detail: `the container ${state.databaseContainer} survived the teardown` },
+            params: { detail: `${survivors.join(", ")} survived the teardown` },
         })
     }
 }

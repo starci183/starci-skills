@@ -7,7 +7,7 @@ import type { TestApi, TestCaller } from "./test-api.client"
 /**
  * Every typed option the test world hands to the real apps: the todo api
  * options plus the worker tick options, all pointing at the shared infrastructure of the run (the migrated database, the
- * network-edge fakes, the run-owned upload directory).
+ * real Keycloak, the network-edge fakes of the external providers, the run-owned upload directory).
  */
 export interface TestOptions extends TodoAppOptions, Pick<WorkerAppOptions, "scheduling" | "messaging"> {}
 
@@ -75,7 +75,7 @@ export interface TestApps {
     readonly worker: WorkerAppHandle
 }
 
-/** A person known to the identity provider fake and signed in through the public door. */
+/** A person registered in the run's Keycloak realm and signed in through the public door. */
 export interface SignedInPerson {
     /** The email the person signs in with. */
     readonly email: string
@@ -87,6 +87,26 @@ export interface SignedInPerson {
     readonly sessionToken: string
     /** A caller that carries the session. */
     readonly caller: TestCaller
+}
+
+/** A real service of the stack the world runs (its container), with the outage a spec drives on it. */
+export interface TestInfraService {
+    /** Takes the service down: its container is killed and every connection to it drops, as when its host crashes. */
+    cut(): void
+    /** Starts the same container again (same port, same data) and waits until the service answers. */
+    restore(): Promise<void>
+}
+
+/** The real Keycloak of the run, with the realm the stack imports. */
+export interface TestKeycloak extends TestInfraService {
+    /** Registers a person in the realm and answers the person id: the `sub` the realm's tokens carry. */
+    person(email: string, password: string): Promise<string>
+}
+
+/** The services of the repository's own stack the world runs real; only external providers are faked. */
+export interface TestInfra {
+    /** The identity provider. */
+    readonly keycloak: TestKeycloak
 }
 
 /** How `waitFor` polls. */

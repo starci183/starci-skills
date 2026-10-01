@@ -1,6 +1,6 @@
 /**
  * The hand-over between the jest globalSetup and the spec workers: one small JSON file under the OS temp dir that
- * carries the coordinates of the shared infrastructure (database URL, fakes, upload directory) and the run-generated test
+ * carries the coordinates of the shared infrastructure (database URL, Keycloak, fakes, upload directory) and the run-generated test
  * secrets. Its path travels in one environment variable; the world is the only place that writes `process.env`.
  */
 import { randomUUID } from "node:crypto"
@@ -26,10 +26,16 @@ export interface TestWorldState {
     readonly databaseUrl: string
     /** The base URL of the fakes control server. */
     readonly controlUrl: string
-    /** The token endpoint of the identity provider fake. */
-    readonly keycloakTokenUrl: string
-    /** The client id the identity provider fake accepts. */
+    /** The name of the Keycloak container. */
+    readonly keycloakContainer: string
+    /** The loopback base URL of the Keycloak server. */
+    readonly keycloakBaseUrl: string
+    /** The realm the stack imports, the one the api signs in against. */
+    readonly keycloakRealm: string
+    /** The client id of the realm the api presents. */
     readonly keycloakClientId: string
+    /** The password of the Keycloak bootstrap administrator of the run. */
+    readonly keycloakAdminPassword: string
     /** The loopback port of the mail host fake. */
     readonly smtpPort: number
     /** The base URL of the payment gateway fake. */
@@ -51,8 +57,11 @@ const STRING_KEYS: ReadonlyArray<Exclude<keyof TestWorldState, "smtpPort">> = [
     "databaseName",
     "databaseUrl",
     "controlUrl",
-    "keycloakTokenUrl",
+    "keycloakContainer",
+    "keycloakBaseUrl",
+    "keycloakRealm",
     "keycloakClientId",
+    "keycloakAdminPassword",
     "sepayBaseUrl",
     "sepayApiKey",
     "sepayWebhookSecret",

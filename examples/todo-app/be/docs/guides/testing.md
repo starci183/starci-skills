@@ -9,10 +9,13 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 | contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`.                                                                    |
 
 `src/tests/world/` is the only test infrastructure. The integration, e2e and contract projects share its jest
-`global-setup.ts` / `global-teardown.ts` (one Postgres container per run, `apps/migrate`'s exported `bootstrap` once, the
-network-edge fakes of every third party under `src/tests/world/fakes/<provider>/`) and run one worker. `use-test-world.ts`
-exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager) and
-`world.fake.<provider>`. Nothing under `src/tests/` overrides a provider; shared test data lives in `src/tests/fixtures/`.
+`global-setup.ts` / `global-teardown.ts` (the services `.starcistacks/dev` declares, real: one Postgres container and one
+Keycloak importing the stack's `realm-todo.json`; `apps/migrate`'s exported `bootstrap` once; the network-edge fakes of the
+external providers, the mail host and the payment gateway, under `src/tests/world/fakes/<provider>/`) and run one worker.
+`use-test-world.ts` exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared
+EntityManager), `world.infra.keycloak` (the real Keycloak: `person()`, `cut()`, `restore()`) and `world.fake.<provider>`.
+Nothing under `src/tests/` overrides a provider and nothing of the stack is faked; shared test data lives in
+`src/tests/fixtures/`.
 
 ## Unit tests
 

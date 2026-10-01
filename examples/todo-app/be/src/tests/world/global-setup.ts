@@ -1,8 +1,9 @@
 /**
  * The jest globalSetup of the test world (default export, Jest API): starts the shared infrastructure ONCE for the run and
  * hands its coordinates to the spec workers through a state file.
- *  1. the network-edge fakes of every third party (identity provider, mail host, payment gateway) and their control server;
- *  2. one Postgres container through `docker run`, named by the run, published on a loopback port the OS allocated;
+ *  1. the network-edge fakes of the external providers (mail host, payment gateway) and their control server;
+ *  2. the services `.starcistacks/dev` declares, real, through `docker run`, named by the run, published on loopback ports
+ *     the OS allocated: one Postgres container, and one Keycloak that imports the stack's realm (`realm-todo.json`);
  *  3. `apps/migrate` `bootstrap(options)` once against it: the only place that creates the schema;
  *  4. a run-owned upload directory.
  * A failure removes whatever was started before it is rethrown: jest does not call the teardown after a failed setup.
@@ -18,18 +19,23 @@ import { EnvSource } from "@modules/platform/config"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import { bootstrap } from "../../../apps/migrate/src/main"
 import { primaryConnectionOf } from "../../../apps/migrate/src/migrate.options"
-import { postgresAccepts, removeContainer, runPostgres } from "./docker.client"
+import { postgresAccepts, removeContainer, runKeycloak, runPostgres } from "./docker.client"
 import { FakesHost } from "./fakes/fakes-host.service"
+import { REALM_FILE, readRealm, realmAnswers } from "./keycloak.client"
 import { writeWorldState } from "./test-world-state.service"
 
 const DATABASE_USER = "e2e"
 const DATABASE_NAME = "todo"
 const DATABASE_READY_DEADLINE_MS = 120_000
+const KEYCLOAK_READY_DEADLINE_MS = 240_000
 
 /** Starts the shared infrastructure of the run and publishes its coordinates. */
 export default async function globalSetup(): Promise<void> {
     const runId = runToken(4)
     const databaseContainer = `todo-e2e-pg-${runId}`
+    const keycloakContainer = `todo-e2e-kc-${runId}`
+    const keycloakAdminPassword = secret()
+    const { realm: keycloakRealm, clientId: keycloakClientId } = readRealm()
     const databasePassword = secret()
     const sepayApiKey = secret()
     const sepayWebhookSecret = secret()
@@ -38,7 +44,15 @@ export default async function globalSetup(): Promise<void> {
     const fakes = new FakesHost({ apiKey: sepayApiKey, webhookSecret: sepayWebhookSecret })
     try {
         const endpoints = await fakes.start()
-        const hostPort = (await freePorts(1))[0] ?? 0
+        const [hostPort = 0, keycloakPort = 0] = await freePorts(2)
+        const keycloakBaseUrl = `http://127.0.0.1:${keycloakPort}`
+        runKeycloak({
+            name: keycloakContainer,
+            runId,
+            hostPort: keycloakPort,
+            realmFile: REALM_FILE,
+            adminPassword: keycloakAdminPassword,
+        })
         const databaseUrl = `postgres://${DATABASE_USER}:${databasePassword}@127.0.0.1:${hostPort}/${DATABASE_NAME}`
         runPostgres({
             name: databaseContainer,
@@ -50,6 +64,9 @@ export default async function globalSetup(): Promise<void> {
         })
         await retryUntil("postgres accepts connections", DATABASE_READY_DEADLINE_MS, () =>
             Promise.resolve(postgresAccepts(databaseContainer, DATABASE_USER, DATABASE_NAME)),
+        )
+        await retryUntil(`keycloak serves the ${keycloakRealm} realm`, KEYCLOAK_READY_DEADLINE_MS, () =>
+            realmAnswers(keycloakBaseUrl, keycloakRealm),
         )
         await bootstrap({
             connections: [
@@ -63,8 +80,11 @@ export default async function globalSetup(): Promise<void> {
             databaseName: DATABASE_NAME,
             databaseUrl,
             controlUrl: endpoints.controlUrl,
-            keycloakTokenUrl: endpoints.keycloakTokenUrl,
-            keycloakClientId: endpoints.keycloakClientId,
+            keycloakContainer,
+            keycloakBaseUrl,
+            keycloakRealm,
+            keycloakClientId,
+            keycloakAdminPassword,
             smtpPort: endpoints.smtpPort,
             sepayBaseUrl: endpoints.sepayBaseUrl,
             sepayApiKey,
@@ -75,6 +95,7 @@ export default async function globalSetup(): Promise<void> {
     } catch (error) {
         await fakes.close()
         removeContainer(databaseContainer)
+        removeContainer(keycloakContainer)
         rmSync(uploadDir, { recursive: true, force: true })
         throw error
     }

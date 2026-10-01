@@ -1,5 +1,5 @@
 /**
- * The fakes host: starts the three third-party fakes (identity provider, mail host, payment gateway) plus one small JSON
+ * The fakes host: starts the fakes of the external providers (mail host, payment gateway) plus one small JSON
  * control server in the process that runs jest globalSetup, and answers where each listens. A spec worker steers and reads
  * the fakes through the control server (`e2e-fake.client.ts`), so every worker of the run shares the same servers.
  */
@@ -8,7 +8,6 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { isRecord } from "@modules/platform/primitives"
 import type { FailureSpec, FakeName } from "./fakes-control.contracts"
 import { answerJson, closeServer, listenLoopback, readBody, readJson } from "./fakes-http.service"
-import { KeycloakFake } from "./keycloak/server"
 import { SepayFake } from "./sepay/server"
 import type { SepayFakeSecrets } from "./sepay/server"
 import { SmtpFake } from "./smtp/server"
@@ -46,10 +45,6 @@ const settleFields = (
 export interface FakesEndpoints {
     /** The base URL of the control server. */
     readonly controlUrl: string
-    /** The token endpoint of the identity provider fake. */
-    readonly keycloakTokenUrl: string
-    /** The client id the identity provider fake accepts. */
-    readonly keycloakClientId: string
     /** The loopback port of the mail host fake. */
     readonly smtpPort: number
     /** The base URL of the payment gateway fake. */
@@ -58,7 +53,6 @@ export interface FakesEndpoints {
 
 /** The started fakes and their control server. */
 export class FakesHost {
-    private readonly keycloak = new KeycloakFake()
     private readonly smtp = new SmtpFake()
     private readonly sepay: SepayFake
     private readonly routes = new Map<string, Handler>()
@@ -76,12 +70,10 @@ export class FakesHost {
 
     /** Binds every listener and answers where they are. */
     async start(): Promise<FakesEndpoints> {
-        await Promise.all([this.keycloak.listen(), this.smtp.listen(), this.sepay.listen()])
+        await Promise.all([this.smtp.listen(), this.sepay.listen()])
         this.controlPort = await listenLoopback(this.control)
         return {
             controlUrl: `http://127.0.0.1:${this.controlPort}`,
-            keycloakTokenUrl: this.keycloak.tokenUrl,
-            keycloakClientId: this.keycloak.clientId,
             smtpPort: this.smtp.port,
             sepayBaseUrl: this.sepay.baseUrl,
         }
@@ -89,18 +81,14 @@ export class FakesHost {
 
     /** Stops every listener; a second call answers the first. */
     close(): Promise<void> {
-        this.closing ??= Promise.all([
-            this.keycloak.close(),
-            this.smtp.close(),
-            this.sepay.close(),
-            closeServer(this.control),
-        ]).then(() => undefined)
+        this.closing ??= Promise.all([this.smtp.close(), this.sepay.close(), closeServer(this.control)]).then(
+            () => undefined,
+        )
         return this.closing
     }
 
     private registerRoutes(): void {
         const fakes: Record<FakeName, { failNext(spec: FailureSpec): void; requests(): unknown }> = {
-            keycloak: this.keycloak,
             smtp: this.smtp,
             sepay: this.sepay,
         }
@@ -112,11 +100,6 @@ export class FakesHost {
                 return OK
             })
         }
-        this.routes.set("POST /control/keycloak/persons", (body) => {
-            if (!isRecord(body) || typeof body.email !== "string" || typeof body.password !== "string")
-                return BAD_REQUEST
-            return { status: 200, body: { personId: this.keycloak.addPerson(body.email, body.password) } }
-        })
         this.routes.set("GET /control/smtp/mails", () => ({ status: 200, body: this.smtp.mails() }))
         this.routes.set("GET /control/sepay/intents", () => ({ status: 200, body: this.sepay.allIntents() }))
         this.routes.set("GET /control/sepay/deliveries", () => ({ status: 200, body: this.sepay.deliveries() }))

@@ -27,12 +27,6 @@ export interface TestFake {
     requests(): Promise<ReadonlyArray<RecordedRequest>>
 }
 
-/** The identity provider fake. */
-export interface TestKeycloakFake extends TestFake {
-    /** Registers a person and answers the person id its access tokens carry as `sub`. */
-    person(email: string, password: string): Promise<string>
-}
-
 /** The mail host fake. */
 export interface TestSmtpFake extends TestFake {
     /** The messages the mail host accepted, oldest first. */
@@ -53,10 +47,8 @@ export interface TestSepayFake extends TestFake {
     replayWebhook(gatewayIntentId: string): Promise<WebhookDelivery>
 }
 
-/** Every fake of the world. */
+/** Every fake of the world: the external providers the app calls. */
 export interface TestFakes {
-    /** The identity provider. */
-    readonly keycloak: TestKeycloakFake
     /** The mail host. */
     readonly smtp: TestSmtpFake
     /** The payment gateway. */
@@ -84,12 +76,6 @@ export const createTestFakes = (controlUrl: string, webhookTarget: () => string)
         requests: () => call<ReadonlyArray<RecordedRequest>>(http, "GET", `/control/${name}/requests`),
     })
     return {
-        keycloak: {
-            ...base("keycloak"),
-            person: async (email, password) =>
-                (await call<{ personId: string }>(http, "POST", "/control/keycloak/persons", { email, password }))
-                    .personId,
-        },
         smtp: {
             ...base("smtp"),
             mails: () => call<ReadonlyArray<SentMail>>(http, "GET", "/control/smtp/mails"),

@@ -97,4 +97,4 @@ export interface WebhookTarget {
 }
 
 /** The names of the fakes that record requests and take failures. */
-export type FakeName = "keycloak" | "smtp" | "sepay"
+export type FakeName = "smtp" | "sepay"

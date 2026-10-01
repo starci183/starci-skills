@@ -5,7 +5,9 @@
  * container and the network-edge fakes of every third party).
  *
  * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden, so signing, parsing, retries and
- * the whole request pipeline of the app run for real; the only doubles are the servers in `fakes/`, reached over the wire.
+ * the whole request pipeline of the app run for real. The services of the stack run real (Postgres, and Keycloak with the
+ * stack's realm: `world.infra.keycloak`); the only doubles are the external providers' servers in `fakes/`, reached over
+ * the wire.
  * No sleeps: an asynchronous effect is awaited with `waitFor` against persisted state or a fake.
  */
 import "reflect-metadata"
@@ -16,6 +18,7 @@ import { NestFactory } from "@nestjs/core"
 import { randomUUID } from "node:crypto"
 import { DataSource } from "typeorm"
 import { killContainer, postgresAccepts, startContainer } from "./docker.client"
+import { realmAnswers, registerPerson } from "./keycloak.client"
 import { createTestApi } from "./test-api.client"
 import type { TestApi } from "./test-api.client"
 import { testOptions } from "./test-apps.options"
@@ -26,6 +29,8 @@ import type {
     SignedInPerson,
     TestApps,
     TestDb,
+    TestInfra,
+    TestKeycloak,
     TestOptions,
     WaitForOptions,
 } from "./test-world.contracts"
@@ -39,6 +44,7 @@ const DEFAULT_TEST_TIMEOUT_MS = 120_000
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
 const DATABASE_RETURN_DEADLINE_MS = 120_000
+const KEYCLOAK_RETURN_DEADLINE_MS = 240_000
 const NEST_LOGGER = ["error", "warn"] as const
 
 interface BootedApp {
@@ -52,8 +58,30 @@ interface Runtime {
     readonly dataSource: DataSource
     readonly db: TestDb
     readonly fake: TestFakes
+    readonly infra: TestInfra
     readonly api: TestApi | null
     readonly workerBooted: boolean
+}
+
+/** The real Keycloak of the run: persons registered through its admin API, its outage a kill and a start of its container. */
+const realKeycloak = (state: TestWorldState): TestKeycloak => {
+    const endpoint = {
+        baseUrl: state.keycloakBaseUrl,
+        realm: state.keycloakRealm,
+        adminPassword: state.keycloakAdminPassword,
+    }
+    return {
+        person: (email, password) => registerPerson(endpoint, email, password),
+        cut: () => killContainer(state.keycloakContainer),
+        restore: async () => {
+            startContainer(state.keycloakContainer)
+            await retryUntil(
+                `keycloak serves the ${state.keycloakRealm} realm again`,
+                KEYCLOAK_RETURN_DEADLINE_MS,
+                () => realmAnswers(state.keycloakBaseUrl, state.keycloakRealm),
+            )
+        },
+    }
 }
 
 const notDeclared = (what: string): TestWorldError =>
@@ -143,9 +171,14 @@ export class TestWorld {
         return this.booted().db
     }
 
-    /** The fakes of the third parties, reached over the control channel. */
+    /** The fakes of the external providers, reached over the control channel. */
     get fake(): TestFakes {
         return this.booted().fake
+    }
+
+    /** The real services of the stack, with the outages a spec drives on them. */
+    get infra(): TestInfra {
+        return this.booted().infra
     }
 
     /**
@@ -194,11 +227,11 @@ export class TestWorld {
         }
     }
 
-    /** Registers a new person at the identity provider fake and signs them in through the public door. */
+    /** Registers a new person in the run's Keycloak realm and signs them in through the public door. */
     async signedInPerson(label: string): Promise<SignedInPerson> {
         const email = `${label}-${randomUUID()}@todo.dev`
         const password = `pw-${randomUUID()}`
-        const personId = await this.fake.keycloak.person(email, password)
+        const personId = await this.infra.keycloak.person(email, password)
         const api = this.apps.todo.api
         const session = await api.signIn(email, password)
         return { email, password, personId, sessionToken: session.sessionToken, caller: api.as(session.sessionToken) }
@@ -237,6 +270,7 @@ export class TestWorld {
                 if (baseUrl === null) throw notDeclared("apps.todo (the webhook target)")
                 return baseUrl
             }),
+            infra: { keycloak: realKeycloak(state) },
             api,
             workerBooted: worker !== undefined,
         }
