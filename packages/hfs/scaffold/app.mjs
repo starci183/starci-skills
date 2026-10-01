@@ -6,7 +6,8 @@
 //   <name>/be/         the back-end side: the managed tool configuration and the templates/be/skeleton tree (the api app's
 //                      entrypoint, platform config/logging/errors/clock/cqrs, the liveness capability and the health feature)
 //   <name>/fe/         the front-end side: the managed tool configuration and the templates/fe/skeleton tree (the next-intl
-//                      [locale] shell with vi default, as-needed prefix and proxy.ts, the app's API client)
+//                      [locale] shell with vi default, as-needed prefix and proxy.ts; each route slot mounts one pages feature
+//                      drawn with @starci/grammar)
 //
 // The skeleton files are written once from templates/<app|be|fe>/skeleton ({{project}}, {{app}} and {{appPascal}} filled, a
 // `__app__` folder named after the side's app); the managed files are the render of `hfs sync` (sync/index.mjs), so a fresh app
@@ -16,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
-import { TEMPLATES_DIR, render, renderTargets, writeTargets } from '../sync/index.mjs';
+import { TEMPLATES_DIR, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
@@ -59,8 +60,8 @@ export const STARTER_SIDES = Object.freeze({
  */
 const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
-    '@nestjs/platform-express': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+    '@heroui/react': null, '@heroui/styles': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
+    '@nestjs/platform-express': null, '@starci/grammar': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
     'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', 'server-only': '^0.0.1', tslib: '^2.8.1',
   },
   devDependencies: {
@@ -100,6 +101,20 @@ function nestCli(app) {
   return { $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${first.name}`, sourceRoot: `apps/${first.name}/src`, projects };
 }
 
+/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app) and {{sonarGate}}. */
+const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate']);
+
+/**
+ * A skeleton file with its variables filled. Only the skeleton names are variables: every other `{{name}}` is source the app keeps
+ * (a message placeholder of the i18n canon, `{{title}}` in a catalog), and a skeleton name with no value for this file is an error.
+ */
+function fill(source, vars, file) {
+  return source.replace(new RegExp(`\\{\\{(${SKELETON_VARIABLES.join('|')})\\}\\}`, 'g'), (_, key) => {
+    if (!Object.hasOwn(vars, key)) throw new ScaffoldError('HFS_SCAFFOLD_TEMPLATE_VARIABLE', `${file} names {{${key}}}, which has no value outside a __app__ folder`);
+    return vars[key];
+  });
+}
+
 /** The skeleton files of one scope (app root, be, fe): [{ path, content }], app-relative; a `__app__` file once per app of the side. */
 function skeletonOf(scope, app, vars) {
   const dir = path.join(TEMPLATES_DIR, scope, 'skeleton');
@@ -111,10 +126,10 @@ function skeletonOf(scope, app, vars) {
     const source = fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n');
     const once = { project: app.project, ...vars };
     if (!rel.includes(APP_DIR)) {
-      files.push({ path: `${prefix}${rel}`, content: render(source, once) });
+      files.push({ path: `${prefix}${rel}`, content: fill(source, once, rel) });
       continue;
     }
-    for (const entry of apps) files.push({ path: `${prefix}${rel.split(APP_DIR).join(entry.name)}`, content: render(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }) });
+    for (const entry of apps) files.push({ path: `${prefix}${rel.split(APP_DIR).join(entry.name)}`, content: fill(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }, rel) });
   }
   return files;
 }

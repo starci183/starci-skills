@@ -1,1 +1,6 @@
 @import "tailwindcss";
+@import "@heroui/styles/css";
+@import "@starci/grammar/common.css";
+
+/* The grammar's renderers spell their layout in Tailwind utilities inside node_modules, which Tailwind never scans by default. */
+@source "../../../../../node_modules/@starci/grammar/dist";

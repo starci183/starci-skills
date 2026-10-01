@@ -1,6 +1,5 @@
 /** The structured data of one log line; values are plain data, never a request, a token or a secret. */
 export interface LogFields {
-    /** The value logged under `name`. */
     readonly [name: string]: unknown
 }
 

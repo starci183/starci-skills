@@ -1,5 +1,5 @@
 import createMiddleware from "next-intl/middleware"
-import { routing } from "./modules/i18n/routing"
+import { routing } from "./modules/i18n"
 
 /** Negotiates the locale and redirects; the default locale (vi) is served without a prefix. */
 export default createMiddleware(routing)

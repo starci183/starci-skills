@@ -1,5 +1,5 @@
 /** Log events of the errors capability. */
 export enum ErrorsLogEvent {
-    /** A request ended in a failure the app's filter answered. */
-    RequestFailed = "http.request_failed",
+    /** A failure no capability declared reached a transport and was masked; the cause rides in the line. */
+    Unhandled = "errors.unhandled",
 }

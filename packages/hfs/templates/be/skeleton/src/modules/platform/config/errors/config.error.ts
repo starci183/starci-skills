@@ -1,21 +1,19 @@
 import { DomainError } from "@modules/platform/errors"
+import type { ErrorKind } from "@modules/platform/errors"
 
-/** Why a configuration key was refused. */
-export type ConfigErrorCode = "CONFIG_KEY_MISSING" | "CONFIG_KEY_INVALID" | "CONFIG_FILE_UNREADABLE"
-
-const REASONS: Readonly<Record<ConfigErrorCode, string>> = {
-    CONFIG_KEY_MISSING: "is required and has no default",
-    CONFIG_KEY_INVALID: "does not hold a valid value",
-    CONFIG_FILE_UNREADABLE: "points at a file that cannot be read",
+/** Codes of the config capability; both are boot failures that name the offending key in the params. */
+export enum ConfigErrorCode {
+    /** A required key is not declared in the environment. */
+    KeyMissing = "CONFIG_KEY_MISSING",
+    /** A declared key does not parse as the type its reader expects. */
+    KeyInvalid = "CONFIG_KEY_INVALID",
 }
 
-/** Startup configuration refusal: names the key and the rule it broke, never the value it was given. */
-export class ConfigError extends DomainError {
-    /** The environment key that was refused. */
-    readonly key: string
-
-    constructor(code: ConfigErrorCode, key: string, options?: { readonly cause?: unknown }) {
-        super(code, `Configuration key ${key} ${REASONS[code]}.`, options)
-        this.key = key
-    }
+/** How each config code travels. */
+export const CONFIG_ERROR_KINDS: Record<ConfigErrorCode, ErrorKind> = {
+    [ConfigErrorCode.KeyMissing]: "internal",
+    [ConfigErrorCode.KeyInvalid]: "internal",
 }
+
+/** The one error class of the config capability. */
+export class ConfigError extends DomainError<ConfigErrorCode> {}

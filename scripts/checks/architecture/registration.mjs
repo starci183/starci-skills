@@ -115,7 +115,7 @@ function frameworkTargets(config, context, checker, localFiles) {
 
 function classToken(ts, checker, node, localFiles) {
   const symbol = valueSymbol(ts, checker, node);
-  const declarations = symbol?.getDeclarations?.().filter(declaration => ts.isClassDeclaration(declaration)) ?? [];
+  const declarations = (symbol?.getDeclarations?.() ?? []).filter(declaration => ts.isClassDeclaration(declaration)) ?? [];
   const local = declarations.filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName)));
   const keys = [...new Set(local.map(declaration => `${canonical(declaration.getSourceFile().fileName)}#${declaration.getStart(declaration.getSourceFile())}`))];
   return { key: keys.length === 1 ? keys[0] : null, external: declarations.length > 0 && local.length === 0 };

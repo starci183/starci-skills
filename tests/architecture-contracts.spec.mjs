@@ -334,3 +334,21 @@ export class PingCapability {
   assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
   assert.equal(result.coverage.publicContracts.status, 'checked', JSON.stringify(result, null, 2));
 });
+
+test('an owner export whose target the compiler cannot resolve (no declaration) is skipped, never a crash of the whole check', t => {
+  // `export { Missing }` of a module that has no such export resolves to the compiler's unknown symbol, which has no
+  // declarations; the public contract walk once read `.filter` of that undefined list and stopped every project-graph rule.
+  const root = fixture(t, {
+    'src/features/orders/index.ts': `
+export { PingCapability, Missing } from './application/ping.service';
+`,
+    'src/features/orders/application/ping.service.ts': `
+export class PingCapability {
+  ping():boolean{return true}
+}
+`,
+  });
+  const result = check(root);
+  assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.publicContracts.status, 'checked', JSON.stringify(result, null, 2));
+});

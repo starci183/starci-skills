@@ -1,6 +1,12 @@
 {
+  "app": {
+    "title": "{{project}}"
+  },
   "home": {
     "title": "Trang chủ"
+  },
+  "loading": {
+    "message": "Đang tải"
   },
   "notFound": {
     "title": "Không tìm thấy trang",

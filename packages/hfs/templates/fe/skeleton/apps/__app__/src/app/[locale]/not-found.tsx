@@ -1,15 +1,6 @@
-import { getTranslations } from "next-intl/server"
-import { Link } from "../../modules/i18n"
+import { NotFoundPage } from "../../features/pages/NotFoundPage"
 
-/** Shown when a route calls `notFound()`. */
-const NotFound = async () => {
-    const t = await getTranslations("notFound")
-    return (
-        <main>
-            <h1>{t("title")}</h1>
-            <Link href="/">{t("home")}</Link>
-        </main>
-    )
-}
+/** The locale segment's not-found slot: it mounts the not-found page and nothing else. */
+const NotFound = () => <NotFoundPage />
 
 export default NotFound

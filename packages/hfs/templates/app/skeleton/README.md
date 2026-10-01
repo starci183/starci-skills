@@ -27,6 +27,10 @@ npm run build:be
 npm run build:fe
 ```
 
+The api app reads `PORT` and `HTTP_SECURITY_ALLOWED_ORIGINS` (comma-separated origins allowed to send state-changing browser
+requests) at boot; every door is closed until it is marked public or sign-in is designed. The web app reads
+`NEXT_PUBLIC_SITE_URL`. A missing key stops the process with an error that names it.
+
 ## Work
 
 The product's Work records live in `.starciwork`.

@@ -1,99 +1,116 @@
-import { Test } from "@nestjs/testing"
-import { FakeClock } from "@starci/jest-preset"
+import type { Writable } from "node:stream"
+import { FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
-import { JsonLoggerService, createJsonLogger } from "./json-logger.service"
-
-const TIME = "2026-01-01T00:00:00.000Z"
+import { Test } from "@nestjs/testing"
+import { createJsonLogger, JsonLoggerService } from "./json-logger.service"
+import { LOG_ERR, LOG_OUT } from "./logging.decorators"
+import { LoggingLogEvent } from "./logging.log-events"
 
 const build = async () => {
-    const clock = new FakeClock(TIME)
+    const clock = new FakeClock("2026-05-06T07:08:09.000Z")
+    const written: Array<{ stream: "out" | "err"; line: string }> = []
+    const out = mock<Writable>({
+        write: (chunk: string) => {
+            written.push({ stream: "out", line: chunk })
+            return true
+        },
+    })
+    const err = mock<Writable>({
+        write: (chunk: string) => {
+            written.push({ stream: "err", line: chunk })
+            return true
+        },
+    })
     const moduleRef = await Test.createTestingModule({
-        providers: [JsonLoggerService, { provide: CLOCK, useValue: clock }],
+        providers: [
+            JsonLoggerService,
+            { provide: CLOCK, useValue: clock },
+            { provide: LOG_OUT, useValue: out },
+            { provide: LOG_ERR, useValue: err },
+        ],
     }).compile()
-    return { service: moduleRef.get(JsonLoggerService), clock }
+    return { logger: moduleRef.get(JsonLoggerService), clock, written }
 }
 
-/** One JSON line, the way the logger writes it. */
-const line = (fields: Record<string, unknown>): string => `${JSON.stringify(fields)}\n`
-
 describe("JsonLoggerService", () => {
-    const stdout: Array<string> = []
-    const stderr: Array<string> = []
+    it("writes an info line to the out stream stamped by the clock", async () => {
+        const { logger, written } = await build()
 
-    beforeEach(() => {
-        stdout.length = 0
-        stderr.length = 0
-        jest.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-            stdout.push(String(chunk))
-            return true
-        })
-        jest.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-            stderr.push(String(chunk))
-            return true
-        })
+        logger.info("cart.opened", { personId: "p-1" })
+
+        expect(written).toEqual([
+            {
+                stream: "out",
+                line: `${JSON.stringify({ level: "info", event: "cart.opened", time: "2026-05-06T07:08:09.000Z", personId: "p-1" })}\n`,
+            },
+        ])
     })
 
-    afterEach(() => {
-        jest.restoreAllMocks()
+    it("writes a warn line without fields to the err stream", async () => {
+        const { logger, clock, written } = await build()
+        clock.advance(1000)
+
+        logger.warn(LoggingLogEvent.StartupFailed)
+
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:10.000Z" })}\n`,
+            },
+        ])
     })
 
-    describe("info", () => {
-        it("stamps the line with the clock and writes it to stdout", async () => {
-            const { service } = await build()
+    it("writes an error line with the name and message of an Error cause", async () => {
+        const { logger, written } = await build()
 
-            service.info("thing.happened", { id: 1 })
+        logger.error("db.failed", new TypeError("boom"), { operation: "PlaceOrderHandler" })
 
-            expect(stdout).toEqual([line({ level: "info", event: "thing.happened", time: TIME, id: 1 })])
-            expect(stderr).toEqual([])
-        })
-    })
-
-    describe("warn", () => {
-        it("writes the line to stderr, stamped with the moment of the call", async () => {
-            const { service, clock } = await build()
-            clock.advance(5_000)
-
-            service.warn("thing.slow")
-
-            expect(stderr).toEqual([line({ level: "warn", event: "thing.slow", time: "2026-01-01T00:00:05.000Z" })])
-            expect(stdout).toEqual([])
-        })
-    })
-
-    describe("error", () => {
-        it("serializes an Error cause by name and message", async () => {
-            const { service } = await build()
-
-            service.error("thing.failed", new TypeError("boom"), { id: 2 })
-
-            expect(stderr).toEqual([
-                line({
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({
                     level: "error",
-                    event: "thing.failed",
-                    time: TIME,
+                    event: "db.failed",
+                    time: "2026-05-06T07:08:09.000Z",
                     errorName: "TypeError",
                     errorMessage: "boom",
-                    id: 2,
-                }),
-            ])
-        })
+                    operation: "PlaceOrderHandler",
+                })}\n`,
+            },
+        ])
+    })
 
-        it("serializes a cause that is not an Error to its text", async () => {
-            const { service } = await build()
+    it("writes an error line with the text of a cause that is not an Error", async () => {
+        const { logger, written } = await build()
 
-            service.error("thing.failed", "plain text")
+        logger.error("db.failed", "plain failure")
 
-            expect(stderr).toEqual([
-                line({ level: "error", event: "thing.failed", time: TIME, errorMessage: "plain text" }),
-            ])
-        })
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({ level: "error", event: "db.failed", time: "2026-05-06T07:08:09.000Z", errorMessage: "plain failure" })}\n`,
+            },
+        ])
     })
 
     describe("createJsonLogger", () => {
-        it("builds a logger stamped by the given clock", () => {
-            createJsonLogger(new FakeClock(TIME)).info("thing.started")
+        afterEach(() => {
+            jest.restoreAllMocks()
+        })
 
-            expect(stdout).toEqual([line({ level: "info", event: "thing.started", time: TIME })])
+        it("builds a logger that writes info to stdout and errors to stderr, stamped by the clock", () => {
+            const lines: Array<string> = []
+            jest.spyOn(process.stdout, "write").mockImplementation((chunk) => lines.push(`out:${String(chunk)}`) > 0)
+            jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
+            const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
+
+            logger.info(LoggingLogEvent.ServerStarted)
+            logger.warn(LoggingLogEvent.StartupFailed)
+
+            expect(lines).toEqual([
+                `out:${JSON.stringify({ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-05-06T07:08:09.000Z" })}\n`,
+                `err:${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:09.000Z" })}\n`,
+            ])
         })
     })
 })

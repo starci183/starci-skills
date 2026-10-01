@@ -276,7 +276,7 @@ function contractTypeStatusFromType(ts, checker, type, seen = new Set(), depth =
   }
   for (const anonymous of ['Record', 'Partial', 'Pick', 'Omit', 'Required']) if (builtinSymbol(ts, named, anonymous)) return 'inline';
   if (type.aliasSymbol) return 'named';
-  if (type.symbol?.getDeclarations?.().some(declaration => ts.isEnumDeclaration(declaration))) return 'named';
+  if ((type.symbol?.getDeclarations?.() ?? []).some(declaration => ts.isEnumDeclaration(declaration))) return 'named';
   if (type.flags & ts.TypeFlags.TypeParameter) return 'named';
   if (type.flags & ts.TypeFlags.Boolean) return 'scalar';
   if (type.flags & (ts.TypeFlags.Union | ts.TypeFlags.Intersection)) return 'inline';
@@ -590,7 +590,7 @@ function checkMessageReadonly(config, context, checker, declaration, localFiles,
     }
     const type = classInstanceType(ts, checker, selected);
     for (const base of type && checker.getBaseTypes ? checker.getBaseTypes(type) : []) {
-      const declarations = base.symbol?.getDeclarations?.().filter(item => ts.isClassDeclaration(item)) ?? [];
+      const declarations = (base.symbol?.getDeclarations?.() ?? []).filter(item => ts.isClassDeclaration(item)) ?? [];
       if (declarations.length !== 1) {
         reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits message fields from a class outside the checked production program`);
       } else if (localFiles.has(canonical(declarations[0].getSourceFile().fileName))) visitClass(declarations[0]);
@@ -654,7 +654,7 @@ function checkInjectedClass(config, context, checker, declaration, classKind, ta
   if (classKind) {
     const type = classInstanceType(ts, checker, declaration);
     for (const base of type && checker.getBaseTypes ? checker.getBaseTypes(type) : []) {
-      const declarations = base.symbol?.getDeclarations?.().filter(item => ts.isClassDeclaration(item)) ?? [];
+      const declarations = (base.symbol?.getDeclarations?.() ?? []).filter(item => ts.isClassDeclaration(item)) ?? [];
       if (declarations.length !== 1) {
         reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits an injected constructor from a class outside the checked production program`);
       } else if (localFiles.has(canonical(declarations[0].getSourceFile().fileName))) {
@@ -709,7 +709,7 @@ export function checkBackendContracts(config, context) {
       publicReasons.push(`${owner.entry} uses export =, so named capability API discovery is unavailable`);
     }
     for (const symbol of exportedSymbols(ts, checker, entry)) {
-      const declarations = symbol.getDeclarations?.().filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName))) ?? [];
+      const declarations = (symbol.getDeclarations?.() ?? []).filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName))) ?? [];
       if (!declarations.length) continue;
       const representative = declarations[0];
       if (isFrameworkHelper(representative.getSourceFile(), representative, framework)) continue;

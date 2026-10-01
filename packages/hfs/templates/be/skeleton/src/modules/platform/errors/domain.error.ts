@@ -1,11 +1,20 @@
-/** The base of every error a capability declares: a stable machine code, a sentence for people, and the cause. */
-export abstract class DomainError extends Error {
-    /** Stable machine code that transports map to a status and logs group by. */
-    readonly code: string
+import type { DomainErrorInit, ErrorParams } from "./errors.contracts"
 
-    constructor(code: string, message: string, options?: { readonly cause?: unknown }) {
-        super(message, options)
+/**
+ * The base of every capability error family: a stable code, text parameters and the cause. The message is the code
+ * itself; display text is resolved from the message catalog by code, so an error never carries prose.
+ */
+export abstract class DomainError<C extends string> extends Error {
+    /** The stable machine code, `<CAPABILITY>_<WHAT>`. */
+    readonly code: C
+
+    /** Values for the placeholders of the display text. */
+    readonly params: ErrorParams
+
+    constructor(init: DomainErrorInit<C>) {
+        super(init.code, init.cause === undefined ? undefined : { cause: init.cause })
         this.name = new.target.name
-        this.code = code
+        this.code = init.code
+        this.params = init.params ?? {}
     }
 }

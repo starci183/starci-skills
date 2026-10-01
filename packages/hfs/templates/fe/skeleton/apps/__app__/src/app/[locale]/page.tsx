@@ -1,27 +1,9 @@
-import type { Metadata } from "next"
-import { getTranslations, setRequestLocale } from "next-intl/server"
+import { HomePage, homeMetadata } from "@/features/pages/HomePage"
 
-interface HomePageProps {
-    readonly params: Promise<{ readonly locale: string }>
-}
+/** The document title of this page, from the catalog of the requested locale. */
+export const generateMetadata = homeMetadata
 
-/** The document title comes from the catalog of the requested locale. */
-export const generateMetadata = async ({ params }: HomePageProps): Promise<Metadata> => {
-    const { locale } = await params
-    const t = await getTranslations({ locale, namespace: "home" })
-    return { title: t("title") }
-}
+/** The locale root's page slot: it mounts the home page and nothing else. */
+const Page = () => <HomePage />
 
-/** The first page of the app; a server component, so no catalog is shipped for it. */
-const HomePage = async ({ params }: HomePageProps) => {
-    const { locale } = await params
-    setRequestLocale(locale)
-    const t = await getTranslations("home")
-    return (
-        <main>
-            <h1>{t("title")}</h1>
-        </main>
-    )
-}
-
-export default HomePage
+export default Page
