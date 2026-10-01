@@ -371,9 +371,9 @@ export async function depthItems({ env = process.env, config = null, orcaOk = fa
   const base = `orca.maxWorkerDepth ${configured} (${settings.source}); it must equal the Orca app's worker depth setting`;
   if (env.STARCI_ORCA_LIVE !== '1') return [green('config', 'orca-depth', NAME, `${base}; not measured (STARCI_ORCA_LIVE=1 measures it)`, { required: false })];
   if (!orcaOk) return [warn('config', 'orca-depth', NAME, `${base}; not measured: Orca is not reachable`, 'open Orca, then run start --check with STARCI_ORCA_LIVE=1 again')];
-  const run = probe ?? (async (opts) => (await import('../agent/depth-probe.mjs')).probeWorkerDepth(opts));
+  const measure = probe ?? (async (opts) => (await import('../agent/depth-probe.mjs')).probeWorkerDepth(opts));
   let measured;
-  try { measured = await run({ entry: env.ORCA_TERMINAL_HANDLE || null, worktree: SKILL_ROOT, agent: env.STARCI_DEPTH_PROBE_AGENT || 'claude' }); }
+  try { measured = await measure({ entry: env.ORCA_TERMINAL_HANDLE || null, worktree: SKILL_ROOT, agent: env.STARCI_DEPTH_PROBE_AGENT || 'claude' }); }
   catch (error) { measured = { ok: false, error: String(error?.message ?? error) }; }
   const leaked = (measured?.released ?? []).filter((w) => !w.released);
   if (leaked.length) return [red('config', 'orca-depth', NAME, `${base}; the probe could not release ${leaked.map((w) => w.dispatchId).join(', ')}`, 'orca orchestration worker-release --dispatch <id> for each, then run the check again')];
