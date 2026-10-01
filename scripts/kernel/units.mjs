@@ -7,7 +7,7 @@
 // job, or re-run a passed unit without a reopen reason. The schema triggers refuse the same things; this answers first
 // with a typed refusal the Kernel can act on. admitUnit only reads; writeUnitTry writes inside the caller's transaction.
 import { AWAITING_OWNER_STATUS, UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
-import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/ledger-db.mjs';
+import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/db/ledger.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};

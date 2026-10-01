@@ -14,8 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { explainPath } from '../runtime/scripts/lib/hfs-check.mjs';
-import { loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { explainPath } from '../runtime/scripts/hfs/check.mjs';
+import { loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 
 export class ScaffoldError extends Error {
   constructor(code, message) {

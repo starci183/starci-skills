@@ -91,7 +91,7 @@ $defs:
     description: "The setup record one workspace.manage mode writes for one workflow - the scope it bounds
       and the review that settled it. The workflow id is the key above it, so request carries no workflow
       field. request, nodes, deps, exclusions and openQuestions use the field names and shapes of
-      work-feature.schema.yaml $defs.scope (tests/scope-define-layout.spec.mjs keeps them identical).
+      work-feature.schema.yaml $defs.scope (tests/engine/scope-define-layout.spec.mjs keeps them identical).
       There is no state: a catalog is never done or todo, and the mode's completion is the kernel's
       settled verdict on its job; review records the outcome and the checks that verdict rests on."
     properties:

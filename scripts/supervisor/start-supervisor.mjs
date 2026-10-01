@@ -4,12 +4,12 @@
 // through orca orchestration worker-start (scripts/agent/lib.mjs startAgent: a Run coordinated by the launching
 // terminal, one Task, the configured agent - config.yaml supervisor.kernel, else the kernel pin) with a prompt built
 // from modules/supervisor/supervisor-prompt.md and supervise.yaml. Its Agent/Task denial is a seat guard
-// (scripts/guards/install.mjs bindSeatGuard, enforced by the .claude/settings.json PreToolUse hook).
+// (scripts/guards/hook-install.mjs bindSeatGuard, enforced by the .claude/settings.json PreToolUse hook).
 //
 // The kernel is OPTIONAL: it runs only in config.yaml supervisor.mode kernel. In chat mode (the default; owner,
 // 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace and --restart launch nothing
 // (action 'chat-mode'); --stop and --status still work. The seat's liveness is the reconciler Host controller's
-// (concern host.supervisor-seat: scripts/supervisor/watchdog.mjs --once).
+// (concern host.supervisor-seat: scripts/supervisor/supervisor-watchdog.mjs --once).
 //
 //   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
@@ -20,7 +20,7 @@
 //
 // Singleton, three fences:
 //   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;
-//   2. the seat (machine.sqlite seats row 'supervisor', scripts/supervisor/home.mjs seatOf/writeSeat): a 'starting'
+//   2. the seat (machine.sqlite seats row 'supervisor', scripts/machine/home.mjs seatOf/writeSeat): a 'starting'
 //      reservation with an expiry, then the attested worker (its Dispatch and terminal). A seat whose Dispatch
 //      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
@@ -32,12 +32,12 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine, pidAlive } from '../../engine/machine-db.mjs';
+import { openMachine, pidAlive } from '../../engine/db/machine.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
-} from './home.mjs';
+} from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -103,7 +103,7 @@ async function orcaDeps() {
     import('../api/orca/terminal-list.mjs'), import('../api/orca/terminal-read.mjs'),
     import('../kernel/terminal-liveness.mjs'), import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'),
     import('../agent/lib.mjs'), import('../kernel/terminal-dedupe.mjs'), import('../api/orca/worker-show.mjs'),
-    import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs'), import('../guards/install.mjs')]);
+    import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs'), import('../guards/hook-install.mjs')]);
   return {
     list: () => terminalList({ includeVisualLayouts: true }),
     tabTitles: dedupe.tabTitlesOf,

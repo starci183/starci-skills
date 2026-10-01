@@ -101,7 +101,7 @@ Evidence records the OS image, architecture, Docker version, Swarm identity/topo
 
 ## Static check
 
-The check is `checkApplicationStacks` in `scripts/checks/stacks.mjs` — invoked
+The check is `checkApplicationStacks` in `scripts/gates/stacks-gate.mjs` — invoked
 with `{repoRoot: <repo>, environment: 'vps', deploymentModelFile: <docker-stack-config.yaml>}`
 (the stack render produced by `docker stack config`).
 

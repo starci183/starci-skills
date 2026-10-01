@@ -193,7 +193,7 @@ export function frameWithDraft(screen, draft) {
 
 // The opening words of every text the runtime types into a Kernel or worker: the Kernel watchdog wake,
 // the transition and nudge wakes, the stall wake, the supervisor's notice and its watchdog wake
-// (tests/input-draft.spec.mjs builds each one and pins it here).
+// (tests/kernel/input-draft.spec.mjs builds each one and pins it here).
 const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wake for workflow\b|Operation liveness wake for durable job\b|\[stall\] Stall self-heal wake for\b|\[supervisor\] |\[Supervisor watchdog\] /g;
 /**
  * Who wrote the draft sitting in an input box. `texts` are what the runtime typed into this terminal

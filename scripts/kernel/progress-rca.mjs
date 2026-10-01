@@ -17,7 +17,7 @@
 //               a runtime or cross-workflow cause the Kernel cannot fix) and whether the decision log already
 //               tried it (a failed try sinks, it is never offered as new).
 //
-// Read-only over the ledger. `api status` exposes `progress` and `rca` (scripts/kernel/api-status/*.mjs); the
+// Read-only over the ledger. `api status` exposes `progress` and `rca` (scripts/kernel/status/*.mjs); the
 // workflow controller (modules/reconciler/workflow.yaml) reuses it for the progress-stall DI and escalation.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,12 +27,12 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { SLOT_STATUSES, priorityTable, readThrottleState } from '../lib/ram-throttle.mjs';
+import { SLOT_STATUSES, priorityTable, readThrottleState } from '../machine/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
-import { JOB_ROW } from './api-lib/rows.mjs';
-import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
-import { importsBrokenOf } from './api-status/imports.mjs';
-import { blockingDecisions, resolutionOf } from '../reconciler/decisions.mjs';
+import { JOB_ROW } from './verbs/shared/rows.mjs';
+import { kernelDecisionItems } from './settle/job-settle.mjs';
+import { importsBrokenOf } from './status/imports.mjs';
+import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -173,7 +173,7 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     since = since == null ? quietSince : Math.min(since, quietSince);
   }
   // SETTLE-FIRST, the Kernel's half (owner ruling settle-runtime-service): the runtime settles green reports itself
-  // (scripts/reconcile/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done
+  // (scripts/kernel/settle/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done
   // reports it could not verify (`kernelItems`, oldest first, already aged past settleBacklog.ageMs). Without them
   // (a caller that passes none) the old reading stands: filed reports never consumed.
   const unsettled = kernelItems
@@ -572,7 +572,7 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
   try { importsBroken = repo ? importsBrokenOf({ db, workflowId, repo, now }) : null; } catch { importsBroken = null; }
   const actions = actionsOf({ progress, rca, units, workflowId, repo, decisions, missingQueued, settings, recutOp: recutTargetOf(units), importsBroken });
   // DECISIONS FIRST: the oldest open Kernel Decision Item is the top action, in copy-paste form (route, dispatch, enqueue
-  // and dispatch-ready refuse decisions-first meanwhile; scripts/reconciler/decisions.mjs).
+  // and dispatch-ready refuse decisions-first meanwhile; scripts/machine/decisions.mjs).
   try {
     const blocking = blockingDecisions(db, workflowId, { now });
     if (blocking.length) {

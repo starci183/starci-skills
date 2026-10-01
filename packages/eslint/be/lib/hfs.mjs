@@ -4,8 +4,8 @@
  * A consuming `eslint.config.mjs` is the one line `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`.
  * The config lives in the be/ side folder of an app; `loadHfs` finds the app-root `hfs.json` one level up and gives every file
  * linted under that folder the view of the be side (paths relative to be/), with the slot manifest this package ships in
- * `runtime/` (a byte copy of the runtime's `knowledge/hfs/slots.yaml`, `scripts/lib/hfs-slots.mjs` and `scripts/lib/hfs-view.mjs`, refreshed by
- * `packages/hfs/scripts/sync-runtime.mjs`), and returns an object the factory puts in `settings.starci.hfs`.
+ * `runtime/` (a byte copy of the runtime's `knowledge/hfs/slots.yaml`, `scripts/hfs/slots.mjs` and `scripts/hfs/view.mjs`, refreshed by
+ * `scripts/hfs/sync-runtime.mjs`), and returns an object the factory puts in `settings.starci.hfs`.
  *
  * Every path-scoped rule asks `slotOf` here instead of testing a path with a regular expression: a rule never assumes
  * `/src/modules/` or `/src/tests/`. A rule that needs the manifest and finds no `settings.starci.hfs` stops the lint run
@@ -13,7 +13,7 @@
  */
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { declaredHfsView, openHfsView } from "../runtime/scripts/lib/hfs-view.mjs"
+import { declaredHfsView, openHfsView } from "../runtime/scripts/hfs/view.mjs"
 
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..", "runtime")
 

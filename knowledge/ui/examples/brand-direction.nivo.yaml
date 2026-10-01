@@ -28,7 +28,7 @@
 # It is knowledge, not product Work: brand.decide (direction mode, param directionArchetype) writes the product's
 # own direction into its .starciwork/brand/index.yaml and parks one brand-direction-review ask per archetype
 # (scripts/work/brand-direction.mjs); nothing here is accepted, so no archetype is ready and `golden` is empty.
-# tests/brand-direction.spec.mjs validates this block against the schema and scripts/checks/brand.mjs `direction`.
+# tests/work/brand-direction.spec.mjs validates this block against the schema and scripts/work/brand/brand.mjs `direction`.
 # Rule ids are cited relative to knowledge/ui (composition/, presentation/, proof/).
 direction:
   rev: 1

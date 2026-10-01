@@ -13,7 +13,7 @@
 //   node scripts/supervisor/workers.mjs cleanup [--job <id>]                remove finished staging checkouts
 //   ... [--json]
 //
-// Lifecycle (machine.sqlite, engine/machine-db.mjs B1: sup_jobs / sup_leases / sup_attempts / sup_reports, audit in
+// Lifecycle (machine.sqlite, engine/db/machine.mjs B1: sup_jobs / sup_leases / sup_attempts / sup_reports, audit in
 // sup_events): queued -> spawning (staging checkout + file leases, one sup_attempts row per spawn) -> running
 // ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
 // checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
@@ -49,23 +49,23 @@ import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../..
 import {
   SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
-} from './home.mjs';
-import { openMachine } from '../../engine/machine-db.mjs';
+} from '../machine/home.mjs';
+import { openMachine } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree } from '../api/orca/worktree-provision.mjs';
 import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
 import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
 import { ci } from '../api/npm/ci.mjs';
-import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
+import { closeSelfSafe, releaseSelfSafe } from '../machine/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../kernel/contract-changes-store.mjs';
-import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 
 /**
- * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/install.mjs guardLaunch), bound to
+ * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
  * the worker's terminal once it starts: its staging checkout has its own node_modules (createStaging runs npm ci), and
  * an install through a node_modules link would empty the link's target (node-modules-link-wipe, 2026-09-28) - the
  * command guard (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
@@ -114,7 +114,7 @@ export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined
 /**
  * The machine's RAM right now: {totalRamBytes, freeRamBytes, freeMem} — freeMem is the 0..1 fraction
  * machineLoad reports. The memory half of the cap's load sample, exported so the dispatch host-resources
- * guard (scripts/lib/host-resources.mjs) reads the same probe instead of writing a second one.
+ * guard (scripts/machine/host-resources.mjs) reads the same probe instead of writing a second one.
  */
 export function memoryProbe({ mem = os } = {}) {
   const totalRamBytes = mem.totalmem(), freeRamBytes = mem.freemem();
@@ -145,7 +145,7 @@ export function adaptiveCap({ base = 4, max = 10, queued = 0, running = 0, load 
 
 // A sup_jobs row with its latest attempt: {job_id, status, kind, role, cluster, title, lane, created_at, updated_at,
 // payload, result (payload.result), worker_id (the attempt's terminal; 'supervisor' for a self job), attempt_id,
-// attempt_closed_at}. `m` is the machine handle (engine/machine-db.mjs) everywhere below.
+// attempt_closed_at}. `m` is the machine handle (engine/db/machine.mjs) everywhere below.
 const JOB_SELECT = `SELECT j.*, a.attempt_id, a.terminal_handle, a.closed_at AS attempt_closed_at FROM sup_jobs j
   LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT attempt_id FROM sup_attempts WHERE job_id=j.job_id ORDER BY dispatch_seq DESC LIMIT 1)`;
 function rowJob(row) {
@@ -221,7 +221,7 @@ export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 
 /* ------------------------------------------------------------ staging */
 
-/** The registry kind of a [Worker] staging checkout (scripts/lib/worktree-registry.mjs ORCA_KINDS). */
+/** The registry kind of a [Worker] staging checkout (scripts/machine/worktree-registry.mjs ORCA_KINDS). */
 export const STAGING_KIND = 'supervisor-staging';
 /** The Orca worktree name of a job's staging checkout; Orca derives the branch from it (the receipt is what counts). */
 export const stagingNameOf = (jobId) => `sup-${jobId}`;
@@ -331,7 +331,7 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
   for (const j of jobsOf(m).filter((x) => x.created_at >= since && x.payload.pool)) recent[j.payload.pool] = (recent[j.payload.pool] ?? 0) + 1;
   const { providerAvailability, providerCircuitOf } = await import('../agent/models.mjs');
   let probe = null;
-  try { probe = (await import('../api/quota/index.mjs')).probeQuota; } catch { probe = null; }
+  try { probe = (await import('../agent/quota/index.mjs')).probeQuota; } catch { probe = null; }
   const { withLedgerRead } = await import('../connectors/lib.mjs');
   const repos = productRepos(supervisorSettings({ config: cfg }));
   const availabilityOf = (provider) => {

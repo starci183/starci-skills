@@ -14,7 +14,7 @@ finish:
     with `task-update --status done`, so a finished workflow leaves nothing
     in the Orca tree (modules/kernel/start-workflow.yaml orcaTree);
     events 'workflow-finished'.
-    The ledger retention pass (scripts/lib/hk-ledger.mjs: debug log rows older
+    The ledger retention pass (scripts/housekeeping/hk-ledger.mjs: debug log rows older
     than 14 days (Q5) and an incremental vacuum; never a purge and never a WAL
     checkpoint) then runs on the ledger, recorded on the receipt as `retention`.
     A workflow ended more than 30 days ago is zipped, verified and purged by the

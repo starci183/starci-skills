@@ -1,6 +1,6 @@
 // language.mjs - the one home of "is this text English?" for source, comments, tests and docs (HFS_LANGUAGE_NOT_ENGLISH,
 // BE_SOURCE_FORM, FE_SOURCE_FORM). Shared by the architecture machine (docs) and by both lint canons (each ships a byte
-// copy in its runtime/ bundle, kept by packages/hfs/scripts/sync-runtime.mjs).
+// copy in its runtime/ bundle, kept by scripts/hfs/sync-runtime.mjs).
 //
 // Detection is structural on characters, never a word list: the letters Vietnamese adds to the Latin alphabet (a-breve, a-circumflex,
 // d-stroke, e-circumflex, o-circumflex, o-horn, u-horn) and every vowel carrying a tone mark. Text is folded to NFC first, so a
@@ -26,7 +26,7 @@ export function secondLanguageHits(text) {
 
 /**
  * The Vietnamese fields of one failure-code entry: the operator text the owner mandated for the failure-code catalog
- * (scripts/checks/failure-codes.mjs types the entry with exactly these). causes_vi is the list companion of the three scalar fields.
+ * (scripts/checks/check-failure-codes.mjs types the entry with exactly these). causes_vi is the list companion of the three scalar fields.
  */
 export const FAILURE_CODE_VIETNAMESE_FIELDS = Object.freeze(['title_vi', 'meaning_vi', 'nextStep_vi', 'causes_vi']);
 

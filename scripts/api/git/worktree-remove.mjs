@@ -1,5 +1,5 @@
 // worktree-remove.mjs — remove a scratch worktree the runtime made with git (worktree-add.mjs): links first, then
-// `git worktree remove --force` and prune (scripts/lib/safe-remove.mjs safeRemoveWorktree), verified, the row closed.
+// `git worktree remove --force` and prune (scripts/api/fs/safe-remove.mjs safeRemoveWorktree), verified, the row closed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitRunner } from './lib.mjs';
@@ -7,8 +7,8 @@ import { registeredAt } from './worktree-list.mjs';
 import { revParse } from './rev-parse.mjs';
 import { deleteBranch } from './branch-delete.mjs';
 import { preserveWork } from './preserve-work.mjs';
-import { safeRemoveWorktree } from '../../lib/safe-remove.mjs';
-import { markRemoved } from '../../lib/worktree-registry.mjs';
+import { safeRemoveWorktree } from '../fs/safe-remove.mjs';
+import { markRemoved } from '../../machine/worktree-registry.mjs';
 
 /**
  * Remove a scratch worktree the runtime made with git. preserve: {name} -> preserveWork first (a failure keeps the

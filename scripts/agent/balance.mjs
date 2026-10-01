@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 

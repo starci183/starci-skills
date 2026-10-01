@@ -1,5 +1,5 @@
 // pack-dry-run.mjs — `npm pack --dry-run --json --ignore-scripts` in a package directory: the file list npm would
-// publish (scripts/lib/canon-digest.mjs packedFiles shapes it).
+// publish (scripts/gates/canon-digest.mjs packedFiles shapes it).
 import { spawnSync } from 'node:child_process';
 
 /** {status, stdout, stderr, error} of the dry run. */

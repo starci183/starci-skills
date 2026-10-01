@@ -17,7 +17,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {machineFileFor, readMachine, withMachine} from '../../engine/machine-db.mjs';
+import {machineFileFor, readMachine, withMachine} from '../../engine/db/machine.mjs';
 import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {recordAlive} from '../connectors/lib.mjs';
 // launch.mjs, never assisted-runner.mjs: assisted-runner imports this module, and a dynamic import of it

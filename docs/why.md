@@ -64,7 +64,7 @@ TARGET_MISSING:
   kind: input-invalid   # check-finding | settle-reason | dispatch-refusal | blocker | check-status | verb-refusal | runtime-fault | input-invalid
 ```
 
-`npm run check` runs `scripts/checks/failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
+`npm run check` runs `scripts/checks/check-failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
 UPPER_SNAKE literal, a `[CODE]` token in a message, a kebab literal in a `code:` / `reason:` / `rejected:` / `failureKind:` /
 `signal:` position, the last argument of `refuse(...)`, `hand('...')`, constant `*_REASONS|CODES|KINDS|CLASSES` lists) and
 refuses an emitted code with no entry, an entry no code emits, a malformed entry, an owner outside the set, an
@@ -108,7 +108,7 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
 
 - `api status`: `legs[].why` (latest attempt of each non-green leg), `legs[].attempts[]` (each with its `why`),
   `frontier.why`, `kernelNotes[]`; the text form prints `why:` lines.
-- `scripts/supervisor/core-watch.mjs`: a bad leg's alert text is `<op> <state> - <why.headline>`.
+- `scripts/reconciler/core-watch.mjs`: a bad leg's alert text is `<op> <state> - <why.headline>`.
 - Dry-run backfill: `node scripts/supervisor/why-backfill.mjs [--ledger <name>] [--workflow <id>] [--op <op>] [--json]`
   computes the why of every attempt of a registered ledger that needs one and prints it; it opens the ledger read-only and has
   no apply mode.

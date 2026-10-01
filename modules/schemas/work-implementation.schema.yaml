@@ -75,7 +75,7 @@ properties:
     type: string
     pattern: ^[a-f0-9]{7,64}$
     description: "The commit the rest of this record is true at, as a hex sha. It is what
-      scripts/checks/check-evidence-binding.mjs reads to decide that a commit touching this record's owned
+      scripts/work/validate/check-evidence-binding.mjs reads to decide that a commit touching this record's owned
       files is drift by the tree's own definition rather than a matter of timestamps - so a record that
       pins one is making a stronger claim than one that does not, and a record without it describes source
       that moves with nothing said about when it was read."
@@ -144,7 +144,7 @@ properties:
             guessing by filename.
         sha256:
           $ref: "#/$defs/sha256"
-          description: The blob's digest - the citation itself (scripts/lib/blob-lookup.mjs resolves it).
+          description: The blob's digest - the citation itself (engine/db/blob-lookup.mjs resolves it).
         provenance:
           $ref: "#/$defs/prose"
           description: How the capture was taken - which route, served by which build, at which viewport.
@@ -525,7 +525,7 @@ $defs:
             - kind
         description: Withdrawing content is a breaking change by definition - the record stops saying
           something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
-          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          accepted and quietly under-reported. It is the same rule scripts/work/validate/work-change.mjs runs as
           WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
   timestamp:
     type: string

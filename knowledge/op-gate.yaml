@@ -1,8 +1,8 @@
 schema: starci/op-gate@1
 # The READ-CODE-CHECK-FIX-REPORT loop every code-writing op follows (owner 2026-10-01), as data. Three readers use it:
-#   scripts/checks/read-digest.mjs   prints what a slice must READ before coding (the pattern files of its file kinds, the
+#   scripts/gates/read-digest.mjs   prints what a slice must READ before coding (the pattern files of its file kinds, the
 #                                    matching example files, the slot map) and records the READ digest with each file's sha256
-#   scripts/checks/gate.mjs          the one gate the op forces every round (its base is the workflow's previous checkpoint,
+#   scripts/gates/gate.mjs          the one gate the op forces every round (its base is the workflow's previous checkpoint,
 #                                    the merge-base with main for the first op) and the workflow's finish runs over the
 #                                    whole branch against main's merge-base
 #   scripts/kernel/gate-settle.mjs   re-reads the attached gate JSON and READ digest at `api settle` and refuses a done that
@@ -31,11 +31,11 @@ enforcedOps:
   - grammar.update
   - task.execute
 gate:
-  script: scripts/checks/gate.mjs
+  script: scripts/gates/gate.mjs
   schema: starci/gate@1
   attach: gate.json
 digest:
-  script: scripts/checks/read-digest.mjs
+  script: scripts/gates/read-digest.mjs
   schema: starci/read-digest@1
   attach: read-digest.json
 # The example app whose files show each slot done right, per side. A slot's example files are the files of the example side
@@ -125,7 +125,7 @@ proofs:
   read-knowledge:
     schema: starci/read-digest@1
     attach: read-digest.json
-    script: scripts/checks/read-digest.mjs
+    script: scripts/gates/read-digest.mjs
     purpose: >-
       The READ step of a deciding or authoring op: the knowledge/patterns files of the kinds it touches, the knowledge files its
       decision cites (--knowledge), and the hfs slot map of the records it writes, each with its sha256. A done whose digest names
@@ -134,14 +134,14 @@ proofs:
     schema: starci/gate@1
     profile: docs
     attach: doc-gate.json
-    script: scripts/checks/gate.mjs
+    script: scripts/gates/gate.mjs
     purpose: >-
       The document gate (gate.mjs --profile docs): the docChecks below over the runtime documents and, with --tree, the Work
       records the op wrote. A red or unrunnable document gate is never done.
   test-world:
     schema: starci/test-world-run@1
     attach: test-world-run.json
-    script: scripts/checks/test-world-run.mjs
+    script: scripts/gates/test-world-run.mjs
     purpose: >-
       The test-world run summary per project: the app runs its world projects on @starci/jest-preset's world runner, the specs
       take their world from the library in the layer's form (useTestWorld({ apps }) for e2e, useTestWorld({ modules }) for
@@ -150,7 +150,7 @@ proofs:
   unit-kit:
     schema: starci/unit-run@1
     attach: unit-run.json
-    script: scripts/checks/unit-run.mjs
+    script: scripts/gates/unit-run.mjs
     purpose: >-
       The unit run summary: the whole unit project ran green, every *.service.ts reaches 100 on lines, branches, functions and
       statements on its own, and every service spec builds its subject with Test.createTestingModule over the kit doubles.
@@ -178,7 +178,7 @@ proofs:
   review-gate:
     schema: starci/gate@1
     attach: gate.json
-    script: scripts/checks/gate.mjs
+    script: scripts/gates/gate.mjs
     purpose: >-
       gate.mjs read-only over the reviewed range (--base <first reviewed commit>^), merge guard included: a review cannot pass a
       range the gate finds red or could not judge.
@@ -191,7 +191,7 @@ proofs:
   release:
     schema: starci/release-proof@1
     attach: release-proof.json
-    script: scripts/checks/release-proof.mjs
+    script: scripts/gates/release-proof.mjs
     purpose: >-
       The release proof: release-app-installs (fresh installs, lint, typecheck, api boot, a skip is never a pass), check-canon-pins
       with the canon content digest, the merge guard over the release range and a green npm run check. Every step is required.
@@ -223,8 +223,8 @@ opProofs:
 # root the op wrote> when the gate is given one (else they judge the runtime's examples).
 docChecks:
   - {id: doc-language, script: scripts/checks/check-doc-language.mjs}
-  - {id: check-work-surfaces, script: scripts/checks/check-work-surfaces.mjs, tree: true}
-  - {id: check-work-deep, script: scripts/checks/check-work-deep.mjs, tree: true}
+  - {id: check-work-surfaces, script: scripts/work/validate/check-work-surfaces.mjs, tree: true}
+  - {id: check-work-deep, script: scripts/work/validate/check-work-deep.mjs, tree: true}
   - {id: check-example-work, script: scripts/checks/check-example-work.mjs}
   - {id: check-contract-cites, script: scripts/checks/check-contract-cites.mjs}
   - {id: check-json-exceptions, script: scripts/checks/check-json-exceptions.mjs}

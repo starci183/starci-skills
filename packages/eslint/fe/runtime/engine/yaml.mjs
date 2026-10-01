@@ -1,8 +1,8 @@
 // engine/yaml.mjs — GENERATED, frozen. This is the yaml@2.9.0 package bundled by esbuild, with the
 // runtime's parseYaml/stringifyYaml wrapper as the entry module (source shown below). The installed
-// runtime carries zero npm dependencies (tests/npm-package.spec.mjs), so it vendors this parser
+// runtime carries zero npm dependencies (tests/repo/npm-package.spec.mjs), so it vendors this parser
 // rather than importing node_modules; yaml is a devDependency and a direct import breaks that
-// install. tests/yaml-vendored-parity.spec.mjs proves the vendored parseYaml/stringifyYaml behave
+// install. tests/engine/yaml-vendored-parity.spec.mjs proves the vendored parseYaml/stringifyYaml behave
 // exactly like yaml@2.9.0 with these options for every tracked *.yaml/*.yml file (parsed values
 // deep-equal, stringify output byte-identical). License: engine/yaml-license.json.
 // Rebuild only when deliberately upgrading yaml. The entry source is:

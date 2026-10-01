@@ -1,4 +1,4 @@
-# The contract of `api rename` (scripts/kernel/api-verbs/rename.mjs). One file per extension verb
+# The contract of `api rename` (scripts/kernel/verbs/rename.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.rename (lane slim-api).
 args: '--workflow <id> --title "<name>" [--by owner|supervisor] (default owner) [--no-terminals] [--dry-run]'
 reads: 'the workflows row; the Kernel signal and job (its terminal); the workflow''s running/answering operation jobs and their terminals'

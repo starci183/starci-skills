@@ -1,6 +1,6 @@
 // sonar-settle.mjs - the settle-time Sonar gate of the code-writing ops (knowledge/sonar-gate.yaml enforcedOps).
 //
-// backend.implement, interface.implement and code.refactor run scripts/checks/sonar-local.mjs on their own change and attach
+// backend.implement, interface.implement and code.refactor run scripts/gates/sonar-local.mjs on their own change and attach
 // its sonar.json. At `api settle` the runtime reads that summary itself (judgeSummary): it never takes the op's word. The
 // judgment is recorded as the runtime check `sonar-gate` (runner settler, authority runtime) on the attempt, so:
 //   - a pass with a red judgment is refused (api settle prints the why code), and the check keeps the attempt from ever
@@ -12,9 +12,9 @@
 //     (scripts/supervisor/poll.mjs lists `[runtime-...]` incidents), and the next passing judgment resolves it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { openIncident, resolveIncident } from '../../engine/ledger-db.mjs';
+import { openIncident, resolveIncident } from '../../engine/db/ledger.mjs';
 import { recordCheck } from './evidence-store.mjs';
-import { judgeSummary, loadSonarGate, SCAN_SCHEMA_PREFIX } from '../checks/sonar-gate.mjs';
+import { judgeSummary, loadSonarGate, SCAN_SCHEMA_PREFIX } from '../gates/sonar-gate.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 
 export const SONAR_ENFORCE_CHANGE = 'sonar-enforce';

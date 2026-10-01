@@ -99,7 +99,7 @@ reads:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern
         topics for the selected repository.
   - id: machines
-    path: scripts/checks/gate.mjs + scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
+    path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml +
       docs/architecture-check.md
     purpose:
       en: When the slice lives in a checked app (`be/` or `fe/`), read the sealed architecture and
@@ -108,7 +108,7 @@ reads:
         pattern regression introduced by a pure refactor is a failure, not a refactor outcome. This
         read grants no fix-flag or repair authority.
   - id: canon
-    path: scripts/checks/canon-scan.mjs + modules/models/canon-conformance.yaml + examples/shape-slot +
+    path: scripts/gates/canon-scan.mjs + modules/models/canon-conformance.yaml + examples/shape-slot +
       packages/eslint/fe/README.md + packages/eslint/be/README.md
     purpose:
       en: For a canon-conformance slice, the finding inventory of the owned paths measured with the
@@ -185,8 +185,8 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/checks/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - target
       - business
@@ -210,17 +210,17 @@ steps:
         record the slice's admission commit before editing (params.admissionBase when it is set;
         with params.resumeFrom set, first bring that commit into the checkout - cherry-pick it, or
         git apply its indexed patch - and continue from the findings it left, never redoing its
-        committed work) and run node scripts/checks/gate.mjs
+        committed work) and run node scripts/gates/gate.mjs
         --root ROOT --base <slice admission commit> --changed <owned paths>
         BEFORE the first edit. It gates only the slice's new findings. Without context.cut,
         run the whole-repository hfs lint --format json at ROOT
         BEFORE the first edit. Keep the machine report, exact command and exit code in either mode.
-        For a cut slice in a TypeScript repository, the gate's tsc step (node scripts/checks/gate.mjs
+        For a cut slice in a TypeScript repository, the gate's tsc step (node scripts/gates/gate.mjs
         --root ROOT --base <slice admission commit> --changed <owned files>) is the typecheck: one program per
         tsconfig that owns a changed file, its base read from the admission commit's blobs, so other in-flight
         files are identical on both sides of the measurement. A repository-wide typecheck may be recorded as context, but
         its pre-existing errors outside the slice do not block this ordinal.
-        When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
+        When params.canonFamilies is set, run node scripts/gates/canon-scan.mjs
         --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
         edit as well: its findings are the slice's scope, the exact list this refactor removes. A green baseline is normally the invariant's left side. The sole
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
@@ -317,7 +317,7 @@ steps:
         runtime commits your green settle as the workflow's checkpoint; prove the tested tree is the
         working tree you report. Sonar gates every refactor - after the AFTER
         regression run, run Sonar only
-        through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository
+        through `node <Source>/.claude/scripts/gates/sonar-local.mjs scan --cwd <absolute repository
         root> --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out
         <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` and attach both files
@@ -331,8 +331,8 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/checks/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/checks/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:

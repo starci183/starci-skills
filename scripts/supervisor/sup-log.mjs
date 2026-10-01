@@ -1,11 +1,11 @@
 // sup-log.mjs — the Supervisor's typed log rows: "log gốc của machine" (owner, 2026-09-28). Every observation,
 // decision, action, message and experiment of the Supervisor is one row of machine.sqlite `machine_logs`
-// (engine/machine-db.mjs log), actor `supervisor`. Kinds: supervisor.action (an owed-action act: item, action, reason,
+// (engine/db/machine.mjs log), actor `supervisor`. Kinds: supervisor.action (an owed-action act: item, action, reason,
 // class), decision, narration, cmd.run, check.result, warning, error. The product workflow / job / repo / commit a row
 // concerns rides in `refs` (refs_json: `workflow:<id>`, `job:<id>`, `repo:<path>`, `commit:<sha>`, `item:<owed-action
 // key>`, `experiment:<id>`) and in data.workflowId (data_json).
 // Best effort: a log write never fails the Supervisor's own step.
-import { withMachine } from '../../engine/machine-db.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
 import { slash } from '../lib/path-key.mjs';
 
 export const SUP_ACTOR = 'supervisor';

@@ -85,7 +85,7 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's layout tree (work/layout-tree@1) and the captures it cites (blobs, scripts/lib/blob-lookup.mjs): the app/ nodes
+      en: "The product's layout tree (work/layout-tree@1) and the captures it cites (blobs, engine/db/blob-lookup.mjs): the app/ nodes
         with their layouts, chrome decisions, navigation and labels per locale, per-layout revs and
         slot-measured captures per breakpoint and theme, productLocale and the demo personas - the
         structure every accepted direction is composited into and every delivered route is compared with."
@@ -258,7 +258,7 @@ steps:
     writes: [evidence]
     action:
       en: "Apply the layout lens in both directions and record it in shell.json. Direction versus layout
-        tree: run `node scripts/checks/shell-conformance.mjs` on every ui record directory in the accepted
+        tree: run `node scripts/work/ui/shell-conformance.mjs` on every ui record directory in the accepted
         lineage - route in the tree, surface/direction/routed/host consistent, ancestors settled and bound
         at their current revs, composites built on the exact current layout capture (or host composite)
         for their breakpoint and theme and re-deriving to the same pixels, routed overlays drawn in both
@@ -422,13 +422,13 @@ proofs:
         childish or interchangeable imagery remains actionable drift.
   - id: shell-conformance
     requirement:
-      en: "`node scripts/checks/shell-conformance.mjs` ran on every audited ui record directory and on the
+      en: "`node scripts/work/ui/shell-conformance.mjs` ran on every audited ui record directory and on the
         implementation record directory, and its output is retained in shell.json. Every direction is a
         reproducible composite in the current layout chain of its route and every delivered route has its
         App Router files where the layout tree says; every capture shows the layouts' chrome, lockup,
         navigation labels and productLocale copy. A direction-side departure routes interface.draw, an
         implementation-side one routes interface.implement, and neither passes."
-    check: scripts/checks/shell-conformance.mjs
+    check: scripts/work/ui/shell-conformance.mjs
   - id: bounded-creative-rubric
     requirement:
       en: Applicable TASTE rows have measurements/calibration and never override deterministic findings.
@@ -639,7 +639,7 @@ policy:
     visualEquivalenceRule: every-required-side-by-side-lens-pass
     layoutLens:
       authority: .starciwork/shell/index.yaml
-      check: scripts/checks/shell-conformance.mjs
+      check: scripts/work/ui/shell-conformance.mjs
       compares: [route-in-tree, surface-routed-host, ancestor-layouts-settled, layout-revs-current, composite-layout-capture, composite-reproducible, routed-overlay-both-presentations, app-router-files, chrome, brand-lockup, nav-labels, product-locale-copy]
       directionDrift: {route: interface.draw, blocker: interface-gap, category: layout.structure}
       implementationDrift: {route: interface.implement, outcome: failed, categories: [layout.structure, shell.conformance]}

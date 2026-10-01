@@ -14,11 +14,11 @@
 //                               resolve against the runtime root)
 //   ctx.clock(entity, state, slaMs, meta) / ctx.clear(entity, state)   SLA clocks (machine.sqlite sla_episodes, append-only:
 //                               one open episode per (entity, state), closed once with a reason); shadow records them too
-//   ctx.openDecision(di)        Decision Item through scripts/reconciler/decisions.mjs openDecision (lane C) when
+//   ctx.openDecision(di)        Decision Item through scripts/machine/decisions.mjs openDecision (lane C) when
 //                               active; in shadow, or before that module exists, only the would-row
 //   ctx.log(kind, msg, data)    a typed row in machine.sqlite machine_logs, actor 'reconciler' (logRowOf, reconcilerLog)
 //   ctx.owns(concern)           whether the concern's controller runs active in THIS engine
-//   ctx.machine                 the engine's machine.sqlite handle (engine/machine-db.mjs; never open another one yourself)
+//   ctx.machine                 the engine's machine.sqlite handle (engine/db/machine.mjs; never open another one yourself)
 //   ctx.stateDb / ctx.stateFile its raw connection (ctx.machine.db) and file; ctx.env
 //   ctx.key / ctx.epoch         the key being reconciled (null in list()) and the leader epoch
 //
@@ -30,8 +30,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { machineLog } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { machineLog } from '../../engine/db/machine.mjs';
 import { LOG_KINDS } from '../kernel/typed-logs.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import { openClock, slaCatalog } from './sla.mjs';
@@ -179,7 +179,7 @@ const catalogNow = (at) => { if (!catalogCache.value || at - catalogCache.at > 6
  * readers: the key of the reconcile running in this async context, the current epoch), so ONE ctx object serves every
  * reconcile of a controller in a mode, and a controller may keep per-ctx memory (a WeakMap keyed by ctx).
  * `shared` = {statusCache: Map, wouldSeen: Map} is shared by every ctx of one engine. `state` is the engine's
- * machine.sqlite handle (engine/machine-db.mjs openMachine). Seams: spawnChild (spawnJson), writeLog (reconcilerLog),
+ * machine.sqlite handle (engine/db/machine.mjs openMachine). Seams: spawnChild (spawnJson), writeLog (reconcilerLog),
  * reader (openLedgerReader), loadDecisions (import of decisions.mjs), isCurrentEpoch (the fence).
  */
 export function createCtx({
@@ -241,7 +241,7 @@ export function createCtx({
     get key() { return keyNow(); },
     get epoch() { return epochNow(); },
     get ledgers() { return ledgersNow(); },
-    /** The engine's machine.sqlite handle (engine/machine-db.mjs); never open the file yourself. */
+    /** The engine's machine.sqlite handle (engine/db/machine.mjs); never open the file yourself. */
     machine: state,
     /** Its raw connection (schedules.mjs claimDue/finishDuty); null without an engine. */
     stateDb: state?.db ?? null,
@@ -295,7 +295,7 @@ export function createCtx({
       return state.clearSla({ entity: String(entity), state: String(clockState), reason }) > 0;
     },
     /**
-     * Open a Decision Item (DESIGN §10.3) through scripts/reconciler/decisions.mjs openDecision(repo, di) when active; a
+     * Open a Decision Item (DESIGN §10.3) through scripts/machine/decisions.mjs openDecision(repo, di) when active; a
      * DI with ledger 'supervisor' goes to the supervisor ledger. In shadow, or before that module exists: the would-row.
      */
     async openDecision(di) {
@@ -304,7 +304,7 @@ export function createCtx({
       if (mode !== 'active') return would('decisions --open', [JSON.stringify(summary)], { decision: summary });
       let mod = null;
       try { mod = await loadDecisions(); } catch { mod = null; }
-      if (typeof mod?.openDecision !== 'function') return { ...would('decisions --open', [JSON.stringify(summary)], { decision: summary, pending: 'scripts/reconciler/decisions.mjs absent' }), recordedOnly: true };
+      if (typeof mod?.openDecision !== 'function') return { ...would('decisions --open', [JSON.stringify(summary)], { decision: summary, pending: 'scripts/machine/decisions.mjs absent' }), recordedOnly: true };
       const l = ledgerOf(item.ledger ?? '') ?? null;
       const opened = await act('decisions --open', [item.idempotencyKey ?? digestOf(item)], async () => {
         const r = await mod.openDecision(l?.repo ?? item.repo ?? null, item, { env: childEnv(), now: now() });

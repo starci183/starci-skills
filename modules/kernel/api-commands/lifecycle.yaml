@@ -1,4 +1,4 @@
-# The contract of `api lifecycle` (scripts/kernel/api-verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
+# The contract of `api lifecycle` (scripts/kernel/verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
 purpose: >-
   The one verb that pauses, stops and resumes a workflow (DBTREE workflow_transitions + lifecycle_changes). A paused or
   stopped workflow takes no new job (api enqueue refuses workflow-not-accepting-work) and launches none (api dispatch
@@ -10,7 +10,7 @@ moves:
   pause: running -> paused; by owner, supervisor or kernel
   stop: awaiting-approval | queued | running | paused -> stopped; by owner or supervisor
   resume: paused -> running (owner or supervisor); stopped -> queued (owner only)
-writes: one lifecycle_changes row {from_phase, to_phase, by, reason} and workflows.phase/phase_reason in one transaction, plus one phase-transition event (engine/ledger-db.mjs changeWorkflowPhase)
+writes: one lifecycle_changes row {from_phase, to_phase, by, reason} and workflows.phase/phase_reason in one transaction, plus one phase-transition event (engine/db/ledger.mjs changeWorkflowPhase)
 returns: '{ok, workflowId, move, from, to, by, reason}'
 refusals:
   lifecycle-move: not exactly one of --pause, --stop, --resume

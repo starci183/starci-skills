@@ -111,7 +111,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Confirm that a declared module owns a cohesive capability instead of hiding feature orchestration.
@@ -124,7 +124,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Inspect callbacks with neutral names for hidden product behavior.
@@ -137,7 +137,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Verify semantic validation and DTO/result projection at the actual transport boundary.
@@ -433,7 +433,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Confirm the exported surface is a stable capability API.
@@ -522,7 +522,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_PUBLIC_CONTRACT_FORM, BE_READONLY_BOUNDARY, BE_SOURCE_FORM]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: knowledge/patterns/be/typing.yaml
           review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
@@ -638,7 +638,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_ROUTE_DEFAULT_EXPORT, FE_ROUTE_ONE_PAGE, FE_ROUTE_DRAWING_DECISION, FE_ROUTE_CLIENT_BOUNDARY, FE_ROUTE_CLIENT_HOOK]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Confirm a server loader adapts framework input rather than owning product orchestration.
@@ -651,7 +651,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_TIER_DIRECTION, FE_APP_ISOLATION, ARCH_OWNER_CYCLE, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_TRANSPORT_OWNER, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Classify scenario, reusable capability and intrinsic visual responsibilities before applying a directory edge.
@@ -664,7 +664,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_PURE_WORLD_HOOK, FE_PURE_WORLD_IMPORT, FE_PURE_REACHES_DATA]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Intrinsic focus, measurement, disclosure, drag and reduced-motion state remain valid visual ownership.
@@ -778,7 +778,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Confirm the public surface belongs to one cohesive feature/module/package owner.
@@ -791,7 +791,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_GRAMMAR_EXPORT_BYPASS, ARCH_GRAMMAR_CONTRACT_INVALID]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Typecheck actual component props and render states; static package identity cannot prove behavior.
@@ -804,7 +804,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_WORLD_OWNER_RENDER_BOUNDARY]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
@@ -858,7 +858,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_SWR_KEY_IDENTITY, FE_SWR_MUTATION_RESOURCE_IDENTITY]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
         semantic:
           guidance: knowledge/patterns/fe/function.yaml
           review: Exercise identity changes and stale-result boundaries; syntax cannot prove key completeness without domain meaning.

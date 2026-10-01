@@ -11,7 +11,7 @@ import path from 'node:path';
 import { orcaWorktreeClient } from './worktree-client.mjs';
 import { removeOrcaWorktree } from './worktree-remove.mjs';
 import { mainRootOf } from '../git/worktree-list.mjs';
-import { ORCA_KINDS, worktreeSettings, withRegistry, claimWorktree, pendingPathOf, releaseOrcaSlot } from '../../lib/worktree-registry.mjs';
+import { ORCA_KINDS, worktreeSettings, withRegistry, claimWorktree, pendingPathOf, releaseOrcaSlot } from '../../machine/worktree-registry.mjs';
 import { runtimeStampOf } from '../../lib/orca-orphans.mjs';
 
 const posixPath = (p) => String(p).replace(/\\/g, '/');

@@ -65,7 +65,7 @@ properties:
             type: integer
             minimum: 1
             description: The shell record's `rev` this screen was drawn inside. A shell bump makes the
-              binding stale, and scripts/checks/shell-conformance.mjs reports SHELL_REV_STALE until the
+              binding stale, and scripts/work/ui/shell-conformance.mjs reports SHELL_REV_STALE until the
               screen is redrawn against the current chrome.
           activeNav:
             type: string
@@ -112,7 +112,7 @@ properties:
       that chrome; this is the edge. It is optional on the schema so ui records drawn before the shell
       record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
       redraw - and interface.draw's shell-conformance proof is what requires it on every record the op
-      writes from now on (scripts/checks/shell-conformance.mjs)."
+      writes from now on (scripts/work/ui/shell-conformance.mjs)."
   app:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
@@ -150,7 +150,7 @@ properties:
   direction:
     description: "The edge a drawer is anchored to - left, right, top or bottom - or one per breakpoint
       ({desktop: right, mobile: bottom}), as the Drawer component's `direction` takes it. Required wherever the
-      surface is a drawer and forbidden elsewhere (scripts/checks/shell-conformance.mjs); the compositor anchors
+      surface is a drawer and forbidden elsewhere (scripts/work/ui/shell-conformance.mjs); the compositor anchors
       the panel to that edge over the dimmed host."
     oneOf:
       - $ref: "#/$defs/drawerDirection"
@@ -281,7 +281,7 @@ properties:
         description: "Every layout this screen draws. A shape is one value of a pure component's `XState`
           and gets exactly one drawing, at the viewports it names. A slot's data status (`$defs/dataStatus`)
           is not a shape: it renders by recipe (SlotView) and is listed under `dataStatus`. A shape whose
-          state is a data status stands only with `nonDerivable`; scripts/checks/ui-shapes.mjs refuses any
+          state is a data status stands only with `nonDerivable`; scripts/work/ui/ui-shapes.mjs refuses any
           other shape or drawing of a data status as DATA_STATUS_DRAWN, and `states` beside this list keeps
           the trigger and behaviour of each shape."
         items:
@@ -1154,7 +1154,7 @@ $defs:
             - kind
         description: Withdrawing content is a breaking change by definition - the record stops saying
           something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
-          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          accepted and quietly under-reported. It is the same rule scripts/work/validate/work-change.mjs runs as
           WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
   timestamp:
     type: string
@@ -1174,7 +1174,7 @@ $defs:
       recipe (SlotView) and is never a drawn shape.
   dataStatusAlias:
     description: The other state-name spellings of a data status, each mapped to the status it names.
-      scripts/checks/ui-shapes.mjs reads a state as a data status when its name is, or ends with `-` and,
+      scripts/work/ui/ui-shapes.mjs reads a state as a data status when its name is, or ends with `-` and,
       a status or one of these spellings, and as `empty` when it is `no-<thing>` or ends with `-no-<thing>`
       (no-runtime). A slot retrying, pending, uncertain, stale (last-known), unverified or limited is a
       banner or badge over the same layout - a status the slot renders through SlotView, never a shape
@@ -1682,7 +1682,7 @@ $defs:
         name:
           $ref: "#/$defs/prose"
           description: The artifact name of a blob citation - agent output (a draw round, a capture, a lockup) lives in
-            the blob store, never on disk; scripts/lib/blob-lookup.mjs resolves it by sha256.
+            the blob store, never on disk; engine/db/blob-lookup.mjs resolves it by sha256.
         role:
           $ref: "#/$defs/slug"
           description: "What the file is - a direction, the exact prompt beside it, an input a later
@@ -1720,7 +1720,7 @@ $defs:
                 for a token-rendered drawing, `image_gen.imagegen` for a raster region. A screen reaches done
                 only with at least one live draw-render asset (an image_gen.imagegen direction on a record
                 that has none, drawn before token rendering), never by an authored claim that a direction
-                exists (scripts/checks/ui-shapes.mjs generatedDrawingsOf).
+                exists (scripts/work/ui/ui-shapes.mjs generatedDrawingsOf).
             promptPath:
               $ref: "#/$defs/prose"
               description: The sibling file holding the exact prompt that was sent. The prompt is kept as
@@ -1758,13 +1758,13 @@ $defs:
                 critic's beauty clears the bar): `sha256` the blob bundle `finish` stored the whole loop in
                 (loop.json, every round, critique and metrics - starci/draw-loop@1, never a folder under ui
                 assets), `round` the best round whose parts `finish` installed. A live part without it, or whose
-                loop did not install its bytes, is DRAW_LOOP_MISSING (scripts/checks/draw-loop-coverage.mjs).
+                loop did not install its bytes, is DRAW_LOOP_MISSING (scripts/work/draw/draw-loop-coverage.mjs).
                 The `path` form (a loop record relative to the ui record) is the pre-bundle citation, kept
                 valid for records written before it; the coverage check accepts only the bundle."
               properties:
                 sha256:
                   $ref: "#/$defs/sha256"
-                  description: The manifest digest of the loop's blob bundle (scripts/lib/blob-lookup.mjs putBundle).
+                  description: The manifest digest of the loop's blob bundle (engine/db/blob-lookup.mjs putBundle).
                 path:
                   $ref: "#/$defs/prose"
                 round:
@@ -1838,7 +1838,7 @@ $defs:
             - image-gen
           description: Why this file no longer counts as a drawing - `data-status`, it drew a slot's data
             status, which renders by recipe; `image-gen`, image_gen.imagegen painted it before drawings were
-            token-rendered by draw-render (owner ruling 2026-09-27), and the redraw of its shape replaces it. The file and its entry stay; scripts/checks/ui-shapes.mjs does
+            token-rendered by draw-render (owner ruling 2026-09-27), and the redraw of its shape replaces it. The file and its entry stay; scripts/work/ui/ui-shapes.mjs does
             not read a retired asset as a drawing.
         selected:
           type: boolean

@@ -21,11 +21,11 @@ provenance:
   observedSource: "packages/grammar/src/common (host source tree of @starci/grammar@0.5.0)"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
-  generatedBy: "scripts/checks/grammar-knowledge.mjs --write (tokens[], renderers[], identity.counts, provenance.digests)"
+  generatedBy: "scripts/work/ui/grammar-knowledge.mjs --write (tokens[], renderers[], identity.counts, provenance.digests)"
   driftCheck: |
-    `node scripts/checks/grammar-knowledge.mjs` re-measures the package source and reports every row of
+    `node scripts/work/ui/grammar-knowledge.mjs` re-measures the package source and reports every row of
     this file that no longer matches it (renderer list, kind, group, props type, classes, rule ids;
-    token names, values, fallbacks and owners; counts; the package version). `tests/grammar-knowledge.spec.mjs`
+    token names, values, fallbacks and owners; counts; the package version). `tests/work-ui/grammar-knowledge.spec.mjs`
     runs the same comparison under `npm test`, so the snapshot cannot silently fall behind the package
     again. Line positions (`source`), use counts (`uses`, `alsoReadBy`) and `digests` are pointers that
     `--write` refreshes; they are not compared.
@@ -36,7 +36,7 @@ provenance:
     absent from it.
   method: |
     Every table below is a measurement of the Common entry's own source, taken by
-    `scripts/checks/grammar-knowledge.mjs` (static reads only; nothing built or rendered). `digests` is
+    `scripts/work/ui/grammar-knowledge.mjs` (static reads only; nothing built or rendered). `digests` is
     the sha256 of each file that measurement read, so a reader can tell whether these tables still
     describe the tree in front of them; a digest that moved means re-capture, not reinterpretation.
       * tokens[] — every custom property named outside a comment in the Common stylesheet set:
@@ -86,7 +86,7 @@ provenance:
         (`src/core/styles.css`, `src/offset-pop/styles.css`), which belongs to that family's snapshot.
       * A brand record may declare token names this snapshot does not carry — the Tailwind primitives
         `--color-white` and `--color-black` appear in no grammar source file at this version, so they
-        are absent from `tokens[]` by design, not by omission. `scripts/checks/brand.mjs` `tokens-in-grammar`
+        are absent from `tokens[]` by design, not by omission. `scripts/work/brand/brand.mjs` `tokens-in-grammar`
         will report such a name as missing; that is the brand importing outside the grammar, not a
         grammar gap.
   digests:
@@ -229,7 +229,7 @@ observations:
   - id: card-surface-canon
     observation: |
       Of the three `*Card` renderers, the classes that name a card surface itself — this is what
-      `scripts/checks/render.mjs` `cardClassesOf` keeps (a `starci-core-*` name ending in `-surface` or
+      `scripts/work/ui/render.mjs` `cardClassesOf` keeps (a `starci-core-*` name ending in `-surface` or
       `-surface-card` after the `--modifier` is stripped) — are `starci-core-surface`,
       `starci-core-surface-card`, `starci-core-frameless-surface` and `starci-core-form-surface`. The
       last is applied beside `starci-core-surface-card` on the same element (`measure: form`), so it
@@ -255,7 +255,7 @@ observations:
   - id: every-renderer-stamps-rule-ids
     observation: |
       Every one of the 100 renderers stamps at least one `data-contract` rule id (`claims` /
-      `computedClaims` per renderer above; `tests/grammar-contracts.spec.mjs` holds it). The base
+      `computedClaims` per renderer above; `tests/work-ui/grammar-contracts.spec.mjs` holds it). The base
       renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids that
       `src/__test__/styleClaims.ts` checks against the shipped declaration. The 53 renderers added in
       0.5.0 claim behaviour instead: A11Y, FOCUS, FIELD, CONTROL-STATE, STATE, FEEDBACK, ICON, MEDIA,
@@ -280,7 +280,7 @@ guidance:
   - id: refresh-not-rewrite
     requirement: |
       When the package moves, refresh the measured blocks with
-      `node scripts/checks/grammar-knowledge.mjs --write` and then re-read the authored observations and
+      `node scripts/work/ui/grammar-knowledge.mjs --write` and then re-read the authored observations and
       gaps against the new source; do not hand-edit a measured row.
     rationale: |
       Hand-edited rows are what let the 0.4.13 snapshot describe 42 renderers while the package shipped 95.
@@ -2565,11 +2565,11 @@ gaps:
       `-time-field`, `-date-picker`) and 20 names on HeroUI parts whose vendor paint Common leaves as it
       is (`-list`, `-list-popover`, `-calendar-grid`, `-slider-track`, `-slider-fill`, …). A stylesheet
       that selects on them adds to the anatomy; it styles nothing the package already styles. The list
-      is `CONSUMER_HOOK_CLASSES` in `tests/grammar-contracts.spec.mjs`, which fails on any other
+      is `CONSUMER_HOOK_CLASSES` in `tests/work-ui/grammar-contracts.spec.mjs`, which fails on any other
       unpainted class and on a hook the emitting renderer's docs do not name
     evidence:
-      - scripts/checks/grammar-knowledge.mjs
-      - tests/grammar-contracts.spec.mjs
+      - scripts/work/ui/grammar-knowledge.mjs
+      - tests/work-ui/grammar-contracts.spec.mjs
       - packages/grammar/src/common/components-forms.css
       - packages/grammar/src/common/components-navigation.css
       - packages/grammar/src/common/components-overlays.css
@@ -2578,11 +2578,11 @@ gaps:
     missing: |
       no card-suffix class on its own root. Its root is `starci-core-surface-accordion-card`, which ends
       in neither `-surface` nor `-surface-card`, so a host that identifies card surfaces by that suffix
-      — the rule `scripts/checks/render.mjs` `cardClassesOf` applies — does not see an accordion card as a card,
+      — the rule `scripts/work/ui/render.mjs` `cardClassesOf` applies — does not see an accordion card as a card,
       while its inner label row still carries `starci-core-surface-label`
     evidence:
       - packages/grammar/src/core/branch/SurfaceAccordionCard/classNames.ts
-      - scripts/checks/render.mjs:337
+      - scripts/work/ui/render.mjs:337
   - components:
       - Badge
       - Heading

@@ -1,4 +1,4 @@
-# The contract of `api decide` (scripts/kernel/api-verbs/decide.mjs): the Kernel's decision log (guardrail d,
+# The contract of `api decide` (scripts/kernel/verbs/decide.mjs): the Kernel's decision log (guardrail d,
 # owner 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
 purpose: >-
   Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline snapshot of the

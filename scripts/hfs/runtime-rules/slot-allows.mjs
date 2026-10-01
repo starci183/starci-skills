@@ -1,8 +1,8 @@
 // slot-allows.mjs - the `allows` and `forbids` entries of the runtime slots (knowledge/hfs/runtime-slots.yaml), judged on
 // every tracked file a slot owns: a slot that lists `allows` admits only its `requires` and `allows` entries, and no slot
 // admits a file its `forbids` names. A refused file is HFS_FORBIDDEN_PRESENT (rule R01), the code of a file the tree
-// forbids. The entries are read through scripts/lib/hfs-allows.mjs, the reading the product machine checks share. Pure.
-import { allowsFile, relativeToRoot } from '../../lib/hfs-allows.mjs';
+// forbids. The entries are read through scripts/hfs/allows.mjs, the reading the product machine checks share. Pure.
+import { allowsFile, relativeToRoot } from '../allows.mjs';
 import { braceVariants, globExpression } from '../../lib/glob.mjs';
 
 export const CODE = 'HFS_FORBIDDEN_PRESENT';

@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
-import { pidAlive } from '../../engine/machine-db.mjs';
+import { pidAlive } from '../../engine/db/machine.mjs';
 
 export const GATEWAY_FILE = fileURLToPath(import.meta.url);
 

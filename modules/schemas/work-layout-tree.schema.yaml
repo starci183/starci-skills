@@ -214,7 +214,7 @@ allOf:
         brand: true
         personas: true
     description: A settled tree names the brand lockup and at least one persona; every visible layout's
-      captures are held by scripts/checks/shell-conformance.mjs, which the schema cannot see.
+      captures are held by scripts/work/ui/shell-conformance.mjs, which the schema cannot see.
   - if:
       type: object
       properties:
@@ -301,7 +301,7 @@ $defs:
       name:
         $ref: "#/$defs/prose"
         description: The logical name - assets/lockups/lockup--<theme>.png. The bytes are a blob the sha256 cites
-          (agent data, never a file under shell/assets; scripts/lib/blob-lookup.mjs resolves it).
+          (agent data, never a file under shell/assets; engine/db/blob-lookup.mjs resolves it).
       sha256:
         $ref: "#/$defs/sha256"
       theme:

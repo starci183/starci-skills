@@ -1,5 +1,5 @@
 // runtime-host.mjs - the repository that hosts this runtime and how a stack declaration's `repository` names resolve on
-// this machine. One home for scripts/checks/check-starcistacks.mjs (the services contract) and scripts/checks/sonar-local.mjs
+// this machine. One home for scripts/gates/starcistacks.mjs (the services contract) and scripts/gates/sonar-local.mjs
 // (the Sonar helper), so both read a declaration's `{repository, path}` the same way.
 //
 // The runtime host is the repository whose checkout holds the runtime's MAIN checkout (`<host>/.claude`), found from git

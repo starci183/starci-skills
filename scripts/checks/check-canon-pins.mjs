@@ -10,7 +10,7 @@
 //
 //   CANON_BINDING_VERSION  canon.version differs from the canon's package.json version or from its pin here
 //   CANON_BINDING_DIGEST   the digest of the canon's PUBLISHED file set (the npm pack list of the pin's source directory,
-//                          scripts/lib/canon-digest.mjs) differs from canon.contentDigest.value or .files
+//                          scripts/gates/canon-digest.mjs) differs from canon.contentDigest.value or .files
 //   CANON_BINDING_INVALID  a profile names no pinned canon, or its digest policy or file set is refused (the typed
 //                          CANON_DIGEST_* / CANON_PACKAGE_* / CANON_PACK_UNAVAILABLE code is quoted)
 //
@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from './check-op-manifest.mjs';
-import { canonContentDigest, packedFiles } from '../lib/canon-digest.mjs';
+import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 
 export const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const SCHEMA_FILE = 'modules/schemas/canon-pins.schema.yaml';

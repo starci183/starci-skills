@@ -3,7 +3,7 @@
 // a nudge follows the dispatch, liveness reads it `starting` and nudge answers `worker-starting`. A spec that exercises
 // the nudge/liveness of a live worker ends the grace the only way the ledger allows - one seeded op-worker-nudged event
 // (events are append-only) - and reads events without it.
-import { openLedger } from '../../engine/ledger-db.mjs';
+import { openLedger } from '../../engine/db/ledger.mjs';
 
 export const GRACE_SEED = 'launch-grace-over';
 

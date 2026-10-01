@@ -2,10 +2,10 @@
 // ledger, <repo>/.starciwork/runtime.sqlite, and twenty ops plus nine kernels logging must never slow a ledger write).
 //
 // Every write of the `logs` and `log_cursors` tables goes through here:
-//   - its OWN connection to the ledger (engine/ledger-db.mjs openLedgerConnection: WAL, synchronous=NORMAL,
+//   - its OWN connection to the ledger (engine/db/ledger.mjs openLedgerConnection: WAL, synchronous=NORMAL,
 //     busy_timeout 15000, ...), never a caller's handle, so a log write is never inside a caller's ledger transaction;
 //   - rows are queued and flushed every <= flushMs (250) or as soon as >= maxRows (200) are queued, in ONE short
-//     BEGIN IMMEDIATE transaction per <= maxRows rows with prepared statements (engine/ledger-db.mjs beginImmediate:
+//     BEGIN IMMEDIATE transaction per <= maxRows rows with prepared statements (engine/db/ledger.mjs beginImmediate:
 //     spin briefly for the lock, then busy_timeout), so the write lock is held for milliseconds, never across a
 //     caller's work;
 //   - a flush never runs while this process holds a ledger write transaction (ledgerTransactionDepth): it waits for the
@@ -20,8 +20,8 @@
 // A row whose workflow the ledger does not hold is refused (the FK), counted as `rejected`, never thrown.
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { appendLog, beginImmediate, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/ledger-db.mjs';
-import { isBusyError } from '../../engine/machine-db.mjs';
+import { appendLog, beginImmediate, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/db/ledger.mjs';
+import { isBusyError } from '../../engine/db/machine.mjs';
 
 const require = createRequire(import.meta.url);
 export const LOG_FLUSH_MS = 250;

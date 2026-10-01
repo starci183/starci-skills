@@ -123,7 +123,7 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
 
 ## Checks
 
-`node scripts/checks/shell-conformance.mjs <work-root | shell-dir | ui-dir | impl-dir>` is structural. The only
+`node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-dir | impl-dir>` is structural. The only
 prompt text it reads is the `Product locale: <default>` line.
 
 - **Tree:**

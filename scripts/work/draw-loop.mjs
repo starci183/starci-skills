@@ -15,7 +15,7 @@
 //          [--css <product global css>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>]
 //          --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui ...] [--out ...] [...]
 //          the real-component drawing (owner ruling 2026-09-27, "chốt"): the shape is a React XBase composing only
-//          @starci/grammar (scripts/checks/draw-source.mjs). The round first runs the SOURCE gate - the grammar the
+//          @starci/grammar (scripts/work/draw/draw-source.mjs). The round first runs the SOURCE gate - the grammar the
 //          draw type-checks against (scripts/work/draw-grammar.mjs: the product's install, else claude-dist with the
 //          product upgrade owed), DRAW_TYPECHECK_FAILED, the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
 //          DRAW_IMPORT_OFF_GRAMMAR, DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE) - then renders it with
@@ -38,18 +38,18 @@
 //          machine metric itself (never the loop's self-reported numbers); exit 1 when one fails
 //
 // Machine metrics (each finding a code): the capture itself (DRAW_RENDER_RED: a missing font, horizontal overflow, a
-// page error, a failed request), the DNA gate (scripts/checks/draw-dna.mjs), the taste metrics (draw-taste.mjs:
+// page error, a failed request), the DNA gate (scripts/work/draw/draw-dna.mjs), the taste metrics (draw-taste.mjs:
 // DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES), the layer and measure gates (draw-layer.mjs:
 // DRAW_NESTED_VARIANT - a form control on a surface without variant=secondary, a form on the bare page Background;
 // DRAW_MEASURE_UNCAPPED - a form region rendered past the W-3xl cap), the copy/badge/action checks of draw-quality.mjs,
 // the brand palette (PALETTE_OFF_BRAND, PRIMARY_ABSENT), the Grammar geometry (GEOMETRY_OFF_GRAMMAR,
 // grammar-geometry.mjs), the ui-proof score (DRAW_SCORE_BELOW, ui-proof-brief.mjs --score) at every viewport, and the
-// decision evidence (DRAW_RATIONALE_MISSING, scripts/checks/draw-rationale.mjs: the rationale.json beside the source,
+// decision evidence (DRAW_RATIONALE_MISSING, scripts/work/draw/draw-rationale.mjs: the rationale.json beside the source,
 // data-why on every element and region, every measured value covered, every rule id resolvable, a redline per part).
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
 import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
-import { putBundle } from '../lib/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob-lookup.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,20 +58,20 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
-import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from '../checks/draw-source.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from '../checks/draw-dna.mjs';
-import { measureFindings, nestedVariantFindings } from '../checks/draw-layer.mjs';
+import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
+import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
 import { assetRequestIdsFor } from './asset-slot.mjs';
-import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from '../checks/draw-taste.mjs';
-import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from '../checks/draw-quality.mjs';
-import { brandOf, brandPalette, paletteFindings } from '../checks/brand-palette.mjs';
-import { parseColor } from '../checks/brand.mjs';
+import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw/draw-taste.mjs';
+import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from './draw/draw-quality.mjs';
+import { brandOf, brandPalette, paletteFindings } from './brand/brand-palette.mjs';
+import { parseColor } from './brand/brand.mjs';
 import { criticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
-import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from '../checks/draw-loop-coverage.mjs';
-import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from '../checks/draw-rationale.mjs';
+import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -98,11 +98,11 @@ const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
 /** The real browser-backed metrics; tests replace them. */
 export const browserProbes = {
   async geometry(html, viewport, { repo, family, drawCss = {} }) {
-    const { checkGeometry } = await import('../checks/grammar-geometry.mjs');
+    const { checkGeometry } = await import('./ui/grammar-geometry.mjs');
     return checkGeometry(html, { repo, family, viewport, ...drawCss });
   },
   async score(html, viewport, { repo, family, record, recordFile, drawCss = {} }) {
-    const { buildBrief, scoreRender } = await import('../checks/ui-proof-brief.mjs');
+    const { buildBrief, scoreRender } = await import('./ui/ui-proof-brief.mjs');
     const brief = buildBrief({ record: record ?? {}, recordFile, repo, family, ...drawCss });
     if (!brief.geometry.ok) return { error: `the product CSS did not resolve (${list(brief.geometry.errors).join('; ')})` };
     return scoreRender(brief, html, { repo, viewport });

@@ -1,0 +1,168 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {withLedger,seedWorkflow,awaitExit} from '../helpers/ledger-fixture.mjs';
+import {openAsks} from '../../scripts/supervisor/poll.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
+
+// The ask-report lifecycle in the ledger: modules/kernel/api.yaml askLifecycle.
+// serve-ask.mjs owns ask-serving / ask-serving-expired / ask-superseded /
+// ask-answered; every reader of open asks honours the terminal kinds.
+
+const ROOT=path.resolve(import.meta.dirname,'..', '..');
+const SERVE_ASK=path.join(ROOT,'scripts','kernel','serve-ask.mjs');
+const WORKFLOW='wf-serve-ask';
+
+const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now(),refs=null})=>{
+  // A reports row keys its attempt: the ask rides a reported job's op_attempts row (a3-3 evidence-db-report).
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId,status:'reported',dispatchId,createdAt:at}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.transaction(db=>{
+    db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at)
+      VALUES(?,?,?,?,?,?,?)`)
+      .run(workflowId,attemptId,dispatchId,jobId,'ask',
+        JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:`ask from ${dispatchId}`,
+          question:{text:'which way?',options:['a','b'],...(refs?{refs}:{})}}),at);
+  });
+};
+
+const serve=(repoRoot,...extra)=>spawnSync(process.execPath,
+  [SERVE_ASK,'--repo',repoRoot,'--workflow',WORKFLOW,'--ttl','400',...extra],
+  {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
+
+const askEvents=(ledger,kind)=>ledger.db
+  .prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(WORKFLOW,kind)
+  .map(r=>JSON.parse(r.payload_json));
+
+test('parking a replacement ask retires the earlier one with ask-superseded',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_old'});
+    seedAskReport(ledger,{dispatchId:'ctx_new'});
+
+    const r=serve(repoRoot);
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.equal(JSON.parse(r.stdout.trim().split('\n').pop()).dispatchId,'ctx_new',
+      'with no --dispatch the newest ask report is the one served');
+
+    assert.deepEqual(askEvents(ledger,'ask-superseded').map(p=>[p.dispatchId,p.by]),
+      [['ctx_old','ctx_new']],'the retired ask names the ask that replaced it');
+    assert.deepEqual(askEvents(ledger,'ask-serving').map(p=>p.dispatchId),['ctx_new']);
+    assert.deepEqual(askEvents(ledger,'ask-serving-expired').map(p=>p.dispatchId),['ctx_new'],
+      'the ttl window closes the form and says so');
+
+    const open=await openAsks(ledger.db);
+    assert.deepEqual(open.map(a=>a.dispatch_id),['ctx_new'],
+      'a superseded ask is no longer open — the owner can never act on it');
+    assert.equal(open[0].liveness,'dead','the expired form is dead, not relayable');
+  });
+});
+
+test('an unanswered ask of a different op is not superseded',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_other_op',opId:'decision.prepare'});
+    seedAskReport(ledger,{dispatchId:'ctx_serving',opId:'provision.ask'});
+
+    const r=serve(repoRoot);
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual(askEvents(ledger,'ask-superseded'),[],
+      'two ops may legitimately hold one owner gate each');
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),
+      ['ctx_other_op','ctx_serving']);
+  });
+});
+
+// Live Modules: three provision.ask jobs asked about Chatbot, Shell auth and
+// Accounting; serving the Accounting ask retired the other two open questions.
+test('an ask of the same op about a different subject is not superseded',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_chatbot',refs:['decision.chatbot.d-chatbot-customer-channel-proof']});
+    seedAskReport(ledger,{dispatchId:'ctx_shell_old',refs:['decision.instance-management.shell-api-authentication']});
+    seedAskReport(ledger,{dispatchId:'ctx_shell_new',refs:['decision.instance-management.shell-api-authentication']});
+
+    const r=serve(repoRoot);
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual(askEvents(ledger,'ask-superseded').map(p=>[p.dispatchId,p.by]),
+      [['ctx_shell_old','ctx_shell_new']],'only the earlier ask about the same decision is retired');
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),['ctx_chatbot','ctx_shell_new'],
+      'the Chatbot question stays open for the owner');
+  });
+});
+
+test('a superseded ask that is served again is open again',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_old'});
+    seedAskReport(ledger,{dispatchId:'ctx_new'});
+    assert.equal(serve(repoRoot).status,0);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id),['ctx_new']);
+    const r=serve(repoRoot,'--dispatch','ctx_old');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),['ctx_new','ctx_old'],
+      'the re-served question reaches the owner list again');
+  });
+});
+
+test('--review reads an ask; it never retires one',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_first'});
+    seedAskReport(ledger,{dispatchId:'ctx_second'});
+
+    const r=serve(repoRoot,'--review');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual(askEvents(ledger,'ask-superseded'),[],'a read-only review mutates nothing');
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),
+      ['ctx_first','ctx_second']);
+  });
+});
+
+// A StarCi Next Kernel sat an hour on an ask-reserve (inc-2558dd227dfd): status
+// said re-serve with serve-ask.mjs, but the Kernel may mutate only through
+// api.mjs. `api serve-ask` launches the same form detached.
+test('api serve-ask launches the form for a filed ask and refuses one that was never filed',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_api'});
+    const API=path.join(ROOT,'scripts','kernel','api.mjs');
+    const api=(...a)=>spawnSync(process.execPath,[API,'serve-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,STARCI_CONNECTORS_OFF:'1'}});
+    const refused=api('--dispatch','ctx_nope');
+    assert.notEqual(refused.status,0);
+    assert.match(refused.stderr,/ask-unknown/);
+    const r=api('--dispatch','ctx_api','--ttl','400');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    const out=JSON.parse(r.stdout);
+    assert.equal(out.dispatchId,'ctx_api');
+    // The detached form binds, records ask-serving, and expires on its ttl. It holds the ledger open
+    // until it exits, and writes ask-serving-expired just before that, so await the pid, not the event.
+    assert.equal(await awaitExit(out.pid),true,`serve-ask pid ${out.pid} exits on its ttl`);
+    assert.deepEqual(askEvents(ledger,'ask-serving').map(p=>p.dispatchId),['ctx_api']);
+    assert.deepEqual(askEvents(ledger,'ask-serving-expired').map(p=>p.dispatchId),['ctx_api']);
+  });
+});
+
+// A StarCi Next brand ask asked the owner to rule on 0.4.13 contrast values
+// that grammar 0.5.0 then fixed (inc-6886d1399989); retire-ask closes it.
+test('api retire-ask closes an obsolete ask so it is no longer open, and needs a reason',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_stale'});
+    const API=path.join(ROOT,'scripts','kernel','api.mjs');
+    const api=(...a)=>spawnSync(process.execPath,[API,'retire-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
+    assert.notEqual(api('--dispatch','ctx_stale').status,0,'a retired ask keeps its reason');
+    assert.match(api('--dispatch','ctx_nope','--reason','x').stderr,/ask-unknown/);
+    const r=api('--dispatch','ctx_stale','--reason','grammar 0.5.0 fixed the contrast the ask was about');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.equal(JSON.parse(r.stdout).retired,true);
+    assert.deepEqual(askEvents(ledger,'ask-superseded').map(p=>[p.dispatchId,p.by,p.retired]),[['ctx_stale',null,true]]);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id),[],'a retired ask is no longer open');
+    assert.equal(JSON.parse(api('--dispatch','ctx_stale','--reason','again').stdout).retired,false,'retiring twice writes nothing');
+  });
+});

@@ -1,6 +1,6 @@
 # Connectors: public owner asks over Cloudflare + Telegram
 
-An owner ask is a `serve-ask` form (`scripts/kernel/serve-ask.mjs`) on a random loopback port
+An owner ask is a `serve-ask` form (`scripts/kernel/ask-server.mjs`) on a random loopback port
 `6969..7069` behind a bearer nonce path `/a-<hex>`. The connectors tell the owner the question exists
 and, **only when the owner asks for it**, serve its form and make it reachable from the owner's phone
 (owner, 2026-09-24: "1 link response.starci.org that points only at the questions, and only serve the
@@ -37,7 +37,7 @@ Repositories read: `connectors.repos`, or by default the source root plus every
 ledgers read-only and never write one.
 
 All connector state lives in `machine.sqlite` ([storage](ledger-db.md) §4), written through
-`engine/machine-db.mjs`; there is no connector state file and no connector log file:
+`engine/db/machine.mjs`; there is no connector state file and no connector log file:
 
 | Fact | Where |
 | --- | --- |
@@ -63,7 +63,7 @@ A lock whose holder process is gone, or started before the current boot, never b
 ## Owner asks on demand
 
 Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
-`scripts/kernel/serve-ask.mjs askClassOf`):
+`scripts/kernel/ask-server.mjs askClassOf`):
 
 - **approval**: a decision only the owner makes (handover, draw review, any ask with options or picks,
   any declared non-credential kind). Urgent: pushed at once, one message each, listed by `/asks`.
@@ -131,7 +131,7 @@ node scripts/connectors/telegram-media.mjs settle --ledger <file> --repo <repo> 
 
 ## Command bridge: the owner talks to a supervisor over Telegram
 
-`scripts/connectors/telegram-bridge.mjs` lets the owner command a supervisor chat by messaging the
+`scripts/supervisor/telegram-bridge.mjs` lets the owner command a supervisor chat by messaging the
 bot. Several supervisors may be registered at once; buttons pick which one the owner talks to.
 
 ```
@@ -147,7 +147,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   update, so a restart never delivers a message twice. A `409 Conflict` exits when another bridge holds
   the lock, else backs off; network and 5xx errors back off 1 s doubling to 60 s; a refused token
   (401/403/404) or Telegram turning off stops it. Between rounds it reloads itself when the runtime changes
-  (`scripts/lib/self-reload.mjs`): the replacement takes the lock over and resumes from the stored offset.
+  (`scripts/reconciler/self-reload.mjs`): the replacement takes the lock over and resumes from the stored offset.
   Its log is `machine_logs` (kind `telegram-bridge.log`), numeric ids only.
 - **Hard auth.** An update is accepted only when its chat id AND its sender id both equal
   `connectors.telegram.chatId` (the owner's private chat). Anything else is dropped unanswered and
@@ -172,7 +172,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
 - **Workflow findings.** The Workflow controller reads
   `scripts/supervisor/stall.mjs` findings, opens one durable Kernel Decision
   Item per actionable stall or stale wait, and escalates overdue items to the
-  Supervisor. `scripts/reconciler/decisions.mjs` supplies the doorbell; a busy
+  Supervisor. `scripts/machine/decisions.mjs` supplies the doorbell; a busy
   Kernel keeps the item in its queue. See `modules/reconciler/workflow.yaml`.
 - **Owner notification.** The Fleet controller is the owner-bound sender. It
   invokes `scripts/reconciler/notifier.mjs` for the periodic digest and urgent
@@ -187,7 +187,7 @@ node scripts/supervisor/channel.mjs heartbeat --id <id>
 node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]     # unread; marks read unless --peek
 node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
 node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]     # "TELEGRAM <inboxId>: <text>", exit 0; 124 on timeout
-node scripts/connectors/telegram-bridge.mjs start | run | status | stop
+node scripts/supervisor/telegram-bridge.mjs start | run | status | stop
 ```
 
 What a supervisor may do on a chat message is `modules/supervisor/supervise.yaml` `channel`: the

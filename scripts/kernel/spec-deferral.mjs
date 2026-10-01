@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
-import { enqueueJob, recordJobResult, setJobStatus } from '../../engine/ledger-db.mjs';
+import { enqueueJob, recordJobResult, setJobStatus } from '../../engine/db/ledger.mjs';
 import { explicitAsk } from '../route/explicit-ask.mjs';
 
 export const SPECS_CLASSES = Object.freeze(['unit', 'e2e']);

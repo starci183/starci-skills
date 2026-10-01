@@ -23,8 +23,8 @@ import { clipLine } from '../lib/clip.mjs';
 import { hhmm, stampMinute } from '../lib/time.mjs';
 import { OWNER_ONLY } from './owed.mjs';
 import { actionRow, supLog } from './sup-log.mjs';
-import { fullJson } from '../../engine/machine-db.mjs';
-import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from './home.mjs';
+import { fullJson } from '../../engine/db/machine.mjs';
+import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const ACTION_KIND = 'supervisor-action';
@@ -50,7 +50,7 @@ export const CLASSES = Object.freeze({
   orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
   stalled: 'read api status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
   'contract-stale': 'notify the Kernel to re-read the changed runtime files and api kernel-ack-rev --rev <sha>',
-  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: node scripts/supervisor/lessons.mjs revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
+  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: node scripts/machine/lessons.mjs revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
   'push-refused': 'classify (secret / lint / test / hook) from the refusal and route the fix to a lane; a secret is removed from history in a lane, never pushed',
 });
 
@@ -243,10 +243,10 @@ export async function ownerDigest({ env = process.env, now = Date.now(), languag
     return { last, actions: since(ACTION_KIND), gcRuns: since('supervisor-gc') };
   }, { last: 0, actions: [], gcRuns: [] }, { env });
   let learning = [];
-  try { const l = await import('./lessons.mjs'); learning = l.learningDigest(l.readLearning({ env }), { since: read.last }); } catch { /* the digest goes without it */ }
+  try { const l = await import('../machine/lessons.mjs'); learning = l.learningDigest(l.readLearning({ env }), { since: read.last }); } catch { /* the digest goes without it */ }
   const lang = language ?? supervisorSettings().language;
   let trend = null;
-  try { trend = await (await import('./op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
+  try { trend = await (await import('../machine/op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
   let progress = [];
   let gc = null;
   if (read.gcRuns?.length) {

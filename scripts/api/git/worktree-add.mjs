@@ -8,7 +8,7 @@ import path from 'node:path';
 import { gitRunner } from './lib.mjs';
 import { mainRootOf, registeredAt } from './worktree-list.mjs';
 import { revParse } from './rev-parse.mjs';
-import { SCRATCH_KINDS, withRegistry, claimWorktree } from '../../lib/worktree-registry.mjs';
+import { SCRATCH_KINDS, withRegistry, claimWorktree } from '../../machine/worktree-registry.mjs';
 
 /**
  * Create one runtime-internal scratch worktree. kind: one of SCRATCH_KINDS - an agent's workspace is an Orca kind and is

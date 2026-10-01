@@ -29,7 +29,7 @@
 //   classify --ui <ui-record-dir> --note <id> --class <class> [--target <x>] [--as antiPattern|vocabulary|rubric]
 //            [--by kernel|critic] [--write]                          reclassify one note; structure must confirm it
 import fs from 'node:fs';
-import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
+import { loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/digest.mjs';
@@ -37,7 +37,7 @@ import { stringifyYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
-import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from '../checks/brand.mjs';
+import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
 import { text } from '../lib/stack-declaration.mjs';
 
 export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';

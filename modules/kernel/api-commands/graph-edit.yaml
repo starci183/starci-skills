@@ -1,4 +1,4 @@
-# The contract of `api graph-edit` (scripts/kernel/api-verbs/graph-edit.mjs): the Kernel's LIGHT unit edits
+# The contract of `api graph-edit` (scripts/kernel/verbs/graph-edit.mjs): the Kernel's LIGHT unit edits
 # (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is api redesign).
 purpose: >-
   Edit this workflow's own queued units, logged and reversible: drop units whose paths are absent, widen a

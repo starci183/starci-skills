@@ -1,5 +1,5 @@
-// declared-deps.mjs - the bare-specifier scanner behind tests/declared-deps.spec.mjs (the runtime root manifest) and
-// tests/package-declared-deps.spec.mjs (each published package's own manifest).
+// declared-deps.mjs - the bare-specifier scanner behind tests/repo/declared-deps.spec.mjs (the runtime root manifest) and
+// tests/gates/package-declared-deps.spec.mjs (each published package's own manifest).
 //
 // A specifier is bound to the scanned tree when Node resolves it from there:
 //   - static import/export ... from 'x', side-effect import 'x', dynamic import('x'), import.meta.resolve('x')

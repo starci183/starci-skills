@@ -40,11 +40,11 @@ rules:
       fe.source-root-pinned, even though the machine list names it as a file Next loads. Any other file at the source
       root, including a helper folder beside a pinned file, has no owner and is refused.
     frameworkPinnedRootFiles:
-      # Machine list read by scripts/checks/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID accepts exactly
+      # Machine list read by scripts/hfs/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID accepts exactly
       # these basenames directly in a Next source root; FE_TIER_DIRECTION keeps them thin). Exact names,
       # case-sensitive, no globs. It lists what the framework loads from the source root. Which of them a repository may
       # keep is decided by the slot fe.source-root-pinned and FE_NEXT_CONVENTIONS, not by this list.
-      # Machine list read by scripts/checks/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID
+      # Machine list read by scripts/hfs/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID
       # accepts exactly these basenames directly in a Next source root;
       # their imports follow the FE_TIER_DIRECTION matrix). Exact names, case-sensitive, no globs. Supervisor rulings for nivo
       # wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4 and inc-846867b9a34e (proxy is the Next 16 name of

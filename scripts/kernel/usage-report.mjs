@@ -9,8 +9,8 @@
 // An attempt that settled with no llm_usage row is 'unavailable' (no adapter for its agent, or no session file found) and
 // is counted apart, never given a number.
 import fs from 'node:fs';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { readMachine } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { readMachine } from '../../engine/db/machine.mjs';
 
 const NUM = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens', 'turns', 'toolCalls', 'toolErrors'];
 const SUMS = `sum(u.input_tokens) AS inputTokens, sum(u.output_tokens) AS outputTokens, sum(u.cache_read_tokens) AS cacheReadTokens,

@@ -16,9 +16,9 @@
 // A receipt whose answeredBy is not the owner never approves: owner delegation
 // (config.yaml delegation) answers feedback and questions, never the handover.
 // Reads only; every write stays in api.mjs.
-import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
-import { jobResultSql, latestReportOf } from './api-lib/rows.mjs';
+import { jobResultSql, latestReportOf } from './verbs/shared/rows.mjs';
 
 export const HANDOVER_OP = 'handover.review';
 export const HANDOVER_DECISIONS = Object.freeze(['approve', 'feedback', 'question']);

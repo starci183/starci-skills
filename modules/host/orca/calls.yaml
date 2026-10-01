@@ -9,7 +9,7 @@ purpose: |-
   builds argv from command + flags, refuses a param this file does not declare, requires every
   `required` flag, applies `timeoutMs` and classifies the receipt, so an Orca failure comes back as
   a typed envelope rather than an untyped exception. The wrappers in scripts/api/orca/ — one .mjs
-  file per verb — only name a verb and shape its receipt; tests/provider-orca.spec.mjs refuses a
+  file per verb — only name a verb and shape its receipt; tests/repo/provider-orca.spec.mjs refuses a
   wrapper whose verb this file does not declare.
 envelope:
   schema: starci/orca-call-result@1
@@ -35,7 +35,7 @@ liveSchema:
   refusal: 'outcome failed, effectState none, reason host-contract-drift, naming the verb and the missing command or flags'
   unreadableListing: refuse-before-effects
   envOverride: STARCI_ORCA_SKIP_LIVE_CHECK=1 skips the comparison; it exists for specs and stubbed binaries only.
-  enforcedBy: scripts/api/orca/lib.mjs orcaCall; scripts/checks/providers.mjs --live compares every entry at once.
+  enforcedBy: scripts/api/orca/lib.mjs orcaCall; scripts/checks/check-providers.mjs --live compares every entry at once.
 idempotency:
   flag: retry-request
   rule: |-
@@ -262,7 +262,7 @@ calls:
       Consuming FIFO Delivery of a Run's coordinator inbox: up to 50 messages of every type in
       {runId, deliveryId, messages[], acknowledged}; the same Delivery replays until --ack names it, and
       check --ack <delivery> acknowledges it (idempotently) and returns the next one. Issued only through
-      scripts/api/orca/orch-check.mjs. scripts/kernel/api-lib/messages.mjs drains each workflow Run with
+      scripts/api/orca/orch-check.mjs. scripts/kernel/verbs/shared/messages.mjs drains each workflow Run with
       --run <run> --terminal <Kernel terminal>, writes every message into the ledger in one transaction and
       acks only after that commit (map REPLACE #7). Smoke E2 (2026-10-01, Orca 1.4.209): a process outside
       any Orca terminal is accepted; only a terminal that is no longer the Run's coordinator (a newer
@@ -345,7 +345,7 @@ calls:
     note: |-
       Every worktree Orca knows across the hosts it covers, each with its id (<repo-id>::<path>), path, branch, comment,
       liveTerminalCount and lastActivityAt; result.truncated and result.hostScope.omittedHostIds say what the page does not
-      cover. It is the worktree GC's source of truth (scripts/lib/worktrees.mjs gcWorktrees): a stamped tree with no
+      cover. It is the worktree GC's source of truth (scripts/machine/worktrees.mjs gcWorktrees): a stamped tree with no
       registry row is adopted or preserved and removed, an unstamped one is never touched, and a workflow tree's live
       terminals are its liveTerminalCount. The core-watch WORKTREE fact reads it too. A truncated page or an omitted host
       proves nothing about a tree it does not list.
@@ -364,7 +364,7 @@ calls:
     note: |-
       Removes a project host setup; a repo-backed setup's id is the repo id that repo add answered, and deleting it removes
       the repository registration (Orca has no repo rm). Live specs that register a throwaway repository remove it with
-      this call in their teardown (tests/orca-worktree-rm-live.spec.mjs).
+      this call in their teardown (tests/api-orca/orca-worktree-rm-live.spec.mjs).
     flags: [setup]
     required: [setup]
     receipt: [result]

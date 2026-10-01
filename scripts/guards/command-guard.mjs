@@ -4,7 +4,7 @@
 // Claude Code, Codex and Devin).
 //
 // Every agent launches through Orca worker-start, which owns the agent's environment, so a guard can no longer ride
-// on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/install.mjs
+// on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/hook-install.mjs
 // bindGuardTerminal -> runtime/guards/terminals/<handle>.json) and launch trust registers this hook in the launch
 // worktree's PROJECT settings only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
 // .codex/config.toml, .devin/config.local.json), never a user-global settings file. The Kernel's launch binds a guard
@@ -42,7 +42,7 @@
 //  - launches: `orca terminal create` and a headless agent CLI (codex exec, claude|cursor-agent|devin -p/--print,
 //    gemini -p, opencode run) - an agent Orca does not supervise; every agent starts through orca orchestration
 //    worker-start. A heredoc body, an echo or a commit message that only mentions a command runs nothing and passes.
-// Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/lib/git-index-lock.mjs).
+// Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/api/git/index-lock.mjs).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -330,7 +330,7 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
   if (!how) return null;
   return { code: 'RECURSIVE_DELETE', command: [program, ...args].join(' ').slice(0, 200),
     reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live nivo-fe files, inc-c8fbf76aa499)`,
-    remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/lib/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
+    remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/api/fs/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
 };
 
 // Ops never commit (contract change workflow-worktree): inside a workflow worktree the runtime is the only writer of
@@ -432,7 +432,7 @@ async function gitVerdict({ args, cwd, env, guard, deps }) {
 }
 
 const loadDeps = async () => {
-  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../lib/git-index-lock.mjs')]);
+  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../api/git/index-lock.mjs')]);
   return { policy, npm, git, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
 };
 

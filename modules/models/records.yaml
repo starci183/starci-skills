@@ -66,7 +66,7 @@ records:
     purpose: The product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one record every drawing and every build reads.
     layout: [brand/index.yaml, 'brand/**']
     schema: work/brand@1
-    validator: [modules/schemas/work-layout.yaml, scripts/checks/brand.mjs]
+    validator: [modules/schemas/work-layout.yaml, scripts/work/brand/brand.mjs]
     nodeKinds: [brand]
     # Every token is read out of the real style and token files of the interface, which is why an
     # untraceable value is a question for the owner rather than a record entry.
@@ -75,7 +75,7 @@ records:
     purpose: The product's layout tree - the frontend's Next.js app/ directory scanned into one node per segment (layouts, route groups, @slots, (.)intercepts, loading/error/not-found), each visible layout's chrome, navigation labels per locale and slot-measured captures per breakpoint and theme, the product locale, the demo personas by role and the brand lockup - in the one record every direction is composited into and every build lands its routes in.
     layout: [shell/index.yaml, 'shell/**']
     schema: work/layout-tree@1
-    validator: [modules/schemas/work-layout-tree.schema.yaml, modules/schemas/work-layout.yaml, scripts/checks/shell-conformance.mjs]
+    validator: [modules/schemas/work-layout-tree.schema.yaml, modules/schemas/work-layout.yaml, scripts/work/ui/shell-conformance.mjs]
     nodeKinds: [brand]
     # Read out of the real frontend source and rendered from it (`code`); the lockup and the locale default
     # come from the brand; a planned shell (no frontend layout yet) takes its navigation and persona from the
@@ -118,7 +118,7 @@ records:
     purpose: What one operation observed when it proved something - the scenario, the run and its output.
     layout: ['**/evidence/**']
     schema: work/evidence@1
-    validator: [modules/schemas/work-layout.yaml, scripts/checks/acceptance.mjs]
+    validator: [modules/schemas/work-layout.yaml, scripts/gates/acceptance.mjs]
     nodeKinds: [uat, e2e]
     reads: [code, design, srs]
   runtime:
@@ -127,7 +127,7 @@ records:
     # operates it, so no path in the tree maps to this kind.
     layout: []
     schema: null
-    validator: [scripts/checks/stacks.mjs]
+    validator: [scripts/gates/stacks-gate.mjs]
     nodeKinds: [operations]
     reads: [code]
   integration:

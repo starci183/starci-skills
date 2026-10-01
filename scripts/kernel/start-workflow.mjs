@@ -37,22 +37,22 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { closeAndVerify } from '../lib/close-verify.mjs';
+import { closeAndVerify } from '../machine/close-verify.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { stopAndRelease } from '../lib/close-verify.mjs';
+import { stopAndRelease } from '../machine/close-verify.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
-import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -88,7 +88,7 @@ const KERNEL_START_RESERVATION_MS = 240000;
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
 
-// Provider liveness probe: scripts/api/quota/index.mjs exports
+// Provider liveness probe: scripts/agent/quota/index.mjs exports
 // probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
 // provider is not authenticated. It is imported lazily and every failure
 // degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
@@ -692,7 +692,7 @@ try {
     }
   }
   const kernelWorktree = workflowWorktree?.path ?? repo;
-  // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/install.mjs
+  // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/hook-install.mjs
   // guardLaunch), role 'kernel', naming the workflow worktree and owning no path. It is bound to the Kernel's Orca
   // terminal the moment worker-start names it, so the PreToolUse command guard refuses the Kernel's raw git history
   // changes, worktree adds, recursive deletes, kills by name and raw agent launches; its `node api.mjs <verb>` calls

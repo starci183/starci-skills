@@ -20,7 +20,7 @@ import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs';
 import { stopTree } from '../supervisor/host-health.mjs';
 import { CONCERN_OWNER } from './owns.mjs';

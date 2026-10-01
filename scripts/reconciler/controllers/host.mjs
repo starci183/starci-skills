@@ -6,7 +6,7 @@
 //                                 --orphan-kernel-jobs / --orca-tasks per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
-//   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/watchdog.mjs --once
+//   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/kernel-watchdog.mjs --once
 //                                 --repair (that child proves death twice, respects host outages, replaces,
 //                                 presses Enter, repairs titles). In shadow the read-only probe (--once without
 //                                 --repair) runs, and a repair is recorded only when the probe says one is needed.
@@ -20,7 +20,7 @@
 //                                 proof is 'gone' or a listing without the handle, and on proof the incident is
 //                                 resolved --by supervisor through api incident. Retries back off (STALE_RETRY_MS
 //                                 doubling to STALE_RETRY_MAX_MS); STALE_ESCALATE_TRIES failures -> one DI.
-//   seat:supervisor               scripts/supervisor/watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
+//   seat:supervisor               scripts/supervisor/supervisor-watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
 //                                 Both seat kinds carry a TURN BUDGET (turnStep): busy in one turn (its spinner timer)
 //                                 past allocation.liveness.kernelTurnBudgetMs (Supervisor: supervisorTurnBudgetMs) ->
 //                                 the agent's own interrupt key + the decision doorbell re-wake (services.mjs
@@ -60,12 +60,12 @@ export const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => 
 const BOOT_EVERY_MS = 365 * 86_400_000;
 
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
-export const KERNEL_WATCHDOG = 'scripts/kernel/watchdog.mjs';
-export const SUPERVISOR_WATCHDOG = 'scripts/supervisor/watchdog.mjs';
+export const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
+export const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
 export const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
 export const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 
-// A read-only probe answer that a --repair pass would act on (scripts/kernel/watchdog.mjs statusTick/kernelTick).
+// A read-only probe answer that a --repair pass would act on (scripts/kernel/kernel-watchdog.mjs statusTick/kernelTick).
 export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
 // A --repair answer that replaced (or tried to replace) the Kernel.
 export const REPLACED = new Set(['restarted', 'restart-failed']);
@@ -74,7 +74,7 @@ export const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
 export const STALE_RETRY_MS = 5 * 60_000;
 export const STALE_RETRY_MAX_MS = 60 * 60_000;
 export const STALE_ESCALATE_TRIES = 6;
-export const CLOSE_VERIFY = 'scripts/lib/close-verify.mjs';
+export const CLOSE_VERIFY = 'scripts/machine/close-verify.mjs';
 export const TERMINAL_LIST = 'scripts/api/orca/terminal-list.mjs';
 
 /**
@@ -203,7 +203,7 @@ export function createHostController(deps = {}) {
     return h ? verdict(procs, h) : { alert: false };
   });
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
-  const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../supervisor/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
+  const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../machine/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
   // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
   const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../api/orca/worker-list.mjs')).activeWorkersAllRuns());
   // The handles a responding Orca lists, or null when it does not answer (read-only: runs in both modes).
@@ -604,7 +604,7 @@ export function createHostController(deps = {}) {
     }
     if (ctx.mode === 'active') {
       try {
-        const [{ withMachine }, { snapshotSeats }] = await Promise.all([import('../../../engine/machine-db.mjs'), import('../../kernel/transcripts.mjs')]);
+        const [{ withMachine }, { snapshotSeats }] = await Promise.all([import('../../../engine/db/machine.mjs'), import('../../kernel/transcripts.mjs')]);
         out.seats = withMachine((m) => snapshotSeats(m, { now, everyMs }), { env: ctx.env ?? process.env });
       } catch (error) { out.seats = { error: String(error?.message ?? error).slice(0, 200) }; }
     } else ctx.log('reconciler.would', 'host would snapshot the live seat transcripts (transcripts.mjs snapshotSeats)', { controller: 'host', action: 'snapshotSeats' });

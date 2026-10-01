@@ -38,17 +38,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree, safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
 import { createScratchWorktree } from '../api/git/worktree-add.mjs';
 import { ci } from '../api/npm/ci.mjs';
-import { markRemoved } from '../lib/worktree-registry.mjs';
-import { getBlob, putBlob } from '../lib/artifact-store.mjs';
+import { markRemoved } from '../machine/worktree-registry.mjs';
+import { getBlob, putBlob } from '../../engine/db/blob.mjs';
 import { redactText } from '../lib/redact.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding } from '../kernel/target-repo.mjs';
-import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
+import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -57,7 +57,7 @@ const selfFile = fileURLToPath(import.meta.url);
 import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
-import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**

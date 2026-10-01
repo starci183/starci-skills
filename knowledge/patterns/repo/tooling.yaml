@@ -84,7 +84,7 @@ rules:
     kind: mandatory
     hfsRules: [R13, R24]
     requirement: |
-      Pre-commit, pre-push, the op gate (`scripts/checks/gate.mjs`, which runs `hfs lint --changed` at the app root), the
+      Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`, which runs `hfs lint --changed` at the app root), the
       Kernel's landing and CI run the same `@starci/hfs` at the version pinned in `canon-pins.yaml`. CI runs `npm run lint`
       (`hfs lint`, which includes the app check); pre-push runs `typecheck`, `lint` and `format:check`. There is no rule only
       agents can run. Every `@starci/*` package is installed from the npm registry at the pinned version.

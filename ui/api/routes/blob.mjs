@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { blobPath, getBlob, statBlob } from '../../../scripts/lib/artifact-store.mjs';
+import { blobPath, getBlob, statBlob } from '../../../engine/db/blob.mjs';
 import { isTextMedia } from '../../../scripts/lib/redact.mjs';
 import { MAX_BUFFERED_TEXT, decodeText, redactUnmarkedText, redactTextStream, publicJson, textEncodingOf } from '../redact-read.mjs';
 import { sendError } from '../envelope.mjs';

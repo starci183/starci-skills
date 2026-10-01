@@ -24,7 +24,7 @@
 // Lane contract (interface.draw reads it; do not rename): the direction is `brand.direction` in
 // .starciwork/brand/index.yaml; `brand.direction.archetypes.<name>.status: accepted` means the archetype is ready;
 // the rubric is `brand.direction.rubric.checks`; the reference renders are `brand.direction.golden`.
-// scripts/checks/brand.mjs `direction` re-checks every acceptance against the owner receipt on disk.
+// scripts/work/brand/brand.mjs `direction` re-checks every acceptance against the owner receipt on disk.
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../kernel/ask-receipts.mjs';
 import path from 'node:path';
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import {
   DIRECTION_ARCHETYPES, DIRECTION_DECISIONS, DIRECTION_REVIEW_KIND, DIRECTION_REVIEW_SCHEMA, OWNER_ANSWER_SCHEMA, readBrandRecord,
-} from '../checks/brand.mjs';
+} from './brand/brand.mjs';
 import { flag, sha256File, slash, writeRecordFile } from './work-io.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 

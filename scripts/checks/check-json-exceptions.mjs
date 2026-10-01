@@ -65,7 +65,7 @@ const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime']);
 const SPEC_ROOT = 'tests';
 
 /**
- * Generated mirrors of runtime files that the published packages carry: packages/hfs/scripts/sync-runtime.mjs writes each
+ * Generated mirrors of runtime files that the published packages carry: scripts/hfs/sync-runtime.mjs writes each
  * tree byte for byte from the runtime (its BUNDLES) and `sync-runtime --check` fails on any missing, stale or extra file.
  * The authored originals stay in the inventory; only these exact skill-root paths are skipped, not a same-named tree elsewhere.
  */

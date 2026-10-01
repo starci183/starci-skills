@@ -1,6 +1,6 @@
 // evidence-store.mjs — agent output into runtime.sqlite + the blob store (alpha.3, ARCHITECTURE-DB §4.2, §4.9 H7/H8/H10).
 //
-// Bytes live in the content-addressed store (scripts/lib/artifact-store.mjs, ~/.starci/artifacts/<sha[0:2]>/<sha>);
+// Bytes live in the content-addressed store (engine/db/blob.mjs, ~/.starci/artifacts/<sha[0:2]>/<sha>);
 // the ledger holds only the index rows that point at them:
 //   blobs                         one row per sha this ledger references (media type, redaction, file uri)
 //   job_artifacts                 every file output, keyed (attempt_id, name) — or (workflow_id, name) for the Kernel's
@@ -10,17 +10,17 @@
 //   attempt_transcript_snapshots  the redacted scrollback of a live op terminal, every 60 s
 //   op_attempts.transcript_sha    the full redacted scrollback when the attempt ends
 // Text bytes pass scripts/lib/redact.mjs before every put (blobs.redaction='v1'); media is stored as is ('binary').
-// The rows go through the runtime writer (engine/ledger-db.mjs recordBlob, recordArtifact, recordCheckRun,
+// The rows go through the runtime writer (engine/db/ledger.mjs recordBlob, recordArtifact, recordCheckRun,
 // recordTranscriptSnapshot, setAttemptTranscript); this module is the evidence policy on top of it: redaction,
 // naming, kinds and roles, the H7/H8 status rules. Every write runs inside the caller's ledger.transaction; the blob
 // put happens BEFORE the transaction (stageBlob), so a rolled-back transaction leaves only an unreferenced blob for GC.
 import fs from 'node:fs';
 import path from 'node:path';
-import { putBlob, blobPath } from '../lib/artifact-store.mjs';
+import { putBlob, blobPath } from '../../engine/db/blob.mjs';
 import { redactBytes } from '../lib/redact.mjs';
 import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript,
-  JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/ledger-db.mjs';
-import { newSpanId } from '../../engine/machine-db.mjs';
+  JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/db/ledger.mjs';
+import { newSpanId } from '../../engine/db/machine.mjs';
 
 export const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
 export const ARTIFACT_KINDS = JOB_ARTIFACT_KINDS;
@@ -153,7 +153,7 @@ export function checkStatusOf({ exitCode = null, declaredExitCode = null, unavai
 }
 
 /**
- * One check_runs row (engine/ledger-db.mjs recordCheckRun). `runner` 'op' is always authority 'declared' (the op's own claim: exitCode is stored as
+ * One check_runs row (engine/db/ledger.mjs recordCheckRun). `runner` 'op' is always authority 'declared' (the op's own claim: exitCode is stored as
  * declared_exit_code, exit_code stays NULL — the runtime did not observe it); the runtime's own runners store the
  * raw exit they observed in exit_code. stdout/stderr/output are staged blobs (stageBlob/stageText) or null.
  * run_seq numbers re-runs of the same (attempt, runner, phase, name). Returns {checkId, runSeq, status, red}.

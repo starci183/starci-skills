@@ -38,14 +38,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll } from '../api/orca/worker-list.mjs';
 import { workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
-import { readSupervisor } from '../supervisor/home.mjs';
+import { readSupervisor } from '../machine/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
+import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../machine/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];

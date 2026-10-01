@@ -7,7 +7,7 @@
 //              scripts/kernel/api.mjs   the verbs usage() prints
 //              bin/starci.mjs           the `starci api <verb>` help line
 //
-// An extension verb (scripts/kernel/api-extensions.mjs) is a file scripts/kernel/api-verbs/<verb>.mjs: it is
+// An extension verb (scripts/kernel/api-extensions.mjs) is a file scripts/kernel/verbs/<verb>.mjs: it is
 // implemented by that file, its contract is modules/kernel/api-commands/<verb>.yaml (a map), its usage is the
 // module's own `usage:` (printed by `api --help`), and the bin help line points at `api --help` for it.
 //
@@ -70,7 +70,7 @@ export function verbsFromCliHelp(source) {
 
 const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
 
-/** Extension verbs: {verbs, documented, withUsage, badDocs} from scripts/kernel/api-verbs and modules/kernel/api-commands. */
+/** Extension verbs: {verbs, documented, withUsage, badDocs} from scripts/kernel/verbs and modules/kernel/api-commands. */
 export function extensionSurface(root = DEFAULT_ROOT) {
   const verbsDir = path.join(root, 'scripts', 'kernel', 'api-verbs');
   const docsDir = path.join(root, 'modules', 'kernel', 'api-commands');

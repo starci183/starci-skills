@@ -19,7 +19,7 @@ and open Decision Items for the Supervisor when judgment is required.
   started in this mode (`start-supervisor.mjs` answers `chat-mode`).
 - **kernel** (optional): `[Supervisor] main` is one long-lived Orca terminal.
   The reconciler Host controller keeps its seat alive by running
-  `scripts/supervisor/watchdog.mjs --once`; the Fleet controller opens its owed
+  `scripts/supervisor/supervisor-watchdog.mjs --once`; the Fleet controller opens its owed
   Decision Items. There is no Supervisor watchdog loop.
 
 Either way: the Supervisor never dispatches ops, never writes a product ledger and never answers an owner ask;
@@ -31,12 +31,12 @@ define-goal and a kernel start run only in the owner's chat, on the owner's own 
 | --- | --- |
 | Supervisor (chat or kernel mode) | Decides runtime and cross-workflow questions from Decision Items, handles owner messages, and fixes through the land gate. It does not dispatch product work or write a product ledger directly. |
 | `[Worker] <cluster>` | Works on one fix cluster in an ephemeral staging checkout with file leases and one report. |
-| Reconciler Host controller | Maintains the Supervisor seat and runs `scripts/supervisor/watchdog.mjs --once` in kernel mode. |
+| Reconciler Host controller | Maintains the Supervisor seat and runs `scripts/supervisor/supervisor-watchdog.mjs --once` in kernel mode. |
 | Reconciler Job controller | Verifies and closes reported `[Worker]` terminals through `sweepWorkers`. |
 | Reconciler Fleet controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
 | Telegram bridge | Files owner messages in channel `main` and relays replies. |
 
-State lives in `machine.sqlite`, written only through `engine/machine-db.mjs` ([storage](ledger-db.md) §4):
+State lives in `machine.sqlite`, written only through `engine/db/machine.mjs` ([storage](ledger-db.md) §4):
 
 | Fact | Table |
 | --- | --- |
@@ -68,7 +68,7 @@ not death. After reboot, the `StarCi-Reconciler` task invokes
 `scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
 `node scripts/reconciler/boot.mjs --restart` restarts the engine and runs the
 Host boot phase; `node scripts/reconciler/start.mjs` (the `start` skill) does that plus the services, the UI build and the
-seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/supervisor/housekeeping.mjs`
+seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
 created at Kernel start (registry kind `workflow`, keyed by Orca's worktree id, a real `npm ci` and no junctions); a
@@ -96,16 +96,16 @@ progress and stalls; Resource manages capacity; GC sweeps and runs housekeeping;
 Fleet handles owed work, land and owner notification; Learning measures outcomes.
 Controllers use the existing API for product-ledger writes and open durable
 Decision Items for the Kernel or Supervisor. The Supervisor reads its items with
-`node scripts/reconciler/decisions.mjs supervisor --list`; its read-only digest is
+`node scripts/machine/decisions.mjs supervisor --list`; its read-only digest is
 `node scripts/supervisor/poll.mjs --once`.
 
 ## Op health and the stuck SLA
 
-`scripts/supervisor/op-metrics.mjs` measures every op and workflow over runtimes.yaml `allocation.opTelemetry.windowMs`
+`scripts/machine/op-metrics.mjs` measures every op and workflow over runtimes.yaml `allocation.opTelemetry.windowMs`
 from ledger rows only: jobs, success rate (succeeded / (succeeded + failed); an owner ask, a drop or an open job is
 neither), failure classes (`dead-worker:<liveness>`, `root-cause:<category>`, `check:<name>`, `blocked:<blocker kind>`,
 `verdict:<v>`), queue wait / run / settle time (median, p90), attempts per retry chain, repeated identical failures,
-dead-worker rate, owner-wait and throttle time. `node scripts/supervisor/op-metrics.mjs [--by workflow] [--json]` prints
+dead-worker rate, owner-wait and throttle time. `node scripts/machine/op-metrics.mjs [--by workflow] [--json]` prints
 the table; `--trend` the recorded snapshots.
 
 What is stuck and who must move it is a query, not a verb: `v_blocking` and `v_settle_overdue` in each
@@ -154,12 +154,12 @@ pin registry semver, never a `file:` link.
 1. Bump the version in a lane (`packages/grammar/package.json` and `package-lock.json`) by semver: additive is
    minor or patch, a fix is patch.
 2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
-   and verify the stamp: `node scripts/checks/grammar-dist.mjs` is fresh.
-3. Move the CHANGELOG entry under the version with its date; `node scripts/checks/grammar-knowledge.mjs --write`
+   and verify the stamp: `node scripts/checks/check-grammar-dist.mjs` is fresh.
+3. Move the CHANGELOG entry under the version with its date; `node scripts/work/ui/grammar-knowledge.mjs --write`
    and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
-   `node scripts/checks/package-clean-test.mjs` is green for every package of the publish set.
+   `node scripts/gates/package-clean-test.mjs` is green for every package of the publish set.
 6. `npm publish --access public`, then `npm view @starci/grammar version`.
 7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 
@@ -181,10 +181,10 @@ pin registry semver, never a `file:` link.
 ## Core debugging from a chat
 
 A chat that supervises and debugs the core while workflows run follows `skills/claude-debug` (`/claude-debug`). Invoked
-once, it records one loop with `node scripts/supervisor/debug-pass.mjs setup` and starts Claude Code's `/loop <interval>
+once, it records one loop with `node scripts/reconciler/debug-pass.mjs setup` and starts Claude Code's `/loop <interval>
 /claude-debug pass`, the interval read from `config.yaml` `claudeDebug.interval` (a second invocation finds the live loop
 and starts none). Each tick is one pass: `debug-pass.mjs pass` takes the read-only snapshot of
-`scripts/supervisor/core-watch.mjs` (engine, controllers and queues, services and seats, every running workflow and leg of
+`scripts/reconciler/core-watch.mjs` (engine, controllers and queues, services and seats, every running workflow and leg of
 every registered ledger, orphan ledgers, token spikes, worktree counts and orphans, main-checkout integrity, failing land
 and push gates; it never restarts anything), the chat diagnoses each new alert with the read-only playbook and dispatches
 one lane per core defect (`claim`), recorded by alert key so no later pass dispatches it again, and prints a Vietnamese

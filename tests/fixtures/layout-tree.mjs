@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
-import { putBlob } from '../../scripts/lib/artifact-store.mjs';
-import { loadSlotManifest } from '../../scripts/lib/hfs-slots.mjs';
+import { putBlob } from '../../engine/db/blob.mjs';
+import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 
 export const APP_FILES = {
   'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@/*': ['./src/*'] } } }, null, 2),

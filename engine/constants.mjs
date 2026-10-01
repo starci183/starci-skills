@@ -3,7 +3,7 @@
  * is named by what it is. `scripts/install/install.mjs` reads it and records it in the install manifest.
  *
  * The store schemas are deliberately NOT re-declared here: `LEDGER_SCHEMA`/`LEDGER_VERSION` and
- * `MACHINE_SCHEMA`/`MACHINE_VERSION` live in `engine/ledger-db.mjs`, beside the code that opens the files
+ * `MACHINE_SCHEMA`/`MACHINE_VERSION` live in `engine/db/ledger.mjs`, beside the code that opens the files
  * they name. Import them from there.
  */
 export const ENGINE_SCHEMA='starci/engine@1';

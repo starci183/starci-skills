@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from './owner-answers.mjs';
 import { renderPromptReads } from '../context/pack.mjs';

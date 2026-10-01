@@ -12,7 +12,7 @@
 //     start_reason, exit_reason, heartbeat age at the end; MB-04, G1); its log lines are machine_logs actor
 //     'reconciler'. Its ONE machine.sqlite connection is the WAL checkpointer (openMachine checkpointer, checkpoint()
 //     every CHECKPOINT_MS);
-//   - self-reload (scripts/lib/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
+//   - self-reload (scripts/reconciler/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
 //     changed engine file, re-execs the engine and hands the lock and the leader row over. While it drains for the
 //     reload, a timer keeps renewing the lease and the heartbeat says `draining`, so boot.mjs ensure leaves it alone
 //     and the engine's own actions are never fenced by its own lease (MB-04);
@@ -23,7 +23,7 @@
 //   - one reconcile per key at a time, try/catch per reconcile, a time budget (over budget: logged, the slot stays
 //     taken until it ends), exponential backoff on failure; one throwing controller never stops the others;
 //   - the SLA layer: scripts/reconciler/sla.mjs slaPass(ctx) every SLA_PASS_MS when that module exists, and the Decision
-//     Item ladder scripts/reconciler/decisions.mjs escalateDue every ESCALATE_MS (apply only when the workflow
+//     Item ladder scripts/machine/decisions.mjs escalateDue every ESCALATE_MS (apply only when the workflow
 //     controller is active and this engine holds the epoch; otherwise it plans);
 //   - ONE ctx object per (controller, mode): the key being reconciled rides an AsyncLocalStorage (ctx.key), so a
 //     controller may keep per-ctx memory; a thrown error with retryAfterMs is requeued after that delay.
@@ -40,10 +40,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/machine-db.mjs';
+import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/db/machine.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
-import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../lib/self-reload.mjs';
-import { lowerOwnPriority } from '../lib/low-priority.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from './self-reload.mjs';
+import { lowerOwnPriority } from '../api/process/set-priority.mjs';
 import { crashLoopPlan, crashLoopRecord } from './boot.mjs';
 import { DEFAULT_STALL_MAX_MS, startHeartbeatWorker } from './heartbeat-worker.mjs';
 import { DECISIONS_FILE, createCtx, logRowOf, reconcilerLog, spawnJson } from './ctx.mjs';
@@ -58,7 +58,7 @@ export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'c
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
 export const LOCK_NAME = 'reconciler';
 export const SLA_PASS_MS = 30_000;
-/** The Decision Item SLA ladder (scripts/reconciler/decisions.mjs escalateDue) runs this often; applied only when active. */
+/** The Decision Item SLA ladder (scripts/machine/decisions.mjs escalateDue) runs this often; applied only when active. */
 export const ESCALATE_MS = 60_000;
 export const CONFIG_REFRESH_MS = 10_000;
 export const RELOAD_CHECK_MS = 60_000;
@@ -110,7 +110,7 @@ export class Engine {
     this.numbers = numbers ?? reconcilerNumbers();
     this.configFn = typeof config === 'function' ? config : () => (config ?? reconcilerConfig());
     this.ledgersFn = typeof ledgers === 'function' ? ledgers : () => ledgers ?? ledgersOf({ env });
-    // The engine's ONE machine.sqlite connection, the WAL checkpointer (engine/machine-db.mjs openMachine).
+    // The engine's ONE machine.sqlite connection, the WAL checkpointer (engine/db/machine.mjs openMachine).
     this.state = state ?? openMachine({ env, now, checkpointer: true, ...stateOptions });
     this.stateFile = this.state.file ?? null;
     this.ownsState = !state;
@@ -416,7 +416,7 @@ export class Engine {
   }
 
   /**
-   * The Decision Item SLA ladder (scripts/reconciler/decisions.mjs escalateDue, lane rc-decisions): applied only when
+   * The Decision Item SLA ladder (scripts/machine/decisions.mjs escalateDue, lane rc-decisions): applied only when
    * the workflow controller is active and this engine holds the epoch; otherwise a plan (logged when it has actions).
    */
   async escalatePass() {
@@ -554,7 +554,7 @@ export class Engine {
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
 export const reloadWatchedFiles = (root = SKILL_ROOT) => [
   'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
-  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
+  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/reconciler/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
 /**

@@ -1,4 +1,4 @@
-# The contract of `api verify-proofs` (scripts/kernel/api-verbs/verify-proofs.mjs). One file per extension
+# The contract of `api verify-proofs` (scripts/kernel/verbs/verify-proofs.mjs). One file per extension
 # verb (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.verify-proofs
 # (lane slim-04).
 purpose: >-
@@ -13,7 +13,7 @@ returns:
     {checked, intact, unchained, tampered:[{artifactId, jobId, name, reason: missing|modified|ledger-row-differs-from-chain,
     expected, actual?}]} — a blob must still hash to its sha256, and the row's sha256 must be the one its chained
     report-filed / artifacts-indexed event recorded; unchained counts rows no chained event covers
-  chain: '{events, ok, brokenAt, broken:[{seq, kind, reason}]} — engine/ledger-db.mjs verifyEventChain'
+  chain: '{events, ok, brokenAt, broken:[{seq, kind, reason}]} — engine/db/ledger.mjs verifyEventChain'
 refusals:
   workflow-unknown: no workflows row for --workflow
 usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'

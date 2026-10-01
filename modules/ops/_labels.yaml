@@ -8,7 +8,7 @@
 # only says what a human reads for it. Every reader goes through scripts/lib/display-names.mjs
 # (opLabel): Orca [Op] worker titles, api status legs/nextActions `label`, the supervisor digest and
 # progress report, Telegram notices and the harness UI (ui/server.mjs sends the map in the snapshot
-# as `opLabels`, so the UI shows exactly these words). tests/display-names.spec.mjs keeps one entry per
+# as `opLabels`, so the UI shows exactly these words). tests/lib/display-names.spec.mjs keeps one entry per
 # modules/ops/ops/*.yaml. `vi` is what the owner reads; `en` is the UI's English rendering of it.
 schema: starci/op-labels@1
 

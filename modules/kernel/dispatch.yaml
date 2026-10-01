@@ -34,7 +34,7 @@ about:
   sources:
     - scripts/kernel/api.mjs
     - scripts/agent/lib.mjs
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
 
 # ============================================================================
 # THE PACKET — the contract shape from the brief, annotated.
@@ -75,12 +75,12 @@ fields:
     meaning: >-
       The operation id is shorthand for the FULL durable identity:
       {workflowId, opId, attempt, generation} (the api's durable identity —
-      the jobs row in engine/ledger-db.mjs).
+      the jobs row in engine/db/ledger.mjs).
       Each attempt owns a distinct durable job row — jobId
       `op-<op>-<token>` is minted at enqueue and a retry is a NEW row at
       attempt+1, never a rewrite of the old one.
     enforcedBy: >-
-      The jobs table row (engine/ledger-db.mjs) plus the
+      The jobs table row (engine/db/ledger.mjs) plus the
       lease-identity-drift guarantee: state, op lease and durable
       job must share the complete identity or the write refuses.
 
@@ -143,7 +143,7 @@ fields:
       `productLocaleFor()` in scripts/kernel/product-locale.mjs resolves it
       from the target repository's .starciwork when the packet is built
       (scripts/kernel/api.mjs buildPacket) and the prompt states it beside
-      owner_language. scripts/checks/shell-conformance.mjs refuses a
+      owner_language. scripts/work/ui/shell-conformance.mjs refuses a
       content prompt that does not state `Product locale: <default>`
       (SHELL_LOCALE_DRIFT); modules/ops/_common.yaml carries the rule.
 
@@ -210,7 +210,7 @@ fields:
           reasons keep the writer fence (the api's settle-time seal reasons).
       And over time: a done record whose deps moved since baseline refuses
       DEP_STALE — writing a path re-arms the re-verification debt of every
-      record that owns it (scripts/checks/check-work-deep.mjs DEP_STALE;
+      record that owns it (scripts/work/validate/check-work-deep.mjs DEP_STALE;
       modules/goal/legality.yaml done-record-reverify).
 
   constraints.model:
@@ -255,7 +255,7 @@ fields:
     meaning: >-
       The lease token is the packet's spine. The api's reserveOpLeases seeds
       the path:* resources and reserveTwoPhase takes the lease atomically
-      (intent-v1 exact-binding, engine/migrations/runtime/0001-init.sql §6); the token is what
+      (intent-v1 exact-binding, engine/db/migrations/runtime/0001-init.sql §6); the token is what
       every later
       fact must match. The agent's writes, its report and its settlement all
       hang off {jobId, leaseToken} — the op physically cannot record evidence
@@ -265,7 +265,7 @@ fields:
       The leases_match_job BEFORE INSERT/UPDATE triggers RAISE(ABORT,
       'lease-identity-drift') when a lease row does not match its job's
       {workflow_id, op_id, attempt, generation, lease_token}
-      (engine/ledger-db.mjs / engine/migrations/runtime/0001-init.sql); the api wraps that as a
+      (engine/db/ledger.mjs / engine/db/migrations/runtime/0001-init.sql); the api wraps that as a
       typed {ok:false, code:'lease-identity-drift'}. A reservation whose
       durable status or resource
       binding no longer matches exactly is status 'effect_unknown' — it stops the
@@ -286,7 +286,7 @@ fields:
       re-runs the checks (`api check`) and settles. The op's terminal dies
       when its verdict settles — `api settle` closes the worker terminal
       (scripts/agent/lib.mjs) and releases the job's lease rows
-      (releaseTwoPhase, engine/ledger-db.mjs).
+      (releaseTwoPhase, engine/db/ledger.mjs).
 
 # ============================================================================
 # PATH-LEGALITY PREFLIGHT — owned_paths are checked against the target repo's
@@ -308,7 +308,7 @@ preflight:
     Disjointness between sibling ops is a different wall (fields
     .owned_paths above); this one is grant-vs-repo-legality. It is kernel
     discipline: the api does not refuse an illegal path.
-  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/gate.mjs; modules/kernel/api.yaml dispatch layoutPreflight"
+  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/gates/gate.mjs; modules/kernel/api.yaml dispatch layoutPreflight"
 
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.

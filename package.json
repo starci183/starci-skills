@@ -52,7 +52,7 @@
   },
   "scripts": {
     "check": "node bin/starci.mjs check",
-    "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --test tests/*.spec.mjs",
+    "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --test \"tests/**/*.spec.mjs\"",
     "starci": "node bin/starci.mjs"
   },
   "devDependencies": {

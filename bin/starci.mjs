@@ -14,7 +14,7 @@ const ROUTES = {
   api: '../scripts/kernel/api.mjs',
   start: '../scripts/kernel/start-workflow.mjs',
   goal: '../scripts/goal/define-goal.mjs',
-  validate: '../scripts/checks/work-validate.mjs',
+  validate: '../scripts/work/validate/work-validate.mjs',
   check: '../scripts/checks/check-runtime.mjs',
 };
 

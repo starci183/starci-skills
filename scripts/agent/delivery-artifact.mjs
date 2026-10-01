@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 // Remove a file-reference delivery artifact. Transient artifacts take their
 // private tmpdir with them; a card-declared directory is only emptied of the

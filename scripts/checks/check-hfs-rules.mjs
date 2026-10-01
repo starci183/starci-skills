@@ -3,7 +3,7 @@
 // `npm run check`).
 //   node scripts/checks/check-hfs-rules.mjs [--json] [--unbuilt]
 //
-// The catalog is loaded through scripts/lib/hfs-slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema
+// The catalog is loaded through scripts/hfs/slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema
 // (HFS_RULES_INVALID). On top of that this check refuses:
 //   - a rule with no enforcer, or a `lint`/`check` kind with no enforcer of that family        HFS_RULE_NO_ENFORCER
 //   - an existing eslint-be / eslint-fe enforcer whose id is not a rule of the plugin in packages/eslint/{be,fe},
@@ -31,26 +31,26 @@
 //   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `hfs check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
 //     rule lists in failureCodes; a code no rule owns has no R-id, no gate and no parity proof. The only exempt codes are the
 //     infrastructure refusals ("cannot judge"), which their owners export as one list each (ERROR_RULE_IDS of the machine's
-//     index, REFUSAL_CODES of scripts/lib/hfs-check.mjs)                                     HFS_RULE_CODE_UNOWNED
+//     index, REFUSAL_CODES of scripts/hfs/check.mjs)                                     HFS_RULE_CODE_UNOWNED
 //   - a `status: planned` enforcer: the catalog carries no owed work (owner acceptance 2026-09-30)  HFS_RULE_ENFORCER_PLANNED
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { ALL_CHECK_CODES, REFUSAL_CODES } from '../lib/hfs-check.mjs';
-import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../lib/hfs-slots.mjs';
-import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from './architecture/index.mjs';
-import { isMain, walkFiles } from './common.mjs';
+import { ALL_CHECK_CODES, REFUSAL_CODES } from '../hfs/check.mjs';
+import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
+import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const RULES_README = 'knowledge/hfs/README.md';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
 export const EMITTER_ROOTS = Object.freeze({
-  machine: ['scripts/checks/architecture.mjs', 'scripts/checks/architecture'],
-  hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-rules', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
-  'work-validate': ['scripts/checks/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/checks/check-work-artifacts.mjs'],
-  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'packages/hfs/scripts/sync-runtime.mjs'],
+  machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
+  hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
+  'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/hfs/sync-runtime.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -74,7 +74,7 @@ export function readEmitters(root) {
     return fs.readdirSync(abs).sort().flatMap((name) => walk(`${rel}/${name}`));
   };
   // The machine's index lists every rule id it covers (coverage.checkedRuleIds) without emitting any of them.
-  for (const [family, roots] of Object.entries(EMITTER_ROOTS)) out[family] = roots.flatMap(walk).filter((f) => f.rel !== 'scripts/checks/architecture/index.mjs');
+  for (const [family, roots] of Object.entries(EMITTER_ROOTS)) out[family] = roots.flatMap(walk).filter((f) => f.rel !== 'scripts/hfs/architecture/index.mjs');
   return out;
 }
 

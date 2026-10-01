@@ -40,7 +40,7 @@ import { readFoundations } from './foundations.mjs';
 import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, normWork, ownedOf, readTransfers } from './work-ownership.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { recordPathTransfer } from '../../engine/ledger-db.mjs';
+import { recordPathTransfer } from '../../engine/db/ledger.mjs';
 import { list } from '../lib/list.mjs';
 
 export const BRIDGE_SCOPE = 'supervisor-bridge';

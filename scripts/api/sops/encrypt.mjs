@@ -1,4 +1,4 @@
-// encrypt.mjs — one `sops --encrypt` of a plaintext file: the extension custody seal (scripts/checks/sonar-ext-custody.mjs
+// encrypt.mjs — one `sops --encrypt` of a plaintext file: the extension custody seal (scripts/gates/sonar-ext-custody.mjs
 // sealExtCustody). The plaintext path is the caller's 0600 temp file; the ciphertext comes back on stdout over a pipe.
 import { spawnSync } from 'node:child_process';
 

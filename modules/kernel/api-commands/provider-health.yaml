@@ -21,7 +21,7 @@ provider-health:
     state, status, code?, detail, why} and events provider-quota-probe-failed;
     the circuit keeps its own expiry. No Kernel proof is needed: the probe is the
     evidence. The kernel watchdog runs it every --repair tick
-    (scripts/kernel/watchdog.mjs probeQuotaCircuits). Returns {ok:true, now,
+    (scripts/kernel/kernel-watchdog.mjs probeQuotaCircuits). Returns {ok:true, now,
     results:[{provider, probed, recovered?, probe?, reason?, nextAt?}]}.
     --recover --probe on a quota circuit uses the same quota probe
   reads: >-

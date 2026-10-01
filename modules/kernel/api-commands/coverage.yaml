@@ -1,11 +1,11 @@
-# The contract of `api coverage` (scripts/kernel/api-verbs/coverage.mjs). One file per extension verb
+# The contract of `api coverage` (scripts/kernel/verbs/coverage.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.coverage (lane slim-04).
 purpose: >-
   Every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing.
 args: '--workflow <id> [--json]'
 reads: >-
   the workflow's scope - its latest work graph's FRs and XBase#state shapes, the FR and ui records its jobs
-  bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases (scripts/checks/ui-proof-brief.mjs
+  bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases (scripts/work/ui/ui-proof-brief.mjs
   buildBrief) - and every job_artifacts row with its artifact_proofs claims and dependency digests
 writes: 'nothing — pure projection'
 returns:

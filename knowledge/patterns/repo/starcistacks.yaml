@@ -14,7 +14,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/application-stacks.yaml
     - docs/application-stacks.md
-    - scripts/checks/check-starcistacks.mjs
+    - scripts/gates/starcistacks.mjs
   limitations: |
     The shape check proves where declarations live. It proves neither startup nor recovery; readiness and recovery evidence
     do. Package profiles and lifecycle are owned by knowledge/application-stacks.yaml.
@@ -43,7 +43,7 @@ rules:
         - HFS_STACKS_SHAPE
         - HFS_STACKS_IN_SIDE
       manual:
-        - node scripts/checks/check-starcistacks.mjs <app> exits 0 (the app root).
+        - node scripts/gates/starcistacks.mjs <app> exits 0 (the app root).
     relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied

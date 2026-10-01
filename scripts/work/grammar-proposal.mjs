@@ -3,7 +3,7 @@
 // DNA lacks becomes a grammar proposal, never invented inline").
 //
 // A drawing that needs a component or variant DNA lacks composes the closest DNA components, marks the spot
-// data-grammar-proposal="<name>" (scripts/checks/draw-dna.mjs), and writes the proposal beside its render source or
+// data-grammar-proposal="<name>" (scripts/work/draw/draw-dna.mjs), and writes the proposal beside its render source or
 // in its draw-loop directory:
 //   grammar-proposal.yaml   schema starci/grammar-proposal@1, proposals: [{name, gap, anatomy, tokens, claims, render,
 //                           status?}] - render is the isolated render (an .html/.png path relative to the file, or

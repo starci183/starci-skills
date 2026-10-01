@@ -146,7 +146,7 @@ guidance:
       modules/schemas/application-stacks.schema.yaml. Declare dev docker-compose and VPS docker-swarm.
       Render the actual deployment model with docker compose config or docker stack config and run the
       `starci-stacks-check` machine — `checkApplicationStacks({repoRoot, environment, deploymentModelFile})`
-      in `scripts/checks/stacks.mjs` — per environment. This is static conformance only. Separately prove empty
+      in `scripts/gates/stacks-gate.mjs` — per environment. This is static conformance only. Separately prove empty
       cold-start, missing/wrong-key refusal, preserved secrets/data after recreation, failed
       init/readiness and scoped cleanup. VPS adds actual Ubuntu bootstrap, relevant DNS/TLS,
       update and image/data recovery. Record revisions, tools, platform, executed and unrun cases.
@@ -157,7 +157,7 @@ guidance:
       mode local|hosted|disabled, host, the stack that runs a local one, project keys per repository,
       credentials as custody references with the variable the tool reads, CI wiring and ownerAction.
       Read it before naming or asking for any credential; never ask the owner for a service declared
-      ownerAction none with custody present. Run scripts/checks/check-starcistacks.mjs (--new for a
+      ownerAction none with custody present. Run scripts/gates/starcistacks.mjs (--new for a
       repository this leg creates). See docs/application-stacks.md Services.
   - id: STACK-RECONCILE
     requirement: |

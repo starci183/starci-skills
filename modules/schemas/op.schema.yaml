@@ -120,7 +120,7 @@ properties:
             bound ui record admits. `api dispatch` decides who draws the shared parents (scripts/kernel/shell-foundation.mjs):
             the first workflow claims foundation `shell` and its op draws or captures them first; a live owner elsewhere
             defers this dispatch as foundation-wait; a stalled owner opens a Supervisor Decision Item. The result is
-            judged at the op's proof (scripts/checks/shell-conformance.mjs)."
+            judged at the op's proof (scripts/work/ui/shell-conformance.mjs)."
         designDrawn:
           const: true
           description: "Set on the read of the drawing (interface.implement reads.draws): the hard design gate. `api
@@ -133,7 +133,7 @@ properties:
           description: "Set on the read of the brand record (.starciwork/brand/index.yaml). For every bound ui
             record, `api dispatch` refuses prerequisite-unmet (kind direction-unaccepted) while the brand
             record's brand.direction is not ready for the record's archetype (ui.archetype, else
-            scripts/work/ui-archetype.mjs derives it; a layout record owes none) - scripts/checks/brand.mjs
+            scripts/work/ui-archetype.mjs derives it; a layout record owes none) - scripts/work/brand/brand.mjs
             checkDirection evidence.ready, the owner's own receipt for the current rev, never `status: accepted`
             alone: the Kernel enqueues brand.decide with --param directionArchetype=<archetype> and this job
             --after it. Switched by modules/models/runtimes.yaml allocation.drawLoop.directionPrerequisite (on)

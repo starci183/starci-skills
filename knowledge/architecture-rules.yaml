@@ -119,7 +119,7 @@ rules:
     rationale: A green check is meaningful only for what it actually measured.
     verification:
       automated:
-        - scripts/checks/gate.mjs
+        - scripts/gates/gate.mjs
       manual:
         - Match each claimed invariant to the real command, source revision and exercised boundary.
   - id: ARCH-WORK

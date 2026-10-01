@@ -12,10 +12,10 @@
 // Storage is the ledger's `foundations` table (one row per name; `detail` keeps the whole FOUNDATION_SCHEMA
 // record as JSON text: the row's columns carry kind, state, owner and version for SQL readers) and
 // `foundation_declarations` (one row per workflow: builds_none, and the {none, detail, at} value as JSON
-// text), written through engine/ledger-db.mjs upsertFoundation / declareFoundations.
+// text), written through engine/db/ledger.mjs upsertFoundation / declareFoundations.
 // Every write also appends an event on the acting workflow (entity_type 'foundation').
 import { parseJson } from '../lib/json.mjs';
-import { declareFoundations, upsertFoundation } from '../../engine/ledger-db.mjs';
+import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
 export const FOUNDATION_SCHEMA = 'starci/foundation@1';
 export const FOUNDATION_SCOPE = 'foundation';

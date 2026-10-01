@@ -22,7 +22,7 @@ provenance:
     actual source/version in .starciwork. If source is unavailable, report unverified; do not infer
     current APIs or defects from old tables. Prefer @starci/grammar/common as the current public
     consumer entry where the installed package supports it; verify exports rather than inventing APIs.
-    DNA.yaml is generated from source and held to it by scripts/checks/grammar-knowledge.mjs; the other
+    DNA.yaml is generated from source and held to it by scripts/work/ui/grammar-knowledge.mjs; the other
     topics are authored.
 topics:
   - id: dna

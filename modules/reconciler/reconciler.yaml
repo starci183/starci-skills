@@ -12,12 +12,12 @@ engine:
     engine: scripts/reconciler/engine.mjs      # leader, heartbeat, self-reload, discovery, dispatch, --once
     boot: scripts/reconciler/boot.mjs          # ensure (crash-loop guard -> --safe + one urgent Telegram), status, task
     sources: scripts/reconciler/sources.mjs    # events cursor per ledger, routing
-    state: scripts/reconciler/state.mjs        # settings (the state itself is machine.sqlite, engine/machine-db.mjs)
+    state: scripts/reconciler/state.mjs        # settings (the state itself is machine.sqlite, engine/db/machine.mjs)
     owns: scripts/reconciler/owns.mjs          # CONCERN_OWNER: concern -> controller (ctx.owns, boot --status)
     workqueue: scripts/reconciler/workqueue.mjs
     ctx: scripts/reconciler/ctx.mjs            # the ctx every controller acts through
     testing: scripts/reconciler/testing.mjs    # fakeCtx(overrides), tempState() for specs
-  state: machine.sqlite through engine/machine-db.mjs (DBTREE.sql B2); tables engine_leader + leader_history, process_runs, engine_cursors, engine_queue, engine_actions, schedules, sla_episodes, services + service_events, controller_modes + mode_changes
+  state: machine.sqlite through engine/db/machine.mjs (DBTREE.sql B2); tables engine_leader + leader_history, process_runs, engine_cursors, engine_queue, engine_actions, schedules, sla_episodes, services + service_events, controller_modes + mode_changes
   heartbeat: engine_leader.heartbeat_at and process_runs.last_heartbeat_at, every allocation.reconciler.renewMs
   log: machine_logs actor reconciler (no text log)
   numbers: modules/models/runtimes.yaml allocation.reconciler   # pollMs, leaseMs, renewMs, heartbeatStaleMs, statusCacheMs, backoff, crashLoop
@@ -25,7 +25,7 @@ engine:
   task: StarCi-Reconciler (at logon + every 5 min, conhost --headless, IgnoreNew, below-normal); created only by `boot.mjs --install-task --apply`, run by the owner or the coordinator
 
 leader:
-  lock: claimManager('reconciler') (scripts/connectors/lib.mjs), handed over on self-reload (scripts/lib/self-reload.mjs)
+  lock: claimManager('reconciler') (scripts/connectors/lib.mjs), handed over on self-reload (scripts/reconciler/self-reload.mjs)
   row: machine.sqlite engine_leader, epoch + 1 on every takeover (a leader_history row with how it was acquired and why it was released); renewed every renewMs, lost at leaseMs
   standby: a second engine waits read-only and takes over once the row expires
   fence: every mutation (ctx.api, ctx.run, ctx.openDecision in active) runs only while the engine's epoch is the leader's; a leader that loses the row stops and exits (DESIGN §7.5, §12.3)
@@ -45,7 +45,7 @@ controllers:
   lanes: {job: rc-job, host: rc-host, gc: rc-gc-resource, resource: rc-gc-resource, workflow: rc-sla-workflow, fleet: rc-fleet-ui, learning: rc-fleet-ui}
   slaLayer: scripts/reconciler/sla.mjs slaPass(ctx), every 30 s when the module exists (lane rc-sla-workflow); its ctx mode follows the workflow controller
 
-# concern -> controller: the same map as scripts/reconciler/owns.mjs CONCERN_OWNER (tests/reconciler-owns.spec.mjs checks it).
+# concern -> controller: the same map as scripts/reconciler/owns.mjs CONCERN_OWNER (tests/reconciler/reconciler-owns.spec.mjs checks it).
 concerns:
   job.settle: job
   job.worker: job
@@ -106,8 +106,8 @@ shadow:
 writes:
   rule: |-
     The engine writes product ledgers ONLY through `api` verbs (ctx.api -> scripts/kernel/api.mjs child); it opens them
-    read-only (openLedgerReader). Its own state is machine.sqlite (engine/machine-db.mjs); its log rows go to machine_logs.
+    read-only (openLedgerReader). Its own state is machine.sqlite (engine/db/machine.mjs); its log rows go to machine_logs.
     Every real mutation is journaled in `engine_actions` (full result, stdout and stderr as blobs) (intent -> running -> done|failed); a stale intent/running
     row becomes `unknown` and is re-evaluated from the ledger, never replayed (DESIGN §7.6).
-  decisionItems: ctx.openDecision -> scripts/reconciler/decisions.mjs openDecision (lane rc-decisions, `api decisions --open`), schema starci/decision-item@1 (DESIGN §10.3)
+  decisionItems: ctx.openDecision -> scripts/machine/decisions.mjs openDecision (lane rc-decisions, `api decisions --open`), schema starci/decision-item@1 (DESIGN §10.3)
   violations: runtime-invariant-violated events (DESIGN §8.8), written by the SLA layer

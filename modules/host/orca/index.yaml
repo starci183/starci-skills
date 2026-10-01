@@ -81,7 +81,7 @@ operationAgent:
       settle: Stop, release and verify one Dispatch; returns a typed settlement.
       notify: Type one message into a live operation agent's own terminal and prove delivery from the screen; the only way the kernel speaks to a working agent.
       report: The typed operation report, written exactly once by the operation agent at its boundary.
-      verify: Read-only contract check of the provider tree before the first effect (node scripts/checks/providers.mjs).
+      verify: Read-only contract check of the provider tree before the first effect (node scripts/checks/check-providers.mjs).
     input: modules/kernel/api.yaml commands.dispatch.args
     candidateAuthority: |-
       The runtime allocator names one runtime per operation and startOperation({candidates}) hands the

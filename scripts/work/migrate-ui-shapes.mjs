@@ -3,7 +3,7 @@
 //   node scripts/work/migrate-ui-shapes.mjs --repo <repo> [--dry-run|--apply] [--json]
 //
 // For every work/ui-screen@1 record under <repo>/.starciwork: each ui.states entry that is a data status
-// (scripts/checks/ui-shapes.mjs dataStatusOf) moves to ui.dataStatus under its base and slot, and leaves
+// (scripts/work/ui/ui-shapes.mjs dataStatusOf) moves to ui.dataStatus under its base and slot, and leaves
 // ui.states and ui.coverage.map; every other state becomes a ui.shapes entry {base, state, viewports}. A
 // direction or direction-content asset that draws a moved state gets `retired: data-status`; no file is
 // deleted. A record that already declares ui.shapes keeps its other states as they are. A moved state that was drawn, or whose text reads like an onboarding or recovery screen, is listed
@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { DATA_STATUSES, DRAWING_ROLES, RETIRED_DATA_STATUS, assetStateOf, dataStatusOf, drawingsOf } from '../checks/ui-shapes.mjs';
+import { DATA_STATUSES, DRAWING_ROLES, RETIRED_DATA_STATUS, assetStateOf, dataStatusOf, drawingsOf } from './ui/ui-shapes.mjs';
 import { REQUIRED_BREAKPOINTS } from './direction-part.mjs';
 import { flag, indexFilesUnder, list, readYaml, slash, writeRecordFile } from './work-io.mjs';
 

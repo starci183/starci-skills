@@ -5,7 +5,7 @@
 // that the ui record each bound implementation record proves has a settled interface.draw (the hard design gate:
 // code is never built before its design). There is NO layout gate on interface.draw: a draw starts from a todo
 // shell and unsettled ancestor layouts and draws them itself (scripts/kernel/shell-foundation.mjs decides which
-// workflow draws the shared parents; the result is judged by scripts/checks/shell-conformance.mjs). Prose (route.prerequisites) is never
+// workflow draws the shared parents; the result is judged by scripts/work/ui/shell-conformance.mjs). Prose (route.prerequisites) is never
 // parsed. Anything the data cannot decide — a placeholder the binding does not
 // resolve, a layout tree that cannot be read — is unknown, and unknown is not unmet.
 import fs from 'node:fs';

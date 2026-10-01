@@ -6,7 +6,7 @@ An operation that writes `assert.equal(typeof double,'function')` and wires it i
 forever, on the pre-change code as well as the new. The missing half of the proof is the contrast: the spec the
 operation added must **fail before the change and pass after it**.
 
-`scripts/checks/proof.mjs` supplies that half. It never edits the operation's worktree, never commits, and
+`scripts/gates/proof.mjs` supplies that half. It never edits the operation's worktree, never commits, and
 never checks anything out there.
 
 ## Scope of the run (owner policy 2026-09-29)
@@ -46,7 +46,7 @@ attempt spent, nothing waits on it), and `api run-deferred-tests --kind integrat
 
 `runAtBase` builds the "before" out of git, not out of a stash:
 
-1. The runtime worktree API (`createWorktree` in `scripts/lib/worktrees.mjs`, kind `land-scratch`) adds a detached
+1. The runtime worktree API (`createWorktree` in `scripts/machine/worktrees.mjs`, kind `land-scratch`) adds a detached
    worktree at `<baseHead>` in a fresh `mkdtemp` directory, so the base is a real
    checkout of the commit the operation started from, beside the live worktree rather than inside it.
 2. Only the changed **spec** files are copied into it - the new tests against the pre-change code. Nothing else from the
@@ -54,7 +54,7 @@ attempt spent, nothing waits on it), and `api run-deferred-tests --kind integrat
 3. The proof commands run there (cwd = the temporary worktree), then the same commands run in the operation's
    worktree at `opHead`. Each result carries `exitCode`, a `tail` of the output and `timedOut`; `timeoutMs`
    defaults to 20 minutes per command.
-4. In a `finally`, whatever happened above, `safeRemoveWorktree` (`scripts/lib/safe-remove.mjs`) removes every link
+4. In a `finally`, whatever happened above, `safeRemoveWorktree` (`scripts/api/fs/safe-remove.mjs`) removes every link
    inside the temporary worktree as a link, then the tree, and prunes its registration; never a forced `git worktree remove`,
    which would follow a junction into the live tree.
 
@@ -78,13 +78,13 @@ passes at base 5412ae012548: it does not prove the change* - and `null` for `pro
 
 ## Evidence binding check
 
-The contrast above proves a change at the moment it lands. `scripts/checks/check-evidence-binding.mjs` asks
+The contrast above proves a change at the moment it lands. `scripts/work/validate/check-evidence-binding.mjs` asks
 the later question a recorded tree owes: does a `state: done` leaf's proof still bind to the source it claims
 to prove? It walks record -> sibling `evidence.yaml` -> the source bytes that evidence names, reads only, and
 prints one finding per line as `CODE  <record id>  <detail>`.
 
 ```sh
-node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--json]
+node scripts/work/validate/check-evidence-binding.mjs --work <.starciwork root> [--json]
 ```
 
 Every path a proof hashes is app-relative (`be/...`, `fe/...`) and resolves under the app root. `--json` emits `{findings:[{code,node,path,detail}]}` instead of lines.
@@ -102,5 +102,5 @@ convention the other read-only checks use.
 Evidence that carries `stale: true` is passed over: it has already said it no longer describes the current
 product, and refusing it for pointing at the past would punish the tree for being honest. Declared artifacts
 - record `assets[]`, `ui.assets[]`, evidence `assets[]`, receipts and run manifests - are
-`scripts/checks/check-work-artifacts.mjs`'s ground, and `recordDigest` plus the aggregate `codeDigest.digest`
+`scripts/work/validate/check-work-artifacts.mjs`'s ground, and `recordDigest` plus the aggregate `codeDigest.digest`
 are `scripts/checks/check-example-work.mjs`'s; this check opens neither.

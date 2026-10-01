@@ -19,8 +19,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitOutput } from '../api/git/lib.mjs';
-import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engine/ledger-db.mjs';
-import { getBlob } from '../lib/artifact-store.mjs';
+import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engine/db/ledger.mjs';
+import { getBlob } from '../../engine/db/blob.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -31,7 +31,7 @@ import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
 const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
 /**
- * An events row's whole payload (the reader engine/ledger-db.mjs eventPayload names): an oversized event keeps a stub
+ * An events row's whole payload (the reader engine/db/ledger.mjs eventPayload names): an oversized event keeps a stub
  * {spilled:true, sha256, bytes, count?} for each spilled field - or no payload_json at all when its writer stored the blob
  * itself - and its payload_sha blob holds the whole payload. A spilled report-filed / artifacts-indexed artifact list
  * is still chained, never counted unchained. An unreadable blob reads as the inline part (verifyEventChain owns tamper).
@@ -279,7 +279,7 @@ export function scopeOf(db, workflowId) {
 
 /**
  * api coverage: every FR, shape and applicable proof case of the workflow's scope with its evidence and status.
- * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/checks/ui-proof-brief.mjs
+ * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/work/ui/ui-proof-brief.mjs
  * buildBrief); it is injected so a caller that cannot load the knowledge still reports FRs and shapes.
  */
 // notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/kernel/spec-deferral.mjs):
@@ -322,7 +322,7 @@ export const coverageLines = (cov) => [
 
 /**
  * api verify-proofs: re-read every artifact's blob (the store re-hashes it), compare its sha with the {id, sha256} the
- * chained report-filed / artifacts-indexed events recorded, and walk the workflow's events digest chain (engine/ledger-db.mjs
+ * chained report-filed / artifacts-indexed events recorded, and walk the workflow's events digest chain (engine/db/ledger.mjs
  * verifyEventChain). Returns {ok, files{checked, intact, tampered[{artifactId, jobId, name, reason, expected, actual?}],
  * unchained}, chain{events, ok, brokenAt, broken[{seq, kind, reason}]}}.
  */

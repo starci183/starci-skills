@@ -4,7 +4,7 @@
 //
 // RT_HELPER_REDEFINED: every tracked `.mjs` under scripts/, engine/, modules/, bin/ and ext/ is parsed with acorn. The
 // helper table is DERIVED from the exports of the shared libs (scripts/lib/*.mjs, scripts/api/<system>/lib.mjs, engine/*.mjs and the check kit
-// scripts/checks/common.mjs): each exported function/const gets a normalised token sequence (parameters plus body,
+// scripts/lib/walk.mjs): each exported function/const gets a normalised token sequence (parameters plus body,
 // declared names renamed by first use, comments, whitespace and semicolons dropped). A top-level function/const of any
 // other place whose sequence equals an exported helper's is a copy: import the lib one. A copy with a different body is a
 // different contract and is not flagged. Two libs that export one NAME with different contracts are reported for a rename.
@@ -13,7 +13,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runGit } from '../api/git/lib.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { isMain } from './common.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 // acorn lives in packages/node_modules (a dev dependency of the packages workspace); no other path is tried.
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
@@ -22,7 +22,7 @@ export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin'
 /** Shortest normalised sequence that counts as a helper body: below it two functions agree by accident. */
 const MIN_TOKENS = 8;
 
-const isLib = (rel) => /^(scripts\/lib|engine)\/[^/]+\.mjs$/.test(rel) || /^scripts\/api\/[^/]+\/lib\.mjs$/.test(rel) || rel === 'scripts/checks/common.mjs';
+const isLib = (rel) => /^(scripts\/lib|engine)\/[^/]+\.mjs$/.test(rel) || /^scripts\/api\/[^/]+\/lib\.mjs$/.test(rel) || rel === 'scripts/lib/walk.mjs';
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
 const GENERATED = /^packages\/[^/]+\/runtime\//;
 

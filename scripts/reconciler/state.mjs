@@ -1,6 +1,6 @@
 // scripts/reconciler/state.mjs — the reconciler's settings (DESIGN §7.3).
 //
-// The engine's state lives in machine.sqlite (engine/machine-db.mjs, DBTREE.sql B2/B3): engine_leader + leader_history
+// The engine's state lives in machine.sqlite (engine/db/machine.mjs, DBTREE.sql B2/B3): engine_leader + leader_history
 // (the leader and its epochs), engine_cursors (per-ledger events cursor, keyed by machine.ledgers ledger_id),
 // engine_queue (the workqueue), engine_actions (the mutation journal), sla_episodes (SLA clocks, append-only; the open
 // ones are v_sla_open), services + service_events + service_probes (the Host controller's registry), controller_modes +

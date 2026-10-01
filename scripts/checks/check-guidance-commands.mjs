@@ -29,9 +29,9 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { commandVerdict } from '../guards/command-guard.mjs';
 import * as gitPolicy from '../guards/git-policy.mjs';
 import * as depsGuard from '../guards/deps-guard.mjs';
-import { CATALOG_FILE } from './failure-codes.mjs';
+import { CATALOG_FILE } from './check-failure-codes.mjs';
 import { runGit } from '../api/git/lib.mjs';
-import { isMain } from './common.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
 const HISTORY_DIR = 'modules/kernel/contract-changes/';

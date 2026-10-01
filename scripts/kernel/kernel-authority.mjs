@@ -2,7 +2,7 @@
 // guardrails around it (owner 2026-09-28: "sao workflows không tự điều phối dc mà đợi supervisor", "kernel phải
 // brainstorm dc, xử lý lỗi dc ... làm mọi thứ để workflows tiến", refined: ops draw the graph, the Kernel only makes
 // LIGHT unit edits and dispatches the owning op for a heavy redesign). Shared by the api verbs graph-edit,
-// dispatch-ready, decide, redesign, op-override and kernel-proposal (scripts/kernel/api-verbs/).
+// dispatch-ready, decide, redesign, op-override and kernel-proposal (scripts/kernel/verbs/).
 //
 // Guardrails enforced here, never only in a prompt:
 //   (a) progress counts only units that passed their gates (progress-rca.mjs unitsOf: a succeeded job)
@@ -21,16 +21,16 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/ledger-db.mjs';
-import { operationNodeId } from './api-lib/hierarchy.mjs';
+import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
+import { operationNodeId } from './verbs/shared/hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { spentTriesOf } from './units.mjs';
 import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
-import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
-import { CHILD_ENV, refuseDecisionsFirst } from '../reconciler/decisions.mjs';
+import { kernelDecisionItems } from './settle/job-settle.mjs';
+import { CHILD_ENV, refuseDecisionsFirst } from '../machine/decisions.mjs';
 
 export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'api.mjs');
 export const OVERRIDE_KIND = 'kernel-op-override';
@@ -47,7 +47,7 @@ const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').re
 
 /** Run one api verb against the same repo: {ok, status, json, out, err}. The caller's env (Kernel identity) passes. */
 export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = {}) {
-  // CHILD_ENV: a child of a resolving verb (graph-edit, redesign) passes the decisions-first guard (scripts/reconciler/decisions.mjs).
+  // CHILD_ENV: a child of a resolving verb (graph-edit, redesign) passes the decisions-first guard (scripts/machine/decisions.mjs).
   const r = spawnSync(process.execPath, [API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   const text = String(r.stdout ?? '').trim();
@@ -88,7 +88,7 @@ export function dropJob(ledger, job, { reason, editId, now = Date.now() }) {
 /**
  * Undo a drop this edit made. jobs.cancelled is terminal (job_transitions): the dropped job itself never comes back.
  * Instead its unit gets a NEW job - the next try (try_no = unit tries + 1), resume_of = the cancelled job, retry_class
- * 'resume', the same payload (its hierarchy re-pointed at the new job) - enqueued through engine/ledger-db.mjs
+ * 'resume', the same payload (its hierarchy re-pointed at the new job) - enqueued through engine/db/ledger.mjs
  * enqueueJob with the db of the CALLER's open transaction (call it inside ledger.transaction). Returns the new job id,
  * or null when nothing is restored: the job is not this edit's drop, it has no unit, the unit is done, the unit already
  * has an open (unsettled) try, the unit's try budget is spent, or the workflow takes no new work.
@@ -272,13 +272,13 @@ export const settingsN = () => progressSettings().maxUnitsPerEdit;
 /**
  * Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule).
  * SETTLE-FIRST, the Kernel's half (owner 2026-09-28; narrowed by owner ruling settle-runtime-service): the runtime
- * settles green reports itself (scripts/reconcile/job-settle.mjs), so the backlog counts only the reported jobs of this
+ * settles green reports itself (scripts/kernel/settle/job-settle.mjs), so the backlog counts only the reported jobs of this
  * workflow older than allocation.progress.settleBacklog.ageMs that wait on the Kernel's decision - non-green outcomes
  * and done reports the settler handed over - consumed or not (job-settle.mjs kernelDecisionItems).
  */
 export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } = {}) {
   // DECISIONS FIRST (coordinator 2026-09-28, fe-canon): an open, unclaimed Kernel Decision Item older than 2 min refuses
-  // route/dispatch too, with the item's exact commands (scripts/reconciler/decisions.mjs refuseDecisionsFirst).
+  // route/dispatch too, with the item's exact commands (scripts/machine/decisions.mjs refuseDecisionsFirst).
   refuseDecisionsFirst(db, workflowId, verb, { now });
   const s = progressSettings().settleBacklog;
   const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });

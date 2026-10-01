@@ -1,7 +1,7 @@
 messages:
   args: '--workflow <id>'
   reads: >-
-    the drain of scripts/kernel/api-lib/messages.mjs: each Run of the workflow (payload orca/managed/hierarchy
+    the drain of scripts/kernel/verbs/shared/messages.mjs: each Run of the workflow (payload orca/managed/hierarchy
     runId of its jobs) through scripts/api/orca/orch-check.mjs (calls.yaml `check`, Orca's consuming FIFO
     Delivery, --run <run> --terminal <Kernel terminal>; a consumer_fenced answer on the Kernel's own Run re-binds it
     once with run-use); then every bridged message of the workflow (the worker-question inbox rows and the

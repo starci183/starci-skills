@@ -1,0 +1,133 @@
+#!/usr/bin/env node
+// unit-run.mjs - the unit run summary (schema starci/unit-run@1) unit.verify attaches (knowledge/op-gate.yaml proofs.unit-kit,
+// contract change op-mechanism-proofs).
+//
+//   node scripts/gates/unit-run.mjs --root <app> [--out <file>]
+//
+// The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): only services are unit-tested, one
+// <name>.service.spec.ts beside each be/src/**/*.service.ts, the subject built by Test.createTestingModule over exactly its
+// constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock,
+// recordingOutbox, FakeClock, fakeIds, mock) and the Outcome matchers, and each service at 100 on lines, branches, functions and
+// statements on its own. Over the app at --root it records:
+//   run       the managed `npm test` (the unit project with --coverage) with jest's --json report and a json-summary coverage
+//             report into a private temp directory: exit, totals, failures;
+//   services  per *.service.ts: its coverage (the four pcts), its spec beside it, and the kit judgment of that spec
+//             (op-gate.yaml unitKit: Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a
+//             `new <Service>(` of the subject forbidden).
+// `api settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { posixPath } from '../lib/path-key.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { reduceJest } from './test-world-run.mjs';
+
+export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
+export const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
+const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SERVICE_ROOT = 'be/src';
+const USAGE = 'usage: unit-run.mjs --root <app> [--out <file>]';
+
+/** op-gate.yaml unitKit: {required[], forbidden[]}. */
+export function unitKitRules(runtime = runtimeRoot) {
+  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
+  return { required: doc?.unitKit?.required ?? [], forbidden: doc?.unitKit?.forbidden ?? [] };
+}
+
+/** The services of the app: be/src/**\/*.service.ts outside be/src/tests (app-relative POSIX paths). */
+export function servicesOf(root) {
+  const dir = path.join(root, SERVICE_ROOT);
+  if (!fs.existsSync(dir)) return [];
+  return walkFiles(dir, { sorted: true, exclude: (name, full, entry) => entry.isDirectory() && ['node_modules', 'dist', 'coverage', 'tests'].includes(name) })
+    .map((file) => posixPath(path.relative(root, file)))
+    .filter((rel) => rel.endsWith('.service.ts'));
+}
+
+/** The kit judgment of one service spec: the forbidden needles it uses, the required ones it lacks, a `new Subject(`. */
+export function judgeServiceSpec(text, serviceText, rules) {
+  const code = String(text).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const subject = /export\s+class\s+([A-Za-z0-9_]+)/.exec(String(serviceText ?? ''))?.[1] ?? null;
+  return { missing: rules.required.filter((needle) => !code.includes(needle)), forbidden: rules.forbidden.filter((needle) => code.includes(needle)),
+    constructsSubject: Boolean(subject && new RegExp(`new\\s+${subject}\\s*\\(`).test(code)), subject };
+}
+
+/** The per-service records from the coverage summary (keys absolute or app-relative) and the specs beside each service. */
+export function judgeServices(root, coverage, rules = unitKitRules()) {
+  const byRel = new Map();
+  for (const [file, metrics] of Object.entries(coverage ?? {})) {
+    if (file === 'total') continue;
+    const rel = posixPath(path.isAbsolute(file) ? path.relative(root, file) : file);
+    byRel.set(rel, metrics);
+  }
+  return servicesOf(root).map((rel) => {
+    const metrics = byRel.get(rel) ?? null;
+    const pct = Object.fromEntries(COVERAGE_METRICS.map((m) => [m, metrics?.[m]?.pct ?? null]));
+    const specRel = rel.replace(/\.service\.ts$/, '.service.spec.ts');
+    const spec = fs.existsSync(path.join(root, specRel)) ? specRel : null;
+    const kit = spec ? judgeServiceSpec(fs.readFileSync(path.join(root, specRel), 'utf8'), fs.readFileSync(path.join(root, rel), 'utf8'), rules) : null;
+    return { path: rel, coverage: pct, spec, kit };
+  });
+}
+
+/** The findings of a summary, each {rule, path, message}. */
+export function unitFindings(summary) {
+  const out = [];
+  for (const s of summary.services ?? []) {
+    const below = COVERAGE_METRICS.filter((m) => s.coverage?.[m] !== 100);
+    if (below.length) out.push({ rule: 'coverage-below', path: s.path, message: `${below.map((m) => `${m} ${s.coverage?.[m] ?? 'not measured'}`).join(', ')} (every service owes 100 on each metric)` });
+    if (!s.spec) { out.push({ rule: 'spec-missing', path: s.path, message: 'no <name>.service.spec.ts beside the service' }); continue; }
+    for (const needle of s.kit?.missing ?? []) out.push({ rule: 'kit', path: s.spec, message: `the spec never uses ${needle}` });
+    for (const needle of s.kit?.forbidden ?? []) out.push({ rule: 'kit', path: s.spec, message: `the spec uses ${needle}` });
+    if (s.kit?.constructsSubject) out.push({ rule: 'kit', path: s.spec, message: `the spec constructs ${s.kit.subject} with new: build it through Test.createTestingModule` });
+  }
+  return out;
+}
+
+/** Run the managed `npm test` with jest's JSON report and a json-summary coverage report: {command, exit, ...totals, coverage, error}. */
+export function runUnit(root, { spawn = spawnSync } = {}) {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unit-run-'));
+  const outFile = path.join(outDir, 'jest.json');
+  const covDir = path.join(outDir, 'coverage');
+  const args = ['test', '--', '--json', `--outputFile=${outFile}`, '--coverageReporters=json-summary', '--coverageReporters=text-summary', `--coverageDirectory=${covDir}`];
+  const run = spawn('npm', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, shell: process.platform === 'win32' });
+  let report = null, coverage = null;
+  try { report = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { report = null; }
+  try { coverage = JSON.parse(fs.readFileSync(path.join(covDir, 'coverage-summary.json'), 'utf8')); } catch { coverage = null; }
+  for (const file of [path.join(covDir, 'coverage-summary.json'), outFile]) { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
+  for (const dir of [covDir, outDir]) { try { fs.rmdirSync(dir); } catch { /* temp; a reporter may leave more */ } }
+  return { command: `npm ${args.filter((a) => !/^--(outputFile|coverageDirectory)=/.test(a)).join(' ')}`, exit: run.status ?? null,
+    ...(report ? reduceJest(report) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }), coverage,
+    error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
+}
+
+export function buildUnitRun({ root, rules = unitKitRules(), spawn = spawnSync }) {
+  const abs = path.resolve(root);
+  const { coverage, ...run } = runUnit(abs, { spawn });
+  const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };
+  summary.findings = unitFindings(summary);
+  const red = run.error || run.exit !== 0 || run.failed > 0 || run.total === 0;
+  summary.exit = run.error ? 2 : summary.findings.length || red ? 1 : 0;
+  return summary;
+}
+
+if (isMain(import.meta.url)) {
+  try {
+    const argv = process.argv.slice(2);
+    const opts = { root: null, out: null };
+    for (let i = 0; i < argv.length; i += 1) {
+      if (argv[i] === '--root' || argv[i] === '--out') opts[argv[i].slice(2)] = argv[++i];
+      else throw new Error(`unknown argument ${argv[i]}; ${USAGE}`);
+    }
+    const summary = buildUnitRun({ root: opts.root ?? process.cwd() });
+    const text = `${JSON.stringify(summary, null, 2)}\n`;
+    if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
+    process.stdout.write(text);
+    process.exitCode = summary.exit;
+  } catch (error) {
+    process.stderr.write(`unit-run: ${error.message}\n`);
+    process.exitCode = 2;
+  }
+}

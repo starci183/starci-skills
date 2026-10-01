@@ -42,7 +42,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
 

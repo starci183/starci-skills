@@ -62,7 +62,7 @@ export function parallelGear(config=loadConfig()){
  * pasted token fails closed instead of landing in a plain-text file.
  */
 const CLOUDFLARE_MODES=['off','quick','named'];
-/** The serve-ask port band, both ends included (scripts/kernel/serve-ask.mjs scans [first..last]); the gateway stays outside it. */
+/** The serve-ask port band, both ends included (scripts/kernel/ask-server.mjs scans [first..last]); the gateway stays outside it. */
 export const ASK_PORT_BAND=[6969,7069];
 export const CONNECTOR_DEFAULTS=Object.freeze({
   secretsFile:null,
@@ -183,7 +183,7 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
 }
 /**
  * config.yaml `asks` — whether an owner ask that carries a recommended option is answered with it
- * instead of being served (scripts/kernel/serve-ask.mjs autoAcceptAsk). `excludes` names the ask classes
+ * instead of being served (scripts/kernel/ask-server.mjs autoAcceptAsk). `excludes` names the ask classes
  * that always reach the owner: `credential` (secret fields, or kind credential/account/access/consent),
  * `handover` (every handover.review ask — excluded even when the owner drops it from the list),
  * `draw-review` (the opt-out: an interface.draw drawing review the owner did not ask for is otherwise
@@ -340,11 +340,11 @@ export function validateConfig(config){
     const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
     if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
       throw Error('Invalid config.yaml: supervisor must be {mode?, pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
-    // mode: where the Supervisor role runs (scripts/supervisor/home.mjs supervisorMode) - chat (default: the owner's desktop
+    // mode: where the Supervisor role runs (scripts/machine/home.mjs supervisorMode) - chat (default: the owner's desktop
     // chat session owns channel 'main' and ticks itself) or kernel (the optional [Supervisor] Orca kernel, start-supervisor.mjs).
     if(!(supervisor.mode===undefined||supervisor.mode===null||['chat','kernel'].includes(supervisor.mode)))
       throw Error('Invalid config.yaml: supervisor.mode must be chat or kernel, or null.');
-    // The [Supervisor] kernel seat (scripts/supervisor/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
+    // The [Supervisor] kernel seat (scripts/machine/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
     // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
     // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
     const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
@@ -356,7 +356,7 @@ export function validateConfig(config){
     if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
       throw Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
     // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
-    // frozenMinutes: scripts/supervisor/watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
+    // frozenMinutes: scripts/supervisor/supervisor-watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
     const frozen=supervisor.frozenMinutes;
     if(!(frozen===undefined||frozen===null||(Number.isInteger(frozen)&&frozen>=1)))
       throw Error('Invalid config.yaml: supervisor.frozenMinutes must be an integer of at least 1, or null.');
@@ -450,7 +450,7 @@ export function specsSettings(config){const specs=plain(config?.specs)?config.sp
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 /**
- * config.yaml `claudeDebug` (skills/claude-debug, scripts/supervisor/debug-pass.mjs): {interval, worktreeLimit}.
+ * config.yaml `claudeDebug` (skills/claude-debug, scripts/reconciler/debug-pass.mjs): {interval, worktreeLimit}.
  *   interval       <n>s | <n>m | <n>h — the cadence of the chat's Claude Code `/loop <interval> /claude-debug pass`.
  *   worktreeLimit  integer >= 1 — more registered worktrees than this in one repository is a core-watch alert.
  * Both keys are required when the block is present; code carries no default (config.example.yaml does).

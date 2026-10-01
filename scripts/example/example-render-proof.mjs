@@ -3,12 +3,12 @@ import path from 'node:path';
 import {capturesOf} from '../work/impl-captures.mjs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../checks/render.mjs';
+import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../work/ui/render.mjs';
 import {readWorkspace, loadRecords} from './example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
 
 /**
- * Grit item 55 (docs/examples/todo-app-grit.md): scripts/checks/render.mjs and scripts/checks/brand.mjs are real - a
+ * Grit item 55 (docs/examples/todo-app-grit.md): scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
  * capture's PNG bytes plus its kept markup are checked against the brand record, palette and component
  * anatomy both - but nothing ever ran them against this example tree, so a frontend work/implementation@1
  * record could reach `done` with no capture at all. This module is the mechanical wiring: for every done
@@ -17,7 +17,7 @@ import {slash} from '../lib/path-key.mjs';
  * artifacts must exist in the shape render.mjs reads (a PNG under the implementation node's assets/,
  * with the kept markup beside it as the same basename .html) and the render/brand checks must pass.
  *
- * The check functions are imported from scripts/checks/render.mjs itself and composed here rather than calling
+ * The check functions are imported from scripts/work/ui/render.mjs itself and composed here rather than calling
  * its runRenderChecks: that wrapper reads the brand through readBrandRecord, while this example tree reads
  * the `work/brand@1` record itself (see schemas/work-layout.yaml). The brand's own `brand:` specification - the object every check actually
  * consumes - is read here with the same leniency the rest of the example toolkit applies, so the canon
@@ -75,7 +75,7 @@ function uiDirsFor(rec, records, workRoot) {
 
 /**
  * The brand specification this tree declares, from `<workRoot>/brand/index.yaml`'s own `brand:` field.
- * Deliberately not scripts/checks/brand.mjs's readBrandRecord: this reads the `brand:` specification object
+ * Deliberately not scripts/work/brand/brand.mjs's readBrandRecord: this reads the `brand:` specification object
  * itself with the leniency the example toolkit applies, as identical input for the checks.
  */
 function readExampleBrand(workRoot) {
@@ -135,7 +135,7 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
 
   const candidates = captureCandidates(rec.dir, rec.data);
   if (!candidates.length) {
-    problems.push('state is done but cites no running-page capture in its assets[] - a frontend implementation is proven by a browser PNG plus the markup it rendered, the shape scripts/checks/render.mjs reads, and a design/direction image is not an implementation capture [RENDER_CAPTURE_MISSING]');
+    problems.push('state is done but cites no running-page capture in its assets[] - a frontend implementation is proven by a browser PNG plus the markup it rendered, the shape scripts/work/ui/render.mjs reads, and a design/direction image is not an implementation capture [RENDER_CAPTURE_MISSING]');
     return problems;
   }
 

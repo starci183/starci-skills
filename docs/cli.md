@@ -6,7 +6,7 @@ from an installed `.claude/` tree. `bin/starci.mjs` is a thin dispatcher — it
 forwards `init|update|doctor|version` to the installer, `api` to
 `scripts/kernel/api.mjs`, `start` to `scripts/kernel/start-workflow.mjs`,
 `goal` to `scripts/goal/define-goal.mjs` and `validate` to
-`scripts/checks/work-validate.mjs`. The kernel agent calls
+`scripts/work/validate/work-validate.mjs`. The kernel agent calls
 `scripts/kernel/api.mjs` itself.
 
 ## Install verbs
@@ -44,14 +44,14 @@ node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> [--age
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
 
 # Read-only Work record/layout validation
-node scripts/checks/work-validate.mjs <work-root>
+node scripts/work/validate/work-validate.mjs <work-root>
 # ...plus every record compiled against the JSON schema its `schema:` const names
 # (closed objects, slug/timestamp patterns); each violation is a [SCHEMA_VIOLATION]
 # refusal. Ops run it on the record directories they write.
-node scripts/checks/work-validate.mjs <work-root-or-record-dir> --strict
+node scripts/work/validate/work-validate.mjs <work-root-or-record-dir> --strict
 # ...judged for a slice: refusals in records outside the owned paths move to
 # `outOfScope` (another owner's pre-existing finding) and never fail the run.
-node scripts/checks/work-validate.mjs <feature-dir> --strict --owned <path>[,<path>]
+node scripts/work/validate/work-validate.mjs <feature-dir> --strict --owned <path>[,<path>]
 ```
 
 See [workflow-kernel](workflow-kernel.md) for the Kernel decisions these calls serve.
@@ -85,16 +85,16 @@ Agent flags always come from the agent card
 Read-only machine gates; they judge bytes, not claims. Highlights:
 
 ```sh
-node scripts/checks/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <files...>] [--tests <pattern>] [--out <file>]
+node scripts/gates/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <files...>] [--tests <pattern>] [--out <file>]
                                                            # THE op gate (starci/gate@1): merge guard, hfs lint --changed, codegen +
                                                            # dist builds, tsc per owning tsconfig, jest --maxWorkers=2; only findings
                                                            # new against --base block; exit 0 clean, 1 new findings, 2 a tool could not run
-node scripts/checks/read-digest.mjs --root <app> --touch <files...> --out <file>
+node scripts/gates/read-digest.mjs --root <app> --touch <files...> --out <file>
                                                            # the op loop's READ digest (starci/read-digest@1)
-node scripts/checks/acceptance.mjs ...                     # evidence-packet verdicts
-node scripts/checks/proof.mjs ...                          # proof verification
+node scripts/gates/acceptance.mjs ...                     # evidence-packet verdicts
+node scripts/gates/proof.mjs ...                          # proof verification
 node scripts/checks/check-entry.mjs <host>                 # installed-entry sanity
-scripts/checks/stacks.mjs                                  # whole-app stack conformance (library: checkApplicationStacks)
+scripts/gates/stacks-gate.mjs                                  # whole-app stack conformance (library: checkApplicationStacks)
 ```
 
 Every check prints a typed JSON report (`starci/<name>-report@1`-style schema)

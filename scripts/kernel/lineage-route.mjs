@@ -33,7 +33,7 @@ import { AWAITING_OWNER_STATUS, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { independentChecksOf } from './api-lib/check-evidence.mjs';
+import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 
 export const EXCLUDE_AFTER = 2;
 export const POOL_CAUSES = Object.freeze(['no-report', 'gate-loop', 'quota', 'provider-outage', 'agent-crash', 'report-rejected', 'repeat-red-check']);

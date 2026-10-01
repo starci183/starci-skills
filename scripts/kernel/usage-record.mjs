@@ -285,7 +285,7 @@ export function planSeatUsage(db, { role, workflowId = null, entry, prices = loa
  */
 export async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false, ledgerFiles = null } = {}) {
   const [{ openMachineReader, withMachine, recordMachineLlmUsage }, { openLedger, openLedgerReader }] = await Promise.all([
-    import('../../engine/machine-db.mjs'), import('../../engine/ledger-db.mjs'),
+    import('../../engine/db/machine.mjs'), import('../../engine/db/ledger.mjs'),
   ]);
   const since = now - lookbackMs;
   const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0, skippedEnded: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0, skippedEnded: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };

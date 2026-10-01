@@ -1,4 +1,4 @@
-# The contract of `api dispatch-ready` (scripts/kernel/api-verbs/dispatch-ready.mjs): the parallelism push.
+# The contract of `api dispatch-ready` (scripts/kernel/verbs/dispatch-ready.mjs): the parallelism push.
 purpose: >-
   Route and dispatch this workflow's queued-ready units up to api status progress.allowedParallel (the fleet
   RAM cap, the pools, the workflow's priority reserve) in one call, through the ordinary api route + api

@@ -3,7 +3,7 @@
 //   learning:tick  every resyncMs (30 min), and at once on runtime-invariant-violated: the invariant violations of the
 //                  window become learning items with signature `inv:<code>` (one item per code, its size the number of
 //                  violations), next to nothing else the old tick fed (the owed actions stay the Fleet controller's).
-//                  scripts/supervisor/lessons.mjs newHypotheses decides which signatures repeated >= minRepeats with no
+//                  scripts/machine/lessons.mjs newHypotheses decides which signatures repeated >= minRepeats with no
 //                  open hypothesis -> ONE Supervisor DI `hypothesis` per signature; measureExperiments judges the
 //                  landed experiments -> ONE Supervisor DI `experiment-revert` per experiment whose revert is due.
 //                  Active, it also runs the recording pass (`lessons.mjs` learnTick through ctx.run) so the hypotheses
@@ -66,11 +66,11 @@ export function planLearning({ items, state, settings, now, newHypotheses, measu
 export async function reconcileLearning(key, ctx, { settings = learningControllerSettings(), deps = {} } = {}) {
   if (key !== KEY) return { ok: false, key, skipped: 'unknown-key' };
   const now = ctx.now();
-  const lessons = deps.lessons ?? await import('../../supervisor/lessons.mjs');
+  const lessons = deps.lessons ?? await import('../../machine/lessons.mjs');
   let violations = deps.violations;
   if (!violations) {
     try {
-      const { readSupervisor } = await import('../../supervisor/home.mjs');
+      const { readSupervisor } = await import('../../machine/home.mjs');
       violations = readSupervisor((m) => m.db.prepare('SELECT code, entity, violated_at FROM invariant_violations WHERE violated_at>=? ORDER BY violation_id').all(now - settings.windowMs)
         .map((r) => ({ code: r.code, dedupeKey: `${r.code}|${r.entity}`, at: Number(r.violated_at) })), [], { env: ctx.env ?? process.env });
     } catch { violations = []; }
@@ -83,7 +83,7 @@ export async function reconcileLearning(key, ctx, { settings = learningControlle
   const opened = [];
   for (const d of plan.decisions) { try { await ctx.openDecision(d); opened.push(d.idempotencyKey); } catch { /* the next pass retries */ } }
   // The recording pass (hypothesis rows, experiment verdicts, lessons) is a write: through ctx.run, so shadow only records it.
-  if (plan.hypotheses.length || plan.verdicts.length) await ctx.run('node', ['scripts/supervisor/lessons.mjs', 'tick', '--items', JSON.stringify(items), '--json'], { timeoutMs: 120_000 });
+  if (plan.hypotheses.length || plan.verdicts.length) await ctx.run('node', ['scripts/machine/lessons.mjs', 'tick', '--items', JSON.stringify(items), '--json'], { timeoutMs: 120_000 });
   return { ok: true, key, items: items.length, hypotheses: plan.hypotheses.map((h) => h.signature), verdicts: plan.verdicts.map((v) => `${v.id}:${v.outcome}`), opened };
 }
 

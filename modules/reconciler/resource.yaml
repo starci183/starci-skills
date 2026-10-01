@@ -1,7 +1,7 @@
 # Resource controller (scripts/reconciler/controllers/resource.mjs; DESIGN §8.3, §14; lane rc-gc-resource).
 # The throttle thresholds (minFreeRamPct 10, heavyResumeAbovePct 15, landSpecPauseBelowPct 2.5, landSpecResumeAbovePct 5,
 # hardFloorPct, cpuHeavyStopAbove 0.95, cpuHeavyResumeBelow 0.85) and priorities stay in modules/models/runtimes.yaml
-# allocation.resources (scripts/lib/ram-throttle.mjs throttleThresholds); this file holds only the controller's numbers.
+# allocation.resources (scripts/machine/ram-throttle.mjs throttleThresholds); this file holds only the controller's numbers.
 name: resource
 concerns: [resource.throttle, resource.quota]
 # resource:host is reconciled every resyncMs (census, load, memory -> mode, slot targets).
@@ -17,7 +17,7 @@ capStarvedMs: 900000
 # SLA clocks (lane F reads them): RAM_CRITICAL while the throttle is critical, DISK_LOW while host-resources reads lowDisk.
 ramCriticalSlaMs: 600000
 diskLowSlaMs: 3600000
-# Adaptive per-pool concurrency (AIMD; scripts/lib/pool-backoff.mjs, key resource:pools). A provider-rate-limited event
+# Adaptive per-pool concurrency (AIMD; scripts/machine/pool-backoff.mjs, key resource:pools). A provider-rate-limited event
 # (the Job controller's worker-health probe) or a provider-health row of failureKind rate-limited halves the pool's
 # effective parallelism, never below backoffFloor, at most once per backoffDecreaseCooldownMs (one burst of stalled
 # workers is one halving). After backoffIncreaseAfterMs with no signal it rises +1 per backoffIncreaseStepMs up to the

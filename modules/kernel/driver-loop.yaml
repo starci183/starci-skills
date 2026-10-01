@@ -43,7 +43,7 @@ about:
     scope, identity or authority.
   sources:
     - scripts/kernel/api.mjs
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
     - scripts/agent/lib.mjs
 
 # ============================================================================
@@ -73,7 +73,7 @@ boundary:
     slice table and model/routing reasoning are persisted into the ledger
     as they form — `api plan` records the plan digest + structural diff +
     lineage, `api incident` records a named finding; the ledger's events
-    (engine/migrations/runtime/0001-init.sql) are the durable memory. A kernel
+    (engine/db/migrations/runtime/0001-init.sql) are the durable memory. A kernel
     that dies mid-survey must lose nothing — hoarding state in context
     until dispatch is a defect.
   terminalLifecycle: >-
@@ -145,7 +145,7 @@ boundary:
 progress:
   settleFirst: >-
     SETTLE IS A RUNTIME SERVICE (owner ruling settle-runtime-service): the
-    settler (scripts/reconcile/job-settle.mjs) is the Job controller's while
+    settler (scripts/kernel/settle/job-settle.mjs) is the Job controller's while
     it owns job.settle (the watchdog loop's own settler run then yields,
     reconciler-owned; it also runs right after `api report`), and settles
     every done report whose declared checks re-verify green through the same
@@ -240,7 +240,7 @@ decisions:
     outside your authority: `api decisions --escalate <id> --to supervisor`.
   doorbell: >-
     The line `[decide] <n> items waiting: api decisions --workflow <wf>` typed into
-    this terminal is only a doorbell (scripts/reconciler/decisions.mjs
+    this terminal is only a doorbell (scripts/machine/decisions.mjs
     ringDoorbell): it rings only when the seat reads turn-idle, at most once per
     2 minutes, and never carries the message. The DI in the ledger is the
     message; a busy Kernel loses nothing.
@@ -280,7 +280,7 @@ decisions:
       - "the cause lies in the runtime or in another workflow (rca.actions tier supervisor): `api kernel-proposal`, or it is raised to a Supervisor DI automatically"
       - "the Kernel lacks the authority"
       - "a Kernel DI is overdue x2 (the SLA layer escalates it on its own, independent of the Kernel)"
-  citation: "modules/kernel/api-commands/decisions.yaml; scripts/kernel/api-verbs/decisions.mjs; scripts/reconciler/decisions.mjs"
+  citation: "modules/kernel/api-commands/decisions.yaml; scripts/kernel/verbs/decisions.mjs; scripts/machine/decisions.mjs"
 
 tick:
   order:
@@ -406,7 +406,7 @@ tick:
       Every slice stays at or below the file/assertion/component bounds and
       carries the same exact goal/record binding. A code.refactor leg whose
       params.canonFamilies is set takes its partition from `node
-      scripts/checks/canon-scan.mjs --root ROOT --families <value> [--exclude
+      scripts/gates/canon-scan.mjs --root ROOT --families <value> [--exclude
       <paths other workflows own>] --json` -> `slices`: one job per slice,
       its `paths` the owned paths, the same params.canonFamilies, each wave
       enqueued `--after` every job of the wave before it; each slice is still
@@ -1015,7 +1015,7 @@ verdictTable:
       credential ask is never pushed, it waits in the owner's /creds list,
       and while only credential asks wait, nextActions names every other
       approved leg to enqueue until each is. The form
-      (scripts/kernel/serve-ask.mjs) is served only when the owner presses
+      (scripts/kernel/ask-server.mjs) is served only when the owner presses
       the button; it seals submitted credentials into custody without any
       agent seeing them, files a sanitized `ask-answered` event and wakes the kernel. With
       Telegram off, or with `--now`, `api serve-ask` serves the form at once.
@@ -1285,7 +1285,7 @@ replanTriggers:
       (modules/goal/anatomy.yaml; legality.yaml existingSurfaceRules). The
       delta shrinks or the chain re-routes; evidence derived from the stale
       premise is marked stale and re-proven, never asserted fresh
-      (propagateInvalidation; scripts/checks/check-work-deep.mjs DEP_STALE).
+      (propagateInvalidation; scripts/work/validate/check-work-deep.mjs DEP_STALE).
     citation: "modules/goal/legality.yaml existingSurfaceRules + backwardEdges; modules/ops/ops/goal.revise.yaml"
 
   - trigger: goal-identity-wrong
@@ -1632,7 +1632,7 @@ failureHandling:
       carries reason stale-active: a frozen spinner row is not a running turn),
       while disconnected/unwritable exact proof re-enters start-workflow for a
       replacement. The Kernel itself never sleeps or polls to preserve liveness
-      (scripts/kernel/watchdog.mjs; scripts/kernel/start-workflow.mjs;
+      (scripts/kernel/kernel-watchdog.mjs; scripts/kernel/start-workflow.mjs;
       modules/kernel/start-workflow.yaml claim.onDeadKernel).
     respawn: >-
       start-workflow re-opens the `[Kernel] <id>` terminal and
@@ -1641,7 +1641,7 @@ failureHandling:
       closed by handle first (scripts/agent/lib.mjs terminal close).
     singleton: >-
       One kernel per workflow, one supervisor per ledger — kernel-lock and
-      supervisor-lock signal rows are the claims (engine/migrations/runtime/0001-init.sql
+      supervisor-lock signal rows are the claims (engine/db/migrations/runtime/0001-init.sql
       signals). Two kernels for one workflow is the corruption this exists
       to prevent.
     note: >-
@@ -1658,7 +1658,7 @@ supervision:
   chain: >-
     owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
     -> [Op] agents (one per op, ephemeral). Above the kernel:
-    watchdog (scripts/kernel/watchdog.mjs) — a liveness pass at
+    watchdog (scripts/kernel/kernel-watchdog.mjs) — a liveness pass at
     modules/models/runtimes.yaml allocation.watchdogCadenceMs over
     canonical status/survey and the attested Kernel terminal, run by the
     Host controller while it owns host.kernel-seat (the standalone loop is
@@ -1669,9 +1669,9 @@ supervision:
     there: one kernel orchestrates its whole workflow, and every other agent
     inside it is an ephemeral Op that kernel dispatched.
   auditTrail: >-
-    Every transition is an event in the ledger (engine/ledger-db.mjs events
+    Every transition is an event in the ledger (engine/db/ledger.mjs events
     table, hash-chained — the writer's eventDigest computes each link;
-    engine/migrations/runtime/0001-init.sql); persist-as-you-
+    engine/db/migrations/runtime/0001-init.sql); persist-as-you-
     think (boundary.persistAsYouThink) is what makes that trail complete —
     findings and plans land in events as they form, so a
     dead kernel leaves a re-readable trail, not a lost context.

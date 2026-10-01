@@ -11,7 +11,7 @@ status:
     Status can resolve met typed waits, sweep autopilot asks and gates, renew
     leases of live workers, and record provider outages observed on worker
     screens. Unless the workflow finished, it drains the workflow's Orca Runs
-    into the ledger first (the same drain as api questions, scripts/kernel/api-lib/messages.mjs:
+    into the ledger first (the same drain as api questions, scripts/kernel/verbs/shared/messages.mjs:
     orchestration check, one ledger transaction, then --ack). Its projection
     reflects those transitions in the same call.
   returns:
@@ -22,7 +22,7 @@ status:
     ramThrottle: >-
       the object {effectiveCap, heavyCap, lightCap, maxParallelOps, running, queued, mode, since, why, capWhy, freeRamPct,
       cpuBusy, priority {weight, reserve}, throttled, line} - the host's RAM-aware dispatch cap
-      (scripts/lib/ram-throttle.mjs): min(maxParallelOps, the ops that still fit in free RAM above
+      (scripts/machine/ram-throttle.mjs): min(maxParallelOps, the ops that still fit in free RAM above
       allocation.resources.ramThrottle.hardFloorPct) across every ledger of the host, the hysteresis mode
       (normal | heavy-paused | critical) and why, this workflow's priority and the last throttled dispatch
     kernelNotes: >-
@@ -115,7 +115,7 @@ status:
     peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
     stuck: >-
       [{key, workflowId, kind, cause, jobId, opId, incidentId, since, ageMs, severity, owner, blockedBy, count,
-      detail}] (scripts/supervisor/op-metrics.mjs stuckOf) — every wait the workflow holds with its age: kind
+      detail}] (scripts/machine/op-metrics.mjs stuckOf) — every wait the workflow holds with its age: kind
       owner-gate (an open owner gate, or a pending owner ask as cause owner-ask) | peer-wait | dependency (one item
       per job waited on, count = its dependants) | retry-cap (a retry route fired its limit into an owner gate) |
       deferred-settle (cause settle-ready or held-<wait>) | queued-ready | throttled (cause pool-full, circuit-open,
@@ -123,7 +123,7 @@ status:
       owner names who moves it next: owner | kernel | peer:<workflowId> | supervisor. Critical first, then oldest.
       Empty once finished. Read-only: the Supervisor tick turns warn/critical into owed actions
     opHealth: >-
-      {windowMs, totals, ops[]} | null (scripts/supervisor/op-metrics.mjs opMetrics, this workflow only, over
+      {windowMs, totals, ops[]} | null (scripts/machine/op-metrics.mjs opMetrics, this workflow only, over
       allocation.opTelemetry.windowMs) — per row {key, jobs, succeeded, failed, owner, dropped, open, successRate,
       failureClasses[{class, n}], topFailureClass, queueWait/runTime/settleTime {n, p50, p90} ms, attemptsPerNode
       {nodes, mean, max}, repeatedIdentical, deadWorkerRate, ownerWait {n, totalMs, p50}, throttle {n, totalMs,

@@ -61,7 +61,7 @@ From this repository root, run `npm ci`, `npm run check` for syntax and contract
 and `npm test` for the Node test suite. The runtime package has no separate TypeScript
 typecheck, lint, or build script; product examples declare their own `typecheck`,
 `lint`, `build`, and `test` commands. Run the runtime presentation gate with
-`node scripts/checks/repo-presentation.mjs --root . --runtime`.
+`node scripts/gates/repo-presentation.mjs --root . --runtime`.
 
 ## Install
 
@@ -151,7 +151,7 @@ node bin/starci.mjs validate <work-root>   # read-only Work record/layout valida
 ```
 
 Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
-directly, e.g. `node .claude/scripts/checks/gate.mjs`. The full surface — install verbs, the
+directly, e.g. `node .claude/scripts/gates/gate.mjs`. The full surface — install verbs, the
 api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli.md).
 
 ## Documentation

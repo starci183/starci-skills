@@ -89,7 +89,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   `.claude/modules/kernel/driver-loop.yaml`. Hand it no op-level work and no
   direct-ledger instructions.
 - The reconciler Host controller keeps the long-lived seat alive by running
-  `scripts/kernel/watchdog.mjs --once --repair`. It wakes the same terminal when
+  `scripts/kernel/kernel-watchdog.mjs --once --repair`. It wakes the same terminal when
   work is actionable and replaces the Kernel only after worker-show proves its
   Dispatch ended (or exact disconnected/unwritable proof). `scripts/reconciler/boot.mjs ensure` starts the one host loop.
 - Orca composes the agent command with the owner's per-agent default args;

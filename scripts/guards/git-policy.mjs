@@ -1,7 +1,7 @@
 // git-policy.mjs — which git commands an op worker may run in a checkout it
 // shares with other workflows. Pure: argv in, verdict out; scripts/guards/command-guard.mjs
 // (a PreToolUse hook) applies it to the agent's shell command before it runs, and the
-// reference-transaction hook git itself runs backs it (scripts/guards/install.mjs).
+// reference-transaction hook git itself runs backs it (scripts/guards/hook-install.mjs).
 //
 // Several workflows of one product ledger build in ONE checkout on ONE branch
 // (nivo: Login, workspace provision, modules and collab on nivo-backend main).
@@ -488,7 +488,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       // An op works in the checkout it was dispatched to; it never creates, moves or removes a worktree.
       if (['add', 'move', 'remove'].includes(words[0]))
         return refusal('WORKTREE_NOT_OPS', `git worktree ${words[0]}: an op worker never creates, moves or removes a git worktree - it works in the checkout it was dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)`,
-          'work in your dispatched checkout; a worktree is created and removed only by the runtime worktree API (scripts/api/git/worktree-add.mjs and worktree-remove.mjs, scripts/api/orca/worktree-provision.mjs and worktree-remove.mjs, safeRemoveWorktree in scripts/lib/safe-remove.mjs) - a build or measurement that needs another revision is reported as a need (report blocked environment), never done in a worktree of your own, and never with a junction or symlink');
+          'work in your dispatched checkout; a worktree is created and removed only by the runtime worktree API (scripts/api/git/worktree-add.mjs and worktree-remove.mjs, scripts/api/orca/worktree-provision.mjs and worktree-remove.mjs, safeRemoveWorktree in scripts/api/fs/safe-remove.mjs) - a build or measurement that needs another revision is reported as a need (report blocked environment), never done in a worktree of your own, and never with a junction or symlink');
       return ALLOW;
     case 'merge':
     case 'cherry-pick':

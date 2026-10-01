@@ -12,7 +12,7 @@
 # One job pass does the FIRST due step (DESIGN §8.1 order):
 #   dead worker (api status frontier.deadWorkerJobs)  api reconcile --job J --dead-worker --settle-failed      job.worker
 #   held worker (frontier.heldWorkerJobs)             api reconcile --job J --release-worker                   job.worker
-#   reported, not settled nor handed over             node scripts/reconcile/job-settle.mjs --repo R --job J   job.settle
+#   reported, not settled nor handed over             node scripts/kernel/settle/job-settle.mjs --repo R --job J   job.settle
 #                                                     (the runtime settler, wrapped: consume, re-verify or canon parity
 #                                                     [contract change canon-parity-settle], api check + api settle,
 #                                                     release, product worktree reap)
@@ -25,7 +25,7 @@
 # wf key: running < progress.allowedParallel and queued-ready -> api dispatch-ready --workflow W (once per dispatchEveryMs);
 #   api status importsBroken (IMPORTS_BROKEN_AFTER_MOVE) holds the push and opens DI repoint-needed (blocksNextWave: no
 #   repoint unit queued) or repoint-dispatch (queued: the Kernel dispatches it) - the next wave waits for the repoint.
-# workers:supervisor: scripts/supervisor/watchdog.mjs sweepWorkers (called); in shadow over a dry ledger and dry seams.
+# workers:supervisor: scripts/supervisor/supervisor-watchdog.mjs sweepWorkers (called); in shadow over a dry ledger and dry seams.
 # overlap: a product-wf-overlap event -> DI product-wf-overlap for the Supervisor (cross-workflow).
 schema: starci/reconciler-controller@1
 controller: job

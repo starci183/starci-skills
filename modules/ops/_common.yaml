@@ -333,7 +333,7 @@ sections:
         that runs it, project keys, credentials as custody references with the variable the tool reads,
         how GitHub CI gets them (ci.wiring) and ownerAction. Before an operation names, asks for or
         wires any credential, host or CI secret/variable it runs `starci-starcistacks-check <repo>`
-        (scripts/checks/check-starcistacks.mjs) and uses what the block declares. A service declared
+        (scripts/gates/starcistacks.mjs) and uses what the block declares. A service declared
         `ownerAction: none` with its custody present is never asked of the owner - api report
         refuses such an ask (ask-declared-in-stack); a custody or server gap is repaired in the stack
         and CI wiring marked optional-follow-up is a Kernel's follow-up, not an owner provision. A
@@ -439,12 +439,12 @@ sections:
         (2026-10-01). End only a PID you started yourself (`taskkill /PID <pid>`, `kill <pid>`,
         `Stop-Process -Id <pid>`); a process you did not start is reported, never killed. The command guard
         refuses a kill by name (PROCESS_KILL_BY_NAME). Never run `git worktree add` or `remove` (WORKTREE_NOT_OPS):
-        a worktree is made and removed only by the runtime worktree API (scripts/lib/worktrees.mjs, safeRemoveWorktree,
+        a worktree is made and removed only by the runtime worktree API (scripts/machine/worktrees.mjs, safeRemoveWorktree,
         and the workflow worktree that Orca creates at Kernel start and the runtime's host-side controller removes after
         the workflow's finish). Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `del /s`,
         `robocopy /MIR` or `/PURGE`, `Remove-Item -Recurse` and its aliases; RECURSIVE_DELETE): a recursive delete
         follows a junction into the live tree; a tree goes only through the runtime's safeRemoveTree
-        (scripts/lib/safe-remove.mjs), one junction is removed with `cmd /c rmdir <path>` (no /s), one file with
+        (scripts/api/fs/safe-remove.mjs), one junction is removed with `cmd /c rmdir <path>` (no /s), one file with
         `rm <file>`. Never start an agent or a terminal outside Orca's supervision: no raw terminal create
         (RAW_TERMINAL_CREATE) and no headless agent CLI (`codex exec`, `claude -p`/`--print`, `cursor-agent -p`,
         `devin -p`, `gemini -p`, `opencode run`; AGENT_HEADLESS_LAUNCH); every agent and worker starts through
@@ -537,7 +537,7 @@ sections:
         reports `blocked` `environment` naming the variable; a build op never reports
         `blocked` `environment` for a credential it can stand in with a placeholder."
       - "Quality-service credentials are the runtime's, never the owner's (owner ruling 2026-09-24):
-        Sonar runs through scripts/checks/sonar-local.mjs against the local SonarQube the stack
+        Sonar runs through scripts/gates/sonar-local.mjs against the local SonarQube the stack
         declaration names, which resolves or mints the project and its token from the source stack
         custody. No op asks the owner for a SONAR_TOKEN, a Sonar host or
         a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
@@ -552,7 +552,7 @@ sections:
         the base that code.refactor owes); (b) a proof the dispatch
         contract or this op's brief assigns to another leg - UAT to uat.verify, journey E2E to
         e2e.verify, live-provider proof to integration.verify - cited with the owning op; (c) Sonar:
-        scripts/checks/sonar-local.mjs runs against the local SonarQube, and a 401 means run it
+        scripts/gates/sonar-local.mjs runs against the local SonarQube, and a 401 means run it
         again, never an owner token and never an open item; (d) an app-wide gate (the whole unit
         suite, typecheck, lint over the whole tree) red only on files this op did not change while its own
         gate.mjs run passes - an op on the shared tree (modules/kernel/product-land.yaml isolation exceptions) shares
@@ -579,7 +579,7 @@ sections:
     blocks:
       - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
         runs ONLY those - the specs of the changed or added source plus the specs that import it - through the op gate
-        (scripts/checks/gate.mjs --tests, beside hfs lint --changed, codegen and tsc). It never runs the app's whole unit suite:
+        (scripts/gates/gate.mjs --tests, beside hfs lint --changed, codegen and tsc). It never runs the app's whole unit suite:
         unit.verify runs it (npm test at the app root), dispatched only when the goal or the owner explicitly asks for the full
         unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime

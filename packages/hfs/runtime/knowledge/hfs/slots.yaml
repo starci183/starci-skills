@@ -4,7 +4,7 @@
 # the CI, the hooks and .starciwork (slots of profile `app`); `be/` and `fe/` are its two sides, each laid out as the old
 # standalone repository root (slots of profile be or fe, paths relative to the side folder). Every tracked path of every
 # repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
-# catalog READ this file through scripts/lib/hfs-slots.mjs; none of them hardcodes a path.
+# catalog READ this file through scripts/hfs/slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
 schema: starci/hfs-slots@2
 version: 2.0.0
@@ -97,7 +97,7 @@ tiers:
 crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
 crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 
-# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/lib/hfs-slots.mjs).
+# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/hfs/slots.mjs).
 ruleParams:
   be:
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
@@ -1166,9 +1166,9 @@ slots:
 
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:
-  - scripts/lib/hfs-slots.mjs                  # the loader every consumer below goes through
-  - scripts/lib/hfs-check.mjs                  # hfs check: HFS_SLOT_* / tracked / external, the side view per side
-  - scripts/checks/architecture.mjs            # tiers, direction matrix, cycles, reachability
+  - scripts/hfs/slots.mjs                  # the loader every consumer below goes through
+  - scripts/hfs/check.mjs                  # hfs check: HFS_SLOT_* / tracked / external, the side view per side
+  - scripts/hfs/architecture.mjs            # tiers, direction matrix, cycles, reachability
   - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
   - packages/eslint/fe starciFeConfig({hfs})
   - packages/stylelint                         # @starci/stylelint-canon: colour and brand allowances from fe.modules.brand

@@ -1,10 +1,10 @@
 // tier-direction.mjs - RT_TIER_DIRECTION and ARCH_OWNER_CYCLE over the runtime (knowledge/hfs/rules.yaml, gate runtime): every
 // relative import between two runtime owners goes from a tier to a tier its mayImport lists (tiers.runtime of
 // knowledge/hfs/runtime-slots.yaml), and the owner graph has no cycle. The judge is the product one,
-// scripts/checks/architecture/tiers.mjs checkTiers, fed the runtime's import graph: the relative specifiers of every
+// scripts/hfs/architecture/tiers.mjs checkTiers, fed the runtime's import graph: the relative specifiers of every
 // production source (read with the TypeScript AST), resolved to tracked files. Pure.
 import path from 'node:path';
-import { checkTiers } from '../../checks/architecture/tiers.mjs';
+import { checkTiers } from '../architecture/tiers.mjs';
 import { relativeImports } from './source-ast.mjs';
 
 export const CODES = Object.freeze({ direction: 'RT_TIER_DIRECTION', cycle: 'ARCH_OWNER_CYCLE' });

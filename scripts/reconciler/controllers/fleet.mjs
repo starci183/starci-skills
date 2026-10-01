@@ -10,12 +10,12 @@
 //   fleet:land    land.mjs landStatus -> clock LAND_QUEUE_STALL while a land holds the gate; the newest land-failed with
 //                 no later land-passed -> clock LAND_FAILED_UNOWNED (the SLA layer turns a clock past its slaMs into
 //                 a violation). On land-* events, also the post-land derivation: the grammar dist against its source
-//                 (scripts/checks/grammar-dist.mjs, the check of commit 25b23059d) -> clock DERIVED_STALE.
+//                 (scripts/checks/check-grammar-dist.mjs, the check of commit 25b23059d) -> clock DERIVED_STALE.
 //   fleet:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused
 //                 keyed (repo, failure signature, head), carrying the full push/hook output blob; push-mains itself holds
 //                 back a repo refused again at the same head (exponential backoff), so an identical refusal escalates once.
 // Every periodic key is claimed in the durable `schedules` table (scripts/reconciler/schedules.mjs, MB-01).
-//   fleet:metrics every metricsEveryMs: the op-health snapshot (scripts/supervisor/op-metrics.mjs aggregate over every
+//   fleet:metrics every metricsEveryMs: the op-health snapshot (scripts/machine/op-metrics.mjs aggregate over every
 //                 product ledger + the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics
 //                 event - the trend line of the digest and of `op-metrics.mjs` reads these (the deleted tick wrote them).
 //                 Telemetry, not an action: recorded in shadow too, like the SLA clocks.
@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { openLedgerReader } from '../../../engine/ledger-db.mjs';
+import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
@@ -247,7 +247,7 @@ async function openAll(ctx, decisions) {
 /** The land gate's runs of the last day (machine.sqlite land_runs) as [{kind: land-passed|land-failed, id, at}], newest first. */
 async function landEventsOf(ctx, now) {
   try {
-    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    const { readSupervisor } = await import('../../machine/home.mjs');
     return readSupervisor((m) => m.landRuns({ limit: 20 }).map((r) => ({ kind: r.result === 'passed' ? 'land-passed' : 'land-failed', id: r.lane ?? r.commit_sha, at: Number(r.finished_at ?? r.started_at) }))
       .filter((e) => e.at >= now - 86_400_000), [], { env: ctx.env ?? process.env });
   } catch { return []; }
@@ -281,7 +281,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     const land = deps.landStatus ? deps.landStatus() : (await import('../../supervisor/land.mjs')).landStatus({ env: ctx.env ?? process.env });
     const events = deps.landEvents ?? await landEventsOf(ctx, now);
     let dist = deps.dist ?? null;
-    if (!dist && !deps.landStatus) { try { dist = (await import('../../checks/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
+    if (!dist && !deps.landStatus) { try { dist = (await import('../../checks/check-grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
     const plan = planLand({ land, events, dist, now, settings });
     for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'fleet', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
     for (const c of plan.clear) await ctx.clear(c.entity, c.state);
@@ -298,7 +298,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
   }
   if (key === KEYS.metrics) {
     if (!force && !due(ctx, key, settings.metricsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const om = deps.opMetrics ?? await import('../../supervisor/op-metrics.mjs');
+    const om = deps.opMetrics ?? await import('../../machine/op-metrics.mjs');
     const windowMs = om.telemetrySettings().windowMs;
     const { records, running } = withReaders(ctx, (readers) => {
       const out = { records: [], running: [] };
@@ -313,7 +313,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
     const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
     const record = deps.recordSnapshot ?? (async (p) => {
-      const { withSupervisor, supervisorEvent } = await import('../../supervisor/home.mjs');
+      const { withSupervisor, supervisorEvent } = await import('../../machine/home.mjs');
       withSupervisor((m) => om.recordSnapshot(m, p), { env: ctx.env ?? process.env });
     });
     await record(payload);
@@ -322,7 +322,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
   if (key === KEYS.direct) {
     if (!force && !due(ctx, key, settings.directEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
     let mode = deps.landGateMode;
-    if (mode === undefined) { try { mode = (await import('../../supervisor/home.mjs')).supervisorSettings().landGate?.mode ?? 'shared'; } catch { mode = 'shared'; } }
+    if (mode === undefined) { try { mode = (await import('../../machine/home.mjs')).supervisorSettings().landGate?.mode ?? 'shared'; } catch { mode = 'shared'; } }
     if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
     const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
     return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings }))) };
@@ -333,7 +333,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     let urgentItems = [];
     try {
       // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
-      const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../decisions.mjs'), import('../../supervisor/home.mjs')]);
+      const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
       const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
       urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations });
     } catch { urgentItems = []; }

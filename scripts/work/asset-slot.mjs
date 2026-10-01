@@ -6,7 +6,7 @@
 // place data-asset-slot="<id>" on the MediaFrame / Image / img (a placeholder src, or none, is fine) and requests it in
 // asset-request.md beside its render source (or in the ui record directory) - one heading per slot naming its id, the
 // section its purpose, placement, pixel size and format, and the brand master it references. The DNA gate refuses
-// artwork without a slot and a slot without a request (DRAW_ASSET_SLOT_UNDECLARED, scripts/checks/draw-dna.mjs), and
+// artwork without a slot and a slot without a request (DRAW_ASSET_SLOT_UNDECLARED, scripts/work/draw/draw-dna.mjs), and
 // the draw records each slot in ui.artworkSlots[] (status owed).
 //
 // interface.asset owes every open slot: it generates the artwork under the brand record's imagery.promptRules (and
@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256File } from '../../engine/digest.mjs';
-import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from '../checks/draw-dna.mjs';
+import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from './draw/draw-dna.mjs';
 import { isDir, isFile, slash } from './work-io.mjs';
 
 export { ASSET_SLOT_ATTR };

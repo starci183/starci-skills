@@ -1,4 +1,4 @@
-# The contract of `api kernel-proposal` (scripts/kernel/api-verbs/kernel-proposal.mjs): tier 2.
+# The contract of `api kernel-proposal` (scripts/kernel/verbs/kernel-proposal.mjs): tier 2.
 purpose: >-
   A change the Kernel needs in shared .claude (op manifest, knowledge, grammar, gate, runtime code) is filed
   as a proposal with evidence and an optional patch; the Supervisor lands AUTO-tier ones through a lane and

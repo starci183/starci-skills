@@ -1,13 +1,13 @@
 // status-block.mjs — the [Supervisor] block the Telegram /status adds after the progress report
-// (scripts/connectors/telegram-bridge.mjs onStatus; modules/supervisor/supervise.yaml chat): the seat, the OWED
+// (scripts/supervisor/telegram-bridge.mjs onStatus; modules/supervisor/supervise.yaml chat): the seat, the OWED
 // count and its trend over the last ticks, the active workers (agent, cluster, age), the land-gate queue and the
 // last push of each main. Read-only over machine.sqlite; null when it does not exist yet.
 import path from 'node:path';
-import { readSupervisor, seatOf, enabledOf, supervisorMode } from './home.mjs';
+import { readSupervisor, seatOf, enabledOf, supervisorMode } from '../machine/home.mjs';
 import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
-import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
-import { TEST_REGISTRY_ENV } from '../../engine/machine-db.mjs';
+import { probeAll as probeAllQuota } from '../agent/quota/index.mjs';
+import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
 
 

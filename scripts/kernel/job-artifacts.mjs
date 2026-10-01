@@ -1,5 +1,5 @@
 // job-artifacts.mjs — every output a job produced, kept as proof and linked to exactly its attempt (alpha.3,
-// ARCHITECTURE-DB §4.2, §5.2). The bytes are blobs (scripts/lib/artifact-store.mjs), the index is job_artifacts keyed
+// ARCHITECTURE-DB §4.2, §5.2). The bytes are blobs (engine/db/blob.mjs), the index is job_artifacts keyed
 // (attempt_id, name), and nothing is copied into the repository: the old <repo>/.starciwork/kernel-evidence job
 // directory is gone.
 //   - api report files the op's own outputs (report attachments and check outputs, api-lib/report-evidence.mjs);
@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appendEvent } from '../../engine/ledger-db.mjs';
+import { appendEvent } from '../../engine/db/ledger.mjs';
 import { subkindOf } from './artifact-subkind.mjs';
 import { recordingsRootOf } from '../uat/playwright-recording.mjs';
 import { allocationMs } from '../../engine/config.mjs';
@@ -26,7 +26,7 @@ import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson, patchJsonFileOf, patchAssetsDirOf } from './patch-json.mjs';
 import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFACT_KINDS, ARTIFACT_SUBKINDS } from './evidence-store.mjs';
 import { jobScratchDirOf } from './op-prompt.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 export { kindOf, mediaTypeOf as mimeOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';

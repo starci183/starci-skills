@@ -21,10 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { machineFileFor, openMachine, readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { machineFileFor, openMachine, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
-import { readSupervisor, supervisorEvent } from '../supervisor/home.mjs';
+import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -237,7 +237,7 @@ function truthSources(ctx) {
       return registry;
     },
     decisions: async () => {
-      if (decisions === undefined) { try { decisions = ctx?.decisionsModule ?? await import('./decisions.mjs'); } catch { decisions = null; } }
+      if (decisions === undefined) { try { decisions = ctx?.decisionsModule ?? await import('../machine/decisions.mjs'); } catch { decisions = null; } }
       return decisions;
     },
     close: () => { for (const db of handles.values()) { try { db?.close(); } catch { /* closed */ } } },

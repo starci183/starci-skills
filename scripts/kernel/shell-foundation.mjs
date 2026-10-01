@@ -3,7 +3,7 @@
 // draw the parent, or tell the supervisor"; the shell/layout ancestors are shared by the five nivo workflows).
 //
 // interface.draw never refuses because a layout above its record is todo or unsettled. `api dispatch` decides who
-// draws the parents (scripts/kernel/api-verbs/dispatch.mjs):
+// draws the parents (scripts/kernel/verbs/dispatch.mjs):
 //   - the chain is settled                        -> nothing to do, the draw only draws its screens;
 //   - nobody owns foundation `shell` (or its owner stopped running, or it landed and the tree went unsettled again)
 //                                                 -> this workflow CLAIMS it: its draw scans the tree, draws or
@@ -14,13 +14,13 @@
 //                                                    deferred (`foundation-wait`); it never drafts a second shell;
 //   - the owner claimed it longer ago than allocation.drawLoop.shellFoundationStallMs -> a Supervisor Decision Item
 //     (kind cross-workflow) asks the Supervisor to re-dispatch a parent draw. No new workflow.
-// The wait is judged at dispatch, the RESULT at the op's proof (scripts/checks/shell-conformance.mjs).
+// The wait is judged at dispatch, the RESULT at the op's proof (scripts/work/ui/shell-conformance.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { appNamesOf, appOfUi, isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, nodesOf, readShellRecord, treeOf } from '../work/layout-tree.mjs';
-import { openDecisionRow } from '../reconciler/decisions.mjs';
-import { getWorkflow, workflowRunning } from './api-lib/rows.mjs';
+import { openDecisionRow } from '../machine/decisions.mjs';
+import { getWorkflow, workflowRunning } from './verbs/shared/rows.mjs';
 import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundations.mjs';
 
 export const SHELL_FOUNDATION = 'shell';

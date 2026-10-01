@@ -73,7 +73,7 @@ rules:
     hfsRules: [R18]
     requirement: |
       The implemented read-only gate is
-      `node scripts/checks/gate.mjs --root <app> --changed <file> [...]`.
+      `node scripts/gates/gate.mjs --root <app> --changed <file> [...]`.
       It runs hfs lint over the changed files, tsc per owning project and the slice's tests, and blocks only on findings the
       base does not have (exit 1); a tool that could not run is exit 2, never a pass. It changes no rule and no inline config.
       Its success means result integrity only: disabled rules, unused directives, TypeScript directives, semantic aliases and
@@ -82,7 +82,7 @@ rules:
       The gate verifies reporting integrity; it is not product acceptance.
     verification:
       automated:
-        - scripts/checks/gate.mjs
+        - scripts/gates/gate.mjs
       manual:
         - Audit disabled rules, aliases and structural omissions separately.
 

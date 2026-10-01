@@ -3,7 +3,7 @@
 // A controller's "last run / next due" lived in process memory (gc.mjs `memory`, fleet.mjs a WeakMap per ctx), so
 // every engine restart or self-reload ran every duty again as a "first run": on 2026-09-28 the daily housekeeping ran
 // 32 times in 3.5 h and the 30-min push 28 times in 3 h. The cadence now lives in machine.sqlite `schedules`
-// (DBTREE.sql B2), one row per (controller, duty), written only through engine/machine-db.mjs
+// (DBTREE.sql B2), one row per (controller, duty), written only through engine/db/machine.mjs
 // (ensureSchedule / claimSchedule / finishSchedule):
 //
 //   claimDue(ctx, {controller, duty, intervalMs, now, earlyAfterMs?, force?})
@@ -18,7 +18,7 @@
 // `ctx` is the controller's ctx: an engine ctx (it has stateDb) uses machine.sqlite (ctx.env picks the file); a spec's
 // fake ctx (no stateDb) keeps the same rules in memory, per ctx object. A store that cannot be opened (an old-schema
 // file) makes nothing due: a duty never runs on a guess.
-import { withMachine, readMachine, pidAlive } from '../../engine/machine-db.mjs';
+import { withMachine, readMachine, pidAlive } from '../../engine/db/machine.mjs';
 
 export const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning', 'sla']);
 export const SCHEDULE_RESULTS = Object.freeze(['done', 'failed', 'unknown', 'skipped']);

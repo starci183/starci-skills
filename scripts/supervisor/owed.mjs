@@ -62,15 +62,15 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { evaluateTypedIncidents } from '../kernel/gate-conditions.mjs';
 import { staleInputs, staleOperationsOf } from '../kernel/input-digests.mjs';
 import {
   GATE_GRACE_MS, ownerGates, peerWaits, judgeGate, judgePeerWait,
   openAskDispatches, runningWorkflows, namedWorkflows, heldBy, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
 } from './stall.mjs';
-import { readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
-import { guardReceiptErrors } from '../guards/install.mjs';
+import { readSupervisor, supervisorEvent, withSupervisor } from '../machine/home.mjs';
+import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs';
@@ -141,7 +141,7 @@ export function actionOf(item) {
       case 'worker-died': return 'provider/launcher defect: fix the launch or liveness path in .claude, or route that provider off the op, then tell the Kernel how to retry';
       case 'repeat-reject': return 'the same dispatch step keeps refusing: fix the launcher/host step in .claude, then tell the Kernel to re-dispatch';
       case 'reroute-loop': return 'routing loops on one job: fix the route inputs or pools in .claude, or give the Kernel an exact route disposition';
-      case 'guard-failed': return 'workers launched without their full guard (scripts/guards/install.mjs): fix the failing layer in .claude; an unguarded worker still running needs its owned paths checked at settle';
+      case 'guard-failed': return 'workers launched without their full guard (scripts/guards/hook-install.mjs): fix the failing layer in .claude; an unguarded worker still running needs its owned paths checked at settle';
       default: return 'a repeated failure is systemic: find what the contract, checker or grant gets wrong and fix it in .claude (or give the Kernel the exact redo), never another blind retry';
     }
   }

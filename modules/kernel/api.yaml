@@ -17,7 +17,7 @@
 #
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/api.mjs      — the executable half; this file is its contract
-#   engine/ledger-db.mjs        — the tables named below (DDL: engine/migrations/runtime/0001-init.sql)
+#   engine/db/ledger.mjs        — the tables named below (DDL: engine/db/migrations/runtime/0001-init.sql)
 #   scripts/agent/lib.mjs       — spawnAgent + terminal lifecycle the api drives;
 #                                 the kernel never calls Orca itself
 #   modules/kernel/driver-loop.yaml    — the caller's tick
@@ -58,7 +58,7 @@ about:
     marks the report consumed if the kernel did not).
   sources:
     - scripts/kernel/api.mjs
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
     - scripts/agent/lib.mjs
 
 # ============================================================================
@@ -67,7 +67,7 @@ about:
 conventions:
   invoke: 'node scripts/kernel/api.mjs <command> [--repo <path>] [--json]'
   ledger: >-
-    .starciwork/runtime.sqlite under the bound repo (engine/ledger-db.mjs
+    .starciwork/runtime.sqlite under the bound repo (engine/db/ledger.mjs
     ledgerFileFor). Every command opens it first; no file there refuses
     `ledger-missing` before the verb runs
   stdout: >-
@@ -84,18 +84,18 @@ conventions:
   exitCode: '0 ok / 1 refusal / 2 usage error'
   extensions: >-
     New verbs, boolean flags and status fields are FILES, never edits of api.mjs's shared lists
-    (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/api-verbs/<verb>.mjs with its contract
+    (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/verbs/<verb>.mjs with its contract
     in modules/kernel/api-commands/<verb>.yaml (what commands.<verb> here would hold); a status field is
-    scripts/kernel/api-status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
+    scripts/kernel/status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
     `api extensions` lists them; check-api-surface reads both forms
   writes: >-
     every mutation runs inside BEGIN IMMEDIATE and appends its event —
-    events is hash-chained (engine/ledger-db.mjs EVENTS_DIGEST_TRIGGER), so a
+    events is hash-chained (engine/db/ledger.mjs EVENTS_DIGEST_TRIGGER), so a
     half-write or a silent edit is impossible
   identity: >-
     a job's durable identity is {workflow_id, op_id, attempt, generation} +
     lease_token; lease writes that do not match the job's complete identity
-    abort at the trigger (engine/migrations/runtime/0001-init.sql leases_match_job
+    abort at the trigger (engine/db/migrations/runtime/0001-init.sql leases_match_job
     RAISE(ABORT,'lease-identity-drift')); a report whose identity fields
     contradict the job's bound {run, task, dispatch, from} fails
     starci/op-report@1 at filing (report-invalid)
@@ -192,7 +192,7 @@ commands: {}
 # of open asks honours all of them.
 # ============================================================================
 askLifecycle:
-  servedBy: scripts/kernel/serve-ask.mjs
+  servedBy: scripts/kernel/ask-server.mjs
   ordering: events are ordered by events.seq — event_id is a random token and orders nothing
   events:
     - ask-notified: 'api serve-ask (serve-ask.mjs parkAsk) told the owner on Telegram: an approval ask is pushed (the question with a Generate URL button, no link, no form; via:telegram), a credential ask is listed for the bridge /creds and never pushed (via:creds). payload {dispatchId, onDemand:true, via:telegram|creds, askClass:approval|credential, messageId, key, fresh, fields}. The ask then waits on the owner with no form (frontier.askOnDemandDispatches, supervisor liveness on-demand); like ask-serving it reopens an ask superseded before it'

@@ -3,8 +3,8 @@
 // needs one and print it. Read-only: the ledger is opened with openLedgerReader, nothing is written and there is no apply
 // mode (op_attempts.why_json of an old attempt is computed on read by whyOf; only the runtime writes the stored column).
 //   node scripts/supervisor/why-backfill.mjs [--ledger <name>] [--workflow <id>] [--op <op>] [--state failed|blocked|...] [--json]
-import { readMachine } from '../../engine/machine-db.mjs';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { readMachine } from '../../engine/db/machine.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { whyOf } from '../kernel/why.mjs';
 
 const argv = process.argv.slice(2);

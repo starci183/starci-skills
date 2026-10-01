@@ -42,7 +42,7 @@ import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-chan
 import {sha256} from '../../engine/digest.mjs';
 import { normWork } from './work-ownership.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
-import { latestContractOf } from './api-lib/rows.mjs';
+import { latestContractOf } from './verbs/shared/rows.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CHANGE_REACH = ['new-legs', 'follow-up'];

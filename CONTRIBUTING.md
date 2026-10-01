@@ -31,7 +31,7 @@ for the test suite and tooling:
   spec that would spawn a real agent is wrong.
 - Specs may spawn `node scripts/...` under test with `spawnSync` — that is the sanctioned
   process boundary. Assert exit codes and ledger state, not stdout poetry.
-- Shared helpers live in `tests/helpers/`; the ledger fixture is `tests/_ledger-fixture.mjs`.
+- Shared helpers live in `tests/helpers/`; the ledger fixture is `tests/helpers/ledger-fixture.mjs`.
 
 ## Evidence policy
 
@@ -52,7 +52,7 @@ record and is worse than a red check.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
   visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
   hashes bytes).
-- **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/ledger-db.mjs`;
+- **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/db/ledger.mjs`;
   dispatch artifacts use the OS tmpdir or are deleted after delivery.
 
 ## Parallel lanes

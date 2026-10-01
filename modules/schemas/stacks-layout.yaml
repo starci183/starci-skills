@@ -165,7 +165,7 @@ rules:
     references with the env variable the tool reads, how GitHub CI gets them (ci.wiring required,
     optional-follow-up or not-used), and ownerAction none unless the owner alone can give something.
     An op reads this block before it asks for any credential and never asks the owner for what it
-    declares ownerAction none with custody present (scripts/checks/check-starcistacks.mjs)."
+    declares ownerAction none with custody present (scripts/gates/starcistacks.mjs)."
 
 example:
   .starcistacks/:

@@ -1,6 +1,6 @@
 // manifest-shape.mjs - the shape rules of an HFS slot manifest that both manifest kinds share, and the whole shape of a
 // manifest of kind runtime (knowledge/hfs/runtime-slots.yaml): the slot fields, the tier map, ruleParams.runtime and the
-// `pending` allowlist. scripts/lib/hfs-slots.mjs (loadSlotManifest) is the only reader; it adds the app kind's own rules
+// `pending` allowlist. scripts/hfs/slots.mjs (loadSlotManifest) is the only reader; it adds the app kind's own rules
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';

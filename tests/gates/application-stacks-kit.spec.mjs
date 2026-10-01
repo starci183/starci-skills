@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {checkApplicationStacks} from '../../scripts/gates/stacks-gate.mjs';
+
+// The stack kit of the todo app: its app root's .starcistacks tree, its sops rule and the .gitignore whose managed block holds the custody rules.
+const source=path.resolve(import.meta.dirname,'..', '..', 'examples', 'todo-app');
+const KIT=['.starcistacks','.sops.yaml','.gitignore'];
+
+test('portable application-stack kit is complete and statically safe in dev and vps',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-application-kit-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  for(const entry of KIT)fs.cpSync(path.join(source,entry),path.join(root,entry),{recursive:true});
+  // dev runs postgres/keycloak/redis/minio/prometheus by default; api and web are behind the
+  // `app` Compose profile and run on the host per the dev README, so a plain `up` never renders them.
+  const devModel={services:{postgres:{},keycloak:{},redis:{},minio:{},prometheus:{}}};
+  const vpsModel={services:{
+    postgres:{image:'postgres:16'},keycloak:{image:'quay.io/keycloak/keycloak:26.0'},redis:{image:'redis:7'},minio:{image:'minio/minio:latest'},
+    api:{image:'todo-app/api',deploy:{replicas:2}},web:{image:'todo-app/web',deploy:{replicas:2}}}};
+  for(const [environment,model] of [['dev',devModel],['vps',vpsModel]]){
+    const modelFile=path.join(root,`${environment}-compose-model.json`);fs.writeFileSync(modelFile,JSON.stringify(model));
+    const checked=checkApplicationStacks({repoRoot:root,environment,deploymentModelFile:modelFile});
+    assert.equal(checked.ok,true,checked.errors.map(error=>`${error.code}:${error.path??''}:${error.message}`).join('\n'));
+  }
+  // Portable means each copied environment runbook still declares its prepare command: prepare is a runbook row
+  // (modules/schemas/stacks-layout.yaml), not a scripts/prepare.* file - the app.scripts slot never requires one.
+  for(const environment of ['dev','vps']){
+    const runbook=fs.readFileSync(path.join(root,'.starcistacks',environment,'README.md'),'utf8');
+    assert.match(runbook,/^| prepare |/m,environment);
+    assert.equal(fs.existsSync(path.join(root,'scripts','prepare.sh')),false,'no scripts/prepare.* is assumed');
+  }
+});

@@ -18,7 +18,7 @@
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openMachine } from '../../engine/machine-db.mjs';
+import { openMachine } from '../../engine/db/machine.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 /** The main thread ticks every second; not ticking for this long is a stall. */

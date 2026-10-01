@@ -289,7 +289,7 @@ allocation:
     alertRepeatMs: 21600000
     actionSlaMs: 1800000
     ownerDigestMs: 7200000
-  # supervisorLearning (scripts/supervisor/lessons.mjs, supervise.yaml selfLearning): a failure signature seen
+  # supervisorLearning (scripts/machine/lessons.mjs, supervise.yaml selfLearning): a failure signature seen
   # minRepeats times opens a hypothesis; a landed experiment is measured for measureMs (its signature recurring, a new
   # signature naming a file it changed, or an op success rate lower by successDrop -> revert due); at most
   # dailyAutoLandCap autonomous landings in 24 h; an owner-feedback lesson weighs ownerWeight (a self-derived one 1).
@@ -318,7 +318,7 @@ allocation:
     # (non-green outcomes and done reports the settler handed over as needs-kernel-decision), consumed or not.
     settleBacklog: {max: 3, ageMs: 120000}
     rca: {minFailures: 3, windowMs: 86400000, examples: 4}
-  # settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service 2026-09-28): the runtime settles every
+  # settler (scripts/kernel/settle/job-settle.mjs; owner ruling settle-runtime-service 2026-09-28): the runtime settles every
   # filed done report whose declared checks re-verify green through the same `api check` + `api settle` path, from each
   # workflow watchdog loop every everyMs and right after `api report`. rerunTimeoutMs bounds one declared check re-run and
   # itemBudgetMs one report. invariantMaxAgeMs: the Supervisor tick asserts no filed/consumed report of a live job stays
@@ -346,13 +346,13 @@ allocation:
   # reap (scripts/kernel/reap-agent-process.mjs): a settled op's agent process is stopped only when it
   # started within windowMs of the dispatch and of no other live agent's launch.
   reap: {windowMs: 90000}
-  # selfReload (scripts/lib/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
+  # selfReload (scripts/reconciler/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
   # replacement takes over the loop's lock within handoverMs or is stopped.
   selfReload: {minIntervalMs: 300000, handoverMs: 30000}
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}
-  # jobGuard (scripts/guards/install.mjs): a guard file older than ttlMs is pruned.
+  # jobGuard (scripts/guards/hook-install.mjs): a guard file older than ttlMs is pruned.
   jobGuard: {ttlMs: 604800000}
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
@@ -369,7 +369,7 @@ allocation:
   # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
   # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
   cutSeam: {maxSiblingWaitMs: 1800000, recutAfterFailures: 2}
-  # opTelemetry (scripts/supervisor/op-metrics.mjs): op health per op and per workflow over the last windowMs; the
+  # opTelemetry (scripts/machine/op-metrics.mjs): op health per op and per workflow over the last windowMs; the
   # supervisor tick records one supervisor-op-metrics snapshot per run and the owner digest's trend line compares the
   # newest with the one closest to trendMs earlier. stuckSla: every wait a running workflow holds (api status stuck[])
   # is severity warn past warnMs and critical past criticalMs - either is a Supervisor owed action; the tick alerts
@@ -390,7 +390,7 @@ allocation:
   quitAgent: {waitMs: 6000}
   # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
   drawRender: {settleMs: 500}
-  # drawLoop (scripts/work/draw-loop.mjs, scripts/checks/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
+  # drawLoop (scripts/work/draw-loop.mjs, scripts/work/draw/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
   # draws -> shoots -> evaluates -> fixes in rounds. A loop stops when every machine metric passes and the
   # independent critic's beauty is at least beautyMin, after maxRounds, or after stallRounds rounds in a row that
   # neither cut the failures nor raised the beauty; the best round is kept. Taste thresholds: accentBudget is the
@@ -444,10 +444,10 @@ allocation:
     supervisorExtraBudget: 2
     supervisorGateTimeoutMs: 21600000
     budgets: {attempts: 600, tokens: 400000000, wallMs: 1209600000}
-  # serveAsk (scripts/kernel/serve-ask.mjs): the default lifetime of a served owner-ask link
+  # serveAsk (scripts/kernel/ask-server.mjs): the default lifetime of a served owner-ask link
   # (--ttl <ms> overrides it per serve).
   serveAsk: {ttlMs: 14400000}
-  # workerJobs (scripts/supervisor/workers.mjs takeLeases, scripts/supervisor/watchdog.mjs
+  # workerJobs (scripts/supervisor/workers.mjs takeLeases, scripts/supervisor/supervisor-watchdog.mjs
   # filedReports): a contract worker's file leases expire leaseTtlMs after it takes them, so a dead
   # worker's leases free themselves; the watchdog consumes worker reports filed in the last
   # reportWindowMs.
@@ -456,7 +456,7 @@ allocation:
   # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
   # the wake-delivery draft probe caps its own interval at it.
   draft: {intervalMs: 300}
-  # housekeeping (scripts/supervisor/housekeeping.mjs): every retention window and root the host
+  # housekeeping (scripts/housekeeping/housekeeping.mjs): every retention window and root the host
   # cleanup reads - no literal may live in the script. tmp: top-level %TEMP% entries whose name starts
   # with one of tmpPrefixes (the prefixes StarCi, its ops lanes and its spec fixtures create) and
   # whose age passes tmpMaxAgeMs are removed, never %TEMP%/claude and never a dir a live process
@@ -470,7 +470,7 @@ allocation:
   # logMaxAgeMs caps every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
   # gitIndexLockStaleMs: a product checkout's .git/index.lock older than this, with no git process on
   # that repository (one naming no repository counts as on it), is removed by
-  # scripts/lib/git-index-lock.mjs - from the op worker's git shim before git runs, and by the
+  # scripts/api/git/index-lock.mjs - from the op worker's git shim before git runs, and by the
   # housekeeping area gitlocks - and recorded as a supervisor-ledger git-index-lock-removed event. A
   # live git holds the lock only while it writes (a commit with hooks: minutes at most), and its
   # process keeps the lock regardless of age.
@@ -513,7 +513,7 @@ allocation:
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
-  # (scripts/lib/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
+  # (scripts/machine/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
   # then reduce the number of parallel ops, avoid freezing the machine and killing ops mid-run"): at every dispatch the effective cap
   # is min(maxParallelOps, running + the ops that fit in free RAM above hardFloorPct of total), counted across
   # every ledger of the host, and never above maxParallelOps. minFreeRamPct is the heavy floor: below it no NEW

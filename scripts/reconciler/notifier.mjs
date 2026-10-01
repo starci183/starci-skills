@@ -89,7 +89,7 @@ export function composeDigest({ digestText, progress = [], actions = [], owed = 
 /* ------------------------------------------------------------ reads (machine.sqlite) */
 
 async function supervisorRead(fn, fallback, env) {
-  const { readSupervisor } = await import('../supervisor/home.mjs');
+  const { readSupervisor } = await import('../machine/home.mjs');
   return readSupervisor(fn, fallback, { env });
 }
 
@@ -111,7 +111,7 @@ export async function notifierState({ env = process.env, now = Date.now(), since
 }
 
 async function record(kind, entityId, payload, { env, now }) {
-  const { withSupervisor, supervisorEvent } = await import('../supervisor/home.mjs');
+  const { withSupervisor, supervisorEvent } = await import('../machine/home.mjs');
   withSupervisor((m) => supervisorEvent(m, { entityType: 'notifier', entityId, kind, payload, now }), { env });
 }
 
@@ -132,7 +132,7 @@ async function languageOf() {
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
 export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
   const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { readMachine }, { workflowView }, { listDecisions }] = await Promise.all([
-    import('../supervisor/home.mjs'), import('../../engine/ledger-db.mjs'), import('../../engine/machine-db.mjs'), import('../kernel/progress-rca.mjs'), import('./decisions.mjs')]);
+    import('../machine/home.mjs'), import('../../engine/db/ledger.mjs'), import('../../engine/db/machine.mjs'), import('../kernel/progress-rca.mjs'), import('../machine/decisions.mjs')]);
   const progress = [], ownerWaits = [];
   if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
   for (const repo of repos) {
@@ -174,7 +174,7 @@ export async function digestInputs({ env = process.env, now = Date.now(), repos 
   try { const a = await import('../supervisor/actions.mjs'); owed = a.latestOwedActions({ env }); } catch { owed = null; }
   // The op-health trend: the Fleet controller's supervisor-op-metrics snapshots (op-metrics.mjs currentTrend).
   let trend = null;
-  try { trend = await (await import('../supervisor/op-metrics.mjs')).currentTrend({ env, language: await languageOf() }); } catch { trend = null; }
+  try { trend = await (await import('../machine/op-metrics.mjs')).currentTrend({ env, language: await languageOf() }); } catch { trend = null; }
   return { progress, ownerWaits, violations, gc, trend, actions, owed };
 }
 

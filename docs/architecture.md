@@ -15,13 +15,13 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
    └───────────────┬────────────────────────────────────────────┘
                    │ api verbs (one transaction + one event each)
                    ▼
-   runtime.sqlite (one per project)  ◄── engine/ledger-db.mjs (the only writer)
+   runtime.sqlite (one per project)  ◄── engine/db/ledger.mjs (the only writer)
                    ▲                                   │
    op agents ──────┘ api report / log / op-contract    │ blobs put first, then the row
                                                        ▼
                                   ~/.starci/artifacts/<sha[0:2]>/<sha256>
                                                        ▲
-   reconciler engine (one per host) ──► machine.sqlite ◄── engine/machine-db.mjs (the only writer)
+   reconciler engine (one per host) ──► machine.sqlite ◄── engine/db/machine.mjs (the only writer)
      Job, Workflow, Resource, Host, GC, Fleet, Learning controllers
                                                        │
    harness UI (ui/server.mjs) ── read-only handles on both DBs and GET /api/blob/<sha>
@@ -31,9 +31,9 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
 
 | Store | Where | Holds | Only writer |
 | --- | --- | --- | --- |
-| `runtime.sqlite` | `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, one per project, resolved through `machine.ledgers` (`STARCI_LOCAL_ROOT` overrides the `%LOCALAPPDATA%/StarCi` base, `STARCI_PROJECTS_ROOT` just `projects/`) | workflows, goals, work units, jobs (tries), op attempts (dispatches), contracts, leases, API idempotency, reports, check runs, artifacts, citations, conditions, Decision Items, decisions, incidents, events and logs | `engine/ledger-db.mjs` |
-| `machine.sqlite` | `%LOCALAPPDATA%/StarCi/machine.sqlite`, one per host (`STARCI_LOCAL_ROOT` overrides the base, `STARCI_TEST_MACHINE_FILE` the exact file) | the ledger and repository registry, the Supervisor (`sup_*`), the reconciler engine (`engine_*`, process runs, leader history, schedules, controller modes, SLA episodes), services, seats and deliveries, terminals, worktrees, throttle, provider health, quotas, GC, land queue and pushes, machine logs and metrics | `engine/machine-db.mjs` |
-| blob store | `~/.starci/artifacts/<sha[0:2]>/<sha256>` (`STARCI_ARTIFACT_ROOT` overrides) | redacted transcripts and scrollback, prompts, check stdout/stderr/output, patches, images, videos, renders | `scripts/lib/artifact-store.mjs`, called by the two writers |
+| `runtime.sqlite` | `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, one per project, resolved through `machine.ledgers` (`STARCI_LOCAL_ROOT` overrides the `%LOCALAPPDATA%/StarCi` base, `STARCI_PROJECTS_ROOT` just `projects/`) | workflows, goals, work units, jobs (tries), op attempts (dispatches), contracts, leases, API idempotency, reports, check runs, artifacts, citations, conditions, Decision Items, decisions, incidents, events and logs | `engine/db/ledger.mjs` |
+| `machine.sqlite` | `%LOCALAPPDATA%/StarCi/machine.sqlite`, one per host (`STARCI_LOCAL_ROOT` overrides the base, `STARCI_TEST_MACHINE_FILE` the exact file) | the ledger and repository registry, the Supervisor (`sup_*`), the reconciler engine (`engine_*`, process runs, leader history, schedules, controller modes, SLA episodes), services, seats and deliveries, terminals, worktrees, throttle, provider health, quotas, GC, land queue and pushes, machine logs and metrics | `engine/db/machine.mjs` |
+| blob store | `~/.starci/artifacts/<sha[0:2]>/<sha256>` (`STARCI_ARTIFACT_ROOT` overrides) | redacted transcripts and scrollback, prompts, check stdout/stderr/output, patches, images, videos, renders | `engine/db/blob.mjs`, called by the two writers |
 
 Rules that hold everywhere:
 
@@ -50,8 +50,8 @@ Rules that hold everywhere:
 - **`.starciwork` holds product content only**: Work records, SRS/SDS, UI specifications and brand.
   Agent output lives in SQL and blobs; a Work record cites it by artifact id and sha256.
 
-The schema itself is data: `engine/migrations/runtime/0001-init.sql` and
-`engine/migrations/machine/0001-init.sql`. See [storage](ledger-db.md) for the tables and
+The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
+`engine/db/migrations/machine/0001-init.sql`. See [storage](ledger-db.md) for the tables and
 [debugging](debugging.md) for the queries that answer "why is this stuck".
 
 ## Roles
@@ -141,7 +141,7 @@ count.
 
 | Controller | Duties |
 | --- | --- |
-| Job | Settles green reports without the Kernel (`scripts/reconcile/job-settle.mjs`), detects a dead worker within the health probe, re-dispatches without consuming the try budget, dispatches ready work. A non-green report opens a `settle-nongreen` Decision Item. |
+| Job | Settles green reports without the Kernel (`scripts/kernel/settle/job-settle.mjs`), detects a dead worker within the health probe, re-dispatches without consuming the try budget, dispatches ready work. A non-green report opens a `settle-nongreen` Decision Item. |
 | Workflow | Watches progress and stalls, writes progress and RCA snapshots to `metrics_snapshots`, opens and escalates stall Decision Items. Never moves a `paused` or `stopped` workflow. |
 | Resource | RAM throttle and pool backoff (`throttle_state` with every change in `throttle_events`), provider quotas. |
 | Host | Services and their probes, the Kernel and Supervisor seats (`seats`, `deliveries`, `seat_turns`), periodic transcript snapshots. Replaces a seat only after proving it dead or deaf. |
@@ -156,7 +156,7 @@ truncated. SLA breaches are `sla_episodes` (append-only); invariant breaches are
 
 **Decision Items** are the durable messages between controllers and deciders
 (`decision_items` in a ledger, `sup_decision_items` in machine). Only
-`scripts/reconciler/decisions.mjs` writes them, through `api decisions`. A Kernel item overdue twice
+`scripts/machine/decisions.mjs` writes them, through `api decisions`. A Kernel item overdue twice
 escalates to the Supervisor. The doorbell (`[decide] N items waiting …` typed into an idle seat) is
 only a reminder; every delivery attempt is a `deliveries` row, and a seat that refuses input
 repeatedly is replaced.
@@ -194,8 +194,8 @@ custody, encrypted with sops; they never enter a database or a blob.
 | Host runtime loop | `modules/reconciler/reconciler.yaml`, `scripts/reconciler/engine.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |
-| Schemas | `engine/migrations/runtime/0001-init.sql`, `engine/migrations/machine/0001-init.sql` |
-| Writers | `engine/ledger-db.mjs`, `engine/machine-db.mjs`, `scripts/lib/artifact-store.mjs` |
+| Schemas | `engine/db/migrations/runtime/0001-init.sql`, `engine/db/migrations/machine/0001-init.sql` |
+| Writers | `engine/db/ledger.mjs`, `engine/db/machine.mjs`, `engine/db/blob.mjs` |
 | Redaction | `scripts/lib/redact.mjs` (applied before every blob put and every log write) |
 | Host contract and agent cards | `modules/host/**`, `modules/models/agents/**` ([host contract](host-contract.md)) |
 | Owner configuration | `config.yaml` (seeded from `config.example.yaml`; [config-format](config-format.md)) |

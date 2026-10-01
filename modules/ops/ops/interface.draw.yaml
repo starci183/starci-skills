@@ -73,13 +73,13 @@ reads:
         mode): the archetype block of the record's ui.archetype (scripts/work/ui-archetype.mjs derives it when
         absent) and the rubric (brand.direction.rubric.checks) the draw loop's critic judges beauty and hierarchy
         by. Dispatch refuses prerequisite-unmet (direction-unaccepted) until the owner accepted that archetype
-        (scripts/checks/brand.mjs checkDirection evidence.ready; runtimes.yaml
+        (scripts/work/brand/brand.mjs checkDirection evidence.ready; runtimes.yaml
         allocation.drawLoop.directionPrerequisite switches it)."
   - id: shell
     path: .starciwork/shell/index.yaml
     layoutFoundation: true
     purpose:
-      en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, scripts/lib/blob-lookup.mjs): one node per
+      en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, engine/db/blob-lookup.mjs): one node per
         app/ segment of each app the frontend declares (`apps[]`: a monorepo may hold several, apps/app and apps/landing; a node id is a
         route within its app) - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per
@@ -253,7 +253,7 @@ writes:
         {path, sha256} (the part placed into the layout chain - evidence for implement and audit only),
         its brief, screen/shape/breakpoint/viewport/theme and `provenance.tool: draw-render`. The UI
         node owns the image, brief and source bytes; this file indexes them.
-        scripts/kernel/serve-ask.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
+        scripts/kernel/ask-server.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
         each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
   - id: work-graph
     path: evidence/work-graph.json
@@ -284,7 +284,7 @@ steps:
         drawn, draw the parent - never wait for a separate brand.decide, never invent chrome). Run `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write`
         (with no frontend yet, `layout-tree.mjs plan` the tree from the accepted journeys and SDS) and read the tree. For
-        the record's route, list every layout above it (`node scripts/checks/shell-conformance.mjs <ui-record-dir>` names each
+        the record's route, list every layout above it (`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` names each
         unsettled one). When every one is settled, skip to the next step. Otherwise, in THIS op and before drawing any
         screen: (a) decide each unknown chrome (visible when it draws a rail, bar or frame around its children,
         passthrough when it renders only document, providers or a guard); (b) a layout the frontend already has is
@@ -312,7 +312,7 @@ steps:
         (ui.<feature>.<layout>-layout, so it lives at features/<feature>/ui/<layout>-layout/), with
         `surface: layout` and `route` the layout node id; this op plans and names it when the tree has none
         (`layout-tree.mjs plan --design`). Every layout above the route is settled BY THE END OF THIS OP
-        (`node scripts/checks/shell-conformance.mjs <ui-record-dir>` judges the result) and is bound by its rev in
+        (`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` judges the result) and is bound by its rev in
         shell.layouts; the layouts this op settled count. The chrome, navigation,
         UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before drawing.
         Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
@@ -323,7 +323,7 @@ steps:
         surface - is never drawn, nor is a variant that only adds a status banner or badge to the same
         layout, unless its shape carries nonDerivable: the SlotView formula, the
         default shape's skeleton or `notFound()` renders it, and the coverage map names which. A record
-        rendered by recipe (scripts/checks/ui-shapes.mjs recipeRenderedOf: a loading, error or not-found
+        rendered by recipe (scripts/work/ui/ui-shapes.mjs recipeRenderedOf: a loading, error or not-found
         surface, or every state it names a data status) has nothing to draw: write it done with no
         drawing and no owner review.
         Enumerate every screen, shape and responsive band of the scope from accepted journeys/SDS; map each
@@ -364,11 +364,11 @@ steps:
       en: "Write one exact brief per representative shape and breakpoint from accepted business/SDS,
         brand rules/masters and the resolved Grammar. It carries verbatim, and no number it does not
         carry is invented - a full-width control takes the fill-variant geometry the block gives, never
-        the hug control's: the geometry block `node scripts/checks/grammar-geometry.mjs --prompt --repo
+        the hug control's: the geometry block `node scripts/work/ui/grammar-geometry.mjs --prompt --repo
         <repo>` prints; the applicable proof cases and knowledge/ui values resolved to numbers with their
-        rule ids that `node scripts/checks/ui-proof-brief.mjs --surface <ui-record-dir> --repo <repo>`
+        rule ids that `node scripts/work/ui/ui-proof-brief.mjs --surface <ui-record-dir> --repo <repo>`
         prints; the grammar sources the dispatch attaches (packet context.grammar); and the brand block
-        `node scripts/checks/brand-palette.mjs --prompt .starciwork` prints - each chromatic token by role
+        `node scripts/work/brand/brand-palette.mjs --prompt .starciwork` prints - each chromatic token by role
         with its hex and the rule that primary buttons, links, selected rows, focus rings, active tabs and
         every call to action are the primary hex. It states screen purpose, component regions, shape,
         viewport, accessibility and forbidden treatments, carries the line `Product locale: <default>`,
@@ -389,7 +389,7 @@ steps:
         spacing scale (gap/p/m steps 0 1 2 3 4 6 8 = GAP/PADDING-0..6; grid/flex/order/span); a free spacing
         value is named with its rule id in rationale.json (a spacing|layout decision), anything that paints is
         a grammar component. Hand-written HTML/CSS and storybook or reference screenshots are no longer
-        drawing inputs. Gate it first: `node scripts/checks/draw-source.mjs <XBase>.draw.tsx --fixture <json>
+        drawing inputs. Gate it first: `node scripts/work/draw/draw-source.mjs <XBase>.draw.tsx --fixture <json>
         --product <app dir>` - TypeScript is the first gate (DRAW_TYPECHECK_FAILED: a prop or variant the
         grammar does not publish), then the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
         DRAW_IMPORT_OFF_GRAMMAR, DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE).
@@ -413,7 +413,7 @@ steps:
         mobile, light theme - at that breakpoint's slot size (or panel shape), never one image stretched to
         both.
         EVIDENCE FOR EVERY DECISION (owner ruling 2026-09-27 draw-rationale-evidence; the owner critiques from evidence,
-        never taste; scripts/checks/draw-rationale.mjs): beside the source write <source stem>.rationale.json, an
+        never taste; scripts/work/draw/draw-rationale.mjs): beside the source write <source stem>.rationale.json, an
         array of {id, selector, kind: element|layout|spacing|type|radius|colour|art, decision, value, because,
         rules[], alternativesRejected[{option, why}], source}, and give every visible element and region of the
         source data-why=\"<id>\" naming its decisions - in a <XBase>.draw.tsx a grammar component takes no data-why
@@ -552,7 +552,7 @@ steps:
       - workflow
     writes: [node, evidence, draws]
     action:
-      en: "Validate Work and every artifact hash, run `node scripts/checks/shell-conformance.mjs` on every
+      en: "Validate Work and every artifact hash, run `node scripts/work/ui/shell-conformance.mjs` on every
         ui record directory written, then report the representative parts, briefs,
         actual tool provenance and complete coverage map. Everything shown to the owner - an ask's
         question.assets and picks, the report summary's images, the drawing notice - names the drawn
@@ -627,7 +627,7 @@ proofs:
         capture; every raster region is an artworkSlots entry with its exact brief, generated by interface.asset
         (never painted by the drawer). A claimed or guessed model name is not proof. The pass is judged over EVERY asset it binds -
         written, adopted, inherited or already there - and every live drawing of each ui record they belong
-        to (scripts/checks/draw-acceptance.mjs, run by api settle) - an image with no draw-render receipt or
+        to (scripts/work/draw/draw-acceptance.mjs, run by api settle) - an image with no draw-render receipt or
         with image-gen provenance (DRAW_ASSET_NOT_TOKEN_RENDERED), a drawn data status (DATA_STATUS_DRAWN),
         a whole-screen drawing or record rather than ui.shapes per XBase#state (DRAW_NOT_SHAPES), or a pass
         that only adopts or reuses prior evidence (DRAW_NOT_REDRAWN) is refused draw-not-accepted. A prior
@@ -635,14 +635,14 @@ proofs:
         is marked retired (reason image-gen) and kept, never deleted.
   - id: rationale
     requirement:
-      en: "Every live part ships its decision evidence (owner ruling 2026-09-27; scripts/checks/draw-rationale.mjs, run by
+      en: "Every live part ships its decision evidence (owner ruling 2026-09-27; scripts/work/draw/draw-rationale.mjs, run by
         the draw loop as a machine metric, by draw-quality.mjs at settle and in the settle re-run): <part>.rationale.json
         with valid decisions, data-why on every visible element and region naming them, the region order and each
         viewport's grid stated, every distinct gap/padding/inset/radius/font-size/weight/line-height the re-measured
         render uses covered by a decision of its kind, every DNA component and variant, colour and art slot decided,
         every rules[] id resolvable, every because naming the FR/content/user job, and <part>.redline.png beside it -
         else DRAW_RATIONALE_MISSING. The draw-review ask shows the redline images and names the rationale."
-    check: scripts/checks/draw-rationale.mjs
+    check: scripts/work/draw/draw-rationale.mjs
   - id: draw-gates
     requirement:
       en: "The pass ran every gate it is judged by before it reported (scripts/work/draw-gates.mjs): report.checks carries
@@ -665,7 +665,7 @@ proofs:
     requirement:
       en: Every drawn shape renders concrete values from the business record; a part showing a skeleton,
         shimmer, grey placeholder block or other data status fails, and `starci validate` refuses a shape or
-        drawing of a data status as DATA_STATUS_DRAWN (scripts/checks/ui-shapes.mjs).
+        drawing of a data status as DATA_STATUS_DRAWN (scripts/work/ui/ui-shapes.mjs).
   - id: truth-boundary
     requirement:
       en: The result is labelled proposed visual direction, never a working-product screenshot or exact
@@ -687,7 +687,7 @@ proofs:
         not pass merely because its label explains it.
   - id: shell-conformance
     requirement:
-      en: "`node scripts/checks/shell-conformance.mjs <ui-record-dir>` exits 0 for every ui record directory
+      en: "`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` exits 0 for every ui record directory
         written: its route is a node of the layout tree (or declared new under an existing routeParent);
         surface, direction, routed and host agree per breakpoint; every layout above the route is settled
         by the END of the op (the ones this op drew or captured count; nothing is refused at the start)
@@ -696,19 +696,19 @@ proofs:
         from its recorded inputs; a routed overlay has both presentations; every drawn state has composites
         at desktop and mobile in the light theme (DRAW_MATRIX_INCOMPLETE; dark is optional); every part's
         declared .html render source keeps the product grammar's geometry (GEOMETRY_OFF_GRAMMAR,
-        scripts/checks/grammar-geometry.mjs); and every
+        scripts/work/ui/grammar-geometry.mjs); and every
         content prompt states `Product locale: <default>`. Its output is retained in evidence."
-    check: scripts/checks/shell-conformance.mjs
+    check: scripts/work/ui/shell-conformance.mjs
   - id: brand-palette
     requirement:
       en: "Every drawn part and composite the record declares is painted in the brand record's colours:
-        `node scripts/checks/shell-conformance.mjs <ui-record-dir>` reads their pixels
-        (scripts/checks/brand-palette.mjs) and refuses PALETTE_OFF_BRAND for any colour the brand does not
+        `node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` reads their pixels
+        (scripts/work/brand/brand-palette.mjs) and refuses PALETTE_OFF_BRAND for any colour the brand does not
         declare - a default blue primary, a purple icon - naming the colour, its share of the coloured area
         and of the image, and the nearest brand token; PRIMARY_ABSENT when the brand primary appears nowhere
         while such a colour does. Tints and shades of a token, navy/grey ink and the declared status colours
         (a green success dot, an amber warning) pass. The prompt carried the brand-palette --prompt block."
-    check: scripts/checks/shell-conformance.mjs
+    check: scripts/work/ui/shell-conformance.mjs
   - id: owner-sees-parts
     requirement:
       en: "What the owner reviews for a drawing is the drawn part of each shape only - the page slot content,
@@ -731,7 +731,7 @@ proofs:
     check: scripts/work/draw-review.mjs
   - id: draw-quality
     requirement:
-      en: "Correct tokens are not a pass (scripts/checks/draw-quality.mjs, run by api settle through
+      en: "Correct tokens are not a pass (scripts/work/draw/draw-quality.mjs, run by api settle through
         draw-acceptance.mjs). Two drawn states of one XBase that differ only in a status band are one shape
         and a data status (SHAPE_DUPLICATE); a state a person leaves by a command renders a control for each
         command of the surface's FR (DRAW_ACTION_MISSING); the visible copy carries no internal ids or
@@ -739,10 +739,10 @@ proofs:
         badge binds a tone token and a success word binds the success tone (DRAW_BADGE_UNTONED); every part
         has a current ui-proof score with no failed case, each failure being critique addressed before the
         pass (DRAW_SCORE_BELOW)."
-    check: scripts/checks/draw-quality.mjs
+    check: scripts/work/draw/draw-quality.mjs
   - id: grammar-dna
     requirement:
-      en: "Every drawing composes only the Grammar's DNA (owner ruling 2026-09-27; scripts/checks/draw-dna.mjs, run
+      en: "Every drawing composes only the Grammar's DNA (owner ruling 2026-09-27; scripts/work/draw/draw-dna.mjs, run
         by draw-quality.mjs at settle): every visible element of every part's render source carries
         data-grammar-component naming a DNA component, data-grammar-part naming an anatomy part of an enclosing
         component, or data-grammar-proposal naming a complete grammar-proposal entry; a closed prop value stays
@@ -756,24 +756,24 @@ proofs:
         other than h-2 (8px) - h-1 (4px) when segmented - narrower than its band or cut into unequal / widely gapped segments is
         DRAW_METER_TRACK. Raster artwork with no data-asset-slot, or a slot its asset-request.md does not request,
         is DRAW_ASSET_SLOT_UNDECLARED."
-    check: scripts/checks/draw-dna.mjs
+    check: scripts/work/draw/draw-dna.mjs
   - id: layer-measure
     requirement:
-      en: "Layers and measure are knowledge, caught by the runtime (owner, 2026-09-28; scripts/checks/draw-layer.mjs,
+      en: "Layers and measure are knowledge, caught by the runtime (owner, 2026-09-28; scripts/work/draw/draw-layer.mjs,
         a draw-loop machine metric `layer`, so re-run at settle): every form control on a bounded surface (SurfaceCard,
         card, dialog, drawer) carries the nested variant=secondary - its data-grammar-variant, else its vendor
         <part>--secondary class - and a form region (fields plus a primary submit) stands in a Surface, never on the
         bare page Background (DRAW_NESTED_VARIANT; ANATOMY-2 case-1, case-3; Switch and Slider have no variant). A
         form region rendered wider than W-3xl (48rem) at any viewport is DRAW_MEASURE_UNCAPPED (MEASURE-4
         case-3/case-4: a drawn XBase owns its measure)."
-    check: scripts/checks/draw-layer.mjs
+    check: scripts/work/draw/draw-layer.mjs
   - id: taste
     requirement:
-      en: "The taste a machine can measure (scripts/checks/draw-taste.mjs, thresholds in runtimes.yaml
+      en: "The taste a machine can measure (scripts/work/draw/draw-taste.mjs, thresholds in runtimes.yaml
         allocation.drawLoop): the accent colour fills at most accentBudget of each part, the brand art band
         excluded (DRAW_ACCENT_BUDGET); a card splits into at most bandsPerCardMax bands (DRAW_TOO_MANY_BANDS); an
         entity carries at most badgesPerEntityMax badges (DRAW_TOO_MANY_BADGES)."
-    check: scripts/checks/draw-taste.mjs
+    check: scripts/work/draw/draw-taste.mjs
   - id: draw-loop
     requirement:
       en: "Every live part came out of the draw loop (scripts/work/draw-loop.mjs): its ui.assets entry carries

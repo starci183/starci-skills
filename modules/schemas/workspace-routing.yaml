@@ -21,7 +21,7 @@ rules:
     declared side folders, and both share that Work.
   - The app owns the one runtime ledger for both BE and FE workflow state, a runtime.sqlite under
     the host's LOCALAPPDATA StarCi/projects/<ledger_id> directory, keyed by the app's Work root
-    (engine/ledger-db.mjs ledgerFileFor, registered in the machine.sqlite ledgers table), never inside
+    (engine/db/ledger.mjs ledgerFileFor, registered in the machine.sqlite ledgers table), never inside
     .starciwork. The
     host registry is not project state; the host is an app only when its binding explicitly names it.
   - Tasks launched outside the host must receive its absolute project skill path and selected

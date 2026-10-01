@@ -91,7 +91,7 @@ reads:
     path: .starciwork/shell/index.yaml
     purpose:
       en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
-        (cited blobs, scripts/lib/blob-lookup.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
+        (cited blobs, engine/db/blob-lookup.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
     path: <app>/<bound-paths>
     purpose:
@@ -245,8 +245,8 @@ steps:
   - reads: [standard, knowledge]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/checks/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<họ của sản phẩm>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi token, cặp tông và luật tài sản mà bản ghi thương hiệu chốt đều dẫn mục grammar hoặc ui knowledge nó theo (cặp tông solid và soft của HeroUI, ngưỡng contrast-aa); giá trị mà grammar cấm là câu hỏi cho chủ sở hữu, không bao giờ ghi đè ngầm. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<họ của sản phẩm>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi token, cặp tông và luật tài sản mà bản ghi thương hiệu chốt đều dẫn mục grammar hoặc ui knowledge nó theo (cặp tông solid và soft của HeroUI, ngưỡng contrast-aa); giá trị mà grammar cấm là câu hỏi cho chủ sở hữu, không bao giờ ghi đè ngầm. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - target
       - owner
@@ -428,7 +428,7 @@ steps:
         soft floor) or an owner-receipted contrast exception, primary and danger are distinct unless the policy permits
         otherwise, every declared mascot asset exists
         with its recorded hash, and the icon set is the only one named; run `node
-        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
+        scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
         STARCI_JOB_SCRATCH/shell-conformance.txt, attached at api report. Bump `rev` and record what
         changed. Report `done` exactly once with the new `rev`, the checks and the token-to-source
         trace; a failing check is `failed` with its output; a value that cannot be traced to a
@@ -475,16 +475,16 @@ proofs:
         or accepted.
   - id: direction
     requirement:
-      en: "When the record carries `brand.direction`, `node scripts/checks/brand.mjs <work-root>` reports its
+      en: "When the record carries `brand.direction`, `node scripts/work/brand/brand.mjs <work-root>` reports its
         `direction` check pass: every required archetype field present, every recipe mapped onto a DNA component
         (else a pending grammar proposal), unique rubric checks with cites, golden renders on disk with their
         sha256, and every `accepted` archetype - and an accepted direction - backed by the owner's own
         starci/ask-answer@1 receipt for the direction rev and golden digests it names. An auto-recommended or
         delegate answer never accepts a direction."
-    check: scripts/checks/brand.mjs
+    check: scripts/work/brand/brand.mjs
   - id: shell-capture
     requirement:
-      en: "`node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written layout
+      en: "`node scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written layout
         tree: it is a work/layout-tree@1 record and done, a re-scan of app/ still matches its source digest,
         every visible layout has a slot-measured capture at desktop and mobile in the light theme (dark
         optional) on disk with its
@@ -492,8 +492,8 @@ proofs:
         productLocale default label and a route that lands on a page (a null route is a disabled
         destination), and every layout capture is painted in this record's colours (PALETTE_OFF_BRAND
         names a colour the brand does not declare, its area share and the nearest token;
-        scripts/checks/brand-palette.mjs). `starci validate --strict` compiles it against work/layout-tree@1."
-    check: scripts/checks/shell-conformance.mjs
+        scripts/work/brand/brand-palette.mjs). `starci validate --strict` compiles it against work/layout-tree@1."
+    check: scripts/work/ui/shell-conformance.mjs
   - id: checkpointed
     requirement:
       en: Every Work record file this operation wrote under its owned paths is committed by the runtime

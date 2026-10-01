@@ -7,7 +7,7 @@ concerns: [gc.sweep, gc.housekeeping]
 # How often the engine re-lists gc:sweep and gc:housekeeping; each key decides for itself whether it is due.
 resyncMs: 60000
 concurrency: 2
-# Housekeeping (scripts/supervisor/housekeeping.mjs --apply) every 24 h, and at once when host-resources reads lowDisk
+# Housekeeping (scripts/housekeeping/housekeeping.mjs --apply) every 24 h, and at once when host-resources reads lowDisk
 # or lowRam - at most once per lowResourceGapMs while the host stays low.
 housekeepingEveryMs: 86400000
 lowResourceGapMs: 3600000

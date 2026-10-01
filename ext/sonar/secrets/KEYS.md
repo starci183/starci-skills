@@ -9,7 +9,7 @@ SOPS/age ciphertext twins of the host-level SonarQube secrets, moved read-only f
 |---|---|---|
 | `sonarqube-db-password.txt.enc` | `secrets/sonarqube-db-password.txt` | `.env` (`SONARQUBE_DB_PASSWORD`) — the sonarqube-postgres role password |
 | `sonarqube-admin-password.txt.enc` | `secrets/sonarqube-admin-password.txt` | `compose.yaml` `sonarqube-bootstrap` mount (replaces the default admin password once) |
-| `sonarqube-admin-token.key.enc` | `secrets/sonarqube-admin-token.key` | `scripts/checks/sonar-local.mjs` — creates projects and mints per-project analysis tokens |
+| `sonarqube-admin-token.key.enc` | `secrets/sonarqube-admin-token.key` | `scripts/gates/sonar-local.mjs` — creates projects and mints per-project analysis tokens |
 | `sonarqube-analysis-token.txt.enc` | `secrets/sonarqube-analysis-token.txt` | `sonar-local.mjs` — the server-wide fallback analysis token |
 | `sonarqube-starci-todo-app-token.key.enc` | `secrets/sonarqube-starci-todo-app-token.key` | `sonar-local.mjs` — the PROJECT_ANALYSIS_TOKEN of the example app `examples/todo-app` (its declaration's analysis credential) |
 | `sonarqube-starci-ecommerce-app-token.key.enc` | `secrets/sonarqube-starci-ecommerce-app-token.key` | `sonar-local.mjs` — the PROJECT_ANALYSIS_TOKEN of the example app `examples/ecommerce-app` (its declaration's analysis credential) |
@@ -22,6 +22,6 @@ repository and have no stack-secret tool or recipient of their own, so their ana
 
 Decrypt one member: `sops -d secrets/<name>.enc > secrets/<name>` — the plaintext twin is gitignored
 and must never be committed. If a twin listed above is missing, the owner re-mints the secret
-(`scripts/checks/sonar-local.mjs` / the legacy `secret:gen` flow), encrypts it to the same recipient
+(`scripts/gates/sonar-local.mjs` / the legacy `secret:gen` flow), encrypts it to the same recipient
 (`sops -e --age age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j`), commits only the
 `.enc`, and applies the new value to the live server where the consumer reads it.

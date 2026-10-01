@@ -27,7 +27,7 @@ properties:
       it needs no feature segment and no name to tell it apart from a sibling it does not have.
   kind:
     const: brand
-    description: The node kind scripts/checks/brand.mjs resolves this record by. It is authored as well as
+    description: The node kind scripts/work/brand/brand.mjs resolves this record by. It is authored as well as
       implied by the schema const because that check reads the kind before it reads anything else, and a
       record it cannot recognise is one whose contrast and mascot rules never run.
   state:
@@ -95,7 +95,7 @@ properties:
                 items:
                   $ref: "#/$defs/contrastException"
                 description: The colour pairs the owner accepted below the contrast floor, one entry each.
-                  scripts/checks/brand.mjs contrast-aa passes a pair under its floor only through an entry
+                  scripts/work/brand/brand.mjs contrast-aa passes a pair under its floor only through an entry
                   here; every unlisted pair is still held to policy.minContrast, so the floor never drops to
                   the lowest accepted ratio.
       typography:
@@ -579,7 +579,7 @@ $defs:
             - kind
         description: Withdrawing content is a breaking change by definition - the record stops saying
           something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
-          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          accepted and quietly under-reported. It is the same rule scripts/work/validate/work-change.mjs runs as
           WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
   timestamp:
     type: string
@@ -911,7 +911,7 @@ $defs:
       - path
       - value
     description: "The external reference render a colour token's value was read from, for a token the app's
-      own theme has not written yet (interface.implement writes it later). scripts/checks/brand.mjs
+      own theme has not written yet (interface.implement writes it later). scripts/work/brand/brand.mjs
       tokens-match-source reads the reference - never writes it - and, at the decide stage, passes the token
       as planned-from-reference when the reference declares `token` in its default scope with exactly
       `value`, the value is the brand value and a declared sha256 still names the file. Once a declared
@@ -955,7 +955,7 @@ $defs:
       knowledge/ui, then the grammar DNA, then the brand record, then this block: where it contradicts one of
       them, the direction is wrong. It is a proposal until the owner accepts it in a brand-direction-review
       ask (scripts/work/brand-direction.mjs question/apply); an acceptance is the owner's only - an
-      auto-recommended answer never accepts it. scripts/checks/brand.mjs `direction` re-checks the shape, the
+      auto-recommended answer never accepts it. scripts/work/brand/brand.mjs `direction` re-checks the shape, the
       DNA mapping of every recipe, the owner receipt of every accepted archetype and the golden bytes."
     properties:
       rev:

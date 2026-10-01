@@ -1,4 +1,4 @@
-# The contract of `api logs` (scripts/kernel/api-verbs/logs.mjs). One file per extension verb
+# The contract of `api logs` (scripts/kernel/verbs/logs.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.logs (lane slim-04).
 purpose: >-
   The workflow's typed log rows, oldest first; the ledger's events are synced first.

@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { artifactRoot } from '../../../scripts/lib/artifact-store.mjs';
+import { artifactRoot } from '../../../engine/db/blob.mjs';
 import { attemptOpen, pipelineOf } from '../pipeline.mjs';
-import { getBlob } from '../../../scripts/lib/artifact-store.mjs';
+import { getBlob } from '../../../engine/db/blob.mjs';
 import { workflowStateOf } from '../../../scripts/kernel/progress-state.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
 import { uiState } from '../state.mjs';

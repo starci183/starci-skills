@@ -10,7 +10,7 @@
 //        [--checks-out <file>] [--json]
 //
 // The gates (names are the report.checks names):
-//   draw-acceptance   scripts/checks/draw-acceptance.mjs over the record dir and --files (what api settle judges:
+//   draw-acceptance   scripts/work/draw/draw-acceptance.mjs over the record dir and --files (what api settle judges:
 //                     token-rendered shapes of ui.shapes, no data status, draw quality, DNA, taste, rationale, the
 //                     loop). DRAW_NOT_OWNER_ACCEPTED is the owner gate, reported apart (owner-review), never a red gate.
 //   draw-metrics      scripts/work/draw-loop-settle.mjs: every live part re-rendered and re-measured by the runtime
@@ -18,24 +18,24 @@
 //                     skips it (it renders; the settle still runs it).
 //   validate-strict   bin/starci.mjs validate <ui dir> --strict: each refused record is named in `failing`; a refusal
 //                     in a child record outside the job's owned paths is attributed foreign by api check.
-//   shell-conformance scripts/checks/shell-conformance.mjs <ui dir>.
-//   draw-layer        scripts/checks/draw-layer.mjs over every live part (standard principles of every drawing, owner
+//   shell-conformance scripts/work/ui/shell-conformance.mjs <ui dir>.
+//   draw-layer        scripts/work/draw/draw-layer.mjs over every live part (standard principles of every drawing, owner
 //                     2026-09-28): DRAW_NESTED_VARIANT on its rendered DOM, DRAW_MEASURE_UNCAPPED on its record's
 //                     measured form regions (a record without the measure is re-measured by draw-metrics).
 //   draw-loop         every loop the live parts name has finished (loop.json outcome), and passed.
 // Exit 0 when every gate is green (the owner gate may still be owed: then file the draw-review ask), 1 when one is
 // red (fix it, or report blocked naming it - never pass), 2 usage.
 import fs from 'node:fs';
-import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
+import { loopFileOfRef, loopLabelOf } from './draw/draw-loop-coverage.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readJsonFile } from '../lib/json.mjs';
-import { drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
-import { livePartsOf } from '../checks/draw-loop-coverage.mjs';
+import { drawAcceptanceFindings } from './draw/draw-acceptance.mjs';
+import { livePartsOf } from './draw/draw-loop-coverage.mjs';
 import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
-import { layerFindingsForParts } from '../checks/draw-layer.mjs';
+import { layerFindingsForParts } from './draw/draw-layer.mjs';
 import { slash } from './work-io.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
@@ -82,7 +82,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const acc = drawAcceptanceFindings({ repo: root, files: bound });
   const owner = acc.findings.filter((f) => f.code === OWNER_GATE_CODE);
   const red = acc.findings.filter((f) => f.code !== OWNER_GATE_CODE);
-  gates.push({ name: 'draw-acceptance', command: cmd('scripts/checks/draw-acceptance.mjs', ['--repo', slash(root), '--files', bound.map((b) => rel(root, b)).join(',')]),
+  gates.push({ name: 'draw-acceptance', command: cmd('scripts/work/draw/draw-acceptance.mjs', ['--repo', slash(root), '--files', bound.map((b) => rel(root, b)).join(',')]),
     exitCode: red.length ? 1 : 0, codes: uniq(red.map((f) => f.code)).sort(), failing: uniq(red.map((f) => fileOf(f, recordFile))),
     evidence: red.length ? `${red.length} finding(s): ${red.slice(0, 6).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}` : `records ${acc.records.join(', ') || '(none)'} accepted by the machine gates`, findings: red.slice(0, 50) });
 
@@ -103,10 +103,10 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
     evidence: v.doc ? (refused.length ? `${refused.length} refusal(s): ${refused.slice(0, 5).map((r) => `${r.file} [${r.code}] ${r.message}`).join(' | ').slice(0, 1500)}` : 'strict validation: 0 refused') : `validate did not answer JSON: ${v.stderr.slice(0, 400)}` });
 
   // 4. shell-conformance.
-  const s = runners.shell ? await runners.shell(uiDir, root) : spawnJson('scripts/checks/shell-conformance.mjs', [slash(uiDir), '--json'], root);
+  const s = runners.shell ? await runners.shell(uiDir, root) : spawnJson('scripts/work/ui/shell-conformance.mjs', [slash(uiDir), '--json'], root);
   const sFindings = [...(s.doc?.refused ?? []), ...(s.doc?.findings ?? []).filter((f) => f?.level === 'refuse')];
   const sCode = (f) => (typeof f === 'string' ? /\[([A-Z0-9_]+)\]/.exec(f)?.[1] : f?.code) ?? null;
-  gates.push({ name: 'shell-conformance', command: cmd('scripts/checks/shell-conformance.mjs', [uiRel, '--json']),
+  gates.push({ name: 'shell-conformance', command: cmd('scripts/work/ui/shell-conformance.mjs', [uiRel, '--json']),
     exitCode: s.doc ? (s.doc.ok === false ? 1 : 0) : (s.exitCode || 2), codes: uniq(sFindings.map(sCode)).sort(), failing: s.doc?.ok === false ? [recordFile] : [],
     evidence: s.doc ? (s.doc.ok === false ? `${sFindings.length} refusal(s): ${sFindings.slice(0, 5).map((f) => (typeof f === 'string' ? f : `[${f.code}] ${f.message ?? f.detail ?? ''}`)).join(' | ').slice(0, 1500)}` : 'shell conformance: 0 refused') : `shell-conformance did not answer JSON: ${s.stderr.slice(0, 400)}` });
 
@@ -118,7 +118,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const layer = runners.layer ? await runners.layer(layerParts) : await layerFindingsForParts(layerParts);
   const layerRed = layer.filter((r) => r.findings.length);
   const layerFindings = layerRed.flatMap((r) => r.findings.map((f) => ({ ...f, path: rel(root, r.part) })));
-  gates.push({ name: 'draw-layer', command: cmd('scripts/checks/draw-layer.mjs', [uiRel, '--playwright', '<product dir>']),
+  gates.push({ name: 'draw-layer', command: cmd('scripts/work/draw/draw-layer.mjs', [uiRel, '--playwright', '<product dir>']),
     exitCode: layerFindings.length ? 1 : 0, codes: uniq(layerFindings.map((f) => f.code)).sort(), failing: uniq(layerFindings.map((f) => fileOf(f, recordFile))),
     evidence: layerFindings.length ? `${layerFindings.length} finding(s): ${layerFindings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}`
       : `${layer.length} live part(s): every form control on a surface nested, every form region capped${layer.some((r) => !r.forms) ? ` (${layer.filter((r) => !r.forms).length} without a recorded measure; draw-metrics re-measures)` : ''}`, findings: layerFindings.slice(0, 50) });

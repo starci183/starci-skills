@@ -1,6 +1,6 @@
 # Architecture check
 
-`scripts/checks/architecture.mjs` (`checkArchitecture`) is a read-only
+`scripts/hfs/architecture.mjs` (`checkArchitecture`) is a read-only
 HFS tree, TypeScript dependency, and source-shape check of one side of an app (`be/` or `fe/`). It resolves
 the checked side's manifests (and the app root's one `package.json` and install), `tsconfig` aliases, relative paths, workspace/file
 packages, declared exports, re-export barrels, static `import()` calls, and
@@ -11,20 +11,20 @@ It runs inside `hfs lint` (the ESLint canon's project-graph rules and `hfs check
 slice's changed files:
 
 ```sh
-node scripts/checks/gate.mjs --root <app> --changed <files...>
+node scripts/gates/gate.mjs --root <app> --changed <files...>
 ```
 
 on its own:
 
 ```sh
-node scripts/checks/architecture.mjs <app>/be [--base <commit>]
-node scripts/checks/architecture.mjs <app>/fe [--base <commit>]
+node scripts/hfs/architecture.mjs <app>/be [--base <commit>]
+node scripts/hfs/architecture.mjs <app>/fe [--base <commit>]
 ```
 
 and programmatically via `checkArchitecture({ repositoryRoot, base })`
-from `scripts/checks/architecture.mjs`.
+from `scripts/hfs/architecture.mjs`.
 
-The checker is the HFS architecture machine: it is driven by the app root's `hfs.json` (the side's view of it) and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/lib/hfs-slots.mjs`). An app carries only `hfs.json`; owners, roots and tiers are derived from slots, and a side imports nothing of the app outside itself except the declared `sides.fe.reads` (`ARCH_INTERNAL_IMPORT_OUTSIDE`). `hfs check` runs it over each side folder. See the HFS machine section below.
+The checker is the HFS architecture machine: it is driven by the app root's `hfs.json` (the side's view of it) and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/hfs/slots.mjs`). An app carries only `hfs.json`; owners, roots and tiers are derived from slots, and a side imports nothing of the app outside itself except the declared `sides.fe.reads` (`ARCH_INTERNAL_IMPORT_OUTSIDE`). `hfs check` runs it over each side folder. See the HFS machine section below.
 
 The check produces one `starci/architecture-check@1` JSON object. Exit code
 `0` means `ok: true`; exit code `1` means the record contains violations or
@@ -112,7 +112,7 @@ Slots, tiers and required files come from `knowledge/hfs/slots.yaml`; the app on
 
 An example is a directory of the runtime clone, not a Git work tree of its own. The machine judges what the given repository root owns: when `git rev-parse --show-toplevel` is not that root (or there is no work tree), `HFS_HOOKS_PATH_REDIRECTED` reports `coverage.hfs.hooksPath.status` as `not-applicable` (a nested directory has no hooks of its own, and the enclosing clone's `core.hooksPath` is not its business), and `HFS_ROOT_ENTRY_FORBIDDEN` lists only the tracked paths under the given root. There is no option, environment variable or allowlist for this.
 
-The backend composition and data checks (`scripts/checks/architecture/{connection-map,sql-owner,register-once,error-masked,default-deny,entrypoint,error-codes,feature-shape,unit-spec-providers,injection-token-exported,schema-owner,module-per-transport,background-unowned}.mjs`, sharing the reading kit `machine-ast.mjs`) run for the `be/` side only; each recognises a framework symbol by the package it is imported from and a capability by the file that declares it, never by a variable name. Their coverage is `coverage.hfsMachine.<name>`.
+The backend composition and data checks (`scripts/hfs/architecture/{connection-map,sql-owner,register-once,error-masked,default-deny,entrypoint,error-codes,feature-shape,unit-spec-providers,injection-token-exported,schema-owner,module-per-transport,background-unowned}.mjs`, sharing the reading kit `machine-ast.mjs`) run for the `be/` side only; each recognises a framework symbol by the package it is imported from and a capability by the file that declares it, never by a variable name. Their coverage is `coverage.hfsMachine.<name>`.
 
 8. **Connection map** (`BE_CONNECTION_DUPLICATE`, R84, `connection-map`): every `hfs.json` connection has `src/modules/platform/database/<name>.connection.ts` exporting `<NAME>_CONNECTION = "<name>"`, `<name>.decorators.ts` exporting `Inject<Pascal>EntityManager` and `<name>.config.ts` reading only `<ENVPREFIX>_*` keys; a connection file for an undeclared name, a `getEntityManagerToken(` or `InjectEntityManager(` call (argument resolved through the checker) outside the decorators file of its connection, a second call in that file, an exported `Inject*EntityManager` anywhere else, and a `getDataSourceToken(` or `InjectDataSource(` outside platform/database, the migrate app and the test fixtures are refused; an app passes each connection to the platform/database module registration once; in every `.starcistacks/<env>/runtime/env` two connections whose host, port and database (`<PREFIX>_NAME`, or `<PREFIX>_DATABASE` when the config reads it) coincide are one database. An env without values for a connection is skipped and counted (`stacksSkipped`).
 9. **SQL owner and bounds** (`BE_SQL_TABLE_OWNER`, R86, `sql-owner`): the `sql` tagged templates (tag declared in platform/database) of `<name>.sql.ts` in a capability's `persistence/` are read with a small tokenizer (`sql-tokens.mjs`; comments and strings stripped). A write (`INSERT INTO`, `UPDATE`, `DELETE FROM`, `MERGE INTO`, `TRUNCATE`) must name a table of an `@Entity("<table>")` in the same capability; a read (`FROM`, `JOIN`, `USING`, comma lists) must name a table of an owner the file's owner may import (`importAllowed` to that owner's entry); every table must be declared by some entity; a multi-row `SELECT` needs `LIMIT`, an `=` on every column of the primary key or of one unique key of its first table, or only aggregates without `GROUP BY`. A `${...}` in a table position is dynamic and only counted; joined tables do not extend the key bound.
@@ -128,7 +128,7 @@ The backend composition and data checks (`scripts/checks/architecture/{connectio
 19. **Module per transport** (`BE_MODULE_SHAPE`, R45, `module-per-transport`): one `<f>-<protocol>.module.ts` per transport folder and nothing else that is a module there, no module-definition and no `@Module`/`ConfigurableModuleBuilder` outside `<f>.module.ts` and the transport module in a feature; an app root lists only transport modules, of the kinds the `composedBy` list of the transport slot allows for the app kind (api: graphql, http, websocket; worker: schedule, message; cli: cli).
 20. **Background unowned** (`BE_BACKGROUND_UNOWNED`, R46, `background-unowned`): every `*.job.ts` and `*.consumer.ts` is reachable, through runtime imports, from the root module of a `worker` app; `@Cron`, `@Interval`, `@Timeout` (from `@nestjs/schedule`) and `setInterval` exist only in `platform/scheduling`; a method named `sweep`, `deliver`, `reconcile` or `retry` (alone or as the first camelCase word) in a feature, domain or integrations class is reachable from a composed job or consumer (its imports, and the files of the feature that holds it, whose handlers the command bus registers). Reachability is static.
 
-The front-end checks (`scripts/checks/architecture/{transport-owner,route-files-thin,hooks-are-hooks,package-shape,fe-slot-allows,client-reaches-server,cross-app-duplicate}.mjs`) run for the `fe/` side only; their coverage is `coverage.hfsMachine.<name>`.
+The front-end checks (`scripts/hfs/architecture/{transport-owner,route-files-thin,hooks-are-hooks,package-shape,fe-slot-allows,client-reaches-server,cross-app-duplicate}.mjs`) run for the `fe/` side only; their coverage is `coverage.hfsMachine.<name>`.
 
 21. **Transport owner** (`FE_TRANSPORT_OWNER`, R50, `transport-owner`): a repository has exactly one transport client and one `Outcome` union, named by slot: the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the apps share it, or the only app's (`fe.transport.client`, `fe.transport.outcome`) when the repository declares one app. Two clients or two unions (two apps each keeping one, a package one plus an app one), and an app client or union in a repository of several apps, are findings on every copy. The client calls the global `fetch`; no other file references it (a call, `globalThis.fetch`, an alias, a value passed to another function), and with no client at all any such reference is a finding; no file imports an HTTP library (static import, `import()`, `require()`); every `modules/api/<domain>/read-*.ts` imports the client or the api package. The eslint rules judge the spelling of a call in one file; this judges what the checker resolves.
 22. **Route files thin** (`FE_ROUTE_FILES_THIN`, R54, `route-files-thin`): a `layout`, `template`, `loading` or `not-found` route file draws no host element, declares no inline component and mounts exactly one feature owner (a package shell may wrap it); every route file, `page` included, calls no hook. The page mount and redirect rules stay `FE_ROUTE_ONE_PAGE`, `FE_ROUTE_DRAWING_DECISION`, `FE_ROUTE_CLIENT_BOUNDARY`, `FE_ROUTE_CLIENT_HOOK`.

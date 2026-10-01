@@ -62,7 +62,7 @@ codes:
   ENDED_WITH_LIVE_WORK:     {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the live jobs and terminals of an ended workflow'}
   # ---- Kernel seat (§9.4), Supervisor seat (§9.5), host services (§8.4, §9.7): the host controller (lane rc-host).
   SEAT_VACANT:              {slaMs: 180000, severity: warn, owner: host-controller, autoAction: 'reserve and start the seat'}
-  SEAT_START_STUCK:         {slaMs: 180000, source: scripts/supervisor/home.mjs STARTUP_RESERVATION_MS, severity: warn, owner: host-controller, autoAction: 'replace the reservation'}
+  SEAT_START_STUCK:         {slaMs: 180000, source: scripts/machine/home.mjs STARTUP_RESERVATION_MS, severity: warn, owner: host-controller, autoAction: 'replace the reservation'}
   SEAT_QUARANTINED:         {slaMs: 1800000, severity: critical, owner: supervisor, autoAction: 'seat-unrecoverable DI; the owner when twice'}
   SEAT_DEAF:                {slaMs: 900000, severity: warn, owner: host-controller, autoAction: 'MB-05: the seat refused input (unwritable/exited/unavailable/wake-failed); the Supervisor watchdog replaces it at 3 in a row (watchdog.mjs SEAT_DEAF_MAX)'}
   DUPLICATE_SEAT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'INV-H4: close the duplicate (check-orca-tree DUPLICATE_KERNEL)'}

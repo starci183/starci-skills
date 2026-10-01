@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { loadContractFreeze } from '../kernel/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
 

@@ -36,7 +36,7 @@ schemas:
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
       - scripts/checks/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
-      - scripts/checks/check-work-consistency.mjs, scripts/example/work-example.mjs
+      - scripts/work/validate/check-work-consistency.mjs, scripts/example/work-example.mjs
     business:
       question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
       whenNeeded: Before any gate that walks Work records, and whenever a workflow creates a new node/family folder.
@@ -52,7 +52,7 @@ schemas:
     subsystem: work-tree
     governs: "The tree's own identity record — which project and which repositories this .starciwork serves."
     binds: .starciwork/workspace.yaml
-    usedBy: [scripts/checks/check-work-artifacts.mjs (record walk), scripts/checks/check-work-consistency.mjs]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs (record walk), scripts/work/validate/check-work-consistency.mjs]
     business:
       question: "Which project does this Work tree belong to, and which repos serve it?"
       whenNeeded: Once per workspace — project identity lives here so no .starciwork/<project>/ wrapper directory exists.
@@ -65,7 +65,7 @@ schemas:
     subsystem: work-tree
     governs: "The product catalog — the one place that says which features exist and where their records live."
     binds: .starciwork/index.yaml
-    usedBy: [scripts/checks/check-work-artifacts.mjs (parent records may not author state)]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs (parent records may not author state)]
     business:
       question: "What features does this product have?"
       whenNeeded: Reading or adding a feature; it is the tree's directory.
@@ -78,7 +78,7 @@ schemas:
     subsystem: work-tree
     governs: "A feature's own record — names the feature; every rule/requirement/screen/impl/flow lives under its directory."
     binds: .starciwork/features/<feature>/index.yaml
-    usedBy: [scripts/checks/check-work-artifacts.mjs]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs]
     business:
       question: "What is this feature about, and where does its work hang?"
       whenNeeded: Creating a feature; locating a feature's records.
@@ -107,9 +107,9 @@ schemas:
     usedBy:
       - "scripts/work/layout-tree.mjs (scan, convert, capture, plan - the record is generated, never hand-listed)"
       - "scripts/work/compose-direction.mjs (the layout capture and slot a direction is composited into)"
-      - "scripts/checks/shell-conformance.mjs (the record, each ui record's route/surface/ancestors/composites, an implementation's app/ files)"
+      - "scripts/work/ui/shell-conformance.mjs (the record, each ui record's route/surface/ancestors/composites, an implementation's app/ files)"
       - "scripts/kernel/prerequisites.mjs (dispatch refuses a draw under an unsettled layout)"
-      - "scripts/checks/work-validate.mjs (ui record findings, legacy ones as suspects)"
+      - "scripts/work/validate/work-validate.mjs (ui record findings, legacy ones as suspects)"
       - "scripts/kernel/product-locale.mjs (the packet's product_locale)"
     business:
       question: "Which layouts, with what chrome, navigation, language and demo personas, does every route of this product sit inside?"
@@ -124,7 +124,7 @@ schemas:
     governs: "One business rule — true whatever screen or endpoint it surfaces on; owns appliesTo/module/blockedBy."
     binds: .starciwork/features/<feature>/br/<name>/index.yaml
     usedBy:
-      - scripts/checks/check-work-consistency.mjs (reads its $defs.state enum to refuse invented states; additionalProperties:false, NO requiresProof)
+      - scripts/work/validate/check-work-consistency.mjs (reads its $defs.state enum to refuse invented states; additionalProperties:false, NO requiresProof)
     business:
       question: "What must be true of the product regardless of where it is implemented?"
       whenNeeded: SRS/business definition; the rule is the unit of work its acceptance criteria prove.
@@ -137,7 +137,7 @@ schemas:
     subsystem: work-tree
     governs: "One checkable consequence of a business rule, given/when/then — the unit of proof, not of work."
     binds: .starciwork/features/<feature>/br/<rule>/ac/<name>/index.yaml (nested under its rule)
-    usedBy: [scripts/checks/check-work-consistency.mjs (rule lists criterion id tails)]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs (rule lists criterion id tails)]
     business:
       question: "How would anyone tell whether this rule holds?"
       whenNeeded: Whenever a business rule needs observable proof.
@@ -150,7 +150,7 @@ schemas:
     subsystem: work-tree
     governs: "One thing a person can do with the product end to end; authors requiresProof."
     binds: .starciwork/features/<feature>/fr/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS member — done requires declared proof)]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS member — done requires declared proof)]
     business:
       question: "What can a user actually do, and what would prove it works?"
       whenNeeded: Capability-level SRS decomposition before implementation.
@@ -163,7 +163,7 @@ schemas:
     subsystem: work-tree
     governs: "A quality the product must hold — speed, safety, availability — expressed so it can be checked; requiresProof."
     binds: .starciwork/features/<feature>/nfr/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
     business:
       question: "What quality bar does this capability sit under, and who checked it?"
       whenNeeded: NFRs attached to features; a done nfr needs observed proof like an fr.
@@ -176,7 +176,7 @@ schemas:
     subsystem: work-tree
     governs: "What a person does in order across however many features it takes — steps phrased as the person's actions and expectations; requiresProof."
     binds: .starciwork/features/<feature>/journey/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
     business:
       question: "Is the product usable end to end, not just feature-correct?"
       whenNeeded: Cross-feature flows (e.g. landing->shop sign-in); one accountable feature owns even shared journeys.
@@ -189,7 +189,7 @@ schemas:
     subsystem: work-tree
     governs: "An unanswered product question written down as a record (tension.records names the disagreeing sides)."
     binds: .starciwork/features/<feature>/decision/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-consistency.mjs (two done records may not leave the tension open)]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs (two done records may not leave the tension open)]
     business:
       question: "Where does the unresolved business question live so it cannot be silently dropped?"
       whenNeeded: When business alternatives conflict and the owner must decide — the record IS the open question.
@@ -202,7 +202,7 @@ schemas:
     subsystem: work-tree
     governs: "One thing the product stores, in product terms: field list PLUS invariants true of every instance forever."
     binds: .starciwork/features/<feature>/data/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-consistency.mjs]
+    usedBy: [scripts/work/validate/check-work-consistency.mjs]
     business:
       question: "What does the product remember, and what promises does that memory keep?"
       whenNeeded: Business/data modeling; invariants are what rules depend on and refactors break.
@@ -216,7 +216,7 @@ schemas:
     governs: "One piece of intended technical design — responsibilities and allowed dependencies; a done one must name owners [{role,path}] whose paths are module-root directories that exist; requiresProof."
     binds: .starciwork/features/<feature>/sds/<name>/index.yaml
     usedBy:
-      - scripts/checks/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS; owners/module-root rule)
+      - scripts/work/validate/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS; owners/module-root rule)
       - work-layout shape note (todo without owners = warn, done without owners = refuse)
     business:
       question: "What is the intended design, component by component, and which real module owns each piece?"
@@ -243,7 +243,7 @@ schemas:
     subsystem: work-tree
     governs: "A module of real code where it actually lives, the records it `proves`, a pinned revision, and verificationSource (kernel-observed vs hand-written)."
     binds: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
-    usedBy: [scripts/checks/check-work-artifacts.mjs, check-work-consistency.mjs (proves-edge records exempt from requiresProof — proof is outbound)]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs, check-work-consistency.mjs (proves-edge records exempt from requiresProof — proof is outbound)]
     business:
       question: "Which real code claims to realise which records — and was that verification observed or asserted?"
       whenNeeded: implement-backend/frontend lanes; the only family reaching out of the tree into a repo, so it pins a commit.
@@ -256,7 +256,7 @@ schemas:
     subsystem: work-tree
     governs: "A walk performed against the RUNNING product — steps a person can follow; `proves` is the authored forward edge to demonstrated records."
     binds: .starciwork/features/<feature>/uat/<name>/index.yaml (+ runs/, captures)
-    usedBy: [scripts/checks/check-work-artifacts.mjs (accounts cross-check vs work/disposable-accounts@1)]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs (accounts cross-check vs work/disposable-accounts@1)]
     business:
       question: "What observable walk proves the product behaves — against a live system, not a unit test?"
       whenNeeded: verify-flows / browser UAT; observes behaviour rather than asserting it.
@@ -269,7 +269,7 @@ schemas:
     subsystem: work-tree
     governs: "Synthetic sign-in identities collocated with the uat-flow that uses them — a record whose whole purpose is a prohibition."
     binds: .starciwork/features/<feature>/uat/<flow>/accounts.yaml
-    usedBy: [scripts/checks/check-work-artifacts.mjs (uat-flow.accounts must resolve to this fixture)]
+    usedBy: [scripts/work/validate/check-work-artifacts.mjs (uat-flow.accounts must resolve to this fixture)]
     business:
       question: "Which throwaway identities may a UAT walk sign in with?"
       whenNeeded: Any UAT flow needing auth — a walk needing a real person's credentials is a walk nobody repeats.
@@ -321,7 +321,7 @@ schemas:
     subsystem: work-tree
     governs: "One external system, its endpoints, the boundary each side owns, and the credential NAMED not carried — done only through a run whose evidence carries proof {boundary: live, fakes: []}."
     binds: .starciwork/features/<feature>/integration/<id>/index.yaml
-    usedBy: [scripts/checks/check-evidence-binding.mjs (live-boundary proof), work-layout rule — a declared extensions.work3.integrations edge owes exactly one record]
+    usedBy: [scripts/work/validate/check-evidence-binding.mjs (live-boundary proof), work-layout rule — a declared extensions.work3.integrations edge owes exactly one record]
     business:
       question: "What outside this product does it depend on, and has anyone actually reached it?"
       whenNeeded: Every declared external dependency; the id matches the declaration by string equality.
@@ -536,7 +536,7 @@ schemas:
     subsystem: host
     governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries. The document carries the schema const itself."
     binds: modules/host/orca/calls.yaml (the contract document)
-    usedBy: [scripts/api/orca/ (call sites need calls.schema==='starci/orca-calls@1'; live agent-context compare), scripts/checks/providers.mjs (envelope must emit starci/orca-call-result@1)]
+    usedBy: [scripts/api/orca/ (call sites need calls.schema==='starci/orca-calls@1'; live agent-context compare), scripts/checks/check-providers.mjs (envelope must emit starci/orca-call-result@1)]
     business:
       question: "Which Orca commands may the runtime issue, with what envelope, and what happens when live Orca disagrees?"
       whenNeeded: Before ANY Orca effect — provider calls come only from this contract + live discovery; never inferred from prose or another provider.
@@ -570,7 +570,7 @@ schemas:
     subsystem: stacks
     governs: "The .starcistacks TREE contract — root <repo>/.starcistacks, declaration application-stacks.yaml, environment-name-as-directory identity, required/refused files, runbook's seven commands (prepare/doctor/up/status/logs/down/verification), rendered-vs-authored distinction."
     binds: <repo>/.starcistacks/**
-    usedBy: [docs/application-stacks.md (checker shares its read-only findings), scripts/checks/stacks.mjs]
+    usedBy: [docs/application-stacks.md (checker shares its read-only findings), scripts/gates/stacks-gate.mjs]
     business:
       question: "Which directories/files must a stack tree have — and which are refused?"
       whenNeeded: Stack declaration/deploy lanes; it governs the tree while application-stacks.schema.yaml governs the manifest CONTENT — confusing the two is why three incompatible .starcistacks trees existed.
@@ -583,7 +583,7 @@ schemas:
     subsystem: stacks
     governs: "Manifest CONTENT — sources, components, environments, k8s posture, and the services block (sonar, container-registry, analytics, error-tracking: provider, mode, host, stack, projects, custody credentials, CI wiring, ownerAction); static repository-owned inventory for reproducible environments; strict subset of what the layout's kit uses."
     binds: <repo>/.starcistacks/application-stacks.yaml
-    usedBy: [scripts/checks/stacks.mjs (loads the source yaml schema), scripts/checks/check-starcistacks.mjs (services block, custody layout, owner-ask guard), docs/application-stacks.md]
+    usedBy: [scripts/gates/stacks-gate.mjs (loads the source yaml schema), scripts/gates/starcistacks.mjs (services block, custody layout, owner-ask guard), docs/application-stacks.md]
     business:
       question: "Is this stack declaration structurally complete — components, environments, custody, runbook?"
       whenNeeded: Validating a stack manifest before deploy work; declares intent, never proves a stack ran.
@@ -656,12 +656,12 @@ schemas:
     subsystem: gate
     governs: "The HFS slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles app/be/fe, path pattern, presence, tracked, tier, requires, tests, budget), the two sides of an app and what each may read of the other, the app kinds and the tier direction matrix."
     binds: knowledge/hfs/slots.yaml
-    usedBy: [scripts/lib/hfs-slots.mjs (loadSlotManifest re-states this shape without ajv; tests/hfs-slots.spec.mjs proves the two agree)]
+    usedBy: [scripts/hfs/slots.mjs (loadSlotManifest re-states this shape without ajv; tests/hfs/hfs-slots.spec.mjs proves the two agree)]
     business:
       question: "What may exist in a product repository, where, and what may import what?"
       whenNeeded: Every HFS check, lint factory and template that needs a path, tier or required file.
       whenNot: Not per-repository - an app declares itself in hfs.json (urn:starci:hfs-repo:2) and never edits the manifest.
-      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
+      selectedBy: scripts/hfs/slots.mjs; owner-approved HFS decisions.
 
   - id: urn:starci:hfs-rules:2
     file: modules/schemas/hfs-rules.schema.yaml
@@ -669,12 +669,12 @@ schemas:
     subsystem: gate
     governs: "The HFS rule catalog knowledge/hfs/rules.yaml - the 77 rules R01-R77 with their finding code, Vietnamese title, gates, failure codes and enforcers (eslint rule ids, architecture machine, hfs, stylelint, sonar and work-validate checks)."
     binds: knowledge/hfs/rules.yaml
-    usedBy: [scripts/lib/hfs-slots.mjs (loadRuleCatalog re-states this shape without ajv; tests/hfs-rules.spec.mjs proves the two agree), scripts/checks/check-hfs-rules.mjs]
+    usedBy: [scripts/hfs/slots.mjs (loadRuleCatalog re-states this shape without ajv; tests/checks/hfs-rules.spec.mjs proves the two agree), scripts/checks/check-hfs-rules.mjs]
     business:
       question: "Which rule is enforced by what, at which gate, and what does its failure say?"
       whenNeeded: Any check, lint factory or gate that needs to know the enforcers, gates or failure codes of an HFS rule.
       whenNot: Not per-repository - a repository never edits the catalog and switches no rule off.
-      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
+      selectedBy: scripts/hfs/slots.mjs; owner-approved HFS decisions.
 
   - id: urn:starci:hfs-repo:2
     file: modules/schemas/hfs-repo.schema.yaml
@@ -682,12 +682,12 @@ schemas:
     subsystem: gate
     governs: "The app-root hfs.json - pinned manifest major, kind app, project, and per side (be, fe) the apps with kinds, opt-in slots used, database connections (be) and the other side's paths it reads."
     binds: <app>/hfs.json
-    usedBy: [scripts/lib/hfs-slots.mjs (resolveRepoDeclaration, readRepoDeclaration)]
+    usedBy: [scripts/hfs/slots.mjs (resolveRepoDeclaration, readRepoDeclaration)]
     business:
       question: "Which HFS does this app follow, which apps does each side hold and which optional slots does it use?"
       whenNeeded: Any check that has to know a repository's apps, connections or enabled slots.
       whenNot: Lists no owners, paths or switched-off rules - owners are derived from slots.
-      selectedBy: scripts/lib/hfs-slots.mjs.
+      selectedBy: scripts/hfs/slots.mjs.
 
   - id: starci/code-pattern-profile@1
     file: modules/schemas/code-pattern-profile.schema.yaml
@@ -695,7 +695,7 @@ schemas:
     subsystem: gate
     governs: "The profile registry for pattern checks — required profiles nest + next, each declaring its rule set (per #/$defs/profile)."
     binds: code-pattern profile declarations
-    usedBy: [scripts/checks/canon-scan.mjs (profiles.<profile>.canon), scripts/checks/check-hfs-rules.mjs (expectedSourceRuleIds parity)]
+    usedBy: [scripts/gates/canon-scan.mjs (profiles.<profile>.canon), scripts/checks/check-hfs-rules.mjs (expectedSourceRuleIds parity)]
     business:
       question: "Which mechanical rules apply to THIS repository's framework?"
       whenNeeded: Before a pattern check runs — the profile picks the nest/next rule set.
@@ -708,12 +708,12 @@ schemas:
     subsystem: gate
     governs: "The runtime peers a driver integration needs and npm does not install for it: when an app depends on every package of a pair (at the named major), its app root package.json declares the pair's peer in its dependencies."
     binds: knowledge/hfs/peer-integrations.yaml
-    usedBy: [scripts/lib/hfs-rules/peer-integrations.mjs]
+    usedBy: [scripts/hfs/rules/peer-integrations.mjs]
     business:
       question: "Which runtime peer must an app declare for a driver integration it uses?"
       whenNeeded: Judging an app root package.json in hfs check (R111), or adding a pair after a boot failure of the same kind.
       whenNot: Not a pin list and not a statement that an app boots; it names the peer, hfs check proves the declaration.
-      selectedBy: hfs check reads it through scripts/lib/hfs-rules/peer-integrations.mjs.
+      selectedBy: hfs check reads it through scripts/hfs/rules/peer-integrations.mjs.
 
   - id: starci/canon-pins@1
     file: modules/schemas/canon-pins.schema.yaml
@@ -796,7 +796,7 @@ schemas:
     subsystem: model
     governs: "The model/runtime registry contract — runtimes[], aliases, executionModel, defaults, targets, skills, operators, fallback."
     binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
-    usedBy: [scripts/checks/providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
+    usedBy: [scripts/checks/check-providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:
       question: "Which runtimes/agents exist, what can each run, and what is the fallback order?"
       whenNeeded: Before creating execution agents — load the registry catalog tree first, fail closed on disagreement.
@@ -869,7 +869,7 @@ moduleLocalDocumentKinds:
     governs: "The frozen op families and gate paths used to batch contract changes for running workflows."
     files: [modules/kernel/contract-freeze.yaml]
   - id: starci/owner-rulings@1
-    governs: "The owner's standing rulings by stable id, cited as owner:<id> by a drawing's rationale (scripts/checks/draw-rationale.mjs)."
+    governs: "The owner's standing rulings by stable id, cited as owner:<id> by a drawing's rationale (scripts/work/draw/draw-rationale.mjs)."
     files: [modules/kernel/owner-rulings.yaml]
   - id: starci/op-labels@1
     governs: "The human name (vi/en) of every operation; op ids stay the key (scripts/lib/display-names.mjs opLabel)."
@@ -891,7 +891,7 @@ moduleLocalDocumentKinds:
     governs: "Cross-workflow dependency findings and Supervisor bridging actions."
     files: [modules/supervisor/bridging.yaml]
   - id: starci/supervisor-lessons@1
-    governs: "Lessons exported from machine.sqlite sup_learning; generated by scripts/supervisor/lessons.mjs."
+    governs: "Lessons exported from machine.sqlite sup_learning; generated by scripts/machine/lessons.mjs."
     files: [modules/supervisor/lessons.yaml]
 
   # --- reconciler -----------------------------------------------------------
@@ -933,7 +933,7 @@ moduleLocalDocumentKinds:
     governs: "Which model may take which workload — qualification, probation, ordering."
     files: [modules/models/selection.yaml]
   - id: starci/canon-conformance@1
-    governs: "The units, waves and shared seams scripts/checks/canon-scan.mjs cuts a canon-conformance cleanup by."
+    governs: "The units, waves and shared seams scripts/gates/canon-scan.mjs cuts a canon-conformance cleanup by."
     files: [modules/models/canon-conformance.yaml]
   - id: starci/module-model-profile@1
     governs: "One routing/capability target: identity, capacity cache, launch shape, position."
@@ -944,7 +944,7 @@ moduleLocalDocumentKinds:
       - modules/models/profiles/gpt-6-luna.yaml
       - modules/models/profiles/gpt-6-sol.yaml
   - id: starci/agent-card@1
-    governs: "One agent's spawn contract. Enforced by scripts/checks/providers.mjs (schema id, agent == file stem) and tests/provider-orca.spec.mjs."
+    governs: "One agent's spawn contract. Enforced by scripts/checks/check-providers.mjs (schema id, agent == file stem) and tests/repo/provider-orca.spec.mjs."
     files:
       - modules/models/agents/claude.yaml
       - modules/models/agents/codex.yaml

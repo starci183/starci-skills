@@ -32,7 +32,7 @@ import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
-import { kernelSignalRows, ledgerJobs, jobTerminalHandles, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
+import { kernelSignalRows, ledgerJobs, jobTerminalHandles, pathUnder, WORKER_HOLDING_STATUSES } from '../machine/terminal-ledger.mjs';
 
 // A StarCi title or frame: [Kernel]/[Op] names, an operation job id
 // (op-backend.implement-ed43628b07).

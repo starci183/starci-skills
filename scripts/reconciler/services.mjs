@@ -12,7 +12,7 @@
 // (whose service port must equal that port: a mismatch is a probe failure, `port-drift`), the ask-gateway port from
 // config.yaml connectors.gateway.port.
 //
-// The state machine of DESIGN 9.7 is stepService (pure); its rows live in machine.sqlite (engine/machine-db.mjs, DBTREE
+// The state machine of DESIGN 9.7 is stepService (pure); its rows live in machine.sqlite (engine/db/machine.mjs, DBTREE
 // B3): one `services` row per name (state: the coarse DBTREE state; the record's own state and fields in
 // last_probe_json), every transition and every restart appended to `service_events` (the restarts of a record are its
 // `restart` events: no restarts_json), every probe to `service_probes`. The same table also holds the Host
@@ -33,7 +33,7 @@ import path from 'node:path';
 import { execFile, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine } from '../../engine/machine-db.mjs';
+import { openMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -521,7 +521,7 @@ export function seatAgentOf(entry, screen = '', fallback = null) {
 export async function turnProbe({ terminal = null, supervisor = false } = {}) {
   let handle = terminal;
   if (!handle && supervisor) {
-    const home = await import('../supervisor/home.mjs');
+    const home = await import('../machine/home.mjs');
     handle = home.readSupervisor((m) => home.seatOf(m, Date.now())?.value?.terminal ?? null, null);
   }
   if (!handle) return { ok: false, error: 'no seat terminal' };
@@ -559,7 +559,7 @@ export async function turnInterrupt({ terminal, agent, repo = null, workflowId =
     if (after.ok && !after.busy) break;
     sleepSync(2000);
   }
-  const d = await import('./decisions.mjs');
+  const d = await import('../machine/decisions.mjs');
   let ring;
   try { ring = supervisor ? await d.ringSupervisor({ minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
   return { ok: sent.every((x) => x.ok), terminal, agent, sent, stateAfter: after?.state ?? null, ring: { action: ring?.action ?? null, delivered: ring?.delivered === true, open: ring?.open ?? null } };

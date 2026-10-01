@@ -25,13 +25,13 @@
 // route, a route no page answers, a label a catalog lacks and a top-level route no destination reaches are
 // each written into the layout's nav.findings - reported, never papered over.
 import { opContextOf } from '../kernel/op-context.mjs';
-import { loadSlotManifest, readRepoDeclaration } from '../lib/hfs-slots.mjs';
+import { loadSlotManifest, readRepoDeclaration } from '../hfs/slots.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { putBlob } from '../lib/artifact-store.mjs';
-import { blobAsFile } from '../lib/blob-lookup.mjs';
+import { putBlob } from '../../engine/db/blob.mjs';
+import { blobAsFile } from '../../engine/db/blob-lookup.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
 import {

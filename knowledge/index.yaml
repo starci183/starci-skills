@@ -50,13 +50,13 @@ branches:
     title: HFS slot manifest
     path: hfs/slots.yaml
     use: The one manifest of what may exist in an app (the root and its be/ and fe/ sides), where, and which tier may
-      import which; read only through scripts/lib/hfs-slots.mjs. An app carries one hfs.json of kind app
+      import which; read only through scripts/hfs/slots.mjs. An app carries one hfs.json of kind app
       (modules/schemas/hfs-repo.schema.yaml).
   - id: hfs-rules
     title: HFS rule catalog
     path: hfs/rules.yaml
     use: The one rule catalog - finding code, Vietnamese title, gates, failure codes and every enforcer of every
-      HFS rule; read only through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules) and held to the packages, the
+      HFS rule; read only through scripts/hfs/slots.mjs (loadRuleCatalog, rules) and held to the packages, the
       scripts and every knowledge file that names a rule code by scripts/checks/check-hfs-rules.mjs. The executable
       obligation inventory that maps rules to machines is modules/models/code-patterns.yaml.
   - id: enforcement

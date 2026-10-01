@@ -42,7 +42,7 @@ import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { recordRecordChange } from '../../engine/ledger-db.mjs';
+import { recordRecordChange } from '../../engine/db/ledger.mjs';
 
 export const TRANSFER_SCOPE = 'ownership-transfer';
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';

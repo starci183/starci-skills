@@ -71,7 +71,7 @@ schemaToSchema:
   # --- providers -------------------------------------------------------------
   - {from: orca-call, to: "modules/host/orca/calls.yaml", type: governs,
      note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1",
-     source: "modules/host/orca/calls.yaml; scripts/checks/providers.mjs"}
+     source: "modules/host/orca/calls.yaml; scripts/checks/check-providers.mjs"}
   - {from: profile-registry, to: "modules/models/registry.yaml", type: governs,
      note: "registry.yaml carries schema: starci/profile-registry@1",
      source: "modules/models/registry.yaml:1"}

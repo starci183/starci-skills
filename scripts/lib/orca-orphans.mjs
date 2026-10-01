@@ -1,5 +1,5 @@
 // orca-orphans.mjs — pure logic of the Orca worktree orphan scan (lane ORPHAN2, deep map REPLACE #5 WT4). No process,
-// no file and no database access here: scripts/lib/worktrees.mjs gcWorktrees feeds it Orca's `worktree ps` rows and
+// no file and no database access here: scripts/machine/worktrees.mjs gcWorktrees feeds it Orca's `worktree ps` rows and
 // the registry, and acts on its verdicts.
 //
 //   stamp     every Orca worktree the runtime creates carries an ownership comment in Orca's metadata
@@ -14,12 +14,12 @@
 //   coverage  Orca's page covers the hosts in hostScope; an omitted host or a truncated page proves nothing about a
 //             tree it does not list (psCoverage).
 
-import { ORCA_KINDS } from './worktree-registry.mjs';
+import { ORCA_KINDS } from '../machine/worktree-registry.mjs';
 
 /** The stamp's prefix: the runtime's mark in Orca's worktree comment. */
 export const RUNTIME_STAMP_PREFIX = 'starci';
 /**
- * The kinds the runtime stamps are exactly the Orca kinds, whose one home is scripts/lib/worktree-registry.mjs ORCA_KINDS
+ * The kinds the runtime stamps are exactly the Orca kinds, whose one home is scripts/machine/worktree-registry.mjs ORCA_KINDS
  * (workflow, critic, and the [Worker] staging checkout supervisor-staging, owned by a Supervisor job: its `sup` field).
  */
 const STAMPED = new Set(ORCA_KINDS);

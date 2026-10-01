@@ -1,6 +1,6 @@
 // stack-declaration.mjs - the one reader of a repository's stack declaration (.starcistacks/application-stacks.yaml): where it
-// lives, its bounded read and parse, and the stack block of one service as declared. scripts/checks/check-starcistacks.mjs (the
-// services contract) and scripts/lib/hfs-rules/stacks.mjs (the .starcistacks shape, R10) both read it here; this file imports
+// lives, its bounded read and parse, and the stack block of one service as declared. scripts/gates/starcistacks.mjs (the
+// services contract) and scripts/hfs/rules/stacks.mjs (the .starcistacks shape, R10) both read it here; this file imports
 // nothing of the kernel, so the published @starci/hfs bundle carries it without the ledger.
 import fs from 'node:fs';
 import path from 'node:path';

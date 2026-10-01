@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // channel.mjs — the supervisor's side of the Telegram command bridge
-// (scripts/connectors/telegram-bridge.mjs, docs/connectors.md "Command bridge").
+// (scripts/supervisor/telegram-bridge.mjs, docs/connectors.md "Command bridge").
 // The owner chats with the bot; the bridge files each message in this
 // supervisor's inbox; the supervisor reads it here and answers through the bot.
 //
 //   node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>] [--force]
-//       id 'main' is the Supervisor's channel (config.yaml supervisor.mode, scripts/supervisor/home.mjs):
+//       id 'main' is the Supervisor's channel (config.yaml supervisor.mode, scripts/machine/home.mjs):
 //       chat (default) - the owner's desktop chat session owns it: it registers with no ORCA_TERMINAL_HANDLE
 //         (its CLAUDE_CODE_SESSION_ID is recorded as the channel's chat session); an Orca terminal ([Kernel],
 //         [Op], [Worker]) is refused (--force overrides);
@@ -37,8 +37,8 @@ import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import {
   appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, readInbox, registerSupervisor, takeInbox, validSupervisorId,
-} from '../connectors/telegram-bridge.mjs';
-import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from './home.mjs';
+} from './telegram-bridge.mjs';
+import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from '../machine/home.mjs';
 
 export const WAIT_TIMEOUT_EXIT = 124;
 

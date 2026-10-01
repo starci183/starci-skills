@@ -23,12 +23,12 @@
 //     terminal liveness settle/dedupe read (terminal-show) gates the archive;
 //   - settle never fails on the release: every early exit is a recorded
 //     {released:false, reason} and the archiver itself is optional
-//     (scripts/lib/hk-sessions.mjs, loaded lazily).
+//     (scripts/housekeeping/hk-sessions.mjs, loaded lazily).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseJson } from '../lib/json.mjs';
-import { latestContractOf } from './api-lib/rows.mjs';
+import { latestContractOf } from './verbs/shared/rows.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 
@@ -191,7 +191,7 @@ export function sessionIdentityOf(db, job, payload, repo, { env = process.env, h
 /** The hk-sessions archiver, lazy: its lane lands it; an absent module skips, never fails. */
 const sessionArchiver = async (env) => {
   try {
-    const mod = await import(env.STARCI_HK_SESSIONS_MODULE ?? new URL('../lib/hk-sessions.mjs', import.meta.url).href);
+    const mod = await import(env.STARCI_HK_SESSIONS_MODULE ?? new URL('../housekeeping/hk-sessions.mjs', import.meta.url).href);
     return typeof mod.archiveSessionFiles === 'function' ? mod.archiveSessionFiles : null;
   } catch { return null; }
 };
@@ -206,7 +206,7 @@ const sessionArchiver = async (env) => {
  * `beforeArchive({agent, files})` runs once the files are attributed and before they move (settle-tail reads the
  * session's token usage there, scripts/kernel/usage-record.mjs; its failure never blocks the release).
  * `show`/`archive` are the spec seams; `archive` defaults to
- * scripts/lib/hk-sessions.mjs archiveSessionFiles(paths, {archiveRoot, agent, apply:true}).
+ * scripts/housekeeping/hk-sessions.mjs archiveSessionFiles(paths, {archiveRoot, agent, apply:true}).
  */
 export async function releaseSettledSession({ db, job, payload, repo, env = process.env, home = os.homedir(), archiveRoot = null, show = terminalShow, archive = null, beforeArchive = null, now = Date.now() } = {}) {
   const agent = sessionAgentOf(payload);

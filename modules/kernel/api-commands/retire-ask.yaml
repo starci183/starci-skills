@@ -1,4 +1,4 @@
-# The contract of `api retire-ask` (scripts/kernel/api-verbs/retire-ask.mjs). One file per extension verb
+# The contract of `api retire-ask` (scripts/kernel/verbs/retire-ask.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.retire-ask (lane slim-api).
 args: '--workflow <id> --dispatch <id> --reason <text>'
 reads: 'the reports row that filed that ask; its ask-answered/ask-superseded events'

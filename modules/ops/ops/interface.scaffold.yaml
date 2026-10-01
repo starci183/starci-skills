@@ -150,8 +150,8 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/checks/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/checks/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - target
       - baseline
@@ -205,8 +205,8 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/checks/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/checks/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: scaffold-runs
     requirement:
@@ -219,7 +219,7 @@ proofs:
     requirement:
       en: Written markup uses the installed grammar's units; no ad-hoc markup bypassed it. The manifest
         names @starci/grammar by a registry semver range, never a `file:` or link path.
-    check: scripts/checks/grammar-registry-pin.mjs
+    check: scripts/work/ui/grammar-registry-pin.mjs
   - id: baseline-runs
     requirement:
       en: The repository baseline for the next profile is present and executes — a staged change makes the
@@ -228,9 +228,9 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: "The ci.yml and sonar-project.properties the baseline writes take the Sonar project key and host and the CI secret/variable names from the services block of the app's stack declaration (.starcistacks at the app root), and node scripts/checks/check-starcistacks.mjs <app> --new reports no refusal. When that declaration is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode stacks) - never an owner ask."
-      vi: "ci.yml và sonar-project.properties mà baseline viết lấy khóa dự án và host Sonar cùng tên secret/biến của CI từ khối services của khai báo stack của app (.starcistacks ở gốc app), và node scripts/checks/check-starcistacks.mjs <app> --new không báo từ chối nào. Khi khai báo đó nằm ngoài các đường dẫn op sở hữu, lệnh kiểm tra chạy không có --new và các nghi vấn STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING của nó được báo kèm việc tiếp theo nó nêu (workspace.manage chế độ stacks) - không bao giờ hỏi chủ sở hữu."
-    check: scripts/checks/check-starcistacks.mjs
+      en: "The ci.yml and sonar-project.properties the baseline writes take the Sonar project key and host and the CI secret/variable names from the services block of the app's stack declaration (.starcistacks at the app root), and node scripts/gates/starcistacks.mjs <app> --new reports no refusal. When that declaration is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode stacks) - never an owner ask."
+      vi: "ci.yml và sonar-project.properties mà baseline viết lấy khóa dự án và host Sonar cùng tên secret/biến của CI từ khối services của khai báo stack của app (.starcistacks ở gốc app), và node scripts/gates/starcistacks.mjs <app> --new không báo từ chối nào. Khi khai báo đó nằm ngoài các đường dẫn op sở hữu, lệnh kiểm tra chạy không có --new và các nghi vấn STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING của nó được báo kèm việc tiếp theo nó nêu (workspace.manage chế độ stacks) - không bao giờ hỏi chủ sở hữu."
+    check: scripts/gates/starcistacks.mjs
   - id: scope
     requirement:
       en: Every created source file lives under the declared source root; the node, its evidence and the
@@ -239,9 +239,9 @@ proofs:
     requirement:
       en: The layout tree is a work/layout-tree@1 record re-scanned from the created app/ (of the app being scaffolded) - every planned
         node the scaffold realised is origin repository with its files' current digests, and `node
-        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` reports no LAYOUT_TREE_STALE (the
+        scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` reports no LAYOUT_TREE_STALE (the
         captures it still lacks are brand.decide's).
-    check: scripts/checks/shell-conformance.mjs
+    check: scripts/work/ui/shell-conformance.mjs
   - id: op-gate
     requirement:
       en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."

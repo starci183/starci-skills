@@ -3,7 +3,7 @@
 // a disposition). Since lane rc-decisions (reconciler DESIGN §10.2) the notice is a durable Decision Item, never text
 // typed into the Kernel terminal: it opens a `supervisor-ruling` DI in the product ledger through `api decisions --open
 // --by supervisor` (text = the notice; it supersedes the Kernel's live DIs on the same entity) and rings the doorbell
-// (scripts/reconciler/decisions.mjs ringDoorbell: one fixed line, only when the seat reads turn-idle).
+// (scripts/machine/decisions.mjs ringDoorbell: one fixed line, only when the seat reads turn-idle).
 //
 //   node scripts/supervisor/notify.mjs --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <owed-action key>]
 //        [--entity <type>:<id>] [--json]
@@ -15,10 +15,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { openDecision, ringDoorbellWith } from '../reconciler/decisions.mjs';
+import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { openDecision, ringDoorbellWith } from '../machine/decisions.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
-import { supervisorEvent, supervisorLog, withSupervisor } from './home.mjs';
+import { supervisorEvent, supervisorLog, withSupervisor } from '../machine/home.mjs';
 import { recordAction } from './actions.mjs';
 import { actionRow, supLog } from './sup-log.mjs';
 

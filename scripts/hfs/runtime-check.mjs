@@ -1,13 +1,13 @@
 // runtime-check.mjs - the runtime HFS check: the StarCi runtime repository judged by its own standard,
 // knowledge/hfs/runtime-slots.yaml (manifest kind runtime), through the one HFS engine the products use.
-//   1. the tree law (rules R01, R02, R03): checkRepo() of scripts/lib/hfs-check.mjs with the runtime manifest -
+//   1. the tree law (rules R01, R02, R03): checkRepo() of scripts/hfs/check.mjs with the runtime manifest -
 //      HFS_SLOT_UNDECLARED, HFS_SLOT_AMBIGUOUS, HFS_FORBIDDEN_PRESENT, HFS_TRACKED_MUST_BE_IGNORED, HFS_SLOT_REQUIRED_MISSING,
 //      HFS_MIN_INSTANCES, HFS_EMPTY_DIR, HFS_GHOST_TREE, HFS_UNTRACKED_ROOT_ENTRY - plus each slot's allows/forbids
 //      (runtime-rules/slot-allows.mjs)
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
 //      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
-//      RT_GENERATED_DRIFT (the generated copies against packages/hfs/scripts/sync-runtime.mjs)
+//      RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
 //      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
 //   4. the pending ratchet (runtime-rules/pending.mjs): the manifest's `pending` list turns the findings it names into level
@@ -20,9 +20,9 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { mergeBase } from '../api/git/merge-base.mjs';
 import { show } from '../api/git/show.mjs';
-import { checkRepo, readWhy, trackedFiles } from '../lib/hfs-check.mjs';
-import { GENERATED_DRIFT, driftOfRuntime } from '../../packages/hfs/scripts/sync-runtime.mjs';
-import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, ruleParams } from '../lib/hfs-slots.mjs';
+import { checkRepo, readWhy, trackedFiles } from './check.mjs';
+import { GENERATED_DRIFT, driftOfRuntime } from './sync-runtime.mjs';
+import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, ruleParams } from './slots.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
@@ -70,7 +70,7 @@ export function runtimeSources(files, params) {
 /**
  * The runtime check of the repository at `repoRoot` (default: this runtime). `files` overrides git ls-files (a dry run; no
  * tree walk), `base` the base revision ({sha, show(path) -> text|null} or null), `drift` the generated-copy differences
- * (a list of strings; default: packages/hfs/scripts/sync-runtime.mjs driftOfRuntime when `repoRoot` is this runtime).
+ * (a list of strings; default: scripts/hfs/sync-runtime.mjs driftOfRuntime when `repoRoot` is this runtime).
  * `extraFindings` are findings another emitter produced (codes in `extraCodes`, whose pending entries are judged only then).
  * Returns {ok, findings (errors), pending (allowed findings), counts, manifest, tracked, sources, base}.
  */
@@ -112,7 +112,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...controlCharFindings(ctx),
   );
   const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
-  for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what packages/hfs/scripts/sync-runtime.mjs writes - run it` });
+  for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });
   findings.push(...extraFindings);
 
   // The finding codes of the rules that run at the runtime gate: a pending entry naming another code is stale.

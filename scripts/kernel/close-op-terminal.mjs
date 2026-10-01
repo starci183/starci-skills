@@ -4,7 +4,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { unbindGuardTerminal } from '../guards/install.mjs';
+import { unbindGuardTerminal } from '../guards/hook-install.mjs';
 
 // An operation terminal is closed with its tab when nothing else lives in
 // that tab. A pane close left the tab in Orca's persisted layout, and Orca

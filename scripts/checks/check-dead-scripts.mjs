@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { isMain } from './common.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import { gitOutput } from '../api/git/lib.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);

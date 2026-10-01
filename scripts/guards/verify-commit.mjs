@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// verify-commit.mjs — the history hook's op half (scripts/guards/install.mjs historyHookBody):
+// verify-commit.mjs — the history hook's op half (scripts/guards/hook-install.mjs historyHookBody):
 //
 //   STARCI_GUARD_FILE=<guard> node verify-commit.mjs <old> <new>
 //

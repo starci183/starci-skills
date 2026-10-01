@@ -6,7 +6,7 @@
 //                              owned paths of the wave's ONE repoint (canon-wire) unit (cut-seam.mjs canonCutPlanOf);
 //   brokenImports(root)        every relative or tsconfig-alias specifier that resolves to no file - the
 //                              IMPORTS_BROKEN_AFTER_MOVE invariant over the workflow worktree
-//                              (scripts/kernel/api-status/imports.mjs).
+//                              (scripts/kernel/status/imports.mjs).
 // Files are the repository's tracked sources (`git ls-files`, so sibling worktrees under .starciwork/worktrees and
 // node_modules never count). Specifiers: static import/export ... from, side-effect import, dynamic import(),
 // require(), vi.mock()/jest.mock(). Aliases: every tsconfig*.json's compilerOptions.paths (+ baseUrl) applies to the

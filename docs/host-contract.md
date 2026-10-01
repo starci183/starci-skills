@@ -22,7 +22,7 @@ agent-blind.
 | `envelopes.yaml` | The operation-input / report envelopes exchanged with agents |
 
 `calls.yaml` is an **enforced** contract, not documentation:
-`tests/provider-orca.spec.mjs` proves every `scripts/api/orca/*.mjs`
+`tests/repo/provider-orca.spec.mjs` proves every `scripts/api/orca/*.mjs`
 wrapper's verb and `--flag` set is declared by a `calls:` entry, and every
 entry names a real, allowed command from `api.yaml`.
 
@@ -200,7 +200,7 @@ only on a worktree it resolves, and a bare temp directory is refused `selector_n
    `verifiedAt`/`verifiedAgainst` and every observed failure in
    `knownFailures`.
 3. Name it in a profile (`launch.orca.agent`) and the registry (`orcaLaunch.agent`);
-   `scripts/checks/providers.mjs` refuses an unknown card.
+   `scripts/checks/check-providers.mjs` refuses an unknown card.
 4. Declare the `forbidden` list honestly; `spawnAgent` and the kernel packet
    enforce it.
 5. If the card drives Orca calls the wrappers do not cover yet, extend

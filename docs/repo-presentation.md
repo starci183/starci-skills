@@ -2,8 +2,8 @@
 
 The HFS root law is [repo.folder](../knowledge/patterns/repo/folder.yaml). Apply this checklist
 to each app repository (its root README; `be/` and `fe/` carry none) and to the StarCi runtime README. The product gate is
-`node scripts/checks/repo-presentation.mjs --root <app>`; the runtime uses
-`node scripts/checks/repo-presentation.mjs --root . --runtime`.
+`node scripts/gates/repo-presentation.mjs --root <app>`; the runtime uses
+`node scripts/gates/repo-presentation.mjs --root . --runtime`.
 
 - [ ] Keep `README.md` and `.gitattributes` at the root. Put stray drafts such as `raw.md`
   under `docs/` or their owning `.starciwork` record. Remove dead configuration and stale

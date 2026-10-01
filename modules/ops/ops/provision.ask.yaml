@@ -73,7 +73,7 @@ steps:
         authority names what and for which system. Never invent, stub, default or skip it. Never the
         value itself. A quality-service credential is never a provision: a SonarQube token or host,
         a Sonar project, and the GitHub secret or variable that would carry them into CI are
-        resolved, created or minted by scripts/checks/sonar-local.mjs from the stack declaration and
+        resolved, created or minted by scripts/gates/sonar-local.mjs from the stack declaration and
         the source stack custody (owner ruling 2026-09-24) - such an
         ask is refused with RUNTIME_OWNED_CREDENTIAL."
   - reads:
@@ -156,7 +156,7 @@ proofs:
         provision was named, and the ask requests nothing that block declares ownerAction none with its
         custody present. A service the declaration omits is named as a declaration gap for the follow-up,
         not asked of the owner when the stack already holds it.
-    check: scripts/checks/check-starcistacks.mjs
+    check: scripts/gates/starcistacks.mjs
   - id: checkpointed
     requirement:
       en: Every Work record file this operation wrote under its owned paths is committed by the runtime
@@ -171,7 +171,7 @@ blockers:
   - code: RUNTIME_OWNED_CREDENTIAL
     condition:
       en: The ask names a SonarQube token, host or project, or a GitHub secret/variable for Sonar CI. The runtime owns these - the asking operation is sent back to run
-        scripts/checks/sonar-local.mjs (status, ensure-project --with-token, scan), and a custody or
+        scripts/gates/sonar-local.mjs (status, ensure-project --with-token, scan), and a custody or
         server gap it reports is repaired in the source stack, never asked of the owner. Wiring the
         CI secret is an optional follow-up, not an owner provision.
   - code: NOT_A_PROVISION

@@ -16,7 +16,7 @@
 //
 // It wraps, never re-implements: progress + rca come from api status (scripts/kernel/progress-rca.mjs), the stall
 // notice from scripts/kernel/progress-rca.mjs stallNotice, the waits and their SLA from
-// scripts/supervisor/op-metrics.mjs (stuck[], opTelemetry.stuckSla), the findings from stall.mjs, the ask tags from
+// scripts/machine/op-metrics.mjs (stuck[], opTelemetry.stuckSla), the findings from stall.mjs, the ask tags from
 // scripts/supervisor/poll.mjs openAsks.
 //
 //   node scripts/reconciler/controllers/workflow.mjs --dry [--repo <path>]... [--workflow <id>] [--json]
@@ -24,7 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openLedgerReader, ledgerFileFor } from '../../../engine/ledger-db.mjs';
+import { openLedgerReader, ledgerFileFor } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { clipLine } from '../../lib/clip.mjs';
@@ -32,10 +32,10 @@ import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, api
 import { openAsks } from '../../supervisor/poll.mjs';
 import { progressSettings } from '../../kernel/progress-rca.mjs';
 import { stallNotice } from '../../kernel/progress-rca.mjs';
-import { telemetrySettings } from '../../supervisor/op-metrics.mjs';
+import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';
-import { productRepos } from '../../supervisor/home.mjs';
+import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -334,11 +334,11 @@ function recentlyOpened(ctx, key, now, ms) {
   return false;
 }
 
-/** lane rc-decisions scripts/reconciler/decisions.mjs, when it exists (guarded: this lane lands first or after). */
+/** lane rc-decisions scripts/machine/decisions.mjs, when it exists (guarded: this lane lands first or after). */
 let decisionsModule;
 async function decisionsMod() {
   if (decisionsModule !== undefined) return decisionsModule;
-  try { decisionsModule = await import('../decisions.mjs'); } catch { decisionsModule = null; }
+  try { decisionsModule = await import('../../machine/decisions.mjs'); } catch { decisionsModule = null; }
   return decisionsModule;
 }
 

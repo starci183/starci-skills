@@ -4,7 +4,7 @@
 //   probeProviderCredential(provider) -> {ok, provider, kind, status?, detail,
 //                                         credentialFingerprint, credentialSource}
 //
-// A provider is probed with its quota probe (scripts/api/quota): 'ok' or 'limited' passes, 'dead' and
+// A provider is probed with its quota probe (scripts/agent/quota): 'ok' or 'limited' passes, 'dead' and
 // 'unknown' do not — an unanswered probe is not proof.
 // No result field, error text or log line carries a key.
 //
@@ -12,11 +12,11 @@
 //
 // The QUOTA proof: a card whose probe kind is
 // orca-account (codex) reads the Orca account's weekly window instead
-// (scripts/api/quota/orca-account.mjs, no tokens spent): ok while the account
+// (scripts/agent/quota/orca-account.mjs, no tokens spent): ok while the account
 // answers auth ok under 100% used, quota-exhausted at 100%, auth for a missing
 // account or credential, inconclusive otherwise.
 import { agentCardOf, credentialFingerprintOf, providerKeyOf } from './credential-fingerprint.mjs';
-import { probeQuota } from '../api/quota/index.mjs';
+import { probeQuota } from './quota/index.mjs';
 import { quotaSpecOf } from './provider-outage.mjs';
 
 export async function probeProviderCredential(provider, { accounts } = {}) {

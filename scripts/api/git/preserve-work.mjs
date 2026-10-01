@@ -4,7 +4,7 @@ import { gitRunner } from './lib.mjs';
 import { revParse } from './rev-parse.mjs';
 import { isAncestor } from './merge-base.mjs';
 import { snapshotCommit } from './snapshot-commit.mjs';
-import { PRESERVED_PREFIX } from '../../lib/worktree-registry.mjs';
+import { PRESERVED_PREFIX } from '../../machine/worktree-registry.mjs';
 
 /**
  * Preserve what a worktree holds that main does not: its uncommitted changes (snapshotCommit) and its unlanded commits,

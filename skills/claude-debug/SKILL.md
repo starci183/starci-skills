@@ -14,7 +14,7 @@ user-invocable: true
 
 **Invoke once; it loops by itself.** `/claude-debug` (no argument) is the setup:
 
-1. Run `node --no-warnings scripts/supervisor/debug-pass.mjs setup`. It reads the interval from `config.yaml`
+1. Run `node --no-warnings scripts/reconciler/debug-pass.mjs setup`. It reads the interval from `config.yaml`
    `claudeDebug.interval` (default in `config.example.yaml`; a missing block is refused with the line to copy, which the
    owner adds) and prints `{created, loop: {id, interval, ...}}`.
 2. `{"created": false}`: a live loop already runs on this host (in this chat or another). Start nothing; tell the owner
@@ -24,7 +24,7 @@ user-invocable: true
    Monitor stream instead.
 
 `/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
-`node scripts/supervisor/debug-pass.mjs stop`.
+`node scripts/reconciler/debug-pass.mjs stop`.
 
 Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
@@ -41,16 +41,16 @@ Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
 Commands run from the runtime root (`.claude`). One pass, then stop:
 
-1. `node --no-warnings scripts/supervisor/debug-pass.mjs pass` takes one read-only core snapshot
-   of everything (`scripts/supervisor/core-watch.mjs --json` in process) and prints `{ok, loop, dispatched[], rows[]}`.
+1. `node --no-warnings scripts/reconciler/debug-pass.mjs pass` takes one read-only core snapshot
+   of everything (`scripts/reconciler/core-watch.mjs --json` in process) and prints `{ok, loop, dispatched[], rows[]}`.
    It closes the fixes whose alert cleared and records every alert that has no open fix; `dispatched` lists only those
    new alerts, each with its default `fixOwner` (`owner` for an open owner ask or the owner's `config.yaml`, noted at
    once; `core` for everything else, reserved for a lane). An alert that already has a lane (or a note) is never in
    `dispatched` again, so a pass is idempotent.
 2. Diagnose each `dispatched` core alert read-only with section 3 until you can name its cause.
 3. A core defect: dispatch one lane (section 4), then
-   `node scripts/supervisor/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
-   workflow waiting normally): `node scripts/supervisor/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
+   `node scripts/reconciler/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
+   workflow waiting normally): `node scripts/reconciler/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
    died or landed without clearing its alert: `release --key <alert key>` so the next pass dispatches it again. A
    reservation nobody claims or notes within 30 minutes is dispatched again.
 4. Print a short diagnosis table in Vietnamese from `rows`, one row per alert: symptom (the alert text), cause (your
@@ -165,18 +165,18 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 - Never run `git worktree add` or `git worktree remove` (with or without `--force`), and never delete a tree recursively:
   git deletes through junctions (the live node_modules was emptied twice on 2026-09-29). A staged lane's checkout is
   removed by its land, or by `workers.mjs cancel` / `cleanup`, which unlink every junction first.
-- Live databases are read-only except through their runtime writers (`engine/ledger-db.mjs`, `engine/machine-db.mjs`);
+- Live databases are read-only except through their runtime writers (`engine/db/ledger.mjs`, `engine/db/machine.mjs`);
   never edit `machine.sqlite` or a `runtime.sqlite` by hand.
 - Every probe or debug script that creates a throwaway repo or ledger (a `repro`, a fake terminal, a one-off `api`/`kernel`
   call against a scratch checkout) must set `STARCI_LOCAL_ROOT` to a temp directory before it runs and remove/unset that
   env var when it exits, success or failure, so the probe's ledger and workflow rows land in the temp state root and
-  never in the real `%LOCALAPPDATA%/StarCi` (`engine/machine-db.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, also honored by
-  `engine/ledger-db.mjs` `projectsRootFor`). Incident 2026-09-30: probes under the OS temp dir (`probe-*`, `dbg-ask-*`,
+  never in the real `%LOCALAPPDATA%/StarCi` (`engine/db/machine.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, also honored by
+  `engine/db/ledger.mjs` `projectsRootFor`). Incident 2026-09-30: probes under the OS temp dir (`probe-*`, `dbg-ask-*`,
   `dbg-env*`) left six fake-worker ledgers with workflows stuck `running` in the live store because they never set this.
   A probe that only needs the machine registry (not a project ledger too) may instead set the narrower
   `STARCI_TEST_MACHINE_FILE`; a probe that needs a specific ledger location without moving the whole state root may
   instead set `STARCI_PROJECTS_ROOT`. Verify before finishing: the probe's ledger id must not appear in
-  `node engine/machine-db.mjs ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
+  `node engine/db/machine.mjs ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
 - A standard, schema or rule set that has not been released is unversioned or version 1 in the runtime; never label runtime
   content as a second version before a first one has shipped (owner ruling 2026-09-29).
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.

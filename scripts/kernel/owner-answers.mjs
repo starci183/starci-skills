@@ -18,7 +18,7 @@
 // unit, however the retry chain was spelled. Ledger reads plus the answer receipt file; never writes.
 import { HANDOVER_OP } from './handover.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
-import { JOB_ROW } from './api-lib/rows.mjs';
+import { JOB_ROW } from './verbs/shared/rows.mjs';
 
 const parse = parseJsonOr;
 const labelOf = (option) => (typeof option === 'string' ? option : option?.label ?? option?.id ?? '');

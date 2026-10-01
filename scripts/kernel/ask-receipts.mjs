@@ -9,8 +9,8 @@
 // repository path.
 import fs from 'node:fs';
 import path from 'node:path';
-import { recordDecision } from '../../engine/ledger-db.mjs';
-import { artifactRoot, blobPath } from '../lib/artifact-store.mjs';
+import { recordDecision } from '../../engine/db/ledger.mjs';
+import { artifactRoot, blobPath } from '../../engine/db/blob.mjs';
 import { stageBlob, putArtifact } from './evidence-store.mjs';
 
 export const ASK_ANSWER_SCHEMA = 'starci/ask-answer@1';

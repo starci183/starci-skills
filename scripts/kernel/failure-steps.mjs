@@ -3,7 +3,7 @@
 import { AWAITING_OWNER_STATUS, sameUnit } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retryAttemptOf } from './gate-conditions.mjs';
-import { JOB_ROW } from './api-lib/rows.mjs';
+import { JOB_ROW } from './verbs/shared/rows.mjs';
 
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const resultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};

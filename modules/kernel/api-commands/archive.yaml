@@ -28,5 +28,5 @@ archive:
     - workflow-unknown
     - archive-needs-reason
     - 'archive-bad-by: --by is neither owner nor supervisor'
-    - 'archive-unsettled-reports: a job of the workflow filed a report that is not settled; the settler (scripts/reconcile/job-settle.mjs) or api settle settles it first. Field jobs:[{jobId, outcome, dispatchId}]'
+    - 'archive-unsettled-reports: a job of the workflow filed a report that is not settled; the settler (scripts/kernel/settle/job-settle.mjs) or api settle settles it first. Field jobs:[{jobId, outcome, dispatchId}]'
   usedBy: 'the owner or supervisor stopping a running workflow to replace it'

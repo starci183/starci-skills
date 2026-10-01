@@ -1,7 +1,7 @@
 // scripts/reconciler/sources.mjs — the events cursor of every ledger and the event routing (DESIGN §7.4).
 //
 // Ledgers: config.yaml supervisor.repos (ledgerId = the repository folder name) plus the Supervisor (ledgerId
-// 'supervisor': its events are machine.sqlite sup_events, scripts/supervisor/home.mjs). Every pollMs, per product
+// 'supervisor': its events are machine.sqlite sup_events, scripts/machine/home.mjs). Every pollMs, per product
 // ledger, read-only (openLedgerReader):
 //   SELECT seq, workflow_id, entity_type, entity_id, kind, payload_json FROM events WHERE seq > ? ORDER BY seq LIMIT 1000
 // An event is {ledgerId, repo, seq, workflowId, entityType, entityId, jobId?, kind, payload} (payload: the parsed
@@ -15,8 +15,8 @@
 // in '*' matches a kind prefix ('land-*'). One throwing route never stops the others.
 import fs from 'node:fs';
 import path from 'node:path';
-import { openLedgerReader, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { supervisorSettings } from '../supervisor/home.mjs';
+import { openLedgerReader, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { supervisorSettings } from '../machine/home.mjs';
 
 export const EVENT_BATCH = 1000;
 

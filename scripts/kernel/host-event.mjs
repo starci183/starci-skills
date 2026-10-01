@@ -16,8 +16,8 @@
 // their deaths are spread across ledgers. hostEventAround (below) reads the same proof in hindsight.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ledgerFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
-import { productRepos } from '../supervisor/home.mjs';
+import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
+import { productRepos } from '../machine/home.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 export const HOST_EVENT_WINDOW_MS = 20 * 60_000;

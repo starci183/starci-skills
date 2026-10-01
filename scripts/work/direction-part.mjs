@@ -7,7 +7,7 @@
 // scripts/work/compose-direction.mjs still places every part into the real layout chain; that composite
 // (<state>--<presentation>--<bp>--<theme>.png, role direction, with a `composite` block) is evidence and the
 // reference interface.implement and interface.audit build and compare against - it is not what the owner
-// reviews. Every owner-facing image picker (scripts/kernel/serve-ask.mjs for asks and the handover package,
+// reviews. Every owner-facing image picker (scripts/kernel/ask-server.mjs for asks and the handover package,
 // scripts/connectors/telegram-media.mjs for drawing notices) runs its choice through partOf()/ownerImages().
 //
 // How a composite finds its part, most specific first (a record drawn before the compositor has no part and
@@ -17,7 +17,7 @@
 //   3. the sibling <name>.content.<ext> exists on disk (the naming interface.draw writes).
 import path from 'node:path';
 import { assetsOf, isFile, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
-import { assetStateOf } from '../checks/ui-shapes.mjs';
+import { assetStateOf } from './ui/ui-shapes.mjs';
 
 export const PART_ROLE = 'direction-content';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
@@ -119,7 +119,7 @@ const digestOrNull = (file) => { try { return sha256File(file); } catch { return
 
 /**
  * The drawn parts a ui record declares (role direction-content, or a *.content.<ext> image), one per path. A part
- * the record retired (asset `retired`, scripts/checks/ui-shapes.mjs) is no drawing and never reaches the owner:
+ * the record retired (asset `retired`, scripts/work/ui/ui-shapes.mjs) is no drawing and never reaches the owner:
  * it is returned only with `retired: true`, which lists the retired parts instead.
  */
 export function partAssetsOf(record, { retired = false } = {}) {

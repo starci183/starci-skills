@@ -18,7 +18,7 @@
 //              (canDispatchConcurrently, enforced by api dispatch as the typed wait workflow-side-busy).
 //   checkpoint part B commits each green op on the workflow branch and calls setCheckpoint; the registry row keeps the sha.
 //   release    never from inside the worktree (coordinator ruling): part B's finish marks the row release-pending
-//              (markReleasePending); the host-side GC (scripts/lib/worktrees.mjs gcWorktrees, the reconciler GC
+//              (markReleasePending); the host-side GC (scripts/machine/worktrees.mjs gcWorktrees, the reconciler GC
 //              controller) removes it only once the Kernel's and every op's terminal is released, through
 //              releaseWorkflowWorktree: every link removed as a link and zero asserted, `orca worktree rm`, the main
 //              checkout asserted untouched, the registry row closed, then `git branch -d` of the workflow branch (Orca
@@ -29,12 +29,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
-import { withMachine } from '../../engine/machine-db.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree, bindOrcaWorktree } from '../api/orca/worktree-provision.mjs';
 import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
 import { mainRootOf } from '../api/git/worktree-list.mjs';
 import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
-import { TERMINAL_JOB_STATUSES } from '../lib/worktree-registry.mjs';
+import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { projectBinding } from './target-repo.mjs';
 
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
@@ -93,7 +93,7 @@ export function workflowWorktreeOf(ctx, workflowId) {
 
 /**
  * The live workflow worktree whose directory is `dir` (or holds it), or null: how a tool run inside a worktree
- * (scripts/checks/gate.mjs) finds its workflow through the registry, never by parsing a branch or folder name.
+ * (scripts/gates/gate.mjs) finds its workflow through the registry, never by parsing a branch or folder name.
  */
 export function workflowWorktreeAt(ctx, dir) {
   const { env } = ctxOf(ctx);

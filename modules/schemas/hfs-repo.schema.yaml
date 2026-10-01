@@ -5,7 +5,7 @@ description: >-
   The one file an app repository adds at its root to say which HFS it follows. A product is ONE app repository of kind `app`
   with two sides, `be` (the folder be/) and `fe` (the folder fe/); there is no standalone back-end or front-end repository.
   Owners are derived from slots, so it lists no owners, no paths and no switched-off rules. The manifest decides which app
-  kinds, slot ids and cross-side reads are legal (scripts/lib/hfs-slots.mjs resolveRepoDeclaration): per side, kinds must exist
+  kinds, slot ids and cross-side reads are legal (scripts/hfs/slots.mjs resolveRepoDeclaration): per side, kinds must exist
   for that profile, optionalSlots may name only opt-in slots of the side, a slot that an app kind implies is never listed, and
   `reads` is a subset of the manifest's sides.<side>.reads. App names are unique across both sides. The StarCi runtime
   repository itself declares kind `runtime` ({hfs, kind, project} only): it is judged by the runtime manifest
@@ -52,7 +52,7 @@ $defs:
                       One entry per physical database (R84): its logical name (the connection the arrays of a be.persistence slot are
                       registered on, the <conn> of platform/database/<conn>.{connection,config,decorators}.ts, one migrate run) and the
                       prefix of the env keys its <conn>.config.ts reads. Names and prefixes are unique and no prefix covers another's
-                      keys (checked by scripts/lib/hfs-slots.mjs).
+                      keys (checked by scripts/hfs/slots.mjs).
                     items:
                       type: object
                       additionalProperties: false

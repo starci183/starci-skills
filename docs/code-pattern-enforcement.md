@@ -5,7 +5,7 @@
 ## Command and operation
 
 The lint of a repository is `hfs lint` (the ESLint canon plus `hfs check`, one `starci/lint@1` report); a code-writing op
-runs it over its changed files through `node scripts/checks/gate.mjs --root <app> --changed <files...>` (ops name it
+runs it over its changed files through `node scripts/gates/gate.mjs --root <app> --changed <files...>` (ops name it
 `starci-gate`). The layout and public owners come from `hfs.json` and the slot manifest. The gate prints one
 `starci/gate@1` JSON report: exit `0` clean, `1` findings new against the base, `2` a tool could not run.
 `review.verify` in `lint` mode runs the whole-repository `hfs lint --format json` plus the selected Work/stack checks and
@@ -34,7 +34,7 @@ The manifest may select a subset of a package's exported toolbox. An extra expor
 
 ### Architecture
 
-Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/checks/architecture.mjs <app>/<side>` (`hfs check` runs it over `be/` and `fe/`). The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
+Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/hfs/architecture.mjs <app>/<side>` (`hfs check` runs it over `be/` and `fe/`). The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
 
 There is no third machine kind: every obligation is judged by a canon rule or the architecture machine, or is not part
 of the locked convention; `require-public-member-jsdoc` (R109), `replacement-throw-carries-cause` (R108) and

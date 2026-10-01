@@ -1,6 +1,6 @@
 // controllers/resource.mjs — the reconciler's Resource controller (DESIGN §8.3, §14; lane rc-gc-resource).
 //
-// It wraps scripts/lib/ram-throttle.mjs (and ram-cap.mjs keeps its prioritize/setPriority path), never re-implements
+// It wraps scripts/machine/ram-throttle.mjs (and ram-cap.mjs keeps its prioritize/setPriority path), never re-implements
 // the math:
 //   key resource:host, every resyncMs (30 s):
 //     fleetCensus (every ledger the machine registry names) + machineLoad + memoryProbe (host-resources) → nextMode
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { providerCircuits } from '../../kernel/provider-circuit.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
-import { readSupervisor, withSupervisor } from '../../supervisor/home.mjs';
+import { readSupervisor, withSupervisor } from '../../machine/home.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'resource';
@@ -145,14 +145,14 @@ export function quotaExhausted({ jobs = [], openProviders = [], providerOf = () 
 /* ------------------------------------------------------------ live deps */
 
 const liveDeps = {
-  throttle: () => import('../../lib/ram-throttle.mjs'),
+  throttle: () => import('../../machine/ram-throttle.mjs'),
   settings: async () => (await import('../../../engine/config.mjs')).allocationSettings(),
   maxParallelOps: async () => { const n = Number((await import('../../../engine/config.mjs')).runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; },
   providerOf: async () => {
     const doc = (await import('../../../engine/config.mjs')).runtimeProfile();
     return (pool) => Object.entries(doc?.runtimes ?? {}).find(([id, r]) => (r?.target ?? id) === pool)?.[1]?.provider ?? null;
   },
-  host: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
+  host: async () => (await import('../../machine/host-resources.mjs')).hostResourcesFor({}),
   // api status progress.queuedReady of one workflow (ctx.status, cached and shared); its ledger from the census row's file.
   queuedReady: async (ctx, workflowId, ledgerFile) => {
     const key = (f) => String(f ?? '').replace(/\\/g, '/').toLowerCase();
@@ -165,16 +165,16 @@ const liveDeps = {
     }
     return null;
   },
-  poolBackoff: () => import('../../lib/pool-backoff.mjs'),
+  poolBackoff: () => import('../../machine/pool-backoff.mjs'),
   pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
     .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
   load: async () => { try { return (await import('../../supervisor/workers.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
-  census: async () => (await import('../../lib/ram-throttle.mjs')).fleetCensus({}),
-  footprints: async (limit, env) => { try { return (await import('../../lib/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
+  census: async () => (await import('../../machine/ram-throttle.mjs')).fleetCensus({}),
+  footprints: async (limit, env) => { try { return (await import('../../machine/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
   // async: the sync process-table read blocks the engine's one thread for minutes on a loaded host (ENGINE-STALL)
   owners: async () => { const h = await import('../../supervisor/host-health.mjs'); return h.groupByOwner(await h.listProcessesAsync(), { limit: Infinity }); },
   recordFootprint: async (payload, env) => {
-    const { recordFootprint } = await import('../../lib/ram-throttle.mjs');
+    const { recordFootprint } = await import('../../machine/ram-throttle.mjs');
     withSupervisor((m) => recordFootprint(m, payload), { env });
   },
   // machine.sqlite of this env (a spec passes STARCI_TEST_MACHINE_FILE in `env`); null: process.env.
@@ -302,7 +302,7 @@ export function createResourceController(overrides = {}) {
   }
 
   /**
-   * resource:pools — adaptive per-pool concurrency (AIMD, scripts/lib/pool-backoff.mjs). The rate-limit signals since
+   * resource:pools — adaptive per-pool concurrency (AIMD, scripts/machine/pool-backoff.mjs). The rate-limit signals since
    * the last pass: provider-rate-limited events of every product ledger (payload pool / model / target, else the
    * job's routed pool, else every pool of payload.provider) and provider-health rows of failureKind rate-limited
    * observed since. Halve on a signal (floor backoffFloor, at most once per backoffDecreaseCooldownMs), +1 per

@@ -4,7 +4,7 @@ title: The Sonar quality gate every product is held to
 purpose: |
   The one place the Sonar thresholds live. A product repository never restates them: its
   .starcistacks/application-stacks.yaml `services.sonar.qualityGate` names the gate below, and
-  scripts/checks/sonar-local.mjs (1) makes the local SonarQube's gate of that name carry exactly these
+  scripts/gates/sonar-local.mjs (1) makes the local SonarQube's gate of that name carry exactly these
   conditions and selects it for the project, and (2) judges an op's slice - the lines it changed - against
   the same numbers. Code-writing ops cannot settle done while the slice is red
   (scripts/kernel/sonar-settle.mjs). Changing a number here changes every repository on the next scan.

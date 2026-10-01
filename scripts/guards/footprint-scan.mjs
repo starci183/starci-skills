@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike } from '../lib/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/safe-remove.mjs';
 import { foldCase } from '../lib/path-key.mjs';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
@@ -93,7 +93,7 @@ export function scanFootprint({ root = defaultRoot(), depth = DEFAULT_DEPTH, sta
 
 /** Scan and record it (machine.sqlite host_samples kind worker-footprint). The first scan only records a baseline. */
 export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultRoot(skillRoot), depth = DEFAULT_DEPTH, env = process.env } = {}) {
-  const { withMachine } = await import('../../engine/machine-db.mjs');
+  const { withMachine } = await import('../../engine/db/machine.mjs');
   return withMachine((m) => {
     const last = m.db.prepare("SELECT detail_json FROM host_samples WHERE kind='worker-footprint' AND subject=? ORDER BY seq DESC LIMIT 1").get(path.resolve(root));
     let state = null; try { state = JSON.parse(last?.detail_json ?? 'null')?.state ?? null; } catch { state = null; }

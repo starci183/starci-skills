@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { artifactRoot, blobPath, getBlob } from '../../../scripts/lib/artifact-store.mjs';
+import { artifactRoot, blobPath, getBlob } from '../../../engine/db/blob.mjs';
 import { decodeText, textEncodingOf, publicText, publicJson } from '../redact-read.mjs';
 import { attemptProducts } from '../products.mjs';
 import { usageDetail, usageSince, mergeUsage } from './work.mjs';

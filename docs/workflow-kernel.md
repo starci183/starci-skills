@@ -40,13 +40,13 @@ one kernel per workflow in data, not by politeness. Contract:
 
 The `StarCi-Reconciler` task starts the one host engine through
 `scripts/reconciler/boot.mjs ensure`. Its Host controller keeps the Kernel seat
-alive by running `scripts/kernel/watchdog.mjs --once --repair` for the workflow.
+alive by running `scripts/kernel/kernel-watchdog.mjs --once --repair` for the workflow.
 That command is a single liveness pass: it reads ledger status and attested
 terminal evidence, wakes a turn-idle Kernel when work is actionable, and replaces
 a seat only after proving it dead or unwritable. There is no per-workflow
 watchdog loop or fallback process.
 
-The Job controller runs `scripts/reconcile/job-settle.mjs` for eligible green
+The Job controller runs `scripts/kernel/settle/job-settle.mjs` for eligible green
 reports, reconciles dead or held workers and dispatches ready work through the
 existing API. A non-green report opens a `settle-nongreen` Decision Item; the
 Kernel chooses its verdict. The Workflow controller opens progress and stall
@@ -85,7 +85,7 @@ node scripts/kernel/api.mjs <verb> --repo <path> [...]
 
 `modules/kernel/api.yaml` `commands:` and `modules/kernel/api-commands/<verb>.yaml`
 together form the verb surface: one entry per verb naming what it reads, writes,
-returns and refuses. New verbs use `scripts/kernel/api-verbs/<verb>.mjs`.
+returns and refuses. New verbs use `scripts/kernel/verbs/<verb>.mjs`.
 `scripts/checks/check-api-surface.mjs` checks both contract forms against the
 core and extension code, and `api.mjs --help` prints each verb with its arguments.
 
@@ -134,14 +134,14 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
 `code.refactor`, `test.author`, `unit|integration|e2e.verify`,
 `grammar.update`, `task.execute`) runs one loop:
 
-1. **READ** — `scripts/checks/read-digest.mjs --root <app> --touch <files>`
+1. **READ** — `scripts/gates/read-digest.mjs --root <app> --touch <files>`
    prints what the slice must read before coding: the `hfs explain` slot map of
    each touched file, the pattern files of each file kind (`op-gate.yaml`
    `kinds`: the family's `always` files plus those of the longest listed slot
    prefix) and the example files of the same slots. It records the READ digest
    (`starci/read-digest@1`, every file with its sha256).
 2. **CODE** — inside the owned paths, in the workflow worktree.
-3. **CHECK** — `scripts/checks/gate.mjs --root <app> --changed <files>
+3. **CHECK** — `scripts/gates/gate.mjs --root <app> --changed <files>
    [--tests <pattern>]`, forced every round. It runs, in order: the merge guard;
    `hfs lint --changed` at the app root (the BE canon under `be/`, the FE canon
    under `fe/`, the repository checks); the root `codegen` and the build of
@@ -223,7 +223,7 @@ never commit keep the shared tree.
   removal, then `git branch -d`. The reconciler's GC controller
   (`gc:worktrees`, always active) also collects a workflow worktree whose
   owner process is gone longer than `ownerGoneMs`, always after preserving its
-  work, and only through Orca. `node scripts/lib/worktrees.mjs
+  work, and only through Orca. `node scripts/machine/worktrees.mjs
   counts` shows each repository's count against its cap; `start --check`
   reports them.
 

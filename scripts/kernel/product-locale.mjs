@@ -9,7 +9,7 @@
 // the brand record's voice.locales default; with neither, it is null and the
 // packet says so rather than guessing.
 import path from 'node:path';
-import { productLocaleOf } from '../checks/shell-conformance.mjs';
+import { productLocaleOf } from '../work/ui/shell-conformance.mjs';
 
 /** {locale, source} for the Work tree in `repo`, or null. Never throws. */
 export function productLocaleFor(repo) {

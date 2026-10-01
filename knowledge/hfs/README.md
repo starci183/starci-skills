@@ -30,7 +30,7 @@ READs the pattern files of the slots it touches before it codes (`knowledge/op-g
 1. **One source of law.** The slot manifest and the rule catalog in `.claude` are the only rules. An app carries no rule
    of its own, no allowlist, no baseline, no suppression file and no local copy of a canon config.
 2. **Growth is addition.** A new kind of content is a new slot. A slot is never edited in place inside a major.
-3. **One machine at every gate.** Pre-commit, pre-push, the op gate (`scripts/checks/gate.mjs`), the Kernel's landing
+3. **One machine at every gate.** Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`), the Kernel's landing
    and CI run the same `@starci/hfs` at the pinned version. There is no rule only agents can run.
 4. **Zero findings is necessary, not sufficient.** An app is done only when the behavioural conditions in section 11
    also hold: the real application boots, every feature is composed, every owner is mounted, the contracts match, the
@@ -46,7 +46,7 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 - `profiles`: `app` (a slot of the app root, `app.*`) or `be`, `fe` or both (a slot of a side: `be.*`, `fe.*`,
   `repo.*`). A side slot's path is relative to its side folder: `src/features/<feature>/` of profile `be` is
   `be/src/features/<feature>/` of the app. `hfs check` judges the root slots once and each side's slots under its folder
-  (the side view of `scripts/lib/hfs-slots.mjs`); every finding path is app-relative.
+  (the side view of `scripts/hfs/slots.mjs`); every finding path is app-relative.
 - `presence`: `required`, `optional`, `opt-in` (legal only when `hfs.json` lists the slot or declares an app of its
   kind) or `forbidden`.
 - `tracked`: `tracked` (committed), `ignored` (may exist, must be gitignored, because a tool needs it in place) or
@@ -496,7 +496,7 @@ no contract copy under `fe/`.
 | --- | --- | --- | --- |
 | PC pre-commit | `hfs work-hygiene` (staged `.starciwork` and `.starcistacks` paths, the secrets guard), `typecheck`, ESLint per side on the staged files, stylelint on the staged CSS of `fe/`, `prettier --check` on the staged files, the unit specs of `be/` the staged files touch | seconds | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
 | PP pre-push | `typecheck`, `lint` (`hfs lint`), `format:check`, the unit specs of `be/` affected since `origin/main` | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
-| OS op settle | the op gate `scripts/checks/gate.mjs` over the op's changed files, forced every round of the op loop: the merge guard, `hfs lint --changed`, `codegen` and package builds, `tsc` per owning tsconfig, the slice's specs; only findings new against the base block (the workflow's previous checkpoint); `api settle` re-reads the attached gate JSON and READ digest and refuses a red `done` | per op | every file-level and owner-level rule in scope |
+| OS op settle | the op gate `scripts/gates/gate.mjs` over the op's changed files, forced every round of the op loop: the merge guard, `hfs lint --changed`, `codegen` and package builds, `tsc` per owning tsconfig, the slice's specs; only findings new against the base block (the workflow's previous checkpoint); `api settle` re-reads the attached gate JSON and READ digest and refuses a red `done` | per op | every file-level and owner-level rule in scope |
 | LG land | the workflow's finish, the only time main is touched: `gate.mjs` over the whole workflow branch against its merge-base with main (merge guard included), `review.verify` of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed; a green op before it is only a checkpoint on `wf-<workflowId>` | per workflow | as OS, over the whole branch, against the newest main |
 | CI GitHub | `npm ci`, `npm run lint -- --sonar reports/lint.sonar.json` (the pinned `hfs lint`), `format:check`, `typecheck`, `npm test` (unit with the per-file coverage threshold), `build:be`, `build:fe`, the Sonar scan and gate | | every rule |
 | SQ Sonar | the imported lint findings, duplication, cognitive complexity and coverage 100 on `be/src/**/*.service.ts` (overall, new code and per file; the be unit run's lcov, the same per-file 100 the unit project enforces) | | R20, R21 (second gate) |
@@ -654,7 +654,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R118 | `RT_SPEC_PLACEMENT` | A runtime spec is tests/<area>/<module>[.<topic>].spec.mjs, shared spec code is tests/helpers/<name>.mjs, preloads tests/setup/<name>.mjs and data tests/fixtures/**; a package spec sits beside its source as <name>.spec.*; no file uses the .test. suffix. |
 | R119 | `RT_SOURCE_NAME` | A runtime source file is named <kebab-name>.mjs, never a one-off of ruleParams.runtime.oneOffNames (_*, tmp-*, fix-*, *-backfill, migrate-*, *-old, *.bak*), and its basename is unique inside its tier except lib.mjs and index.mjs. |
 | R120 | `RT_RETIRED_PRESENT` | No path of retired[] and no `from` of moved[] in modules/kernel/retired-paths.yaml is tracked again, and no symbol of its retiredSymbols[] is declared in runtime production code. |
-| R121 | `RT_GENERATED_DRIFT` | A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what packages/hfs/scripts/sync-runtime.mjs writes from the single source. |
+| R121 | `RT_GENERATED_DRIFT` | A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what scripts/hfs/sync-runtime.mjs writes from the single source. |
 | R122 | `RT_CITED_PATH_MISSING` | A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history. |
 | R123 | `RT_PENDING_STALE` | Every entry of the pending list of knowledge/hfs/runtime-slots.yaml names a runtime finding code and still allows a finding, and no entry allows a finding the base revision's list did not allow: the list only shrinks. |
 | R124 | `RT_PINNED_PATH_MOVED` | A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the fleet stopped. |

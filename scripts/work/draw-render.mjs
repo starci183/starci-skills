@@ -12,11 +12,11 @@
 //        round or a debugging run turns it on.
 //   [--rationale <file>]  the rationale.json of the drawing (owner ruling 2026-09-27; default: <html stem>.rationale.json,
 //        else rationale.json beside the html). Every capture measures what the render uses (record `rationale`:
-//        scripts/checks/draw-rationale.mjs measureRationale) and, with a rationale, also writes the annotated redline
+//        scripts/work/draw/draw-rationale.mjs measureRationale) and, with a rationale, also writes the annotated redline
 //        <base>.redline.png (spacing brackets with value and rule id, DNA labels at component roots; record `redline`).
 //   [--product <app dir>] [--grammar auto|product|claude-dist] [--grammar-dist <package root>] [--harness-out <dir>]
 //        fixture mode with a real grammar drawing (owner ruling 2026-09-27: interface.draw draws WITH the real grammar
-//        components - <XBase>.draw.tsx, scripts/checks/draw-source.mjs). --product is the product app whose own
+//        components - <XBase>.draw.tsx, scripts/work/draw/draw-source.mjs). --product is the product app whose own
 //        node_modules every bare import resolves from (react, @heroui/*, tailwindcss, the icons), so the draw file may
 //        live outside it (a ui record dir, a temp dir) and the product checkout is only read. The @starci/grammar the
 //        bundle AND the CSS resolve is chosen by scripts/work/draw-grammar.mjs: the product's install when the draw
@@ -56,12 +56,12 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { ACCENT_EXEMPT_SELECTOR } from '../checks/draw-taste.mjs';
-import { LAYER_PROBE, measureLayer } from '../checks/draw-layer.mjs';
-import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from '../checks/draw-rationale.mjs';
-import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from '../checks/draw-source.mjs';
-import { grammarDistStatus, grammarDistMessage } from '../checks/grammar-dist.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
+import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
+import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
+import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
+import { grammarDistStatus, grammarDistMessage } from '../checks/check-grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';

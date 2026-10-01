@@ -2,7 +2,7 @@
 // (api-lib/check-evidence.mjs independentChecksOf, the predecessor's newest attempt). The predecessor is jobs.retry_of -
 // by construction the previous FAILED try of the same work unit (scripts/kernel/units.mjs, H4) - never a sibling slice
 // or another unit's job. Contract: modules/kernel/api.yaml commands.dispatch priorFailures. Ledger reads only.
-import { independentChecksOf } from './api-lib/check-evidence.mjs';
+import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 
 const EVIDENCE_CHARS = 400;
 

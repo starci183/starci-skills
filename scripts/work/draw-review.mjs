@@ -52,19 +52,19 @@ import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
-import { dataStatusOf, recipeRenderedOf } from '../checks/ui-shapes.mjs';
+import { dataStatusOf, recipeRenderedOf } from './ui/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
-import { rationaleFileOf, rationaleSummary } from '../checks/draw-rationale.mjs';
+import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
-import { readBrandRecord } from '../checks/brand.mjs';
+import { readBrandRecord } from './brand/brand.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -143,7 +143,7 @@ export function gatesOf({ workRoot, record }) {
 /**
  * The owner reviews shapes only, one per XBase#state: {shapes: [{shape, state}], parts, retired}. `shapes` are
  * ui.shapes {base, state} when the record declares them, else every drawn state that is not a data status
- * (scripts/checks/ui-shapes.mjs dataStatusOf). `parts` are the live review parts (desktop and mobile, light) of a
+ * (scripts/work/ui/ui-shapes.mjs dataStatusOf). `parts` are the live review parts (desktop and mobile, light) of a
  * shape, each with its `shape`; `retired` are the live review parts of anything else and every part the record
  * retired (asset `retired`): listed, never put to the owner.
  */

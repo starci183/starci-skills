@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // dispatch-op.mjs — build and preview the dispatch packet for one op. It launches nothing: every operation starts
-// through `api dispatch --spawn` (scripts/kernel/api-verbs/dispatch.mjs), the one agent launch
+// through `api dispatch --spawn` (scripts/kernel/verbs/dispatch.mjs), the one agent launch
 // (orca orchestration worker-start, modules/kernel/contract-changes/launch-through-worker-start.yaml).
 //
 // Packet contract per modules/kernel/dispatch.yaml +

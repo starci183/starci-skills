@@ -12,9 +12,9 @@
 //   digest      sup_events supervisor-owner-digest
 // The typed rows are machine_logs actor supervisor (sup-log.mjs; /api/supervisor/logs).
 import { redactText } from '../lib/redact.mjs';
-import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings } from './home.mjs';
+import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings } from '../machine/home.mjs';
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
-import { learningState } from './lessons.mjs';
+import { learningState } from '../machine/lessons.mjs';
 
 export const STATE_SCHEMA = 'starci/supervisor-state@1';
 const txt = (v, n = 600) => { const s = redactText(String(v ?? '').replace(/\s+/g, ' ').trim()); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };

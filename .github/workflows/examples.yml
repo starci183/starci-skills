@@ -2,8 +2,8 @@ name: examples
 
 # Every example app of this repository in CI: GitHub runs only the root workflows, so the app's own ci.yml (the app-repository
 # form hfs sync renders) never runs here. The app list is DERIVED: job `apps` prints every examples/* folder whose hfs.json is of
-# kind app (scripts/checks/examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
-# list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/examples-ci.mjs).
+# kind app (scripts/checks/check-examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
+# list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/check-examples-ci.mjs).
 #
 # Two triggers, one workflow (owner ruling: e2e runs manually only):
 #   push / pull_request   per app: install, typecheck, hfs lint (with the Sonar import file), the unit project with coverage
@@ -13,7 +13,7 @@ name: examples
 #   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
 #                         `layers` input: integration, e2e, or both. They never run on push or pull_request (npm run check
 #                         refuses an integration or e2e step that is not gated on workflow_dispatch).
-# The local dashboard gate (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
+# The local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
 #
 # Secrets: CODECOV_TOKEN once for this repository (the owner adds it: Codecov, then GitHub Settings > Secrets and variables >
 # Actions); without it the upload step is skipped and the log says so.
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - id: list
-        run: echo "apps=$(node scripts/checks/examples-ci.mjs --matrix)" >> "$GITHUB_OUTPUT"
+        run: echo "apps=$(node scripts/checks/check-examples-ci.mjs --matrix)" >> "$GITHUB_OUTPUT"
 
   # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
   records:
@@ -86,7 +86,7 @@ jobs:
       - name: Example Work-tree layout (ids, refs, evidence)
         run: node scripts/checks/check-example-work.mjs
       - name: Example Work-gate fixture suite
-        run: node --test tests/example-work-gate.spec.mjs
+        run: node --test tests/checks/example-work-gate.spec.mjs
 
   app:
     name: ${{ matrix.app }}
@@ -158,4 +158,4 @@ jobs:
           scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
       - name: Sonar skipped (no server configured)
         if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
-        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so ${{ matrix.app }} was not scanned; the local dashboard gate (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item."
+        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so ${{ matrix.app }} was not scanned; the local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item."

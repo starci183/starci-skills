@@ -1,4 +1,4 @@
-# The contract of `api usage` (scripts/kernel/api-verbs/usage.mjs). One file per extension verb
+# The contract of `api usage` (scripts/kernel/verbs/usage.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs).
 args: '[--workflow <id> [--legs]] [--json]'
 reads: >-

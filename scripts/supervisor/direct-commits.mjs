@@ -12,7 +12,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
-import { SKILL_ROOT, readSupervisor } from './home.mjs';
+import { SKILL_ROOT, readSupervisor } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 

@@ -17,8 +17,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { TEST_REGISTRY_ENV, openMachine } from '../../engine/machine-db.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 export function fakeCtx(overrides = {}) {
   const {

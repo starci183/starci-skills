@@ -17,7 +17,7 @@
 //        app              the app's managed scripts (packages/hfs/templates/app/package-scripts): npm run typecheck,
 //                         npm run lint, npm test (the be unit project only - e2e is manual-only and never run here),
 //                         every npm run build:<side> the app declares (build:be, build:fe), canon-scan
-//                         (scripts/checks/canon-scan.mjs --root <repo>); a managed script the app lacks is `absent`.
+//                         (scripts/gates/canon-scan.mjs --root <repo>); a managed script the app lacks is `absent`.
 //   3. red: a failure list grouped by spec file (or by file for typecheck/lint/canon), exit 1, and the flow STOPS -
 //      no push, no later repository. The skill (skills/push-git/SKILL.md) spawns one fixer per failing group, lands
 //      the fixes (land.mjs --specs touching / ff-main.mjs) and runs /push-git again. main must not move between
@@ -34,7 +34,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { defaultPushRepos, pushMains, describePush } from './push-mains.mjs';
-import { SKILL_ROOT, supervisorLog } from './home.mjs';
+import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const canonical = (p) => { const r = path.resolve(p); try { return fs.realpathSync.native(r); } catch { return r; } };

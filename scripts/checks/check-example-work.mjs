@@ -5,13 +5,13 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
 import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 import {renderProofProblems} from '../example/example-render-proof.mjs';
-import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from './ui-shapes.mjs';
+import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from '../work/ui/ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
-import {walkFiles} from './common.mjs';
-import {blobPath} from '../lib/artifact-store.mjs';
+import { walkFiles } from '../lib/walk.mjs';
+import {blobPath} from '../../engine/db/blob.mjs';
 import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
 import { runGit } from '../api/git/lib.mjs';
-import {sealedLocationProblem} from './check-work-artifacts.mjs';
+import {sealedLocationProblem} from '../work/validate/check-work-artifacts.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -61,7 +61,7 @@ const expectedId = segments => {
 
 /**
  * The fewest dot-segments after the family prefix each family's JSON schema id pattern admits
- * (modules/schemas/work-*.schema.yaml `id.pattern` `{N,}`; tests/work-place-depth.spec.mjs holds the two
+ * (modules/schemas/work-*.schema.yaml `id.pattern` `{N,}`; tests/checks/work-place-depth.spec.mjs holds the two
  * in step). The place rule derives an id from any depth, so without this a record can sit where its id
  * matches its place yet its own schema refuses the id: impl/index.yaml derives impl.<feature> and
  * impl/<repository>/index.yaml derives impl.<feature>.<repository>, both below
@@ -645,7 +645,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       }
     }
 
-    // ---- concept 10b: a ui record draws shapes, never a slot's data status (scripts/checks/ui-shapes.mjs) ----
+    // ---- concept 10b: a ui record draws shapes, never a slot's data status (scripts/work/ui/ui-shapes.mjs) ----
     // A record not yet on ui.shapes is warned until scripts/work/migrate-ui-shapes.mjs rewrites it.
     for (const finding of uiShapeFindings(data)) (Array.isArray(data.ui?.shapes) ? problems : warnings).push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
 
@@ -708,7 +708,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   }
 
   // ---- trust concept 9: a done frontend implementation needs render/brand proof ----
-  // scripts/checks/render.mjs + scripts/checks/brand.mjs are the canon for "the running page looks like the brand and the
+  // scripts/work/ui/render.mjs + scripts/work/brand/brand.mjs are the canon for "the running page looks like the brand and the
   // grammar" - palette from the captured PNG's own bytes, card anatomy from the markup kept beside it,
   // mascot slots from the ui record's surfaces. Until now nothing ran them against this tree, so a
   // frontend work/implementation@1 could reach `done` with no capture at all (grit item 55). The rule:

@@ -15,7 +15,7 @@
 #                                propagateInvalidation and AUTHORITY_WIDENING,
 #                                and the rule that a credential counts as
 #                                verified only after integration.verify done+pass
-#   engine/ledger-db.mjs         — the .starciwork runtime.sqlite record rows —
+#   engine/db/ledger.mjs         — the .starciwork runtime.sqlite record rows —
 #                                path-prefix allowlist coverage + ownership
 #   modules/goal/legality.yaml         — the disjoint-allowlist split rule
 #   modules/models/kinds.yaml work.author — intake reconciliation cases
@@ -25,7 +25,7 @@
 #   docs/ledger-db.md       — .starciwork ownership: one index.yaml per scope folder, only leaves author state
 #   modules/kernel/dispatch.yaml    — seam-first cut, one observable behaviour per child, serial fallback
 #   docs/verify-proof.md — verify is read-only; source drift vs evidence invalidation vs unavailable input
-#   scripts/checks/check-work-deep.mjs     — DEP_STALE / NORM_UNRECORDED baseline semantics
+#   scripts/work/validate/check-work-deep.mjs     — DEP_STALE / NORM_UNRECORDED baseline semantics
 #   modules/goal/existing.yaml      — the survey leg + extend-vs-add decision
 #
 # Convention: the camelCase and CAPITALISED names in this file (goalPhase,

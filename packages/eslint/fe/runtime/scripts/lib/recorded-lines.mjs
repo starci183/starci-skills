@@ -1,5 +1,5 @@
 // recorded-lines.mjs - the one home of the file-size ratchet's arithmetic (R20 HFS_SIZE_GROWTH), shared by the back-end
-// and front-end lint canons (each ships a byte copy in its runtime/ bundle, kept by packages/hfs/scripts/sync-runtime.mjs).
+// and front-end lint canons (each ships a byte copy in its runtime/ bundle, kept by scripts/hfs/sync-runtime.mjs).
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 

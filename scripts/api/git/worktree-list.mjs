@@ -1,7 +1,7 @@
 // worktree-list.mjs — `git worktree list --porcelain` as {path, branch, head, prunable} rows, and the lookups over it.
 import path from 'node:path';
 import { gitRunner } from './lib.mjs';
-import { sameTree } from '../../lib/worktree-registry.mjs';
+import { sameTree } from '../../machine/worktree-registry.mjs';
 
 /** {path, branch, head, prunable} of every registered worktree of the repository (the main checkout first). */
 export function gitWorktreeList(repoRoot, { git = null } = {}) {

@@ -1,6 +1,6 @@
 // Deep map WRAP WT1, WT6: links first, then Orca's rm, then the registry row and the git branch -d fallback.
 // worktree-remove.mjs — the one removal of a worktree Orca made (worktree-provision.mjs): every link in the tree removed
-// as a link and zero asserted (scripts/lib/safe-remove.mjs removeLinksUnder), then `orca worktree rm` (worktree-rm.mjs),
+// as a link and zero asserted (scripts/api/fs/safe-remove.mjs removeLinksUnder), then `orca worktree rm` (worktree-rm.mjs),
 // the main checkout asserted untouched. Never git's worktree removal, never a raw delete.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,8 +10,8 @@ import { mainRootOf, registeredAt } from '../git/worktree-list.mjs';
 import { revParse } from '../git/rev-parse.mjs';
 import { deleteBranch } from '../git/branch-delete.mjs';
 import { preserveWork } from '../git/preserve-work.mjs';
-import { removeLinksUnder, mainCheckoutGuard, mainCheckoutDamage } from '../../lib/safe-remove.mjs';
-import { sameTree, isGone, markRemoved } from '../../lib/worktree-registry.mjs';
+import { removeLinksUnder, mainCheckoutGuard, mainCheckoutDamage } from '../fs/safe-remove.mjs';
+import { sameTree, isGone, markRemoved } from '../../machine/worktree-registry.mjs';
 
 /**
  * Remove a worktree Orca made (scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree, the critic, the GC).

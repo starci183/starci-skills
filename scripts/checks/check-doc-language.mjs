@@ -15,8 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { documentLanguageHits, isDocument } from '../lib/language.mjs';
-import { BUNDLES } from '../../packages/hfs/scripts/sync-runtime.mjs';
-import { isMain } from './common.mjs';
+import { BUNDLES } from '../hfs/sync-runtime.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 
 /** The runtime folders whose documents are read; the repository root's own Markdown is read too. */

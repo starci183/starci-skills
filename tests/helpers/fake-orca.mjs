@@ -713,7 +713,7 @@ else if (verb === 'orchestration reply') {
 else if (verb === 'worktree show')
   out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });
 else if (verb === 'account list') {
-  // Pinned receipt shape (scripts/api/quota/orca-account.mjs):
+  // Pinned receipt shape (scripts/agent/quota/orca-account.mjs):
   //   result.rateLimits.<provider> = {status, weekly:{usedPercent,...}, error,
   //   usageMetadata:{failureKind}} — 'unavailable' / missing-credentials → dead.
   const rateLimits = {};

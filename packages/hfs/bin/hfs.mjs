@@ -38,9 +38,9 @@
 // 0 clean, 1 error findings, 2 a refusal or bad usage.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isMain } from '../runtime/scripts/checks/common.mjs';
-import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
-import { HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { isMain } from '../runtime/scripts/lib/is-main.mjs';
+import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
+import { HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError, loadPresets } from '../sync/index.mjs';
@@ -48,7 +48,7 @@ import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
 import { scaffoldApp } from '../scaffold/app.mjs';
-import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
+import { contractEmitFindings } from '../runtime/scripts/hfs/rules/contract.mjs';
 import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
 

@@ -1,4 +1,4 @@
-# The contract of `api redesign` (scripts/kernel/api-verbs/redesign.mjs): the heavy path.
+# The contract of `api redesign` (scripts/kernel/verbs/redesign.mjs): the heavy path.
 purpose: >-
   When the RCA says the cut, the scope or the leg plan is wrong, dispatch the op that owns it - work.author
   (re-cut), scope.define (re-scope), goal.revise (leg plan) - with the RCA (progress, clusters, examples) as

@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { JOB_STATUSES, inspectLedger, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { diffGraphs, frontierOf, validateGraph } from './work-graph-model.mjs';

@@ -26,7 +26,7 @@ The root `README.md` follows the [repository presentation checklist](repo-presen
 name, one-line description, Overview, Stack, Repository layout, Development, and a Work pointer to
 `.starciwork`. The HFS architecture machine checks that structure, root Markdown drafts,
 package-manager drift and README links to private hosts. Run
-`node scripts/checks/repo-presentation.mjs --root <app>` directly for a tree-only gate.
+`node scripts/gates/repo-presentation.mjs --root <app>` directly for a tree-only gate.
 
 ```text
 <app>/                               # the one repository of a product
@@ -174,7 +174,7 @@ hfs lint --repo <app> --format json
 ```
 
 The HFS tree law itself is reported by `hfs check` (the root slots once, each side's slots under
-its folder) and the architecture machine (`scripts/checks/architecture.mjs`, run per side) as the
+its folder) and the architecture machine (`scripts/hfs/architecture.mjs`, run per side) as the
 `HFS_*` finding codes named in `knowledge/patterns/repo/folder.yaml` and the rule catalog in
 `knowledge/hfs/README.md`; every finding path is app-relative.
 
@@ -185,7 +185,7 @@ prove application behavior, builds, tests, deployment readiness or feature compl
 ## Runtime layout
 
 The StarCi runtime repository (this tree) follows the same standard as a product app, through the same engine. Its
-standard is `knowledge/hfs/runtime-slots.yaml`, a slot manifest of kind `runtime` read by `scripts/lib/hfs-slots.mjs`,
+standard is `knowledge/hfs/runtime-slots.yaml`, a slot manifest of kind `runtime` read by `scripts/hfs/slots.mjs`,
 and the root `hfs.json` declares `{"hfs": 1, "kind": "runtime", "project": "starci"}`. The manifest has slots for the
 current tree and for the target tree of the runtime HFS migration. A current path that the target moves is a forbidden
 slot whose `goesTo` names its successor.
@@ -219,7 +219,7 @@ chunk C2a.
 `npm run check` is `node bin/starci.mjs check`, which runs `scripts/checks/check-runtime.mjs`:
 
 1. `node --check` over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`;
-2. `scripts/hfs/runtime-check.mjs`: the tree law (`checkRepo` of `scripts/lib/hfs-check.mjs` with the runtime
+2. `scripts/hfs/runtime-check.mjs`: the tree law (`checkRepo` of `scripts/hfs/check.mjs` with the runtime
    manifest, and each slot's `allows`/`forbids`), then the runtime rules of `knowledge/hfs/rules.yaml` with gate
    `runtime`, one module each under `scripts/hfs/runtime-rules/` (`RT_EXTERNAL_OWNER`, `RT_TIER_DIRECTION`,
    `ARCH_OWNER_CYCLE`, `RT_BASE_IMPURE`, `RT_API_SHAPE`, `RT_SPEC_PLACEMENT`, `RT_SOURCE_NAME`, `RT_RETIRED_PRESENT`,

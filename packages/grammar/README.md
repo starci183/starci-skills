@@ -232,10 +232,10 @@ except stories, test helpers, specs and tests, plus `tsconfig.build.json`, `scri
 and the `exports` and `files` fields of `package.json`), a digest of the built files, and the build
 time. The stamp ships in the tarball.
 
-**Freshness check.** The root `npm run check` runs `scripts/checks/grammar-dist.mjs`. It fails when
+**Freshness check.** The root `npm run check` runs `scripts/checks/check-grammar-dist.mjs`. It fails when
 `dist/` is missing, has no stamp, was built from other source or another version, or was edited
 after the build. It also compares every `--*` custom property in each family's dist CSS with the
-source CSS, so a hand-edited token fails too. The brand check (`scripts/checks/brand.mjs`) runs the same test before
+source CSS, so a hand-edited token fails too. The brand check (`scripts/work/brand/brand.mjs`) runs the same test before
 it reads a grammar dist, and refuses a dist that fails it. Every refusal ends with the same fix:
 `run npm run build in packages/grammar`. A registry install carries no `src/`, so it cannot be
 compared. It is reported as `unverifiable` and allowed, but if it carries a stamp, the version and

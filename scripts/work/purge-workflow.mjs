@@ -7,7 +7,7 @@
 //       dry run (the default): what would be archived and deleted, per table, and whether the workflow may be purged
 //   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
-// --apply, in order (each step recorded in workflow_purges, engine/migrations/runtime/0001-init.sql; a re-run resumes):
+// --apply, in order (each step recorded in workflow_purges, engine/db/migrations/runtime/0001-init.sql; a re-run resumes):
 //   1. refuse unless the workflow is finished (phase 'finished') or archived (archived_at set) and no job of it is queued/leased/running/answering/
 //      effect_unknown;
 //   2. ARCHIVE to <archive-root>/<product>/<workflowId>-<YYYYMMDD>.zip (product = the repo's folder name): ledger/<table>.ndjson
@@ -19,15 +19,15 @@
 //      and the manifest's own sha256 recorded; state 'archived', verified_at set. No delete happens before this;
 //   4. DELETE: state 'deleting' (the table CHECK refuses it without the approval and a verified archive; the events and
 //      logs delete guards open only now), one DELETE of the workflows row that cascades to every workflow table
-//      (engine/ledger-db.mjs deleteWorkflowRows); state 'purged'. The workflow_purges row stays as the tombstone that
+//      (engine/db/ledger.mjs deleteWorkflowRows); state 'purged'. The workflow_purges row stays as the tombstone that
 //      names the archive (path, sha256, bytes, manifest sha256, events head, counts).
 // Blobs are archived but never deleted here: the blob GC (mark and sweep over every ledger) owns their lifetime.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/ledger-db.mjs';
-import { readZip, writeZip } from '../lib/zip-archive.mjs';
+import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/db/ledger.mjs';
+import { readZip, writeZip } from '../api/fs/zip-write.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';

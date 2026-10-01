@@ -14,9 +14,9 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { runScript } from '../api/node/run-script.mjs';
 import { syntaxCheck } from '../api/node/syntax-check.mjs';
 import { runtimeCheck } from '../hfs/runtime-check.mjs';
-import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../lib/hfs-slots.mjs';
+import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../hfs/slots.mjs';
 import { CITED_PATH_MISSING, citedPathFindings } from './check-contract-cites.mjs';
-import { isMain, walkFiles } from './common.mjs';
+import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 /** The folders whose every .mjs must parse. */
 export const SYNTAX_ROOTS = Object.freeze(['engine', 'scripts', 'modules', 'bin']);

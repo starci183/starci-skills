@@ -34,11 +34,11 @@
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
-import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
+import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
 import { fileAskReceipt, stageReceipt } from './ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
-import { openIncident, updateIncident } from '../../engine/ledger-db.mjs';
+import { openIncident, updateIncident } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -46,11 +46,11 @@ import { HANDOVER_OP, OWNER, handoverAsks } from './handover.mjs';
 import { CREDENTIAL_ASK_KINDS, askKindOf, recommendationOf } from './ask-recommendation.mjs';
 import { foldText, ownerAnswerProof } from './owner-claim.mjs';
 import { isAwaitingOwner } from './failure-steps.mjs';
-import { JOB_ROW } from './api-lib/rows.mjs';
-import { askClassOf, custodyPresent, isLiveProofOp, questionFields } from './serve-ask.mjs';
-import { livePartsOf, LOOP_SCHEMA } from '../checks/draw-loop-coverage.mjs';
-import { rationaleFileOf } from '../checks/draw-rationale.mjs';
-import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandRecord } from '../checks/brand.mjs';
+import { JOB_ROW } from './verbs/shared/rows.mjs';
+import { askClassOf, custodyPresent, isLiveProofOp, questionFields } from './ask-server.mjs';
+import { livePartsOf, LOOP_SCHEMA } from '../work/draw/draw-loop-coverage.mjs';
+import { rationaleFileOf } from '../work/draw/draw-rationale.mjs';
+import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
 
 export const AUTOPILOT_BY = 'autopilot';

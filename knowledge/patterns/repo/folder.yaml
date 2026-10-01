@@ -22,7 +22,7 @@ provenance:
   limitations: |
     The tree law governs entries and top-level placement only; it does not certify an app's contents, behavior or
     deployment. Record shape inside .starciwork stays with modules/schemas/work-layout.yaml; stack declaration shape stays
-    with knowledge/application-stacks.yaml and scripts/checks/check-starcistacks.mjs.
+    with knowledge/application-stacks.yaml and scripts/gates/starcistacks.mjs.
 rules:
   - id: REPO-FOLDER-1
     title: Every tracked path has a slot
@@ -145,8 +145,8 @@ rules:
         - HFS_STACKS_IN_SIDE
         - HFS_FORBIDDEN_PRESENT
       manual:
-        - node scripts/checks/work-validate.mjs <app>/.starciwork passes.
-        - node scripts/checks/check-starcistacks.mjs <app> exits 0.
+        - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
+        - node scripts/gates/starcistacks.mjs <app> exits 0.
     relatedExamples: []
   - id: REPO-FOLDER-5
     title: Storage states, ignored and external

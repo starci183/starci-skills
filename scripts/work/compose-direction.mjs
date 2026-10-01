@@ -20,7 +20,7 @@
 // The output goes to <ui-dir>/assets/directions/<state>--<presentation>--<breakpoint>--<theme>.png and the
 // script prints the ui asset entries to record: the content (role direction-content) and the composite
 // (role direction) with its `composite` block - every input by path and digest, the rectangle, and the
-// pixel digest scripts/checks/shell-conformance.mjs re-derives to prove the composite is exactly this.
+// pixel digest scripts/work/ui/shell-conformance.mjs re-derives to prove the composite is exactly this.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,7 @@ import {
   OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
   allNodesOf, appOfUi, captureFileOf, captureRelOf, destinationsOf, nodeById, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
-import { DRAW_TOOL } from '../checks/ui-shapes.mjs';
+import { DRAW_TOOL } from './ui/ui-shapes.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
 

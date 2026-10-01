@@ -6,7 +6,7 @@ different purple, the mascot a designer approved can be absent from the tree, an
 a component nobody reopened, and a token the record names can be a name no grammar declares — styling
 nothing, while the record reads as applied.
 
-`scripts/checks/brand.mjs` re-derives each of those claims from the artefacts themselves and reports every
+`scripts/work/brand/brand.mjs` re-derives each of those claims from the artefacts themselves and reports every
 one it could not reproduce. The brand is **bound** to the source, not copied from it; **proven**, not stated.
 
 Nothing in this module renders, installs, commits or edits. Every check reads. The colour mathematics is
@@ -16,7 +16,7 @@ never proven by a dependency that may not be installed.
 ## Running it
 
 ```
-node scripts/checks/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
+node scripts/work/brand/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
 ```
 
 `<work-root>` is the Work tree that owns the brand record (`<tree>/brand/index.yaml`; a repository root works
@@ -194,7 +194,7 @@ family or the host carries no DNA snapshot for it — an unreadable canon proves
 ## Render checks
 
 The six checks above read the record and the source. They cannot see an actual implementation render.
-`scripts/checks/render.mjs` reads the two artefacts a downstream browser capture leaves behind — the PNG and the
+`scripts/work/ui/render.mjs` reads the two artefacts a downstream browser capture leaves behind — the PNG and the
 markup it was rendered from, kept beside it as `<candidate>.html` — and answers the two canon rules of
 2026-09-13 from them. Capture identity is structural: assets carrying `generation` are generated direction,
 while PNG assets without `generation` are implementation captures regardless of prose provenance. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide

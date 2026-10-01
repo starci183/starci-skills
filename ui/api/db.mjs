@@ -1,5 +1,5 @@
-import { openMachineReader, machineFileFor } from '../../engine/machine-db.mjs';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { openMachineReader, machineFileFor } from '../../engine/db/machine.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
 
 export function openUiDb({ env = process.env } = {}) {
   const file = env.STARCI_MACHINE_DB || machineFileFor(env);

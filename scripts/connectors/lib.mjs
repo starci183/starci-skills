@@ -7,20 +7,20 @@
 //
 // Every ledger read here goes through inspectLedger (read-only): the
 // connectors observe asks, they never write a ledger. Every piece of host state
-// lives in machine.sqlite (engine/machine-db.mjs): a manager lock is a
+// lives in machine.sqlite (engine/db/machine.mjs): a manager lock is a
 // host_locks row, a launch still starting is that row in state 'starting'.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
-import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/db/ledger.mjs';
+import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 
 
 /** When this host last booted (ms). */
@@ -101,7 +101,7 @@ export function claimManager(name, { current = null, env = process.env } = {}) {
 }
 
 /**
- * Claim a manager lock that may be handed over (scripts/lib/self-reload.mjs): a loop that re-execs itself
+ * Claim a manager lock that may be handed over (scripts/reconciler/self-reload.mjs): a loop that re-execs itself
  * spawns its replacement with `from` = its own pid and waits, still holding the lock, until the lock names
  * the replacement. The replacement takes the row over only while it still names `from`, in one transaction,
  * so there is no moment the lock is free for a third claimant. Without `from`, or when the lock no longer

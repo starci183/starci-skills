@@ -7,7 +7,7 @@
 //   claude-dist  the runtime-built package (.claude/packages/grammar/dist, the grammar main carries - possibly
 //                newer than the product's install, e.g. Meter segments 0.5.2 against an installed 0.5.0)
 // The product's install wins when it SATISFIES what the draw needs, and "satisfies" is decided by TypeScript: the
-// draw file type-checks against that candidate's types (scripts/checks/draw-source.mjs typecheckDraw). When only
+// draw file type-checks against that candidate's types (scripts/work/draw/draw-source.mjs typecheckDraw). When only
 // claude-dist satisfies, the drawing renders against it through an alias in the draw bundle ONLY (draw-render.mjs
 // --grammar-root), the provenance says so (grammarSource claude-dist@<v>) and an upgrade of the product is OWED
 // (upgradeOwed {status: owed, from, to, range, inRange}) - interface.implement bumps the product's dependency; the
@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
-import { GRAMMAR_PACKAGE, typecheckDraw } from '../checks/draw-source.mjs';
-import { grammarDistStatus } from '../checks/grammar-dist.mjs';
+import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-source.mjs';
+import { grammarDistStatus } from '../checks/check-grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);

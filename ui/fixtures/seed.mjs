@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { openMachine, openMachineReader } from '../../engine/machine-db.mjs';
-import { openLedger, openLedgerReader, ledgerIdForRepo } from '../../engine/ledger-db.mjs';
+import { openMachine, openMachineReader } from '../../engine/db/machine.mjs';
+import { openLedger, openLedgerReader, ledgerIdForRepo } from '../../engine/db/ledger.mjs';
 import { redactText } from '../../scripts/lib/redact.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

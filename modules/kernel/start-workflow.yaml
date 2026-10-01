@@ -19,7 +19,7 @@ about:
     plan/jobs/events survive agent churn.
 
 watchdog:
-  executable: scripts/kernel/watchdog.mjs
+  executable: scripts/kernel/kernel-watchdog.mjs
   cadence: modules/models/runtimes.yaml allocation.watchdogCadenceMs
   resume: >-
     The reconciler Host controller (concern host.kernel-seat) runs the --repair pass for every running,
@@ -37,7 +37,7 @@ watchdog:
     worker through `api reconcile --release-worker` - the Job controller's
     reconciles while it is active (the watchdog's run yields, reconciler-owned).
     It also runs the ledger's quota-circuit probe and the host footprint scan
-    (scripts/kernel/watchdog.mjs header; the footprint scan is the Host
+    (scripts/kernel/kernel-watchdog.mjs header; the footprint scan is the Host
     controller's while it is active). A loop always runs --repair. It owns the
     waiting cadence: the
     Kernel yields when no durable transition is immediately executable and

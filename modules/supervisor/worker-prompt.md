@@ -36,8 +36,8 @@ Specs that must pass (done criteria): {specs}
   modules/kernel/contract-changes-format.yaml), with `paths` naming every such file and `reach: new-legs` unless the brief says
   otherwise.
 - Grow the kernel api by files, not by editing its shared lines (scripts/kernel/api-extensions.mjs): a new verb is
-  scripts/kernel/api-verbs/<verb>.mjs plus modules/kernel/api-commands/<verb>.yaml, a new status field is
-  scripts/kernel/api-status/<key>.mjs, a new boolean flag is a line in scripts/kernel/api-boolean-flags.txt.
+  scripts/kernel/verbs/<verb>.mjs plus modules/kernel/api-commands/<verb>.yaml, a new status field is
+  scripts/kernel/status/<key>.mjs, a new boolean flag is a line in scripts/kernel/api-boolean-flags.txt.
 - Commit on your branch with a message that says what and why and ends with the co-author line the repository uses.
   One commit is best; several are cherry-picked in order.
 - Never print or commit a secret value.

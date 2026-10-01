@@ -14,14 +14,14 @@
 // is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
-import { askClassOf } from '../kernel/serve-ask.mjs';
+import { askClassOf } from '../kernel/ask-server.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
-import { productRepos, supervisorSettings } from './home.mjs';
+import { productRepos, supervisorSettings } from '../machine/home.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { opLabelMap } from '../lib/display-names.mjs';
 

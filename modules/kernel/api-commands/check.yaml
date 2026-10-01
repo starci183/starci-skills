@@ -8,11 +8,11 @@ check:
     failure implicates (each failing test file and the source file it points at, `path[:line]`).
   rawExit: >-
     H8: a verdict reads only the RAW exit a runtime runner observed, never an exit a caller declared. A check whose
-    command the runtime can re-run (scripts/reconcile/job-settle.mjs classifyCheck: a runtime check script, argv, no
+    command the runtime can re-run (scripts/kernel/settle/job-settle.mjs classifyCheck: a runtime check script, argv, no
     shell, no mutating flag) is re-run by api check in the repository; its raw exit replaces exitCode and the
     caller's value is kept as declaredExitCode (authority runtime). A command the runtime cannot re-run is recorded
     authority declared: its red counts failed, its green never counts passed (checkEvidence.declared), so a pass
-    needs at least one runtime-green check. A re-run whose checker could not run (scripts/reconcile/check-verdict.mjs:
+    needs at least one runtime-green check. A re-run whose checker could not run (scripts/kernel/settle/check-verdict.mjs:
     status unavailable, exit 124/127) is unavailable (H7): counted neither (checkEvidence.unavailable). The runtime
     settler (STARCI_CALLER runtime-settler) passes checks it re-ran itself; they are recorded authority runtime as given.
   admittedContract: >-

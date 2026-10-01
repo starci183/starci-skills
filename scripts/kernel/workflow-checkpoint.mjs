@@ -32,14 +32,14 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
 import { mainRootOf } from '../api/git/worktree-list.mjs';
-import { TERMINAL_JOB_STATUSES } from '../lib/worktree-registry.mjs';
-import { mergeGuard } from '../checks/gate.mjs';
+import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
+import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../supervisor/land.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
-import { ownedPathsOf } from './api-lib/rows.mjs';
+import { ownedPathsOf } from './verbs/shared/rows.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'checks', 'gate.mjs');
@@ -99,7 +99,7 @@ const ownedOf = (payloadJson) => {
 /**
  * The leases of the workflow's ops in its worktree: `own`, the owned paths of `opId` (exactly what its leases hold: its
  * be/ or fe/ paths and its owned .starciwork Work records; the whole tree for an op the ledger does not know), and
- * `others`, the owned paths of every other op of the workflow still occupying the tree (part A's TERMINAL_JOB_STATUSES, scripts/lib/worktree-registry.mjs).
+ * `others`, the owned paths of every other op of the workflow still occupying the tree (part A's TERMINAL_JOB_STATUSES, scripts/machine/worktree-registry.mjs).
  */
 export function leasesOf(ctx, { workflowId, opId }) {
   const row = ctx?.db?.prepare?.('SELECT job_id, payload_json FROM jobs WHERE job_id=?').get(opId) ?? null;
@@ -178,7 +178,7 @@ export function requireCheckpointChain(ctx, rec, workflowId) {
 
 /**
  * The gate base of the workflow worktree that holds `dir` (part A's workflowWorktreeAt over the registry), or null when
- * `dir` is no workflow worktree: scripts/checks/gate.mjs measures an op there against its previous checkpoint.
+ * `dir` is no workflow worktree: scripts/gates/gate.mjs measures an op there against its previous checkpoint.
  */
 export function gateBaseAt(ctx, dir) {
   const rec = wt(ctx).workflowWorktreeAt(ctx, dir);
@@ -290,7 +290,7 @@ export function rebaseWorkflow(ctx, { workflowId }) {
   return { ok: true, onto, head };
 }
 
-/** The whole-branch gate: scripts/checks/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
+/** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
 export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
   const run = spawnSync(process.execPath, [GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }

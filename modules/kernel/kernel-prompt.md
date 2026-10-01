@@ -63,7 +63,7 @@ DECISIONS FIRST, EVERY WAKE [decisions]: before anything else run
   ran>" --decision <decide id>`. A DI you cannot decide inside your
   authority: `api decisions --escalate <id> --to supervisor`. A DI left past
   its due time is escalated once, and past twice its due time it becomes the
-  Supervisor's (scripts/reconciler/decisions.mjs escalateDue). A wake line
+  Supervisor's (scripts/machine/decisions.mjs escalateDue). A wake line
   `[decide] <n> items waiting: ...` is only the doorbell: the DIs are the message.
   ENFORCED: while an item is open and unclaimed for 2 min, api route, dispatch,
   enqueue and dispatch-ready refuse `decisions-first`; the refusal, the

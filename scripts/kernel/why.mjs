@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { blobPath } from '../lib/artifact-store.mjs';
+import { blobPath } from '../../engine/db/blob.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -6,12 +6,12 @@
 // "slice meets the gate, READ done" record.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadSonarGate, thresholdsOf } from '../../scripts/checks/sonar-gate.mjs';
-import { GATE_SCHEMA } from '../../scripts/checks/gate.mjs';
-import { DIGEST_SCHEMA } from '../../scripts/checks/read-digest.mjs';
-import { TEST_WORLD_RUN_SCHEMA } from '../../scripts/checks/test-world-run.mjs';
-import { UNIT_RUN_SCHEMA } from '../../scripts/checks/unit-run.mjs';
-import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS } from '../../scripts/checks/release-proof.mjs';
+import { loadSonarGate, thresholdsOf } from '../../scripts/gates/sonar-gate.mjs';
+import { GATE_SCHEMA } from '../../scripts/gates/gate.mjs';
+import { DIGEST_SCHEMA } from '../../scripts/gates/read-digest.mjs';
+import { TEST_WORLD_RUN_SCHEMA } from '../../scripts/gates/test-world-run.mjs';
+import { UNIT_RUN_SCHEMA } from '../../scripts/gates/unit-run.mjs';
+import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS } from '../../scripts/gates/release-proof.mjs';
 import { REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA } from '../../scripts/kernel/gate-settle.mjs';
 
 export const greenSonarScan = () => ({

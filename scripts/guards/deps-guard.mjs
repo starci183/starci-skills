@@ -127,8 +127,8 @@ export function classifyInstall(program, argv) {
 /** Jobs of OTHER workflows of this ledger that hold a lease right now (read-only). */
 export async function peerLeasedJobs({ ledgerRepo, workflowId, env = process.env, now = Date.now() }) {
   if (!ledgerRepo) return { known: false, jobs: [] };
-  const { openLedgerReader, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
-  const { readMachine } = await import('../../engine/machine-db.mjs');
+  const { openLedgerReader, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
+  const { readMachine } = await import('../../engine/db/machine.mjs');
   // Decision Q1 (same as the owner digest): the repo's runtime ledger is the file machine.ledgers names for it —
   // never the pre-Q1 in-repo .starciwork/runtime.sqlite. That legacy store is opened only when the registry names
   // no ledger for the repo at all: a never-registered checkout's in-repo file is its only lease record, and a

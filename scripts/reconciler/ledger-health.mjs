@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { openLedgerReader } from '../../engine/db/ledger.mjs';
 
 // A read-only handle through the ledger module (check-db-openers); unverified so a damaged file still gets its
 // quick_check, and not query_only so VACUUM INTO can write the backup file.

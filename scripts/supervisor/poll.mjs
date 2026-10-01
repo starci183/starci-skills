@@ -9,7 +9,7 @@
 //       [--workflow <id>]...   default: every non-finished workflow
 //       [--interval-ms <ms>] [--stall-minutes <n>] [--once] [--json]
 //
-// The interval is --interval-ms, else supervisorSettings().pollIntervalMs (scripts/supervisor/home.mjs).
+// The interval is --interval-ms, else supervisorSettings().pollIntervalMs (scripts/machine/home.mjs).
 //
 // Each cycle prints: new op reports since the last cycle, open asks with
 // their serving URLs, direction artifacts newer than the last cycle, kernel
@@ -29,7 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -42,7 +42,7 @@ import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
 import { owedFindings } from './owed.mjs';
-import { supervisorSettings } from './home.mjs';
+import { supervisorSettings } from '../machine/home.mjs';
 import { opLabel, workflowNames } from '../lib/display-names.mjs';
 
 // The digest's first cycle has no previous cycle to diff against: it prints
@@ -88,7 +88,7 @@ const probe = async (url, timeoutMs) => {
 };
 
 // An open ask's URL is worth relaying only when it still answers. The ledger
-// already knows when a form server gave up (scripts/kernel/serve-ask.mjs
+// already knows when a form server gave up (scripts/kernel/ask-server.mjs
 // appends 'ask-serving-expired'), so a dead ask costs no network at all;
 // everything else is probed once per cycle. An ask that a replacement
 // retired ('ask-superseded') is not open and never reaches here.

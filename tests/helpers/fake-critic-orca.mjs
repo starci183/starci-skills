@@ -9,7 +9,7 @@
 //   silent           never answers (the critic's timeout)
 //   launch-failed    worker-start refuses before any effect
 // The placement (draw-critic criticWorkspace) is a plain temp directory under `placement.tmpRoot` (default the OS temp
-// dir): a spec creates no git worktree; tests/draw-critic-worker-start.spec.mjs proves the real placement on its own.
+// dir): a spec creates no git worktree; tests/work/draw-critic-worker-start.spec.mjs proves the real placement on its own.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

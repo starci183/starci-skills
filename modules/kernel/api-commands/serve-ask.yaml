@@ -1,11 +1,11 @@
-# The contract of `api serve-ask` (scripts/kernel/api-verbs/serve-ask.mjs). One file per extension verb
+# The contract of `api serve-ask` (scripts/kernel/verbs/serve-ask.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.serve-ask (lane slim-api).
 args: '--workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]'
 reads: 'the workflow row; with --dispatch, the reports row that filed that ask'
 writes: >-
   Parks the ask for the owner; it serves NO form by default (owner,
   2026-09-24: a form URL is served only when the owner asks for it).
-  scripts/kernel/serve-ask.mjs parkAsk supersedes the earlier asks it
+  scripts/kernel/ask-server.mjs parkAsk supersedes the earlier asks it
   replaces (ask-superseded, their Telegram messages deleted:
   ask-message-closed), sends the owner the question with its numbered
   options and one "Generate URL" button (scripts/connectors/telegram.mjs
@@ -21,7 +21,7 @@ writes: >-
   config.yaml asks.autoAcceptRecommended on, an ask that carries a
   recommended option and falls in no class of asks.excludes (credential
   and handover.review asks always do) is answered in-process instead
-  (scripts/kernel/serve-ask.mjs autoAcceptAsk): the answer receipt,
+  (scripts/kernel/ask-server.mjs autoAcceptAsk): the answer receipt,
   ask-answered with answeredBy auto-recommended, ask-auto-accepted, the
   kernel wake and one Telegram message; nothing is served. A draw-review
   ask (question.kind draw-review, scripts/work/draw-review.mjs) the owner

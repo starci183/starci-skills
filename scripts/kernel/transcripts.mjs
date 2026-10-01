@@ -22,7 +22,7 @@ import path from 'node:path';
 import { workerOutput } from '../api/orca/worker-read.mjs';
 import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from './evidence-store.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { operationDispatchOf } from './api-lib/rows.mjs';
+import { operationDispatchOf } from './verbs/shared/rows.mjs';
 
 /** The header line that keeps Orca's completeness verdict with the stored output. */
 export const outputHeader = (out) => `[worker-read dispatch=${out.dispatch} source=${out.source}${out.fallbackReason ? ` fallback=${out.fallbackReason}` : ''}`
@@ -117,7 +117,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
     console.error('usage: node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]');
     process.exit(2);
   }
-  const { openLedger, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+  const { openLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
   const repo = path.resolve(arg('repo'));
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try {

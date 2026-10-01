@@ -1,7 +1,7 @@
 // why-record.mjs — the one writer of op_attempts.why_json. Every path that ends an attempt without a passing verdict
 // (settle fail/blocked/ask, a refused launch, a dead worker, a reconcile requeue, a cancel) calls recordWhy inside its own
 // transaction, after the attempt's end columns and its settle_json are written, so the stored explanation matches the row.
-import { updateAttempt } from '../../engine/ledger-db.mjs';
+import { updateAttempt } from '../../engine/db/ledger.mjs';
 import { computeWhy } from './why.mjs';
 
 /**

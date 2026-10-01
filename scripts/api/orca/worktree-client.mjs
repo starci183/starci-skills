@@ -7,5 +7,5 @@ import { worktreeRm } from './worktree-rm.mjs';
 import { worktreePs } from './worktree-ps.mjs';
 import { repoAdd } from './repo-add.mjs';
 
-// ps (worktree-ps.mjs) is the worktree GC's source of truth (scripts/lib/worktrees.mjs gcWorktrees).
+// ps (worktree-ps.mjs) is the worktree GC's source of truth (scripts/machine/worktrees.mjs gcWorktrees).
 export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, ps: worktreePs, addRepo: repoAdd });

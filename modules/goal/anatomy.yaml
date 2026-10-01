@@ -16,7 +16,7 @@
 #                                  the kernel reasons through
 #   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
 #   modules/schemas/goal-plan.yaml — the api plan --file shape {legs:[{op,paths?,notes?}]}
-#   engine/ledger-db.mjs           — the .starciwork/runtime.sqlite goal/job rows
+#   engine/db/ledger.mjs           — the .starciwork/runtime.sqlite goal/job rows
 #   docs/workflow-kernel.md        — goal phase narrative
 #   skills/define-goal/SKILL.md    — the owner-only approval gate (exact `ok`)
 #   modules/models/kinds.yaml      — lanes (nodeKind -> ordered steps), routes, kinds
@@ -85,8 +85,8 @@ stateModel:
     extend-vs-add).
   sources:
     - this file (evaluateGoalMetrics, deriveGoalMetrics are its rules)
-    - engine/ledger-db.mjs (record states) + the api's path:* lease admission (scripts/kernel/api.mjs)
-    - scripts/checks/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
+    - engine/db/ledger.mjs (record states) + the api's path:* lease admission (scripts/kernel/api.mjs)
+    - scripts/work/validate/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
     - modules/goal/existing.yaml
 
 # ----------------------------------------------------------------------------
@@ -104,7 +104,7 @@ decomposition:
       does: >-
         measure S₀: query .starciwork owners for the records owning the touched
         paths (the .starciwork ownership tree — docs/ledger-db.md; record
-        state via engine/ledger-db.mjs; work.author's intake mode reconciles
+        state via engine/db/ledger.mjs; work.author's intake mode reconciles
         authored records against decided ones as three typed cases —
         reference/conflict/new — modules/models/kinds.yaml) and scan the
         source surfaces they name
@@ -118,7 +118,7 @@ decomposition:
         only the new part -> chain shortens and records `extends: X` -> the
         extended surface's `verified` variable goes stale -> a
         regression/re-verification leg on X is generated automatically
-        (DEP_STALE semantics, scripts/checks/check-work-deep.mjs)
+        (DEP_STALE semantics, scripts/work/validate/check-work-deep.mjs)
 
     - id: CHAIN
       does: >-
@@ -140,9 +140,9 @@ decomposition:
     (legality.yaml backwardEdges).
   sources:
     - modules/kernel/driver-loop.yaml
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
     - modules/models/kinds.yaml work.author intake cases (reference/conflict/new)
-    - scripts/checks/check-work-deep.mjs (DEP_STALE)
+    - scripts/work/validate/check-work-deep.mjs (DEP_STALE)
     - modules/goal/legality.yaml, modules/goal/existing.yaml, modules/goal/archetypes.yaml
 
 # ----------------------------------------------------------------------------
@@ -151,7 +151,7 @@ decomposition:
 identity:
   record: starci/goal@1
   files:
-    goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/ledger-db.mjs)
+    goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/db/ledger.mjs)
     goalMd:  rendered for humans only — never a store     # runtime.sqlite is the store
   writer: scripts/goal/define-goal.mjs  # the goal row and its json (modules/goal/define-goal.yaml writes)
   rev: >-

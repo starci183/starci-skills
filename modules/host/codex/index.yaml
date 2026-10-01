@@ -12,4 +12,4 @@ executionAuthority: >-
   facts are modules/models/agents/codex.yaml, and `node scripts/kernel/api.mjs dispatch --spawn` is
   the only path that creates one.
 concurrency: modules/models/runtimes.yaml runtimes.codex-agent.maxParallel
-validatedBy: scripts/checks/providers.mjs
+validatedBy: scripts/checks/check-providers.mjs

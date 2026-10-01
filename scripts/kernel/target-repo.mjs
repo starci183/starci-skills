@@ -9,7 +9,7 @@ import { runGit } from '../api/git/lib.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
-import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 
 const canonical = (value) => {
   const resolved = path.resolve(value);

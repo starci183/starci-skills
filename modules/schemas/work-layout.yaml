@@ -123,7 +123,7 @@ shape:
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
       the implementation record's assets[] cites {artifact?, name, role, sha256}; layout captures and lockups are blobs
-      shell/index.yaml cites {name, sha256}. Every reader resolves them through scripts/lib/blob-lookup.mjs. The final
+      shell/index.yaml cites {name, sha256}. Every reader resolves them through engine/db/blob-lookup.mjs. The final
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
     - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
@@ -137,7 +137,7 @@ shape:
     - "/_derived/* !/_derived/index.yaml !/_derived/frontier.md !/_derived/critique.yaml !/_derived/critique.md"
     - "evidence/ runs/ draw-loop/ operations/ report*.json *.tmp.json /features/**/impl/**/assets/ /shell/assets/"
   workflowRunState: one SQLite file per project ledger, %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
-    (decision Q1; engine/ledger-db.mjs ledgerFileFor resolves it through machine.ledgers), outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
+    (decision Q1; engine/db/ledger.mjs ledgerFileFor resolves it through machine.ledgers), outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
     op attempts, contracts, reports, check runs, artifacts, blobs, events, logs, conditions, leases, inbox and
     citations. Report JSON lives only in reports.report_json. Query views expose op history, media, timeline and
     workflow progress. See ledger-db.md.
@@ -145,7 +145,7 @@ shape:
     attachments belong in the content-addressed blob store outside every repository (~/.starci/artifacts/, or
     STARCI_ARTIFACT_ROOT). The ledger references each blob by sha256 (blob_ref_columns lists every referencing
     column) and serves it at /api/blob/<sha256>. A product record cites a blob through work_citations, which pins
-    it; scripts/supervisor/blob-gc.mjs sweeps an unreferenced blob only after the 24 h grace and a verified archive."
+    it; scripts/housekeeping/blob-gc.mjs sweeps an unreferenced blob only after the 24 h grace and a verified archive."
   workflowLogs: the typed log rows the kernel, ops and runtime write are the logs table of the project ledger (see
     workflowRunState). No log file, cursor or retired log database lives in the Work tree.
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
@@ -163,7 +163,7 @@ shape:
   frontendCaptures: "blobs the implementation record's assets[] cites {artifact?, name, role, sha256} - the running-page
     screenshot and its markup under the same stem, filed from STARCI_JOB_SCRATCH/captures (never under the impl node). These assets never carry a
     generation record - that is what tells a capture and a direction apart regardless of prose
-    provenance (see scripts/checks/render.mjs's capture-identity rule) - and a generation-bearing asset
+    provenance (see scripts/work/ui/render.mjs's capture-identity rule) - and a generation-bearing asset
     never sits outside a work/ui-screen@1 record's own assets/. Agent data (shape.agentData): its target is job_artifacts(role=capture/dom) + blobs."
   featureCatalog: index.yaml at the .starciwork root, schema work/catalog@1 - one entry per feature
   setup: "index.yaml at the .starciwork root under extensions.work3.setup.<workflow>.<mode>, typed by
@@ -185,7 +185,7 @@ shape:
     name}) and its checkout and remote are the host project binding (starci/workspace-binding@2),
     so there is no _resources/repositories/ record; workspace.manage lists a bound repository there
     and keeps observed remote/HEAD/dirty state in its evidence bundle.
-    tests/op-work-paths.spec.mjs holds every op manifest's .starciwork paths to this shape."
+    tests/engine/op-work-paths.spec.mjs holds every op manifest's .starciwork paths to this shape."
 rules:
   - SRS and SDS are the upstream source of truth for every feature and are independent of source
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
@@ -221,7 +221,7 @@ rules:
     planned. A work/ui-screen@1 declares route, surface (per breakpoint for an overlay), a drawer's
     direction, routed and host, and binds the tree as shell: {ref: shell, rev, layouts: [{node, rev}]} or
     {chromeless: true, because}; its directions are composited into the layout captures
-    (scripts/work/compose-direction.mjs) and scripts/checks/shell-conformance.mjs holds the record, the
+    (scripts/work/compose-direction.mjs) and scripts/work/ui/shell-conformance.mjs holds the record, the
     draws and the implementations to it. At most one shell record exists per tree."
   - "Frontend-facing nodes bind the brand implicitly: a ui node, an implementation or uat node with a
     frontend layout, and any node that names the brand in refs or dependsOn fold the brand's spec

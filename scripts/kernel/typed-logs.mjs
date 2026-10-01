@@ -1,5 +1,5 @@
 // typed-logs.mjs — logs as typed rows, not scraped terminal text. The `logs` table of the repository's ledger
-// (engine/ledger-db.mjs ledgerFileFor; engine/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
+// (engine/db/ledger.mjs ledgerFileFor; engine/db/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
 // workflow is archived and deleted as a unit).
 // Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
 // BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold
@@ -37,9 +37,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
-import { jobResultSql } from './api-lib/rows.mjs';
-import { independentChecksOf } from './api-lib/check-evidence.mjs';
+import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
+import { jobResultSql } from './verbs/shared/rows.mjs';
+import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { logWriterFor } from './log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
@@ -537,7 +537,7 @@ async function main() {
     process.exit(2);
   }
   const repo = path.resolve(args.repo);
-  const { inspectLedger } = await import('../../engine/ledger-db.mjs');
+  const { inspectLedger } = await import('../../engine/db/ledger.mjs');
   const ledger = inspectLedger({ file: ledgerFileFor(repo) });
   const dryRun = !args.apply;
   const logs = openLogs(repo);

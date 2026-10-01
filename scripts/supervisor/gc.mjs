@@ -14,7 +14,7 @@
 // when it first saw a candidate, so the age rules below can hold). --apply closes and removes.
 //
 // Ownership (owner clarification 2026-09-28): a Kernel closes its own op workers at settle, the Supervisor closes its
-// own [Worker]s at report/cancel/land (both through scripts/lib/close-verify.mjs). This GC is the periodic scan for the
+// own [Worker]s at report/cancel/land (both through scripts/machine/close-verify.mjs). This GC is the periodic scan for the
 // leftovers that slipped past both; every leftover it collects is recorded as a self-derived lesson
 // (lessons.mjs recordLeftover): a leftover is a bug in the step that owned it.
 //
@@ -36,12 +36,12 @@
 //   lanes     worktrees under the lanes root (hk-lanes.mjs lanesRoot): a lane/* branch landed by patch, ledger or
 //             file content with a clean tree, idle for gcLaneGraceMs; a detached land scratch while no land runs; an
 //             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
-//             the worktree GC (scripts/lib/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
+//             the worktree GC (scripts/machine/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
 //             The node_modules junction is unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
 //             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
-//    through scripts/lib/hk-ledger.mjs and scripts/work/purge-workflow.mjs.)
+//    through scripts/housekeeping/hk-ledger.mjs and scripts/work/purge-workflow.mjs.)
 //   tmp       %TEMP% entries with a runtime prefix past tmpMaxAgeMs (hk-tmp.mjs sweepTmp).
 //   tasks     Orca Tasks of settled jobs whose close was refused: closed again (task-update completed).
 //   leases    lease rows (product ledgers and machine.sqlite sup_leases) of a settled job, a job the ledger no longer
@@ -64,28 +64,28 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { allocationSettings } from '../../engine/config.mjs';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll, activeWorkersAllRuns } from '../api/orca/worker-list.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
-import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
+import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../machine/close-verify.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
-import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { markRemoved } from '../lib/worktree-registry.mjs';
+import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../housekeeping/hk-lanes.mjs';
+import { safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
+import { markRemoved } from '../machine/worktree-registry.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
-import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../lib/terminal-ledger.mjs';
-import { SKILL_ROOT, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from './home.mjs';
+import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
+import { SKILL_ROOT, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
 import { jobsOf } from './workers.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { pidAlive } from '../../engine/machine-db.mjs';
-import { LANE_IDLE_MS, laneOwnerOf } from '../lib/lane-owner.mjs';
+import { pidAlive } from '../../engine/db/machine.mjs';
+import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -208,7 +208,7 @@ export function writeState({ seen = {}, closed = [], report = null, trigger = 's
 
 /* ------------------------------------------------------------ pure classification */
 
-// laneOwnerOf lives in scripts/lib/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
+// laneOwnerOf lives in scripts/machine/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
 export { laneOwnerOf };
 
 /** Tab titles by handle from terminal-list visualLayouts (the title Orca gave the tab, which agents never rewrite). */
@@ -789,7 +789,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     // The live owners of a lane: Orca's active workers over every Run (null when Orca is down or answers for one Run).
     const laneWorkers = (deps.activeWorkers ?? (() => activeWorkersAllRuns()))();
     // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
-    // (node scripts/lib/worktrees.mjs resume): the same stop mark as the worktree GC.
+    // (node scripts/machine/worktrees.mjs resume): the same stop mark as the worktree GC.
     const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
     const cursor = (deps.laneCursor ?? readLaneCursor)(env);
     const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, workers: laneWorkers, cursor, clock: deps.clock ?? Date.now });
@@ -814,7 +814,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
 
   if (want.has('tmp')) {
     try {
-      const sweep = deps.sweepTmp ?? (await import('../lib/hk-tmp.mjs')).sweepTmp;
+      const sweep = deps.sweepTmp ?? (await import('../housekeeping/hk-tmp.mjs')).sweepTmp;
       const r = await sweep({ apply, now, env, allocation: settings.housekeeping });
       const n = apply ? (r.deleted?.length ?? 0) : (r.skipped ?? []).filter((s) => /dry run/.test(s.reason ?? '')).length;
       report.counts.tmp += n;
@@ -887,7 +887,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     for (const i of report.items) if (i.leftover && (i.ok || i.reportOnly)) (byClass[i.class] ??= []).push(`${i.target} ${String(i.title ?? '').slice(0, 50)}`.trim());
     if (report.counts.terminals) byClass['idle-shell'] = report.items.filter((i) => i.class === 'idle-shell' && i.ok).map((i) => i.target);
     try {
-      const record = deps.lesson ?? (await import('./lessons.mjs')).recordLeftover;
+      const record = deps.lesson ?? (await import('../machine/lessons.mjs')).recordLeftover;
       for (const [klass, examples] of Object.entries(byClass)) if (examples.length)
         record({ klass, count: examples.length, examples: LEFTOVER_OWNERS[klass] ? [`owner step: ${LEFTOVER_OWNERS[klass]}`, ...examples] : examples, env, now });
     } catch { /* the lesson is best effort */ }
@@ -928,7 +928,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const args = parseArgs(process.argv.slice(2));
   if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   let language = 'vi';
-  try { language = (await import('./home.mjs')).supervisorSettings().language ?? 'vi'; } catch { /* vi */ }
+  try { language = (await import('../machine/home.mjs')).supervisorSettings().language ?? 'vi'; } catch { /* vi */ }
   // --plan: no seen-state, no log rows, no lessons; --holder: the host-lock holder of an apply (deps other than holder drop the lock, so name only it)
   const deps = args.plan ? { writeState: () => {}, log: () => {}, lesson: () => null } : args.holder ? { holder: args.holder } : {};
   const report = await runGc({ apply: args.apply, only: args.only, language, trigger: args.trigger ?? 'manual', deps });

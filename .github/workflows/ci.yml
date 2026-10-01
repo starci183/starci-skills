@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       # packages/grammar/dist is untracked; `npm run check` refuses a missing or stale one
-      # (scripts/checks/grammar-dist.mjs), so build it from this commit's source first.
+      # (scripts/checks/check-grammar-dist.mjs), so build it from this commit's source first.
       - name: Build @starci/grammar
         working-directory: packages/grammar
         run: |
@@ -48,9 +48,9 @@ jobs:
       # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
       # dependency (test-world 1.0.0 shipped one). Exit 1 a red package, 2 a proof that could not run - never a pass.
       - name: Published packages from a clean install
-        run: node scripts/checks/package-clean-test.mjs
+        run: node scripts/gates/package-clean-test.mjs
 
       # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
       # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
       - name: Scaffold app against registry installs
-        run: node scripts/checks/release-app-installs.mjs
+        run: node scripts/gates/release-app-installs.mjs

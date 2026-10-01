@@ -4,7 +4,7 @@ title: HFS slot manifest (kind app or runtime)
 description: >-
   The shape of knowledge/hfs/slots.yaml. Semantic rules JSON Schema cannot state (unique ids, every tier named by a
   slot or mayImport exists in the profile, a retired slot has a successor, an app-kind slot names a declared kind)
-  are checked by scripts/lib/hfs-slots.mjs loadSlotManifest. Two kinds share the loader: `app` (knowledge/hfs/slots.yaml,
+  are checked by scripts/hfs/slots.mjs loadSlotManifest. Two kinds share the loader: `app` (knowledge/hfs/slots.yaml,
   no `kind` key) for product apps, and `runtime` (knowledge/hfs/runtime-slots.yaml) for the StarCi runtime repository.
 if: {required: [kind], properties: {kind: {const: runtime}}}
 then: {$ref: '#/$defs/runtimeManifest'}

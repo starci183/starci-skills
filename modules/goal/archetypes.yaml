@@ -81,7 +81,7 @@ signalMatching:
     No surviving match means S* cannot be formed: route-plan reports the INTENT
     tier (needs-owner) and define-goal prints the chain as `underivable (kernel
     will derive at boot)`. No archetype is a default.
-  enforcedBy: scripts/route/route-plan.mjs (loadArchetypeSignals, intentToStar) + tests/goal-planner.spec.mjs
+  enforcedBy: scripts/route/route-plan.mjs (loadArchetypeSignals, intentToStar) + tests/engine/goal-planner.spec.mjs
 
 archetypes:
 

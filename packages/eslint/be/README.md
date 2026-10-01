@@ -22,7 +22,7 @@ export default starciBeConfig({ hfs: loadHfs(import.meta.url) })
 
 That is the whole configuration. `loadHfs` reads the repository's `hfs.json` beside the config file and the slot
 manifest this package ships in `runtime/` (a byte copy of `knowledge/hfs/slots.yaml`, refreshed by
-`packages/hfs/scripts/sync-runtime.mjs`). `starciBeConfig` returns the flat config: typed linting
+`scripts/hfs/sync-runtime.mjs`). `starciBeConfig` returns the flat config: typed linting
 (`parserOptions.projectService`) over every `.ts/.mts/.cts/.js/.mjs/.cjs`, ignores `dist/`, `coverage/` and
 `node_modules/` only, `noInlineConfig` with unused-disable reporting, the borrowed typescript-eslint rules, every canon
 rule at `error`, and `settings.starci.hfs` - the slot view each path-scoped rule asks (`lib/hfs.mjs`). The factory takes

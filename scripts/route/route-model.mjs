@@ -48,7 +48,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
   providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
@@ -450,7 +450,7 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
 // 'unknown' and never blocks.
 async function availabilityReader(repo) {
   let probeQuota = null;
-  try { ({ probeQuota } = await import('../api/quota/index.mjs')); } catch { /* probe not installed */ }
+  try { ({ probeQuota } = await import('../agent/quota/index.mjs')); } catch { /* probe not installed */ }
   let db = null;
   if (repo) {
     try {

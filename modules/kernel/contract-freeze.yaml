@@ -31,11 +31,11 @@ families:
       - scripts/checks/draw-
       - scripts/work/draw-
       - scripts/work/grammar-proposal.mjs
-      - scripts/checks/ui-proof-brief.mjs
+      - scripts/work/ui/ui-proof-brief.mjs
       - modules/ops/ops/interface.draw.yaml
       - knowledge/grammars/
       - knowledge/ui/
       - packages/grammar/
     gates:
-      - module: scripts/checks/draw-acceptance.mjs
+      - module: scripts/work/draw/draw-acceptance.mjs
         export: drawAcceptanceFindings

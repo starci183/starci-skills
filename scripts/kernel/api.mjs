@@ -58,8 +58,8 @@ import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
   startAttempt, writeContract, updateContractContext, updateAttempt, endRejectedAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
   updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
-} from '../../engine/ledger-db.mjs';
-import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
+} from '../../engine/db/ledger.mjs';
+import { machineFileFor, openMachine } from '../../engine/db/machine.mjs';
 import { recordWhy } from './why-record.mjs';
 import { gateBaseOf } from './workflow-checkpoint.mjs';
 import { workflowWorktreeOf } from './workflow-worktree.mjs';
@@ -69,7 +69,7 @@ import {
   findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, ownedPathsIntersect,
 } from '../../engine/admission.mjs';
 import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs';
-import { independentChecksOf } from './api-lib/check-evidence.mjs';
+import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
 import { ownedPathEffects } from './settle-landed.mjs';
@@ -86,29 +86,29 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
-// one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
+// one definition per helper, in scripts/kernel/verbs/shared/, imported back under the same names.
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf,
   latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestContractOf, latestReportOf, latestAttemptOf,
   operationTaskOf, operationDispatchOf,
-} from './api-lib/rows.mjs';
-import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
-import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
-import { foundationDutyFor } from './api-lib/foundation-duty.mjs';
-import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatchedReportBinding, parseAttempt, reportIdentityOf } from './api-lib/report-binding.mjs';
-import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './api-lib/hierarchy.mjs';
-import { WORKER_QUESTION } from './api-lib/messages.mjs';
-import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './api-lib/peers.mjs';
-import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
+} from './verbs/shared/rows.mjs';
+import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
+import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
+import { foundationDutyFor } from './verbs/shared/foundation-duty.mjs';
+import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatchedReportBinding, parseAttempt, reportIdentityOf } from './verbs/shared/report-binding.mjs';
+import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './verbs/shared/hierarchy.mjs';
+import { WORKER_QUESTION } from './verbs/shared/messages.mjs';
+import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peers.mjs';
+import { OP_ROLE, callerOf, refuseOpCaller } from './verbs/shared/caller.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
-import { closeSelfSafe } from '../lib/close-verify.mjs';
+import { closeSelfSafe } from '../machine/close-verify.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
-import { isLiveProofOp } from './serve-ask.mjs';
+import { isLiveProofOp } from './ask-server.mjs';
 import {
   AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
   SUPERVISOR_GATE, credentialsOwed, deferredQueueCause, openSupervisorGate, provisionalOps,
@@ -143,7 +143,7 @@ import {
   contractVersionOf, laterChangesFor, loadContractChanges,
 } from './contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
-import { guardLaunch } from '../guards/install.mjs';
+import { guardLaunch } from '../guards/hook-install.mjs';
 
 import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
@@ -172,20 +172,20 @@ import { taskList } from '../api/orca/task-list.mjs';
 import { UNTIL_FLAGS, lineageHeadById } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
 import { refuseSettleBacklog } from './kernel-authority.mjs';
-import { refuseDecisionsFirst } from '../reconciler/decisions.mjs';
-import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '../checks/draw-acceptance.mjs';
+import { refuseDecisionsFirst } from '../machine/decisions.mjs';
+import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '../work/draw/draw-acceptance.mjs';
 import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
 import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
 import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
 import { judgeJobLoop, judgeJobProofs, OP_GATE_CHANGE, OP_PROOF_CHANGE } from './gate-settle.mjs';
 import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
-import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../checks/work-hygiene.mjs';
+import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
 import { taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
-import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -193,7 +193,7 @@ const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // seam scripts/kernel/start-workflow.mjs and scripts/route/route-model.mjs use.
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 
-// The status vocabulary is engine/ledger-db.mjs JOB_STATUSES; these are the
+// The status vocabulary is engine/db/ledger.mjs JOB_STATUSES; these are the
 // three views this gate reasons in. enqueue writes 'queued' and settle writes
 // 'succeeded'|'failed' — the durable engine's own words.
 const FINAL_SETTLED = [...JOB_STATUSES.settled];
@@ -391,7 +391,7 @@ const openRepoLedger = (repo) => {
 };
 
 const emit = (out, human, asJson) => {
-  // Status fields contributed by scripts/kernel/api-status/*.mjs (api-extensions.mjs), for the status that asked.
+  // Status fields contributed by scripts/kernel/status/*.mjs (api-extensions.mjs), for the status that asked.
   if (statusAsk && out?.workflowId === statusAsk.ctx.workflowId && Object.hasOwn(out, 'frontier')) {
     const { fields, lines } = statusExtras(API_EXT.status, statusAsk.ctx, out);
     statusAsk = null;
@@ -1713,7 +1713,7 @@ function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
 // every probe degrades to {state:'unknown'} when it throws — routing still
 // decides on the capacity rows it can prove (running counts, maxParallel,
 // open incidents). A probe is evidence, never a verdict.
-const quotaModule = import('../api/quota/index.mjs').catch(() => null);
+const quotaModule = import('../agent/quota/index.mjs').catch(() => null);
 const probeQuotaSafe = async (provider) => {
   try {
     const mod = await quotaModule;
@@ -3733,7 +3733,7 @@ async function settleOpProofs(db, jobId, repo) {
   const judgment = judgeJobProofs({ op, files, mode });
   return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
 }
-// The draw acceptance an interface.draw pass owes (scripts/checks/draw-acceptance.mjs): every asset the pass binds -
+// The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
@@ -3776,7 +3776,7 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
   return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records, loops: verdict.loops } : null;
 }
-// The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/checks/work-hygiene.mjs,
+// The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/work/validate/work-hygiene.mjs,
 // the same parse + scoped strict validate + secret scan the product repo's pre-commit hook runs): the files its report
 // names plus every file its commits changed since the base it was admitted on. Read-only, before anything is written.
 // A leg admitted before the work-hygiene-gate change settles on its old contract.
@@ -3876,7 +3876,7 @@ function typedLogWarningsOf(db, workflowId, { limit = 20 } = {}) {
  * The settle's async tail for one settled job (owner ruling settle-runtime-service): session retention, the Telegram
  * media sender, the input re-baseline, artifact indexing (evidence copy + typed logs). Each step is best effort and
  * never un-settles; {ok, sessionReleased, artifacts, errors}. Run inline by settle under the test runner, else by
- * `api settle-tail` (scripts/kernel/api-verbs/settle-tail.mjs), retried by the settler until it succeeds.
+ * `api settle-tail` (scripts/kernel/verbs/settle-tail.mjs), retried by the settler until it succeeds.
  */
 async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   const db = ledger.db, jobId = job.job_id, errors = [];
@@ -4205,7 +4205,7 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 // Residual (modules/kernel/api.yaml conventions.callerBoundary): a worker
 // running with unattended permissions can still read the ledger file or unset
 // the marker; the api cannot stop raw file access, only refuse its verbs.
-// The shared-checkout guard of one op launch (scripts/guards/install.mjs,
+// The shared-checkout guard of one op launch (scripts/guards/hook-install.mjs,
 // modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
 // absolute paths for the command guard (bound to the worker's terminal once it
 // starts), and the history hook in every checkout the job writes. Best effort — a guard that cannot be put in place rides on the
@@ -4311,7 +4311,7 @@ const runExtensionVerb = async (spec, args, repo) => {
 async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
-  if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/api-verbs):\n${lines.join('\n')}\n`); }
+  if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/verbs):\n${lines.join('\n')}\n`); }
   if (!cmd || cmd === '--help' || cmd === '-h') usage(cmd ? 0 : 2);
   const args = parseArgs(argv.slice(1));
   const repo = path.resolve(args.repo ?? process.cwd());

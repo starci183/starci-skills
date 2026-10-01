@@ -18,7 +18,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
-import { APP_SCOPE, SIDES, loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { APP_SCOPE, SIDES, loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');

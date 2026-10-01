@@ -37,7 +37,7 @@ guidance:
     requirement: |-
       A product's composition taste is settled in its brand record as `brand.direction` (work/brand@1), one
       page archetype at a time, and is ready for drawing only once the owner accepted that archetype
-      (`brand.direction.archetypes.<name>.status: accepted`, checked by scripts/checks/brand.mjs `direction`).
+      (`brand.direction.archetypes.<name>.status: accepted`, checked by scripts/work/brand/brand.mjs `direction`).
       It applies the owner's nine-step UX/UI discipline - [Taste composition](composition/taste.yaml),
       HIERARCHY-6, ACCENT-6 and the [Taste proof](proof/taste.yaml) cases - and never overrides these rules
       or the grammar DNA. [The Nivo example](examples/brand-direction.nivo.yaml) is a proposed direction

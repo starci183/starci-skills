@@ -6,12 +6,12 @@
 // verb help line), so each land invalidated every queued lane. New work goes through files instead, one per
 // thing, discovered at startup:
 //
-//   scripts/kernel/api-verbs/<verb>.mjs      a verb: export default {verb, required?, kernelOnly?, flags?, ledger?, usage, run}
+//   scripts/kernel/verbs/<verb>.mjs      a verb: export default {verb, required?, kernelOnly?, flags?, ledger?, usage, run}
 //                                            required: [flag] or (args) => [flag]; flags: its boolean flags;
 //                                            ledger false: run without opening the repo ledger;
 //                                            run({ledger, args, repo, emit, need, caller, ext}) (may be async)
 //   modules/kernel/api-commands/<verb>.yaml  its contract (what `commands.<verb>` of api.yaml would hold)
-//   scripts/kernel/api-status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}
+//   scripts/kernel/status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}
 //                                            ctx {ledger, db, wf, workflowId, args, repo, now, core}; a null/undefined
 //                                            value adds nothing; `lines` adds human lines to `api status`
 //   scripts/kernel/api-boolean-flags.txt     one boolean flag per line (any verb); merge=union, order free
@@ -22,8 +22,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const VERBS_DIR = 'scripts/kernel/api-verbs';
-export const STATUS_DIR = 'scripts/kernel/api-status';
+export const VERBS_DIR = 'scripts/kernel/verbs';
+export const STATUS_DIR = 'scripts/kernel/status';
 export const FLAGS_FILE = 'scripts/kernel/api-boolean-flags.txt';
 export const COMMANDS_DIR = 'modules/kernel/api-commands';
 const SLUG = /^[a-z][a-z0-9-]*$/;

@@ -1,5 +1,5 @@
 schema: starci/canon-conformance@1
-# scripts/checks/canon-scan.mjs reads this file: which source roots a finding's unit belongs to, the
+# scripts/gates/canon-scan.mjs reads this file: which source roots a finding's unit belongs to, the
 # order the waves of a conformance cut run in, and the shared seams the first wave owns.
 waves:
   - id: foundation

@@ -18,7 +18,7 @@
 //      crash loop behind it;
 //   5. every host service that is down, started through services.mjs startService (Orca is never launched: the owner does);
 //   6. the Supervisor seat (start-supervisor.mjs, only when supervisor.mode is kernel) and every running workflow's
-//      Kernel seat (scripts/kernel/watchdog.mjs --once --repair, the Host controller's own call);
+//      Kernel seat (scripts/kernel/kernel-watchdog.mjs --once --repair, the Host controller's own call);
 //   7. the checklist, re-read until green or --wait seconds (default 120) pass.
 // --check runs only the read-only checklist (steps 1 and 7, one pass). Exit 0 only when every REQUIRED item is green.
 import '../api/process/hide-child-windows.mjs';
@@ -28,8 +28,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readMachine, withMachine } from '../../engine/machine-db.mjs';
-import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../lib/hk-orphan-ledgers.mjs';
+import { readMachine, withMachine } from '../../engine/db/machine.mjs';
+import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { quickCheck } from './ledger-health.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { green, red, warn } from './checklist-items.mjs';
@@ -283,7 +283,7 @@ export function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
   const action = answer?.action ?? null;
   if (seatState === 'live' && answer?.ok !== false) return green('seats', id, name, `live (${action ?? 'ok'})`);
   return red('seats', id, name, `${seatState ?? 'unknown'}${action ? ` (${action})` : ''}${answer?.error ? `: ${String(answer.error).slice(0, 120)}` : ''}`,
-    `node scripts/kernel/watchdog.mjs --repo <repo> --workflow ${workflowId} --once --repair --json`);
+    `node scripts/kernel/kernel-watchdog.mjs --repo <repo> --workflow ${workflowId} --once --repair --json`);
 }
 
 /* ------------------------------------------------------------ the read-only gather */
@@ -309,7 +309,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/machine-db.mjs (initialises it) or restore from D:/starci-archive/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from D:/starci-archive/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
@@ -319,7 +319,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
   const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
-  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/checks/ledger-hygiene.mjs)')
+  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/housekeeping/ledger-hygiene.mjs)')
     : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   push(await worktreeItems({ env, repos: ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
   const pinBad = pinProblems(configuredPins(config));
@@ -350,21 +350,21 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
 }
 
 /**
- * One row per repository the runtime keeps worktrees in, its own included (scripts/lib/worktrees.mjs worktreeCounts): its
+ * One row per repository the runtime keeps worktrees in, its own included (scripts/machine/worktrees.mjs worktreeCounts): its
  * runtime and linked worktree counts against worktrees.capPerRepo, red when either is over the cap or it holds orphans (a registered tree whose directory is gone, or a tree
  * under <repo>/.starciwork/worktrees no live registry row owns). The GC controller's gc:worktrees pass clears orphans.
  * Seam: counts.
  */
 export async function worktreeItems({ env = process.env, repos = [], counts = null } = {}) {
   let rows;
-  try { rows = counts ?? (await import('../lib/worktrees.mjs')).worktreeCounts({ env, repos: [SKILL_ROOT, ...(await import('../kernel/target-repo.mjs')).boundRepoRoots(repos)] }); }
+  try { rows = counts ?? (await import('../machine/worktrees.mjs')).worktreeCounts({ env, repos: [SKILL_ROOT, ...(await import('../kernel/target-repo.mjs')).boundRepoRoots(repos)] }); }
   catch (error) { return [warn('preflight', 'worktrees', 'worktrees per repo', `unreadable: ${String(error?.message ?? error).slice(0, 200)}`, 'node scripts/reconciler/start.mjs --check again')]; }
   if (!rows.length) return [green('preflight', 'worktrees', 'worktrees per repo', 'no runtime worktree', { required: false })];
   return rows.map((r) => {
     const id = `worktrees:${path.basename(r.repoRoot)}`, name = `worktrees ${path.basename(r.repoRoot)}`;
     const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : ''}`;
     return r.over || r.orphans.length
-      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: node scripts/lib/worktrees.mjs gc')
+      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: node scripts/machine/worktrees.mjs gc')
       : green('preflight', id, name, detail);
   });
 }

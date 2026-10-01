@@ -4,8 +4,8 @@
 // (the runtime signals table only takes kernel|stop|launch|decision-doorbell). `value` is the circuit shape the kernel
 // used to store in the provider-health signal ({status, failureKind, provider, model, strikes, credentialFingerprint,
 // ...}); it rides in provider_health.detail_json, `expiresAt` in circuit_open_until. Every change of status appends one
-// provider_health_events row (engine/machine-db.mjs setProviderHealth). Reads never throw: no machine, no circuit.
-import { openMachine, openMachineReader, providerHealth, setProviderHealth } from '../../engine/machine-db.mjs';
+// provider_health_events row (engine/db/machine.mjs setProviderHealth). Reads never throw: no machine, no circuit.
+import { openMachine, openMachineReader, providerHealth, setProviderHealth } from '../../engine/db/machine.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 export const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);

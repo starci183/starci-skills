@@ -14,9 +14,9 @@
 // opChain has no edges, or whose projection is not a provable graph is reported `underivable` and left
 // untouched. A write goes through the ledger writer (updateGoalJson) inside one transaction and records
 // a 'plan-edges-migrated' event {by:'supervisor', reason:'plan-edges migration', edges, source}.
-import { inspectLedger, openLedger } from '../../engine/ledger-db.mjs';
-import { updateGoalJson } from '../../engine/ledger-db.mjs';
-import { machineFileFor, openMachine, listLedgers } from '../../engine/machine-db.mjs';
+import { inspectLedger, openLedger } from '../../engine/db/ledger.mjs';
+import { updateGoalJson } from '../../engine/db/ledger.mjs';
+import { machineFileFor, openMachine, listLedgers } from '../../engine/db/machine.mjs';
 import { pathToFileURL } from 'node:url';
 import { legOpsOf, planGraphOf } from '../route/plan-edges.mjs';
 

@@ -3,7 +3,7 @@
 //   node scripts/api/orca/agent-context.mjs
 // The live command/flag signature of the binary that will actually run. It is
 // what scripts/api/orca/lib.mjs compares calls.yaml against before the first
-// mutation and what `scripts/checks/providers.mjs --live` compares in bulk.
+// mutation and what `scripts/checks/check-providers.mjs --live` compares in bulk.
 // Returns {ok, commands, listing, schemaVersion} — listing is
 // Map<command, Set<flag>>.
 import { orcaCall, listingOf } from './lib.mjs';

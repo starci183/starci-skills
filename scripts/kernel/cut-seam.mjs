@@ -28,7 +28,7 @@ import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { jobResultSql } from './api-lib/rows.mjs';
+import { jobResultSql } from './verbs/shared/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 
@@ -504,7 +504,7 @@ async function main(argv) {
     return 0;
   }
   if (verb === 'canon-redispatch' && flag('repo') && flag('job')) {
-    const { inspectLedger, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+    const { inspectLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
     const ledger = inspectLedger({ file: ledgerFileFor(path.resolve(flag('repo'))) });
     try {
       const extraPaths = String(flag('paths') ?? '').split(',').map((p) => p.trim()).filter(Boolean);

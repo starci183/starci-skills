@@ -1,21 +1,21 @@
 // hfs work-hygiene: the guard for the two trees an app tracks besides source. A file under the app root's .starciwork must be
 // product content (the .starciwork/.gitignore allowlist admits it, so agent output is refused), and a file under the app root's
 // .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
-// any tree, is read from the index and judged with the one secret judgement of `hfs check` (scripts/lib/hfs-rules/secrets.mjs: a secret by
+// any tree, is read from the index and judged with the one secret judgement of `hfs check` (scripts/hfs/rules/secrets.mjs: a secret by
 // being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
 // .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. The pre-commit hook judges the staged
-// files; scripts/checks/check-hfs-sync.mjs judges every tracked file.
+// files; scripts/gates/hfs-sync.mjs judges every tracked file.
 //
 // Run inside a full runtime checkout — the repository under judgment is the checkout — it also reports the
-// state-root ledger findings of that checkout's scripts/lib/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT and
+// state-root ledger findings of that checkout's scripts/housekeeping/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT and
 // LEDGER_LEGACY_WORK_SQLITE (COOK-BRIEF F4 handover, incident 2026-09-30). Any other repository — a product repo,
-// a bare repo — carries no scripts/checks/ledger-hygiene.mjs at its root, so that section is silently absent:
+// a bare repo — carries no scripts/housekeeping/ledger-hygiene.mjs at its root, so that section is silently absent:
 // never a crash, never machine-state findings blamed on a repository that does not own them.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { secretFileFindings } from '../runtime/scripts/lib/hfs-rules/secrets.mjs';
+import { secretFileFindings } from '../runtime/scripts/hfs/rules/secrets.mjs';
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
 /** The app root's work tree and stack tree, app-relative (hfs work-hygiene runs at the app root). */
@@ -83,9 +83,9 @@ export function judge(cwd, files) {
   return { checked: files.length, findings: [...findings, ...secretGuardFindings(cwd, files, refused)] };
 }
 
-// The scripts/checks/ledger-hygiene.mjs of the checkout under judgment: the root git names for `cwd`, which carries
+// The scripts/housekeeping/ledger-hygiene.mjs of the checkout under judgment: the root git names for `cwd`, which carries
 // that script only when the repository IS a full StarCi runtime checkout (packages/hfs/sync/ sits 3 directories
-// under such a root, the same computation packages/hfs/scripts/sync-runtime.mjs uses). A product repository — or a
+// under such a root, the same computation scripts/hfs/sync-runtime.mjs uses). A product repository — or a
 // bare repo — has no such file, so the section is silently absent wherever this module happens to be installed.
 const ledgerHygieneScript = cwd => {
   try {

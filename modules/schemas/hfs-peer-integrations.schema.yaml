@@ -4,7 +4,7 @@ title: HFS driver integration peers
 description: >-
   The catalog of runtime peers a driver integration needs: when an app depends on every package of `when` (at the named
   major, when one is named) it must declare `requires` in the dependencies of its app root package.json. The document is
-  data read by scripts/lib/hfs-rules/peer-integrations.mjs (R111 HFS_PEER_INTEGRATION_MISSING); it installs nothing.
+  data read by scripts/hfs/rules/peer-integrations.mjs (R111 HFS_PEER_INTEGRATION_MISSING); it installs nothing.
 type: object
 additionalProperties: false
 required: [schema, purpose, pairs]

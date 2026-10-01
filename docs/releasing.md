@@ -15,7 +15,7 @@ Review source changes and test failures. Do not weaken validators to produce a g
 ## Example apps: CI and the local Sonar dashboard
 
 The root `.github/workflows/examples.yml` runs every example app (the matrix is derived from `examples/*/hfs.json` of kind app,
-`scripts/checks/examples-ci.mjs`): typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
+`scripts/checks/check-examples-ci.mjs`): typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
 `codecov.yml`, one flag per app, 100 on the project and the patch), the front-end build and the Sonar gate on push and pull request;
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
 only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
@@ -23,8 +23,8 @@ Actions); each product monorepo adds its own for its app-repository `codecov.yml
 per example app against the local SonarQube after `npm test` and a project scan:
 
 ```sh
-node scripts/checks/sonar-local.mjs scan --cwd examples/<app> --project-gate --wait
-node scripts/checks/sonar-local.mjs dashboard --cwd examples/<app>
+node scripts/gates/sonar-local.mjs scan --cwd examples/<app> --project-gate --wait
+node scripts/gates/sonar-local.mjs dashboard --cwd examples/<app>
 ```
 
 It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every service is at 100 coverage.

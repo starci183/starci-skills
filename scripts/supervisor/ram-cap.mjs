@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ram-cap.mjs — the Supervisor's handle on the RAM-aware dispatch cap (scripts/lib/ram-throttle.mjs).
+// ram-cap.mjs — the Supervisor's handle on the RAM-aware dispatch cap (scripts/machine/ram-throttle.mjs).
 //
 //   node scripts/supervisor/ram-cap.mjs status [--op <kind>] [--workflow <id>] [--json]
 //        the effective cap on this host now and why: mode, free RAM, CPU, running ops across every ledger, the
@@ -15,7 +15,7 @@
 // this host.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hostThrottle, setPriority, throttleLine, readThrottleState, priorityTable } from '../lib/ram-throttle.mjs';
+import { hostThrottle, setPriority, throttleLine, readThrottleState, priorityTable } from '../machine/ram-throttle.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 

@@ -7,10 +7,10 @@
 // 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler is the only loop).
 import fs from 'node:fs';
 import path from 'node:path';
-import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { isRuntimeRoot, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
-import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../housekeeping/hk-orphan-ledgers.mjs';
 
 /**
  * The managed product ledgers: {repos, missing, configError?}. `missing` names listed paths that hold no ledger;

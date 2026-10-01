@@ -76,7 +76,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
   counts, pending inbox rows), and `api.mjs survey --workflow <id>` when you need the detail —
   open jobs, live signals, the events tail, open incidents.
 - The reconciler Host controller owns Kernel seat liveness and runs
-  `scripts/kernel/watchdog.mjs --once --repair` as a single pass. The Workflow
+  `scripts/kernel/kernel-watchdog.mjs --once --repair` as a single pass. The Workflow
   controller opens progress and stall Decision Items. Read their ledger evidence
   when reporting a stalled workflow; the monitor does not start a watchdog cadence.
   The Kernel's yield rule is `.claude/modules/kernel/driver-loop.yaml`.

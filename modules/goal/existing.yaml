@@ -7,12 +7,12 @@
 # request touches, and the extend-vs-add decision falls out of the GAP.
 #
 # Sources:
-#   engine/ledger-db.mjs        — the .starciwork runtime.sqlite record rows
+#   engine/db/ledger.mjs        — the .starciwork runtime.sqlite record rows
 #                                    (record state, ownership)
 #   modules/models/kinds.yaml — work.author's intake mode: the typed
 #                                    reference/conflict/new cases an intake
 #                                    reconciles authored records against decided ones
-#   scripts/checks/check-work-deep.mjs    — DEP_STALE: a done record whose referenced
+#   scripts/work/validate/check-work-deep.mjs    — DEP_STALE: a done record whose referenced
 #                                    deps moved since baseline ("its proof was
 #                                    captured against older premises");
 #                                    normDigest excludes volatile lifecycle fields
@@ -44,9 +44,9 @@ about:
     chain proposed against an unmeasured S₀ plans work that may already be
     done, or misses the surface it is about to break.
   sources:
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
     - modules/kernel/driver-loop.yaml
-    - scripts/checks/check-work-deep.mjs
+    - scripts/work/validate/check-work-deep.mjs
 
 # ----------------------------------------------------------------------------
 # SURVEY — measuring S₀. Two surfaces, always both.
@@ -125,7 +125,7 @@ rules:
       proposed — never decompose against an unmeasured S₀.
     mechanism: >-
       The .starciwork ownership lookup: which record owns the touched paths
-      (the record rows in engine/ledger-db.mjs's runtime.sqlite — ownership is
+      (the record rows in engine/db/ledger.mjs's runtime.sqlite — ownership is
       the node's allowlist of path prefixes, docs/ledger-db.md) + the source
       scan those records name. The intake writes its findings as typed
       reconciliation cases (work.author intake mode, modules/models/kinds.yaml)

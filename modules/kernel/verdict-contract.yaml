@@ -34,7 +34,7 @@ about:
   sources:
     - scripts/kernel/api.mjs
     - modules/models/kinds.yaml
-    - engine/ledger-db.mjs
+    - engine/db/ledger.mjs
 
 # ============================================================================
 # 1 — THE AGENT'S OUTPUT. The packet's `returns` block, spelled out.
@@ -84,14 +84,14 @@ returns:
       - stamped digests are real sha256 and match    -> ASSET_STAMP / ASSET_DIGEST
       - recorded media is not a stub/fake            -> RUN_MEDIA_FAKE
       - every receipt names a real artifact          -> RECEIPT_ORPHAN
-      (all: scripts/checks/check-work-artifacts.mjs; DEP_STALE /
-      NORM_UNRECORDED baseline semantics: scripts/checks/check-work-deep.mjs).
+      (all: scripts/work/validate/check-work-artifacts.mjs; DEP_STALE /
+      NORM_UNRECORDED baseline semantics: scripts/work/validate/check-work-deep.mjs).
     kernelSide: >-
       The file LIST is never taken from the report: validateOpReport
       refuses report.files outside the job's owned_paths
       (scripts/kernel/report-envelope.mjs), and the byte-level checks above
       run as the op's declared checks re-executed by the kernel via
-      `api check` (scripts/checks/check-work-artifacts.mjs). A claim of
+      `api check` (scripts/work/validate/check-work-artifacts.mjs). A claim of
       bytes that differ on disk is ASSET_DIGEST — rejected.
 
   suspicion:
@@ -149,8 +149,8 @@ envelope:
   binding: >-
     Identity fields (run, task, dispatch, from) bind the report to the exact
     dispatch; UNIQUE(workflow_id, dispatch_id) on the reports table means one
-    dispatch produces exactly one report (engine/ledger-db.mjs /
-    engine/migrations/runtime/0001-init.sql reports DDL). Filing is `api report --job <id>
+    dispatch produces exactly one report (engine/db/ledger.mjs /
+    engine/db/migrations/runtime/0001-init.sql reports DDL). Filing is `api report --job <id>
     --report <file>` — the file is a starci/op-report@1 JSON envelope the api
     validates (identity fields run/task/dispatch/from are stamped from the
     job row, never the worker's claim); an upsert on that key, so a re-filed
@@ -299,13 +299,13 @@ rejects:
       {workflow_id,op_id,attempt,generation,token} must equal its job's);
       a settle against an already-settled job is refused (job-settled).
       An agent cannot graft evidence or a lease onto another job.
-    citation: "engine/migrations/runtime/0001-init.sql leases_match_job triggers; scripts/kernel/api.mjs settle job-settled refusal"
+    citation: "engine/db/migrations/runtime/0001-init.sql leases_match_job triggers; scripts/kernel/api.mjs settle job-settled refusal"
   - id: unverifiable-evidence
     rule: >-
       Declared bytes missing/empty/wrong-magic/wrong-digest refuse the run
       (ASSET_* codes); a record whose dependency baseline moved refuses
       DEP_STALE — stale evidence is missing evidence.
-    citation: "scripts/checks/check-work-artifacts.mjs; scripts/checks/check-work-deep.mjs"
+    citation: "scripts/work/validate/check-work-artifacts.mjs; scripts/work/validate/check-work-deep.mjs"
   - id: unknown-effect-fallback
     rule: >-
       A missing output, unknown effect or guessed terminal identity never

@@ -19,9 +19,9 @@ provenance:
   publicEntry: "@starci/grammar/common"
   familyEntry: "@starci/grammar/offset-pop"
   styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
-  generatedBy: "scripts/checks/grammar-knowledge.mjs --write (dna, tokens[], renderers[], identity.counts, provenance.digests)"
+  generatedBy: "scripts/work/ui/grammar-knowledge.mjs --write (dna, tokens[], renderers[], identity.counts, provenance.digests)"
   driftCheck: |
-    `node scripts/checks/grammar-knowledge.mjs` (and `tests/grammar-knowledge.spec.mjs` under `npm test`)
+    `node scripts/work/ui/grammar-knowledge.mjs` (and `tests/work-ui/grammar-knowledge.spec.mjs` under `npm test`)
     compares this file with the source: `dna` must deep-equal every object `src/offset-pop/dna.ts`
     exports (accentText and the `offset`/`palette` groups included), each token row's value, dark value
     and overrides must equal what the family sheets set on the root, and the renderer rows must equal

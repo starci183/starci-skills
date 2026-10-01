@@ -116,7 +116,7 @@ incident:
     --by kernel|supervisor. frontier.ownerClaimsUnproven [{incidentId, kind,
     resolvedAt, by, claim, reason}] - past resolutions of this workflow whose owner
     claim no owner answer backs; read-only, history is never rewritten
-    (node scripts/checks/owner-claims-audit.mjs --repo <repo> lists a whole ledger).
+    (node scripts/housekeeping/owner-claims-audit.mjs --repo <repo> lists a whole ledger).
     grammarProposals [{name, file, jobId, opId, filedAt, status: proposed, complete}], present only when
     non-empty: the grammar proposals interface.draw filed (grammar-proposal-filed) that no grammar lane has
     resolved (grammar-proposal-resolved) - the owner's to decide through the draw-review ask, never

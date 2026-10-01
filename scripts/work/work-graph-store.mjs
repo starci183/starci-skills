@@ -1,7 +1,7 @@
-// work-graph-store.mjs — the ledger half of the work graph: versions live in work_graph_versions (engine/migrations/runtime/0001-init.sql),
+// work-graph-store.mjs — the ledger half of the work graph: versions live in work_graph_versions (engine/db/migrations/runtime/0001-init.sql),
 // one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours come from
 // the workflow's jobs on each node's owned paths (colorsFromJobs); the recorded colours only carry rework (red).
-import { JOB_STATUSES, recordGraphVersion } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, recordGraphVersion } from '../../engine/db/ledger.mjs';
 import { AWAITING_OWNER_STATUS } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';

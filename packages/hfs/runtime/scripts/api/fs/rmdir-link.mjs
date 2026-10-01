@@ -1,5 +1,5 @@
 // rmdir-link.mjs — the link-safe removal primitive: `cmd /d /c rmdir <link>` (no /s) removes a Windows junction or
-// directory symlink as a link and never touches its target. scripts/lib/safe-remove.mjs removeLink is its one caller and
+// directory symlink as a link and never touches its target. scripts/api/fs/safe-remove.mjs removeLink is its one caller and
 // checks afterwards that the link is gone (unlinkOnly); this file only issues the call.
 
 import { spawnSync } from 'node:child_process';

@@ -1,4 +1,4 @@
-# The contract of `api kernel-ack-rev` (scripts/kernel/api-verbs/kernel-ack-rev.mjs). One file per extension verb
+# The contract of `api kernel-ack-rev` (scripts/kernel/verbs/kernel-ack-rev.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.kernel-ack-rev (lane slim-api).
 args: '--workflow <id> --rev <sha or unique prefix> [--files <csv of what was re-read>]'
 reads: 'the workflows row; the runtime root''s git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)'

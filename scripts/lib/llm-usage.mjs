@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYamlFile } from './yaml.mjs';
+import { readYamlFile } from './read-yaml.mjs';
 
 export const USAGE_SOURCE = 'cli-transcript';
 export const USAGE_UNAVAILABLE = 'unavailable';

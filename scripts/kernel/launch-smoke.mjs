@@ -47,7 +47,7 @@
 // (the first live run: a Kernel dropped one character of it and its stage never ran).
 //
 // It is step `launch-smoke` of the pre-workflow readiness (docs/releasing.md "Pre-workflow readiness", docs/host-contract.md); it starts real agents, so it
-// is run by hand once per runtime release, never by a check or a spec (tests/launch-smoke.spec.mjs fakes the client).
+// is run by hand once per runtime release, never by a check or a spec (tests/kernel/launch-smoke.spec.mjs fakes the client).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -55,7 +55,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';

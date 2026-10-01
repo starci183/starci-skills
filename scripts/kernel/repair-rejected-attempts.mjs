@@ -3,7 +3,7 @@
 // the refusal left open: end_state NULL, or the legacy end_state requeued with settled_at / released_at never stamped.
 // Every reader that asks "is this attempt still running?" (the UI, the frontier) read those rows as running for hours
 // (nivo wf-nivo-collab-mum8xsop, op-scope.define try 3, attempt 28: "prompt-stuck" at submission, retried as attempt 29).
-// Since the fix rejectDispatch ends the attempt itself (engine/ledger-db.mjs endRejectedAttempt); this seals the ones
+// Since the fix rejectDispatch ends the attempt itself (engine/db/ledger.mjs endRejectedAttempt); this seals the ones
 // written before it, once.
 //
 //   node scripts/kernel/repair-rejected-attempts.mjs --repo <work repo> | --file <runtime.sqlite> [--json]
@@ -16,7 +16,7 @@
 // event of its job between its own dispatch and the job's next dispatch (older events carry no attempt id).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { endRejectedAttempt, ledgerFileFor, openLedger, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { endRejectedAttempt, ledgerFileFor, openLedger, openLedgerReader } from '../../engine/db/ledger.mjs';
 
 const CANDIDATES = `
   SELECT a.attempt_id, a.workflow_id, a.job_id, a.unit_id, a.op_id, a.try_no, a.dispatch_seq, a.dispatched_at, a.end_state, a.terminal_handle,

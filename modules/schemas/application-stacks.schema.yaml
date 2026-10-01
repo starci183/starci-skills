@@ -52,7 +52,7 @@ properties:
       service the repository does not use is still declared `mode: disabled` when its CI or config
       mentions it. Owner ruling 2026-09-24: every product states these unambiguously so no Kernel or
       op misreads them and asks the owner again. Optional in this schema so older declarations
-      stay loadable; scripts/checks/check-starcistacks.mjs requires it for a new repository or a
+      stay loadable; scripts/gates/starcistacks.mjs requires it for a new repository or a
       new leg (contract change starcistacks-services) and reports its absence as a suspect with a
       planned follow-up everywhere else.
     type: object
@@ -86,7 +86,7 @@ $defs:
       qualityGate:
         description: >-
           sonar only: the name of the one quality gate the repository is held to. The thresholds are not restated
-          here - knowledge/sonar-gate.yaml owns them and scripts/checks/check-starcistacks.mjs refuses any other name
+          here - knowledge/sonar-gate.yaml owns them and scripts/gates/starcistacks.mjs refuses any other name
           (STACKS_QUALITY_GATE_DRIFT).
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
@@ -176,7 +176,7 @@ $defs:
       member's path from that repository's root; the tracked <path>.enc twin must exist. `env` is the
       variable the consuming tool reads; `key` is the field inside a structured custody file (app.yaml)
       when the application reads the file itself. At least one of env and key is named. Sonar
-      convention (scripts/checks/sonar-local.mjs reads it): id `admin` creates projects and mints
+      convention (scripts/gates/sonar-local.mjs reads it): id `admin` creates projects and mints
       tokens; a credential whose id is a project key is that project's analysis token.
     type: object
     additionalProperties: false

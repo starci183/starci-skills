@@ -9,7 +9,7 @@
 //   dead worker (frontier.deadWorkerJobs)       -> api reconcile --job <id> --dead-worker --settle-failed   job.worker
 //   held worker (frontier.heldWorkerJobs)       -> api reconcile --job <id> --release-worker                job.worker
 //   reported, not yet settled or handed over    -> the runtime settler for this job                          job.settle
-//                                                  (node scripts/reconcile/job-settle.mjs --repo R --job J: reconcileJobSettle -
+//                                                  (node scripts/kernel/settle/job-settle.mjs --repo R --job J: reconcileJobSettle -
 //                                                  consume, re-verify or canon parity, api check + api settle; wrapped, never
 //                                                  re-implemented)
 //   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
@@ -19,7 +19,7 @@
 //                                                  verifies the terminal), recordLeftover op-worker-after-settle
 //   wf: running < allowedParallel, queued-ready -> api dispatch-ready --workflow <wf> (at most once per       job.dispatch
 //                                                  dispatchEveryMs per workflow)
-//   workers:supervisor                          -> scripts/supervisor/watchdog.mjs sweepWorkers (called, not   job.close-verify
+//   workers:supervisor                          -> scripts/supervisor/supervisor-watchdog.mjs sweepWorkers (called, not   job.close-verify
 //                                                  copied); in shadow over a dry ledger and dry host seams
 //
 // Every job pass also keeps the job's SLA clocks (DESIGN §9.1 table; codes in modules/reconciler/sla.yaml, numbers in
@@ -36,13 +36,13 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mjs';
 import { clocksOf } from '../sla.mjs';
-import { settlerSettings, reportedJobs, kernelHandoverOf, releaseProofOf, EVENTS as SETTLE_EVENTS, KERNEL_ONLY_OPS } from '../../reconcile/job-settle.mjs';
+import { settlerSettings, reportedJobs, kernelHandoverOf, releaseProofOf, EVENTS as SETTLE_EVENTS, KERNEL_ONLY_OPS } from '../../kernel/settle/job-settle.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 export const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
-export const SETTLER_SCRIPT = 'scripts/reconcile/job-settle.mjs';
+export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle.mjs';
 export const OPENED_BY = 'job-controller';
 export const SUPERVISOR_LEDGER = 'supervisor';
 export const WORKERS_KEY = 'workers:supervisor';
@@ -218,7 +218,7 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 
 /* ------------------------------------------------------------------------------------------------ the [Worker] sweep */
 
-/** Host seams for sweepWorkers (the same primitives as scripts/supervisor/watchdog.mjs hostDeps). */
+/** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps). */
 export async function workerSweepDeps() {
   const [{ terminalRead }, host, liveness, closeMod, quitMod] = await Promise.all([
     import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../kernel/terminal-liveness.mjs'),
@@ -321,7 +321,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       const closedNow = (r?.value?.results ?? []).flatMap((x) => x.released ?? []).filter((x) => x.closedNow);
       if (closedNow.length && ctx.mode === 'active') {
         // A terminal the settle step should have closed is a bug of that step (INV-J2): one lesson per day.
-        try { (await import('../../supervisor/lessons.mjs')).recordLeftover({ klass: 'op-worker-after-settle', count: closedNow.length, examples: closedNow.map((x) => x.jobId), env: ctx.env }); } catch { /* a lesson */ }
+        try { (await import('../../machine/lessons.mjs')).recordLeftover({ klass: 'op-worker-after-settle', count: closedNow.length, examples: closedNow.map((x) => x.jobId), env: ctx.env }); } catch { /* a lesson */ }
       }
       return { action: 'close-verify', closedNow: closedNow.length, ...r };
     }
@@ -356,16 +356,16 @@ async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
 
 async function reconcileWorkers(ctx, settings) {
   if (!may(ctx, 'job.close-verify')) return { ok: true, action: 'not-owned' };
-  const { sweepWorkers } = await import('../../supervisor/watchdog.mjs');
+  const { sweepWorkers } = await import('../../supervisor/supervisor-watchdog.mjs');
   const deps = await workerSweepDeps();
   if (ctx.mode !== 'active') {
     const would = [];
-    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    const { readSupervisor } = await import('../../machine/home.mjs');
     const out = readSupervisor((m) => sweepWorkers(dryLedger(m, would), drySweep(deps, would), { now: ctx.now() }), null, { env: ctx.env ?? process.env }) ?? { deaths: [], closed: [] };
     if (out.deaths.length || would.some((w) => w.act !== 'ledger-write')) ctx.log('reconciler.would', `job would sweep [Worker] jobs: ${out.deaths.length} death(s), ${would.filter((w) => w.act !== 'ledger-write').length} close(s)`, { deaths: out.deaths, would: would.slice(0, 20) });
     return { ok: true, action: 'workers', shadow: true, deaths: out.deaths.length };
   }
-  const { withSupervisor } = await import('../../supervisor/home.mjs');
+  const { withSupervisor } = await import('../../machine/home.mjs');
   return withSupervisor((m) => {
     const out = sweepWorkers(m, deps, { now: ctx.now() });
     if (out.deaths?.length || out.closed?.length) ctx.log('reconciler.act', `job swept [Worker] jobs: ${out.deaths.length} death(s), ${out.closed.length} closed`, out);
@@ -469,7 +469,7 @@ export default {
     const settings = jobSettings();
     const keys = [];
     // The [Worker] jobs are machine.sqlite sup_jobs (no supervisor ledger).
-    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    const { readSupervisor } = await import('../../machine/home.mjs');
     if (readSupervisor((m) => m.db.prepare("SELECT COUNT(*) n FROM sup_jobs WHERE status IN ('running','reported')").get()?.n ?? 0, 0, { env: ctx.env ?? process.env })) keys.push(WORKERS_KEY);
     for (const l of ctx.ledgers ?? []) {
       if (l.ledgerId === SUPERVISOR_LEDGER) continue;
@@ -498,8 +498,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const argv = process.argv.slice(2);
   const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   if (!argv.includes('--dry')) { console.error('use: job.mjs --dry [--repo <path>] [--workflow <id>] [--json]'); process.exit(2); }
-  const { openLedgerReader, ledgerFileFor } = await import('../../../engine/ledger-db.mjs');
-  const { productRepos } = await import('../../supervisor/home.mjs');
+  const { openLedgerReader, ledgerFileFor } = await import('../../../engine/db/ledger.mjs');
+  const { productRepos } = await import('../../machine/home.mjs');
   const repos = val('repo') ? [path.resolve(val('repo'))] : productRepos();
   const settings = jobSettings();
   const out = [];

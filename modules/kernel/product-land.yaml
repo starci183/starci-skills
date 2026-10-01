@@ -1,6 +1,6 @@
 # Workflow worktrees and the land (owner decision WFWT, final: ONE Orca-owned worktree per Kernel workflow; the per-op
-# worktree and its node_modules junction overlay are gone). Read by scripts/lib/worktree-registry.mjs worktreeSettings(),
-# and scripts/kernel/api-status/imports.mjs (invariant.importsCacheMs). Every value has the
+# worktree and its node_modules junction overlay are gone). Read by scripts/machine/worktree-registry.mjs worktreeSettings(),
+# and scripts/kernel/status/imports.mjs (invariant.importsCacheMs). Every value has the
 # same default in code.
 
 worktrees:

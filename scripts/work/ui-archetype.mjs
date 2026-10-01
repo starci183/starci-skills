@@ -22,7 +22,7 @@
 // owner's receipt ({ready: true, provisional: true}). It never becomes `accepted`, never golden, and the owner's
 // brand-direction-review ask still stands for the handover. Measured 2026-09-27: every nivo/starci-next draw of a
 // list/detail surface waited on a proposed archetype the owner had not answered (prerequisite-unmet, awaiting-owner).
-import { DIRECTION_ARCHETYPES, checkDirection, defaultGrammarRoot, readBrandRecord } from '../checks/brand.mjs';
+import { DIRECTION_ARCHETYPES, checkDirection, defaultGrammarRoot, readBrandRecord } from './brand/brand.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 /**

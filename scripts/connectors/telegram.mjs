@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // telegram.mjs — tells the owner about an owner ask over a Telegram bot
 // (docs/connectors.md). The one send point is the KERNEL's ask path:
-// `api serve-ask` (scripts/kernel/serve-ask.mjs parkAsk) calls notifyAsk()
+// `api serve-ask` (scripts/kernel/ask-server.mjs parkAsk) calls notifyAsk()
 // when an ask is parked; only an approval ask is pushed, a credential ask waits
 // under the bridge's /creds (serve-ask.mjs askClassOf). The message carries
 // the workflow, the question and its numbered options, and ONE inline button "Generate URL" — never a link:
@@ -45,9 +45,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
-import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, askRepos, askState, ownerConfig, withHostMutex, withLedgerRead } from './lib.mjs';
 import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';

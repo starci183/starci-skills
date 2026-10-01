@@ -204,7 +204,7 @@ ARCH_KNOWLEDGE_UNAVAILABLE:
   meaning_vi: "Bộ kiểm kiến trúc cần một tệp tri thức đi kèm (danh sách tệp gốc do framework ghim) nhưng không đọc được hoặc sai khuôn, nên không phán xét bằng hợp đồng khác."
   causes_vi:
     - "Bản đóng gói của `hfs` thiếu hoặc hỏng tệp tri thức, hoặc tệp tri thức trong runtime bị sửa sai khuôn."
-  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node packages/hfs/scripts/sync-runtime.mjs`."
+  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node scripts/hfs/sync-runtime.mjs`."
   owner: runtime-core
   kind: check-finding
 
@@ -3320,7 +3320,7 @@ LEDGER_LEGACY_WORK_SQLITE:
   causes_vi:
     - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
     - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (node scripts/checks/ledger-hygiene.mjs, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (node scripts/housekeeping/ledger-hygiene.mjs, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
   owner: owner
   kind: check-finding
 
@@ -3331,7 +3331,7 @@ LEDGER_ORPHAN_STATE_ROOT:
   causes_vi:
     - "Một probe hoặc script debug tạo repo dùng một lần dưới thư mục tạm mà không đặt STARCI_LOCAL_ROOT trước khi đăng ký sổ ledger"
     - "Repo nguồn của sổ ledger đã bị xóa hoặc di chuyển mà không retire sổ ledger tương ứng"
-  nextStep_vi: "node scripts/checks/ledger-hygiene.mjs --apply (hoặc node scripts/supervisor/housekeeping.mjs --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
+  nextStep_vi: "node scripts/housekeeping/ledger-hygiene.mjs --apply (hoặc node scripts/housekeeping/housekeeping.mjs --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
   owner: owner
   kind: check-finding
 
@@ -3662,7 +3662,7 @@ PACKAGE_INSTALL_RED:
   causes_vi:
     - "package.json và package-lock.json của gói lệch nhau, npm ci từ chối"
     - "Một phụ thuộc khai báo không tồn tại hoặc không phân giải được trên npm registry"
-  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại node scripts/checks/package-clean-test.mjs."
+  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại node scripts/gates/package-clean-test.mjs."
   owner: runtime-core
   kind: check-finding
 
@@ -3685,7 +3685,7 @@ PACKAGE_PROOF_UNRUN:
     - "Không gọi được npm, hoặc mạng không tới được npm registry"
     - "Thư mục tạm nằm dưới một thư mục có node_modules, nên bản cài không còn sạch"
     - "Hết thời gian cài hoặc chạy bài kiểm tra"
-  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại node scripts/checks/package-clean-test.mjs."
+  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại node scripts/gates/package-clean-test.mjs."
   owner: runtime-core
   kind: check-finding
 
@@ -4184,7 +4184,7 @@ RECURSIVE_DELETE:
   causes_vi:
     - "Dùng rm -rf hoặc Remove-Item -Recurse để dọn node_modules, worktree hay thư mục tạm"
     - "Dùng robocopy /MIR với thư mục rỗng để xóa nhanh một cây"
-  nextStep_vi: "Lệnh không được chạy; xóa cây thư mục chỉ qua safeRemoveTree của runtime (scripts/lib/safe-remove.mjs), hàm này gỡ mọi liên kết trước; gỡ một junction đơn lẻ bằng cmd /c rmdir <đường dẫn> (không có /s), xóa một tệp bằng rm <tệp>."
+  nextStep_vi: "Lệnh không được chạy; xóa cây thư mục chỉ qua safeRemoveTree của runtime (scripts/api/fs/safe-remove.mjs), hàm này gỡ mọi liên kết trước; gỡ một junction đơn lẻ bằng cmd /c rmdir <đường dẫn> (không có /s), xóa một tệp bằng rm <tệp>."
   owner: op-retry
   kind: verb-refusal
 
@@ -4401,7 +4401,7 @@ RT_GUIDANCE_REFUSED_COMMAND:
 RT_HELPER_REDEFINED:
   title: "Shared helper redefined"
   title_vi: "Hàm dùng chung bị viết lại"
-  meaning_vi: "Một hàm hoặc hằng ở đầu tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ có thân giống hệt (sau khi đổi tên biến, bỏ chú thích và khoảng trắng) một hàm đã export của scripts/lib/*.mjs, engine/*.mjs hoặc scripts/checks/common.mjs; hoặc hai thư viện export cùng một tên với hai hợp đồng khác nhau."
+  meaning_vi: "Một hàm hoặc hằng ở đầu tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ có thân giống hệt (sau khi đổi tên biến, bỏ chú thích và khoảng trắng) một hàm đã export của scripts/lib/*.mjs, engine/*.mjs hoặc scripts/lib/walk.mjs; hoặc hai thư viện export cùng một tên với hai hợp đồng khác nhau."
   causes_vi:
     - "Sao chép một hàm nhỏ (slash, samePath, clip, sleep, sha256, readJsonFile, isDir...) thay vì import từ thư viện"
     - "Hai thư viện đặt cùng một tên cho hai hàm có hành vi khác nhau"
@@ -4489,11 +4489,11 @@ RT_RETIRED_PRESENT:
 RT_GENERATED_DRIFT:
   title: "Generated copy drifted"
   title_vi: "Bản sao sinh tự động bị lệch"
-  meaning_vi: "Một bản sao sinh tự động trong packages/hfs/runtime, packages/eslint/be/runtime hoặc packages/eslint/fe/runtime khác với nội dung mà packages/hfs/scripts/sync-runtime.mjs ghi ra từ nguồn duy nhất: thiếu, cũ, hoặc thừa tệp."
+  meaning_vi: "Một bản sao sinh tự động trong packages/hfs/runtime, packages/eslint/be/runtime hoặc packages/eslint/fe/runtime khác với nội dung mà scripts/hfs/sync-runtime.mjs ghi ra từ nguồn duy nhất: thiếu, cũ, hoặc thừa tệp."
   causes_vi:
     - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
     - "Sửa tay một tệp trong thư mục runtime/ của gói"
-  nextStep_vi: "Người giám sát chạy node packages/hfs/scripts/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
+  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
   owner: supervisor
   kind: check-finding
 
@@ -6210,7 +6210,7 @@ WORKTREE_NOT_OPS:
   causes_vi:
     - "Worker muốn dựng bản sao mã ở nơi khác để đo hoặc build"
     - "Worker nhầm mình được quản lý thư mục làm việc"
-  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao. Worktree chỉ được tạo và gỡ qua API worktree của runtime (scripts/lib/worktrees.mjs, safeRemoveWorktree, và worktree của workflow do Orca tạo khi Kernel khởi động); cần bản khác thì báo là một nhu cầu (report blocked environment)."
+  nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao. Worktree chỉ được tạo và gỡ qua API worktree của runtime (scripts/machine/worktrees.mjs, safeRemoveWorktree, và worktree của workflow do Orca tạo khi Kernel khởi động); cần bản khác thì báo là một nhu cầu (report blocked environment)."
   owner: op-retry
   kind: dispatch-refusal
 
@@ -8197,7 +8197,7 @@ link-stuck:
   causes_vi:
     - "Một tiến trình còn giữ thư mục liên kết"
     - "Quyền truy cập trên Windows chặn việc gỡ"
-  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/lib/worktrees.mjs gc."
+  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
   owner: runtime-core
   kind: runtime-fault
 live-not-on-main:
@@ -8326,7 +8326,7 @@ main-checkout-damaged:
   causes_vi:
     - "Một liên kết trong worktree trỏ vào checkout chính và bị đi xuyên qua"
     - "Có người sửa checkout chính đúng lúc GC chạy"
-  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy node scripts/lib/worktrees.mjs resume."
+  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy node scripts/machine/worktrees.mjs resume."
   owner: supervisor
   kind: runtime-fault
 main-moving:
@@ -8513,7 +8513,7 @@ orca-worktree-rm-failed:
   causes_vi:
     - "Orca chưa chạy hoặc đang khởi động lại"
     - "Một tiến trình còn giữ thư mục của cây"
-  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/lib/worktrees.mjs gc."
+  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
   owner: runtime-core
   kind: runtime-fault
 no-typescript:
@@ -12276,11 +12276,11 @@ sonar-proof-missing:
 op-gate-proof-missing:
   title: "No gate result is attached"
   title_vi: "Chưa đính kèm kết quả cổng kiểm tra"
-  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/checks/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
+  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/gates/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
   causes_vi:
     - "Op chưa chạy gate.mjs sau khi viết code"
     - "Tệp gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
   owner: op-retry
   kind: settle-reason
 
@@ -12313,7 +12313,7 @@ op-read-digest-missing:
   title_vi: "Op đã bỏ qua bước ĐỌC"
   meaning_vi: "Report không đính kèm bản tóm tắt ĐỌC (read-digest.json, schema starci/read-digest@1): không có bằng chứng op đã đọc tệp pattern, ví dụ và bản đồ slot trước khi viết code."
   causes_vi:
-    - "Op viết code ngay mà không chạy scripts/checks/read-digest.mjs"
+    - "Op viết code ngay mà không chạy scripts/gates/read-digest.mjs"
     - "Tệp read-digest.json không được đính kèm vào api report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy read-digest.mjs --touch <tệp> --out read-digest.json, đọc đúng các tệp nó liệt kê, kiểm lại code theo đó rồi nộp lại kèm read-digest.json."
   owner: op-retry
@@ -12348,7 +12348,7 @@ op-doc-gate-missing:
   causes_vi:
     - "Op chưa chạy gate.mjs --profile docs sau khi viết"
     - "Tệp doc-gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/gate.mjs --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
   owner: op-retry
   kind: settle-reason
 
@@ -12379,9 +12379,9 @@ op-test-world-proof-missing:
   title_vi: "Chưa đính kèm tóm tắt lần chạy test-world"
   meaning_vi: "Op e2e hoặc integration không đính kèm test-world-run.json (schema starci/test-world-run@1), nên runtime không biết bộ test đã chạy trên test world thật hay chưa."
   causes_vi:
-    - "Op chạy jest trực tiếp mà không qua scripts/checks/test-world-run.mjs"
+    - "Op chạy jest trực tiếp mà không qua scripts/gates/test-world-run.mjs"
     - "Tệp test-world-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/test-world-run.mjs --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/test-world-run.mjs --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -12412,9 +12412,9 @@ op-unit-proof-missing:
   title_vi: "Chưa đính kèm tóm tắt lần chạy unit"
   meaning_vi: "unit.verify không đính kèm unit-run.json (schema starci/unit-run@1), nên runtime không chấm được độ phủ từng service và cách dựng spec."
   causes_vi:
-    - "Op chạy npm test trực tiếp mà không qua scripts/checks/unit-run.mjs"
+    - "Op chạy npm test trực tiếp mà không qua scripts/gates/unit-run.mjs"
     - "Tệp unit-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/unit-run.mjs --root <app> --out unit-run.json và đính kèm khi nộp."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/unit-run.mjs --root <app> --out unit-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -12541,11 +12541,11 @@ op-review-missing-check-unrecorded:
 op-release-proof-missing:
   title: "No release proof is attached"
   title_vi: "Chưa đính kèm bằng chứng phát hành"
-  meaning_vi: "release.deliver publish hoặc deploy không đính kèm release-proof.json (schema starci/release-proof@1) do scripts/checks/release-proof.mjs in ra."
+  meaning_vi: "release.deliver publish hoặc deploy không đính kèm release-proof.json (schema starci/release-proof@1) do scripts/gates/release-proof.mjs in ra."
   causes_vi:
     - "Op phát hành mà không chạy release-proof.mjs"
     - "Tệp release-proof.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/release-proof.mjs --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/release-proof.mjs --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -13105,7 +13105,7 @@ EXAMPLES_CI_WORKFLOW_MISSING:
   meaning_vi: "Không có `.github/workflows/examples.yml`: GitHub chỉ chạy workflow ở gốc repository, nên không ứng dụng ví dụ nào được kiểm tra trong CI."
   causes_vi:
     - "Workflow gốc bị xoá hoặc đổi tên"
-  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `node scripts/checks/examples-ci.mjs --matrix`."
+  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `node scripts/checks/check-examples-ci.mjs --matrix`."
   owner: runtime-core
   kind: check-finding
 
@@ -13177,7 +13177,7 @@ EXAMPLES_CI_CODECOV_MISSING:
   meaning_vi: "Codecov chỉ đọc một cấu hình gốc; không có `codecov.yml` thì không cờ nào của ứng dụng ví dụ được giữ ở mức 100."
   causes_vi:
     - "Tệp `codecov.yml` gốc bị xoá"
-  nextStep_vi: "Chạy `node scripts/checks/examples-ci.mjs --write` để sinh lại tệp."
+  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` để sinh lại tệp."
   owner: runtime-core
   kind: check-finding
 
@@ -13188,6 +13188,6 @@ EXAMPLES_CI_CODECOV_DRIFT:
   causes_vi:
     - "Thêm một ứng dụng ví dụ mà chưa sinh lại tệp"
     - "Sửa tay tệp sinh ra"
-  nextStep_vi: "Chạy `node scripts/checks/examples-ci.mjs --write` và commit tệp."
+  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit tệp."
   owner: runtime-core
   kind: check-finding

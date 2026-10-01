@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
  *
  * `npm run build` ends by writing `dist/.build-stamp.json`: the package version, the source digest
  * (below), a digest of the built files, and the build time. The root check
- * `scripts/checks/grammar-dist.mjs` recomputes the source digest and refuses a dist whose stamp is
+ * `scripts/checks/check-grammar-dist.mjs` recomputes the source digest and refuses a dist whose stamp is
  * missing or names other source, so a stale build can no longer pass for the current one.
  *
  * The source digest covers everything that decides what `dist/` contains: every file under `src/`

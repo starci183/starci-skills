@@ -35,8 +35,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
-import { resolveIncident } from '../../engine/ledger-db.mjs';
-import { jobResultSql } from './api-lib/rows.mjs';
+import { resolveIncident } from '../../engine/db/ledger.mjs';
+import { jobResultSql } from './verbs/shared/rows.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 const repoMatches = (repoRoot, want) => {

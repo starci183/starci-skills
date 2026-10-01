@@ -39,8 +39,8 @@ vocabularies:
   # ref lists and resolved by the kernel to concrete paths and digests - never a repo dump. `knowledge`
   # names entries of the `knowledge/` tree by extensionless name or directory glob (`patterns/fe/*`,
   # `architecture-rules`, `design-patterns`, `hfs/rules`, `grammars/<name>`, `ui/*`,
-  # `application-stacks`); `checks` names executable check scripts (`scripts/checks/gate.mjs`,
-  # `scripts/checks/architecture/*.mjs`, `scripts/checks/acceptance.mjs`); `stacks` names the
+  # `application-stacks`); `checks` names executable check scripts (`scripts/gates/gate.mjs`,
+  # `scripts/hfs/architecture/*.mjs`, `scripts/gates/acceptance.mjs`); `stacks` names the
   # bound repository's `.starcistacks` compose manifests and the `.claude`-owned layout and schema definitions an
   # op's artifacts obey - `modules/schemas/work-layout.yaml` for `.starciwork` paths and filenames,
   # `modules/schemas/workspace-routing.yaml` for bound-source routing, and the `modules/schemas/*.schema.yaml` shape each
@@ -264,7 +264,7 @@ kinds:
     reads: [code, grammar, srs, sds]
     writes: [brand, asset, shell]
     knowledge: [grammars/*, ui/*]
-    checks: [scripts/checks/shell-conformance.mjs]
+    checks: [scripts/work/ui/shell-conformance.mjs]
     stacks: [modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/brand@1, work/layout-tree@1]
     purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads, and write the layout tree (interface.draw writes it too, from todo) - app/ scanned into layouts, groups, slots and intercepts, each visible layout captured per breakpoint and theme with its slot measured, navigation labels, product locale, personas, lockup - in the one shell record every direction is composited into.
@@ -291,7 +291,7 @@ kinds:
     # shell foundation (owner ruling 2026-09-29 draw-from-todo), so it writes the layout tree beside the ui record.
     writes: [design, asset, shell]
     knowledge: [grammars/*, patterns/fe/*, ui/*]
-    checks: [scripts/checks/shell-conformance.mjs]
+    checks: [scripts/work/ui/shell-conformance.mjs]
     stacks: [modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/ui-screen@1]
     purpose: Token-render a small representative direction and map every remaining screen/state/component before interface code exists.
@@ -334,7 +334,7 @@ kinds:
     # directions and generated artwork remain owned by the separate `ui` lane.
     writes: [code, asset]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs, scripts/work/ui/shell-conformance.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
@@ -351,7 +351,7 @@ kinds:
     reads: [srs, sds, design, asset, brand, shell, grammar, code, evidence]
     writes: [evidence]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
-    checks: [scripts/checks/acceptance.mjs, scripts/checks/shell-conformance.mjs]
+    checks: [scripts/gates/acceptance.mjs, scripts/work/ui/shell-conformance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Inspect fresh implementation-produced renders against intent, installed Grammar, brand, the app shell and UI proof rules, then report a bounded repair route or no-actionable-drift without repairing anything.
@@ -366,7 +366,7 @@ kinds:
     reads: [srs, sds, decision, code]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
@@ -383,7 +383,7 @@ kinds:
     reads: [srs, sds, decision]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/check-hfs-sync.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs, scripts/gates/hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Create one new backend source tree - toolchain, house layout, runnable skeleton - proven green.
@@ -404,7 +404,7 @@ kinds:
     reads: [srs, sds, design, brand, shell, grammar]
     writes: [code, asset, shell]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs, scripts/checks/check-hfs-sync.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs, scripts/work/ui/shell-conformance.mjs, scripts/gates/hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/layout-tree@1]
     purpose: Create one new interface source tree - grammar-written shell with tokens wired, realising the planned layout tree - proven by build plus captured first render, and re-scan the layout tree from it.
@@ -421,7 +421,7 @@ kinds:
     reads: [sds, decision, code]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs]
+    checks: [scripts/gates/gate.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Create one new package/module tree - manifest, exports, harness - proven by build plus a real consumer import.
@@ -476,7 +476,7 @@ kinds:
     # scripts inside the bound repository, which is `code`.
     writes: [evidence, code]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
@@ -510,7 +510,7 @@ kinds:
     reads: [srs, design, asset, brand, code, evidence]
     writes: [evidence]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-verification.schema.yaml]
     carries: [work/uat-flow@1, work/evidence@1, starci/assisted-uat-receipt@1, starci/assisted-uat-verification@1, starci/evidence-packet@1]
     purpose: Derive acceptance from one exact immutable assisted-run receipt using current bindings, machine postconditions, evidence integrity, redaction and cleanup; human ok is completion only.
@@ -528,7 +528,7 @@ kinds:
     # code - that ceiling is the operator's allowlist, not the record catalog.
     writes: [evidence, code]
     knowledge: [patterns/be/*, application-stacks]
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
@@ -547,7 +547,7 @@ kinds:
     reads: [integration, sds, code]
     writes: [evidence]
     knowledge: [application-stacks]
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
@@ -564,7 +564,7 @@ kinds:
     reads: [srs, sds, code, evidence, runtime]
     writes: []
     knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs, scripts/gates/acceptance.mjs]
     stacks: []
     carries: []
     purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
@@ -644,7 +644,7 @@ kinds:
   # owner opens a Supervisor Decision Item; settle lands the foundation when the tree is settled. Three machines hold
   # it in code: that foundation gate; a cut's non-seam ordinals wait
   # on ordinal 1 (scripts/kernel/api.mjs queue hold), so a cut whose seam is the layout draw or the layout's
-  # own source lands it before any slice under it; and scripts/checks/shell-conformance.mjs judges the RESULT,
+  # own source lands it before any slice under it; and scripts/work/ui/shell-conformance.mjs judges the RESULT,
   # refusing a direction under an unsettled or rev-stale layout at the draw's proof. Parallel slices drawing or
   # building their own chrome is the defect this rule exists for (wf-nivo-modules-agentos: three logos,
   # three sidebars, two UI languages, two tenants in one cut).
@@ -736,7 +736,7 @@ kinds:
     reads: [sds, code]
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Restructure the selected code with its behaviour invariant - the existing regression check is run before and after the edit, and a slice with no coverage to pin it reports `test-gap` instead of proceeding.
@@ -753,7 +753,7 @@ kinds:
     reads: [sds, code]
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/gates/gate.mjs, scripts/hfs/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Author the test files a slice is missing - tests are code records and this kind writes them, never judges them.
@@ -771,7 +771,7 @@ kinds:
     reads: [code, asset]
     writes: [evidence]
     knowledge: [hfs/rules]
-    checks: [scripts/checks/gate.mjs]
+    checks: [scripts/gates/gate.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Inspect the delivered code, configuration and shipped assets for vulnerabilities and leave the findings as evidence, repairing nothing.
@@ -786,7 +786,7 @@ kinds:
     reads: [code]
     writes: [evidence]
     knowledge: []
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Run the product repository's whole unit suite (npm test) on the delivered source and report the observed result, only when the goal or the owner explicitly asks for the full unit run; a code-writing op never runs it.
@@ -801,7 +801,7 @@ kinds:
     reads: [code, asset]
     writes: [evidence]
     knowledge: [application-stacks]
-    checks: [scripts/checks/acceptance.mjs]
+    checks: [scripts/gates/acceptance.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Measure the running product against the performance budget the goal declared and leave the measured numbers as evidence.
@@ -889,7 +889,7 @@ kinds:
     reads: [record, code, decision]
     writes: [record]
     knowledge: []
-    checks: [scripts/checks/gate.mjs]
+    checks: [scripts/gates/gate.mjs]
     stacks: [modules/schemas/work-feature.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/feature@1, work/catalog@1]
     purpose: Retire exactly the selected scope - a scoped metadata decision that preserves live consumers and required evidence, with destructive effects only where separately authorised.
@@ -925,7 +925,7 @@ kinds:
     reads: [record, srs, sds, design, brand, grammar, code]
     writes: [record, asset, code]
     knowledge: [coding-reference]
-    checks: [scripts/checks/gate.mjs]
+    checks: [scripts/gates/gate.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: Author or revise one selected content unit from its brief, grounded in the settled records and the selected source.
@@ -942,7 +942,7 @@ kinds:
     reads: [code, evidence, runtime]
     writes: [record]
     knowledge: [application-stacks]
-    checks: [scripts/checks/stacks.mjs, scripts/checks/proof.mjs]
+    checks: [scripts/gates/stacks-gate.mjs, scripts/gates/proof.mjs]
     stacks: [modules/schemas/application-stacks.schema.yaml]
     carries: [starci/evidence-packet@1]
     purpose: Deliver the proven build to the selected environment - deploy, publish or migrate as authorised - and leave the verified remote outcome as evidence.

@@ -3,7 +3,7 @@
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
 # rule is knowledge/hfs/README.md (section 12 lists the same ids and codes); this file is the data behind it. Read it only
-# through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules); its shape is modules/schemas/hfs-rules.schema.yaml.
+# through scripts/hfs/slots.mjs (loadRuleCatalog, rules); its shape is modules/schemas/hfs-rules.schema.yaml.
 #
 # An enforcer is a check that exists or one still owed. `status: planned` marks one owed: the architecture machine, the
 # hfs CLI, stylelint and Sonar lanes fill them, and the entry's `status` is removed the day the check ships (the check
@@ -21,7 +21,7 @@ version: 2.0.0
 gates:
   pre-commit: the managed .husky/pre-commit at the app root - hfs work-hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
   pre-push: typecheck, lint (hfs lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
-  settle: the op gate scripts/checks/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
+  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
   ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the services' coverage at 100
@@ -30,9 +30,9 @@ enforcerKinds:
   eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
   eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
   stylelint: a rule of the @starci/stylelint-canon package
-  machine: a check of the architecture machine (scripts/checks/architecture), which reads the import graph
+  machine: a check of the architecture machine (scripts/hfs/architecture), which reads the import graph
   hfs: a check of the hfs CLI that reads the repository tree, configuration, contracts or catalogs
-  work-validate: a check of scripts/checks/work-validate.mjs over a .starciwork tree
+  work-validate: a check of scripts/work/validate/work-validate.mjs over a .starciwork tree
   sonar: a condition of the Sonar quality gate
   runtime: a rule module of the runtime check (scripts/hfs/runtime-check.mjs, scripts/hfs/runtime-rules/*) or an emitter whose findings it judges, over the runtime repository
 rules:
@@ -43,10 +43,10 @@ rules:
     gates: [pre-push, settle, land, ci, runtime]
     failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED", "HFS_ROOT_ENTRY_FORBIDDEN", "HFS_ROOT_MARKDOWN_FORBIDDEN", "HFS_ROOT_SRC_FORBIDDEN_FE", "HFS_SRC_LAYOUT_INVALID", "HFS_MODULE_TIER_INVALID", "HFS_WORK_IN_FE", "HFS_STACKS_IN_SIDE"]
     enforcers:
-      - {kind: hfs, id: slot-undeclared, at: scripts/lib/hfs-check.mjs}
+      - {kind: hfs, id: slot-undeclared, at: scripts/hfs/check.mjs}
       - {kind: eslint-be, id: slot-undeclared}
       - {kind: eslint-fe, id: slot-undeclared}
-      - {kind: machine, id: repository-tree-layout, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: machine, id: repository-tree-layout, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: runtime, id: runtime-tree, at: scripts/hfs/runtime-check.mjs}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
@@ -55,9 +55,9 @@ rules:
     gates: [settle, land, ci, runtime]
     failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES", "BE_REQUIRED_MODULE_MISSING", "HFS_REQUIRED_FILE_MISSING", "HFS_ROOT_ENTRY_MISSING", "HFS_APPS_REQUIRED", "HFS_APP_LAYOUT_INVALID", "HFS_README_TITLE_INVALID", "HFS_README_DESCRIPTION_INVALID", "HFS_README_SECTION_MISSING", "HFS_README_SECTION_ORDER", "HFS_README_DEVELOPMENT_INCOMPLETE", "HFS_README_WORK_POINTER_MISSING", "HFS_README_PRIVATE_URL", "HFS_README_BADGE_NOT_LIVE"]
     enforcers:
-      - {kind: hfs, id: slot-required-missing, at: scripts/lib/hfs-check.mjs}
-      - {kind: machine, id: required-files, at: scripts/checks/architecture/required-files.mjs}
-      - {kind: machine, id: repository-tree-required, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: hfs, id: slot-required-missing, at: scripts/hfs/check.mjs}
+      - {kind: machine, id: required-files, at: scripts/hfs/architecture/required-files.mjs}
+      - {kind: machine, id: repository-tree-required, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: runtime, id: runtime-required, at: scripts/hfs/runtime-check.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
@@ -66,7 +66,7 @@ rules:
     gates: [pre-push, land, ci, runtime]
     failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY", "HFS_EMPTY_DIR", "HFS_GHOST_TREE"]
     enforcers:
-      - {kind: hfs, id: untracked-root-entry, at: scripts/lib/hfs-check.mjs}
+      - {kind: hfs, id: untracked-root-entry, at: scripts/hfs/check.mjs}
       - {kind: runtime, id: runtime-untracked, at: scripts/hfs/runtime-check.mjs}
   - id: R04
     code: "HFS_GITIGNORE_BLOCK_DRIFT"
@@ -91,7 +91,7 @@ rules:
     gates: [pre-commit, pre-push, land, ci]
     failureCodes: ["HFS_PLAINTEXT_SECRET"]
     enforcers:
-      - {kind: hfs, id: plaintext-secret, at: scripts/lib/hfs-rules/secrets.mjs}
+      - {kind: hfs, id: plaintext-secret, at: scripts/hfs/rules/secrets.mjs}
       - {kind: hfs, id: plaintext-secret-staged, at: packages/hfs/sync/hygiene.mjs}
   - id: R07
     code: "HFS_AGENT_DATA_TRACKED"
@@ -116,7 +116,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_IDENTITY_CUSTODY", "SEALED_CUSTODY_LOCATION", "SEALED_FILE_IN_WORK"]
     enforcers:
-      - {kind: work-validate, id: sealed-custody-location, at: scripts/checks/check-work-artifacts.mjs}
+      - {kind: work-validate, id: sealed-custody-location, at: scripts/work/validate/check-work-artifacts.mjs}
       - {kind: work-validate, id: identity-custody-role, at: scripts/checks/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
@@ -125,7 +125,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_STACKS_SHAPE"]
     enforcers:
-      - {kind: hfs, id: stacks-shape, at: scripts/lib/hfs-rules/stacks.mjs}
+      - {kind: hfs, id: stacks-shape, at: scripts/hfs/rules/stacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
     law: "Sonar config is generated, with no host URL, importing the be lcov with the services as the only coverage scope."
@@ -141,7 +141,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_E2E_IN_AUTOMATIC_GATE"]
     enforcers:
-      - {kind: machine, id: e2e-in-automatic-gate, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
     law: "CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
@@ -149,8 +149,8 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
     enforcers:
-      - {kind: machine, id: hooks-path-not-redirected, at: scripts/checks/architecture/hfs.mjs}
-      - {kind: hfs, id: ci-missing-canon, at: scripts/lib/hfs-rules/pipeline.mjs}
+      - {kind: machine, id: hooks-path-not-redirected, at: scripts/hfs/architecture/hfs.mjs}
+      - {kind: hfs, id: ci-missing-canon, at: scripts/hfs/rules/pipeline.mjs}
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
     law: "One version per dependency in the workspace, a root `overrides` pin included, and npm is the only package manager."
@@ -158,8 +158,8 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_DEP_VERSION_SKEW", "HFS_PACKAGE_MANAGER_MIXED"]
     enforcers:
-      - {kind: hfs, id: dep-version-skew, at: scripts/lib/hfs-rules/deps.mjs}
-      - {kind: machine, id: package-manager, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: hfs, id: dep-version-skew, at: scripts/hfs/rules/deps.mjs}
+      - {kind: machine, id: package-manager, at: scripts/hfs/architecture/hfs.mjs}
   - id: R15
     code: "HFS_CANON_PIN_DRIFT"
     law: "Canon packages and frameworks match `canon-pins.yaml`."
@@ -167,7 +167,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CANON_PIN_DRIFT"]
     enforcers:
-      - {kind: hfs, id: canon-pin-drift, at: scripts/lib/hfs-check.mjs}
+      - {kind: hfs, id: canon-pin-drift, at: scripts/hfs/check.mjs}
   - id: R16
     code: "HFS_TOOL_CONFIG_LOCAL"
     law: "Configs only call the factories; no local rules."
@@ -176,7 +176,7 @@ rules:
     failureCodes: ["HFS_TOOL_CONFIG_LOCAL"]
     enforcers:
       - {kind: hfs, id: tool-config-local, at: packages/hfs/sync/managed.mjs}
-      - {kind: hfs, id: tool-config-forbidden, at: scripts/lib/hfs-check.mjs}
+      - {kind: hfs, id: tool-config-forbidden, at: scripts/hfs/check.mjs}
   - id: R17
     code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
     law: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository."
@@ -246,7 +246,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]
     enforcers:
-      - {kind: hfs, id: contract-snapshot-drift, at: scripts/lib/hfs-rules/contract.mjs}
+      - {kind: hfs, id: contract-snapshot-drift, at: scripts/hfs/rules/contract.mjs}
   - id: R24
     code: "HFS_ARCH_CONFIG_UNREAD"
     law: "The machine reads `hfs.json`; zero files analysed is red."
@@ -254,7 +254,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_ARCH_CONFIG_UNREAD"]
     enforcers:
-      - {kind: machine, id: arch-config-unread, at: scripts/checks/architecture/config-unread.mjs}
+      - {kind: machine, id: arch-config-unread, at: scripts/hfs/architecture/config-unread.mjs}
   - id: R25
     code: "HFS_UNUSED_EXPORT"
     law: "No public export without a consumer; no source file nothing reaches."
@@ -300,7 +300,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_FEATURE_SHAPE", "BE_FEATURE_LAYOUT_INVALID", "BE_APPLICATION_IMPORTS_TRANSPORT", "BE_APPLICATION_TRANSPORT_FRAMEWORK"]
     enforcers:
-      - {kind: machine, id: feature-shape, at: scripts/checks/architecture/feature-shape.mjs}
+      - {kind: machine, id: feature-shape, at: scripts/hfs/architecture/feature-shape.mjs}
       - {kind: eslint-be, id: feature-layout}
       - {kind: eslint-be, id: application-never-imports-transport}
   - id: R30
@@ -480,10 +480,10 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY", "HFS_TEST_KIND_RETIRED", "BE_CONTRACT_UNGUARDED"]
     enforcers:
-      - {kind: hfs, id: test-topology, at: scripts/lib/hfs-rules/test-topology.mjs}
-      - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: hfs, id: test-topology, at: scripts/hfs/rules/test-topology.mjs}
+      - {kind: machine, id: test-kind-retired, at: scripts/hfs/architecture/hfs.mjs}
       - {kind: eslint-be, id: test-world-files}
-      - {kind: machine, id: contract-fixture-guard, at: scripts/checks/architecture/contract-fixture-guard.mjs}
+      - {kind: machine, id: contract-fixture-guard, at: scripts/hfs/architecture/contract-fixture-guard.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: tests-infra-only-in-world}
       - {kind: eslint-be, id: tests-no-override}
@@ -558,7 +558,7 @@ rules:
     failureCodes: ["FE_WIRE_GENERATED"]
     enforcers:
       - {kind: eslint-fe, id: no-hand-typed-wire}
-      - {kind: hfs, id: wire-generated, at: scripts/lib/hfs-rules/frontend.mjs}
+      - {kind: hfs, id: wire-generated, at: scripts/hfs/rules/frontend-tree.mjs}
   - id: R53
     code: "FE_ERROR_BOUNDARY_MISSING"
     law: "Global, locale error, not-found and loading boundaries exist."
@@ -567,7 +567,7 @@ rules:
     failureCodes: ["FE_ERROR_BOUNDARY_MISSING", "FE_SUSPENSE_NULL_FALLBACK"]
     enforcers:
       - {kind: eslint-fe, id: no-null-suspense-fallback}
-      - {kind: machine, id: error-boundary-missing, at: scripts/checks/architecture/required-files.mjs}
+      - {kind: machine, id: error-boundary-missing, at: scripts/hfs/architecture/required-files.mjs}
   - id: R54
     code: "FE_ROUTE_FILES_THIN"
     law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
@@ -634,7 +634,7 @@ rules:
       - {kind: eslint-fe, id: navigation-from-intl}
       - {kind: eslint-fe, id: no-native-anchor}
       - {kind: eslint-fe, id: use-intl-formatter}
-      - {kind: hfs, id: i18n-placement, at: scripts/lib/hfs-rules/frontend.mjs}
+      - {kind: hfs, id: i18n-placement, at: scripts/hfs/rules/frontend-tree.mjs}
   - id: R60
     code: "FE_I18N_CATALOG"
     law: "Same keys in every catalog, `pick` for clients."
@@ -642,7 +642,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["FE_I18N_CATALOG"]
     enforcers:
-      - {kind: hfs, id: i18n-catalog, at: scripts/lib/hfs-rules/frontend.mjs}
+      - {kind: hfs, id: i18n-catalog, at: scripts/hfs/rules/frontend-tree.mjs}
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
     law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). Status colours follow HeroUI soft pairs: every status tone has `--<tone>-soft` and `--<tone>-soft-foreground` in light and dark, the soft foreground reaches 3:1 on its tint and on `--background`, body text 4.5:1, a solid tone is never text below 4.5:1, and text and icons take the soft foreground, never the solid tone."
@@ -688,7 +688,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["FE_PACKAGE_SHAPE"]
     enforcers:
-      - {kind: machine, id: package-shape, at: scripts/checks/architecture/package-shape.mjs}
+      - {kind: machine, id: package-shape, at: scripts/hfs/architecture/package-shape.mjs}
   - id: R64
     code: "FE_APP_ISOLATION"
     law: "Apps never import apps; ui-screen declares `app`."
@@ -929,7 +929,7 @@ rules:
       - {kind: eslint-be, id: no-inline-param-type}
       - {kind: eslint-be, id: no-test-double-in-source}
       - {kind: eslint-be, id: no-default-export}
-      - {kind: hfs, id: source-suffix, at: scripts/lib/hfs-check.mjs}
+      - {kind: hfs, id: source-suffix, at: scripts/hfs/check.mjs}
       - {kind: eslint-be, id: source-suffix}
       - {kind: eslint-be, id: source-names}
       - {kind: eslint-be, id: public-contract-form}
@@ -1012,7 +1012,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["FE_SLOT_FILE_ROLE"]
     enforcers:
-      - {kind: machine, id: fe-slot-allows, at: scripts/checks/architecture/fe-slot-allows.mjs}
+      - {kind: machine, id: fe-slot-allows, at: scripts/hfs/architecture/fe-slot-allows.mjs}
   - id: R95
     code: "BE_OPERATION_CONTRACT"
     law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table."
@@ -1029,7 +1029,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOC_NOT_ENGLISH"]
     enforcers:
-      - {kind: machine, id: doc-language, at: scripts/checks/architecture/doc-language.mjs}
+      - {kind: machine, id: doc-language, at: scripts/hfs/architecture/doc-language.mjs}
   - id: R97
     code: "FE_NO_TESTS"
     law: "The front end (`fe/`) has no tests by standard: no `*.spec.*`, `*.test.*` or `*-spec.*` file, no `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, no vitest, Playwright, jest or Cypress configuration or setup file, no test script, and no test-runner, test-environment, testing-library or axe dependency in any `package.json`; there is no exception, `scripts/` included."
@@ -1037,7 +1037,7 @@ rules:
     gates: [pre-push, settle, land, ci]
     failureCodes: ["FE_NO_TESTS"]
     enforcers:
-      - {kind: hfs, id: fe-no-tests, at: scripts/lib/hfs-rules/fe-no-tests.mjs}
+      - {kind: hfs, id: fe-no-tests, at: scripts/hfs/rules/fe-no-tests.mjs}
   - id: R98
     code: "BE_TEST_BUILDER_HOME"
     law: "A test data builder lives only in `be/src/tests/fixtures/builders/<area>.builder.ts` (slot `be.tests.fixtures.builders`, its SQL text in `<area>.sql.ts` beside it): a `*.repository.ts`, `*.factory.ts` or `*.fixture.ts` under `be/src/tests` and a `*.builder.ts` elsewhere are BE_SOURCE_FORM findings, and any other module of the test tree that exports a function creating persisted rows through an EntityManager, DataSource or QueryRunner is a builder in the wrong place."
@@ -1078,7 +1078,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_SPEC_PLACEMENT"]
     enforcers:
-      - {kind: hfs, id: spec-placement, at: scripts/lib/hfs-rules/spec-placement.mjs}
+      - {kind: hfs, id: spec-placement, at: scripts/hfs/rules/spec-placement.mjs}
       - {kind: eslint-be, id: spec-placement}
   - id: R103
     code: "HFS_REPO_LOCAL_CHECK"
@@ -1087,7 +1087,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_REPO_LOCAL_CHECK"]
     enforcers:
-      - {kind: hfs, id: repo-local-check, at: scripts/lib/hfs-rules/repo-local-checks.mjs}
+      - {kind: hfs, id: repo-local-check, at: scripts/hfs/rules/repo-local-checks.mjs}
   - id: R104
     code: "HFS_LINT_SUPPRESSION_FILE"
     law: "A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code."
@@ -1095,7 +1095,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_LINT_SUPPRESSION_FILE"]
     enforcers:
-      - {kind: hfs, id: lint-suppression, at: scripts/lib/hfs-rules/lint-suppression.mjs}
+      - {kind: hfs, id: lint-suppression, at: scripts/hfs/rules/lint-suppression.mjs}
   - id: R105
     code: "HFS_PROOF_COMMAND_FILE_MISSING"
     law: "A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists."
@@ -1103,7 +1103,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_PROOF_COMMAND_FILE_MISSING"]
     enforcers:
-      - {kind: hfs, id: proof-command-files, at: scripts/lib/hfs-rules/proof-commands.mjs}
+      - {kind: hfs, id: proof-command-files, at: scripts/hfs/rules/proof-commands.mjs}
   - id: R106
     code: "FE_I18N_KEYS"
     law: "The catalogs of a front-end app and its source agree both ways: a literal key read through `next-intl` (`useTranslations`, `getTranslations`, `t`, `t.rich`, `t.raw`, `t.markup`) exists in every locale, and a catalog key that no string of the app's or the shared packages' source can be reading is deleted."
@@ -1151,7 +1151,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_PEER_INTEGRATION_MISSING"]
     enforcers:
-      - {kind: hfs, id: peer-integrations, at: scripts/lib/hfs-rules/peer-integrations.mjs}
+      - {kind: hfs, id: peer-integrations, at: scripts/hfs/rules/peer-integrations.mjs}
   - id: R112
     code: "BE_INTEGRATION_SPEC_MISSING"
     law: "Every integration of a back end (`src/modules/integrations/<provider>/` holding `<provider>.config.ts`) has at least one `src/tests/integration/<provider>/*.integration-spec.ts` that, read as a syntax tree, calls `useTestWorld({ modules })` with a factory registering the integration's own module (`<Provider>Module.register`, imported from the integration folder; an inline array, a local const or an exported const of another file), references the ErrorCode enum the integration exports, and drives an outage through the world (`world.infra.<service>.cut|latency|during|connection`, `world.fake.<name>.failNext`, `world.apps.<peer>.during`, `world.interruptDatabase`); the finding sits on the integration folder."
@@ -1159,7 +1159,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_INTEGRATION_SPEC_MISSING"]
     enforcers:
-      - {kind: hfs, id: integration-specs, at: scripts/lib/hfs-rules/integration-specs.mjs}
+      - {kind: hfs, id: integration-specs, at: scripts/hfs/rules/integration-specs.mjs}
   - id: R113
     code: "FE_GRAPHQL_CONTRACT"
     law: "Every GraphQL operation a front end keeps in a `.graphql` file under `fe/` is one its back end serves: it is judged against the contract snapshot (`be/contracts/<service>/schema.graphql`) whose root type declares its first root field, and every selected field, argument and input field must be declared there, every required argument and required input field given, every variable passed with the argument's named type, every leaf selected without and every object with a selection, and every declared variable used; a root field no contract declares is a finding too."
@@ -1167,7 +1167,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["FE_GRAPHQL_CONTRACT"]
     enforcers:
-      - {kind: hfs, id: fe-contract-documents, at: scripts/lib/hfs-rules/fe-contract-documents.mjs}
+      - {kind: hfs, id: fe-contract-documents, at: scripts/hfs/rules/fe-contract-documents.mjs}
   - id: R114
     code: "RT_EXTERNAL_OWNER"
     law: "In the runtime repository a process, the network, SQLite or an external binary is reached only by its owner in ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml: an owned module specifier, global or spawned program word is used only by the files of scripts/api/<system> or engine/db that the map names."
@@ -1226,12 +1226,12 @@ rules:
       - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
   - id: R121
     code: "RT_GENERATED_DRIFT"
-    law: "A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what packages/hfs/scripts/sync-runtime.mjs writes from the single source."
+    law: "A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what scripts/hfs/sync-runtime.mjs writes from the single source."
     kinds: [check, codemod]
     gates: [land, runtime]
     failureCodes: ["RT_GENERATED_DRIFT"]
     enforcers:
-      - {kind: runtime, id: generated-drift, at: packages/hfs/scripts/sync-runtime.mjs}
+      - {kind: runtime, id: generated-drift, at: scripts/hfs/sync-runtime.mjs}
   - id: R122
     code: "RT_CITED_PATH_MISSING"
     law: "A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."

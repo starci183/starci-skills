@@ -59,7 +59,7 @@ The server gate every project is selected onto is `starci-new-code`; its conditi
 
 ## Who uses it
 
-Every product repository scans here (local ops through `scripts/checks/sonar-local.mjs`, GitHub CI
+Every product repository scans here (local ops through `scripts/gates/sonar-local.mjs`, GitHub CI
 through the public host): starci-academy-backend, starci-academy-fe, nivo-backend, nivo-fe,
 starci-next, starci-next-fe, mia-mia-backend, miamia-fe, tedo-landing — the set is each repository's
 `services.sonar.projects` entry, listed in the host declaration

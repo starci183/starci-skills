@@ -1,8 +1,8 @@
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
-The schema is data, not prose. The executed DDL is `engine/migrations/runtime/0001-init.sql` plus its forward migrations
+The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql` plus its forward migrations
 (`0003-usage-unavailable.sql`; `meta.schema = 'starci/runtime@1'`, `user_version = 3`; an older ledger is migrated on the first writer open after a
-`VACUUM INTO` backup and integrity check, `schema_migrations` records each step) and `engine/migrations/machine/0001-init.sql`
+`VACUUM INTO` backup and integrity check, `schema_migrations` records each step) and `engine/db/migrations/machine/0001-init.sql`
 (`machine_meta.schema = 'starci/machine@1'`, `user_version = 1`). This page explains the
 decisions and the invariants; when it disagrees with the SQL files, the SQL wins.
 
@@ -23,7 +23,7 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
   at the file `ledgerFileFor(<repo root>)` resolves, the host store by `openMachine` at `machineFileFor` —
   once the refused file is moved aside.
 - `STARCI_LOCAL_ROOT` overrides the per-host state base (`%LOCALAPPDATA%/StarCi` itself, one shared helper:
-  `engine/machine-db.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/ledger-db.mjs`
+  `engine/db/machine.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/db/ledger.mjs`
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
   file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
@@ -34,9 +34,9 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
 
 | Database | Writer | Callers |
 | --- | --- | --- |
-| `runtime.sqlite` | `engine/ledger-db.mjs` | API verbs, the settler, controllers, `define-goal`, `start-workflow`, the buffered log writer |
-| `machine.sqlite` | `engine/machine-db.mjs` | the reconciler engine and controllers, the Supervisor scripts, the land gate, GC |
-| blob store | `scripts/lib/artifact-store.mjs` | the two writers only |
+| `runtime.sqlite` | `engine/db/ledger.mjs` | API verbs, the settler, controllers, `define-goal`, `start-workflow`, the buffered log writer |
+| `machine.sqlite` | `engine/db/machine.mjs` | the reconciler engine and controllers, the Supervisor scripts, the land gate, GC |
+| blob store | `engine/db/blob.mjs` | the two writers only |
 
 "Single writer" means one module, not one process: several processes write, and SQLite serializes
 them. Everything else calls named business functions of the writer; the land gate refuses
@@ -162,7 +162,7 @@ each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a bat
   registered ledger, read-only, select every column listed in its `blob_ref_columns` into
   `gc_marks`; do the same for machine; sweep a file only when it is unmarked in this run, unpinned in
   every database, archived, and older than 24 h (the grace against put-before-insert). Every item
-  is a `gc_items` row with its outcome. `scripts/supervisor/blob-gc.mjs` runs it (dry by default);
+  is a `gc_items` row with its outcome. `scripts/housekeeping/blob-gc.mjs` runs it (dry by default);
   an unmarked blob past the grace is first zipped to `D:/starci-archive/blob-retention-<date>/`,
   re-read and re-hashed, recorded in `archives` and marked `archived_at` in every DB that holds it.
   An old-schema or unreadable source sweeps nothing (fail closed).

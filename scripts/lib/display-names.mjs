@@ -15,7 +15,7 @@ import path from 'node:path';
 import { clipLine } from './clip.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
-import { readYamlFile } from './yaml.mjs';
+import { readYamlFile } from './read-yaml.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
 export const DISPLAY_NAME_LIMIT = 80;

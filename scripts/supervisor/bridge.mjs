@@ -36,7 +36,7 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -47,7 +47,7 @@ import {
   FOUNDATION_KINDS, claimFoundation, declareDependent, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation,
 } from '../kernel/foundations.mjs';
 import { TRANSFER_SCHEMA, createOwnership, normWork } from '../kernel/work-ownership.mjs';
-import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from './home.mjs';
+import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');

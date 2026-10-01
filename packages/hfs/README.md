@@ -5,7 +5,7 @@ and it is self-contained: `runtime/` carries the slot manifest, the canon pins, 
 catalog slice, the loader and the architecture machine with every file it imports, so it runs where there is no runtime
 checkout. The machine loads `typescript` from the app it checks (never its own copy), so run `npm ci` first.
 
-Every command runs at the app root. A side is judged with its folder as the root it was when products were split in two repositories (the "side view" of `scripts/lib/hfs-slots.mjs`): the root slots (`app.*`) are judged once, the `be.*` slots under `be/` and the `fe.*` slots under `fe/`, and nothing crosses sides except `sides.fe.reads` (`be/contracts/`, the input of the front end's codegen). Every finding path is app-relative (`be/src/...`, `fe/apps/...`).
+Every command runs at the app root. A side is judged with its folder as the root it was when products were split in two repositories (the "side view" of `scripts/hfs/slots.mjs`): the root slots (`app.*`) are judged once, the `be.*` slots under `be/` and the `fe.*` slots under `fe/`, and nothing crosses sides except `sides.fe.reads` (`be/contracts/`, the input of the front end's codegen). Every finding path is app-relative (`be/src/...`, `fe/apps/...`).
 
 ```sh
 npx hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]   # THE lint entry (`npm run lint`): ESLint over be/ with the BE canon and over fe/ with the FE canon, stylelint over fe/, the hfs checks; exit 0 clean, 1 findings, 2 a tool could not run
@@ -32,7 +32,7 @@ The spec skeleton is `Test.createTestingModule({ providers: [Service, { provide:
 whole architecture machine over each side folder. Every finding carries a why code and its Vietnamese text
 (`modules/kernel/failure-codes.yaml`).
 
-Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rendered-file checks (`sync/managed.mjs`) and the prettier check (`sync/format.mjs`) live in `sync/` because they read the templates and the repository's own install, and reach `hfs check` as `extraFindings`; the jest / vitest preset the coverage exclusions come from and prettier are read from the repository's `node_modules`, so run `npm ci` first):
+Its own checks (`scripts/hfs/check.mjs`, `scripts/hfs/rules/`; the rendered-file checks (`sync/managed.mjs`) and the prettier check (`sync/format.mjs`) live in `sync/` because they read the templates and the repository's own install, and reach `hfs check` as `extraFindings`; the jest / vitest preset the coverage exclusions come from and prettier are read from the repository's `node_modules`, so run `npm ci` first):
 
 | Code | Level | Meaning |
 |---|---|---|
@@ -70,7 +70,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
 | `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |
 | `FE_I18N_KEYS` | error | a literal key read through `next-intl` that a locale lacks, or a catalog key no source reads (R106; the architecture machine) |
-| `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R97; `scripts/lib/hfs-rules/fe-no-tests.mjs`) |
+| `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R97; `scripts/hfs/rules/fe-no-tests.mjs`) |
 | `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the `sonar.exclusions` of the installed jest preset, the be lcov import with the services as the only coverage scope (R11; `sync/managed.mjs`) |
 | `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
@@ -82,7 +82,7 @@ Each finding is reported once: the eslint and stylelint one-liners under R17, `t
 The root and both sides are rendered by the one mechanism. The root: `package.json` `scripts` (`dev:be`, `dev:fe`, `build:be`, `build:fe`, `start:<app>`, `lint`, `lint:fix`, `test`, `test:integration`, `test:e2e`, `test:contract`, `test:stack`, `codegen`, `contract:emit`, `migrate`, `typecheck`, ...; a be script runs from `be/`, where its tsconfig and jest configuration are), `.prettierrc`, `.prettierignore`, the `.husky` hooks, the CI workflows, the Sonar file and the `.gitignore` block. A side: its `tsconfig.json` (resolving `@starci/tsconfig` from the root `node_modules`), its `eslint.config.mjs` one-liner, and for be `tsconfig.build.json`, `src/tests/tsconfig.json` and `jest.config.js`, for fe `stylelint.config.mjs`. `lint` is the one lint gate, `hfs lint`: ESLint over each side with its canon, the app check and stylelint over fe; `lint:fix` is the same with `--fix`. The front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R97) refuses any spec, e2e file, test tool or test script under `fe/`. `turbo.json` stays the app's own
 (`fe.tool-config-repo`): it carries the task graph, which no preset can render.
 
-The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
+The architecture machine (`scripts/hfs/architecture.mjs` of the runtime, the same code bundled here): tiers and import
 direction, owner public API, cycles, module registration and composition, clones, dead exports, required files,
 the source-shape, contract-form and front-end rules, and the repository-tree rules. Each violation and each error is one
 finding under the machine's own rule id (`BE_TIER_DIRECTION`, `HFS_UNUSED_EXPORT`, `ARCH_OWNER_EXPORT_BYPASS`, ...). A
@@ -127,12 +127,12 @@ The upload needs the repository secret `CODECOV_TOKEN` (each product monorepo ge
 
 ## Maintaining the bundle
 
-`runtime/` is a byte copy of the slot loader files, the pins, and the import closure of `scripts/lib/hfs-check.mjs` and
-`scripts/checks/architecture.mjs` (computed by `scripts/sync-runtime.mjs`, so a new import of the machine is bundled without
+`runtime/` is a byte copy of the slot loader files, the pins, and the import closure of `scripts/hfs/check.mjs` and
+`scripts/hfs/architecture.mjs` (computed by `scripts/sync-runtime.mjs`, so a new import of the machine is bundled without
 editing a list), plus the catalog slice of every code `hfs check` can emit: its own and the machine's (`ARCHITECTURE_RULE_IDS`,
 derived from the machine's rule id lists). After changing any of those files, `knowledge/hfs/slots.yaml`,
-`knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `node packages/hfs/scripts/sync-runtime.mjs`;
-`tests/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
+`knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `node scripts/hfs/sync-runtime.mjs`;
+`tests/packages-hfs/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
 The examples gate `node scripts/checks/check-example-architecture.mjs` runs `hfs lint` of this CLI at the root of every `examples/*`
 app with an `hfs.json` (`examples/todo-app`, `examples/ecommerce-app`) and fails on any finding or any tool that could not run;

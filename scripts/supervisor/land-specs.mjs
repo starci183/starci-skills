@@ -2,7 +2,7 @@
 // merely mentions a changed file.
 //
 // `touching` (land.mjs specsTouching) keeps every spec whose text contains the last two path segments of a changed file,
-// prose and comments included. For a hub module that is most of the suite: lane/token-meter changed engine/ledger-db.mjs,
+// prose and comments included. For a hub module that is most of the suite: lane/token-meter changed engine/db/ledger.mjs,
 // 113 specs import it, so `touching` ran 131 of 355 specs (2026-09-29, run 18, about an hour under load).
 //
 // `direct` keeps, per changed non-spec file:

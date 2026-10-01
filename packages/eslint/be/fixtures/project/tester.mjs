@@ -12,8 +12,8 @@ import { createRequire } from "node:module"
 import { execFileSync } from "node:child_process"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
-import { resetProjectGraphs } from "../../runtime/scripts/lib/project-graph.mjs"
-import { declaredHfsView } from "../../runtime/scripts/lib/hfs-view.mjs"
+import { resetProjectGraphs } from "../../runtime/scripts/hfs/project-graph.mjs"
+import { declaredHfsView } from "../../runtime/scripts/hfs/view.mjs"
 import { appDeclaration } from "../app.mjs"
 
 const ts = createRequire(import.meta.url)("typescript")

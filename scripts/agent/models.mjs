@@ -31,7 +31,7 @@ import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { readProviderCircuit } from '../kernel/provider-circuit.mjs';
-import { poolCapsNow } from '../lib/pool-backoff.mjs';
+import { poolCapsNow } from '../machine/pool-backoff.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -276,7 +276,7 @@ function poolRejectionReasons({ pool, target, role, kind, order = null, difficul
     const running = Number(cap.running ?? 0);
     if (Number.isFinite(max) && Number.isFinite(running) && running >= max)
       reasons.push(`pool at capacity (${running}/${max} running)`);
-    // Adaptive per-pool concurrency (scripts/lib/pool-backoff.mjs): after provider rate limits the reconciler's
+    // Adaptive per-pool concurrency (scripts/machine/pool-backoff.mjs): after provider rate limits the reconciler's
     // Resource controller halves the pool's effective parallelism; the next eligible pool of the order takes the job.
     const backedOff = Number(backoff?.[target]);
     if (Number.isInteger(backedOff) && backedOff > 0 && Number.isFinite(running) && running >= backedOff && !(Number.isFinite(max) && running >= max))
@@ -344,7 +344,7 @@ export function auditFamilyOf(rt, target) {
 //     only when no other candidate is eligible (demote); one they failed on
 //     twice is rejected for this retry (exclude).
 //   Rate-limit backoff (`backoff` = {pool: cap}, default the live caps of
-//     scripts/lib/pool-backoff.mjs when a capacity map is passed): a pool
+//     scripts/machine/pool-backoff.mjs when a capacity map is passed): a pool
 //     whose running count reached its backed-off cap is rejected, so the next
 //     eligible pool takes the job.
 // Returns the chosen pool with its launch model, or {error} with the full

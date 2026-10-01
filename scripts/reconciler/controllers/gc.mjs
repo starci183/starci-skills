@@ -12,10 +12,10 @@
 //   2. key gc:sweep, every allocation.gc.sweepMs (30 min): runGc({apply: mode === 'active'}) under the host lock
 //      `gc` (runGc takes it on a live apply), so a hand-run gc.mjs never overlaps;
 //   3. key gc:housekeeping, every housekeepingEveryMs (24 h) and at once when host-resources reads lowDisk/lowRam
-//      (at most every lowResourceGapMs): `node scripts/supervisor/housekeeping.mjs --apply` through ctx.run.
-//   4. key gc:blob-sweep, every blobSweepEveryMs (24 h): scripts/supervisor/blob-gc.mjs (mark each ledger, then machine.sqlite;
+//      (at most every lowResourceGapMs): `node scripts/housekeeping/housekeeping.mjs --apply` through ctx.run.
+//   4. key gc:blob-sweep, every blobSweepEveryMs (24 h): scripts/housekeeping/blob-gc.mjs (mark each ledger, then machine.sqlite;
 //      sweep what nothing marks) - shadow logs the read-only plan, active runs --apply as a child.
-//   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/lib/worktrees.mjs
+//   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/machine/worktrees.mjs
 //      gcWorktrees. ALWAYS ACTIVE, whatever the controller's mode (owner order lane WT: 600+ orphan worktrees piled up
 //      while the GC ran shadow): a worktree whose branch is merged, whose owner op settled, or whose owner process has
 //      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed; a tree
@@ -110,16 +110,16 @@ const liveDeps = {
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
   // Orca's worker accounting of one Run (every page).
   workers: async (run) => (await import('../../api/orca/worker-list.mjs')).workerListAll({ run }),
-  worktrees: async ({ env, repos }) => (await import('../../lib/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
-  worktreeSettings: async () => (await import('../../lib/worktree-registry.mjs')).worktreeSettings(),
+  worktrees: async ({ env, repos }) => (await import('../../machine/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
+  worktreeSettings: async () => (await import('../../machine/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
-  hostResources: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
-  lesson: async (args) => (await import('../../supervisor/lessons.mjs')).recordLeftover(args),
+  hostResources: async () => (await import('../../machine/host-resources.mjs')).hostResourcesFor({}),
+  lesson: async (args) => (await import('../../machine/lessons.mjs')).recordLeftover(args),
   removeStaging: async (args) => (await import('../../supervisor/workers.mjs')).removeStaging(args),
   stagingExists: async (job) => Boolean(job?.staging?.path) && fs.existsSync(job.staging.path),
   // MB-13/MB-14 (G4): every GC item's final outcome in machine.sqlite gc_runs / gc_items, through the one writer.
   recordRun: async ({ trigger, report = null, items = [] }) => {
-    const { withMachine } = await import('../../../engine/machine-db.mjs');
+    const { withMachine } = await import('../../../engine/db/machine.mjs');
     return withMachine((m) => m.transaction(() => {
       const runId = m.startGcRun({ trigger });
       for (const it of items) m.recordGcItem({ runId, ...it });
@@ -128,7 +128,7 @@ const liveDeps = {
     }));
   },
   recordSweep: async (report) => {
-    const { withSupervisor, supervisorEvent } = await import('../../supervisor/home.mjs');
+    const { withSupervisor, supervisorEvent } = await import('../../machine/home.mjs');
     const { GC_EVENT_KIND } = await import('../../supervisor/gc.mjs');
     withSupervisor((m) => supervisorEvent(m, { entityType: 'gc', entityId: 'reconciler', kind: GC_EVENT_KIND, payload: { ...report.counts, line: report.line, errors: report.errors.length, by: OWNER } }));
   },
@@ -189,7 +189,7 @@ export function createGcController(overrides = {}) {
 
   /** One verified close of a runtime terminal (the engine's shadow gate records it instead in shadow). */
   async function closeTerminal(ctx, d, { entity }) {
-    const r = await ctx.run('node', ['scripts/lib/close-verify.mjs', '--terminal', d.handle, '--owner', OWNER, '--tree', '--log', '--json'], { timeoutMs: 90_000 });
+    const r = await ctx.run('node', ['scripts/machine/close-verify.mjs', '--terminal', d.handle, '--owner', OWNER, '--tree', '--log', '--json'], { timeoutMs: 90_000 });
     const closed = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
     ctx.log('reconciler.gc.close', `${closed ? 'closed' : ctx.mode === 'active' ? 'close FAILED' : 'would close'} ${d.klass} ${d.handle} of ${entity}`, { controller: NAME, handle: d.handle, klass: d.klass, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     if (closed) await deps.lesson({ klass: d.klass, count: 1, examples: [`${d.handle} ${String(d.title ?? '').slice(0, 50)} (${entity}, closed by the GC controller after its event)`] });
@@ -380,7 +380,7 @@ export function createGcController(overrides = {}) {
 
   /**
    * key gc:blob-sweep, every blobSweepEveryMs (24 h, schedules gc/blob-sweep): the blob store's mark-and-sweep
-   * (scripts/supervisor/blob-gc.mjs). It marks each enrolled ledger read-only, one at a time, then machine.sqlite,
+   * (scripts/housekeeping/blob-gc.mjs). It marks each enrolled ledger read-only, one at a time, then machine.sqlite,
    * and sweeps only what no source marks (its own Q4 retention and archive-before-delete). Shadow: the read-only plan
    * (planBlobGc) is logged and the --apply run is the engine's would-row; active: the --apply run as a child.
    */
@@ -390,12 +390,12 @@ export function createGcController(overrides = {}) {
     if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
     let plan = null;
     if (ctx.mode !== 'active') {
-      try { plan = await (deps.planBlobGc ?? (async () => (await import('../../supervisor/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
+      try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
       catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
       ctx.log(WOULD, `blob-sweep: ${plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${plan.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : ''}`}`,
         { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
     }
-    const r = await ctx.run('node', ['scripts/supervisor/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
+    const r = await ctx.run('node', ['scripts/housekeeping/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
     if (ctx.mode === 'active') ctx.log('reconciler.gc.blob-sweep', `blob-sweep ${r?.ok ? 'done' : 'FAILED'}: ${r?.value?.refused ?? (r?.value ? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '')}`,
       { controller: NAME, ok: r?.ok ?? null, runId: r?.value?.runId ?? null });
     finishDuty(ctx, { controller: NAME, duty: 'blob-sweep', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', now: ctx.now() });
@@ -410,7 +410,7 @@ export function createGcController(overrides = {}) {
       idempotencyKey: `gc-main-damaged:${String(stop.path ?? 'unknown').replace(/:/g, '_')}`, entity: { type: 'worktree', id: String(stop.path ?? 'unknown') },
       summary: `The GC stopped: removing ${stop.path ?? 'a worktree'} changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`,
       evidence: [{ ref: `worktree:${stop.path ?? ''}`, why: (stop.damage ?? []).join('; ').slice(0, 500) }],
-      options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then node scripts/lib/worktrees.mjs resume', recommended: true }],
+      options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then node scripts/machine/worktrees.mjs resume', recommended: true }],
       allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
     });
   }
@@ -457,7 +457,7 @@ export function createGcController(overrides = {}) {
     const claim = claimDue(ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
     if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
     const why = claim.reason === 'first-run' ? 'first run' : claim.reason === 'early' ? `host ${host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : ''}${host.lowDisk && host.lowRam ? ', ' : ''}${host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : ''}` : 'daily';
-    const r = await ctx.run('node', ['scripts/supervisor/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
+    const r = await ctx.run('node', ['scripts/housekeeping/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
     finishDuty(ctx, { controller: NAME, duty: 'housekeeping', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', actionId: r?.actionId ?? null, now: ctx.now() });
     ctx.log('reconciler.gc.housekeeping', `${ctx.mode === 'active' ? 'ran' : 'would run'} housekeeping (${why})`, { controller: NAME, why, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     return { ran: ctx.mode === 'active', why };

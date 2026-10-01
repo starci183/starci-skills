@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readBrandRecord } from '../checks/brand.mjs';
+import { readBrandRecord } from '../work/brand/brand.mjs';
 import { projectBinding, bindingRepo } from './target-repo.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 

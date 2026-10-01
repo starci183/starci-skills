@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256} from '../../engine/digest.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { goalTextRefusal } from './goal-text.mjs';
-import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/ledger-db.mjs';
+import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 

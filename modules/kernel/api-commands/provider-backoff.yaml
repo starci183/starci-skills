@@ -1,5 +1,5 @@
-# The contract of `api provider-backoff` (scripts/kernel/api-verbs/provider-backoff.mjs): open the provider circuit a
-# persisting rate limit calls for (reconciler Resource controller, adaptive per-pool concurrency, scripts/lib/pool-backoff.mjs).
+# The contract of `api provider-backoff` (scripts/kernel/verbs/provider-backoff.mjs): open the provider circuit a
+# persisting rate limit calls for (reconciler Resource controller, adaptive per-pool concurrency, scripts/machine/pool-backoff.mjs).
 purpose: >-
   Open the ledger's provider-health circuit for one provider (failureKind quota by default, or rate-limited) for
   allocation.cooldownMs.<kind>, when the Resource controller's AIMD backoff held the provider's pool at its floor and

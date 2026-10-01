@@ -6,11 +6,11 @@
 //   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
-// 1. The land queue in machine.sqlite (engine/machine-db.mjs land_queue): each waiter files a ticket and only the
+// 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
 //    runtimes.yaml allocation.landGate.waitMs). Every run is a land_runs row (full output as blobs, G9/MB-10).
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
-//    (scripts/lib/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
+//    (scripts/housekeeping/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
 //    already landed and moves nothing. Before a waiter even joins the queue, a lock-free preflight
 //    (`git merge-tree` of each commit onto main, conflictPreflight) refuses a pick that cannot apply, so a lane
@@ -23,7 +23,7 @@
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches (packageProofCheck:
-//        scripts/checks/package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
+//        scripts/gates/package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -58,26 +58,26 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
-import { lowerOwnPriority } from '../lib/low-priority.mjs';
+import { lowerOwnPriority } from '../api/process/set-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
-import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/machine-db.mjs';
-import { lanesRoot } from '../lib/hk-lanes.mjs';
+import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
+import { lanesRoot } from '../housekeeping/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveTree, safeRemoveWorktree, unlinkNodeModulesLink } from '../lib/safe-remove.mjs';
+import { safeRemoveTree, safeRemoveWorktree, unlinkNodeModulesLink } from '../api/fs/safe-remove.mjs';
 import { createScratchWorktree } from '../api/git/worktree-add.mjs';
 import { ci } from '../api/npm/ci.mjs';
-import { markRemoved } from '../lib/worktree-registry.mjs';
+import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { hostThrottle } from '../lib/ram-throttle.mjs';
-import { grammarDistStatus } from '../checks/grammar-dist.mjs';
+import { hostThrottle } from '../machine/ram-throttle.mjs';
+import { grammarDistStatus } from '../checks/check-grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
-import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
+import { SKILL_ROOT, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
-import { DEFAULT_DUE_MS } from '../reconciler/decisions.mjs';
+import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export { CONTRACT_CHANGES_DIR };
@@ -90,7 +90,7 @@ export const specConcurrency = () => { const n = Number(allocationSettings()?.la
 export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
 
 /**
- * The land gate's spec run under the RAM-aware throttle (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28):
+ * The land gate's spec run under the RAM-aware throttle (scripts/machine/ram-throttle.mjs, owner ruling 2026-09-28):
  * while the host is `critical` (free RAM under allocation.resources.ramThrottle.landSpecPauseBelowPct, until it is
  * back above landSpecResumeAbovePct) the spec run waits, polling every pollMs up to waitMs; still critical after
  * that, it does not run and the land is refused (a retry lands it once there is room). While `heavy-paused` it runs
@@ -431,8 +431,8 @@ export function specBaselineVerdict({ candidate, base, changed = [] }) {
 }
 
 /** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
-export const MIRROR_CHECK = 'packages/hfs/scripts/sync-runtime.mjs';
-export const MIRROR_FIX = 'run node packages/hfs/scripts/sync-runtime.mjs and include the refreshed mirror in the change';
+export const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
+export const MIRROR_FIX = 'run node scripts/hfs/sync-runtime.mjs and include the refreshed mirror in the change';
 
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
@@ -470,7 +470,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
 }
 
-export const PACKAGE_PROOF = 'scripts/checks/package-clean-test.mjs';
+export const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
 export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 /**
  * The clean-install proof of every published package the land changes: package-clean-test.mjs --base <base> in the scratch

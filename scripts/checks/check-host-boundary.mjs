@@ -20,9 +20,9 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {walkFiles} from './common.mjs';
+import { walkFiles } from '../lib/walk.mjs';
 import {spawnCalls} from '../lib/spawn-calls.mjs';
-import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../lib/hfs-slots.mjs';
+import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
 const ALLOW_FILE='scripts/checks/host-boundary.allow';

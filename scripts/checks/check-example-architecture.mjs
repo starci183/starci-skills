@@ -4,7 +4,7 @@
 // findings, stylelint over fe/ and `hfs check`) on every examples/<name> app that has an hfs.json, prints per example the
 // findings by code (the catalog code a finding carries, else its rule) and fails when any example has a finding or a tool that
 // could not run. `hfs check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
-// ...) sit on the lint surface (scripts/checks/architecture/surface.mjs) and reach an app only through `hfs lint`.
+// ...) sit on the lint surface (scripts/hfs/architecture/surface.mjs) and reach an app only through `hfs lint`.
 //
 //   node scripts/checks/check-example-architecture.mjs [--examples <dir>] [--only <name>]
 //
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { isMain } from './common.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const HFS_BIN = path.join(skillRoot, 'packages', 'hfs', 'bin', 'hfs.mjs');
 const USAGE = 'usage: check-example-architecture.mjs [--examples <dir>] [--only <name>]';

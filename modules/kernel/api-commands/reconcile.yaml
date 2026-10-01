@@ -106,7 +106,7 @@ reconcile:
     (inc-2c1ac4ff3e48).
   settleFailed: >-
     `--dead-worker --settle-failed` is the recovery the watchdog runs under
-    --repair for every frontier deadWorkerJobs entry (scripts/kernel/watchdog.mjs
+    --repair for every frontier deadWorkerJobs entry (scripts/kernel/kernel-watchdog.mjs
     recoverDeadWorkers), so a dead worker never waits on a Kernel or a
     hand-written incident. Routes (1) and (2) are unchanged. In place of
     route (3), evidence the owned paths bound (dirty:<path>, commit:<sha>,
@@ -250,7 +250,7 @@ reconcile:
 
 # --------------------------------------------------------------------------
 # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
-# checks beside. These rows (engine/migrations/runtime/0001-init.sql reports/contracts/checks)
+# checks beside. These rows (engine/db/migrations/runtime/0001-init.sql reports/contracts/checks)
 # are the truth.
 # --------------------------------------------------------------------------
 

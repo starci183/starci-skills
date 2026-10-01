@@ -21,7 +21,7 @@ node server.mjs
 
 To prepare the fixture first, run `node ui/fixtures/seed.mjs` from the runtime root. The fixture uses the engine's database writers and stores its content-addressed blobs outside the Git worktree. Set `STARCI_MACHINE_DB` and `STARCI_ARTIFACT_ROOT` to the paths printed by that command. Use a separate preview port; the live harness service is outside this workflow.
 
-Without `STARCI_MACHINE_DB`, `engine/machine-db.mjs` resolves the host's real `machine.sqlite` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
+Without `STARCI_MACHINE_DB`, `engine/db/machine.mjs` resolves the host's real `machine.sqlite` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
 
 For source development, `npm run dev` starts Vite and the API preview; see `package.json` for the current script and ports. `npm run build` runs lint, TypeScript and Vite build. The public server defaults to `127.0.0.1:4547` unless `STARCI_STATUS_PORT` is set.
 
