@@ -271,7 +271,7 @@ test('the scaffolded be api builds with build:be and boots with start:api from t
   const port = await freePort();
   const origin = 'http://localhost:3000';
   const { spawn } = await import('node:child_process');
-  child = spawn(process.execPath, [entry], { cwd: app, env: { ...process.env, PORT: String(port), HTTP_SECURITY_ALLOWED_ORIGINS: origin }, stdio: ['ignore', 'pipe', 'pipe'] });
+  child = spawn(process.execPath, [entry], { cwd: app, env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('STARCI_'))), PORT: String(port), HTTP_SECURITY_ALLOWED_ORIGINS: origin }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (chunk) => { output += chunk; });
   child.stderr.on('data', (chunk) => { output += chunk; });
@@ -305,11 +305,12 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts.test;
   assert.equal(script, 'cd be && jest --selectProjects unit --coverage');
   const jest = path.join(app, 'node_modules', 'jest', 'bin', 'jest.js');
-  const unit = spawnSync(process.execPath, [jest, '--selectProjects', 'unit', '--coverage', '--ci'], { cwd: path.join(app, 'be'), encoding: 'utf8', timeout: 540_000 });
+  const unit = spawnSync(process.execPath, [jest, '--selectProjects', 'unit', '--coverage', '--ci', '--cacheDirectory', path.join(into, 'jest-cache')], { cwd: path.join(app, 'be'), encoding: 'utf8', timeout: 540_000 });
   assert.equal(unit.status, 0, `the scaffold's unit run passes at per-file 100 on its services: ${unit.stdout}${unit.stderr}`);
   const lcov = path.join(app, ...LCOV.split('/'));
   assert.ok(fs.existsSync(lcov), `${LCOV} is written by the unit run`);
   const files = fs.readFileSync(lcov, 'utf8').split(/\r?\n/).filter((line) => line.startsWith('SF:')).map((line) => line.slice(3).replace(/\\/g, '/'));
   assert.ok(files.length > 0, 'the lcov names the services it measured');
-  for (const file of files) assert.match(file, /\/src\/.*\.service\.ts$/, `${file}: only services are measured`);
+  // lcov SF: entries are relative to the jest rootDir (be/), so a service is src/<...>.service.ts.
+  for (const file of files) assert.match(file, /^src\/.*\.service\.ts$/, `${file}: only services are measured`);
 });

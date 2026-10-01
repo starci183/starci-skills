@@ -18,7 +18,12 @@ export function runtimeInstalls() {
   const examples = path.join(RUNTIME, 'examples');
   const nested = fs.existsSync(examples) ? fs.readdirSync(examples, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(examples, entry.name, 'node_modules')) : [];
   const extra = (process.env.STARCI_APP_INSTALLS ?? '').split(path.delimiter).filter(Boolean).map((dir) => path.resolve(dir));
-  return [...extra, path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
+  const own = [path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
+  // The first install that holds a package wins, so the install that holds the most of what a scaffold imports goes first: a framework
+  // package is then linked from the one install that also holds its adapters (@nestjs/core resolves @nestjs/platform-express from its own
+  // folder, never from the app), not from the runtime's partial copy.
+  const held = (dir) => LINT_DEPENDENCIES.filter((name) => has(dir, name)).length;
+  return [...extra.filter((dir) => fs.existsSync(dir)), ...own.sort((a, b) => held(b) - held(a))];
 }
 
 /** The @starci packages an app installs, from the runtime's own source: package name -> folder under packages/. */
