@@ -155,29 +155,11 @@ steps:
         names this service. An unbound or unexpected-dirty repository is reported, never worked
         around. Read the house rules the new tree must conform to from its first commit — lint kits,
         layout contract, naming.
-  - reads:
-      - baseline
-      - architecture
-      - conventions
+  - reads: [baseline, architecture, conventions]
     writes: [source]
     action:
-      en: Write the manifest first - hfs.json and package.json with the pinned engines and dependencies;
-        then run `hfs sync --write`, which generates the tool configuration (tsconfig.json, tsconfig.build.json,
-        src/tests/tsconfig.json, eslint.config.mjs, jest.config.js, .prettierrc, .prettierignore), the package.json scripts, husky,
-        .github/workflows/ci.yml and e2e.yml, .gitignore, sonar-project.properties and
-        .starciwork/.gitignore, and `hfs check` must report no managed-file finding -
-        a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
-        scaffold evidence, never an improvised choice - then the declared layout, then the first source tree by running `hfs sync --init`
-        (packages/hfs/templates/be/skeleton, never overwriting) - per api app the entrypoint that reads the
-        environment once, AppModule.register(options) and its one error filter; platform/config
-        (the only reader of the environment), platform/clock, platform/composition, platform/cqrs,
-        platform/logging (the logger port with enum log events) and platform/errors (DomainError); the
-        domain/liveness capability with its service and the service's unit spec; and the system-health
-        feature, a thin controller dispatching one query to a thin handler that calls the liveness service,
-        answering GET /health/live with { status, startedAt, uptimeSeconds } - plus any health the settled
-        records add. The skeleton writes no spec but the service specs (a repository lists @nestjs/cqrs and tslib). The stubs need the
-        @modules and @features path aliases in tsconfig and the jest moduleNameMapper. No business behaviour
-        beyond what the skeleton proves.
+      en: "Scaffold through hfs, never by hand. A new app comes from hfs scaffold app <name> --into <parent> (the published @starci/hfs at its canon pin): the app root - one package.json for both sides with every dependency at its canon pin (knowledge/hfs/canon-pins.yaml), the lockfile npm resolves, hfs.json of kind app, README, CI, .husky, scripts/, .starcistacks/ and .starciwork/ - and the be/ side with its managed configuration and first source tree. An existing app gains or refreshes its managed files only through hfs sync --write at the app root, and hfs check must report no managed-file finding; a generated file is never hand-written or edited, a dependency is never added to a side's own package.json (the app root holds the one manifest), and a value or a skeleton file hfs does not write is a named gap in the scaffold evidence, never an improvised choice. The first be/ source tree is the scaffold's own: per api app the entrypoint that reads the environment once, AppModule.register(options) and its one error filter; platform/config (the only reader of the environment), platform/clock, platform/composition, platform/cqrs, platform/logging and platform/errors; the domain/liveness capability with its service and the service's unit spec; and the system-health feature answering GET /health/live, plus any health the settled records add. No behaviour beyond what the skeleton proves."
+      vi: "Dựng qua hfs, không bao giờ bằng tay. App mới đến từ hfs scaffold app <name> --into <thư mục cha> (@starci/hfs đã publish theo canon pin): gốc app - một package.json cho cả hai phía với mọi phụ thuộc theo canon pin (knowledge/hfs/canon-pins.yaml), lockfile do npm phân giải, hfs.json loại app, README, CI, .husky, scripts/, .starcistacks/ và .starciwork/ - cùng phía be/ với cấu hình được quản lý và cây mã đầu tiên. App đã có chỉ thêm hoặc làm mới các tệp được quản lý qua hfs sync --write ở gốc app, và hfs check không được báo lỗi tệp quản lý nào; tệp sinh ra không bao giờ được viết hay sửa tay, không bao giờ thêm phụ thuộc vào package.json riêng của một phía (gốc app giữ manifest duy nhất), và giá trị hay tệp khung mà hfs không viết là khoảng trống được nêu trong bằng chứng scaffold, không bao giờ là lựa chọn tự chế. Cây mã be/ đầu tiên là của chính scaffold: với mỗi app api là entrypoint đọc môi trường một lần, AppModule.register(options) và một error filter; platform/config (nơi duy nhất đọc môi trường), platform/clock, platform/composition, platform/cqrs, platform/logging và platform/errors; capability domain/liveness với service và unit spec của service; và feature system-health trả lời GET /health/live, cùng mọi health mà các bản ghi đã chốt thêm vào. Không có hành vi nào ngoài những gì khung chứng minh."
   - reads:
       - repo
     writes: [source, evidence]
@@ -214,13 +196,8 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: The ci.yml and sonar-project.properties the baseline writes take the Sonar project key
-        and host and the CI secret/variable names from the stack declaration's services
-        block (the repository's own .starcistacks, or the backend declaration whose sources list it), and
-        `node scripts/checks/check-starcistacks.mjs <repo> --new` reports no refusal. When that declaration
-        is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING /
-        STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode
-        stacks, examples/starcistacks-services/<repository>.services.yaml) - never an owner ask.
+      en: "The ci.yml and sonar-project.properties the baseline writes take the Sonar project key and host and the CI secret/variable names from the services block of the app's stack declaration (.starcistacks at the app root), and node scripts/checks/check-starcistacks.mjs <app> --new reports no refusal. When that declaration is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode stacks) - never an owner ask."
+      vi: "ci.yml và sonar-project.properties mà baseline viết lấy khóa dự án và host Sonar cùng tên secret/biến của CI từ khối services của khai báo stack của app (.starcistacks ở gốc app), và node scripts/checks/check-starcistacks.mjs <app> --new không báo từ chối nào. Khi khai báo đó nằm ngoài các đường dẫn op sở hữu, lệnh kiểm tra chạy không có --new và các nghi vấn STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING của nó được báo kèm việc tiếp theo nó nêu (workspace.manage chế độ stacks) - không bao giờ hỏi chủ sở hữu."
     check: scripts/checks/check-starcistacks.mjs
   - id: scope
     requirement:

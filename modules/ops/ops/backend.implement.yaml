@@ -264,7 +264,7 @@ steps:
         command, exit code, counts and sanitized output. Positive, denial, invalid-input and applicable
         race/reload cases must map to the selected operations in the unit specs. E2E runs MANUALLY
         only (owner ruling 2026-09-29) - this operator does not run the e2e suite, typecheck:e2e or any
-        src/tests/e2e/ code; backend E2E proof belongs to a separately selected e2e.verify leg that the
+        be/src/tests/e2e/ code; backend E2E proof belongs to a separately selected e2e.verify leg that the
         goal explicitly asked for. After the unit gate passes, run the routine gates - typecheck, lint,
         canon, build - plus required coverage (unit runs only) and Sonar against the same source
         revision; an unavailable runner or not-run required gate is blocked/not-run rather than pass. Preserve failures, repair only within the

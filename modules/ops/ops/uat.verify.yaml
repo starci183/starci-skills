@@ -313,6 +313,11 @@ steps:
         evidence, plus outputs.cleanup with no unresolved owned resources for a pass. Submit the
         exact response to the kernel gate; never self-advance. This handoff is conditional and does
         not change standalone or named frontend response contracts.
+  - reads: [environment, scripts]
+    writes: [evidence]
+    action:
+      en: "The walk runs against the app's real dev stack - the services the app-root .starcistacks/<env> declares, brought up by the environment's own start commands and checked by env-health - never a test world, a fake of our own service or a shared production target. Where the op runs automated checks (seed, delete and resource scripts, automation specs), they follow the test-world conventions: people through the app's declared identity doors (sign-in and registration helpers, never a hand-made token), state awaited by polling with a deadline (waitFor-style), never a sleep, no process.env read in a spec, a third-party provider reached only through its declared integration and test credentials through testSecret(<name>, {repo}). Evidence is gathered as the evidence write declares."
+      vi: "Lần đi chạy trên stack dev thật của app - các dịch vụ mà .starcistacks/<env> ở gốc app khai báo, khởi động bằng lệnh start riêng của môi trường và được env-health kiểm tra - không bao giờ trên test world, fake của dịch vụ của chính ta hay đích production dùng chung. Khi op chạy kiểm tra tự động (script seed, xóa và tài nguyên, spec tự động), chúng theo quy ước của test world: người dùng qua các cửa identity đã khai báo của app (helper đăng nhập và đăng ký, không bao giờ token tự chế), trạng thái được chờ bằng thăm dò có hạn (kiểu waitFor), không bao giờ sleep, không đọc process.env trong spec, nhà cung cấp bên thứ ba chỉ được chạm qua tích hợp đã khai báo và credential test lấy qua testSecret(<name>, {repo}). Bằng chứng được thu như mục ghi evidence đã khai báo."
 proofs:
   - id: binding
     requirement:

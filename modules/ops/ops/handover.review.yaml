@@ -125,6 +125,11 @@ steps:
         deferred-to-handover proof with its sandbox/stub path and what real proof is owed, and the autopilot decision
         log. The owner's feedback may name items: per named provisional item the Kernel re-opens only that item (api
         autopilot --reopen) and the draw-feedback loop re-runs it; approve still means only the owner's approve."
+  - reads: [repo]
+    writes: [package]
+    action:
+      en: "The package's how-to-test section names the app's managed commands per test layer, as the app declares them: npm test (the unit project with per-service coverage), npm run test:integration and npm run test:e2e (the test world on the preset's world runner, attaching the warm stack through npm run test:stack -- up), npm run test:contract (provider sandboxes; it skips itself without keys), plus npm run lint and npm run typecheck at the app root - never a hand-made docker or container recipe."
+      vi: "Phần hướng dẫn test của gói nêu các lệnh được quản lý của app theo từng tầng test, đúng như app khai báo: npm test (dự án unit với độ phủ từng service), npm run test:integration và npm run test:e2e (test world trên world runner của preset, gắn stack ấm qua npm run test:stack -- up), npm run test:contract (sandbox của nhà cung cấp; tự bỏ qua khi không có khóa), cùng npm run lint và npm run typecheck ở gốc app - không bao giờ là công thức docker hay container tự chế."
 proofs:
   - id: package-grounded
     requirement:
