@@ -837,6 +837,8 @@ test('settle --verdict fail --report marks the job settled and appends an event'
 
 test('cut pass requires the cut-aware green check names before settlement',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-cut-settle',jobId='op-k7-cut';
+  const proofDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-k7-proofs-'));
+  t.after(()=>fs.rmSync(proofDir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     seedOp(ledger,wf,{jobId,opId:'docs.author',status:'running',dispatchId:'ctx-k7-cut',
@@ -844,7 +846,7 @@ test('cut pass requires the cut-aware green check names before settlement',t=>{
         orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'}}});
     const attemptId=writeFixtureContract(ledger,jobId,'# cut contract');
     // docs.author owes its READ digest and document gate at settle (knowledge/op-gate.yaml opProofs): the green ones ride along.
-    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(path.join(path.dirname(repo),'proofs-k7-cut'))});
+    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done',files:writeGreenProofs(proofDir)});
     ledger.write.recordCheckRun({attemptId,name:'generic-green',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
   });
   const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
