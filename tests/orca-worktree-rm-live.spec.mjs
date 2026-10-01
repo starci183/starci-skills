@@ -6,10 +6,11 @@
 // first, then Orca) is run the same way. Measured result: identical - Orca does not walk junctions; the runtime still
 // unlinks every link first.
 //
-// A skip must never pass silently. With no reachable Orca it prints one SKIPPED line. CI and the release verification set
-// STARCI_REQUIRE_ORCA_LIVE=1, and then a missing Orca fails the test instead of skipping it. The throwaway repo lives at
-// a fixed temp path (Orca keeps a repository it was given; `orca repo add` of the same path is idempotent), and every
-// worktree the spec creates is removed.
+// The probe talks to the LIVE Orca and registers a repository there that the CLI cannot remove, so a normal `npm test`
+// never runs it: it runs only on an explicit opt-in, STARCI_ORCA_LIVE=1, or STARCI_REQUIRE_ORCA_LIVE=1 (CI and the
+// release verification), and then a missing Orca fails the test instead of skipping it. Without an opt-in it prints one
+// SKIPPED line and makes no Orca call at all - not even a status probe. The throwaway repo lives in a fresh directory
+// under the spec's isolated temp root and is removed with every worktree the spec creates.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,11 +25,13 @@ import { worktreeRm } from '../scripts/api/orca/worktree-rm.mjs';
 import { removeOrcaWorktree } from '../scripts/lib/worktrees.mjs';
 
 export const REQUIRE_ORCA_LIVE = process.env.STARCI_REQUIRE_ORCA_LIVE === '1';
-const PROBE = path.join(os.tmpdir(), 'starci-orca-rm-probe', 'fake-main');
+export const ORCA_LIVE_OPT_IN = REQUIRE_ORCA_LIVE || process.env.STARCI_ORCA_LIVE === '1';
+let PROBE = null;
 const posix = (p) => String(p).replace(/\\/g, '/');
 
 /** Why the live probe cannot run here, or null. */
 function unavailable() {
+  if (!ORCA_LIVE_OPT_IN) return 'a live Orca probe runs only with STARCI_ORCA_LIVE=1 or STARCI_REQUIRE_ORCA_LIVE=1';
   if (process.platform !== 'win32') return 'the junction probe is Windows-only (mklink /J)';
   if (process.env.STARCI_ORCA_COMMAND || process.env.STARCI_ORCA_ARGS) return 'STARCI_ORCA_COMMAND points at a stub, not the real Orca';
   const st = orcaStatus();
@@ -38,6 +41,7 @@ const reason = unavailable();
 const gate = (() => {
   if (!reason) return { skip: false, required: null };
   if (REQUIRE_ORCA_LIVE) return { skip: false, required: `REQUIRED (STARCI_REQUIRE_ORCA_LIVE=1) but ${reason}` };
+  if (!ORCA_LIVE_OPT_IN) { console.log(`SKIPPED: ${reason}`); return { skip: reason, required: null }; }
   console.log(`SKIPPED: no live Orca - orca worktree rm junction probe: ${reason}`);
   return { skip: reason, required: null };
 })();
@@ -99,8 +103,11 @@ function linkedTree(name) {
   return made.worktree;
 }
 
-test('orca worktree rm with junctions into the main checkout leaves it byte-identical; so does the runtime release', { skip: gate.skip, timeout: 600_000 }, () => {
+test('orca worktree rm with junctions into the main checkout leaves it byte-identical; so does the runtime release', { skip: gate.skip, timeout: 600_000 }, (t) => {
   if (gate.required) assert.fail(gate.required);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-orca-rm-probe-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  PROBE = path.join(home, 'fake-main');
   fakeMain();
   const before = picture(PROBE);
   assert.equal(Object.keys(before).filter((f) => f.includes('node_modules')).length, 10, 'real files in both node_modules');
