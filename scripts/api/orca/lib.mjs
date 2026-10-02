@@ -290,6 +290,16 @@ export function requestStateOf(id) {
 }
 
 /**
+ * Runs one wrapper as its CLI: `node <file>` prints the wrapper's result as JSON and exits non-zero when it is not ok.
+ */
+export function runAsCli(file, call) {
+  if (!process.argv[1]?.endsWith(file)) return;
+  const out = call(process.argv.slice(2));
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(out.ok ? 0 : 1);
+}
+
+/**
  * Issue one calls.yaml call. `params` are keyed by the flag names calls.yaml
  * declares; anything else is a contract violation and throws. A `replay:
  * request` mutation needs `request` (its ledger identity); no other call takes

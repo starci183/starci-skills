@@ -21,6 +21,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { posixPath } from '../lib/path-key.mjs';
+import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { mainTipOf, mergeGuard, resolveGateBase } from './gate.mjs';
 
@@ -93,14 +94,7 @@ export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRo
 }
 
 export function parseReleaseArgs(argv) {
-  const opts = { repo: null, base: null, main: null, out: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (['--repo', '--base', '--main', '--out'].includes(arg)) {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
-    } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
-  }
+  const opts = { repo: null, base: null, main: null, out: null, ...valueFlags(argv, ['--repo', '--base', '--main', '--out'], USAGE) };
   if (!opts.repo || !opts.base) throw new Error(`--repo and --base are required; ${USAGE}`);
   return opts;
 }

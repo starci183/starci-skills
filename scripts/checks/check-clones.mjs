@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { runCheckCli } from '../lib/check-cli.mjs';
 
 export const CLONE_LINES = 8;
 export const CLONE_TOKENS = 60;
@@ -171,12 +172,4 @@ export function checkClones(root = skillRoot) {
   return cloneFindings(files);
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkClones();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: no duplicated block of code.');
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) runCheckCli(checkClones(), 'OK: no duplicated block of code.');

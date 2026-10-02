@@ -9,3 +9,19 @@ export const arg = (argv, name, fallback = null) => {
 
 /** True when argv holds `--<name>`. */
 export const flag = (argv, name) => argv.includes(`--${name}`);
+
+/**
+ * The `--<name> value` pairs of `names` read from argv: every other token, a missing value and a `--`-led value throw
+ * an error suffixed with `usage`.
+ */
+export const valueFlags = (argv, names, usage) => {
+  const opts = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (names.includes(arg)) {
+      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${usage}`);
+      opts[arg.slice(2)] = argv[++i];
+    } else throw new Error(`unknown argument ${arg}; ${usage}`);
+  }
+  return opts;
+};

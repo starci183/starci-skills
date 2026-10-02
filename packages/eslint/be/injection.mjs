@@ -25,7 +25,7 @@
  */
 import { posix } from "node:path"
 import ts from "typescript"
-import { staticText } from "./lib/ast.mjs"
+import { paramParts, staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isImportedFrom } from "./lib/import-source.mjs"
 import { normalizePath } from "./lib/path.mjs"
@@ -131,13 +131,6 @@ const inComposition = (hfs, file) => {
     if (!file || file.includes("/node_modules/") || hfs.tierOf(file) !== "platform") return false
     const owner = hfs.ownerOf(file)
     return owner !== null && posix.basename(owner) === "composition"
-}
-
-/** The decorators of a constructor parameter: on the parameter, its wrapper (`private readonly x`) or its inner identifier. */
-const decoratorsOfParam = (param) => {
-    const inner = param.type === "TSParameterProperty" ? param.parameter : param
-    const target = inner.type === "AssignmentPattern" ? inner.left : inner
-    return { target, decorators: [...new Set([...(param.decorators ?? []), ...(inner.decorators ?? []), ...(target.decorators ?? [])])] }
 }
 
 /** The injected type `T` of a call typed `TypedParameterDecorator<T>`, else null. */
@@ -373,7 +366,7 @@ export const injectorTypeMatch = {
         return {
             MethodDefinition(node) {
                 for (const param of constructorParams(node)) {
-                    const { target, decorators } = decoratorsOfParam(param)
+                    const { target, decorators } = paramParts(param)
                     for (const decorator of decorators) {
                         if (decorator.expression.type !== "CallExpression") continue
                         const injected = injectedTypeOf(context, decorator.expression)
@@ -417,7 +410,7 @@ const isContainerBuilt = (context, constructor) => {
     const declaration = constructor.parent?.parent
     if (declaration?.type !== "ClassDeclaration" && declaration?.type !== "ClassExpression") return false
     if ((declaration.decorators ?? []).some((decorator) => packageOfExport(context, decorator.expression)?.startsWith("@nestjs/"))) return true
-    return constructorParams(constructor).some((param) => decoratorsOfParam(param).decorators.length > 0)
+    return constructorParams(constructor).some((param) => paramParts(param).decorators.length > 0)
 }
 
 /**
@@ -459,7 +452,7 @@ export const infraNeedsInjector = {
                 // metadata. A plain class (a CQRS message, a factory-built adapter, a test fake) is never DI-constructed.
                 if (!isContainerBuilt(context, node)) return
                 for (const param of constructorParams(node)) {
-                    const { target, decorators } = decoratorsOfParam(param)
+                    const { target, decorators } = paramParts(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
                     if (!annotation) continue
                     const infra = infraOriginOf(context, hfs, own, annotation)
@@ -501,7 +494,7 @@ export const injectedParamName = {
             MethodDefinition(node) {
                 if (!isContainerBuilt(context, node)) return
                 for (const param of constructorParams(node)) {
-                    const { target, decorators } = decoratorsOfParam(param)
+                    const { target, decorators } = paramParts(param)
                     if (target.type !== "Identifier") continue
                     const annotation = target.typeAnnotation?.typeAnnotation
                     if (!annotation) continue

@@ -12,6 +12,7 @@
  * generalises on its own, and the gap between them is exactly where a third step gets invented.
  */
 
+import { isClassAttribute, staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { fileOf, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
@@ -83,21 +84,6 @@ const isGlyphImport = (source) => {
 
 /** A glyph size written as a fraction of a step, or as an arbitrary value. */
 const OFF_SCALE_GLYPH = /\bsize-(?:\d+\.\d+|\[[^\]]+\])/
-
-/** True for a `className` / `class` JSX attribute. */
-const isClassAttribute = (node) =>
-  node.type === "JSXAttribute" && node.name && (node.name.name === "className" || node.name.name === "class")
-
-/** Static string carried by a JSX attribute, or by a module constant holding a class string. */
-const staticText = (value) => {
-  if (!value) return null
-  if (value.type === "Literal" && typeof value.value === "string") return value.value
-  if (value.type === "TemplateLiteral" && value.expressions.length === 0) {
-    return value.quasis.map((quasi) => quasi.value.cooked).join(" ")
-  }
-  if (value.type === "JSXExpressionContainer") return staticText(value.expression)
-  return null
-}
 
 // -- ICON-6 ----------------------------------------------------------------------------------------
 

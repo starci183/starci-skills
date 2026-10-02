@@ -20,7 +20,7 @@
 import { posix } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
 import { baseName } from "./lib/ports.mjs"
-import { typed } from "./lib/types.mjs"
+import { resolveAlias } from "./lib/specifier.mjs"
 
 /** The tiers whose files belong to an owner with a root `index.ts`. */
 const OWNER_TIERS = new Set(["feature", "domain", "platform", "integrations"])
@@ -44,27 +44,6 @@ const absolute = (hfs, rel) => `${hfs.repoRoot.replace(/\\/g, "/")}/${rel}`
 
 /** The owner an import path (no extension, absolute) reaches: the owner of `<path>/index.ts`, which any file or folder of that owner shares. */
 const ownerOfTarget = (hfs, target) => ownerDirOf(hfs, `${target}/index.ts`)
-
-/**
- * The absolute path an alias specifier maps to under the program's `compilerOptions.paths`, or null when no pattern matches.
- *
- * @param {object} context - The ESLint rule context.
- * @param {string} specifier - An import specifier.
- * @returns {{ target: string, rest: string } | null} The absolute target without extension and the part the wildcard matched.
- */
-const resolveAlias = (context, specifier) => {
-  const options = typed(context).program.getCompilerOptions()
-  const base = options.baseUrl ?? options.pathsBasePath
-  if (!options.paths || typeof base !== "string") return null
-  for (const [pattern, targets] of Object.entries(options.paths)) {
-    if (!pattern.endsWith("/*") || !targets[0]) continue
-    const prefix = pattern.slice(0, -1)
-    if (!specifier.startsWith(prefix)) continue
-    const rest = specifier.slice(prefix.length)
-    return { target: posix.normalize(`${base.replace(/\\/g, "/")}/${targets[0].replace("*", rest)}`), rest }
-  }
-  return null
-}
 
 /** A specifier that names a directory by construction: `.`, `./`, `..`, `../`, or a trailing `/`. */
 const isBareFolderSpecifier = (specifier) =>

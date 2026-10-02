@@ -9,7 +9,7 @@
 // unreachable. hostUnavailable marks that second case (runtime_unavailable,
 // orca.exe ENOENT while an update replaces it, a timed-out call): it says
 // nothing about the terminal, so no caller may read it as a dead one.
-import { orcaCall, terminalOf } from './lib.mjs';
+import { orcaCall, runAsCli, terminalOf } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';
 
 export function terminalShow({ terminal }) {
@@ -28,8 +28,4 @@ export function terminalShow({ terminal }) {
   };
 }
 
-if (process.argv[1]?.endsWith('terminal-show.mjs')) {
-  const out = terminalShow({ terminal: arg(process.argv.slice(2), 'terminal') });
-  console.log(JSON.stringify(out, null, 2));
-  process.exit(out.ok ? 0 : 1);
-}
+runAsCli('terminal-show.mjs', (argv) => terminalShow({ terminal: arg(argv, 'terminal') }));

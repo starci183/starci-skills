@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { workCli } from '../lib/work-cli.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
@@ -639,25 +640,16 @@ export function runCritique(workRoot, {write} = {}) {
 }
 
 if (isMain(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const workFlagIndex = args.indexOf('--work');
-  const workArg = workFlagIndex >= 0 ? args[workFlagIndex + 1] : null;
-  const write = args.includes('--write');
-  if (!workArg) {
-    console.error('Usage: node scripts/example/example-critique.mjs --work <path-to-.starciwork> [--write]');
-    process.exitCode = 2;
-  } else {
-    const workRoot = path.resolve(workArg);
-    const result = runCritique(workRoot, {write});
-    for (const section of SECTIONS) {
-      const count = result.critique.findings.filter(f => section.kind.includes(f.kind)).length;
-      console.log(`${section.title}: ${count}`);
-    }
-    if (write) {
-      console.log(`wrote ${path.relative(workRoot, path.join(workRoot, CRITIQUE_YAML_REL))} and ${path.relative(workRoot, path.join(workRoot, CRITIQUE_MD_REL))}`);
-    } else if (!result.ok) {
-      console.log(`REFUSED: ${CRITIQUE_YAML_REL}/${CRITIQUE_MD_REL} missing or stale; run with --write to refresh them.`);
-      process.exitCode = 1;
-    }
-  }
+  workCli({
+    usage: 'Usage: node scripts/example/example-critique.mjs --work <path-to-.starciwork> [--write]',
+    run: (workRoot, { write }) => runCritique(workRoot, { write }),
+    report: (result) => {
+      for (const section of SECTIONS) {
+        const count = result.critique.findings.filter(f => section.kind.includes(f.kind)).length;
+        console.log(`${section.title}: ${count}`);
+      }
+    },
+    wrote: (workRoot) => `wrote ${path.relative(workRoot, path.join(workRoot, CRITIQUE_YAML_REL))} and ${path.relative(workRoot, path.join(workRoot, CRITIQUE_MD_REL))}`,
+    stale: `REFUSED: ${CRITIQUE_YAML_REL}/${CRITIQUE_MD_REL} missing or stale; run with --write to refresh them.`,
+  });
 }

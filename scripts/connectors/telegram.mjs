@@ -157,16 +157,15 @@ export function closedMessage({ reason, by = null, title, question, language, no
 const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
 
 /**
- * One Bot API call with polite retries: 429 waits `retry_after` (capped at 60 s), 5xx and network
- * errors back off 1 s, 2 s, 4 s; any other 4xx fails at once. Returns {ok, status, result, error}
- * with the token scrubbed from the error.
+ * The polite retry loop every Bot API transport shares: `issue()` performs one attempt's fetch; 429 waits
+ * `retry_after` (capped at 60 s), 5xx and network errors back off 1 s, 2 s, 4 s; any other 4xx fails at once.
+ * Returns {ok, status, result, error} with the token scrubbed from the error.
  */
-export async function botCall({ token, method, payload, apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 4 }) {
-  const body = JSON.stringify(payload);
+export async function botPolite({ token, sleepImpl = sleep, attempts = 4 }, issue) {
   let last = null;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const res = await fetchImpl(endpoint(apiBase, token, method), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(15000) });
+      const res = await issue();
       const json = await res.json().catch(() => null);
       if (res.ok && json?.ok !== false) return { ok: true, status: res.status, result: json?.result ?? null };
       last = { ok: false, status: res.status, error: redact(json?.description ?? `HTTP ${res.status}`, token) };
@@ -178,6 +177,14 @@ export async function botCall({ token, method, payload, apiBase = DEFAULT_API_BA
     if (attempt < attempts) await sleepImpl(1000 * 2 ** (attempt - 1));
   }
   return last;
+}
+
+/**
+ * One Bot API call with polite retries (botPolite): a JSON POST to `method` under the 15 s read timeout.
+ */
+export function botCall({ token, method, payload, apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 4 }) {
+  const body = JSON.stringify(payload);
+  return botPolite({ token, sleepImpl, attempts }, () => fetchImpl(endpoint(apiBase, token, method), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(15000) }));
 }
 
 export const sendMessage = ({ token, chatId, text, markup = null, ...rest }) =>
@@ -394,6 +401,40 @@ const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' 
   : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
 
 /**
+ * The resolved context of one owner-facing send: every option defaulted, Telegram checked (a guarded-off
+ * environment, the settings ready). `skipped` names the reason nothing is sent; a not-ready warning is
+ * surfaced once through `warn`.
+ */
+function sendContext(over = {}) {
+  const env = over.env ?? process.env;
+  const o = {
+    config: ownerConfig(), env, root: configRoot, fetchImpl: fetch,
+    apiBase: env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
+    warn: (line) => process.stderr.write(`${line}\n`), sleepImpl: sleep, now: Date.now(),
+    ...over,
+  };
+  const off = guarded(o.env, o.apiBase, o.fetchImpl);
+  if (off) return { ...o, skipped: off };
+  const settings = telegramSettings({ config: o.config, env: o.env, root: o.root });
+  if (!settings.ready) {
+    if (settings.warning) o.warn(settings.warning);
+    return { ...o, skipped: settings.warning ?? 'telegram off' };
+  }
+  return { ...o, settings };
+}
+
+/** Runs `work` as one owner-facing send: any throw becomes one `warn` line and {ok:false}, never a throw into the caller. */
+async function attemptSend(warn, what, work) {
+  try {
+    return await work();
+  } catch (error) {
+    const line = `telegram: ${what} failed: ${redact(error?.message ?? error)}`;
+    try { warn(line); } catch { /* nothing left to do */ }
+    return { ok: false, error: line };
+  }
+}
+
+/**
  * Tell the owner about one parked ask: ONE message with the workflow, the question, its numbered
  * options and the "Generate URL" button, no link. Deduped per ask: an ask whose notice is still in
  * the chat is not sent again ({skipped:'already notified', key, messageId}). Never throws: every
@@ -402,15 +443,10 @@ const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' 
  * credential ask, serve-ask.mjs askClassOf) sends nothing: {ok, listed:true, key} once Telegram is
  * ready and the ask open, and the owner finds it under the bridge's /creds.
  */
-export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId, push = true }, {
-  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
-  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
-} = {}) {
-  try {
-    const off = guarded(env, apiBase, fetchImpl);
-    if (off) return { ok: true, skipped: off };
-    const settings = telegramSettings({ config, env, root });
-    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
+export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId, push = true }, options = {}) {
+  const { env, fetchImpl, apiBase, warn, sleepImpl, now, settings, skipped } = sendContext(options);
+  return attemptSend(warn, 'ask notification', async () => {
+    if (skipped) return { ok: true, skipped };
     let view;
     try { view = readAsk(ledgerFile, workflowId, dispatchId, now); } catch (error) { warn(`telegram: ask not sent: ledger unreadable (${error.message})`); return { ok: false, error: 'ledger unreadable' }; }
     if (!view) return { ok: true, skipped: 'no ask report' };
@@ -434,11 +470,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       texts[askKey] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
-  } catch (error) {
-    const line = `telegram: ask notification failed: ${redact(error?.message ?? error)}`;
-    try { warn(line); } catch { /* nothing left to do */ }
-    return { ok: false, error: line };
-  }
+  });
 }
 
 /**
@@ -546,15 +578,10 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
  * per ask (`ask-auto-accepted|<workflow>|<dispatch>`), no form link. Never throws; the same guards as
  * notifyAsk (STARCI_CONNECTORS_OFF, a spec run never reaches the real Bot API, Telegram off = no-op).
  */
-export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, label }, {
-  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
-  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
-} = {}) {
-  try {
-    const off = guarded(env, apiBase, fetchImpl);
-    if (off) return { ok: true, skipped: off };
-    const settings = telegramSettings({ config, env, root });
-    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
+export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, label }, options = {}) {
+  const { env, fetchImpl, apiBase, warn, sleepImpl, now, settings, skipped } = sendContext(options);
+  return attemptSend(warn, 'auto-accept notification', async () => {
+    if (skipped) return { ok: true, skipped };
     return await withStore(env, async (store, texts) => {
       const key = `ask-auto-accepted|${workflowId}|${dispatchId}`;
       if (store.events[key]) return { ok: true, skipped: 'already sent', key };
@@ -575,11 +602,7 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
       texts[key] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
-  } catch (error) {
-    const line = `telegram: auto-accept notification failed: ${redact(error?.message ?? error)}`;
-    try { warn(line); } catch { /* nothing left to do */ }
-    return { ok: false, error: line };
-  }
+  });
 }
 
 async function main() {

@@ -24,6 +24,7 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
@@ -146,14 +147,7 @@ export function buildTestWorldRun({ root, project, tests = null, rules = testWor
 }
 
 export function parseTestWorldArgs(argv) {
-  const opts = { root: null, project: null, tests: null, out: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (['--root', '--project', '--tests', '--out'].includes(arg)) {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
-    } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
-  }
+  const opts = { root: null, project: null, tests: null, out: null, ...valueFlags(argv, ['--root', '--project', '--tests', '--out'], USAGE) };
   if (!opts.project) throw new Error(`--project is required; ${USAGE}`);
   return opts;
 }

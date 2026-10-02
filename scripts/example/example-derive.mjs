@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { workCli } from '../lib/work-cli.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} from '../../engine/digest.mjs';
 import {ID_RE, walk as walkAll} from '../work/validate/check-example-work.mjs';
@@ -403,23 +404,14 @@ export function runDerive(workRoot, {write} = {}) {
 }
 
 if (isMain(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const workFlagIndex = args.indexOf('--work');
-  const workArg = workFlagIndex >= 0 ? args[workFlagIndex + 1] : null;
-  const write = args.includes('--write');
-  if (!workArg) {
-    console.error('Usage: node scripts/example/example-derive.mjs --work <path-to-.starciwork> [--write]');
-    process.exitCode = 2;
-  } else {
-    const workRoot = path.resolve(workArg);
-    const result = runDerive(workRoot, {write});
-    const t = result.derived.tally.overall;
-    console.log(`${t.total} record(s) with a lifecycle state: ${t.done} done, ${t.todo} todo, ${t.stale} stale, ${t.blocked} blocked; ${result.derived.tally.gaps.length} gap(s) (${result.derived.tally.unbuiltModuleGaps} open unbuilt-module); ${result.derived.frontier.length} in the frontier.`);
-    if (write) {
-      console.log(`wrote ${path.relative(workRoot, path.join(workRoot, DERIVED_INDEX_REL))} and ${path.relative(workRoot, path.join(workRoot, DERIVED_FRONTIER_REL))}`);
-    } else if (!result.ok) {
-      console.log(`REFUSED: ${DERIVED_INDEX_REL} is missing or stale; run with --write to refresh it.`);
-      process.exitCode = 1;
-    }
-  }
+  workCli({
+    usage: 'Usage: node scripts/example/example-derive.mjs --work <path-to-.starciwork> [--write]',
+    run: (workRoot, { write }) => runDerive(workRoot, { write }),
+    report: (result) => {
+      const t = result.derived.tally.overall;
+      console.log(`${t.total} record(s) with a lifecycle state: ${t.done} done, ${t.todo} todo, ${t.stale} stale, ${t.blocked} blocked; ${result.derived.tally.gaps.length} gap(s) (${result.derived.tally.unbuiltModuleGaps} open unbuilt-module); ${result.derived.frontier.length} in the frontier.`);
+    },
+    wrote: (workRoot) => `wrote ${path.relative(workRoot, path.join(workRoot, DERIVED_INDEX_REL))} and ${path.relative(workRoot, path.join(workRoot, DERIVED_FRONTIER_REL))}`,
+    stale: `REFUSED: ${DERIVED_INDEX_REL} is missing or stale; run with --write to refresh it.`,
+  });
 }

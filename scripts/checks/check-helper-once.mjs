@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { runCheckCli } from '../lib/check-cli.mjs';
 
 // acorn lives in packages/node_modules (a dev dependency of the packages workspace); no other path is tried.
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
@@ -251,12 +252,4 @@ export function checkHelperOnce(root = skillRoot) {
   return helperOnceFindings({ tracked, read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkHelperOnce();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: every shared helper has one home.');
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) runCheckCli(checkHelperOnce(), 'OK: every shared helper has one home.');

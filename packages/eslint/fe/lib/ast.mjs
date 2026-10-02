@@ -47,6 +47,21 @@ export const calleeName = (node) => {
 /** The name of a JSX element for a plain tag or a component; null for a member or namespaced name. */
 export const tagName = (opening) => (opening.name.type === "JSXIdentifier" ? opening.name.name : null)
 
+/** True for a `className` / `class` JSX attribute. */
+export const isClassAttribute = (node) =>
+  node.type === "JSXAttribute" && node.name && (node.name.name === "className" || node.name.name === "class")
+
+/** Static string carried by a JSX attribute or by a module constant holding a class string. */
+export const staticText = (value) => {
+  if (!value) return null
+  if (value.type === "Literal" && typeof value.value === "string") return value.value
+  if (value.type === "TemplateLiteral" && value.expressions.length === 0) {
+    return value.quasis.map((quasi) => quasi.value.cooked).join(" ")
+  }
+  if (value.type === "JSXExpressionContainer") return staticText(value.expression)
+  return null
+}
+
 /** True for a function expression or an arrow function. */
 export const isFunction = (node) => node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression"
 

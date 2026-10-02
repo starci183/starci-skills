@@ -29,7 +29,7 @@ import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot } from '../../engine/config.mjs';
-import { DEFAULT_API_BASE, botCall, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { DEFAULT_API_BASE, botCall, botPolite, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
@@ -383,24 +383,12 @@ const blobOf = async (file) => {
  * scrubbed from every error.
  */
 export async function botUpload({ token, method, fields = {}, files = [], apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 3, timeoutMs = 180000 }) {
-  let last = null;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const form = new FormData();
-      for (const [key, value] of Object.entries(fields)) if (value !== undefined && value !== null) form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
-      for (const { field, file } of files) form.append(field, await blobOf(file), path.basename(file));
-      const res = await fetchImpl(endpoint(apiBase, token, method), { method: 'POST', body: form, signal: AbortSignal.timeout(timeoutMs) });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.ok !== false) return { ok: true, status: res.status, result: json?.result ?? null };
-      last = { ok: false, status: res.status, error: redact(json?.description ?? `HTTP ${res.status}`, token) };
-      if (res.status === 429) { await sleepImpl(Math.min(Number(json?.parameters?.retry_after ?? 1), 60) * 1000); continue; }
-      if (res.status < 500) return last;
-    } catch (error) {
-      last = { ok: false, status: null, error: redact(error?.cause?.message ?? error?.message ?? error, token) };
-    }
-    if (attempt < attempts) await sleepImpl(1000 * 2 ** (attempt - 1));
-  }
-  return last;
+  return botPolite({ token, sleepImpl, attempts }, async () => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) if (value !== undefined && value !== null) form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+    for (const { field, file } of files) form.append(field, await blobOf(file), path.basename(file));
+    return fetchImpl(endpoint(apiBase, token, method), { method: 'POST', body: form, signal: AbortSignal.timeout(timeoutMs) });
+  });
 }
 
 /**
