@@ -1,0 +1,33 @@
+schema: starci/code-example@1
+id: cli
+title: An operator command - one cli entry that dispatches one command
+purpose: |
+  Show an operator command: a cli entry that maps its arguments, dispatches one command and prints the result, and the e2e spec that runs it.
+appliesTo: [backend]
+relatedRules:
+  - BE-CLI-1
+  - BE-CLI-2
+files:
+  - path: requeue-dead-letter.cli.ts
+    role: The entry takes arguments in and sends one command out.
+  - path: requeue-dead-letter.e2e-spec.ts
+    role: The command run on the booted cli app, a repeat and a bad argument.
+entrypoint: requeue-dead-letter.cli.ts
+adapt:
+  - One entry per command under features/cli/<command>/transport/cli/, composed only by an app of kind cli.
+dependencies:
+  packages: []
+  assumptions: |
+    The platform cli capability and the command bus exist in the host.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Does not show the handler; see knowledge/patterns/be/cli.yaml.
+provenance:
+  sources:
+    - knowledge/patterns/be/cli.yaml
+  simplifications: |
+    Synthetic names; entities, mappers and module wiring are omitted.

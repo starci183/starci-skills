@@ -712,7 +712,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/{,jobs/,reactors/}<feature>/application/"     # inside a trigger kind (jobs, reactors) the feature folder is one level down
+    path: "src/features/{,jobs/,reactors/,cli/}<feature>/application/"     # inside a trigger kind the feature folder is one level down
     presence: required
     tracked: tracked
     tier: feature
@@ -753,7 +753,7 @@ slots:
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/{,jobs/,reactors/}<feature>/application/support/"
+    path: "src/features/{,jobs/,reactors/,cli/}<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -809,7 +809,7 @@ slots:
     since: 1.0.0
   - id: be.feature.transport.cli
     profiles: [be]
-    path: "src/features/<feature>/transport/cli/"
+    path: "src/features/{,cli/}<feature>/transport/cli/"
     presence: opt-in              # a command line entry: dispatches one command or query, composed by an app of kind cli
     tracked: tracked
     tier: feature
@@ -946,6 +946,18 @@ slots:
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
+  - id: be.feature.cli
+    profiles: [be]
+    path: "src/features/cli/<command>/"
+    presence: optional            # an operator command line: dispatches one command or query, composed only by an app of kind cli
+    trigger: cli
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<command>.module.ts", application/, transport/]
+    allows: [index.ts, "<command>.module.ts", application/, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.reactors
     profiles: [be]
     path: "src/features/reactors/<reactor>/"
@@ -1005,7 +1017,7 @@ slots:
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
     allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
     tests: none
-    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION]
+    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"

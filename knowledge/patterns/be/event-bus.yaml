@@ -237,6 +237,10 @@ files:
     slot: be.events
     role: One typed event class.
     rules: [BE_EVENT_CLASS_CONTRACT]
+  - path: contracts/<service>/events.json
+    slot: be.contract.events
+    role: The emitted catalog of the service events (name, version, payload shape); the event classes equal it, so a consumer in another service reads one contract.
+    rules: [BE_EVENT_CLASS_CONTRACT]
   - path: src/features/<kind>/<feature>/transport/message/<event>.consumer.ts
     slot: be.transport.message
     role: The consumer door of one event.
