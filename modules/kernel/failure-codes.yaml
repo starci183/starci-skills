@@ -4549,6 +4549,17 @@ RT_HELPER_REDEFINED:
   owner: supervisor
   kind: check-finding
 
+RT_HELPER_NEAR_COPY:
+  title: "Shared helper copied with small edits"
+  title_vi: "Hàm dùng chung bị sao chép kèm chỉnh sửa nhỏ"
+  meaning_vi: "Một hàm ở đầu tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ có thân dài từ 30 token trở lên và giống từ 80% (độ tương đồng Dice trên bộ ba token đã chuẩn hóa tên) một hàm ở tệp khác: cùng một hàm bị viết hai lần dưới tên hoặc chi tiết khác. Nhóm sao chép có một nơi chính (hàm export của thư viện nếu có, nếu không thì đường dẫn đứng đầu); mọi thành viên còn lại là một phát hiện."
+  causes_vi:
+    - "Sao chép một bộ chuẩn hóa đường dẫn, bộ đọc yaml, bộ duyệt thư mục, bộ băm hoặc bộ đọc tham số rồi đổi tên và sửa nhẹ"
+    - "Hai tệp cùng viết một đoạn xử lý lỗi hoặc chuyển đổi dữ liệu thay vì chia sẻ"
+  nextStep_vi: "Người giám sát giữ một định nghĩa trong một mô-đun scripts/lib và để các tệp còn lại import nó, qua một lane đã land; nếu hai hàm thật sự khác hợp đồng thì tách phần khác ra khỏi phần chung."
+  owner: supervisor
+  kind: check-finding
+
 RT_EXTERNAL_OWNER:
   title: "External system reached outside its owner"
   title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"

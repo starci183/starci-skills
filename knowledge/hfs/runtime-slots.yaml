@@ -336,7 +336,7 @@ slots:
     tracked: tracked
     tier: base
     tests: none
-    rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_SOURCE_NAME]
+    rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_HELPER_NEAR_COPY, RT_SOURCE_NAME]
   - id: runtime.lib-retired
     profiles: [runtime]
     # Every name is spelled out: a wildcard segment ranks below the <name>.mjs of runtime.lib.
