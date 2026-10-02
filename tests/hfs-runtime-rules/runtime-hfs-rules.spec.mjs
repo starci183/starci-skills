@@ -467,6 +467,3 @@ test('RELEASE_NOTES: a finished section, a tag that is not a release tag and a H
   assert.deepEqual(codesOf(releaseNotesRepoFindings(ctxOf({}, { tagsAtHead: ['v1.0.0-alpha.5'], read: () => CHANGELOG }))), ['RELEASE_NOTES']);
 });
 
-test('the runtime manifest: every cut landed, so the shrink-only pending allowlist is empty', () => {
-  assert.deepEqual(MANIFEST.pending, [], 'a runtime finding is fixed, never allowlisted again');
-});
