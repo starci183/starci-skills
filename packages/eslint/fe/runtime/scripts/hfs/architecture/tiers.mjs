@@ -2,13 +2,15 @@
  * HFS checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
  *   1. the tier direction matrix: every import, re-export and type-only import between two owners must go from a tier to
  *      a tier its `mayImport` lists (BE_TIER_DIRECTION / FE_TIER_DIRECTION); a backend feature importing another feature
- *      is the one direction with its own code (BE_FEATURE_IMPORTS_FEATURE, R28), never BE_TIER_DIRECTION,
+ *      is the one direction with its own code (BE_FEATURE_IMPORTS_FEATURE, R28), never BE_TIER_DIRECTION, and a feature of one trigger
+ *      kind (slot field `trigger`: api, webhooks, realtime, saga, reactors, jobs, cli) importing a feature of another is
+ *      BE_KIND_ISOLATION, whose fix is the event bus,
  *      an app never imports another app (FE_APP_ISOLATION), and a component layer imports only the layers after it;
  *   2. owner cycles: a strongly connected component of the owner graph, type-only imports included (ARCH_OWNER_CYCLE),
  *      reported with the cycle path and the import that closes each hop.
  * Importing inside one owner is always allowed; the public-entry rule stays with owners.mjs (ARCH_OWNER_EXPORT_BYPASS).
  */
-export const TIER_RULE_IDS = ['BE_TIER_DIRECTION', 'BE_FEATURE_IMPORTS_FEATURE', 'FE_TIER_DIRECTION', 'FE_APP_ISOLATION', 'ARCH_OWNER_CYCLE'];
+export const TIER_RULE_IDS = ['BE_TIER_DIRECTION', 'BE_FEATURE_IMPORTS_FEATURE', 'BE_KIND_ISOLATION', 'FE_TIER_DIRECTION', 'FE_APP_ISOLATION', 'ARCH_OWNER_CYCLE'];
 
 const REASON_TEXT = {
   tierDirection: ({ fromTier, toTier, mayImport }) => `a ${fromTier} may import only ${mayImport.join(', ') || 'nothing'}; it imports a ${toTier}`,
@@ -70,6 +72,12 @@ function cycleThrough(adjacency, members, origin) {
   return [origin, origin];
 }
 
+/** The trigger kind (slot field `trigger`) of the owner that holds `file`, or null when its owner's slot names none. */
+const triggerOf = (resolver, file) => {
+  const owner = resolver.ownerOf(file);
+  return owner ? (resolver.slot(owner.slot)?.trigger ?? null) : null;
+};
+
 export function checkTiers(graph) {
   const { resolver, profile } = graph;
   const violations = [];
@@ -84,12 +92,17 @@ export function checkTiers(graph) {
     if (verdict.allowed || !REASON_TEXT[verdict.reason]) continue;
     counts[verdict.reason] += 1;
     const featureToFeature = profile === 'be' && verdict.reason === 'tierDirection' && verdict.fromTier === 'feature' && verdict.toTier === 'feature';
+    const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;
+    const toKind = featureToFeature ? triggerOf(resolver, edge.to) : null;
+    const crossKind = fromKind !== null && toKind !== null && fromKind !== toKind;
     violations.push({
-      ruleId: verdict.reason === 'crossApp' ? 'FE_APP_ISOLATION' : featureToFeature ? 'BE_FEATURE_IMPORTS_FEATURE' : tierRule,
+      ruleId: verdict.reason === 'crossApp' ? 'FE_APP_ISOLATION' : crossKind ? 'BE_KIND_ISOLATION' : featureToFeature ? 'BE_FEATURE_IMPORTS_FEATURE' : tierRule,
       path: edge.from, line: edge.line, column: edge.column,
       specifier: edge.specifier, resolvedPath: edge.to, typeOnly: !edge.runtime,
       fromTier: verdict.fromTier ?? null, toTier: verdict.toTier ?? null,
-      message: `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${edge.runtime ? '' : ' (type-only imports count)'}.`,
+      message: crossKind
+        ? `${edge.from} -> ${edge.to}: a ${fromKind} feature imports a ${toKind} feature; no kind imports another, every cross-kind call is an event published with eventBus.publish(event, tx) from a domain service${edge.runtime ? '' : ' (type-only imports count)'}.`
+        : `${edge.from} -> ${edge.to}: ${REASON_TEXT[verdict.reason](verdict)}${edge.runtime ? '' : ' (type-only imports count)'}.`,
     });
   }
 

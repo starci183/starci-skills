@@ -340,6 +340,17 @@ BE_ERROR_MASKED:
   owner: op-retry
   kind: check-finding
 
+BE_EVENT_CLASS_CONTRACT:
+  title: "A typed event class and its vendored contract agree"
+  title_vi: "Lớp sự kiện và hợp đồng sự kiện đã vendor không khớp"
+  meaning_vi: "Một lớp sự kiện dưới `be/src/modules/events/<service>/` không khai báo đúng một lớp với `eventName` và `version` là literal, không đặt tên tệp theo sự kiện của nó, không có mục tương ứng (cùng tên và phiên bản) trong `be/contracts/<service>/events.json`, hoặc một mục của hợp đồng không có lớp."
+  causes_vi:
+    - "Vi phạm luật R131: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
+    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `hfs emit-contracts`, hoặc thêm mục hợp đồng bằng tay."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
+  owner: op-retry
+  kind: check-finding
+
 BE_FEATURE_IMPORTS_FEATURE:
   title: "A feature never imports a feature"
   title_vi: "Feature import feature khác"
@@ -394,6 +405,17 @@ BE_INTEGRATION_SPEC_MISSING:
   owner: op-retry
   kind: check-finding
 
+BE_KIND_ISOLATION:
+  title: "No feature kind imports another kind"
+  title_vi: "Một loại feature import trực tiếp loại feature khác"
+  meaning_vi: "Một feature thuộc một loại kích hoạt (api, webhooks, realtime, saga, reactors, jobs hoặc cli) import một feature thuộc loại khác (kể cả import chỉ-kiểu), nên hai loại dính vào nhau thay vì gặp nhau qua event bus."
+  causes_vi:
+    - "Vi phạm luật R136: mỗi loại feature chỉ import xuống `modules/*`, chỉ `be/apps/*` mới ghép các feature; mọi lời gọi giữa các loại (api sang saga hoặc jobs, saga sang jobs, jobs sang saga, cli sang jobs) đi qua event bus để vẫn bền khi một bên chết."
+    - "Một handler hoặc step được gọi trực tiếp từ loại khác để tiện, thay vì phát sự kiện từ domain service rồi để loại kia consume."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ import giữa các loại; để domain service phát sự kiện bằng `eventBus.publish(event, tx)` trong transaction của nó, và loại kia consume sự kiện đó; phần dùng chung đưa xuống `modules/*`."
+  owner: op-retry
+  kind: check-finding
+
 BE_MODULE_HANDLER_REGISTRATION:
   title: "Handler not registered exactly once"
   title_vi: "Handler chưa đăng ký đúng một lần"
@@ -431,6 +453,16 @@ BE_MODULE_SHAPE:
     - "Module con có hơn một nơi import, hoặc vừa nằm ở gốc app vừa được module khác import"
     - "isGlobal: true xuất hiện ngoài gốc app apps/<app>/src/app.module.ts"
   nextStep_vi: "Bỏ @Global, để app đăng ký capability đúng một lần với isGlobal: true, dùng capability khác qua Inject<Thing>(), khai kiểu options, chỉ dùng static register, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_PATTERN_SPEC_MISSING:
+  title: "A declared pattern has its proof scenarios on the test world"
+  title_vi: "Pattern đã khai báo thiếu kịch bản chứng minh trên test world"
+  meaning_vi: "hfs.json khai báo một pattern (event-bus, queue, ...) nhưng không có spec e2e hoặc integration nào có test mang tiêu đề `<pattern>/<kịch bản>: ...` cho một kịch bản bắt buộc của pattern đó."
+  causes_vi:
+    - "Vi phạm luật R135: phân tích tĩnh chỉ chứng minh hình dạng; hành vi (giao lại rồi vào dead letter, fencing token từ chối worker cũ, outbox chỉ phát sau commit) chỉ được chứng minh bằng kịch bản chạy thật trên test world."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e hoặc integration có test tiêu đề `<pattern>/<kịch bản>: ...` chạy trên `useTestWorld` cho từng kịch bản còn thiếu."
   owner: op-retry
   kind: check-finding
 

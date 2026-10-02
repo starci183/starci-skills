@@ -1304,3 +1304,52 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R131
+    code: "BE_EVENT_CLASS_CONTRACT"
+    law: "Every typed event class `be/src/modules/events/<service>/<event>.event.ts` (one class with literal `static readonly eventName` and `version`, in a file named after its event: dots become dashes) equals an entry of the vendored contract `be/contracts/<service>/events.json` at the same name and version, and every entry of a vendored contract has its class; a class the contract does not list, a version mismatch, a contract entry with no class or a misnamed file is a finding (pattern event-bus)."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_EVENT_CLASS_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: event-class-contract, at: scripts/hfs/rules/event-bus.mjs}
+  - id: R132
+    code: "BE_OUTBOX_WRITE_TX"
+    law: "The outbox is written only by a domain service, with the manager of its own transaction: `eventBus.publish(event, tx)` and a queue producer's `enqueueX(payload, tx)` are called only in a file of `modules/domain` (the test world, e2e and fixtures aside), and `tx` is the `manager` parameter of a `.transaction(async (manager) => ...)` callback or a function parameter typed `EntityManager`; the injected shared manager, an alias, an outer manager or a missing argument is a finding. The call is found by the receiver's TYPE (the `EventBus` port of platform/event-bus) or by the resolved signature's declaring tier (queues), never by a name."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_OUTBOX_WRITE_TX"]
+    enforcers:
+      - {kind: eslint-be, id: outbox-write-tx}
+  - id: R133
+    code: "BE_EVENT_CONSUMER_SHAPE"
+    law: "A class that implements the `EventConsumer` port of platform/event-bus (by type origin) is `transport/message/<event>.consumer.ts` (slot be.transport.message), its file stem is the kebab form of its event class's literal `eventName` (dots become dashes), and its `handle` reads `delivery.eventId` so the dispatched command carries the id the domain service claims in platform/inbox; a `.consumer.ts` that implements no `EventConsumer` is a finding."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_EVENT_CONSUMER_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: event-consumer-shape}
+  - id: R134
+    code: "BE_QUEUE_PRODUCER_SHAPE"
+    law: "In `modules/queues/<queue>/<queue>.queue.ts` every exported function or class method that writes the `QueueOutbox` port of platform/queue declares a `tx` parameter typed `EntityManager` and passes that parameter as the first argument of the write; a write with another manager, an outer manager or none is a finding (pattern queue)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_QUEUE_PRODUCER_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: queue-producer-shape}
+  - id: R135
+    code: "BE_PATTERN_SPEC_MISSING"
+    law: "Every pattern a back end declares (hfs.json sides.be.patterns) is proven on the test world: each scenario id of ruleParams.be.patternScenarios.<pattern> has a test titled `<pattern>/<scenario>: ...` (the first argument of `it(` or `test(`) in an e2e or integration spec under be/src/tests; a declared pattern with a missing scenario is a finding."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_PATTERN_SPEC_MISSING"]
+    enforcers:
+      - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
+  - id: R136
+    code: "BE_KIND_ISOLATION"
+    law: "No trigger kind imports another: a feature whose owner slot names one `trigger` (api, webhooks, realtime, saga, reactors, jobs, cli) never imports (static, dynamic, re-export or type-only) a feature of another kind; each kind imports only `modules/*` and only be/apps/* compose features. The kinds meet through the event bus: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it. The importing and imported owners are read from the slot view (slot field `trigger`), never from a folder name; the finding replaces BE_FEATURE_IMPORTS_FEATURE when both features name different kinds."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_KIND_ISOLATION"]
+    enforcers:
+      - {kind: eslint-be, id: kind-isolation}
+      - {kind: machine, id: tiers, at: scripts/hfs/architecture/tiers.mjs}

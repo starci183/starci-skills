@@ -108,6 +108,41 @@ properties:
     type: array
     items:
       $ref: starci/knowledge-rule@1
+  files:
+    type: array
+    description: The exact file tree a pattern places in a back end. The tree is the one source of the files `hfs add` generates and of the slots and rules that judge them; there is no second list.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - slot
+      properties:
+        path:
+          type: string
+          minLength: 1
+          description: Path under the be side root; `<name>` is the kebab name of the instance, `<Name>` its PascalCase form.
+        slot:
+          type: string
+          minLength: 1
+          description: The slot id that owns the path (knowledge/hfs/slots.yaml).
+        role:
+          type: string
+          description: What the file is for, in one line.
+        rules:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: The failure codes that judge the file or its shape.
+        spec:
+          type: string
+          description: The spec that must exist for the file (a path of the same tree, or a test scenario id of ruleParams.be.patternScenarios).
+        optional:
+          type: boolean
+        template:
+          type: string
+          description: The one content body of the file, under packages/hfs/templates/be/patterns/.
   topics:
     type: array
     items:

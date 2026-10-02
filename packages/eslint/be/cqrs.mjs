@@ -434,16 +434,16 @@ const holdsFunctions = (checker, type) => {
     return args.length > 0 && isFunctionType(args[args.length - 1])
 }
 
-/** No in-process events: a side effect that must happen anyway is an outbox message. */
+/** No in-process events: a side effect that must happen anyway is an event published through the bus. */
 export const noEventBus = {
     meta: {
         type: "problem",
         docs: { description: "`EventBus`, `@EventsHandler`, `IEventHandler` and `@nestjs/event-emitter` are not used." },
         schema: [],
         messages: {
-            event: "`{{name}}` is an in-process event mechanism. Events die with the process and run outside the transaction: write an outbox message in the transaction and consume it in `transport/message/` instead.",
-            bus: "`{{name}}` is constructed or extended here as an in-process event bus. A `*TransitionEmitter`, a Subject used as a channel or an EventEmitter subclass has the same failure as `EventBus`: listeners live in one process and run outside the transaction. Write an outbox message in the transaction and consume it in `transport/message/`; a state a caller waits for is read from the database.",
-            registry: "`{{name}}` stores callbacks that other code registers and this class later calls: a hand-rolled listener list is an in-process event bus. Write an outbox message in the transaction and consume it in `transport/message/` instead.",
+            event: "`{{name}}` is an in-process event mechanism. Events die with the process and run outside the transaction: publish an event with `eventBus.publish(event, tx)` in the transaction and consume it in `transport/message/` instead.",
+            bus: "`{{name}}` is constructed or extended here as an in-process event bus. A `*TransitionEmitter`, a Subject used as a channel or an EventEmitter subclass has the same failure as `EventBus`: listeners live in one process and run outside the transaction. Publish an event with `eventBus.publish(event, tx)` in the transaction and consume it in `transport/message/`; a state a caller waits for is read from the database.",
+            registry: "`{{name}}` stores callbacks that other code registers and this class later calls: a hand-rolled listener list is an in-process event bus. Publish an event with `eventBus.publish(event, tx)` in the transaction and consume it in `transport/message/` instead.",
         },
     },
     create(context) {

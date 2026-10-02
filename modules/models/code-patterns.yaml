@@ -10,8 +10,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 29c2100125858c9af85d2b5e887c4ff62ca8cd62ec5998dc7e2dc0a9843c91bf
-        files: 135
+        value: dc076097fe3b071f00e439534c26be3c7c27238a0fae5a516d348a178a6aa6fc
+        files: 137
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -33,6 +33,11 @@ profiles:
       - BE-ERROR-5
       - BE-ERROR-6
       - BE-ERROR-7
+      - BE-EVENT-BUS-1
+      - BE-EVENT-BUS-2
+      - BE-EVENT-BUS-3
+      - BE-EVENT-BUS-4
+      - BE-EVENT-BUS-5
       - BE-FOLDER-1
       - BE-FOLDER-2
       - BE-FOLDER-3
@@ -69,6 +74,10 @@ profiles:
       - BE-NAMING-8
       - BE-PERSISTENCE-6
       - BE-PERSISTENCE-7
+      - BE-QUEUES-1
+      - BE-QUEUES-2
+      - BE-QUEUES-3
+      - BE-QUEUES-4
       - BE-RESILIENCE-1
       - BE-TEMPORAL-1
       - BE-TEST-1
@@ -549,6 +558,25 @@ profiles:
         rationale: A lint rule cannot see a migration's column types, whether the unique constraint actually exists on (source, event_id), or whether an adapter claims by insert-and-catch rather than a racy check-then-insert; this is reviewed against the actual migration and adapter.
         guidance: knowledge/patterns/be/idempotency.yaml
 
+      - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
+        sourceRuleIds: [BE-EVENT-BUS-3, BE-EVENT-BUS-4, BE-QUEUES-1]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: The outbox is written only by a domain service with the manager of its own transaction, a message consumer is a transport door named after its event that forwards the event id, and a queue producer passes its own tx.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/outbox-write-tx, starci-be/event-consumer-shape, starci-be/queue-producer-shape]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/event-bus.yaml
+          review: Confirm each published event crosses a context or starts asynchronous work, and that each consumer's retry budget fits its side effects.
+        status: implemented
+      - id: NEST-EVENT-BUS-OBSERVATION
+        sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
+        rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
+        guidance: knowledge/patterns/be/event-bus.yaml
+
   next:
     title: StarCi Next.js code pattern
     canon:
@@ -559,7 +587,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 87d2b496848eaf08b381a3736d0e1d7efd99421fd0c1659dd30481678810ea0d
+        value: f71204c7afb2a503c098320ade2de11e842ae3a3af09947add4831a347657c35
         files: 148
     sourceRuleRoots:
       - knowledge/patterns/fe
