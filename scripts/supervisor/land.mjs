@@ -86,7 +86,7 @@ import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { tailLines } from '../lib/clip.mjs';
+import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, selfUpgradeNote, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs';
 const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
@@ -762,7 +762,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable'].includes(r.reason) ? 'refused' : 'failed');
+const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason) ? 'refused' : 'failed');
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
 const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**
@@ -830,11 +830,11 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
   const asked = specs.map((s) => String(s).trim()).filter(Boolean);
-  let named = [];
+  let named = [], sourceBranch = null, supervisorJob = false;
   if (jobId) {
     const found = readMachine((m) => ({ job: m.supJob(jobId), report: m.supReports({ jobId }).pop()?.report ?? null }), null, { env });
     if (!found?.job) return { ok: false, reason: 'no-job', detail: jobId };
-    const { job, report } = found;
+    const { job, report } = found; supervisorJob = true; sourceBranch = report?.branch ?? job.payload?.staging?.branch ?? null;
     if (job.payload?.self && !commits) {
       const staging = job.payload.staging;
       commits = staging ? git(['rev-list', '--reverse', `${staging.base}..${staging.branch}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
@@ -891,7 +891,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
     // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
     let outbox = null;
     try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-    const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
+    const result = withSelfUpgradeRef({ ...landUnderHostLock({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }, landCommits), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) }, { root, id: selfUpgradeIdOf({ branch: sourceBranch ?? (supervisorJob ? null : (deps.selfUpgradeBranchContaining ?? selfUpgradeBranchContaining)({ root, commit: commits[commits.length - 1] })), lane, jobId: supervisorJob ? jobId : null }), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
     if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
     if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
     state = result.ok ? 'passed' : 'failed';
@@ -927,7 +927,7 @@ export function describe(r, { jobId = null } = {}) {
   const redOnMain = inherited ? `; ${inherited.name} (advisory, fix main): ${failList(inherited.inherited).slice(0, 400)}` : '';
   const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
   if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
-  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}${redOnMain}`;
+  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}${selfUpgradeNote(r)}${redOnMain}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
   const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
   return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;

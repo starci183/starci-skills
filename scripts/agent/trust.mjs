@@ -442,7 +442,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 
 /* ------------------------------------------------------ the command guard */
 
-export const TOOL_GUARD_MARKER = 'starci guard command', TOOL_GUARD_MATCHER = 'Bash|PowerShell', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
+export const TOOL_GUARD_MARKER = 'starci guard command', TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
 /** The hook command every host runs through the per-user StarCi shim already placed on agent PATH. */
 export const toolGuardCommand = () => TOOL_GUARD_MARKER;
 const isGuardHandler = (h) => typeof h?.command === 'string'

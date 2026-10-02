@@ -91,8 +91,9 @@ rules:
     requirement: |
       Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`, which runs `starci app lint --changed` at the app root), the
       Kernel's landing and CI run the same `@starci/hfs` at the version pinned in `canon-pins.yaml`. CI runs `npm run lint`
-      (`starci app lint`, which includes the app check); pre-push runs `typecheck`, `lint` and `format:check`. There is no rule only
-      agents can run. Every `@starci/*` package is installed from the npm registry at the pinned version.
+      (`starci app lint`, which includes the app check). Pre-commit is L0 only: work hygiene plus lint and format checks on staged
+      files, with no typecheck or test run. Pre-push is only the release gate and runs no test, typecheck, lint or format
+      command. There is no rule only agents can run. Every `@starci/*` package is installed from the npm registry at the pinned version.
     rationale: |
       An app that is green under an old rule while the agent grades it under a new rule wastes every cycle.
     cases:

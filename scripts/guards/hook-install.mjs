@@ -34,6 +34,7 @@ export { guardsRoot };
 const HOOK_MARKER = 'starci-history-guard';
 export const HOOK_VERSION = 6;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
+export const RUNTIME_GIT_HOOKS_MARKER = 'starci-git-hooks';
 const WORK_HOOK_VERSION = 1;
 
 const normOwned = (p) => path.resolve(p).replace(/\\/g, '/');
@@ -237,19 +238,25 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   return { installed: true, path: file, changed: true };
 }
 
-/**
- * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
- * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
- */
-export function workHookBody({ root, nodePath = process.execPath }) {
+/** The work-record check shared by the dispatch hook and the runtime's generated pre-commit hook. */
+export function workHookCheck({ root, nodePath = process.execPath }) {
   const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
-  return `#!/bin/sh
-# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
+  return `# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # Staged Work and stack files are checked before the commit exists: YAML that parses, records that pass their scoped
 # strict validation, and no secret outside an .enc file (starci work hygiene). e2e never runs here.
 if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)\\.(starciwork|starcistacks)/'; then
   STARCI_RUNTIME=${q(root)} ${q(nodePath)} ${q(path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'))} work hygiene staged --repo "$(git rev-parse --show-toplevel)" || exit 1
 fi
+`;
+}
+
+/**
+ * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
+ * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
+ */
+function workHookBody({ root, nodePath = process.execPath }) {
+  return `#!/bin/sh
+${workHookCheck({ root, nodePath })}
 # husky's generated dispatcher (.husky/_/h) keeps running the repository's own pre-commit
 if [ -f "$(dirname "$0")/h" ]; then . "$(dirname "$0")/h"; fi
 `;
@@ -269,6 +276,7 @@ export function ensureWorkHook(repoRoot, { skillRoot = path.resolve(here, '..', 
   const body = workHookBody({ root: skillRoot, nodePath });
   if (fs.existsSync(file)) {
     const current = fs.readFileSync(file, 'utf8');
+    if (current.includes(RUNTIME_GIT_HOOKS_MARKER)) return { installed: true, path: file, changed: false };
     if (current.includes(WORK_HOOK_MARKER)) { if (current === body) return { installed: true, path: file, changed: false }; }
     else if (!HUSKY_DISPATCHER.test(current)) return { installed: false, reason: 'foreign-hook', path: file };
   }

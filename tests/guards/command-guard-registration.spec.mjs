@@ -16,12 +16,12 @@ const groups = settings.hooks.PreToolUse;
 const guardGroups = groups.filter((g) => g.hooks.some((h) => h.command.includes(TOOL_GUARD_MARKER)));
 const GUARD = path.join(ROOT, 'scripts', 'guards', 'command-guard.mjs');
 
-test('the tracked settings register the command guard once, for Bash and PowerShell, next to seat-tools', () => {
+test('the tracked settings register the command guard once, for the shell and the file-writing tools, next to seat-tools', () => {
   assert.equal(guardGroups.length, 1, 'exactly one command-guard group');
   const [group] = guardGroups;
   assert.equal(group.matcher, TOOL_GUARD_MATCHER);
-  for (const tool of ['Bash', 'PowerShell']) assert.match(tool, new RegExp(`^(?:${group.matcher})$`), `${tool} is matched`);
-  for (const tool of ['Read', 'Edit', 'Write', 'Agent']) assert.doesNotMatch(tool, new RegExp(`^(?:${group.matcher})$`), `${tool} is not`);
+  for (const tool of ['Bash', 'PowerShell', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit']) assert.match(tool, new RegExp(`^(?:${group.matcher})$`), `${tool} is matched`);
+  for (const tool of ['Read', 'Grep', 'Glob', 'Agent']) assert.doesNotMatch(tool, new RegExp(`^(?:${group.matcher})$`), `${tool} is not`);
   assert.equal(group.hooks.length, 1);
   assert.equal(group.hooks[0].type, 'command');
   assert.equal(group.hooks[0].timeout, TOOL_GUARD_TIMEOUT_S);
