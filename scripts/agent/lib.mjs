@@ -393,8 +393,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   if (refusal) return { ...refusal, provider, taskId: null, runId: run ?? null };
   const takesModel = card?.start?.modelArgument !== false;
   // A card's `start.defaultModel: pool` names the provider pool's registry.yaml defaultModel; a concrete id pins itself.
-  if (takesModel && !model)
-    model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
+  if (takesModel && !model) model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
   // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).
