@@ -1,5 +1,6 @@
 // database-config.mjs - L08 Supabase TOML policy and L09 generated-type drift checks. Parsing and type emission stay
 // lazy/injected so applications without Supabase do not load either tool and this rule starts no Docker process.
+import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 
 const DB_CONFIG_POLICY = 'DB_CONFIG_POLICY';
@@ -8,7 +9,6 @@ const TYPES_FILE = 'supabase/types/database.types.ts';
 const ENV_REF = /^env\([A-Za-z_][A-Za-z0-9_]*\)$/;
 const PUBLIC_KEYS = new Set(['anon_key', 'publishable_key', 'public_key']);
 
-const sameText = (a, b) => a !== null && b !== null && a.replace(/\r\n/g, '\n').trimEnd() === b.replace(/\r\n/g, '\n').trimEnd();
 
 function tomlEntries(value, path = []) {
   if (!value || typeof value !== 'object') return [];

@@ -4,6 +4,7 @@ import { lsTree } from '../../api/git/ls-tree.mjs';
 import { mergeBase } from '../../api/git/merge-base.mjs';
 import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
+import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 
 const DB_MIGRATION_SHAPE = 'DB_MIGRATION_SHAPE';
@@ -51,7 +52,6 @@ async function baseFileText(git, repoRoot, sha, file) {
   return result.ok ? result.stdout : null;
 }
 
-const sameText = (a, b) => a !== null && b !== null && a.replace(/\r\n/g, '\n').trimEnd() === b.replace(/\r\n/g, '\n').trimEnd();
 
 /** L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. */
 export async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {

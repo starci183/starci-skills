@@ -31,8 +31,8 @@ import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, optionalSlotProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
-import { declarationEdition, editionRuleParams, effectiveSlot, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition.mjs';
-export { litePresenceOf, slotInEdition } from './edition.mjs';
+import { declarationEdition, editionRuleParams, effectiveSlot, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
+export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
