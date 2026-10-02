@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { folded as lf } from '../lib/event-contract.mjs';
 import { RUNTIME_GIT_HOOKS_MARKER, WORK_HOOK_MARKER, workHookCheck } from './hook-install.mjs';
 
 /** The line every generated hook carries; a hook file without it is foreign. */
@@ -33,7 +34,6 @@ for file in $(git diff --cached --name-only --diff-filter=ACMR -- '*.mjs' '*.cjs
 done
 `;
 
-const lf = (text) => text.replace(/\r\n/g, '\n');
 const withHeader = (name, body) => `${SHEBANG}${lf(body).replace('{{header}}', header(name))}`;
 
 /** The hook files of the runtime repository as {'pre-commit': text, 'pre-push': text}; the app pre-push template at `root` is the one source of the push gate. */

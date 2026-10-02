@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
-import { pathKey } from '../lib/path-key.mjs';
+import { pathKey, sameOrUnder } from '../lib/path-key.mjs';
 
 const ENV_ROLES = new Set(['op', 'supervisor', 'lead', 'coordinator', 'release']);
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -159,7 +159,8 @@ export function nodeWholeSuite(args) {
 
 /* ----------------------------------------------------------------------------------------------------- file writes */
 
-const refusal = (code, command, reason, remedy) => ({ code, command: String(command).slice(0, 200), reason, remedy });
+/** One refusal of the command guard: {code, command, reason, remedy}, plus `use` (the starci verb) when the table names one. */
+export const refusal = (code, command, reason, remedy, use = null) => ({ code, command: String(command).slice(0, 200), reason, remedy, ...(use ? { use } : {}) });
 
 /** The runtime checkout root a path lies in (the nearest ancestor holding the runtime marker), or null. */
 export function runtimeRootOf(file, { exists = fs.existsSync } = {}) {
@@ -173,7 +174,6 @@ export function runtimeRootOf(file, { exists = fs.existsSync } = {}) {
   return null;
 }
 
-const insideDir = (file, dir) => { const f = pathKey(file); const d = pathKey(dir); return f === d || f.startsWith(`${d}/`); };
 
 /**
  * The refusal of one file write (an Edit/Write tool call or a shell write target), or null. `edit` is the text the call
@@ -187,7 +187,7 @@ export function fileWriteVerdict({ role, filePath, tool = 'Edit', edit = null, g
     const runtimeRoot = zone?.runtimeRoot ?? runtimeRootOf(file);
     if (!runtimeRoot) return null;
     const own = [guard?.workflowWorktree, ...(guard?.owned ?? [])].filter(Boolean);
-    if (own.some((dir) => insideDir(file, dir))) return null;
+    if (own.some((dir) => sameOrUnder(pathKey(file), pathKey(dir)))) return null;
     return refusal('RIGHTS_OP_RUNTIME_WRITE', file, 'an op works on its app in the workflow worktree and never writes inside the .claude runtime checkout: a defect of the harness is not the op\'s to fix',
       'record a lesson or an upgrade request in your report (kernel report: lessons / upgrade request); the owner path or the supervisor self-upgrade picks it up');
   }

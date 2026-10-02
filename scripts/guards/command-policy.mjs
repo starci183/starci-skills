@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
-import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, rightsRoleOf } from './rights.mjs';
+import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
 
 const policyCache = new Map();
@@ -56,7 +56,7 @@ const compile = (policy) => {
   return value;
 };
 
-const refusal = (code, command, reason, use) => ({ code, command: String(command).slice(0, 200), reason, remedy: use, use });
+const refusal = (code, command, reason, use) => baseRefusal(code, command, reason, use, use);
 const textOf = ({ program, args, word }) => [word ?? program, ...args].map(String).join(' ').trim();
 const useOf = (entry, fallback) => typeof entry?.use === 'string' && entry.use ? entry.use : fallback;
 const RIGHTS_CODES = new Set(['RIGHTS_ROLE_DENIED', 'RIGHTS_GIT_PUSH', 'RIGHTS_GIT_TAG', 'RIGHTS_GIT_COMMIT', 'RIGHTS_GIT_SYNC', 'RIGHTS_NPM_PUBLISH', 'RIGHTS_NPM_CI_UNLOCKED',

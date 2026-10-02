@@ -10,8 +10,8 @@
 // Pure apart from ctx.read; a tree without the data files (a fixture) has nothing to judge.
 import { parseYaml } from '../../../engine/yaml.mjs';
 
-export const POLICY_FILE = 'modules/kernel/command-policy.yaml';
-export const ZONE_FILE = 'modules/kernel/protected-zone.yaml';
+const POLICY_FILE = 'modules/kernel/command-policy.yaml';
+const ZONE_FILE = 'modules/kernel/protected-zone.yaml';
 const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 const R223_CODES = Object.freeze(['RIGHTS_ROLE_DENIED', 'RIGHTS_GIT_PUSH', 'RIGHTS_GIT_TAG', 'RIGHTS_GIT_COMMIT', 'RIGHTS_GIT_SYNC', 'RIGHTS_NPM_PUBLISH', 'RIGHTS_NPM_CI_UNLOCKED',
   'RIGHTS_SUITE_RUN', 'RIGHTS_RELEASE_CUT', 'RIGHTS_RAW_TOOL']);
