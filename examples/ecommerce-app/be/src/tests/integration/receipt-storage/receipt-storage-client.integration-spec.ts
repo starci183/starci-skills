@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { RECEIPT_STORAGE, ReceiptStorageErrorCode } from "@modules/integrations/receipt-storage"
 import type { ReceiptStorage } from "@modules/integrations/receipt-storage"
-import { JOB_CLAIMS } from "@modules/platform/jobs"
-import type { JobClaims, RunKey } from "@modules/platform/jobs"
+import type { RunKey } from "@modules/platform/jobs"
 import { JOBS_CAPABILITY_MODULES, RECEIPT_STORAGE_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
+import { ProbeJobBehavior } from "../../world/probe-job.module"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -18,7 +18,7 @@ describe("receipt-storage: receipt archive client (integration)", () => {
     const archive = (): ReceiptStorage => world.resolve<ReceiptStorage>(RECEIPT_STORAGE)
     /** The run key a storing job step passes: only a real claim of the job row makes one. */
     const runKeyOf = async (): Promise<RunKey> => {
-        const claims = world.resolve<JobClaims>(JOB_CLAIMS)
+        const claims = world.resolve(ProbeJobBehavior).claims
         const job = await world.waitFor("a job is claimed", () =>
             claims.claim({
                 kind: "receipt-storage-spec",

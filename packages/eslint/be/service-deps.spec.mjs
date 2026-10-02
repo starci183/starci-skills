@@ -76,8 +76,8 @@ test("R83: a persistence class lives only where the manager may be held", () => 
             { filename: HANDLER, code: wrapper },
             { filename: SERVICE, code: wrapper },
             { filename: PLATFORM_DATABASE, code: wrapper },
-            // the typed producer of a queue takes the caller's transaction to write the outbox row in it
-            { filename: at("src/modules/queues/receipt/receipt.queue.ts"), code: wrapper },
+            // a typed queue producer takes the transaction of its caller
+            { filename: at("src/modules/queues/mail/mail.queue.ts"), code: `${TYPEORM}export class MailQueue { enqueueMail(payload: object, tx: EntityManager): Promise<void> { return tx.query("select 1") } }` },
             // the migrate app, the test world and a migration receive a connection or a runner by nature
             { filename: MIGRATE, code: `${TYPEORM}export class Runner { run(source: DataSource) { return source.query("select 1") } }` },
             { filename: WORLD, code: `${TYPEORM}export class World { constructor(readonly source: DataSource) {} }` },
@@ -102,6 +102,8 @@ export class OrderBuilder { constructor(private readonly em: EntityManager) {} }
 export const x = load` },
         ],
         invalid: [
+            // only the `.queue.ts` of a queue folder is the producer: another class there is a repository
+            { filename: at("src/modules/queues/mail/mail.store.ts"), code: wrapper, errors: [{ messageId: "repository" }] },
             // the shape of the census findings: a per-entity class whose methods take the manager
             { filename: REPOSITORY_FILE, code: wrapper, errors: [{ messageId: "repository" }] },
             // whatever it is called
@@ -120,8 +122,6 @@ export const x = load` },
  set(em: EntityManager) { this.manager = em } }`, errors: [{ messageId: "repository" }] },
             { filename: at("src/modules/domain/order/persistence/order.statements.ts"), code: `${TYPEORM}export function insertOrder(em: EntityManager, id: string) { return em.query(id) }`, errors: [{ messageId: "statements" }] },
             { filename: at("src/modules/domain/order/persistence/order.statements.ts"), code: `${TYPEORM}export const insertOrder = async (em: EntityManager, id: string) => em.query(id)`, errors: [{ messageId: "statements" }] },
-            // only the producer file of a queue holds the manager: another class of the queue folder is still a wrapper
-            { filename: at("src/modules/queues/receipt/receipt.mapper.ts"), code: wrapper, errors: [{ messageId: "repository" }] },
         ],
     })
 })

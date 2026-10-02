@@ -426,7 +426,7 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
   assert.ok(slot, 'the support slot exists');
-  assert.equal(slot.path, 'src/features/{,jobs/,reactors/}<feature>/application/support/');
+  assert.equal(slot.path, 'src/features/{,jobs/,reactors/,cli/}<feature>/application/support/');
   assert.equal(slot.presence, 'optional');
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.tests, 'none');
@@ -440,7 +440,7 @@ test('be.feature.transport.cli is an opt-in feature-tier transport slot, owned o
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.transport.cli');
   assert.ok(slot, 'the cli transport slot exists');
-  assert.equal(slot.path, 'src/features/<feature>/transport/cli/');
+  assert.equal(slot.path, 'src/features/{,cli/}<feature>/transport/cli/');
   assert.equal(slot.presence, 'opt-in');
   assert.equal(slot.tier, 'feature');
   assert.deepEqual(slot.requires, ['<feature>-cli.module.ts']);

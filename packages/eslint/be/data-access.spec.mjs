@@ -211,7 +211,7 @@ test("DATA-5: a relation carries no eager: true", () => {
 })
 
 test("R82: no transaction spans an external call", () => {
-    const head = `${TYPEORM}import { StripeClient } from "@modules/integrations/stripe/stripe.client"\nimport { PayOsGateway } from "@modules/integrations/payos/payos.gateway"\nimport { HttpClient } from "@modules/platform/http/http.client"\nimport { MessagePublisher } from "@modules/platform/messaging/message-publisher"\nimport { HttpClient as LocalClient } from "@modules/domain/order/http.client"\n`
+    const head = `${TYPEORM}import { StripeClient } from "@modules/integrations/stripe/stripe.client"\nimport { PayOsGateway } from "@modules/integrations/payos/payos.gateway"\nimport { HttpClient } from "@modules/platform/http/http.client"\nimport { EventBus as MessagePublisher } from "@modules/platform/event-bus/event-bus.port"\nimport { HttpClient as LocalClient } from "@modules/domain/order/http.client"\n`
     const S = `${head}class S {\n constructor(private readonly entityManager: EntityManager, private readonly stripe: StripeClient, private readonly payos: PayOsGateway, private readonly http: HttpClient, private readonly publisher: MessagePublisher, private readonly local: LocalClient, private readonly deps: { stripe: StripeClient }) {}\n`
     const inside = (body) => `${S} async run() { ${body} }\n}`
     tester.run("no-external-call-in-transaction", noExternalCallInTransaction, {
@@ -222,6 +222,8 @@ test("R82: no transaction spans an external call", () => {
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await tx.save(OrderEntity) })\n await this.stripe.charge('1')") },
             // fetch outside a transaction
             { filename: HANDLER, code: "async function run() { await fetch('x') }" },
+            // the event bus writes the outbox through the transaction: publishing inside it is the one allowed way to announce a change
+            { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.publisher.publish({}, tx) })") },
             // a receiver typed from neither an integration nor the platform is not external, whatever it is called
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.local.get('x') })") },
             // a transaction that is not typeorm's
@@ -232,7 +234,6 @@ test("R82: no transaction spans an external call", () => {
             // an integration type that is not named like a client
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.payos.create('1') })"), errors: [{ messageId: "external" }] },
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.http.get('x') })"), errors: [{ messageId: "external" }] },
-            { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.publisher.publish({}) })"), errors: [{ messageId: "external" }] },
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await fetch('x') })"), errors: [{ messageId: "external" }] },
             // a chain whose receiver is an integration object
             { filename: HANDLER, code: inside("await this.entityManager.transaction(async (tx) => { await this.deps.stripe.charge('1') })"), errors: [{ messageId: "external" }] },

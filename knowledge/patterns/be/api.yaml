@@ -1,0 +1,172 @@
+schema: starci/knowledge-source@1
+id: be.api
+title: Api features (kind api)
+purpose: |-
+  Given a request a client makes (a GraphQL operation, a typed operation route), what does the feature that serves it look like? An
+  api feature is the default trigger kind: `features/<feature>/` holds one `application/` of plain CQRS and thin transports
+  (`transport/graphql/`, `transport/http/`). A transport maps the input, dispatches one command or query and maps the result; the
+  domain service of the owning context decides. It imports no feature of another kind: a webhook, a reactor or a job reaches an api
+  feature only through an event.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - knowledge/patterns/be/transport.yaml
+    - knowledge/patterns/be/cqrs.yaml
+    - owner decision 2026-10-02 (seven trigger kinds, one folder shape each)
+  limitations: |-
+    Static checks prove the folder shape, what a transport injects and imports, the kind boundary and composition. They do not prove that a
+    mapping is right, that a status fits the accepted contract or that a client handles an error code; the e2e run and the contract
+    snapshot do.
+rules:
+  - id: BE-API-1
+    title: An api feature is request-driven, flat and composed by an api app
+    kind: mandatory
+    hfsRules: [R136, R46, R31]
+    requirement: |-
+      A feature outside the folders `webhooks/`, `realtime/`, `jobs/`, `reactors/` and `cli/` is of kind `api`: `index.ts`,
+      `<feature>.module.ts`, `application/` (messages, handlers, contracts), `transport/graphql/` and, only where GraphQL cannot serve,
+      `transport/http/`. Only an app of kind `api` composes its transport modules, and no feature imports a feature of another kind (a call
+      between kinds is an event on the bus).
+    rationale: |-
+      One folder shape per kind lets a reader and a check tell from the path what starts the work and who may call it.
+    cases:
+      - id: case-1
+        when: A shopper starts a checkout
+        write: 'features/checkout/transport/graphql/start-checkout.resolver.ts dispatches StartCheckoutCommand; features/checkout/application holds the command, handler and contracts.'
+    verification:
+      automated:
+        - BE_FEATURE_SHAPE
+        - BE_KIND_ISOLATION
+        - BE_FEATURE_NOT_COMPOSED
+      manual:
+        - Confirm the operation belongs to the capability the feature is named after.
+    relatedExamples: [api]
+  - id: BE-API-2
+    title: Every operation has an e2e flow on the real app
+    kind: mandatory
+    hfsRules: [R46]
+    requirement: |-
+      Each resolver method and controller action of an api feature is driven by an e2e spec (`src/tests/e2e/<area>/*.e2e-spec.ts`) that boots the
+      app's real AppModule and calls it as a client does: the happy path, the refusal the command declares and the denial of an unauthenticated caller.
+    rationale: |-
+      A transport has no logic to unit-test; what can break is the wiring, the guards and the mapping, which only the booted app exercises.
+    cases:
+      - id: case-1
+        when: A new mutation
+        write: 'checkout.e2e-spec.ts signs a shopper in, runs startCheckout, asserts the typed payload, then asserts the same call without a token is refused.'
+    verification:
+      automated:
+        - BE_DEFAULT_DENY
+      manual:
+        - Confirm the spec asserts the error code of each refusal, not only a status.
+    relatedExamples: [api]
+  - id: BE-OPERATIONS-1
+    title: A versioned operation is declared once in the app's typed operation table
+    kind: mandatory
+    hfsRules: [R95, R88]
+    requirement: |-
+      A versioned operation `<name>@<version>` (for example `sales.policy@1`) that an app serves over one operation route is
+      declared once, in the app's operation table `be/apps/<app>/src/operations.ts`, which exports `OPERATIONS`. The table is made by
+      `defineOperations` of the platform capability `operations` (`be/src/modules/platform/operations/`, which declares
+      `OperationContract<Input, Output, RefusalCode>`, `query`, `mutation`, `defineOperations`, `OperationRequest<Table>` and
+      `OperationReply<Table>`). `Input` and `Output` are named, closed types: never `any`, `unknown`, `Record<string, unknown>`,
+      `object`, an unbound generic, a function or `Date`. `RefusalCode` is a closed union of string literals, or omitted for an
+      operation that never refuses. The one route of the app takes `@Body() request: OperationRequest<Table>` and answers
+      `Promise<OperationReply<Table>>` of the same table; the wire is `{ operation, requestId, input }` in and `{ operation, requestId,
+      outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `hfs emit-contracts`
+      derives `be/contracts/<app>/openapi.json` (OpenAPI 3.1, `x-operation: "<name>@<version>"`, a oneOf over the operations) from the
+      table with the type checker, and the full `hfs check` fails when the committed file is stale.
+    rationale: |-
+      The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
+      bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the
+      handlers the same types.
+    cases:
+      - id: case-1
+        when: A query with two refusals and a mutation with none
+        write: |-
+          // be/apps/core/src/operations.ts
+          export const OPERATIONS = defineOperations({
+              "sales.policy@1": query<SalesPolicyAsk, SalesPolicyView, "DENIED" | "INVALID">(),
+              "sales.close@1": mutation<SalesCloseAsk, SalesOpportunityView>(),
+          })
+          // features/sales/transport/http/operations.controller.ts
+          @Post("operations")
+          async invoke(@Body() request: OperationRequest<typeof OPERATIONS>): Promise<OperationReply<typeof OPERATIONS>> { ... }
+    verification:
+      automated:
+        - BE_OPERATION_CONTRACT
+        - HFS_CONTRACT_SNAPSHOT_DRIFT
+      manual:
+        - Confirm each refusal code is one the operation's owner can actually answer.
+    relatedExamples: [api]
+files:
+  - path: src/features/<feature>/index.ts
+    slot: be.feature
+    role: The public surface of the feature; only apps import it.
+    rules: [BE_PUBLIC_SURFACE]
+    template: api/feature.index.ts.tpl
+  - path: src/features/<feature>/<feature>.module.ts
+    slot: be.feature
+    role: Composes the application handlers.
+    template: api/feature.module.ts.tpl
+  - path: src/features/<feature>/application/<action>.command.ts
+    slot: be.feature.application
+    role: One command (or `.query.ts`) carrying one `params` field.
+    template: api/application.command.ts.tpl
+  - path: src/features/<feature>/application/<action>.handler.ts
+    slot: be.feature.application
+    role: Overrides `process` and calls the domain service of its context.
+    template: api/application.handler.ts.tpl
+  - path: src/features/<feature>/application/<action>.contracts.ts
+    slot: be.feature.application
+    role: The plain request and result types of the action.
+    template: api/application.contracts.ts.tpl
+  - path: src/features/<feature>/transport/graphql/<action>.resolver.ts
+    slot: be.transport.graphql
+    role: The GraphQL door of one operation; dispatches one message.
+    rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
+    template: api/graphql.resolver.ts.tpl
+  - path: src/features/<feature>/transport/graphql/dto/<action>.input.ts
+    slot: be.transport.graphql
+    role: The bounded input of the operation.
+    rules: [BE_INPUT_BOUNDED]
+    template: api/graphql.input.ts.tpl
+  - path: src/features/<feature>/transport/graphql/dto/<action>.type.ts
+    slot: be.transport.graphql
+    role: The typed output of the operation.
+    template: api/graphql.type.ts.tpl
+  - path: src/features/<feature>/transport/graphql/<action>.mapper.ts
+    slot: be.transport.graphql
+    role: Maps the input to the request and the result to the type.
+    template: api/graphql.mapper.ts.tpl
+  - path: src/features/<feature>/transport/graphql/<feature>-graphql.module.ts
+    slot: be.transport.graphql
+    role: One module for the whole GraphQL transport of the feature.
+    template: api/graphql.module.ts.tpl
+  - path: src/features/<feature>/transport/http/<action>.controller.ts
+    slot: be.transport.http
+    role: A REST door, only where GraphQL cannot serve (health, byte streams, the operation route).
+    optional: true
+    rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
+  - path: src/features/<feature>/transport/http/<feature>-http.module.ts
+    slot: be.transport.http
+    role: One module for the whole HTTP transport of the feature.
+    optional: true
+  - path: src/features/<feature>/messages/<feature>.messages.ts
+    slot: be.feature.messages
+    role: The keyed vi and en text of the feature.
+    optional: true
+  - path: contracts/<app>/schema.graphql
+    slot: be.contract.graphql
+    role: The emitted GraphQL snapshot of the app; a stale file fails the full check.
+    optional: true
+  - path: src/tests/e2e/<area>/<action>.e2e-spec.ts
+    slot: be.tests.e2e
+    role: The operation on the booted app, refusal and unauthenticated call included.
+    optional: true

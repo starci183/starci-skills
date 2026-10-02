@@ -22,3 +22,12 @@ examples:
   - id: projection
     path: projection
     title: A projection kept current by a reactor
+  - id: api
+    path: api
+    title: An api feature - a resolver, its command and handler, and the e2e flow
+  - id: cli
+    path: cli
+    title: An operator command - one cli entry that dispatches one command
+  - id: domain
+    path: domain
+    title: A domain capability - a service that owns its rules and publishes inside its transaction

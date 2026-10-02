@@ -30,7 +30,7 @@ export class JobRunnerService implements JobProcessorRegistry {
 
     /** Subscribes the processor to its queue. */
     add(processor: FencedProcessor): void {
-        this.queues.add(processor.queue, (delivery) => this.run(processor, delivery))
+        this.queues.add({ queue: processor.queue, handle: (delivery) => this.run(processor, delivery) })
     }
 
     /** Runs one delivery of the processor's queue. */
@@ -48,7 +48,7 @@ export class JobRunnerService implements JobProcessorRegistry {
             await this.claims.complete({ jobId: job.jobId, expectedFencingToken: job.fencingToken })
         } catch (cause) {
             if (isFencedOut(cause)) {
-                this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId, token: job.fencingToken })
+                this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId })
                 return
             }
             await this.recordFailure(job, cause)
@@ -58,12 +58,11 @@ export class JobRunnerService implements JobProcessorRegistry {
 
     private async recordFailure(job: ClaimedJob, cause: unknown): Promise<void> {
         const reason = cause instanceof Error ? cause.message : String(cause)
-        this.logger.error(JobsLogEvent.DeliveryFailed, cause, { jobId: job.jobId, token: job.fencingToken })
+        this.logger.error(JobsLogEvent.DeliveryFailed, cause, { jobId: job.jobId })
         await this.claims
             .fail({ jobId: job.jobId, expectedFencingToken: job.fencingToken, reason })
             .catch((failure: unknown) => {
-                if (isFencedOut(failure))
-                    this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId, token: job.fencingToken })
+                if (isFencedOut(failure)) this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId })
                 else this.logger.error(JobsLogEvent.FailureNotRecorded, failure, { jobId: job.jobId })
             })
     }

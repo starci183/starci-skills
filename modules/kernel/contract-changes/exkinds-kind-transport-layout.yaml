@@ -14,9 +14,7 @@ summary: >-
   its own schema owner (schema-owner, BE_SCHEMA_OWNER); the inbox joins event-bus and jobs in the perConnection list of be.persistence; a queue needs
   no module file (a scheduler-only queue has none); HFS_CONTRACT_SNAPSHOT_DRIFT asks a GraphQL snapshot only of an api app whose root module composes
   platform/graphql. `hfs add webhook <provider> --service Class=module` and `hfs add realtime <channel> --service topicFn=module` generate the door
-  trees of both kinds from their pattern topics (ruleParams.be.addKinds, templates under templates/be/patterns/webhooks and realtime). The skeleton
-  primitives gain relayLoopOf (the one loop of the two outbox relays) and isRecord.
-reach: new-legs
+  trees of both kinds from their pattern topics (ruleParams.be.addKinds, templates under templates/be/patterns/webhooks and realtime).reach: new-legs
 paths:
   - modules/kernel/contract-changes/exkinds-kind-transport-layout.yaml
   - knowledge/hfs/slots.yaml
@@ -48,9 +46,6 @@ paths:
   - packages/hfs/templates/be/patterns/realtime/channel.subscription.spec.ts.tpl
   - packages/hfs/templates/be/patterns/realtime/channel.subscription.ts.tpl
   - packages/hfs/templates/be/patterns/realtime/channel.type.ts.tpl
-  - packages/hfs/templates/be/skeleton/src/modules/platform/primitives/index.ts
-  - packages/hfs/templates/be/skeleton/src/modules/platform/primitives/relay-loop.policy.ts
-  - packages/hfs/templates/be/skeleton/src/modules/platform/primitives/record.policy.ts
   - scripts/hfs/rules/contract.mjs
   - scripts/hfs/check.mjs
   - scripts/hfs/architecture/schema-owner.mjs

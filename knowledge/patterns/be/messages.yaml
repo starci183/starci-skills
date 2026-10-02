@@ -33,7 +33,7 @@ rules:
       `be/src/features/<f>/messages/`): one keyed entry per message, `vi` and `en` maps with the same keys, named `{{param}}`
       interpolation for anything a literal built with `+` or a template. A class reads the catalog through
       `@InjectMessageCatalog() private readonly messages: MessageCatalog`, never by importing a catalog file. An error's display
-      text is the entry `errors.<code>` resolved by the filter (error.yaml), so an error constructor never takes prose. A short
+      text is the entry `errors.<code>` (error.yaml). A short
       code-shaped literal (`UPPER_SNAKE`, a single bare word) is a code or an enum value, not copy, and stays in source. No
       Vietnamese text exists in source outside the `messages/` catalogs.
     rationale: |-

@@ -1427,7 +1427,7 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R146
     code: "HFS_EVENT_CONTRACT"
-    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and every queue a consumer defines with `defineQueue` of `platform/messaging` must be listed in a consumes table; a missing or stale snapshot, an unknown event, a version mismatch or an unlisted consumer queue is a finding."
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]

@@ -46,18 +46,17 @@ export const CONSUMES = { order: { "order.placed": 1 } } as const
 ```
 
 `HFS_EVENT_CONTRACT` (R146) refuses a snapshot that no longer equals the provider's table, a consumed event the provider's
-snapshot does not declare, a version mismatch, an event that `compensates` an event no contract declares, and a queue a consumer
-defines with `defineQueue` that no consumes table lists. A breaking change bumps the `version`; every consumer that has not
+snapshot does not declare, a version mismatch and an event that `compensates` an event no contract declares. A breaking change bumps the `version`; every consumer that has not
 followed fails the check.
 
 ## Messages, idempotency, retries
 
-Asynchronous messages travel on the queues of `platform/messaging` (BullMQ over the Redis of the stack); the queue of an event is
-its name. A publisher appends after its commit (an order is never failed by a queue that is down; a replayed confirmation
-announces again, which repairs a lost announcement). A consumer is a `transport/message/<event>.consumer.ts` of a worker app that
+Asynchronous messages travel on the Kafka topics of `platform/event-bus`; the topic of an event is the events topic of its service. A
+publisher writes the outbox row in the transaction of its change, so the event exists exactly when the change commits, and the relay
+hands it to Kafka after the commit. A consumer is a `transport/message/<event>.consumer.ts` of a worker app that
 dispatches one command; the receiver dedupes on the event id, either with the inbox claim (R80) or because the effect is
 idempotent by state (cancelling an order that is already cancelled changes nothing). A delivery that fails is delivered again
-after an exponential backoff; a message that runs out of attempts stays in the dead letters of its queue, where an operator
+after an exponential backoff; a message that runs out of attempts stays in the dead letters of its topic, where an operator
 command reads it.
 
 ## Sagas and compensation

@@ -14,14 +14,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const PATTERNS = path.join(ROOT, 'knowledge', 'patterns', 'be');
 const manifest = loadSlotManifest();
 const slotIds = new Set(manifest.slots.map((slot) => slot.id));
-const codes = new Set(loadRuleCatalog({ manifest }).rules.flatMap((rule) => rule.failureCodes ?? []));
+const catalog = loadRuleCatalog({ manifest }).rules;
+const codes = new Set([...catalog.flatMap((rule) => rule.failureCodes ?? []), ...catalog.map((rule) => rule.id)]);
 const scenarios = ruleParams(manifest, 'be').patternScenarios;
 const scenarioIds = new Set(Object.entries(scenarios).flatMap(([pattern, list]) => list.map((id) => `${pattern}/${id}`)));
 
 const topics = fs.readdirSync(PATTERNS).filter((name) => name.endsWith('.yaml')).map((name) => ({ name, doc: parse(fs.readFileSync(path.join(PATTERNS, name), 'utf8')) })).filter((topic) => Array.isArray(topic.doc?.files));
 
-test('the pattern topics that carry a files tree are the event, queue, job, projection, reactor, realtime, saga and webhook topics', () => {
-  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml', 'realtime.yaml', 'saga.yaml', 'webhooks.yaml']);
+test('the topics that carry a files tree are the kind topics (api, cli, reactors, jobs, saga, webhooks, realtime) and the module-family topics (domain, event-bus, queues, projections)', () => {
+  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['api.yaml', 'cli.yaml', 'domain.yaml', 'event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml', 'realtime.yaml', 'saga.yaml', 'webhooks.yaml']);
 });
 
 for (const { name, doc } of topics) {

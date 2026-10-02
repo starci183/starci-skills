@@ -39,11 +39,26 @@ topics:
     path: injection.yaml
     decides: Inject<Thing>() injectors over unique symbol tokens, the fixed injector catalog, no ModuleRef, forwardRef or property injection
     rules: BE-INJECTION-1 … BE-INJECTION-4
+  - id: be.api
+    title: Api features
+    path: api.yaml
+    decides: The api trigger kind, a flat feature of plain CQRS and thin graphql or http transports, the typed operation table, the e2e flow of every operation
+    rules: BE-API-1, BE-API-2, BE-OPERATIONS-1
+  - id: be.cli
+    title: Operator commands
+    path: cli.yaml
+    decides: The cli trigger kind, one entry that dispatches one command, composed only by a cli app and run on the world
+    rules: BE-CLI-1 … BE-CLI-2
+  - id: be.domain
+    title: Domain capabilities
+    path: domain.yaml
+    decides: A capability that owns its rules, tables and one transaction on its context connection, synchronous inside a context and events across
+    rules: BE-DOMAIN-1 … BE-DOMAIN-2
   - id: be.transport
     title: Transport
     path: transport.yaml
     decides: GraphQL as the default door, bus-only injection, no envelope, REST, WebSocket, schedule, message and CLI shapes
-    rules: BE-TRANSPORT-1 … BE-TRANSPORT-4
+    rules: BE-TRANSPORT-1 … BE-TRANSPORT-3
   - id: be.infra
     title: Infrastructure ownership
     path: infra.yaml
@@ -113,7 +128,7 @@ topics:
     title: Background work
     path: background.yaml
     decides: Jobs and consumers as transports, worker apps, runners for every sweep, producers through the bus or a typed queue
-    rules: BE-BACKGROUND-1 … BE-BACKGROUND-4
+    rules: BE-BACKGROUND-1 … BE-BACKGROUND-2
   - id: be.event-bus
     title: Event bus
     path: event-bus.yaml
@@ -143,7 +158,7 @@ topics:
     title: Projections (read models)
     path: projections.yaml
     decides: Read models that replace cross-context joins, one writer per table, recompute and get, replay
-    rules: BE-PROJECTIONS-1 … BE-PROJECTIONS-4
+    rules: BE-PROJECTIONS-1 … BE-PROJECTIONS-5
   - id: be.reactors
     title: Reactors
     path: reactors.yaml

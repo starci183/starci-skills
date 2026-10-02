@@ -122,10 +122,9 @@ rules:
     hfsRules: [R87, R88]
     requirement: |-
       A transport calls `await this.commandBus.execute(new XCommand({ request, principal }))` (or `queryBus`) through
-      `@InjectCommandBus()` / `@InjectQueryBus()`. No `<op>.service.ts` sits between a transport and a handler. No in-process
-      event exists: `EventBus`, `@EventsHandler`, `EventEmitter2`, `@OnEvent` and NATS bridges are not used. A side effect
-      that must happen anyway is an outbox message written in the handler's transaction and consumed in `transport/message/`
-      (background.yaml).
+      `@InjectCommandBus()` / `@InjectQueryBus()`. No `<op>.service.ts` sits between a transport and a handler. Work that stays
+      inside one context is synchronous: the handler calls the domain service in one transaction. A follow-up that must happen anyway
+      or that crosses a context is an event published inside that transaction (event-bus.yaml), never an in-process event.
     rationale: |-
       A forwarder is pure indirection where logic creeps in, and an in-process event does not survive a crash between the
       commit and the delivery.
@@ -135,7 +134,7 @@ rules:
         write: '`constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}` then `this.commandBus.execute(new StartCheckoutCommand({ request, principal }))`.'
       - id: case-2
         when: A follow-up effect after a write
-        write: 'the handler calls `this.outbox.enqueue(manager, message)` inside its transaction; a consumer in transport/message runs the follow-up.'
+        write: 'the domain service the handler calls publishes the event with eventBus.publish(event, tx) in its own transaction; a reactor or job consumes it (event-bus.yaml).'
     verification:
       automated:
         - BE_CQRS_SHAPE
