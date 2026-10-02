@@ -1,9 +1,9 @@
-# ecommerce-app/billing - the billing worker, built from this repository. The build context is the APP ROOT (the folder
+# ecommerce-app/billing - the billing api, built from this repository. The build context is the APP ROOT (the folder
 # holding the one package.json and package-lock.json), not this folder:
 #
 #   docker build -f be/apps/billing/Dockerfile -t ecommerce-app/billing:1.0.0 .
 #
-# The worker has no listener: it consumes the order stream and writes invoices. The tag in .starcistacks is the exact version
+# It listens on 7070: the signed webhook door of the bank transfer notifier and the readiness probe; it also consumes the order stream and writes invoices. The tag in .starcistacks is the exact version
 # of this image; compose names it and the stack never uses a moving tag.
 
 FROM node:22.14.0-alpine3.21 AS build
@@ -31,5 +31,6 @@ COPY --from=build /app/be/dist be/dist
 
 # runs unprivileged
 USER node
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD pgrep -f "apps/billing/src/main.js" > /dev/null || exit 1
+EXPOSE 7070
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- http://127.0.0.1:7070/health/ready > /dev/null || exit 1
 CMD ["node", "be/dist/apps/billing/src/main.js"]

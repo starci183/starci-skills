@@ -16,6 +16,7 @@
  *     argument is `RateTier.Strict` of `platform/http-security`, on the method or on its class. A sign-in, sign-up,
  *     password-reset or callback door on the default tier is the brute-force path the strict tier exists for.
  */
+import { isTransportSlot } from "./lib/transport-slots.mjs"
 import ts from "typescript"
 import { decoratorName, keyName, staticText } from "./lib/ast.mjs"
 import { importsFrom, isOwnedEnumMember, partsOf, presentParts, typeOf } from "./lib/declared.mjs"
@@ -26,7 +27,7 @@ import { isPackageType, typed } from "./lib/types.mjs"
 /** True when the file sits in a transport slot inside a `dto/` folder, judged by the slot and the owner-relative path. */
 const isTransportDto = (hfs, filename) => {
     const slot = hfs.slotOf(filename) ?? ""
-    if (!slot.startsWith("be.transport.") && !slot.startsWith("be.feature.transport.")) return false
+    if (!isTransportSlot(slot) && !slot.startsWith("be.feature.transport.")) return false
     return hfs.relative(filename).split("/").slice(0, -1).includes("dto")
 }
 

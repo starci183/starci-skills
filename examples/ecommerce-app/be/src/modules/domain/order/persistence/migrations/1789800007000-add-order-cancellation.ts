@@ -1,27 +1,19 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
 
-/** Lets an order be cancelled and a payment be refunded: the compensation of a rejected invoice. */
+/** Lets an order be paid and cancelled: the payment a bank transfer records and the compensation of a rejected invoice. */
 export class AddOrderCancellation1789800007000 implements MigrationInterface {
     name = "AddOrderCancellation1789800007000"
 
-    /** Widens the status checks of orders and payments. */
+    /** Widens the status check of orders. */
     async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
         await queryRunner.query(
             `ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'cancelled'))`,
         )
-        await queryRunner.query(`ALTER TABLE payments DROP CONSTRAINT payments_status_check`)
-        await queryRunner.query(
-            `ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('captured', 'refunded'))`,
-        )
     }
 
-    /** Restores the narrow checks; every cancelled order and refunded payment must be gone first. */
+    /** Restores the narrow check; every paid and cancelled order must be gone first. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE payments DROP CONSTRAINT payments_status_check`)
-        await queryRunner.query(
-            `ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('captured'))`,
-        )
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
         await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending'))`)
     }

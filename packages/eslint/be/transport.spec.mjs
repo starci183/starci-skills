@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
+import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
     doorLivesInFeatures,
     noCapabilityImportsFeatures,
@@ -20,12 +20,14 @@ import {
 } from "./transport.mjs"
 
 const tester = typedTester()
+/** The fixture with the feature kinds enabled (a webhook door has its own slot). */
+const kinds = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
+const WEBHOOK = at("src/features/webhooks/payment/payment.webhook.ts")
 const T = "src/features/api/plan/transport"
 const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)
 const DTO = at(`${T}/graphql/dto/place-order.input.ts`)
 const CONTROLLER = at(`${T}/http/pay.controller.ts`)
 const CONSUMER = at(`${T}/message/paid.consumer.ts`)
-const GATEWAY = at(`${T}/websocket/chat.gateway.ts`)
 const CLI = at(`${T}/cli/seed.cli.ts`)
 const DOMAIN = at("src/modules/domain/order/order.service.ts")
 const PLATFORM = at("src/modules/platform/graphql/graphql.module.ts")
@@ -35,7 +37,6 @@ const BUS = `import { Command, CommandBus, Query, QueryBus } from "@nestjs/cqrs"
 import { EntityManager } from "typeorm"
 import { Get, Inject, Post, Controller } from "@nestjs/common"
 import { Mutation, Query as GqlQuery, Resolver } from "@nestjs/graphql"
-import { SubscribeMessage } from "@nestjs/websockets"
 import { InjectCommandBus, InjectQueryBus } from "@modules/platform/cqrs/cqrs.decorators"
 import type { RequestLocale } from "@modules/platform/i18n"
 import { unwrapOutcome } from "@modules/platform/primitives"
@@ -57,7 +58,6 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(@InjectQueryBus() private readonly q: QueryBus, @InjectCommandBus() readonly c: CommandBus) {} @GqlQuery(() => String) async ask() { return this.q.execute(new Ask()) } }` },
             // REST content negotiation
             { filename: CONTROLLER, code: `${BUS}@Controller() export class C { constructor(@InjectCommandBus() private readonly bus: CommandBus, private readonly locale: RequestLocale) {} @Post() async pay() { return this.bus.execute(new Place()) } }` },
-            { filename: GATEWAY, code: `${BUS}export class G { constructor(private readonly bus: CommandBus) {} @SubscribeMessage("say") say() { return this.bus.execute(new Place()) } handleConnection() { return 1 } }` },
             { filename: CLI, code: `${BUS}export class S { constructor(private readonly bus: CommandBus) {} async run() { await this.bus.execute(new Place()) } }` },
             // mapping the input and the result with pure mapper functions is mapping
             { filename: RESOLVER, code: `${BUS}import { toCommand, toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place(input: string) { const command = toCommand(input); return toView(await this.commandBus.execute(command)) } }` },
@@ -92,7 +92,6 @@ export class PlanMessageModule { constructor(private readonly registry: Registry
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus, private readonly q: QueryBus) {} @Mutation(() => String) async place() { await this.q.execute(new Ask()); return this.bus.execute(new Place()) } }`, errors: [{ messageId: "many" }] },
             { filename: CONTROLLER, code: `${BUS}@Controller() export class C { constructor(private readonly bus: CommandBus) {} @Get() list() { return 1 } }`, errors: [{ messageId: "none" }] },
             { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly bus: CommandBus) {} async handle() { return 1 } }`, errors: [{ messageId: "none" }] },
-            { filename: GATEWAY, code: `${BUS}export class G { constructor(private readonly svc: OrderService) {} @SubscribeMessage("say") say() { return this.svc.place() } }`, errors: [{ messageId: "injects" }, { messageId: "none" }, { messageId: "call" }] },
             // a decision, a loop or a throw in a door is logic no unit spec covers
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(flag: boolean) { if (flag) { return "" } return this.bus.execute(new Place()) } }`, errors: [{ messageId: "branch" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(flag: boolean) { return this.bus.execute(flag ? new Place() : new Place()) } }`, errors: [{ messageId: "branch" }] },
@@ -183,6 +182,25 @@ test("door-lives-in-features: a @Controller is declared in the transport/http sl
             { filename: RESOLVER, code: `${head}@Controller() export class C {}`, errors: [{ messageId: "wrongSlot" }] },
             { filename: DOMAIN, code: `import { Controller as Door } from "@nestjs/common"\n@Door() export class C {}`, errors: [{ messageId: "wrongSlot" }] },
         ],
+    })
+})
+
+test("door-lives-in-features: a provider webhook door lives in the webhooks slot of its kind", () => {
+    const head = `import { Controller } from "@nestjs/common"
+`
+    kinds.run("door-lives-in-features", doorLivesInFeatures, {
+        valid: [{ filename: WEBHOOK, code: `${head}@Controller() export class C {}` }],
+        invalid: [{ filename: at("src/features/realtime/orders/orders.gateway.ts"), code: `${head}@Controller() export class C {}`, errors: [{ messageId: "wrongSlot" }] }],
+    })
+})
+
+test("transport-is-thin: the doors of the webhook and realtime kinds answer to their own kind laws, not to the one-dispatch shape", () => {
+    kinds.run("transport-is-thin", transportIsThin, {
+        valid: [
+            { filename: WEBHOOK, code: `import { Controller, Post } from "@nestjs/common"
+@Controller() export class C { @Post() receive() { this.payments.accept(1) } }` },
+        ],
+        invalid: [],
     })
 })
 

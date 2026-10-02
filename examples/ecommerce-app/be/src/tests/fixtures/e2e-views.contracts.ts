@@ -68,6 +68,22 @@ export interface OrderReceiptData {
     orderReceipt: OrderReceiptView
 }
 
+/** One push of an order's status, as the subscription delivers it. */
+export interface OrderStatusChangedView {
+    /** The order. */
+    orderId: string
+    /** The state the order is in now. */
+    status: string
+    /** When the order entered that state, ISO 8601. */
+    changedAt: string
+}
+
+/** The orderStatusChanged subscription data of one frame. */
+export interface OrderStatusChangedData {
+    /** The `orderStatusChanged` field. */
+    orderStatusChanged: OrderStatusChangedView
+}
+
 /** The receipt document a download link answers. */
 export interface ReceiptDocumentView {
     /** The order. */

@@ -147,6 +147,10 @@ ruleParams:
       "@nestjs/config": []
       dotenv: []
       "@nestjs/event-emitter": []
+      "@nestjs/platform-socket.io": [platform/realtime]
+      socket.io: [platform/realtime]
+      graphql-subscriptions: [platform/realtime]
+      graphql-ws: [platform/realtime]
     # R48 BE_SPEC_QUALITY spec-infra-double-from-kit: in a `<name>.service.spec.ts` a provider `{ provide: TOKEN, useValue: X }` takes X from
     # the kit named here (the package root of `kit`). The token name is normalised to UPPER_SNAKE (`EntityManager` -> ENTITY_MANAGER), the
     # FIRST entry whose `token` regex matches decides, and `fallback` decides for every other token. `forms` say what X may be:
@@ -168,7 +172,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -186,6 +190,8 @@ ruleParams:
     patternScenarios:
       event-bus: [atomic-with-transaction, relay-only-after-commit, redelivery-then-dead-letter, duplicate-delivery-is-a-noop]
       queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
+      webhooks: [bad-signature-is-refused, replay-is-refused, accepted-delivery-publishes-once]
+      realtime: [subscriber-receives-push, foreign-topic-is-isolated, disconnect-releases-subscription]
       fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
       projection: [recompute-is-idempotent, replay-rebuilds]
     # BE_KIND_DECLARATION: the patterns an app that uses a trigger kind declares in hfs.json sides.be.patterns; the platform capabilities of those
@@ -801,16 +807,63 @@ slots:
     tests: none
     composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED, BE_SAGA_CONSUMER_DEDUPE]
-  - id: be.transport.websocket
+  # ----- BE: feature kinds that are not an api: a webhook door and a realtime door. Each kind is a folder of src/features/ named by
+  # the kind and holds one folder per provider or channel; a kind imports only modules/* (never another kind) and only an
+  # api-kind app composes it. Their doors answer to the same door laws as every transport (default deny, bounded input,
+  # no envelope), plus the kind laws of knowledge/patterns/be/webhooks.yaml and realtime.yaml.
+  - id: be.feature.webhooks
     profiles: [be]
-    path: "src/features/api/<feature>/transport/websocket/"
-    presence: opt-in
+    path: "src/features/webhooks/<provider>/"
+    presence: opt-in              # a provider webhook intake: verifies the signature and replay window, then hands the delivery to ONE domain intake method
+    pattern: webhooks             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/webhooks.yaml)
+    trigger: webhooks
     tracked: tracked
     tier: feature
-    requires: ["<feature>-websocket.module.ts"]
-    allows: ["<channel>.gateway.ts", "dto/*.ts"]
+    owner: true
+    requires: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
+    allows: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
+    tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
+    composedBy: [api]
+    rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_FEATURE_NOT_COMPOSED]
+    since: 1.0.0
+  - id: be.feature.webhooks.dto
+    profiles: [be]
+    path: "src/features/webhooks/<provider>/dto/"
+    presence: opt-in
+    pattern: webhooks
+    tracked: tracked
+    tier: feature
+    allows: ["<event>.request.ts"]   # the typed provider payload, validated and bounded (BE_INPUT_BOUNDED)
     tests: none
     composedBy: [api]
+    rules: [BE_INPUT_BOUNDED]
+    since: 1.0.0
+  - id: be.feature.realtime
+    profiles: [be]
+    path: "src/features/realtime/<channel>/"
+    presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
+    pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
+    trigger: realtime
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<channel>-realtime.module.ts"]
+    allows: [index.ts, "<channel>-realtime.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
+    tests: unit-beside            # the door's own spec beside the door (a gateway or a subscription has no service of its own)
+    composedBy: [api]
+    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY, BE_FEATURE_NOT_COMPOSED]
+    since: 1.0.0
+  - id: be.feature.realtime.dto
+    profiles: [be]
+    path: "src/features/realtime/<channel>/dto/"
+    presence: opt-in
+    pattern: realtime
+    tracked: tracked
+    tier: feature
+    allows: ["<name>.{input,type,args}.ts"]
+    tests: none
+    composedBy: [api]
+    rules: [BE_INPUT_BOUNDED]
     since: 1.0.0
   - id: be.cli
     profiles: [be]

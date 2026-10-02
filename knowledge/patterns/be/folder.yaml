@@ -69,9 +69,10 @@ rules:
       into `src/modules/*`, and only `be/apps/*` composes a feature.
       An api feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
       `messages/`, and nothing else. `application/` holds the CQRS files of api.yaml and no folder named after a protocol. A
-      protocol lives in `transport/graphql`, `transport/http`, `transport/websocket`,
-      or `transport/message`, each with exactly one Nest module `<feature>-<protocol>.module.ts`, its
-      resolvers, controllers, gateways or consumers, and `dto/` where the protocol has DTOs.
+      protocol lives in `transport/graphql`, `transport/http` or `transport/message`, each with exactly one Nest module
+      `<feature>-<protocol>.module.ts`, its resolvers, controllers or consumers, and `dto/` where the protocol has DTOs. A socket
+      gateway or a subscription is the realtime kind (`features/realtime/<channel>/`) and a provider webhook the webhooks kind
+      (`features/webhooks/<provider>/`).
     rationale: |-
       The trigger decides which app composes the code, so grouping by trigger keeps each app's composition one folder and
       makes a cross-kind import visible from the path alone.

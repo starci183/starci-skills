@@ -1,6 +1,9 @@
 import { sql } from "@modules/platform/database"
 import type {
+    BillingPaymentRow,
     CountRow,
+    OrderSummaryProjectionRow,
+    PointsRow,
     InvoiceRow,
     OutboxStateRow,
     OrderLineRow,
@@ -63,6 +66,31 @@ export const PAYMENTS_OF_PERSON: RowQuery<PaymentRow> = {
 /** How many payments one person has ($1 person id). */
 export const PAYMENT_COUNT: RowQuery<CountRow> = {
     text: sql`SELECT count(*)::int AS count FROM payments WHERE person_id = $1`,
+}
+
+/** The payment of one order in the billing database ($1 order id): at most one, whatever the deliveries. */
+export const BILLING_PAYMENTS_OF_ORDER: RowQuery<BillingPaymentRow> = {
+    text: sql`SELECT order_id, amount_minor_units, provider_reference FROM payments WHERE order_id = $1 LIMIT 10`,
+}
+
+/** The loyalty points one order earned ($1 order id): a single row, zero when none were granted. */
+export const LOYALTY_POINTS_OF_ORDER: RowQuery<PointsRow> = {
+    text: sql`SELECT coalesce(sum(points), 0)::int AS points FROM loyalty_entries WHERE order_id = $1`,
+}
+
+/** How many summaries the order-summary read model holds for one buyer ($1 person id). */
+export const ORDER_SUMMARY_COUNT_OF_PERSON: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM order_summaries WHERE person_id = $1`,
+}
+
+/** The order-summary rows of the orders of one buyer in order id order ($1 person id): what a replay must rebuild unchanged. */
+export const ORDER_SUMMARIES_OF_PERSON: RowQuery<OrderSummaryProjectionRow> = {
+    text: sql`SELECT order_id, status, total_minor_units, line_count, loyalty_points FROM order_summaries WHERE person_id = $1 ORDER BY order_id LIMIT 100`,
+}
+
+/** Empties the order-summary read model of one buyer ($1 person id): the start of a replay. */
+export const DELETE_ORDER_SUMMARIES_OF_PERSON: RowQuery<CountRow> = {
+    text: sql`DELETE FROM order_summaries WHERE person_id = $1`,
 }
 
 /** The invoices of one order ($1 order id): at most one, whatever the redeliveries. */

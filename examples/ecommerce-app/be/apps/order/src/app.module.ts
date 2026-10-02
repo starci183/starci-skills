@@ -5,7 +5,7 @@ import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } fr
 import { CART_ERROR_KINDS, CartModule, cartEntities, cartMigrations } from "@modules/domain/cart"
 import { CatalogModule, catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { ORDER_ERROR_KINDS, ORDER_MESSAGES, OrderModule, orderEntities, orderMigrations } from "@modules/domain/order"
-import { PaymentModule, paymentEntities, paymentMigrations } from "@modules/domain/payment"
+import { LoyaltyModule, loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import {
     IDENTITY_API,
     IDENTITY_API_ERROR_KINDS,
@@ -32,6 +32,7 @@ import {
     RateLimitGuard,
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
+import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import {
     EVENT_BUS_ERROR_KINDS,
     EVENT_BUS_MESSAGES,
@@ -42,9 +43,16 @@ import {
 } from "@modules/platform/event-bus"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
+import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/api/checkout"
 import { HealthHttpModule } from "@features/api/health"
+import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
+import { OrderPaidLoyaltyMessageModule } from "@features/reactors/order-paid-loyalty"
+import { OrderPaymentStatusMessageModule } from "@features/reactors/order-payment-status"
+import { OrderStatusPushMessageModule } from "@features/reactors/order-status-push"
+import { OrderSummaryProjectionMessageModule } from "@features/reactors/order-summary-projection"
+import { OrderStatusRealtimeModule } from "@features/realtime/order-status"
 import type { OrderAppOptions } from "./order.options"
 
 @Module({})
@@ -98,7 +106,9 @@ export class AppModule {
                                 ...catalogEntities,
                                 ...cartEntities,
                                 ...orderEntities,
-                                ...paymentEntities,
+                                ...loyaltyEntities,
+                                ...orderSummaryEntities,
+                                ...inboxEntities,
                                 ...sagaEntities,
                                 ...eventBusEntities,
                             ],
@@ -106,7 +116,9 @@ export class AppModule {
                                 ...catalogMigrations,
                                 ...cartMigrations,
                                 ...orderMigrations,
-                                ...paymentMigrations,
+                                ...loyaltyMigrations,
+                                ...orderSummaryMigrations,
+                                ...inboxMigrations,
                                 ...sagaMigrations,
                                 ...eventBusMigrations,
                             ],
@@ -119,7 +131,10 @@ export class AppModule {
                 EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [ORDER_ENTITY_MANAGER] }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
-                PaymentModule.register({ isGlobal: true }),
+                InboxModule.register({ isGlobal: true }),
+                RealtimeModule.register({ isGlobal: true }),
+                LoyaltyModule.register({ isGlobal: true }),
+                OrderSummaryModule,
                 SagaModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
@@ -132,6 +147,11 @@ export class AppModule {
                 HealthHttpModule,
                 CheckoutGraphqlModule,
                 CheckoutMessageModule,
+                OrderPaymentStatusMessageModule,
+                OrderPaidLoyaltyMessageModule,
+                OrderStatusPushMessageModule,
+                OrderSummaryProjectionMessageModule,
+                OrderStatusRealtimeModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

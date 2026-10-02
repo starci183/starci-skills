@@ -37,7 +37,7 @@ export class S3ReceiptStorageClient implements ReceiptStorage {
         @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** Stores the receipt document under its key, creating the bucket on the first write. */
+    /** Stores the receipt document under its key (a repeat replaces it with the same bytes), creating the bucket on the first write. */
     async store(params: StoreReceiptParams): Promise<void> {
         let written = await this.put(this.objectUrl(params.key), params.content, params.key)
         if (written.status === HTTP_NOT_FOUND) {
@@ -47,6 +47,7 @@ export class S3ReceiptStorageClient implements ReceiptStorage {
             written = await this.put(this.objectUrl(params.key), params.content, params.key)
         }
         if (!succeeded(written.status)) throw this.failure(`http-${written.status}`, params.key)
+        this.logger.info(ReceiptStorageLogEvent.Stored, { key: params.key, runKey: params.runKey })
     }
 
     /** A presigned GET of the receipt, valid for the configured lifetime from now. */

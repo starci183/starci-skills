@@ -26,12 +26,14 @@ src/
       <action>.contracts.ts                     # protocol-neutral request and result
     transport/
       graphql/<feature>-graphql.module.ts, <action>.resolver.ts, <action>.mapper.ts, dto/<action>.{input,type,args}.ts
-      http/<feature>-http.module.ts, <action>.controller.ts, dto/<action>.{request,response}.ts   # webhooks, OAuth, health, byte streams only
-      websocket/, message/, schedule/   # opt-in: <feature>-<protocol>.module.ts and the protocol files
+      http/<feature>-http.module.ts, <action>.controller.ts, dto/<action>.{request,response}.ts   # OAuth, health, byte streams only (a provider webhook is the webhooks kind)
+      message/   # opt-in: <feature>-message.module.ts and its consumers
     messages/<feature>.messages.ts  # opt-in: the feature's vi and en copy
   features/cli/                     # the cli feature root: index.ts, cli.module.ts, cli.module-definition.ts
     <group>/<group>.cli.ts          # group @Command with subCommands, plus <group>.module.ts and <group>.module-definition.ts
     <group>/subs/<name>.cli.ts      # @SubCommand extending CommandRunner, with <name>.cli.spec.ts beside it
+  features/webhooks/<provider>/     # opt-in kind (pattern webhooks): index.ts, <provider>-webhook.module.ts, <provider>.webhook.ts + spec, dto/<event>.request.ts; verifies the signature, then ONE domain intake call
+  features/realtime/<channel>/      # opt-in kind (pattern realtime): index.ts, <channel>-realtime.module.ts, <channel>.gateway.ts or <x>.subscription.ts + spec; reads and pushes only through the RealtimeHub
   modules/
     domain/<capability>/            # business invariants, owned state: index.ts, module, module-definition, options, config, decorators, errors/, persistence/, services
     platform/<capability>/          # composition, config, errors, logging, clock, cqrs, database, ... each with its port and injector
@@ -101,7 +103,7 @@ These snippets illustrate responsibility, not a complete boot-tested project. On
 
 **Configuration** (`be/config.yaml`). Only `platform/config` reads `process.env` through `EnvSource` and its typed readers. Each capability parses its own config into typed options in `<c>.config.ts`; `main.ts` builds `EnvSource` once and passes options to `AppModule.register(options)`, and classes read them with `Inject<C>Options()`. A secret, host, URL, remote port, bucket or database name has no default, and an optional integration is all-or-nothing. Secrets exist only sealed at `.starcistacks/<env>/secrets/<slug>.enc`.
 
-**Authentication** (`be/api-auth.yaml`). Default deny: `APP_GUARD` throttler, CSRF origin guard and `AuthGuard` in that order, and `@Public({ reason: PublicReason.X })` for every open operation. Webhooks verify a signature and compare with `timingSafeEqual`. No `unknown` body, no `GraphQLJSON`, no operation-name switch. Input is validated and bounded, pagination is by cursor, and the auth and webhook doors are strictly rate limited.
+**Authentication** (`be/api-auth.yaml`). Default deny: `APP_GUARD` throttler, CSRF origin guard and `AuthGuard` in that order, and `@Public({ reason: PublicReason.X })` for every open operation. A provider webhook is the webhooks kind (`be/webhooks.yaml`): its door verifies the signature and replay window first (`WebhookSignatureService` of `platform/http-security`, `timingSafeEqual`) and makes one domain intake call; a push channel is the realtime kind (`be/realtime.yaml`). No `unknown` body, no `GraphQLJSON`, no operation-name switch. Input is validated and bounded, pagination is by cursor, and the auth and webhook doors are strictly rate limited.
 
 **Background work** (`be/background.yaml`). A job processor (`features/jobs/<job>/<job>.processor.ts`) or a consumer (`transport/message/<event>.consumer.ts`) dispatches one command exactly as a resolver does, registered into `platform/scheduling` or `platform/messaging`, and the api app that owns the feature composes it, or a `worker` app only when the background load must scale apart. A one-off action is a cli command, never a job. A sweep, delivery, reconcile, retry or relay method that no job or consumer calls is a finding. Every consumer and signed webhook claims its event through `InjectInbox()` first.
 

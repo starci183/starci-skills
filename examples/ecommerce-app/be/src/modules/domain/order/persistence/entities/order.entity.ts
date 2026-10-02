@@ -14,7 +14,7 @@ export class OrderEntity {
 
     /** The lifecycle state; a varchar with a CHECK in the migration, not a native enum. */
     @Column({ name: "status", type: "varchar", length: 16 })
-    status!: "pending" | "paid" | "cancelled"
+    status!: "pending" | "paid" | "expired" | "cancelled"
 
     /** The order total in minor units. */
     @Column({ name: "total_minor_units", type: "int" })
@@ -35,4 +35,8 @@ export class OrderEntity {
     /** When the order was placed. */
     @Column({ name: "created_at", type: "timestamptz", default: () => "now()" })
     createdAt!: Date
+
+    /** When a bank transfer paid the order; null until it is paid. */
+    @Column({ name: "paid_at", type: "timestamptz", nullable: true })
+    paidAt!: Date | null
 }

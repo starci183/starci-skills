@@ -11,8 +11,9 @@ export class CreateInvoices1789800006000 implements MigrationInterface {
     order_id uuid NOT NULL UNIQUE,
     person_id uuid NOT NULL,
     total_minor_units int NOT NULL CHECK (total_minor_units >= 0),
-    status varchar(16) NOT NULL CHECK (status IN ('issued', 'rejected')),
-    created_at timestamptz NOT NULL DEFAULT now()
+    status varchar(16) NOT NULL CHECK (status IN ('issued', 'rejected', 'paid')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    paid_at timestamptz
 )`)
     }
 

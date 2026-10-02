@@ -70,9 +70,6 @@ export interface ReceiptLinkParams {
     readonly orderId: string
 }
 
-/** The object key of an archived receipt, or null when the archive could not take it. */
-export type ArchivedReceiptKey = string | null
-
 /** Whether a person has confirmed orders. */
 export interface GetBuyerStatusResult {
     /** The person. */

@@ -2,6 +2,7 @@ import { accountEntities, accountMigrations } from "@modules/domain/account"
 import { cartEntities, cartMigrations } from "@modules/domain/cart"
 import { catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { invoiceEntities, invoiceMigrations } from "@modules/domain/invoice"
+import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { orderEntities, orderMigrations } from "@modules/domain/order"
 import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
 import type { EnvSource } from "@modules/platform/config"
@@ -16,6 +17,7 @@ import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
 import { queueEntities, queueMigrations } from "@modules/platform/queue"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
+import { orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 
 /** Everything the cli app needs from its environment: every connection with the entities and migrations of its owners. */
 export interface CliAppOptions {
@@ -30,14 +32,16 @@ export const identityConnectionOf = (env: EnvSource): DatabaseConnectionOptions 
     migrations: accountMigrations,
 })
 
-/** The order database: the catalog, the carts, the orders and their payments, the place-order saga, the order outbox, the queue outbox and the job table. */
+/** The order database: the catalog, the carts, the orders, loyalty, the order-summary projection and its inbox, the place-order saga, the order outbox, the queue outbox and the job table. */
 export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
     ...parseOrderDatabaseConfig(env),
     entities: [
         ...catalogEntities,
         ...cartEntities,
         ...orderEntities,
-        ...paymentEntities,
+        ...loyaltyEntities,
+        ...orderSummaryEntities,
+        ...inboxEntities,
         ...sagaEntities,
         ...eventBusEntities,
         ...queueEntities,
@@ -47,7 +51,9 @@ export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => 
         ...catalogMigrations,
         ...cartMigrations,
         ...orderMigrations,
-        ...paymentMigrations,
+        ...loyaltyMigrations,
+        ...orderSummaryMigrations,
+        ...inboxMigrations,
         ...sagaMigrations,
         ...eventBusMigrations,
         ...queueMigrations,
@@ -55,11 +61,11 @@ export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => 
     ],
 })
 
-/** The billing database: the invoices, the billing inbox and the billing outbox. */
+/** The billing database: the invoices, the payments, the billing inbox and the billing outbox. */
 export const billingConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
     ...parseBillingDatabaseConfig(env),
-    entities: [...invoiceEntities, ...inboxEntities, ...eventBusEntities],
-    migrations: [...invoiceMigrations, ...inboxMigrations, ...eventBusMigrations],
+    entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
+    migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
 })
 
 /** Parses the cli options from the environment: one entry per connection, each built by its own function above. */

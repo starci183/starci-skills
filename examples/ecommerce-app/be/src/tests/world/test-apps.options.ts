@@ -10,9 +10,11 @@ import { accountEntities } from "@modules/domain/account"
 import { cartEntities } from "@modules/domain/cart"
 import { catalogEntities } from "@modules/domain/catalog"
 import { invoiceEntities } from "@modules/domain/invoice"
+import { loyaltyEntities } from "@modules/domain/loyalty"
 import { orderEntities } from "@modules/domain/order"
 import { paymentEntities } from "@modules/domain/payment"
 import { ClockModule } from "@modules/platform/clock"
+import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { EnvSource, Secret } from "@modules/platform/config"
 import {
     DatabaseModule,
@@ -29,6 +31,7 @@ import { queueEntities } from "@modules/platform/queue"
 import type { EventBusConfig } from "@modules/platform/event-bus"
 import type { QueueConfig } from "@modules/platform/queue"
 import { sagaEntities } from "@modules/platform/saga"
+import { orderSummaryEntities } from "@modules/projections/order-summary"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
@@ -37,10 +40,15 @@ import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
 import type { BillingAppOptions } from "../../../apps/billing/src/billing.options"
+import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
 const RATE_LIMIT_HIGH = 100_000
+
+/** The expiry sweep of the world ticks twice a second; the payment window is the deployment default, so only an order a spec backdates expires. */
+const ORDER_EXPIRY_TICK_MS = 500
+const ORDER_PAYMENT_WINDOW_TEST_MS = 3_600_000
 const CALL_DEADLINE_MS = 5000
 const ALLOWED_ORIGINS: ReadonlyArray<string> = ["http://localhost:4069"]
 
@@ -50,8 +58,8 @@ export const KEYCLOAK_SIGN_IN_CLIENT = "identity-api"
 /** The confidential client of the realm whose service account creates the shoppers (realm-ecommerce.json). */
 export const KEYCLOAK_ADMIN_CLIENT = "identity-admin"
 
-/** The wiring of the ecommerce world: its three apps and their three connections. */
-export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing">
+/** The wiring of the ecommerce world: its three apps, their three connections and the bank transfer notifier fake. */
+export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing", "sepay">
 
 /** The entities the identity connection maps. */
 export const IDENTITY_ENTITIES: DatabaseConnectionOptions["entities"] = accountEntities
@@ -61,7 +69,9 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...catalogEntities,
     ...cartEntities,
     ...orderEntities,
-    ...paymentEntities,
+    ...loyaltyEntities,
+    ...orderSummaryEntities,
+    ...inboxEntities,
     ...sagaEntities,
     ...eventBusEntities,
     ...queueEntities,
@@ -69,11 +79,7 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [
-    ...invoiceEntities,
-    ...inboxEntities,
-    ...eventBusEntities,
-]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -152,9 +158,22 @@ export const receiptStorageOptionsOf = (w: EcommerceWiring): ReceiptStorageOptio
     timeoutMs: CALL_DEADLINE_MS,
 })
 
-const httpSecurity = {
+const httpSecurity: HttpSecurityOptions = {
     allowedOrigins: ALLOWED_ORIGINS,
     rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
+    webhooks: {},
+}
+
+/** The value a fake exposes for the app options; a missing one is a declaration mistake the boot must name. */
+const fakeValue = (values: Readonly<Record<string, string>>, key: string): string => {
+    const value = values[key]
+    if (value === undefined) {
+        throw new TestWorldError({
+            code: TestWorldErrorCode.NotDeclared,
+            params: { detail: `the fake exposes no value "${key}"` },
+        })
+    }
+    return value
 }
 
 /** The options of the identity app. */
@@ -176,14 +195,26 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     eventBus: eventBusOptionsOf(w, "order"),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
+    orderExpiry: { everyMs: ORDER_EXPIRY_TICK_MS, olderThanMs: ORDER_PAYMENT_WINDOW_TEST_MS },
 })
 
 /** The largest total the billing worker of the world invoices: small, so a spec can place an order it rejects. */
 export const BILLING_LIMIT_MINOR_UNITS = 100_000
 
-/** The options of the billing worker. */
+/** The replay window of the notifier signature in the world: five minutes, like the deployment default. */
+const WEBHOOK_TOLERANCE_MS = 300_000
+
+/** The options of the billing api: the notifier fake signs with the secret the fake exposes, and the app verifies with the same one. */
 export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
+    port: w.apps.billing.port,
     database: billingDatabase(w),
+    identityApi: identityApiOptionsOf(w),
+    httpSecurity: {
+        ...httpSecurity,
+        webhooks: {
+            sepay: { secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")), toleranceMs: WEBHOOK_TOLERANCE_MS },
+        },
+    },
     eventBus: eventBusOptionsOf(w, "billing"),
     invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },
 })

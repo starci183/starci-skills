@@ -9,9 +9,11 @@ export interface InvoiceRow {
     /** The billed amount in minor units. */
     totalMinorUnits: number
     /** The invoice state. */
-    status: "issued" | "rejected"
+    status: "issued" | "rejected" | "paid"
     /** When the invoice was recorded. */
     createdAt: Date
+    /** When a bank transfer paid the invoice; null until then. */
+    paidAt: Date | null
 }
 
 /** An issued invoice row with valid defaults and a fixed time; the spec overrides only what matters. */
@@ -22,5 +24,6 @@ export const invoiceRow = (overrides: Partial<InvoiceRow> = {}): InvoiceRow => (
     totalMinorUnits: 1500,
     status: "issued",
     createdAt: new Date("2026-02-03T04:05:06.000Z"),
+    paidAt: null,
     ...overrides,
 })

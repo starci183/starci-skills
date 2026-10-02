@@ -50,6 +50,36 @@ export interface PaymentRow {
     amount_minor_units: number
 }
 
+/** A persisted payment of the billing database: one confirmed bank transfer. */
+export interface BillingPaymentRow {
+    /** The order the payment settles. */
+    order_id: string
+    /** The transferred amount in minor units. */
+    amount_minor_units: number
+    /** The bank reference of the transfer. */
+    provider_reference: string
+}
+
+/** One row of the order-summary read model, as the verification statements read it. */
+export interface OrderSummaryProjectionRow {
+    /** The order. */
+    order_id: string
+    /** The lifecycle state. */
+    status: string
+    /** The order total in minor units. */
+    total_minor_units: number
+    /** How many lines the order has. */
+    line_count: number
+    /** The loyalty points the order earned. */
+    loyalty_points: number
+}
+
+/** The loyalty points of one order. */
+export interface PointsRow {
+    /** The points the order earned; zero when nothing was granted. */
+    points: number
+}
+
 /** A persisted invoice of the billing database. */
 export interface InvoiceRow {
     /** The order the invoice bills. */

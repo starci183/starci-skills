@@ -12,7 +12,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
+import { BE_DECLARATION, at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   e2eAssertsPersistedState,
   noApiShapedE2eFilename,
@@ -30,6 +30,12 @@ const tester = new RuleTester({
 })
 /** The one rule that reads types: the default project holds at most eight virtual files, so it has its own tester. */
 const typed = typedTester()
+
+/** The same slots with the feature kinds enabled: a webhook or realtime door carries its own spec beside it. */
+const kinds = new RuleTester({
+  languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+  settings: { starci: { hfs: fixtureHfs({ ...BE_DECLARATION, patterns: ["webhooks", "realtime"] }) } },
+})
 
 const UNIT = at("src/features/api/checkout/application/add-to-cart.handler.spec.ts")
 const SRC = at("src/features/api/checkout/application/add-to-cart.handler.ts")
@@ -133,6 +139,26 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/order.service.test.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
       { filename: at("src/modules/domain/order/order.int-spec.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
       { filename: at("src/tests/e2e/checkout/order.harness-spec.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
+    ],
+  })
+})
+
+test("R47: a webhook or realtime door carries its own spec beside it, and only in the slot of its kind", () => {
+  kinds.run("unit-test-colocated", unitTestColocated, {
+    valid: [
+      // the door's spec beside its real door
+      { filename: at("src/features/webhooks/payment/payment.webhook.spec.ts"), code: "export {}" },
+      // the door itself needs no service spec
+      { filename: at("src/features/webhooks/payment/payment.webhook.ts"), code: "export class PaymentWebhook {}" },
+    ],
+    invalid: [
+      // a door spec with no door beside it
+      { filename: at("src/features/webhooks/ghost/ghost.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/features/realtime/orders/orders.gateway.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      // the same name outside the slot of the kind is an ordinary non-service unit spec
+      { filename: at("src/features/plan/transport/http/pay.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      // the kind's slot holds door specs only: a controller spec of another role is still refused
+      { filename: at("src/features/webhooks/payment/payment.controller.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
     ],
   })
 })

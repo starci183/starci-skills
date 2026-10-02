@@ -145,6 +145,16 @@ topics:
     path: queues.yaml
     decides: Typed queue producers that write the outbox in the caller's transaction, the BullMQ owner and relay, job schedulers instead of cron
     rules: BE-QUEUES-1 … BE-QUEUES-4
+  - id: be.webhooks
+    title: Provider webhooks
+    path: webhooks.yaml
+    decides: The webhooks feature kind, the signed door that verifies first and makes one domain intake call, the intake that claims the inbox and publishes the event in its transaction, the three scenarios proven on the provider fake
+    rules: BE-WEBHOOK-1 … BE-WEBHOOK-4
+  - id: be.realtime
+    title: Realtime channels
+    path: realtime.yaml
+    decides: The realtime feature kind, a read-and-push door (socket gateway or GraphQL subscription) that injects only the RealtimeHub, principal-scoped topics fed by a reactor, the three scenarios proven with a real client
+    rules: BE-REALTIME-1 … BE-REALTIME-4
   - id: be.jobs
     title: Fenced background jobs
     path: jobs.yaml

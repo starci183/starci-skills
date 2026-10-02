@@ -11,7 +11,13 @@ import type { BaseEvent, EventBus } from "@modules/platform/event-bus"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { InvoiceErrorCode } from "./errors/invoice.error"
-import type { InvoiceView, IssueInvoiceParams } from "./invoice.contracts"
+import type {
+    FindOpenInvoiceParams,
+    FindOpenInvoiceResult,
+    InvoiceView,
+    IssueInvoiceParams,
+    MarkInvoicePaidParams,
+} from "./invoice.contracts"
 import { InjectInvoiceOptions } from "./invoice.decorators"
 import type { InvoiceOptions } from "./invoice.options"
 import { InvoiceEntity } from "./persistence/entities/invoice.entity"
@@ -22,6 +28,7 @@ const ORDER_SOURCE = "order"
 const toView = (row: InvoiceEntity): InvoiceView => ({
     invoiceId: row.id,
     orderId: row.orderId,
+    personId: row.personId,
     totalMinorUnits: row.totalMinorUnits,
 })
 
@@ -48,6 +55,21 @@ export class InvoiceService {
             return this.outcomeOf(await this.entityManager.findOneByOrFail(InvoiceEntity, { orderId: params.orderId }))
         }
         return this.outcomeOf(await this.record(params))
+    }
+
+    /** The issued, still unpaid invoice of an order, read with the manager of the caller transaction; null when the order has none. */
+    async findOpen(params: FindOpenInvoiceParams): Promise<FindOpenInvoiceResult> {
+        const row = await params.manager.findOneBy(InvoiceEntity, { orderId: params.orderId, status: "issued" })
+        return row === null ? null : toView(row)
+    }
+
+    /** Marks the issued invoice of an order paid in the caller transaction; a no-op for an invoice that is not issued. */
+    async markPaid(params: MarkInvoicePaidParams): Promise<void> {
+        await params.manager.update(
+            InvoiceEntity,
+            { orderId: params.orderId, status: "issued" },
+            { status: "paid", paidAt: params.paidAt },
+        )
     }
 
     /** Writes the invoice row and the outbox row of its announcement in one transaction; a failed write gives the claim back so the redelivery is processed again. */

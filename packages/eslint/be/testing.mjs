@@ -26,7 +26,7 @@ import { statSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
-import { isUnitSpecFile, unitRoleOfSpec, unitRoleOfSubject } from "./lib/unit-spec.mjs"
+import { doorOfSpec, isUnitSpecFile, unitRoleOfSpec, unitRoleOfSubject } from "./lib/unit-spec.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
 const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
@@ -149,6 +149,8 @@ export const unitTestColocated = {
       return { Program(node) { context.report({ node, messageId: "suffix", data: { name } }) } }
     }
     if (isUnitSpecFile(hfs, filename)) {
+      const door = doorOfSpec(hfs, filename)
+      if (door !== null) return exists(join(dirname(filename), door)) ? {} : { Program(node) { context.report({ node, messageId: "orphan", data: { name } }) } }
       const role = unitRoleOfSpec(hfs, filename)
       if (!role) return { Program(node) { context.report({ node, messageId: "notService", data: { name } }) } }
       const subject = `${name.slice(0, -`.${role.spec}.ts`.length)}.${role.role}.ts`

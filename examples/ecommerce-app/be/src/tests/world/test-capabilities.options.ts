@@ -16,6 +16,8 @@ import { EventBusModule } from "@modules/platform/event-bus"
 import { InboxModule } from "@modules/platform/inbox"
 import { JobsModule } from "@modules/platform/jobs"
 import { QueueModule } from "@modules/platform/queue"
+import { RealtimeModule } from "@modules/platform/realtime"
+import { OrderSummaryModule } from "@modules/projections/order-summary"
 import {
     cacheOptionsOf,
     eventBusOptionsOf,
@@ -52,6 +54,12 @@ export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     () => InboxModule.register({ isGlobal: true }),
     () => ({ module: ProbeConsumerModule }),
 ]
+
+/** The realtime hub of one app instance: the push channel of the realtime kind. */
+export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => RealtimeModule.register({ isGlobal: true })]
+
+/** The order-summary projection over the order database. */
+export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => ({ module: OrderSummaryModule })]
 
 /** The password-grant client over the run's realm. */
 export const KEYCLOAK_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [

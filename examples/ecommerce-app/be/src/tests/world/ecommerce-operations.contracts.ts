@@ -13,4 +13,6 @@ export const ECOMMERCE_OPERATIONS = {
         "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency replayed } }",
     buyerStatus: "query { buyerStatus { personId hasOrders } }",
     orderReceipt: "query OrderReceipt($input: OrderReceiptInput!) { orderReceipt(input: $input) { url expiresAt } }",
+    orderStatusChanged:
+        "subscription OrderStatusChanged($input: OrderStatusInput!) { orderStatusChanged(input: $input) { orderId status changedAt } }",
 } as const

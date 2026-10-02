@@ -13173,6 +13173,68 @@ BE_TRANSPORT_SHAPE:
   owner: op-retry
   kind: check-finding
 
+BE_WEBHOOK_SHAPE:
+  title: "A webhook door does more than prove and hand over"
+  title_vi: "Cửa webhook làm nhiều hơn xác thực và chuyển giao"
+  meaning_vi: "Webhook của nhà cung cấp là một cửa ký số: một `@Controller` có đúng một handler `@Post` khai báo `@Public({ reason: PublicReason.SignedWebhook })`, chỉ tiêm `WebhookSignatureService` của platform/http-security và service của modules/domain, không rẽ nhánh, không vòng lặp, không try, chỉ gọi `verify` rồi đúng một phương thức nhận của service miền, và không trả dữ liệu miền về cho nhà cung cấp."
+  causes_vi:
+    - "Webhook tiêm EntityManager, CommandBus hoặc hàng đợi và tự ghi dữ liệu hay tự phát sự kiện"
+    - "Handler có if hoặc try để tự quyết định xử lý hay bỏ qua giao hàng"
+    - "Handler gọi hai phương thức nhận, hoặc phân tích và ánh xạ payload ngay trong cửa"
+    - "Cửa webhook không khai báo lý do SignedWebhook nên mở công khai mà không được tính vào bậc giới hạn nghiêm ngặt"
+  nextStep_vi: "Đưa mọi quyết định và mọi lần ghi vào một phương thức nhận của service trong modules/domain (service tự ghi bản nhận và gọi eventBus.publish(event, tx) trong giao dịch của nó, dùng inbox để chống giao lại); để handler chỉ gọi verify rồi gọi đúng phương thức nhận đó, khai báo @Public({ reason: PublicReason.SignedWebhook }) và không trả gì. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và knowledge/patterns/be/webhooks.yaml; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_WEBHOOK_UNVERIFIED:
+  title: "A webhook handler runs code before proving the delivery"
+  title_vi: "Handler webhook chạy mã trước khi xác thực giao hàng"
+  meaning_vi: "Câu lệnh đầu tiên của handler webhook phải là lời gọi `verify` không điều kiện của `WebhookSignatureService` (chữ ký và cửa sổ chống phát lại). Giao hàng sai chữ ký hoặc quá hạn phải bị ném lỗi trước khi bất kỳ mã nào khác chạy, nhờ đó không có đường nào tới phương thức nhận khi chưa được chứng minh."
+  causes_vi:
+    - "Handler đọc hoặc gán biến trước khi gọi verify"
+    - "verify nằm trong if nên có đường đi bỏ qua nó"
+    - "Handler gọi verify của một lớp cùng tên nhưng không phải WebhookSignatureService của platform/http-security"
+  nextStep_vi: "Đặt `this.<signature>.verify({ rawBody, signature, timestamp })` làm câu lệnh đầu tiên của handler, không điều kiện, dùng WebhookSignatureService của platform/http-security và thân yêu cầu thô (không phải bản đã serialize lại). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và BE-WEBHOOK trong knowledge/patterns/be/webhooks.yaml; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_REALTIME_SHAPE:
+  title: "A realtime file is not exactly one push door"
+  title_vi: "Tệp realtime không phải đúng một cửa đẩy tin"
+  meaning_vi: "Mỗi tệp realtime là đúng một cửa theo vai trò của tên tệp: `<kênh>.gateway.ts` có một lớp `@WebSocketGateway` với các handler `@SubscribeMessage`, còn `<x>.subscription.ts` có một lớp `@Resolver` với các thao tác `@Subscription`. Không có query, mutation, field resolver, route REST hoặc giao thức còn lại trong cùng tệp."
+  causes_vi:
+    - "Tệp có hai lớp cửa hoặc không có lớp cửa nào"
+    - "Cửa không có handler @SubscribeMessage hoặc @Subscription nào"
+    - "Resolver của subscription chứa thêm @Query hoặc @Mutation"
+    - "Gateway và subscription bị trộn trong một tệp"
+  nextStep_vi: "Tách thành đúng một cửa cho mỗi tệp và đặt tên theo vai trò (.gateway.ts cho socket, .subscription.ts cho GraphQL subscription); chuyển query, mutation hoặc route REST sang một feature api. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và knowledge/patterns/be/realtime.yaml; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_REALTIME_WRITES:
+  title: "A realtime door can write"
+  title_vi: "Cửa realtime có khả năng ghi dữ liệu"
+  meaning_vi: "Cửa realtime chỉ đọc và đẩy tin: giá trị duy nhất được tiêm vào là `RealtimeHub` của platform/realtime. EntityManager, bus lệnh, hàng đợi, event bus hoặc service miền (có thể ghi) không bao giờ được tiêm vào cửa này; tin đẩy do một reactor gọi hub, không do cửa."
+  causes_vi:
+    - "Gateway tiêm EntityManager hoặc CommandBus để cập nhật dữ liệu khi nhận tin của client"
+    - "Subscription tiêm service miền để đọc, nhưng service đó có phương thức ghi"
+    - "Cửa tiêm một lớp giả danh RealtimeHub do owner khác khai báo"
+  nextStep_vi: "Bỏ mọi thứ khác ngoài RealtimeHub khỏi cửa; việc ghi thuộc về một feature api, và nguồn dữ liệu đẩy đi do một reactor (transport/message) gọi RealtimeHub.publish sau khi sự kiện đến. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và knowledge/patterns/be/realtime.yaml; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_REALTIME_TOPIC_SCOPE:
+  title: "A realtime topic is not scoped to the principal"
+  title_vi: "Chủ đề realtime không gắn với chủ thể đăng nhập"
+  meaning_vi: "Chủ đề mà handler realtime truyền cho `RealtimeHub.subscribe` phải được dựng từ tham số `@CurrentPrincipal()` của domain/identity, để một client chỉ nghe được kênh thuộc về chủ thể của nó. Chủ đề lấy hoàn toàn từ đầu vào client là lỗ hổng rò rỉ dữ liệu của người khác."
+  causes_vi:
+    - "Chủ đề là một chuỗi cố định dùng chung cho mọi client"
+    - "Chủ đề chỉ ghép từ tham số do client gửi"
+    - "Handler không nhận @CurrentPrincipal() hoặc dùng decorator trùng tên của owner khác"
+  nextStep_vi: "Thêm tham số `@CurrentPrincipal() principal` vào handler và dựng chủ đề từ principal.id (cộng với mã đã kiểm tra quyền sở hữu nếu cần). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và knowledge/patterns/be/realtime.yaml; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_UNNAMED_DATA_ACCESS:
   title: "Database reached without the named shared EntityManager"
   title_vi: "Truy cập cơ sở dữ liệu không qua EntityManager dùng chung có tên"

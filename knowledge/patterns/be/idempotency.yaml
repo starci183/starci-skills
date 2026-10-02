@@ -39,7 +39,7 @@ rules:
     cases:
       - id: case-1
         when: A signed webhook controller
-        write: '@Public({ reason: PublicReason.SignedWebhook }) async handle(@Body() body: PayosWebhookRequest): Promise<void> { if (!(await this.inbox.claim(PAYOS_SOURCE, body.eventId))) return; await this.commandBus.execute(new SettlePaymentCommand({ request: toSettleRequest(body) })) }'
+        write: 'the webhook door (webhooks.yaml) verifies the signature and calls one domain intake method; that method of the domain service claims (PAYOS_SOURCE, eventId) as its first awaited expression, returns when the claim answers false, and publishes the event in its transaction.'
       - id: case-2
         when: A consumer
         write: 'be/src/features/api/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'

@@ -155,10 +155,9 @@ rules:
       An api feature is `be/src/features/api/<feature>/` (slot `be.feature`) and holds `index.ts`, `<feature>.module.ts`,
       `application/` (`be.feature.application`, with the opt-in `support/`, `be.feature.application.support`),
       `transport/<protocol>/` and, when it has copy, `messages/` (`be.feature.messages`), and nothing else. A protocol lives
-      in `transport/graphql`, `transport/http`, `transport/websocket` (`be.transport.{graphql,http,websocket}`, composed by
-      an api app) or `transport/schedule`, `transport/message` (`be.transport.{schedule,message}`, composed by the api app
-      that owns it or by a worker app), each with exactly one Nest module `<feature>-<protocol>.module.ts`, its resolvers,
-      controllers, gateways, jobs or consumers, their `<action>.mapper.ts` and `dto/` where the protocol has DTOs (shapes in
+      in `transport/graphql`, `transport/http` (`be.transport.{graphql,http}`, composed by an api app) or
+      `transport/message` (`be.transport.message`, composed by the api app that owns it or by a worker app), each with
+      exactly one Nest module `<feature>-<protocol>.module.ts`, its resolvers, controllers or consumers, their `<action>.mapper.ts` and `dto/` where the protocol has DTOs (shapes in
       transport.yaml). The feature imports only downward into `src/modules/*`, never another api feature and never another
       trigger kind such as `features/cli`; only `be/apps/*` composes it (folder.yaml BE-FOLDER-2).
     rationale: |-

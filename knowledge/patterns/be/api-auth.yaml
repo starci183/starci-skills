@@ -83,15 +83,15 @@ rules:
     hfsRules: [R41]
     requirement: |-
       `platform/http-security` owns the origin and referer allowlist guard that every state-changing request passes; only
-      `SignedWebhook` is exempt. A webhook is `@Public({ reason: PublicReason.SignedWebhook })` and verifies its signature with
-      `verifySignature` from `platform/http-security` before any parsing effect. Every comparison of a secret, signature or
+      `SignedWebhook` is exempt. A webhook (webhooks.yaml) is `@Public({ reason: PublicReason.SignedWebhook })` and verifies its signature and
+      replay window with `verify` of the `WebhookSignatureService` of `platform/http-security`, as its first statement. Every comparison of a secret, signature or
       token uses `timingSafeEqual` on equal-length buffers; a secret is never compared with `===`.
     rationale: |-
       A public door is only safe when the request proves its origin, and a variable-time comparison leaks the secret.
     cases:
       - id: case-1
         when: A provider webhook
-        write: '@Public({ reason: PublicReason.SignedWebhook }) then `verifySignature({ rawBody, signature, secret })`, which calls timingSafeEqual.'
+        write: '@Public({ reason: PublicReason.SignedWebhook }) then `this.signature.verify({ rawBody, signature, timestamp })`, which calls timingSafeEqual.'
     verification:
       automated:
         - BE_DEFAULT_DENY

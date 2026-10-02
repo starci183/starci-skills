@@ -2,12 +2,14 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_PIPE } from "@nestjs/core"
 import { ThrottlerModule } from "@nestjs/throttler"
+import { WEBHOOK_SIGNATURE } from "./http-security.decorators"
 import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } from "./http-security.module-definition"
 import { throttlerOptionsOf } from "./rate-limit.guard"
 import { RequestValidationService } from "./request-validation.service"
+import { WebhookSignatureService } from "./webhook-signature.service"
 
 @Module({})
-/** The http-security capability: the global validation pipe, the throttler windows and the options the guards (registered by each api app) read. */
+/** The http-security capability: the global validation pipe, the throttler windows, the webhook signature proof and the options the guards (registered by each api app) read. */
 export class HttpSecurityModule extends ConfigurableModuleClass {
     /** Registers the capability once per app. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
@@ -15,8 +17,13 @@ export class HttpSecurityModule extends ConfigurableModuleClass {
         return {
             ...base,
             imports: [...(base.imports ?? []), ThrottlerModule.forRoot(throttlerOptionsOf(options.rateLimit))],
-            providers: [...(base.providers ?? []), { provide: APP_PIPE, useClass: RequestValidationService }],
-            exports: [MODULE_OPTIONS_TOKEN],
+            providers: [
+                ...(base.providers ?? []),
+                { provide: APP_PIPE, useClass: RequestValidationService },
+                WebhookSignatureService,
+                { provide: WEBHOOK_SIGNATURE, useExisting: WebhookSignatureService },
+            ],
+            exports: [MODULE_OPTIONS_TOKEN, WebhookSignatureService, WEBHOOK_SIGNATURE],
         }
     }
 }

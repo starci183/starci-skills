@@ -1,9 +1,13 @@
-/** One receipt document to store: its object key and its exact bytes. */
+import type { RunKey } from "@modules/platform/jobs"
+
+/** One receipt document to store: its object key, its exact bytes and the run key of the job claim that stores it. */
 export interface StoreReceiptParams {
     /** The object key, `receipts/<order id>.json`. */
     readonly key: string
     /** The JSON document. */
     readonly content: Buffer
+    /** The idempotency key of this effect: it includes the fencing token of the claim, so a repeat by a zombie worker is recognisable in the log of the store. */
+    readonly runKey: RunKey
 }
 
 /** A time-limited link that downloads one stored receipt. */

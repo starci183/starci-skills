@@ -1,40 +1,13 @@
-import type { EntityManager } from "typeorm"
-
-/** The captured-payment view a confirmation returns: the ledger row id and the amount. */
-export interface PaymentView {
-    /** The payment id. */
-    readonly paymentId: string
-    /** The captured amount in minor units. */
-    readonly amountMinorUnits: number
-}
-
-/** What capturing a payment needs; the write joins the caller transaction. */
-export interface CapturePaymentParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
-    /** The paying person. */
-    readonly personId: string
-    /** The order the payment settles. */
-    readonly orderId: string
-    /** The amount in minor units. */
-    readonly amountMinorUnits: number
-}
-
-/** What refunding the payment of an order needs; the write joins the caller transaction. */
-export interface RefundPaymentParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
-    /** The order whose payment is given back. */
-    readonly orderId: string
-}
-
-/** The payment of an order, or null when none was captured. */
-export type FindPaymentResult = PaymentView | null
-
-/** What looking a payment up by order needs. */
-export interface FindPaymentParams {
-    /** The order the payment settles. */
-    readonly orderId: string
-    /** The manager to read with, when the read must see the caller transaction. */
-    readonly manager?: EntityManager
+/** A bank transfer notice as the payment intake takes it: what the notifier says about one transfer. */
+export interface BankTransferNotice {
+    /** The notifier id of this transfer; the inbox key, so a redelivery changes nothing. */
+    readonly eventId: string
+    /** The payment code the buyer wrote in the transfer: the id of the order it pays. */
+    readonly code: string
+    /** `in` is money received; only that can pay an invoice. */
+    readonly transferType: "in" | "out"
+    /** The transferred amount in minor units. */
+    readonly transferAmount: number
+    /** The bank reference of the transfer, kept on the payment record. */
+    readonly referenceCode: string
 }

@@ -20,6 +20,7 @@
  * file's syntax for and cannot split into its static and interpolated halves without guessing. Specs get the same
  * law: fixture text is a `messages` catalog key or lives in a fixture.
  */
+import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { keyName, staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { ownerNameOf } from "./lib/ports.mjs"
@@ -73,7 +74,7 @@ export const userCopyThroughCatalog = {
         if (isDeclarationFile(filename)) return {}
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(filename) ?? ""
-        const inTransport = slot.startsWith("be.transport.")
+        const inTransport = isTransportSlot(slot)
         const { program, checker, toTs } = typed(context)
         const isOutboundCall = (node) =>
             node?.type === "CallExpression" && node.callee.type === "MemberExpression" && !node.callee.computed && isOutboundPort(context, hfs, node.callee.object)

@@ -21,8 +21,8 @@ const scenarioIds = new Set(Object.entries(scenarios).flatMap(([pattern, list]) 
 
 const topics = fs.readdirSync(PATTERNS).filter((name) => name.endsWith('.yaml')).map((name) => ({ name, doc: parse(fs.readFileSync(path.join(PATTERNS, name), 'utf8')) })).filter((topic) => Array.isArray(topic.doc?.files));
 
-test('the topics that carry a files tree are the kind topics (api, cli, reactors, jobs, saga) and the module-family topics (domain, event-bus, queues, projections)', () => {
-  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['api.yaml', 'cli.yaml', 'domain.yaml', 'event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml', 'saga.yaml']);
+test('the topics that carry a files tree are the kind topics (api, cli, reactors, jobs, saga, webhooks, realtime) and the module-family topics (domain, event-bus, queues, projections)', () => {
+  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['api.yaml', 'cli.yaml', 'domain.yaml', 'event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml', 'realtime.yaml', 'saga.yaml', 'webhooks.yaml']);
 });
 
 for (const { name, doc } of topics) {
