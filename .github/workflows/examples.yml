@@ -92,7 +92,7 @@ jobs:
       - name: Example YAML parses under the runtime's own loader
         run: npm run starci --silent -- runtime check --only example-yaml
       - name: Example Work-tree layout (ids, refs, evidence)
-        run: starci work check-example-work
+        run: npm run starci --silent -- work check-example-work
       - name: Example Work-gate fixture suite
         run: node --test tests/checks/example-work-gate.spec.mjs
 
@@ -134,7 +134,7 @@ jobs:
       # THE lint of the app (ESLint with both canons, stylelint, starci app check), also written as the one Sonar import file.
       - name: starci app lint
         working-directory: .
-        run: starci app lint --cwd "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
+        run: npm run starci --silent -- app lint --cwd "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
       - name: Unit tests with coverage (per-file 100 on the services; writes be/coverage/lcov.info)
         if: ${{ !cancelled() }}
         run: npm test -- --ci
