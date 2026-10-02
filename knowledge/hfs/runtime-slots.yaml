@@ -230,7 +230,7 @@ slots:
     rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
   - id: runtime.agent-output
     profiles: [runtime]
-    path: "{_*.mjs,_*.cjs,_*.py,tmp-*,**/tmp-*.mjs,*.bak*,nul,3-jobs,LEAD.md,*.log,report*.json,*.tmp.json,.experiments/}"
+    path: "{_*.mjs,_*.cjs,_*.py,tmp-*,**/tmp-*.mjs,*.bak*,nul,*.txt,3-jobs,LEAD.md,*.log,report*.json,*.tmp.json,.experiments/}"
     presence: forbidden
     tracked: external
     tier: none

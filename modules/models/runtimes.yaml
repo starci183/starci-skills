@@ -499,6 +499,9 @@ allocation:
   # pane title; an owner's hand-opened tab with recent output is reported, not closed, allowlisted or not).
   gc:
     sweepMs: 1800000
+    # laneCap: the most lane worktrees that stay registered under the lanes root (scripts/supervisor/gc.mjs collectLanes); past it the
+    # longest idle clean lanes go, landed or not (an unlanded lane keeps its branch). Owner rule: worktrees never accumulate.
+    laneCap: 40
     keepTitles: []
   # reconciler (scripts/reconciler/*; DESIGN 7.4-7.8, contract modules/reconciler/reconciler.yaml): the engine polls
   # every ledger's events every pollMs; the leader row lasts leaseMs and is renewed (with the heartbeat row and file)

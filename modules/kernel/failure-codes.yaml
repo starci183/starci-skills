@@ -12818,11 +12818,11 @@ GATE_TOOL_FAILED:
 STACKS_QUALITY_GATE_DRIFT:
   title: "Sonar quality gate name differs from the standard"
   title_vi: "Tên cổng chất lượng Sonar khác chuẩn chung"
-  meaning_vi: "Khai báo services.sonar.qualityGate của repository không phải cổng chung starci-new-code (ngưỡng nằm ở knowledge/sonar-gate.yaml, không viết lại trong từng repository)."
+  meaning_vi: "Khai báo services.sonar.qualityGate của repository không phải cổng chung starci-quality (ngưỡng nằm ở knowledge/sonar-gate.yaml, không viết lại trong từng repository)."
   causes_vi:
     - "Khai báo Sonar chưa có dòng qualityGate"
     - "Repository tự đặt tên cổng riêng"
-  nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-new-code vào khối services.sonar."
+  nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-quality vào khối services.sonar."
   owner: other-op:workspace.manage
   kind: check-finding
 
