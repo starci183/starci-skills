@@ -149,14 +149,16 @@ test('hfs add generates a missing platform capability from its templates: jobs a
   assert.doesNotMatch(second.out, /platform/, 'a capability that exists is not written again');
 });
 
-test('hfs add refuses (writing nothing) while a platform capability has no template yet', async () => {
+test('hfs add reactor brings the event-bus platform capability with its first member when it is missing', async () => {
   const dir = repo();
-  const before = read(dir, 'hfs.json');
-  const refused = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--repo', dir]);
-  assert.equal(refused.code, 2);
-  assert.match(refused.err, /HFS_ADD_TEMPLATE_PENDING/);
-  assert.equal(exists(dir, 'be/src/features/reactors'), false, 'nothing was written');
-  assert.equal(read(dir, 'hfs.json'), before, 'hfs.json is unchanged');
+  const result = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--repo', dir]);
+  assert.equal(result.code, 0, result.err);
+  for (const file of ['event-bus.module.ts', 'event-bus.service.ts', 'event-relay.service.ts', 'event-runner.service.ts', 'kafka-event-transport.client.ts', 'persistence/event-bus.sql.ts']) {
+    assert.ok(parses(read(dir, `be/src/modules/platform/event-bus/${file}`)), `${file} parses`);
+  }
+  const created = result.out.split('\n').filter((line) => line.startsWith('created '));
+  assert.ok(created.some((line) => /migrations\/\d{13}-create-event-outbox\.ts$/.test(line)));
+  assert.ok(exists(dir, 'be/src/features/reactors/payment-status/transport/message/payment-settled.consumer.ts'));
 });
 
 test('hfs add refuses an unknown noun, a bad name and a repository that is not an app root', async () => {

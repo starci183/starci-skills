@@ -111,7 +111,6 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const beRoot = path.join(repoRoot, 'be');
 
   const planned = [];
-  const missingTemplates = [];
   const consider = (entry, topic, instance, shared = false) => {
     if (entry.optional === true) return;
     const target = fillPath(entry.path, withStamp);
@@ -120,7 +119,7 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     // A platform capability is whole or absent: it exists when its index.ts does, and then none of its files is written again.
     if (!instance && fs.existsSync(path.join(beRoot, ...target.split('/').slice(0, 4), 'index.ts'))) return;
     if ((!instance || shared) && fs.existsSync(absolute)) return;
-    if (!entry.template) { missingTemplates.push(target); return; }
+    if (!entry.template) throw new ScaffoldError('HFS_ADD_TEMPLATE_MISSING', `${topic}.yaml lists ${entry.path} without a template, so it cannot be generated`);
     const templateFile = path.join(PATTERN_TEMPLATES, ...entry.template.split('/'));
     if (!fs.existsSync(templateFile)) throw new ScaffoldError('HFS_ADD_TEMPLATE_MISSING', `${topic}.yaml names template ${entry.template} for ${entry.path}, which the package does not carry`);
     planned.push({ target, absolute, body: renderBody(fs.readFileSync(templateFile, 'utf8'), withStamp, forms, entry.template), instance });
@@ -132,7 +131,6 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
 
   const clash = planned.filter((file) => file.instance && fs.existsSync(file.absolute)).map((file) => file.target);
   if (clash.length) throw new ScaffoldError('HFS_ADD_EXISTS', `${noun} ${name} already exists: ${clash.join(', ')}`);
-  if (missingTemplates.length) throw new ScaffoldError('HFS_ADD_TEMPLATE_PENDING', `no template yet for ${missingTemplates.join(', ')}; the platform capabilities of ${noun} are written by their pattern lane before this noun can be generated`);
 
   for (const file of planned) {
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });

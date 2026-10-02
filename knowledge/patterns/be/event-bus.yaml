@@ -148,59 +148,89 @@ rules:
       manual: []
     relatedExamples: [event-bus]
 files:
-  - path: src/modules/platform/event-bus/index.ts
-    slot: be.platform.event-bus
-    role: Public surface of the capability (ports, base event, tokens).
-  - path: src/modules/platform/event-bus/event-bus.module.ts
-    slot: be.platform.event-bus
-    role: Dynamic module registered once per app with the connections that publish.
-  - path: src/modules/platform/event-bus/event-bus.module-definition.ts
-    slot: be.platform.event-bus
-  - path: src/modules/platform/event-bus/event-bus.options.ts
-    slot: be.platform.event-bus
-  - path: src/modules/platform/event-bus/event-bus.config.ts
-    slot: be.platform.event-bus
-    role: Typed reader of the broker settings.
-  - path: src/modules/platform/event-bus/event-bus.decorators.ts
-    slot: be.platform.event-bus
-    role: InjectEventBus, InjectEventConsumerRegistry and their tokens.
-  - path: src/modules/platform/event-bus/event-bus.contracts.ts
-    slot: be.platform.event-bus
-    role: BaseEvent, EventClass, EventDelivery, DeadLetter.
-  - path: src/modules/platform/event-bus/event-bus.port.ts
-    slot: be.platform.event-bus
-    role: EventBus, EventConsumer and EventConsumerRegistry ports.
-  - path: src/modules/platform/event-bus/event-bus.service.ts
-    slot: be.platform.event-bus
-    role: publish (outbox write through tx), dead letters, requeue, pending retries.
-    spec: src/modules/platform/event-bus/event-bus.service.spec.ts
-  - path: src/modules/platform/event-bus/event-relay.service.ts
-    slot: be.platform.event-bus
-    role: Relay of committed outbox rows to Kafka, per registered connection.
-    spec: src/modules/platform/event-bus/event-relay.service.spec.ts
-  - path: src/modules/platform/event-bus/event-runner.service.ts
-    slot: be.platform.event-bus
-    role: Consumer registry and Kafka read loop with retry and dead letter.
-    spec: src/modules/platform/event-bus/event-runner.service.spec.ts
-  - path: src/modules/platform/event-bus/kafka-event-transport.client.ts
-    slot: be.platform.event-bus
-    role: The one kafkajs importer.
-  - path: src/modules/platform/event-bus/event.policy.ts
-    slot: be.platform.event-bus
-    role: Backoff and retry-topic policy.
-  - path: src/modules/platform/event-bus/event-bus.log-events.ts
-    slot: be.platform.event-bus
   - path: src/modules/platform/event-bus/errors/event-bus.error.ts
     slot: be.platform.event-bus
+    template: event-bus/platform/errors/event-bus.error.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.config.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.config.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.contracts.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.contracts.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.decorators.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.decorators.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.log-events.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.log-events.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.module-definition.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.module-definition.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.module.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.module.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.options.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.options.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.port.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.port.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.service.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-bus.service.spec.ts.tpl
+  - path: src/modules/platform/event-bus/event-bus.service.ts
+    slot: be.platform.event-bus
+    role: "publish (outbox write through tx), dead letters, requeue, pending retries."
+    template: event-bus/platform/event-bus.service.ts.tpl
+  - path: src/modules/platform/event-bus/event-envelope.policy.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-envelope.policy.ts.tpl
+  - path: src/modules/platform/event-bus/event-relay.service.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-relay.service.spec.ts.tpl
+  - path: src/modules/platform/event-bus/event-relay.service.ts
+    slot: be.platform.event-bus
+    role: "Relay of committed outbox rows to Kafka, per registered connection."
+    template: event-bus/platform/event-relay.service.ts.tpl
+  - path: src/modules/platform/event-bus/event-runner.service.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-runner.service.spec.ts.tpl
+  - path: src/modules/platform/event-bus/event-runner.service.ts
+    slot: be.platform.event-bus
+    role: "Consumer registry and Kafka read loop with retry and dead letter."
+    template: event-bus/platform/event-runner.service.ts.tpl
+  - path: src/modules/platform/event-bus/event-transport.port.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-transport.port.ts.tpl
+  - path: src/modules/platform/event-bus/event.policy.ts
+    slot: be.platform.event-bus
+    role: "Topics, attempts and backoff."
+    template: event-bus/platform/event.policy.ts.tpl
+  - path: src/modules/platform/event-bus/index.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/index.ts.tpl
+  - path: src/modules/platform/event-bus/kafka-event-transport.client.ts
+    slot: be.platform.event-bus
+    role: "The one kafkajs importer."
+    template: event-bus/platform/kafka-event-transport.client.ts.tpl
+  - path: src/modules/platform/event-bus/messages/event-bus.messages.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/messages/event-bus.messages.ts.tpl
   - path: src/modules/platform/event-bus/persistence/connection.ts
     slot: be.persistence
-    role: The outbox entity array registered on every publishing connection.
+    template: event-bus/platform/persistence/connection.ts.tpl
   - path: src/modules/platform/event-bus/persistence/entities/event-outbox.entity.ts
     slot: be.persistence
+    template: event-bus/platform/persistence/entities/event-outbox.entity.ts.tpl
+  - path: src/modules/platform/event-bus/persistence/event-bus.rows.ts
+    slot: be.persistence
+    template: event-bus/platform/persistence/event-bus.rows.ts.tpl
   - path: src/modules/platform/event-bus/persistence/event-bus.sql.ts
     slot: be.persistence
+    template: event-bus/platform/persistence/event-bus.sql.ts.tpl
   - path: src/modules/platform/event-bus/persistence/migrations/<epochMs13>-create-event-outbox.ts
     slot: be.persistence
+    template: event-bus/platform/persistence/migrations/1789800009000-create-event-outbox.ts.tpl
   - path: src/modules/events/<service>/index.ts
     slot: be.events
   - path: src/modules/events/<service>/<event>.event.ts
