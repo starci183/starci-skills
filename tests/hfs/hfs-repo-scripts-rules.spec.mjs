@@ -6,22 +6,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
-import { APP, cleanup, gitAdd, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
+import { APP } from '../helpers/hfs-cli-fixture.mjs';
+import { createHfsRepoScriptsRulesFixture } from '../helpers/hfs-hfs-repo-scripts-rules-fixture.mjs';
 
-const made = [];
-const repoOf = (declaration = APP, mutate, options) => {
-  const dir = writeCleanRepo(declaration, options);
-  made.push(dir);
-  if (mutate) mutate(dir);
-  return gitAdd(dir);
-};
-test.after(() => cleanup(made));
-
-const put = (dir, relative, text = 'export {};\n') => {
-  const target = path.join(dir, ...relative.split('/'));
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, text);
-};
+const { basePackage, dispose, put, repoOf } = createHfsRepoScriptsRulesFixture();
+test.after(dispose);
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const only = (result, code) => result.findings.filter((f) => f.code === code);
 const pathsOf = (result, code) => only(result, code).map((f) => f.path).sort();
@@ -170,8 +159,7 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a record of an implementation in another r
 // ------------------------------------------------------------------------------------------------ R111 HFS_PEER_INTEGRATION_MISSING
 
 const withDependencies = (dependencies, devDependencies = {}) => (dir) => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-  put(dir, 'package.json', json({ ...pkg, dependencies: { ...(pkg.dependencies ?? {}), ...dependencies }, devDependencies: { ...(pkg.devDependencies ?? {}), ...devDependencies } }));
+  put(dir, 'package.json', json({ ...basePackage, dependencies: { ...(basePackage.dependencies ?? {}), ...dependencies }, devDependencies: { ...(basePackage.devDependencies ?? {}), ...devDependencies } }));
 };
 const APOLLO_ON_EXPRESS5 = { '@nestjs/apollo': '^13.4.5', '@nestjs/platform-express': '11.2.5' };
 
@@ -327,13 +315,23 @@ test('FE_GRAPHQL_CONTRACT: an argument the contract does not take, a missing inp
 });
 
 test('FE_GRAPHQL_CONTRACT: unknown fields, input fields, missing required input fields, variable types and selection shapes are refused', () => {
-  const problems = (text) => r113({ doc: text }).flatMap((f) => f.problems ?? [f.message]);
-  assert.match(problems('query Q { cart { productId sku } }\n').join(), /Q\.cart\.sku is not a field of ItemType/);
-  assert.match(problems('query Q { cart }\n').join(), /Q\.cart is a ItemType, which needs a selection/);
-  assert.match(problems('query Q { cart { quantity { value } } }\n').join(), /Q\.cart\.quantity is a Int, which selects no fields/);
-  assert.match(problems('query Q($id: String!) { item(input: { productId: $id }) { productId } }\n').join(), /takes ID!, but \$id is String!/);
-  assert.match(problems('mutation M { addItem(input: { productId: "p", colour: "red" }) { productId } }\n').join(), /names colour, which the input AddItemInput does not declare/);
-  assert.match(problems('mutation M { addItem(input: { productId: "p" }) { productId } }\n').join(), /omits quantity, which the input AddItemInput requires/);
-  assert.match(problems('query Q { orders { id } }\n').join(), /asks query orders, but no contract of .* declares query orders/);
-  assert.match(problems('query Q { cart { productId }\n').join(), /is not a GraphQL document/);
+  const findings = r113({
+    'unknown-output': 'query Q { cart { productId sku } }\n',
+    'missing-selection': 'query Q { cart }\n',
+    'scalar-selection': 'query Q { cart { quantity { value } } }\n',
+    'variable-type': 'query Q($id: String!) { item(input: { productId: $id }) { productId } }\n',
+    'unknown-input': 'mutation M { addItem(input: { productId: "p", colour: "red" }) { productId } }\n',
+    'missing-input': 'mutation M { addItem(input: { productId: "p" }) { productId } }\n',
+    'unknown-root': 'query Q { orders { id } }\n',
+    syntax: 'query Q { cart { productId }\n',
+  });
+  const problems = (name) => findings.filter((f) => f.path.endsWith(`/${name}.graphql`)).flatMap((f) => f.problems ?? [f.message]);
+  assert.match(problems('unknown-output').join(), /Q\.cart\.sku is not a field of ItemType/);
+  assert.match(problems('missing-selection').join(), /Q\.cart is a ItemType, which needs a selection/);
+  assert.match(problems('scalar-selection').join(), /Q\.cart\.quantity is a Int, which selects no fields/);
+  assert.match(problems('variable-type').join(), /takes ID!, but \$id is String!/);
+  assert.match(problems('unknown-input').join(), /names colour, which the input AddItemInput does not declare/);
+  assert.match(problems('missing-input').join(), /omits quantity, which the input AddItemInput requires/);
+  assert.match(problems('unknown-root').join(), /asks query orders, but no contract of .* declares query orders/);
+  assert.match(problems('syntax').join(), /is not a GraphQL document/);
 });
