@@ -237,7 +237,7 @@ const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/wo
 
 /**
  * The Dockerfile of every declared app, [{ path, content }] (app-relative): written once by hfs scaffold from templates/<side>/image/<kind>
- * and then the app's own, judged by the docker rules (R172-R176). A Next image copies the fe packages only when the fe side opts into
+ * and then the app's own, judged by the docker rules (R187-R191). A Next image copies the fe packages only when the fe side opts into
  * them and the be contracts only when the fe side reads them, so each COPY names a folder the app has.
  */
 export function imageFiles(app) {

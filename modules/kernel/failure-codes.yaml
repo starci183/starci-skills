@@ -13359,7 +13359,7 @@ HFS_SERVICE_PLACEMENT:
   title_vi: "Dịch vụ back end nằm ngoài be/apps/<service>"
   meaning_vi: "Một thư mục có Dockerfile hoặc package.json riêng nằm ngoài `be/apps/<service>/` (và không phải Dockerfile của front end hay package workspace của `fe/packages`), nên nó trở thành một gốc dịch vụ thứ hai bên cạnh `be/` và `fe/`."
   causes_vi:
-    - "Vi phạm luật R148: mỗi dịch vụ back end là một ứng dụng Nest tại `be/apps/<service>/` dùng chung thư viện `be/src` và một `package.json` duy nhất của app; image của nó được build từ `be/apps/<service>/Dockerfile`."
+    - "Vi phạm luật R163: mỗi dịch vụ back end là một ứng dụng Nest tại `be/apps/<service>/` dùng chung thư viện `be/src` và một `package.json` duy nhất của app; image của nó được build từ `be/apps/<service>/Dockerfile`."
     - "Op đã tạo thư mục dịch vụ riêng (ví dụ `services/<name>/` hoặc `be/<name>/`) thay vì thêm ứng dụng dưới `be/apps/`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển dịch vụ vào `be/apps/<service>/` (main.ts, app.module.ts, Dockerfile) và xoá thư mục cũ; không thêm ngoại lệ."
   owner: op-retry
@@ -13370,7 +13370,7 @@ HFS_IMAGE_UNPINNED:
   title_vi: "Image của stack nhiều dịch vụ chưa được ghim phiên bản"
   meaning_vi: "Trong `.starcistacks/application-stacks.yaml` của một sản phẩm có từ hai dịch vụ trở lên, một `components.<name>.image` không có tag, dùng `latest`, một từ nhánh hoặc tag chỉ gồm major/minor (ví dụ `postgres:16`), nên image trôi theo thời gian."
   causes_vi:
-    - "Vi phạm luật R149: image được ghim bằng digest (`@sha256:...`) hoặc phiên bản chính xác `x.y.z`; image của dịch vụ trong repo là `<repo>/<service>:<x.y.z>`, dịch vụ bên thứ ba cũng là image đã ghim."
+    - "Vi phạm luật R164: image được ghim bằng digest (`@sha256:...`) hoặc phiên bản chính xác `x.y.z`; image của dịch vụ trong repo là `<repo>/<service>:<x.y.z>`, dịch vụ bên thứ ba cũng là image đã ghim."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: ghi tag chính xác hoặc digest vào `image` của thành phần; không dùng tag trôi."
   owner: op-retry
   kind: check-finding
@@ -13380,7 +13380,7 @@ HFS_SERVICE_STACK_DECLARATION:
   title_vi: "Ứng dụng dịch vụ chưa được khai báo trong stack"
   meaning_vi: "Một ứng dụng api hoặc worker dưới `be/apps/<service>/` của sản phẩm nhiều dịch vụ không có thành phần `role: service` cùng tên trong `.starcistacks/application-stacks.yaml`."
   causes_vi:
-    - "Vi phạm luật R150: mọi dịch vụ của sản phẩm nhiều dịch vụ là một thành phần `role: service` của stack (image riêng `<repo>/<service>:<x.y.z>`, build từ Dockerfile của app)."
+    - "Vi phạm luật R165: mọi dịch vụ của sản phẩm nhiều dịch vụ là một thành phần `role: service` của stack (image riêng `<repo>/<service>:<x.y.z>`, build từ Dockerfile của app)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm thành phần cùng tên app (role service, image đã ghim, file compose và cổng của môi trường)."
   owner: op-retry
   kind: check-finding
@@ -13390,7 +13390,7 @@ HFS_EVENT_CONTRACT:
   title_vi: "Hợp đồng sự kiện giữa các dịch vụ không khớp"
   meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác, hoặc một hàng đợi consumer định nghĩa bằng `defineQueue` không được liệt kê trong bảng `consumes.ts` nào."
   causes_vi:
-    - "Vi phạm luật R151: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
+    - "Vi phạm luật R166: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
     - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `npm run contract:emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
   owner: op-retry
@@ -13401,7 +13401,7 @@ BE_SERVICE_ISOLATION:
   title_vi: "Ứng dụng dịch vụ import trực tiếp ứng dụng dịch vụ anh em"
   meaning_vi: "Một tệp dưới `be/apps/<service>/` import (đường dẫn tương đối hoặc alias) một tệp dưới `be/apps/<other>/`, nên hai dịch vụ dính vào nhau thành một khối triển khai."
   causes_vi:
-    - "Vi phạm luật R153: các dịch vụ chỉ dùng chung thư viện `be/src` và gặp nhau qua đường truyền (client API của dịch vụ kia, hoặc sự kiện theo hợp đồng đã vendor dưới `be/contracts/<service>/`)."
+    - "Vi phạm luật R168: các dịch vụ chỉ dùng chung thư viện `be/src` và gặp nhau qua đường truyền (client API của dịch vụ kia, hoặc sự kiện theo hợp đồng đã vendor dưới `be/contracts/<service>/`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ import, đưa phần dùng chung vào `be/src` hoặc gọi dịch vụ kia qua client/sự kiện của hợp đồng."
   owner: op-retry
   kind: check-finding
@@ -13411,7 +13411,7 @@ BE_SAGA_STEP_COMPENSATION:
   title_vi: "Bước saga thiếu bù trừ hoặc orchestrator không liệt kê đủ"
   meaning_vi: "Một bước `saga/steps/<step>.step.ts` không có `saga/compensations/<step>.compensation.ts` (hoặc ngược lại), thư mục saga không có orchestrator `<saga>.saga.ts`, hoặc orchestrator không import đủ mọi bước và mọi bù trừ của thư mục."
   causes_vi:
-    - "Vi phạm luật R154: mỗi bước tiến của saga có đúng một bù trừ cùng tên; orchestrator liệt kê tất cả, nên không có bước nào chạy mà không có đường lùi."
+    - "Vi phạm luật R169: mỗi bước tiến của saga có đúng một bù trừ cùng tên; orchestrator liệt kê tất cả, nên không có bước nào chạy mà không có đường lùi."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm bù trừ cho bước (một lệnh hoàn tác) và import nó trong orchestrator; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
@@ -13421,7 +13421,7 @@ BE_SAGA_STATE_VERSIONED:
   title_vi: "Trạng thái saga không có phiên bản hoặc không đi qua kho có rào"
   meaning_vi: "Orchestrator không có `<saga>.saga-state.ts`, kiểu trạng thái xuất ra không khai `status` và `version: number`, hoặc orchestrator không dùng kho có rào của `platform/saga`."
   causes_vi:
-    - "Vi phạm luật R155: trạng thái một lần chạy saga được lưu cùng phiên bản (rào), mọi chuyển trạng thái nêu phiên bản đã đọc, nên một lần giao lại \"xác sống\" không thể chuyển hai lần."
+    - "Vi phạm luật R170: trạng thái một lần chạy saga được lưu cùng phiên bản (rào), mọi chuyển trạng thái nêu phiên bản đã đọc, nên một lần giao lại \"xác sống\" không thể chuyển hai lần."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai kiểu trạng thái có `status` và `version`, và chuyển trạng thái qua `SagaService` của `platform/saga`."
   owner: op-retry
   kind: check-finding
@@ -13431,7 +13431,7 @@ BE_SAGA_EVENT_CONTRACT:
   title_vi: "Sự kiện của bước saga không nằm trong hợp đồng hoặc bù trừ không khớp"
   meaning_vi: "Một bước hoặc bù trừ không khai `readonly event = \"<tên>\"`, sự kiện đó không có trong `be/contracts/<service>/events.json`, hoặc hợp đồng của sự kiện bù trừ không khai `compensates` đúng sự kiện của bước cùng tên."
   causes_vi:
-    - "Vi phạm luật R156: mọi sự kiện của saga nằm trong hợp đồng đã vendor, và sự kiện thất bại của một bù trừ nói rõ nó hoàn tác sự kiện của bước nào."
+    - "Vi phạm luật R171: mọi sự kiện của saga nằm trong hợp đồng đã vendor, và sự kiện thất bại của một bù trừ nói rõ nó hoàn tác sự kiện của bước nào."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `npm run contract:emit`, và ghi tên sự kiện vào bước/bù trừ."
   owner: op-retry
   kind: check-finding
@@ -13441,7 +13441,7 @@ BE_SAGA_CONSUMER_DEDUPE:
   title_vi: "Consumer của saga không chuyển id lần giao đi tiếp"
   meaning_vi: "Một `transport/message/<event>.consumer.ts` của feature có saga không đọc `message.eventId` để đưa vào lệnh nó gửi."
   causes_vi:
-    - "Vi phạm luật R157: saga nhận mọi sự kiện qua inbox (R80), nên consumer phải chuyển khoá chống trùng (id lần giao) cho lệnh."
+    - "Vi phạm luật R172: saga nhận mọi sự kiện qua inbox (R80), nên consumer phải chuyển khoá chống trùng (id lần giao) cho lệnh."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đưa `message.eventId` vào yêu cầu của lệnh để saga claim qua inbox."
   owner: op-retry
   kind: check-finding
@@ -13451,7 +13451,7 @@ BE_SAGA_E2E_MISSING:
   title_vi: "Đường bù trừ của saga chưa có spec e2e chèn lỗi"
   meaning_vi: "Một bù trừ của saga không có spec e2e (qua `useTestWorld`) nêu tên sự kiện của nó, hoặc spec đó không chèn lỗi nào qua world (`during`, `cut`, `latency`, `failNext`, `interruptDatabase`)."
   causes_vi:
-    - "Vi phạm luật R158: đường bù trừ được chứng minh dưới lỗi thật, không chỉ trên luồng thuận."
+    - "Vi phạm luật R173: đường bù trừ được chứng minh dưới lỗi thật, không chỉ trên luồng thuận."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e cho đường bù trừ, cắt một hạ tầng (hoặc app) khi sự kiện thất bại tới, rồi đọc trạng thái đã bù trừ."
   owner: op-retry
   kind: check-finding
@@ -13461,7 +13461,7 @@ BE_ASYNC_SPEC_MISSING:
   title_vi: "Consumer hoặc saga chưa có spec e2e"
   meaning_vi: "Một sự kiện mà ứng dụng tiêu thụ (mục trong `consumes.ts`) không được spec e2e nào gọi `useTestWorld` nêu tên, hoặc (với bước saga, hợp đồng khai báo `compensates`) spec không nêu cả sự kiện được bù trừ."
   causes_vi:
-    - "Vi phạm luật R152: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, thử giao lại; với bước saga, spec chạy cả luồng (bước đầu, lỗi, rồi trạng thái đã bù trừ)."
+    - "Vi phạm luật R167: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, thử giao lại; với bước saga, spec chạy cả luồng (bước đầu, lỗi, rồi trạng thái đã bù trừ)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e `be/src/tests/e2e/<area>/<tên>.e2e-spec.ts` khởi động world, phát sự kiện thật và đọc kết quả (với bước saga: nêu cả sự kiện được bù trừ và đọc trạng thái đã bù trừ)."
   owner: op-retry
   kind: check-finding
@@ -13631,7 +13631,7 @@ HFS_MONO_WORKSPACES:
   title_vi: "Gốc app không phải gốc monorepo"
   meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do hfs sync sinh ra."
   causes_vi:
-    - "Vi phạm luật R128: mọi sản phẩm luôn là monorepo, kể cả khi chỉ có một service, nên hình dạng hfs đồng nhất; thiếu workspaces hoặc turbo thì các app fe không được build qua turbo."
+    - "Vi phạm luật R143: mọi sản phẩm luôn là monorepo, kể cả khi chỉ có một service, nên hình dạng hfs đồng nhất; thiếu workspaces hoặc turbo thì các app fe không được build qua turbo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx hfs sync --write` để sinh `turbo.json`."
   owner: op-retry
   kind: check-finding
@@ -13641,7 +13641,7 @@ HFS_MONO_FE_WORKSPACE:
   title_vi: "Manifest của một workspace fe sai hình dạng"
   meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`hfs lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
   causes_vi:
-    - "Vi phạm luật R129: turbo chạy các task theo script của từng workspace; tên, script hoặc cờ private sai khiến build, lint hoặc typecheck của app bị bỏ qua hoặc chạy khác chuẩn."
+    - "Vi phạm luật R144: turbo chạy các task theo script của từng workspace; tên, script hoặc cờ private sai khiến build, lint hoặc typecheck của app bị bỏ qua hoặc chạy khác chuẩn."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt tên `@<project>/<app>`, `\"private\": true` và đúng bộ script trong `package.json` của workspace đó."
   owner: op-retry
   kind: check-finding
@@ -13651,7 +13651,7 @@ HFS_MONO_NEST_PROJECTS:
   title_vi: "be/nest-cli.json không khớp các app be đã khai báo"
   meaning_vi: "`be/nest-cli.json` phải là `\"monorepo\": true`, project mặc định là một app api, và `projects` đúng bằng các app be mà `hfs.json` khai báo, mỗi project có `root` là `apps/<app>` và `sourceRoot` là `apps/<app>/src`."
   causes_vi:
-    - "Vi phạm luật R130: back end luôn là monorepo Nest của `be/apps/<app>`, kể cả khi chỉ có một service; một project thừa hoặc thiếu nghĩa là app đó không được build hoặc chạy theo khai báo."
+    - "Vi phạm luật R145: back end luôn là monorepo Nest của `be/apps/<app>`, kể cả khi chỉ có một service; một project thừa hoặc thiếu nghĩa là app đó không được build hoặc chạy theo khai báo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa `be/nest-cli.json` cho khớp đúng các app be trong `hfs.json`."
   owner: op-retry
   kind: check-finding
@@ -13661,7 +13661,7 @@ HFS_MONO_WORKSPACE_DEP:
   title_vi: "Một workspace fe import gói mà nó không khai báo"
   meaning_vi: "Mọi gói mà các tệp của một workspace fe import phải được khai báo trong `package.json` của chính workspace đó (gói workspace anh em ghi `\"*\"`); `package.json` ở gốc không bao giờ khai báo một gói workspace."
   causes_vi:
-    - "Vi phạm luật R131: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
+    - "Vi phạm luật R146: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
   owner: op-retry
   kind: check-finding
@@ -13671,7 +13671,7 @@ BE_CLI_REQUIRED:
   title_vi: "Back end thiếu app cli hoặc image của nó"
   meaning_vi: "Mọi hành động chạy một lần của back end (migrate, seed, sync, backup, lệnh vận hành) nằm trong MỘT app `be/apps/cli` (kind cli, tên cli) chạy trên nest-commander. Back end có connection (migration chạy bằng `cli migrate run`) hoặc có lệnh dưới `src/features/cli/` thì phải khai báo đúng app đó và có `be/apps/cli/Dockerfile`."
   causes_vi:
-    - "Vi phạm luật R132: không có app cli thì migration và các hành động một lần không có chỗ chạy chuẩn; thiếu Dockerfile thì không có image `cli` để chạy `cli <group> <command>`."
+    - "Vi phạm luật R147: không có app cli thì migration và các hành động một lần không có chỗ chạy chuẩn; thiếu Dockerfile thì không có image `cli` để chạy `cli <group> <command>`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai báo { \"name\": \"cli\", \"kind\": \"cli\" } trong `sides.be.apps` của `hfs.json`, dựng `be/apps/cli` với `CommandFactory.run` và thêm `be/apps/cli/Dockerfile`; đổi tên app cli khác thành `cli`."
   owner: op-retry
   kind: check-finding
@@ -13681,7 +13681,7 @@ BE_CLI_BOOTSTRAP:
   title_vi: "App cli không khởi động bằng CommandFactory.run hoặc lại chạy như server"
   meaning_vi: "`main.ts` của app cli khởi động bằng `CommandFactory.run(...)` của nest-commander và không bao giờ phục vụ HTTP hay microservice: `NestFactory.create*`, `.listen()`, adapter `@nestjs/platform-*` hay `@nestjs/microservices` trong app cli đều bị từ chối."
   causes_vi:
-    - "Vi phạm luật R133: app cli chạy một lệnh rồi thoát; một server trong app cli là một app api đội lốt."
+    - "Vi phạm luật R148: app cli chạy một lệnh rồi thoát; một server trong app cli là một app api đội lốt."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết `main.ts` của app cli là `CommandFactory.run(AppModule, logger)` và bỏ mọi phần tạo server khỏi app cli."
   owner: op-retry
   kind: check-finding
@@ -13691,7 +13691,7 @@ BE_CLI_COMMAND_SHAPE:
   title_vi: "Lệnh cli đặt sai chỗ hoặc thiếu spec"
   meaning_vi: "Lệnh nest-commander (`@Command` hoặc `@SubCommand`) chỉ được khai báo trong `src/features/cli/`: nhóm `@Command` ở `<group>/<group>.cli.ts`, `@SubCommand` kế thừa `CommandRunner` ở `<group>/subs/<name>.cli.ts`, mỗi tệp một lệnh, và mỗi lệnh con có unit spec `<name>.cli.spec.ts` bên cạnh."
   causes_vi:
-    - "Vi phạm luật R134: lệnh cli là nơi chạy hành động (không phải transport mỏng), nên phải nằm đúng chỗ và được chứng minh bằng spec như một service."
+    - "Vi phạm luật R149: lệnh cli là nơi chạy hành động (không phải transport mỏng), nên phải nằm đúng chỗ và được chứng minh bằng spec như một service."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển lệnh về `src/features/cli/<group>/subs/<name>.cli.ts` (nhóm về `<group>/<group>.cli.ts`), cho lệnh con kế thừa `CommandRunner` và viết `<name>.cli.spec.ts` bên cạnh."
   owner: op-retry
   kind: check-finding
@@ -13701,7 +13701,7 @@ BE_CLI_OWNER:
   title_vi: "Có dòng lệnh nằm ngoài cli"
   meaning_vi: "`nest-commander` chỉ được import trong app cli và gốc feature cli; không mã back end nào tự đọc `process.argv` hay import commander, yargs, minimist."
   causes_vi:
-    - "Vi phạm luật R135: một cửa hành động một lần ở app khác (ví dụ cờ `migrate` trong api) lách khỏi app cli, image cli và spec của lệnh."
+    - "Vi phạm luật R150: một cửa hành động một lần ở app khác (ví dụ cờ `migrate` trong api) lách khỏi app cli, image cli và spec của lệnh."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết hành động thành một lệnh `src/features/cli/<group>/subs/<name>.cli.ts` do app cli chạy và bỏ việc đọc tham số dòng lệnh ở nơi khác."
   owner: op-retry
   kind: check-finding
@@ -13711,7 +13711,7 @@ BE_EVENT_CLASS_CONTRACT:
   title_vi: "Lớp sự kiện và hợp đồng sự kiện đã vendor không khớp"
   meaning_vi: "Một lớp sự kiện dưới `be/src/modules/events/<service>/` không khai báo đúng một lớp với `eventName` và `version` là literal, không đặt tên tệp theo sự kiện của nó, không có mục tương ứng (cùng tên và phiên bản) trong `be/contracts/<service>/events.json`, hoặc một mục của hợp đồng không có lớp."
   causes_vi:
-    - "Vi phạm luật R136: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
+    - "Vi phạm luật R151: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
     - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `hfs emit-contracts`, hoặc thêm mục hợp đồng bằng tay."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
   owner: op-retry
@@ -13722,7 +13722,7 @@ BE_OUTBOX_WRITE_TX:
   title_vi: "Outbox bị ghi ngoài domain hoặc không trong transaction"
   meaning_vi: "`eventBus.publish(event, tx)` hoặc `enqueueX(payload, tx)` của một queue được gọi ngoài `modules/domain`, hoặc đối số `tx` không phải manager của transaction đang chạy (manager dùng chung được inject, một bí danh, manager ở ngoài hoặc thiếu đối số)."
   causes_vi:
-    - "Vi phạm luật R137: một sự kiện hoặc job là hệ quả của thay đổi miền; dòng outbox phải cùng commit hoặc cùng rollback với thay đổi đó, nên chỉ domain service ghi và chỉ trong transaction của nó."
+    - "Vi phạm luật R152: một sự kiện hoặc job là hệ quả của thay đổi miền; dòng outbox phải cùng commit hoặc cùng rollback với thay đổi đó, nên chỉ domain service ghi và chỉ trong transaction của nó."
     - "Handler, consumer, integration hoặc platform tự phát sự kiện, hoặc gọi `publish` bằng manager ngoài transaction làm sự kiện bị mất hoặc phát dù giao dịch đã rollback."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đưa việc phát sự kiện vào domain service, gọi trong `this.entityManager.transaction(async (manager) => { ... })` và truyền đúng `manager` đó; handler hay consumer chỉ gọi domain service."
   owner: op-retry
@@ -13733,7 +13733,7 @@ BE_EVENT_CONSUMER_SHAPE:
   title_vi: "Consumer sự kiện sai chỗ, sai tên hoặc không chuyển eventId"
   meaning_vi: "Một lớp implements `EventConsumer` nằm ngoài tệp `.consumer.ts` của `transport/message`, tên tệp không theo `eventName` của lớp sự kiện, `handle` không đọc `delivery.eventId`, hoặc một tệp `.consumer.ts` chứa lớp không phải consumer sự kiện."
   causes_vi:
-    - "Vi phạm luật R138: giao hàng ít nhất một lần nên mỗi lần nhận lại phải dedupe; consumer chuyển `eventId` vào command để domain service claim trong `platform/inbox` cùng transaction với tác dụng của nó."
+    - "Vi phạm luật R153: giao hàng ít nhất một lần nên mỗi lần nhận lại phải dedupe; consumer chuyển `eventId` vào command để domain service claim trong `platform/inbox` cùng transaction với tác dụng của nó."
     - "Consumer được đặt ở handler hoặc nơi khác, hoặc đặt tên theo ý riêng khiến bên phát và bên nhận không cùng một tên sự kiện."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt consumer tại `transport/message/<event>.consumer.ts` (tên theo eventName, dấu chấm thành gạch ngang), khai báo `readonly event = <Lớp>Event`, và truyền `delivery.eventId` vào command được dispatch."
   owner: op-retry
@@ -13744,7 +13744,7 @@ BE_QUEUE_PRODUCER_SHAPE:
   title_vi: "Producer của queue ghi outbox không bằng tham số tx của nó"
   meaning_vi: "Một hàm hoặc phương thức export trong `<queue>.queue.ts` ghi vào `QueueOutbox` mà không khai báo tham số `tx: EntityManager` hoặc không truyền chính tham số đó làm đối số đầu."
   causes_vi:
-    - "Vi phạm luật R139: job được enqueue trong transaction của người gọi (`enqueueX(payload, tx)`), nếu không job có thể chạy dù giao dịch rollback hoặc mất khi commit thành công."
+    - "Vi phạm luật R154: job được enqueue trong transaction của người gọi (`enqueueX(payload, tx)`), nếu không job có thể chạy dù giao dịch rollback hoặc mất khi commit thành công."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm tham số `tx: EntityManager` vào producer và gọi `outbox.write(tx, ...)`."
   owner: op-retry
   kind: check-finding
@@ -13754,7 +13754,7 @@ BE_PATTERN_SPEC_MISSING:
   title_vi: "Pattern đã khai báo thiếu kịch bản chứng minh trên test world"
   meaning_vi: "hfs.json khai báo một pattern (event-bus, queue, ...) nhưng không có spec e2e hoặc integration nào có test mang tiêu đề `<pattern>/<kịch bản>: ...` cho một kịch bản bắt buộc của pattern đó."
   causes_vi:
-    - "Vi phạm luật R140: phân tích tĩnh chỉ chứng minh hình dạng; hành vi (giao lại rồi vào dead letter, fencing token từ chối worker cũ, outbox chỉ phát sau commit) chỉ được chứng minh bằng kịch bản chạy thật trên test world."
+    - "Vi phạm luật R155: phân tích tĩnh chỉ chứng minh hình dạng; hành vi (giao lại rồi vào dead letter, fencing token từ chối worker cũ, outbox chỉ phát sau commit) chỉ được chứng minh bằng kịch bản chạy thật trên test world."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e hoặc integration có test tiêu đề `<pattern>/<kịch bản>: ...` chạy trên `useTestWorld` cho từng kịch bản còn thiếu."
   owner: op-retry
   kind: check-finding
@@ -13764,7 +13764,7 @@ BE_KIND_ISOLATION:
   title_vi: "Một loại feature import trực tiếp loại feature khác"
   meaning_vi: "Một feature thuộc một loại kích hoạt (api, webhooks, realtime, saga, reactors, jobs hoặc cli) import một feature thuộc loại khác (kể cả import chỉ-kiểu), nên hai loại dính vào nhau thay vì gặp nhau qua event bus."
   causes_vi:
-    - "Vi phạm luật R141: mỗi loại feature chỉ import xuống `modules/*`, chỉ `be/apps/*` mới ghép các feature; mọi lời gọi giữa các loại (api sang saga hoặc jobs, saga sang jobs, jobs sang saga, cli sang jobs) đi qua event bus để vẫn bền khi một bên chết."
+    - "Vi phạm luật R156: mỗi loại feature chỉ import xuống `modules/*`, chỉ `be/apps/*` mới ghép các feature; mọi lời gọi giữa các loại (api sang saga hoặc jobs, saga sang jobs, jobs sang saga, cli sang jobs) đi qua event bus để vẫn bền khi một bên chết."
     - "Một handler hoặc step được gọi trực tiếp từ loại khác để tiện, thay vì phát sự kiện từ domain service rồi để loại kia consume."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ import giữa các loại; để domain service phát sự kiện bằng `eventBus.publish(event, tx)` trong transaction của nó, và loại kia consume sự kiện đó; phần dùng chung đưa xuống `modules/*`."
   owner: op-retry
@@ -13775,7 +13775,7 @@ BE_JOB_WRITE_OUTSIDE_OWNER:
   title_vi: "Dòng job bị ghi ngoài platform/jobs"
   meaning_vi: "Một lời gọi `update`, `increment`, `save`, `insert`, `delete` hoặc query builder ghi vào entity của job nằm ngoài `platform/jobs`."
   causes_vi:
-    - "Vi phạm luật R142: fencing token và trạng thái của job chỉ đổi qua `JobClaims` (claim, advance, complete, fail), mỗi hàm đều bắt buộc `expectedFencingToken`; ghi thẳng cho phép một worker zombie ghi đè job mà worker mới đang sở hữu."
+    - "Vi phạm luật R157: fencing token và trạng thái của job chỉ đổi qua `JobClaims` (claim, advance, complete, fail), mỗi hàm đều bắt buộc `expectedFencingToken`; ghi thẳng cho phép một worker zombie ghi đè job mà worker mới đang sở hữu."
     - "Một handler, step hoặc domain service tự `manager.update(JobEntity, ...)` để tiện thay vì gọi cổng `JobClaims`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ lệnh ghi trực tiếp, gọi `JobClaims.advance`, `complete` hoặc `fail` với `expectedFencingToken` của lần claim; việc chỉ đọc thì không bị cấm."
   owner: op-retry
@@ -13786,7 +13786,7 @@ BE_JOB_FENCE_REQUIRED:
   title_vi: "Ghi vào job đã claim không bắt buộc fencing token"
   meaning_vi: "Một phương thức của `JobClaims` nhận job mà kiểu tham số không bắt buộc `expectedFencingToken: number`, một lời gọi dùng `as`, `!` hoặc type assertion để lách, hoặc một `catch` quanh lệnh ghi có guard nuốt lỗi `JobFencedOut`."
   causes_vi:
-    - "Vi phạm luật R143: lease hết hạn chỉ cho phép claimant mới, không dừng được tiến trình cũ; chỉ token đơn điệu được kiểm tra nguyên tử tại nơi nhận lệnh ghi mới từ chối worker zombie, nên token phải là bắt buộc trong kiểu."
+    - "Vi phạm luật R158: lease hết hạn chỉ cho phép claimant mới, không dừng được tiến trình cũ; chỉ token đơn điệu được kiểm tra nguyên tử tại nơi nhận lệnh ghi mới từ chối worker zombie, nên token phải là bắt buộc trong kiểu."
     - "Token để optional, ép kiểu `as number`, hoặc `catch` ghi log rồi tiếp tục làm worker cũ vẫn gây tác dụng sau khi bị fence."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai báo `expectedFencingToken: number` bắt buộc trong kiểu, truyền đúng token trả về từ claim không ép kiểu, và để `FencedProcessor` xử lý lỗi (không `catch` quanh lệnh ghi trong step hay processor)."
   owner: op-retry
@@ -13797,7 +13797,7 @@ BE_JOB_RUN_KEY:
   title_vi: "Tác dụng ngoài của step không mang run key chứa fencing token"
   meaning_vi: "Một lời gọi tới integration trong `steps/<step>.step.ts` không truyền đối số kiểu `RunKey`, hoặc `RunKey` được tạo bằng ép kiểu thay vì `JobClaims.runKey`."
   causes_vi:
-    - "Vi phạm luật R144: một worker zombie có thể lặp lại tác dụng ngoài; nhà cung cấp chỉ chặn được lặp nếu khoá idempotency gồm `jobId`, bước và fencing token của lần claim."
+    - "Vi phạm luật R159: một worker zombie có thể lặp lại tác dụng ngoài; nhà cung cấp chỉ chặn được lặp nếu khoá idempotency gồm `jobId`, bước và fencing token của lần claim."
     - "Step truyền chuỗi cố định, hoặc `as RunKey` để tránh lỗi kiểu."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tạo khoá bằng `this.claims.runKey(job, \"<step>\")` và truyền cho integration; việc đọc dữ liệu đưa về lớp application."
   owner: op-retry
@@ -13808,7 +13808,7 @@ BE_JOB_SHAPE:
   title_vi: "Processor của job không kế thừa lớp fenced hoặc step đặt sai chỗ"
   meaning_vi: "Một tệp `.processor.ts` nằm ngoài thư mục job của nó, tên khác job, không extends `FencedProcessor`; hoặc một tệp `.step.ts` nằm ngoài `steps/` hay không implements `JobStep`."
   causes_vi:
-    - "Vi phạm luật R145: lớp cơ sở `FencedProcessor` claim job với token được tăng và kết thúc job qua các lệnh ghi có guard; một processor không kế thừa nó không có fence."
+    - "Vi phạm luật R160: lớp cơ sở `FencedProcessor` claim job với token được tăng và kết thúc job qua các lệnh ghi có guard; một processor không kế thừa nó không có fence."
     - "Processor hoặc step được đặt cạnh handler hay nơi khác, làm loại jobs không còn một chỗ duy nhất."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `<job>.processor.ts` trong `features/jobs/<job>/transport/queue/` với class extends `FencedProcessor`, và mỗi step trong `steps/<step>.step.ts` implements `JobStep`."
   owner: op-retry
@@ -13819,7 +13819,7 @@ BE_PROJECTION_WRITE_OWNER:
   title_vi: "Bảng read model bị ghi ngoài projection của nó"
   meaning_vi: "Một lệnh ghi vào entity của projection nằm ngoài tệp `<name>.projection.ts` cùng thư mục."
   causes_vi:
-    - "Vi phạm luật R146: read model chỉ có một người ghi là `recompute*` của projection, idempotent và có thể replay từ sự kiện nguồn; ghi từ nơi khác làm bảng lệch khỏi nguồn mà replay không sửa được."
+    - "Vi phạm luật R161: read model chỉ có một người ghi là `recompute*` của projection, idempotent và có thể replay từ sự kiện nguồn; ghi từ nơi khác làm bảng lệch khỏi nguồn mà replay không sửa được."
     - "Một domain service hoặc handler cập nhật thẳng bảng projection để nhanh."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ lệnh ghi, để reactor hoặc job gọi `recompute*` của projection, và đọc qua `get*`."
   owner: op-retry
@@ -13830,7 +13830,7 @@ BE_PROJECTION_SHAPE:
   title_vi: "Projection có phương thức ngoài recompute/get, lộ entity hoặc api gọi recompute"
   meaning_vi: "Một phương thức public của projection không phải `recompute*` hay `get*`, `index.ts` của projection export entity, hoặc một feature loại api gọi `recompute*`."
   causes_vi:
-    - "Vi phạm luật R147: projection chỉ làm hai việc, tính lại bảng từ sự kiện nguồn hoặc đọc nó; entity không được lộ để nơi khác không phụ thuộc hình dạng bảng; api chỉ đọc, còn reactor hoặc job giữ bảng luôn mới."
+    - "Vi phạm luật R162: projection chỉ làm hai việc, tính lại bảng từ sự kiện nguồn hoặc đọc nó; entity không được lộ để nơi khác không phụ thuộc hình dạng bảng; api chỉ đọc, còn reactor hoặc job giữ bảng luôn mới."
     - "Thêm một phương thức `set` hay `update` vào projection, hoặc export entity qua index để tiện đọc."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi tên phương thức theo `recompute*`/`get*` (hoặc chuyển logic về domain service), bỏ export entity khỏi `index.ts`, và để reactor hoặc job gọi `recompute*`."
   owner: op-retry
@@ -13841,7 +13841,7 @@ BE_KIND_DECLARATION:
   title_vi: "Loại kích hoạt đang dùng chưa khai báo đủ trong hfs.json"
   meaning_vi: "`sides.be.kinds` của hfs.json không khớp với các loại feature đang có: thiếu một loại đang dùng, khai báo một loại không có feature nào, thiếu pattern mà loại đó cần, hoặc thiếu platform capability của pattern đó."
   causes_vi:
-    - "Vi phạm luật R164: mỗi loại chỉ được sinh ra khi dùng đến (không có boilerplate rỗng), và loại nào đang dùng thì hạ tầng platform của nó phải có (jobs cần platform/jobs và platform/queue, reactors cần platform/event-bus)."
+    - "Vi phạm luật R179: mỗi loại chỉ được sinh ra khi dùng đến (không có boilerplate rỗng), và loại nào đang dùng thì hạ tầng platform của nó phải có (jobs cần platform/jobs và platform/queue, reactors cần platform/event-bus)."
     - "Feature được tạo tay thay vì bằng `hfs add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `hfs add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
   owner: op-retry
@@ -13852,7 +13852,7 @@ BE_KIND_EMPTY:
   title_vi: "Thư mục loại feature rỗng hoặc thành viên không có mã"
   meaning_vi: "Một tệp nằm trực tiếp trong `be/src/features/<loại>/` (ví dụ `.gitkeep` hay một feature trùng tên loại), hoặc một thư mục thành viên `<loại>/<tên>/` không có tệp TypeScript nào."
   causes_vi:
-    - "Vi phạm luật R165: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `hfs add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
+    - "Vi phạm luật R180: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `hfs add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
     - "Tạo sẵn thư mục cho loại chưa dùng hoặc đổi tên feature api thành tên một loại."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `hfs add`."
   owner: op-retry
@@ -13874,7 +13874,7 @@ HFS_DOCKER_BUILD_CONTEXT:
   title_vi: "Dockerfile không build từ gốc app"
   meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` đúng đường dẫn của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
   causes_vi:
-    - "Vi phạm luật R172: context build là gốc app; lệnh build sai hoặc nguồn COPY vượt ra ngoài context khiến image build được trên máy này nhưng hỏng trên CI hoặc trộn lẫn dữ liệu của app khác."
+    - "Vi phạm luật R187: context build là gốc app; lệnh build sai hoặc nguồn COPY vượt ra ngoài context khiến image build được trên máy này nhưng hỏng trên CI hoặc trộn lẫn dữ liệu của app khác."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `docker build -f <đường dẫn Dockerfile> -t <image> .` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
   owner: op-retry
   kind: check-finding
@@ -13884,7 +13884,7 @@ HFS_DOCKER_STAGES:
   title_vi: "Các stage, user hoặc lệnh cài của Dockerfile sai chuẩn"
   meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài là `npm ci` (không `npm install`); runtime của be chạy `npm ci --omit=dev --ignore-scripts`, runtime của fe không cài gì."
   causes_vi:
-    - "Vi phạm luật R173: image chạy bằng root, mang theo công cụ build hoặc cài không theo lockfile thì vừa lớn vừa kém an toàn, và không tái lập được."
+    - "Vi phạm luật R188: image chạy bằng root, mang theo công cụ build hoặc cài không theo lockfile thì vừa lớn vừa kém an toàn, và không tái lập được."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `npm install` thành `npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
   owner: op-retry
   kind: check-finding
@@ -13894,7 +13894,7 @@ HFS_DOCKER_ENTRY:
   title_vi: "Dockerfile không chạy đúng entry của app hoặc thiếu cổng và healthcheck"
   meaning_vi: "Stage `runtime` phải chạy entry đã build của chính app ở dạng exec (be: `node be/dist/apps/<app>/src/main.js`; fe: `node fe/apps/<app>/server.js`); app api hoặc Next đặt `ENV PORT`, EXPOSE đúng cổng đó và có HEALTHCHECK; worker có HEALTHCHECK theo tiến trình và không EXPOSE; cli/migrate ghi `HEALTHCHECK NONE` và không EXPOSE; app Next build bằng `turbo run build --filter=@<project>/<app>` và `next.config.ts` đặt `output: \"standalone\"`."
   causes_vi:
-    - "Vi phạm luật R174: một image khởi động sai entry, không công bố cổng hoặc không có healthcheck thì nền tảng không thể điều phối hay phát hiện lỗi của nó."
+    - "Vi phạm luật R189: một image khởi động sai entry, không công bố cổng hoặc không có healthcheck thì nền tảng không thể điều phối hay phát hiện lỗi của nó."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa CMD/ENTRYPOINT về entry của app, thêm `ENV PORT`, `EXPOSE`, `HEALTHCHECK` (hoặc `HEALTHCHECK NONE` cho cli), và đặt `output: \"standalone\"` trong `next.config.ts` của app Next."
   owner: op-retry
   kind: check-finding
@@ -13904,7 +13904,7 @@ HFS_DOCKER_BASE_PIN:
   title_vi: "Image nền của Dockerfile không được ghim"
   meaning_vi: "Mọi FROM của Dockerfile phải là một stage trước đó, image node duy nhất của chuẩn (phiên bản node và bản alpine cụ thể), hoặc image ghim bằng digest `@sha256`; không dùng tag trôi nổi (`latest`, `node:22`) và không để build argument chưa xác định."
   causes_vi:
-    - "Vi phạm luật R175: tag trôi nổi làm image đổi nội dung mà không có thay đổi nào trong repo, nên build không tái lập và lỗ hổng mới lọt vào không dấu vết."
+    - "Vi phạm luật R190: tag trôi nổi làm image đổi nội dung mà không có thay đổi nào trong repo, nên build không tái lập và lỗ hổng mới lọt vào không dấu vết."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi FROM thành image node của chuẩn (xem `NODE_IMAGE` trong scripts/hfs/rules/docker.mjs) hoặc ghim image bằng digest `@sha256`."
   owner: op-retry
   kind: check-finding
@@ -13914,7 +13914,7 @@ HFS_DOCKER_SECRETS:
   title_vi: "Bí mật bị đưa vào image"
   meaning_vi: "Không được COPY/ADD tệp `.env*` (trừ `.env.example`) hay đường dẫn trong `.starcistacks`, `.secrets`, `.volume`, khóa, chứng chỉ, kubeconfig; không ADD một URL; không có ARG hoặc ENV mang tên một thông tin xác thực (PASSWORD, SECRET, TOKEN, KEY, CREDENTIAL, PRIVATE); riêng `NEXT_PUBLIC_*` được phép vì được công khai theo thiết kế."
   causes_vi:
-    - "Vi phạm luật R176: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
+    - "Vi phạm luật R191: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
   kind: check-finding

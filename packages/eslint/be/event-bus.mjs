@@ -1,6 +1,6 @@
 /**
- * The rules that hold the event-bus and queue patterns (catalog R137 `BE_OUTBOX_WRITE_TX`, R138 `BE_EVENT_CONSUMER_SHAPE`,
- * R139 `BE_QUEUE_PRODUCER_SHAPE`).
+ * The rules that hold the event-bus and queue patterns (catalog R152 `BE_OUTBOX_WRITE_TX`, R153 `BE_EVENT_CONSUMER_SHAPE`,
+ * R154 `BE_QUEUE_PRODUCER_SHAPE`).
  *
  * The one durable path of an event is: a domain service writes the outbox row in ITS transaction (`eventBus.publish(event, tx)`), the
  * relay hands the row to Kafka, a consumer in `transport/message` receives it and dispatches one command. A queue job takes the same

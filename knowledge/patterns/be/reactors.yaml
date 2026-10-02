@@ -23,7 +23,7 @@ rules:
   - id: BE-REACTORS-1
     title: A reactor consumes events and dispatches commands
     kind: mandatory
-    hfsRules: [R138, R80]
+    hfsRules: [R153, R80]
     requirement: |-
       A reactor holds `transport/message/<event>.consumer.ts` (implementing `EventConsumer<E>` with `readonly event = <Event>Event`),
       `<reactor>-message.module.ts` and an `application/` of plain CQRS. `handle(delivery)` dispatches one command and forwards
@@ -44,7 +44,7 @@ rules:
   - id: BE-REACTORS-2
     title: A reactor never imports another kind and never reads another context
     kind: mandatory
-    hfsRules: [R141]
+    hfsRules: [R156]
     requirement: |-
       A reactor imports only `modules/*`; it meets the api, saga and jobs kinds through events. It never reads another context's
       tables or imports its entities, services or SQL: what it needs from that context arrives in the event, or is read from a
@@ -66,7 +66,7 @@ rules:
   - id: BE-REACTORS-3
     title: The local copy lives in the reactor's own context and is replayable
     kind: mandatory
-    hfsRules: [R137]
+    hfsRules: [R152]
     requirement: |-
       The copy is a table of the context that owns the reactor, on that context's connection, written by a domain service of that
       context (one transaction touches one context's connection). The write is an idempotent upsert keyed by the aggregate id and

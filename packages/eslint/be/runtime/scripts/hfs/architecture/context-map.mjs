@@ -7,7 +7,7 @@ const camel = name => { const text = pascal(name); return text[0].toLowerCase() 
 /**
  * Where the persistence arrays of every capability are registered: the object literals (`DatabaseModule.register` connections and the
  * migrate/cli app's) that list `<c>Entities` / `<c>Migrations` of a capability's `persistence/connection.ts` under a connection `name`.
- * The one walk BE_SCHEMA_OWNER and the bounded-context rules (R159 to R163) share, so a capability's context is decided once, by origin.
+ * The one walk BE_SCHEMA_OWNER and the bounded-context rules (R174 to R178) share, so a capability's context is decided once, by origin.
  *
  * @param {{kit: object, graph: object, persistenceOf: (rel: string) => ({root: string, capability: string, folder: string, below: string[]} | null)}} input
  * @returns {{registered: Map<string, {name: string, connections: Map<string, {file: object, node: object}>}>, registrations: number, all: Array<{file: object, node: object, connection: string | null}>}}

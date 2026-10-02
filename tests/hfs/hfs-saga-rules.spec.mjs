@@ -1,5 +1,5 @@
-// The saga pattern of `hfs check` (scripts/hfs/rules/saga.mjs): R154 BE_SAGA_STEP_COMPENSATION, R155 BE_SAGA_STATE_VERSIONED,
-// R156 BE_SAGA_EVENT_CONTRACT, R157 BE_SAGA_CONSUMER_DEDUPE, R158 BE_SAGA_E2E_MISSING, and the declared-pattern mechanism that enables
+// The saga pattern of `hfs check` (scripts/hfs/rules/saga.mjs): R169 BE_SAGA_STEP_COMPENSATION, R170 BE_SAGA_STATE_VERSIONED,
+// R171 BE_SAGA_EVENT_CONTRACT, R172 BE_SAGA_CONSUMER_DEDUPE, R173 BE_SAGA_E2E_MISSING, and the declared-pattern mechanism that enables
 // the saga slots (`patterns: ["saga"]` in hfs.json sides.be). Each rule has a violating and a passing tree.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,7 +68,7 @@ test('a pattern no slot declares is refused in hfs.json', () => {
   assert.doesNotThrow(() => resolveRepoDeclaration(loadSlotManifest(), WITH_SAGA));
 });
 
-// ------------------------------------------------------------------------------------------------ R154 BE_SAGA_STEP_COMPENSATION
+// ------------------------------------------------------------------------------------------------ R169 BE_SAGA_STEP_COMPENSATION
 
 test('BE_SAGA_STEP_COMPENSATION: a step without a compensation, a compensation without a step and an orchestrator that omits one are refused', () => {
   const missing = saga('BE_SAGA_STEP_COMPENSATION', { [COMPENSATION]: null });
@@ -86,7 +86,7 @@ test('BE_SAGA_STEP_COMPENSATION: a folder of steps with no orchestrator is refus
   assert.deepEqual(saga('BE_SAGA_STEP_COMPENSATION'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R155 BE_SAGA_STATE_VERSIONED
+// ------------------------------------------------------------------------------------------------ R170 BE_SAGA_STATE_VERSIONED
 
 test('BE_SAGA_STATE_VERSIONED: an orchestrator with no state file, a state with no numeric version and an orchestrator that bypasses the store are refused', () => {
   assert.match(saga('BE_SAGA_STATE_VERSIONED', { [STATE]: null })[0].message, /has no .*place.saga-state.ts/);
@@ -101,7 +101,7 @@ test('BE_SAGA_STATE_VERSIONED: a typed, versioned state and an orchestrator on t
   assert.deepEqual(saga('BE_SAGA_STATE_VERSIONED', { [STATE]: "export type PlaceSagaState = {\n  status: string\n  version: number\n}\n" }), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R156 BE_SAGA_EVENT_CONTRACT
+// ------------------------------------------------------------------------------------------------ R171 BE_SAGA_EVENT_CONTRACT
 
 test('BE_SAGA_EVENT_CONTRACT: a step with no event, an event no contract declares and a compensation the contract does not say compensates are refused', () => {
   assert.match(saga('BE_SAGA_EVENT_CONTRACT', { [STEP]: 'export class ReserveStep {}\n' })[0].message, /names no event/);
@@ -114,7 +114,7 @@ test('BE_SAGA_EVENT_CONTRACT: events named in the contracts, the compensation de
   assert.deepEqual(saga('BE_SAGA_EVENT_CONTRACT'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R157 BE_SAGA_CONSUMER_DEDUPE
+// ------------------------------------------------------------------------------------------------ R172 BE_SAGA_CONSUMER_DEDUPE
 
 test('BE_SAGA_CONSUMER_DEDUPE: a consumer of a saga feature that never reads the delivery id is refused; one that passes it on passes', () => {
   const findings = saga('BE_SAGA_CONSUMER_DEDUPE', { [CONSUMER]: 'export class InvoiceRejectedConsumer {\n  handle(): string { return "x" }\n}\n' });
@@ -122,7 +122,7 @@ test('BE_SAGA_CONSUMER_DEDUPE: a consumer of a saga feature that never reads the
   assert.deepEqual(saga('BE_SAGA_CONSUMER_DEDUPE'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R158 BE_SAGA_E2E_MISSING
+// ------------------------------------------------------------------------------------------------ R173 BE_SAGA_E2E_MISSING
 
 test('BE_SAGA_E2E_MISSING: a compensation path with no e2e spec, one through the world that injects no failure, are refused', () => {
   assert.match(saga('BE_SAGA_E2E_MISSING', { [SPEC]: null })[0].message, /has no e2e spec/);

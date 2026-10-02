@@ -4,7 +4,7 @@ import { machineKit } from './machine-ast.mjs';
 import { entitiesOf } from './sql-owner.mjs';
 
 /**
- * R160 `context-coupling` (BE_CONTEXT_COUPLING). Bounded contexts are coupled by events only, never by their schema or their code:
+ * R175 `context-coupling` (BE_CONTEXT_COUPLING). Bounded contexts are coupled by events only, never by their schema or their code:
  *   - an entity relation (`OneToOne`, `OneToMany`, `ManyToOne`, `ManyToMany` imported from typeorm) whose target class is an entity of a capability
  *     of another context is refused;
  *   - a migration foreign key (`REFERENCES <table>` in a string of a migration file) onto a table whose entity belongs to another context is refused;

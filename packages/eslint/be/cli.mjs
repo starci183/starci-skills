@@ -1,5 +1,5 @@
 /**
- * The rules of the one-off actions of a back end (catalog R133 `BE_CLI_BOOTSTRAP`, R134 `BE_CLI_COMMAND_SHAPE`, R135
+ * The rules of the one-off actions of a back end (catalog R148 `BE_CLI_BOOTSTRAP`, R149 `BE_CLI_COMMAND_SHAPE`, R150
  * `BE_CLI_OWNER`). Every one-off action (migrate, seed, sync, backup, any operator command)
  * lives in ONE app, `be/apps/cli` (slot `be.app.cli`), built on nest-commander, and its commands live in the cli feature root
  * `src/features/cli/` (slot `be.cli`):

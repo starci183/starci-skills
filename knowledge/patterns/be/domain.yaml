@@ -26,7 +26,7 @@ rules:
   - id: BE-DOMAIN-1
     title: A capability owns its rules, its tables and its transaction
     kind: mandatory
-    hfsRules: [R160, R161, R159]
+    hfsRules: [R175, R176, R174]
     requirement: |-
       A capability folder holds `index.ts`, `<capability>.module.ts`, `<capability>.service.ts` with its `<capability>.service.spec.ts` beside it,
       `<capability>.contracts.ts`, `errors/`, `messages/` and `persistence/` (its entities, migrations, SQL and rows on the connection of its
@@ -51,7 +51,7 @@ rules:
   - id: BE-DOMAIN-2
     title: Work inside one context is synchronous; an event crosses contexts or starts async work
     kind: mandatory
-    hfsRules: [R137, R160]
+    hfsRules: [R152, R175]
     requirement: |-
       A handler that needs another capability of the same context calls its service in the same transaction and no event exists for it. An event is
       published only when another context must react or when the work it starts is asynchronous by nature (a job, a saga step, a reactor, a projection

@@ -92,7 +92,7 @@ pins:
     version: 2.11.6
     group: tooling
     side: fe
-    why: 'every app is a monorepo (R128): turbo runs build, dev, lint and typecheck over the fe workspaces fe/apps/* and fe/packages/* from the app root turbo.json, as nivo-fe does; 2.11.6 is the newest 2.x on 2026-10-02.'
+    why: 'every app is a monorepo (R143): turbo runs build, dev, lint and typecheck over the fe workspaces fe/apps/* and fe/packages/* from the app root turbo.json, as nivo-fe does; 2.11.6 is the newest 2.x on 2026-10-02.'
   prettier:
     version: 3.9.6
     group: tooling
@@ -153,7 +153,7 @@ pins:
     version: 3.21.0
     group: framework
     side: be
-    why: 'the one command-line framework of a back end (R133-R135): apps/cli boots with CommandFactory.run and every one-off action is a nest-commander command of src/features/cli; 3.21.0 is the newest on 2026-10-02 and takes @nestjs 11 as its peer.'
+    why: 'the one command-line framework of a back end (R148-R150): apps/cli boots with CommandFactory.run and every one-off action is a nest-commander command of src/features/cli; 3.21.0 is the newest on 2026-10-02 and takes @nestjs 11 as its peer.'
   '@nestjs/core':
     version: 11.2.5
     group: framework

@@ -353,7 +353,7 @@ rules:
   - id: BE-TEST-7
     title: Transport is thin, so only services and cli commands need unit specs
     kind: mandatory
-    hfsRules: [R87, R88, R48, R134]
+    hfsRules: [R87, R88, R48, R149]
     requirement: |-
       "Only services and cli commands are unit-tested" is safe because everything else is thin. A cli command is not a thin
       transport: it is an action runner with its own spec (cli.yaml), and R88 does not apply to it. A handler, a resolver, a controller and a message

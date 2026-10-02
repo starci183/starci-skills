@@ -291,7 +291,7 @@ test('FE_WIRE_GENERATED: generated types newer than the snapshots, and an app wi
 
 test('FE_I18N_PLACEMENT: no next-intl, no proxy.ts, a middleware.ts, a route file outside [locale], a missing default catalog and a stray catalog are refused', () => {
   const result = checkRepo({ repoRoot: repoOf(TWO_FE_APPS, (dir) => {
-    // no fe workspace declares next-intl (each fe app is a workspace with its own package.json, R129)
+    // no fe workspace declares next-intl (each fe app is a workspace with its own package.json, R144)
     for (const app of ['web', 'admin']) put(dir, `fe/apps/${app}/package.json`, json({ name: `@demo/${app}`, private: true }));
     drop(dir, 'fe/apps/web/src/proxy.ts');
     put(dir, 'fe/apps/web/src/middleware.ts');

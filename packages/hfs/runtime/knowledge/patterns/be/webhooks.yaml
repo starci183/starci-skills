@@ -54,7 +54,7 @@ rules:
   - id: BE-WEBHOOK-2
     title: The door verifies first, then makes one domain call
     kind: mandatory
-    hfsRules: [R167, R168, R41, R42]
+    hfsRules: [R182, R183, R41, R42]
     requirement: |-
       `<provider>.webhook.ts` is one `@Controller` with one `@Post` handler declared
       `@Public({ reason: PublicReason.SignedWebhook })`. The handler's FIRST statement is the unconditional
@@ -101,7 +101,7 @@ rules:
   - id: BE-WEBHOOK-3
     title: The intake publishes the event inside its own transaction
     kind: mandatory
-    hfsRules: [R80, R137, R136]
+    hfsRules: [R80, R152, R151]
     requirement: |-
       The domain intake method (`PaymentService.acceptNotification`) is the delivery method of R80: its first awaited expression
       claims `(source, eventId)` in the `Inbox` and it returns when the claim answers false, so a redelivery is a no-op. It then
@@ -127,7 +127,7 @@ rules:
   - id: BE-WEBHOOK-4
     title: Three behaviours are proven on the test world
     kind: mandatory
-    hfsRules: [R140]
+    hfsRules: [R155]
     requirement: |-
       Declaring the pattern `webhooks` requires e2e or integration tests titled `webhooks/<scenario>: ...` for each scenario
       `bad-signature-is-refused` (a tampered body is refused and nothing is published), `replay-is-refused` (a stale timestamp is

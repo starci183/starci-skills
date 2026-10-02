@@ -1,5 +1,5 @@
-// The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R148 HFS_SERVICE_PLACEMENT, R149 HFS_IMAGE_UNPINNED,
-// R150 HFS_SERVICE_STACK_DECLARATION, R151 HFS_EVENT_CONTRACT (event classes -> events.json), R152 BE_ASYNC_SPEC_MISSING, plus the event contract emit
+// The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R163 HFS_SERVICE_PLACEMENT, R164 HFS_IMAGE_UNPINNED,
+// R165 HFS_SERVICE_STACK_DECLARATION, R166 HFS_EVENT_CONTRACT (event classes -> events.json), R167 BE_ASYNC_SPEC_MISSING, plus the event contract emit
 // (packages/hfs/emit). Each rule has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the base.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +36,7 @@ const COMPONENTS = [
 ].join('\n');
 const withStack = (components) => (dir) => put(dir, '.starcistacks/application-stacks.yaml', stack(components));
 
-// ------------------------------------------------------------------------------------------------ R148 HFS_SERVICE_PLACEMENT
+// ------------------------------------------------------------------------------------------------ R163 HFS_SERVICE_PLACEMENT
 
 test('HFS_SERVICE_PLACEMENT: a Dockerfile or a package.json of a folder outside be/apps/<service> is a second service root', () => {
   const findings = only(APP, (dir) => {
@@ -56,7 +56,7 @@ test('HFS_SERVICE_PLACEMENT: the Dockerfile of a be app, of a front-end app, the
   }, 'HFS_SERVICE_PLACEMENT'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R149 HFS_IMAGE_UNPINNED
+// ------------------------------------------------------------------------------------------------ R164 HFS_IMAGE_UNPINNED
 
 test('HFS_IMAGE_UNPINNED: a multi-service stack with a moving image (no tag, latest, major only) is refused, each component named', () => {
   const findings = only(MULTI, withStack([
@@ -76,7 +76,7 @@ test('HFS_IMAGE_UNPINNED: exact versions and digests pass, and a single-service 
   assert.deepEqual(only(APP, withStack('  postgres:\n    image: postgres:16\n    role: stateful\n'), 'HFS_IMAGE_UNPINNED'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R150 HFS_SERVICE_STACK_DECLARATION
+// ------------------------------------------------------------------------------------------------ R165 HFS_SERVICE_STACK_DECLARATION
 
 test('HFS_SERVICE_STACK_DECLARATION: a service app with no component, or one that is not role service, is refused', () => {
   const findings = only(MULTI, withStack('  core:\n    image: demo/core:1.0.0\n    role: stateful\n'), 'HFS_SERVICE_STACK_DECLARATION');
@@ -87,7 +87,7 @@ test('HFS_SERVICE_STACK_DECLARATION: every service app declared as a role servic
   assert.deepEqual(only(MULTI, withStack(COMPONENTS), 'HFS_SERVICE_STACK_DECLARATION'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R151 HFS_EVENT_CONTRACT
+// ------------------------------------------------------------------------------------------------ R166 HFS_EVENT_CONTRACT
 
 const EVENTS_DIR = 'be/src/modules/events';
 const PLACED_PATH = `${EVENTS_DIR}/core/order-placed.event.ts`;
@@ -181,7 +181,7 @@ test('hfs emit-contracts writes events.json for a service that declares event cl
   assert.equal(text, `${JSON.stringify({ events: { 'billing.invoice-rejected': { compensates: 'order.placed', payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
 });
 
-// ------------------------------------------------------------------------------------------------ R152 BE_ASYNC_SPEC_MISSING
+// ------------------------------------------------------------------------------------------------ R167 BE_ASYNC_SPEC_MISSING
 
 const consumerOf = (className, file) => `import { ${className} } from '@modules/events/${file}';\nexport class ${className}Consumer {\n  readonly event = ${className}\n}\n`;
 const CONSUMER_REJECTED = 'be/src/features/orders/transport/message/invoice-rejected.consumer.ts';

@@ -77,7 +77,7 @@ function envOf(stage) {
   return env;
 }
 
-/** R172: the header states this app's build command, and the build never reaches outside its context. */
+/** R187: the header states this app's build command, and the build never reaches outside its context. */
 function contextFindings(file, parsed, side, app) {
   const findings = [];
   const wanted = dockerfilePath(side, app);
@@ -103,7 +103,7 @@ function contextFindings(file, parsed, side, app) {
   return findings;
 }
 
-/** R173: the stages and the install, the user and the build discipline of each. */
+/** R188: the stages and the install, the user and the build discipline of each. */
 function stageFindings(file, parsed, side, kind) {
   const findings = [];
   const { stages } = parsed;
@@ -143,7 +143,7 @@ function nextOutput(ts, text) {
   return output;
 }
 
-/** R174: the entry, the port and the health of the runtime. */
+/** R189: the entry, the port and the health of the runtime. */
 function entryFindings({ repoRoot, file, parsed, side, app, kind, project, ts }) {
   const findings = [];
   const runtime = parsed.stages.at(-1);
@@ -194,7 +194,7 @@ function resolvedImage(parsed, image) {
   return unresolved ? null : text;
 }
 
-/** R175: every FROM is a prior stage, the canon node image, or an image pinned by digest. */
+/** R190: every FROM is a prior stage, the canon node image, or an image pinned by digest. */
 function pinFindings(file, parsed) {
   const findings = [];
   const earlier = new Set();
@@ -215,7 +215,7 @@ const isSecretPath = (source) => {
   return env || segments.some((segment) => SECRET_FOLDERS.has(segment)) || SECRET_SUFFIXES.some((suffix) => base.endsWith(suffix)) || base.startsWith('kubeconfig');
 };
 
-/** R176: no secret enters an image. */
+/** R191: no secret enters an image. */
 function secretFindings(file, parsed) {
   const findings = [];
   for (const item of parsed.instructions) {

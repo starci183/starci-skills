@@ -1,5 +1,5 @@
-// The image rules of an app (scripts/hfs/rules/docker.mjs over scripts/lib/dockerfile.mjs): R172 HFS_DOCKER_BUILD_CONTEXT, R173
-// HFS_DOCKER_STAGES, R174 HFS_DOCKER_ENTRY, R175 HFS_DOCKER_BASE_PIN and R176 HFS_DOCKER_SECRETS. The clean app of
+// The image rules of an app (scripts/hfs/rules/docker.mjs over scripts/lib/dockerfile.mjs): R187 HFS_DOCKER_BUILD_CONTEXT, R188
+// HFS_DOCKER_STAGES, R189 HFS_DOCKER_ENTRY, R190 HFS_DOCKER_BASE_PIN and R191 HFS_DOCKER_SECRETS. The clean app of
 // tests/helpers/hfs-cli-fixture.mjs holds the Dockerfile each declared app's template renders (the passing base); each violating
 // case changes one fact of one Dockerfile.
 import test from 'node:test';
@@ -78,7 +78,7 @@ test('hfs new image writes the Dockerfile of every declared app that has none an
   for (const file of ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']) assert.deepEqual(result.findings.filter((f) => f.path === file), [], file);
 });
 
-// ------------------------------------------------------------------------------------------------ R172 HFS_DOCKER_BUILD_CONTEXT
+// ------------------------------------------------------------------------------------------------ R187 HFS_DOCKER_BUILD_CONTEXT
 
 test('HFS_DOCKER_BUILD_CONTEXT: a header with another path, a context other than the root, or no command is refused', () => {
   const wrong = judged('HFS_DOCKER_BUILD_CONTEXT', BE, replace('docker build -f be/apps/core/Dockerfile', 'docker build -f be/apps/other/Dockerfile'));
@@ -96,7 +96,7 @@ test('HFS_DOCKER_BUILD_CONTEXT: a COPY source that leaves the context is refused
   assert.deepEqual(judged('HFS_DOCKER_BUILD_CONTEXT', BE, replace('COPY be/src be/src', 'COPY be/src be/src\nCOPY --from=manifests /app/package.json ./copy.json')), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R173 HFS_DOCKER_STAGES
+// ------------------------------------------------------------------------------------------------ R188 HFS_DOCKER_STAGES
 
 test('HFS_DOCKER_STAGES: a single-stage Dockerfile, or one whose last stage is not runtime, is refused', () => {
   const single = judged('HFS_DOCKER_STAGES', BE, (text) => text.slice(0, text.indexOf('FROM', text.indexOf('AS build'))));
@@ -124,7 +124,7 @@ test('HFS_DOCKER_STAGES: a back-end runtime installs --omit=dev --ignore-scripts
   assert.match(fe[0].message, /installs nothing/);
 });
 
-// ------------------------------------------------------------------------------------------------ R174 HFS_DOCKER_ENTRY
+// ------------------------------------------------------------------------------------------------ R189 HFS_DOCKER_ENTRY
 
 test('HFS_DOCKER_ENTRY: the runtime must start the app entry built from this app, in exec form', () => {
   const cmd = 'CMD ["node", "be/dist/apps/core/src/main.js"]';
@@ -160,7 +160,7 @@ test('HFS_DOCKER_ENTRY: a Next image builds its own workspace through turbo and 
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'fe/apps/web/next.config.ts', standalone)) }), 'HFS_DOCKER_ENTRY'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R175 HFS_DOCKER_BASE_PIN
+// ------------------------------------------------------------------------------------------------ R190 HFS_DOCKER_BASE_PIN
 
 test('HFS_DOCKER_BASE_PIN: a moving or foreign base is refused in every stage', () => {
   const floating = judged('HFS_DOCKER_BASE_PIN', BE, replace(`FROM ${NODE_IMAGE} AS runtime`, 'FROM node:22-alpine AS runtime'));
@@ -178,7 +178,7 @@ test('HFS_DOCKER_BASE_PIN: the canon image, a prior stage, a digest-pinned image
   assert.deepEqual(judged('HFS_DOCKER_BASE_PIN', BE, replace(`FROM ${NODE_IMAGE} AS runtime`, 'FROM build AS runtime')), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R176 HFS_DOCKER_SECRETS
+// ------------------------------------------------------------------------------------------------ R191 HFS_DOCKER_SECRETS
 
 test('HFS_DOCKER_SECRETS: a COPY or ADD of an env file or of credential material is refused', () => {
   const copy = (source) => judged('HFS_DOCKER_SECRETS', BE, replace('COPY be/src be/src', `COPY be/src be/src\nCOPY ${source} /tmp/x`));

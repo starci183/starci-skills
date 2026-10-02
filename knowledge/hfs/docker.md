@@ -1,7 +1,7 @@
 # The image canon
 
 Every app builds its own image. This is the pattern; `slots.yaml` (`repo.app-image`, `app.dockerignore`, `app.ci-images`) and the
-rules R172 to R176 (`HFS_DOCKER_*`, `scripts/hfs/rules/docker.mjs`) enforce it, and `hfs scaffold app` writes it. It is adapted from the
+rules R187 to R191 (`HFS_DOCKER_*`, `scripts/hfs/rules/docker.mjs`) enforce it, and `hfs scaffold app` writes it. It is adapted from the
 Dockerfiles of the nivo back end and front end to the shape of an app: one `package.json` and one lockfile at the app root, a Nest
 monorepo of `be/apps/<app>`, and an npm-workspaces monorepo of `fe/apps/<app>` and `fe/packages/<pkg>`.
 
@@ -43,8 +43,8 @@ monorepo of `be/apps/<app>`, and an npm-workspaces monorepo of `fe/apps/<app>` a
 
 | Rule | Code | Judges |
 | --- | --- | --- |
-| R172 | `HFS_DOCKER_BUILD_CONTEXT` | the header names the app's own build command; no COPY or ADD source leaves the context |
-| R173 | `HFS_DOCKER_STAGES` | `build` then `runtime`; `USER node`; no build in the runtime; `npm ci`; the install flags of each side |
-| R174 | `HFS_DOCKER_ENTRY` | the app's own entry; port, EXPOSE and HEALTHCHECK by kind; the standalone output of a Next app |
-| R175 | `HFS_DOCKER_BASE_PIN` | every FROM is a prior stage, the canon node image or a digest-pinned image |
-| R176 | `HFS_DOCKER_SECRETS` | no secret file, URL download or credential-named ARG or ENV |
+| R187 | `HFS_DOCKER_BUILD_CONTEXT` | the header names the app's own build command; no COPY or ADD source leaves the context |
+| R188 | `HFS_DOCKER_STAGES` | `build` then `runtime`; `USER node`; no build in the runtime; `npm ci`; the install flags of each side |
+| R189 | `HFS_DOCKER_ENTRY` | the app's own entry; port, EXPOSE and HEALTHCHECK by kind; the standalone output of a Next app |
+| R190 | `HFS_DOCKER_BASE_PIN` | every FROM is a prior stage, the canon node image or a digest-pinned image |
+| R191 | `HFS_DOCKER_SECRETS` | no secret file, URL download or credential-named ARG or ENV |

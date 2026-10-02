@@ -27,7 +27,7 @@ rules:
   - id: BE-CLI-1
     title: One cli app boots nest-commander and never serves
     kind: mandatory
-    hfsRules: [R132, R133]
+    hfsRules: [R147, R148]
     requirement: |-
       Every one-off action of a back end runs in ONE app, `be/apps/cli` (slot `be.app.cli`, kind `cli`, named `cli`). It is
       required as soon as the back end declares a connection in `hfs.json` `sides.be.connections` (its migrations run as
@@ -66,7 +66,7 @@ rules:
   - id: BE-CLI-2
     title: Commands live in the cli feature root as groups and sub-commands
     kind: mandatory
-    hfsRules: [R134]
+    hfsRules: [R149]
     requirement: |-
       A nest-commander command (`@Command` or `@SubCommand`) is declared only in the cli feature root `src/features/cli/`
       (slot `be.cli`). The root holds `index.ts` and `cli.module.ts` and one folder per group: `<group>/<group>.cli.ts` (the
@@ -102,7 +102,7 @@ rules:
   - id: BE-CLI-3
     title: A command is an action runner with its own unit spec
     kind: mandatory
-    hfsRules: [R134, R47]
+    hfsRules: [R149, R47]
     requirement: |-
       A cli command is not a thin transport, so the thin-door rule (R88) does not apply to it: its `run` carries the action
       (it may branch, loop and call the domain or platform services the action needs). Every `.cli.ts` therefore has its unit
@@ -131,7 +131,7 @@ rules:
   - id: BE-CLI-4
     title: Only the cli parses the command line
     kind: mandatory
-    hfsRules: [R135]
+    hfsRules: [R150]
     requirement: |-
       `nest-commander` is imported only by `be/apps/cli` and `src/features/cli/`. No back-end source parses command-line
       arguments itself: `process.argv` and the parsers `commander`, `yargs` and `minimist` are refused everywhere, the cli
@@ -151,7 +151,7 @@ rules:
   - id: BE-CLI-5
     title: Migrations and seeds run only as cli commands
     kind: mandatory
-    hfsRules: [R34, R132]
+    hfsRules: [R34, R147]
     requirement: |-
       Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`) and through
       the test world over the same connection list (`cli.options.ts`). Seed data never sits in a

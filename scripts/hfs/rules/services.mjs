@@ -1,18 +1,18 @@
-// services.mjs - the microservice policy of a product that runs more than one service (R148 to R152).
+// services.mjs - the microservice policy of a product that runs more than one service (R163 to R167).
 // A product keeps every back-end service as a Nest app at `be/apps/<service>/` of the one repository, sharing the `be/src` libraries and
 // the one package.json; the services it does not own stay pinned images in the stack. Five tree checks:
-//   R148 HFS_SERVICE_PLACEMENT      a service root (a Dockerfile, or a package.json other than the app's own and a workspace package's)
+//   R163 HFS_SERVICE_PLACEMENT      a service root (a Dockerfile, or a package.json other than the app's own and a workspace package's)
 //                                   exists only at be/apps/<service>/ (fe/apps/<app>/Dockerfile is a front end's);
-//   R149 HFS_IMAGE_UNPINNED         in a multi-service product every component image of application-stacks.yaml is a digest or an exact
+//   R164 HFS_IMAGE_UNPINNED         in a multi-service product every component image of application-stacks.yaml is a digest or an exact
 //                                   version (x.y.z), never a missing tag, `latest`, a branch word or a major/minor-only tag;
-//   R150 HFS_SERVICE_STACK_DECLARATION  each api or worker app of a multi-service product is a `role: service` component of the stack;
-//   R151 HFS_EVENT_CONTRACT         the async contract is vendored: `be/contracts/<service>/events.json` equals the provider's
+//   R165 HFS_SERVICE_STACK_DECLARATION  each api or worker app of a multi-service product is a `role: service` component of the stack;
+//   R166 HFS_EVENT_CONTRACT         the async contract is vendored: `be/contracts/<service>/events.json` equals the provider's
 //                                   `apps/<service>/src/events.ts` table (an event may declare `compensates: "<event>"`), every event a
 //                                   consumer's `apps/<app>/src/consumes.ts` names exists in that snapshot at the same version;
-//   R152 BE_ASYNC_SPEC_MISSING      every consumed event (a consumes.ts entry) is named by an e2e spec through `useTestWorld`; the spec of a
+//   R167 BE_ASYNC_SPEC_MISSING      every consumed event (a consumes.ts entry) is named by an e2e spec through `useTestWorld`; the spec of a
 //                                   saga step (an event whose contract says `compensates`) also names the compensated event, so the whole
 //                                   flow is driven, not the undo alone.
-// "Multi-service" = two or more be apps of kind api or worker. A single-service product is judged by R148 and R151-R152 only.
+// "Multi-service" = two or more be apps of kind api or worker. A single-service product is judged by R163 and R166-R167 only.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findStackDeclaration } from '../../lib/stack-declaration.mjs';
@@ -48,9 +48,9 @@ function typescriptFor(repoRoot) {
   return located ? requirePackage(located) : null;
 }
 
-// ------------------------------------------------------------------------------------------------ R148 placement
+// ------------------------------------------------------------------------------------------------ R163 placement
 
-/** Findings of R148: a service root outside `be/apps/<service>/`. */
+/** Findings of R163: a service root outside `be/apps/<service>/`. */
 export function servicePlacementFindings({ files }) {
   const findings = [];
   for (const file of files) {
@@ -65,7 +65,7 @@ export function servicePlacementFindings({ files }) {
   return findings;
 }
 
-// ------------------------------------------------------------------------------------------------ R149 pinned images
+// ------------------------------------------------------------------------------------------------ R164 pinned images
 
 /** The image reference with `${VAR:-default}` resolved to its default, or null when it cannot be (a bare `${VAR}`). */
 function resolvedImage(image) {
@@ -86,7 +86,7 @@ export function unpinnedReason(image) {
   return EXACT_TAG.test(tag) ? null : `its tag \`${tag}\` is not an exact version (x.y.z) or a digest, so it moves`;
 }
 
-/** Findings of R149 over a multi-service product's stack declaration. */
+/** Findings of R164 over a multi-service product's stack declaration. */
 export function imagePinFindings({ repoRoot, repo }) {
   if (servicesOf(repo).length < 2) return [];
   const declaration = findStackDeclaration(repoRoot);
@@ -103,9 +103,9 @@ export function imagePinFindings({ repoRoot, repo }) {
   return findings;
 }
 
-// ------------------------------------------------------------------------------------------------ R150 stack declaration
+// ------------------------------------------------------------------------------------------------ R165 stack declaration
 
-/** Findings of R150: each service app of a multi-service product is a `role: service` component. */
+/** Findings of R165: each service app of a multi-service product is a `role: service` component. */
 export function serviceStackFindings({ repoRoot, repo }) {
   const services = servicesOf(repo);
   if (services.length < 2) return [];
@@ -122,7 +122,7 @@ export function serviceStackFindings({ repoRoot, repo }) {
   return findings;
 }
 
-// ------------------------------------------------------------------------------------------------ R151 event contract
+// ------------------------------------------------------------------------------------------------ R166 event contract
 
 /** The typed event classes of every service: `[{ service, file, className, name, version, compensates, payload }]` and the problems of the ones that cannot be read. */
 function eventClassesOf({ repoRoot, files, ts }) {
@@ -137,7 +137,7 @@ function eventClassesOf({ repoRoot, files, ts }) {
   return { classes, problems };
 }
 
-/** Findings of R151: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
+/** Findings of R166: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
 export function eventContractFindings({ repoRoot, files }) {
   const classFiles = files.filter((file) => EVENT_CLASS_FILE.test(file));
   const snapshots = files.filter((file) => SNAPSHOT.test(file));
@@ -165,7 +165,7 @@ export function eventContractFindings({ repoRoot, files }) {
   return findings;
 }
 
-// ------------------------------------------------------------------------------------------------ R152 async specs
+// ------------------------------------------------------------------------------------------------ R167 async specs
 
 /** The class an expression names, from `readonly event = <Class>` of a consumer: the identifier, or null. */
 function consumedClassOf(ts, text) {
@@ -191,7 +191,7 @@ function consumedEvents({ repoRoot, files, ts }) {
   return consumed;
 }
 
-/** Findings of R152: every consumed event has an e2e spec through the world; a saga step's spec also names the event it compensates. */
+/** Findings of R167: every consumed event has an e2e spec through the world; a saga step's spec also names the event it compensates. */
 export function asyncSpecFindings({ repoRoot, files }) {
   const ts = typescriptFor(repoRoot);
   if (ts === null) return [];

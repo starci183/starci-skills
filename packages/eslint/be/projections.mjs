@@ -1,10 +1,10 @@
 /**
- * The rules that hold the projection pattern (catalog R146 `BE_PROJECTION_WRITE_OWNER`, R147 `BE_PROJECTION_SHAPE`).
+ * The rules that hold the projection pattern (catalog R161 `BE_PROJECTION_WRITE_OWNER`, R162 `BE_PROJECTION_SHAPE`).
  *
  * A projection is a read model: `modules/projections/<name>/` holds `<name>.projection.ts` (the only class that touches its table:
  * `recompute*` writes it idempotently from the source facts and can replay from scratch, `get*` reads it) and
  * `<name>.projection-entity.ts` (the table's entity). A reactor, a job or a cli command triggers a recompute; an api feature only calls `get*`.
- * A projection publishes no event (R137 refuses `eventBus.publish` outside `modules/domain`).
+ * A projection publishes no event (R152 refuses `eventBus.publish` outside `modules/domain`).
  *
  * Entities are found by TYPE ORIGIN; the owner and the kind of a file by the slot view. The vocabulary `recompute` and `get` is the
  * pattern's own method contract.
