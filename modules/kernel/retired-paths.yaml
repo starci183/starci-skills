@@ -974,8 +974,8 @@ moved:
   - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
   - {from: scripts/kernel/settle-landed.mjs, to: scripts/kernel/owned-path-effects.mjs, movedIn: WFWT2, quiesced: false}
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
-  - {from: modules/cli/commands/kernel/check.yaml, to: modules/cli/commands/kernel/record-checks.yaml, movedIn: c3-cli, quiesced: false}
-  - {from: modules/cli/commands/kernel/, to: modules/cli/commands/kernel/, movedIn: c3-cli, quiesced: false}
+  - {from: modules/kernel/api-commands/check.yaml, to: modules/cli/commands/kernel/record-checks.yaml, movedIn: c3-cli, quiesced: false}
+  - {from: modules/kernel/api-commands/, to: modules/cli/commands/kernel/, movedIn: c3-cli, quiesced: false}
   - {from: bin/starci.mjs, to: packages/cli/bin/starci.mjs, movedIn: c3-cli, quiesced: false}
   - {from: packages/hfs/bin/hfs.mjs, to: packages/hfs/src/main.mjs, movedIn: c3-cli, quiesced: false}
   - {from: packages/hfs/bin/hfs.spec.mjs, to: packages/hfs/src/main.spec.mjs, movedIn: c3-cli, quiesced: false}
