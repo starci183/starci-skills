@@ -23,7 +23,7 @@ const dataSource = (ran: ReadonlyArray<string>, failure?: Error) =>
         initialize: jest.fn(async () => mock<DataSource>()),
         runMigrations: jest.fn(async () => {
             if (failure) throw failure
-            return ran.map((name) => new Migration(1, name, name))
+            return ran.map((name) => new Migration(1, 1, name))
         }),
         destroy: jest.fn(async () => undefined),
     })

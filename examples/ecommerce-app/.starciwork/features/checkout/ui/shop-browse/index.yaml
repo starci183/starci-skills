@@ -222,7 +222,7 @@ ui:
   - Live shop data comes from the order API. These six products are editorial sample data from the landing catalogue; Add
     to cart is not implemented by ProductTile.
 change:
-  rev: 1
+  rev: 2
   kind: clarifying
   at: '2026-09-19T15:30:00.000Z'
   reason: 'v9-7 wired the screen to the real backend and the uat.checkout.place-order walk exercised it live (runs/20260919T152927Z-5c10a673):

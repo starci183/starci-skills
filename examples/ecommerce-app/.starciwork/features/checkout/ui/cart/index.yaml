@@ -271,7 +271,7 @@ ui:
   - Current cart route is an empty scaffold and explicitly defers persistence. Populated state, quantity mutations and Remove
     controls are proposals.
 change:
-  rev: 1
+  rev: 2
   kind: clarifying
   at: '2026-09-19T15:30:00.000Z'
   reason: 'v9-7 wired the cart surface to the real cart query/mutations and the walk exercised it (runs/20260919T152927Z-5c10a673):

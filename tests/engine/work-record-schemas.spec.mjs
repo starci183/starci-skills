@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {isWorkRecordSchema} from '../../scripts/work/record-ownership.mjs';
 
 /**
  * One schema per Work record family, checked against the tree that is the readable statement of the shape.
@@ -84,6 +85,8 @@ test('every record family named in the example has a schema, and every schema is
       unparseable.push(`${path.relative(root, file)}: ${error.message}`);
       continue;
     }
+    // A tool's artifact payload (starci/generation-receipts@1, starci/direction-check@1) is no record: its own checks read it.
+    if (!isWorkRecordSchema(record?.schema)) continue;
     named.add(record?.schema);
   }
   assert.deepEqual(unparseable, [], 'these example records are not valid YAML, so no schema can accept them');
@@ -103,6 +106,7 @@ test('every record in the example validates against the schema it names', () => 
       rejected.push(`${path.relative(root, file)}: unreadable YAML - ${error.message}`);
       continue;
     }
+    if (!isWorkRecordSchema(record?.schema)) continue;
     const validate = validatorFor(record?.schema);
     if (!validate) {
       rejected.push(`${path.relative(root, file)}: names schema ${record?.schema}, which does not exist`);
