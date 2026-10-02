@@ -202,3 +202,34 @@ pins:
     group: ui
     side: fe
     why: one product front end resolves 3.2.4, the others 3.2.6.
+  # --- Supabase lite
+  '@supabase/ssr':
+    version: 0.12.7
+    group: framework
+    side: fe
+    why: the one server/browser client factory for a lite Next app; exact version registry-checked for the lite scaffold.
+  '@supabase/supabase-js':
+    version: 2.117.2
+    group: framework
+    side: both
+    why: the generated Database-typed client used by the FE data owner and the BE Auth/Storage integration.
+  jose:
+    version: 6.2.12
+    group: framework
+    side: be
+    why: verifies Supabase access tokens against the project JWKS with issuer, audience, expiry and algorithm checks.
+  supabase:
+    version: 2.119.0
+    group: tooling
+    side: both
+    why: the root CLI wrapper owns local schema lifecycle and generates the committed database types.
+  class-transformer:
+    version: 0.5.1
+    group: framework
+    side: be
+    why: Nest request transformation in the API runtime, pinned with the validation library.
+  class-validator:
+    version: 0.15.1
+    group: framework
+    side: be
+    why: Nest boundary validation in the API runtime, pinned with the transformation library.
