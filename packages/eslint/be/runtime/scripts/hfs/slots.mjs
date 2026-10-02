@@ -584,8 +584,8 @@ function createScopeResolver(manifest, repo) {
     // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.
     if (toOwner && repo.kind !== RUNTIME_KIND) {
       const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
-      const ownerTier = byId.get(toOwner.slot).tier;
-      const entry = isEntryFile(relative) || (ownerTier === 'package' && relative === 'src/index.ts') || (ownerTier === 'app' && relative === 'app.module.ts');
+      const ownerSlot = byId.get(toOwner.slot);
+      const entry = isEntryFile(relative) || (ownerSlot.entries ?? []).includes(relative) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
       if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
     }
     return { allowed: true, reason: 'allowed', fromTier, toTier };

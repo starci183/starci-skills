@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
 // R50 transport-owner (FE_TRANSPORT_OWNER): the machine half of the eslint fetch rules. modules/api/client.ts is the one module
 // of an app that references the global fetch (call, alias or value), no app file imports an HTTP library, and every server
@@ -138,4 +138,31 @@ test('a repository with no client and no fetch has nothing to own and raises no 
 test('a fetch outside the package client in a package-client repository is FE_TRANSPORT_OWNER, the client itself is not', t => {
   const report = runShape(t, { ...PACKAGE, 'apps/admin/src/hooks/course/useCalled.ts': "export const useCalled = () => fetch('/x');\n" });
   assert.deepEqual(hits(report).map(item => item.path), ['apps/admin/src/hooks/course/useCalled.ts']);
+});
+
+// The Outcome homes are the slots the manifest marks `outcomeHome`; the lite edition adds fe.db.outcome (modules/db/outcome.ts).
+const DB_OUTCOME = 'apps/web/src/modules/db/outcome.ts';
+const runEdition = (t, edition, files) => {
+  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+  if (edition) declaration.edition = edition;
+  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+  return runArch(archFixture(t, { profile: 'fe', files: { '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`, 'apps/web/src/modules/db/index.ts': 'export const db = 1;\n', ...files } }));
+};
+
+test('lite: the db owner outcome is THE Outcome union (counted), alone it raises no FE_TRANSPORT_OWNER', t => {
+  const report = runEdition(t, 'lite', { [DB_OUTCOME]: OUTCOME });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
+});
+
+test('lite: a second Outcome union next to the db owner one is FE_TRANSPORT_OWNER on both', t => {
+  const report = runEdition(t, 'lite', { [DB_OUTCOME]: OUTCOME, [`${API}/outcome.ts`]: OUTCOME });
+  assert.deepEqual(hits(report).map(item => item.path).sort(), [DB_OUTCOME, `${API}/outcome.ts`]);
+  assert.match(messages(report)[0], /2 Outcome unions/);
+});
+
+test('full: modules/db/outcome.ts is plain db owner content, not an Outcome home, so the one api outcome raises no FE_TRANSPORT_OWNER', t => {
+  const report = runEdition(t, null, { [DB_OUTCOME]: OUTCOME, [`${API}/outcome.ts`]: OUTCOME });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
 });

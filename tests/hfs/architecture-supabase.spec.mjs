@@ -50,7 +50,7 @@ const feClean = (extra = {}) => ({
 export const client=createServerClient<Database>('https://fixture.invalid','public-anon');\n`,
   'apps/web/src/modules/db/browser.ts': `import {createBrowserClient} from '@supabase/ssr'; import type {Database} from '../../../../../supabase/types/database.types';
 export const browserClient=createBrowserClient<Database>('https://fixture.invalid','public-anon');\n`,
-  'apps/web/src/modules/db/principal.ts': `export const getPrincipal=async()=>({kind:'member' as const});\n`,
+  'apps/web/src/modules/db/principal.ts': `import {client} from './server'; export const getPrincipal=async()=>{const result=await client.auth.getClaims();if(result.error)return {kind:'anonymous' as const};return {kind:'member' as const,claims:result.data.claims}};\n`,
   'apps/web/src/modules/db/outcome.ts': `export const toOutcome=<T>(result:{data:T;error:Error|null})=>result.error?{kind:'unavailable' as const}:{kind:'ok' as const,data:result.data};\n`,
   'apps/web/src/modules/db/items/read-items.ts': `import {client} from '../server'; import {toOutcome} from '../outcome';
 export const readItems=async()=>{const result=await client.from('items').select().limit(20);return toOutcome(result)};\n`,
@@ -180,6 +180,15 @@ test('the new Supabase machine is not applicable to a full app with no supabase 
   assert.deepEqual(newFindings(report), []);
   assert.equal(report.coverage.hfsMachine.supabaseFrontend.status, 'not-applicable');
   assert.equal(FE_CODES.some(code => report.coverage.checkedRuleIds.includes(code)), false);
+});
+
+test('the Supabase machine is enabled by the resolved Supabase slot in a full app with the provider', t => {
+  const full = JSON.parse(declaration('fe'));
+  delete full.edition;
+  const report = runArch(freshFe(t, { '../hfs.json': `${JSON.stringify(full, null, 2)}\n` }));
+  assert.deepEqual(newFindings(report), [], JSON.stringify(newFindings(report), null, 2));
+  assert.equal(report.coverage.hfsMachine.supabaseFrontend.status, 'checked');
+  for (const code of FE_CODES) assert.ok(report.coverage.checkedRuleIds.includes(code), `${code} was not recorded as checked`);
 });
 
 const joseTypes = `

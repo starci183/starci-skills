@@ -8,14 +8,22 @@ function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));
 }
 
-/** The owner's public entries: its declared entry, plus every source file its package.json `exports` maps when the owner is a workspace package. */
+/** The extra public entries the slot manifest declares for the owner (slot field `entries`, on the slot that holds its entry file), as absolute paths. */
+function slotEntries(config, owner) {
+  const found = config.hfs?.classifyPath?.(owner.entry);
+  const names = found?.slot ? config.hfs.slot(found.slot)?.entries ?? [] : [];
+  return names.map(name => absolute(config.root, `${found.root}/${name}`));
+}
+
+/** The owner's public entries: its declared entry, the `entries` its slot declares, plus every source file its package.json `exports` maps when the owner is a workspace package. */
 function ownerDeclarations(config, context) {
   return config.owners.map(owner => {
     const root = absolute(config.root, owner.root);
     const entry = absolute(config.root, owner.entry);
     const workspace = context.workspaces?.find(item => item.root === root);
-    const entries = new Set([entry, ...(workspace ? workspaceExportSources(context.ts, workspace) : [])]);
-    return { ...owner, root, entry, entries };
+    const declared = slotEntries(config, owner);
+    const entries = new Set([entry, ...declared, ...(workspace ? workspaceExportSources(context.ts, workspace) : [])]);
+    return { ...owner, root, entry, entries, declared };
   }).sort((a, b) => b.root.length - a.root.length);
 }
 
@@ -67,14 +75,16 @@ export function checkOwners(config, context) {
         message: `Owner ${owner.id} public entry is outside the configured TypeScript programs, so its boundary cannot be checked.` });
       continue;
     }
-    for (const statement of sourceFile.statements) if (context.ts.isExportDeclaration(statement) && !statement.exportClause) {
-      violations.push({
-        ruleId: 'ARCH_OWNER_EXPORT_STAR',
-        path: relativePath(config.root, owner.entry),
-        ...sourceLocation(sourceFile, statement),
-        owner: owner.id,
-        message: `Owner ${owner.id} public entry must use explicit named exports rather than export *.`
-      });
+    for (const entryFile of [sourceFile, ...owner.declared.map(file => sourceFiles.get(file)).filter(Boolean)]) {
+      for (const statement of entryFile.statements) if (context.ts.isExportDeclaration(statement) && !statement.exportClause) {
+        violations.push({
+          ruleId: 'ARCH_OWNER_EXPORT_STAR',
+          path: relativePath(config.root, canonical(entryFile.fileName)),
+          ...sourceLocation(entryFile, statement),
+          owner: owner.id,
+          message: `Owner ${owner.id} public entry must use explicit named exports rather than export *.`
+        });
+      }
     }
   }
   for (const sourceFile of context.files) {

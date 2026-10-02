@@ -20,8 +20,19 @@ export const FE_DECLARATION = Object.freeze({
   optionalSlots: ["repo.packages", "fe.package.ui", "fe.package.api", "fe.package.i18n"],
 })
 
-/** The HFS view of the fixture fe side (`declaration` is the fe side of the app). */
-export const fixtureHfs = (declaration = FE_DECLARATION) => hfsFromDeclaration(appDeclaration("fe", declaration), TYPED_ROOT)
+/** The fe side of a lite fixture app: one app on a Supabase connection, no packages. */
+export const LITE_FE_DECLARATION = Object.freeze({ apps: [{ name: "web", kind: "next" }] })
+
+const SUPABASE_CONNECTION = { name: "primary", envPrefix: "PRIMARY_DB", owner: "core", isolation: "schema", provider: "supabase" }
+
+/** The app declaration a fixture lints under: `lite` makes it an edition-lite app with a Supabase connection. */
+const fixtureApp = (declaration, lite) => {
+  const app = appDeclaration("fe", declaration)
+  return lite ? { ...app, edition: "lite", sides: { ...app.sides, be: { ...app.sides.be, connections: [SUPABASE_CONNECTION] } } } : app
+}
+
+/** The HFS view of the fixture fe side (`declaration` is the fe side of the app; `lite` lints it as an edition-lite app). */
+export const fixtureHfs = (declaration = FE_DECLARATION, { lite = false } = {}) => hfsFromDeclaration(fixtureApp(declaration, lite), TYPED_ROOT)
 
 /** Globs of every depth a case filename may sit at (the project service refuses a `**` glob). */
 const DEPTHS = Array.from({ length: 10 }, (_, depth) => [`${"*/".repeat(depth)}*.ts`, `${"*/".repeat(depth)}*.tsx`]).flat()
@@ -30,7 +41,7 @@ const DEPTHS = Array.from({ length: 10 }, (_, depth) => [`${"*/".repeat(depth)}*
 export const at = (rel) => join(TYPED_ROOT, rel)
 
 /** A RuleTester with typed linting, JSX and the fixture HFS settings. */
-export const typedTester = ({ declaration } = {}) => new RuleTester({
+export const typedTester = ({ declaration, lite } = {}) => new RuleTester({
   languageOptions: {
     parser: tsParser,
     ecmaVersion: 2022,
@@ -42,7 +53,7 @@ export const typedTester = ({ declaration } = {}) => new RuleTester({
       tsconfigRootDir: TYPED_ROOT,
     },
   },
-  settings: { starci: { hfs: fixtureHfs(declaration) } },
+  settings: { starci: { hfs: fixtureHfs(declaration, { lite }) } },
 })
 
 /** A RuleTester with the fixture HFS settings and a syntax-only parser, for rules that read slots but no types. */

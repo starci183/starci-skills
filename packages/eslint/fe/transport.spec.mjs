@@ -21,12 +21,13 @@ import {
   outcomeKindsExhaustive,
   rules,
 } from "./transport.mjs"
-import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
+import { LITE_FE_DECLARATION, at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 
 // Rules that read the slot of the file (fetch-only-in-api-client, ...) run under the fixture repository: two apps and the
 // shared packages, so `at("apps/web/...")` is an app file and `at("packages/todo-app-api/...")` the shared api package.
 const slots = slotTester()
 const typed = typedTester()
+const typedLite = typedTester({ declaration: LITE_FE_DECLARATION, lite: true })
 
 const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -392,6 +393,36 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       { filename: CLIENT, code: UNION, errors: [{ messageId: "second" }] },
       { filename: PKG_CLIENT, code: UNION, errors: [{ messageId: "second" }] },
       { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: UNION, errors: [{ messageId: "second" }] },
+    ],
+  })
+})
+
+test("FE-OUTCOME-2: in a lite app the db owner is the transport: modules/db/outcome.ts is the one union, and nothing else may declare another", () => {
+  const DB_OUTCOME = at("apps/web/src/modules/db/outcome.ts")
+  const UNION = "export type Outcome<T> = { ok: true; data: T } | { ok: false; kind: \"refused\" | \"unavailable\" }"
+  typedLite.run("one-outcome-union", oneOutcomeUnion, {
+    valid: [
+      { filename: DB_OUTCOME, code: UNION },
+      // composing the db owner's union is not declaring another
+      { filename: HOOK, code: "import type { Outcome } from \"../../modules/db\"\nexport type OrdersRead = Outcome<{ id: string }>" },
+    ],
+    invalid: [
+      { filename: HOOK, code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
+      // the other files of the db owner are not the union's home
+      { filename: at("apps/web/src/modules/db/principal.ts"), code: UNION, errors: [{ messageId: "second" }] },
+      { filename: at("apps/web/src/modules/db/server.ts"), code: UNION, errors: [{ messageId: "second" }] },
+      { filename: at("apps/web/src/modules/db/orders/read-orders.ts"), code: UNION, errors: [{ messageId: "second" }] },
+      // a second union beside the home, in another module of the app
+      { filename: at("apps/web/src/modules/config/index.ts"), code: UNION, errors: [{ messageId: "second" }] },
+    ],
+  })
+})
+
+test("FE-OUTCOME-3: in the full edition modules/db/outcome.ts is not an Outcome home", () => {
+  typed.run("one-outcome-union", oneOutcomeUnion, {
+    valid: [],
+    invalid: [
+      { filename: at("apps/web/src/modules/db/outcome.ts"), code: "export type Outcome<T> = { ok: true; data: T } | { ok: false; kind: \"refused\" }", errors: [{ messageId: "second" }] },
     ],
   })
 })

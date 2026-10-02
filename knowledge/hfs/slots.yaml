@@ -41,6 +41,12 @@ versioning:
 #   tier        node of the import direction matrix (tiers below); none = takes no part in import checks;
 #               inherit = the tier of the enclosing owner.
 #   owner       true when every directory matching the slot is an owner: the unit cross-owner imports and cycles use.
+#   entries     on a directory slot that sits inside an owner (not an owner itself): the files, besides the owner's index.ts, an importer
+#               outside the owner may enter through (a client-safe entry of a module whose barrel is server-only). Each is a relative
+#               path the slot allows. Everything else of the owner is entered through index.ts only (ARCH_OWNER_EXPORT_BYPASS).
+#   outcomeHome true on a file slot: the one file that declares the repository's Outcome union. A repository holds exactly one such
+#               file (modules/api/outcome.ts, the api package's outcome.ts, or modules/db/outcome.ts of a lite app),
+#               and no other file declares an Outcome union (one-outcome-union, FE_TRANSPORT_OWNER).
 #   requires    files or directories that must exist inside each instance; <var> is replaced by the bound name,
 #               a leading / means repository root; a trailing / means directory.
 #   requiredInstances  variable -> names that must exist as instances (config, logging ... of platform).
@@ -1766,6 +1772,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: transport
+    outcomeHome: true
     tests: none
     why: the one Outcome union of a one-app repository; a shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
@@ -1820,7 +1827,8 @@ slots:
     # server client factory (cookies, anon key, RLS applies), the browser client factory, getPrincipal() (React cache,
     # auth.getClaims()) and toOutcome() mapping {data, error} into the same Outcome vocabulary modules/api uses. Readers
     # live in <domain>/read-*.ts, Server Actions (schema-parsed input) in <domain>/write-*.ts; the row types come from
-    # supabase/types/database.types.ts (sides.fe.reads).
+    # supabase/types/database.types.ts (sides.fe.reads). The barrel index.ts is server-only (it re-exports server code), so
+    # browser.ts, the browser client factory a client hook imports, is a second public entry of the owner (`entries`).
     path: "apps/<app>/src/modules/db/"
     presence: opt-in              # enabled by a connection with provider: supabase; required under edition lite
     provider: supabase
@@ -1829,7 +1837,24 @@ slots:
     tier: transport
     requires: [index.ts, server.ts, browser.ts, principal.ts]
     allows: [index.ts, server.ts, browser.ts, principal.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/write-*.ts", "<domain>/<domain>.mapper.ts"]
+    entries: [browser.ts]
     tests: none
+    since: 2.1.0
+  - id: fe.db.outcome
+    profiles: [fe]
+    # A lite app has no modules/api: its db transport is the transport, so the one Outcome union lives here (toOutcome maps
+    # {data, error} into it). Under full the union stays fe.transport.outcome / fe.package.api.outcome.
+    editions: [lite]
+    path: "apps/<app>/src/modules/db/outcome.ts"
+    presence: opt-in
+    provider: supabase
+    litePresence: optional
+    tracked: tracked
+    tier: transport
+    outcomeHome: true
+    tests: none
+    why: the one Outcome union of a lite app; its db owner is the transport
+    rules: [FE_HTTP_STATUS_COLLAPSE]
     since: 2.1.0
   - id: fe.package.ui
     profiles: [fe]
@@ -1873,6 +1898,7 @@ slots:
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
+    outcomeHome: true
     tests: none
     why: the repository's one Outcome union
     rules: [FE_HTTP_STATUS_COLLAPSE]

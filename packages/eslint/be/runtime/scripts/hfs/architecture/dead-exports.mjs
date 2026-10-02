@@ -8,7 +8,8 @@
  *                      so a file only a spec imports is dead, on purpose. Type-only imports reach a file.
  *
  * Owner = every graph.ownerRoots unit whose tier is not `app` and whose public entry file is in the graph (index.ts or
- * index.tsx, a package's src/index.ts). The exported names of the entry are its named exports, `export { a as b }`,
+ * index.tsx, a package's src/index.ts). The `entries` its slot declares (slot data, e.g. fe.modules.db browser.ts) are further
+ * public entries of the same owner, judged exactly like the entry. The exported names of an entry are its named exports, `export { a as b }`,
  * `export { x } from`, declarations with `export`, and `default` for `export default`. `export *` is refused by owners.mjs
  * and contributes no name here.
  *
@@ -53,6 +54,11 @@ export function entryOf(graph, config, key, owner) {
     if (graph.files.has(rel)) return rel;
   }
   return null;
+}
+
+/** The additional public entry files (repository-relative, in the graph) the slot manifest declares for the owner (slot field `entries`). */
+function extraEntries(graph, owner) {
+  return (graph.resolver.slot(owner.slot)?.entries ?? []).map(name => `${owner.root}/${name}`).filter(rel => graph.files.has(rel));
 }
 
 /** Names an import/export declaration takes from its target: {all} or {pairs: [{imported, exported}]}. */
@@ -283,25 +289,27 @@ export function checkDeadExports({ context, graph, config }) {
     const entry = entryOf(graph, config, key, owner);
     if (!entry) continue;
     owners += 1;
-    const names = exportedNames(ts, graph.files.get(entry).sourceFile);
-    const used = consumed(entry, key, 0, new Set([entry]));
-    // A consumer outside the owner that imports a file the entry re-exports by name reaches the entry's export of that name.
-    for (const edge of graph.edges) {
-      if (edge.from !== entry || !edge.reexport || graph.unit(edge.to) !== key) continue;
-      const reexport = bindingsOf(ts, edge.edge.declaration);
-      const inner = consumed(edge.to, key, 0, new Set([entry, edge.to]));
-      if (reexport.all) continue;
-      for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
-    }
-    for (const [name, line] of names) {
-      exports += 1;
-      if (used.all || used.names.has(name)) continue;
-      violations.push({
-        ruleId: 'HFS_UNUSED_EXPORT',
-        path: entry, line, column: 1,
-        name, owner: owner.root, slot: owner.slot,
-        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
-      });
+    for (const publicEntry of [entry, ...extraEntries(graph, owner)]) {
+      const names = exportedNames(ts, graph.files.get(publicEntry).sourceFile);
+      const used = consumed(publicEntry, key, 0, new Set([publicEntry]));
+      // A consumer outside the owner that imports a file the entry re-exports by name reaches the entry's export of that name.
+      for (const edge of graph.edges) {
+        if (edge.from !== publicEntry || !edge.reexport || graph.unit(edge.to) !== key) continue;
+        const reexport = bindingsOf(ts, edge.edge.declaration);
+        const inner = consumed(edge.to, key, 0, new Set([publicEntry, edge.to]));
+        if (reexport.all) continue;
+        for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
+      }
+      for (const [name, line] of names) {
+        exports += 1;
+        if (used.all || used.names.has(name)) continue;
+        violations.push({
+          ruleId: 'HFS_UNUSED_EXPORT',
+          path: publicEntry, line, column: 1,
+          name, owner: owner.root, slot: owner.slot,
+          message: `${publicEntry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
+        });
+      }
     }
   }
   const files = deadFiles(graph, config);

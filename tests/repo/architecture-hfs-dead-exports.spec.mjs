@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
 // HFS check 4: an export of an owner's public entry that no production file outside the owner imports is dead
 // (HFS_UNUSED_EXPORT). Specs are not part of the graph, so an export used only by a spec is dead on purpose.
@@ -164,4 +164,49 @@ test('HFS_UNUSED_EXPORT: the unit spec of a webhook, gateway or subscription doo
     'src/features/webhooks/pay/transport/http/pay.webhook.spec.ts': "import { nobody } from '../../../../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n",
   };
   assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['onlyE2e']);
+});
+
+// A slot-declared entry (slot field `entries`, fe.modules.db browser.ts under lite) is a public entry of its owner: a hook importing
+// it uses its exports, and an export of it that nothing outside the owner imports is dead like one of index.ts.
+const liteDb = (extra = {}) => {
+  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+  declaration.edition = 'lite';
+  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+  return {
+    '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+    'apps/web/src/modules/db/index.ts': "export { readSession } from './principal';\n",
+    'apps/web/src/modules/db/principal.ts': 'export const readSession = async () => 1;\n',
+    'apps/web/src/modules/db/browser.ts': 'export const createBrowserDbClient = () => 1;\nexport const spareBrowserHelper = () => 2;\n',
+    'apps/web/src/hooks/orders/useOrders.ts': "import { readSession } from '../../modules/db';\nimport { createBrowserDbClient } from '../../modules/db/browser';\nexport const useOrders = () => [readSession, createBrowserDbClient];\n",
+    ...extra,
+  };
+};
+const DB_BROWSER = 'apps/web/src/modules/db/browser.ts';
+
+test('an export of a slot-declared entry that a hook imports is used, one nothing imports is HFS_UNUSED_EXPORT', t => {
+  const report = runArch(archFixture(t, { profile: 'fe', files: liteDb() }));
+  assert.deepEqual(dead(report, DB_BROWSER), ['spareBrowserHelper']);
+  assert.deepEqual(dead(report, 'apps/web/src/modules/db/index.ts'), []);
+  const hit = findings(report, 'HFS_UNUSED_EXPORT').find(item => item.path === DB_BROWSER);
+  assert.equal(hit.line, 2);
+  assert.equal(hit.owner, 'apps/web/src/modules/db');
+});
+
+test('a slot-declared entry nobody imports has every export dead; a namespace import of it uses them all', t => {
+  const unused = runArch(archFixture(t, { profile: 'fe', files: liteDb({ 'apps/web/src/hooks/orders/useOrders.ts': "import { readSession } from '../../modules/db';\nexport const useOrders = readSession;\n" }) }));
+  assert.deepEqual(dead(unused, DB_BROWSER), ['createBrowserDbClient', 'spareBrowserHelper']);
+  const all = runArch(archFixture(t, { profile: 'fe', files: liteDb({ 'apps/web/src/hooks/orders/useOrders.ts': "import { readSession } from '../../modules/db';\nimport * as browser from '../../modules/db/browser';\nexport const useOrders = () => [readSession, browser];\n" }) }));
+  assert.deepEqual(dead(all, DB_BROWSER), []);
+});
+
+test('a file the slot does not declare as an entry is not judged as one: modules/config/browser.ts exports are not HFS_UNUSED_EXPORT', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: liteDb({
+      'apps/web/src/modules/config/index.ts': 'export const config = 1;\n',
+      'apps/web/src/modules/config/browser.ts': 'export const browserConfig = 1;\n',
+      'apps/web/src/hooks/orders/useConfig.ts': "import { config } from '../../modules/config';\nexport const useConfig = config;\n",
+    }),
+  }));
+  assert.deepEqual(dead(report, 'apps/web/src/modules/config/browser.ts'), []);
 });

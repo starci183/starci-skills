@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
+import { isServerActionModule } from './server-action.mjs';
 import { callName, chainParts, contextTypesClient, isDatabaseType, isSupabaseCall, isSupabaseValue, moduleNameOf, reportAt, signatureFromSupabase, supabaseClientType, SUPABASE_MODULES, unwrap } from './supabase-ast.mjs';
 import { checkBackendJwt } from './supabase-be.mjs';
 
@@ -27,15 +28,17 @@ const FE_SERVICE_ROLE = 'FE_SERVICE_ROLE_FORBIDDEN';
 const FE_SESSION_TRUST = 'FE_AUTH_SESSION_TRUST';
 const FE_WRITE_SHAPE = 'FE_DB_WRITE_SHAPE';
 const FE_ROUTE_HANDLER = 'FE_ROUTE_HANDLER_FORBIDDEN';
-const FE_DB_SLOTS = new Set(['fe.modules.db', 'fe.package.db']);
+const FE_DB_SLOTS = new Set(['fe.modules.db', 'fe.package.db', 'fe.db.outcome']);
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const FE_CONFIG_SLOT = 'fe.modules.config';
 const SUPABASE_CALLS = new Set(['from', 'rpc']);
 const QUERY_TERMINALS = new Set(['single', 'maybeSingle', 'returns']);
 const QUERY_WRITES = new Set(['insert', 'update', 'upsert', 'delete']);
-const KEYSET_BOUNDS = new Set(['gt', 'gte', 'lt', 'lte']);
-const supabaseStandardApplies = input => input.graph.resolver.repo.edition === 'lite'
-  || input.graph.resolver.repo.providers?.includes('supabase') === true;
+const LIST_BOUNDS = new Set(['gt', 'gte', 'lt', 'lte', 'range']);
+const supabaseSlotEnabled = (input, slotId) => {
+  const slot = input.graph.resolver.slot(slotId);
+  return Boolean(slot && input.graph.resolver.slotEnabled(slot));
+};
 
 function checkClientOwnership(input, { slots, ruleId }) {
   const kit = machineKit(input);
@@ -188,8 +191,8 @@ function checkFrontendQueryResults(input) {
         const methods = chainParts(ts, expression);
         if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
           listReads += 1;
-          if (!methods.includes('limit') && !methods.some(method => KEYSET_BOUNDS.has(method))) {
-            report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit() or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
+          if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
+            report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
           }
         }
         if (!handledAwait(kit, checker, input.graph, node)) {
@@ -252,22 +255,32 @@ function checkFrontendSecretNames(input) {
   return { violations, coverage: { status: 'checked', envReads: reads } };
 }
 
-const hasDirective = (ts, sourceFile, directive) => sourceFile.statements.some((statement, index) => index < 4 && ts.isExpressionStatement(statement)
-  && ts.isStringLiteralLike(statement.expression) && statement.expression.text === directive);
+const isClientModule = (ts, sourceFile) => sourceFile.statements.some((statement, index) => index < 4 && ts.isExpressionStatement(statement)
+  && ts.isStringLiteralLike(statement.expression) && statement.expression.text === 'use client');
 
-const exportedActions = (ts, sourceFile) => {
+const isDirectiveStatement = (ts, statement) => ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression);
+
+const exportedValues = (ts, sourceFile) => {
   const hasExport = node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
   const out = [];
   for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.body) out.push(statement);
+    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.name && statement.body) {
+      out.push({ name: statement.name.text, implementation: statement.body, functionNode: statement });
+    }
     if (!ts.isVariableStatement(statement) || !hasExport(statement)) continue;
     for (const declaration of statement.declarationList.declarations) {
-      if (declaration.initializer && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer)) && declaration.initializer.body
-        && ts.isBlock(declaration.initializer.body)) out.push(declaration.initializer);
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+      const functionNode = (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+        && ts.isBlock(declaration.initializer.body) ? declaration.initializer : null;
+      out.push({ name: declaration.name.text, implementation: declaration.initializer, functionNode });
     }
   }
   return out;
 };
+
+const exportedActions = (ts, sourceFile) => exportedValues(ts, sourceFile).map(value => value.functionNode).filter(Boolean);
+const exportedImplementations = (ts, sourceFile, name) => exportedValues(ts, sourceFile)
+  .filter(value => value.name === name).map(value => value.implementation);
 
 const contains = (kit, root, predicate) => {
   let found = false;
@@ -328,13 +341,22 @@ function checkFrontendAuthAndRoutes(input) {
   let routes = 0;
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    if (!hasDirective(ts, file.sourceFile, 'use client')) {
+    if (!isClientModule(ts, file.sourceFile)) {
       kit.walk(file.sourceFile, node => {
         if (ts.isCallExpression(node) && callName(ts, node) === 'getSession' && signatureFromSupabase(checker, node)) {
           reportAt(violations, kit, FE_SESSION_TRUST, file, node, 'auth.getSession() trusts cookie-backed session data in server code; call getPrincipal() (getClaims), and getUser() for sensitive mutations.');
         }
         return true;
       });
+    }
+    if (FE_DB_SLOTS.has(file.slot)) {
+      for (const implementation of exportedImplementations(ts, file.sourceFile, 'getPrincipal')) {
+        const readsClaims = contains(kit, implementation, node => ts.isCallExpression(node) && callName(ts, node) === 'getClaims'
+          && signatureFromSupabase(checker, node));
+        if (!readsClaims) {
+          reportAt(violations, kit, FE_SESSION_TRUST, file, implementation, 'getPrincipal() must establish the server principal through Supabase auth.getClaims().');
+        }
+      }
     }
     if (FE_DB_SLOTS.has(file.slot) && path.posix.basename(file.rel).startsWith('write-')) {
       const classified = input.graph.resolver.classifyPath(file.rel);
@@ -344,8 +366,12 @@ function checkFrontendAuthAndRoutes(input) {
       if (!declared.length) reportAt(violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
       for (const action of declared) {
         actions += 1;
-        // A function-level directive ("use server") is the prologue, not work: the principal is the first statement after it.
-        const work = action.body.statements.slice(action.body.statements.findIndex((statement) => !(ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) >>> 0);
+        const functionLevel = action.body.statements[0]?.expression?.text === 'use server' && isDirectiveStatement(ts, action.body.statements[0]);
+        if (!isServerActionModule(ts, file.sourceFile) && !functionLevel) {
+          reportAt(violations, kit, FE_WRITE_SHAPE, file, action, 'An exported write function must be a Server Action through a file-level or function-level `use server` directive.');
+        }
+        // Function directives are the prologue, not work: the principal is the first non-directive statement.
+        const work = action.body.statements.slice(action.body.statements.findIndex(statement => !isDirectiveStatement(ts, statement)) >>> 0);
         const first = work[0];
         const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
         if (!principal.call || !principal.symbol) {
@@ -386,7 +412,7 @@ function checkFrontendAuthAndRoutes(input) {
 }
 
 export function checkFrontendSupabase(input) {
-  if (!supabaseStandardApplies(input)) return { violations: [], coverage: { status: 'not-applicable', reason: 'the full-edition app declares no supabase provider' } };
+  if (!supabaseSlotEnabled(input, 'fe.modules.db')) return { violations: [], coverage: { status: 'not-applicable', reason: 'the Supabase front-end database slot is not enabled' } };
   const owner = checkClientOwnership(input, { slots: FE_DB_SLOTS, ruleId: FE_CLIENT_OWNER });
   const results = checkFrontendQueryResults(input);
   const secrets = checkFrontendSecretNames(input);
@@ -398,7 +424,7 @@ export function checkFrontendSupabase(input) {
 }
 
 export function checkBackendSupabase(input) {
-  if (!supabaseStandardApplies(input)) return { violations: [], coverage: { status: 'not-applicable', reason: 'the full-edition app declares no supabase provider' } };
+  if (!supabaseSlotEnabled(input, BE_SUPABASE_SLOT)) return { violations: [], coverage: { status: 'not-applicable', reason: 'the Supabase back-end integration slot is not enabled' } };
   const owner = checkClientOwnership(input, { slots: new Set([BE_SUPABASE_SLOT]), ruleId: BE_CLIENT_OWNER });
   const jwt = checkBackendJwt(input);
   return {

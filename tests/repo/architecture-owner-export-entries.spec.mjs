@@ -66,3 +66,56 @@ test('a Server Action is its own owner entry, but a barrel that re-exports it is
     'apps/web/src/modules/db/orders/actions.ts',
   ]]);
 });
+
+const liteDb = (extra = {}) => {
+  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+  declaration.edition = 'lite';
+  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+  return {
+    '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+    'apps/web/src/modules/db/index.ts': "export { readSession } from './principal';\n",
+    'apps/web/src/modules/db/principal.ts': 'export const readSession = async () => 1;\n',
+    'apps/web/src/modules/db/browser.ts': 'export const createBrowserDbClient = () => 1;\n',
+    ...extra,
+  };
+};
+
+test('the slot-declared client entry (modules/db/browser.ts) is a public entry of its owner: a hook imports it with no ARCH_OWNER_EXPORT_BYPASS', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: liteDb({ 'apps/web/src/hooks/orders/useOrders.ts': "import { createBrowserDbClient } from '../../modules/db/browser';\nexport const useOrders = createBrowserDbClient;\n" }),
+  }));
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS'), [], JSON.stringify(report.errors));
+});
+
+test('a file the slot does not list as an entry stays private: principal.ts deep-imported from a hook is refused, index.ts is still the entry', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: liteDb({
+      'apps/web/src/hooks/orders/useOrders.ts': "import { readSession } from '../../modules/db/principal';\nexport const useOrders = readSession;\n",
+      'apps/web/src/hooks/orders/useViaIndex.ts': "import { readSession } from '../../modules/db';\nexport const useViaIndex = readSession;\n",
+    }),
+  }));
+  const found = findings(report, 'ARCH_OWNER_EXPORT_BYPASS');
+  assert.deepEqual(found.map(item => [item.path, item.resolvedPath]), [['apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/modules/db/principal.ts']]);
+});
+
+test('a slot-declared entry keeps the explicit-export law: export * in browser.ts is ARCH_OWNER_EXPORT_STAR', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: liteDb({ 'apps/web/src/modules/db/browser.ts': "export * from './principal';\n" }),
+  }));
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_STAR').map(item => item.path), ['apps/web/src/modules/db/browser.ts']);
+});
+
+test('without the slot field the same file is not an entry: another owner (modules/config) has no browser.ts entry', t => {
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: liteDb({
+      'apps/web/src/modules/config/index.ts': 'export const config = 1;\n',
+      'apps/web/src/modules/config/browser.ts': 'export const browserConfig = 1;\n',
+      'apps/web/src/hooks/orders/useConfig.ts': "import { browserConfig } from '../../modules/config/browser';\nexport const useConfig = browserConfig;\n",
+    }),
+  }));
+  assert.deepEqual(findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(item => item.resolvedPath), ['apps/web/src/modules/config/browser.ts']);
+});

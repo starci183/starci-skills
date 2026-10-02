@@ -116,15 +116,6 @@ exceptions:
   - path: examples/lite-app/be/tsconfig.json
     reason: >
       TypeScript toolchain config inside the lite-app back end; tsc reads JSON (with comments).
-  - path: examples/lite-app/fe/apps/landing/package.json
-    reason: >
-      npm workspace manifest of the lite-app landing front end; npm requires JSON.
-  - path: examples/lite-app/fe/apps/landing/src/modules/i18n/messages/vi.json
-    reason: >
-      i18n message catalog inside the lite-app landing source; next-intl consumes JSON.
-  - path: examples/lite-app/fe/apps/landing/tsconfig.json
-    reason: >
-      TypeScript toolchain config inside the lite-app landing front end; tsc reads JSON (with comments).
   - path: examples/lite-app/fe/apps/web/package.json
     reason: >
       npm workspace manifest of the lite-app product front end; npm requires JSON.

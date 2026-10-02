@@ -2,7 +2,7 @@
 
 Law module: `transport.mjs`. Catalogue: R50 FE_TRANSPORT_OWNER, R51 FE_HTTP_STATUS_COLLAPSE, R52 FE_WIRE_GENERATED.
 
-One repository, one client, one result vocabulary. The client is the file of HFS slot `fe.transport.client` (`apps/<app>/src/modules/api/client.ts`, a one-app repository) or `fe.package.api.client` (`packages/<family>-api/src/client.ts`, the shared client of a multi-app repository); the vocabulary is `Outcome<T>` (`ok`, `refused`, `invalid`, `not-found`, `unavailable`), declared in the `fe.transport.outcome` / `fe.package.api.outcome` file. The rules read the slot of the file being linted, never its path. 401 and 403 become `refused`; nothing collapses a status into `null`; wire types are generated from the contract copy in `modules/api/contract/`.
+One repository, one client, one result vocabulary. The client is the file of HFS slot `fe.transport.client` (`apps/<app>/src/modules/api/client.ts`, a one-app repository) or `fe.package.api.client` (`packages/<family>-api/src/client.ts`, the shared client of a multi-app repository); the vocabulary is `Outcome<T>` (`ok`, `refused`, `invalid`, `not-found`, `unavailable`), declared in the file of the slot the manifest marks `outcomeHome`: `fe.transport.outcome`, `fe.package.api.outcome`, or `fe.db.outcome` (`modules/db/outcome.ts`) in a lite app, whose db owner is the transport. The rules read the slot of the file being linted, never its path. 401 and 403 become `refused`; nothing collapses a status into `null`; wire types are generated from the contract copy in `modules/api/contract/`.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
@@ -171,7 +171,7 @@ switch (outcome.kind) {
 
 ## `starci-fe/one-outcome-union`
 
-A result union (`ok` / `kind` discriminant) is declared only in the outcome slot; elsewhere the code composes `Outcome<T>`.
+A result union (`ok` / `kind` discriminant) is declared only in the outcome-home slot (`outcomeHome: true` in the slot manifest); elsewhere the code composes `Outcome<T>`.
 
 A union type alias is a result union when its resolved members are all object types that carry the same literal-typed discriminant in the result vocabulary: `ok` (each member pins it to one value, `true` and `false` both present) or `kind` (at least one literal of the Outcome vocabulary: `ok`, `refused`, `forbidden`, `invalid`, `not-found`, `unavailable`). The members are read through the type checker, so `Ok<T> | Failure` and intersections are seen as what they are; no name (`*Outcome`, `*Result`) decides anything. UI state unions (`status`, `state`, `type`, a `kind` of tree nodes or menu items) are not result vocabulary and pass; so does an alias that only composes the one union (`type Read = Outcome<Course>`, `Exclude<Outcome<T>, ...>`). `Outcome<T> | { ok: false; kind: "conflict" }` adds an arm to the one union and is refused.
 
