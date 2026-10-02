@@ -15,7 +15,7 @@ export const importedFrom = (kit, checker, node, modules, names = null) => {
   return Boolean(binding && modules.has(binding.module) && (names === null || names.has(binding.name)));
 };
 
-const declarationFromSupabase = (declaration) => /(?:^|\/)node_modules\/@supabase\/(?:ssr|supabase-js)(?:\/|$)/u
+const declarationFromSupabase = (declaration) => /(?:^|\/)node_modules\/@supabase\/(?:ssr|supabase-js|auth-js|postgrest-js|storage-js)(?:\/|$)/u
   .test(String(declaration?.getSourceFile?.().fileName ?? '').replace(/\\/gu, '/'));
 
 const typeFromSupabase = (checker, node) => {
