@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
-import { imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { appSource, imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../../scripts/hfs/rules/monorepo.mjs';
 import { loadSonarGate } from '../../scripts/gates/sonar-gate.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -100,6 +100,8 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
   write('README.md', readmeOf(path.basename(dir)));
   if (declare) write('hfs.json', `${JSON.stringify(declaration, null, 2)}\n`);
   else fs.rmSync(path.join(dir, 'hfs.json'), { force: true });
+  // The Codecov components read the source the app now has: render the managed files once more over it, as `hfs sync` does after a capability is added.
+  writeTargets(dir, renderTargets(declaration, PRESETS, { source: appSource(dir) }));
   return dir;
 }
 

@@ -444,7 +444,7 @@ test('the scaffolded be core api builds with build:be and boots with start:core 
 const UNIT_DEPENDENCIES = Object.freeze(['jest', 'ts-jest', 'tslib']);
 const unitGate = gate('scaffold be unit run', missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...UNIT_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
 
-test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the unit-tested roles only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
+test('the scaffolded be unit run (the test script) writes the lcov Sonar and Codecov import, naming the logic files of be/src/modules only', { skip: unitGate.skip, timeout: 600_000 }, async (t) => {
   if (unitGate.required) assert.fail(unitGate.required);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-unit-'));
   const app = path.join(into, 'demo');
@@ -458,13 +458,15 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   assert.equal(script, 'cd be && jest --selectProjects unit --coverage');
   const jest = path.join(app, 'node_modules', 'jest', 'bin', 'jest.js');
   const unit = spawnSync(process.execPath, [jest, '--selectProjects', 'unit', '--coverage', '--ci', '--cacheDirectory', path.join(into, 'jest-cache')], { cwd: path.join(app, 'be'), encoding: 'utf8', timeout: 540_000 });
-  assert.equal(unit.status, 0, `the scaffold's unit run passes at per-file 100 on its services: ${unit.stdout}${unit.stderr}`);
+  assert.equal(unit.status, 0, `the scaffold's unit run passes at per-file 100 on its measured logic files: ${unit.stdout}${unit.stderr}`);
   const lcov = path.join(app, ...LCOV.split('/'));
   assert.ok(fs.existsSync(lcov), `${LCOV} is written by the unit run`);
   const files = fs.readFileSync(lcov, 'utf8').split(/\r?\n/).filter((line) => line.startsWith('SF:')).map((line) => line.slice(3).replace(/\\/g, '/'));
-  assert.ok(files.length > 0, 'the lcov names the services it measured');
-  for (const file of files) assert.match(file, /(^|\/)src\/(.*\.service\.ts|features\/cli\/.*\.cli\.ts)$/, `${file}: only services and cli commands are measured (jest names the file relative to be/ or absolute)`);
-  assert.ok(files.some((file) => file.endsWith('.service.ts')) && files.some((file) => file.endsWith('.cli.ts')), 'the lcov measures both unit-tested roles');
+  assert.ok(files.length > 0, 'the lcov names the files it measured');
+  const roles = MANIFEST.ruleParams.be.logicRoles;
+  for (const file of files) assert.ok(/(^|\/)src\/modules\//.test(file) && roles.some((role) => file.endsWith(`.${role}.ts`)), `${file}: only the logic roles of be/src/modules are measured (jest names the file relative to be/ or absolute)`);
+  assert.ok(!files.some((file) => /(^|\/)src\/features\//.test(file)), 'a feature is thin and never measured');
+  assert.ok(files.some((file) => file.endsWith('.service.ts')) && files.some((file) => /\.(guard|policy|client)\.ts$/.test(file)), 'the lcov measures the services and the other logic roles');
 });
 
 /** What the fe build loads besides the lint set: the server-only marker the i18n package's server modules import. */
