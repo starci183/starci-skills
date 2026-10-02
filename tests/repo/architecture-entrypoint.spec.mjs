@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-be-fixture.mjs';
+import { archFixture, runArch, findings } from '../helpers/repo-architecture-entrypoint-fixture.mjs';
 
 // R33 entrypoint-only-in-apps (BE_ENTRYPOINT_ONLY_IN_APPS): NestFactory.create* and a top-level bootstrap() live in
 // apps/<app>/src/main.ts only.
