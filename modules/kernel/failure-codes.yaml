@@ -3885,14 +3885,27 @@ PRIMARY_ABSENT:
   owner: other-op:interface.draw
   kind: check-finding
 
+ENV_DUMP:
+  title: "Environment dump refused"
+  title_vi: "Không được in toàn bộ biến môi trường"
+  meaning_vi: "Lệnh bị chặn vì nó ghi toàn bộ biến môi trường ra đầu ra (env, printenv, set không đối số, export -p, declare -x, Get-ChildItem env:, [Environment]::GetEnvironmentVariables(), node -p process.env, python -c print(os.environ), cmd /c set). Môi trường chứa mọi token và khóa của phiên; lọc bằng grep hay che bằng sed sau đó vẫn làm lộ các tên không khớp mẫu (giá trị AWS, Azure và Anthropic đã lọt vào transcript theo cách này)."
+  causes_vi:
+    - "Chạy env | grep ... để tìm một biến thay vì đọc đúng biến cần"
+    - "In toàn bộ process.env hoặc os.environ để gỡ lỗi"
+    - "Liệt kê Get-ChildItem env: rồi lọc bằng Where-Object"
+  nextStep_vi: "Lệnh không được chạy; chỉ đọc đúng một biến có tên và không phải bí mật (echo $NAME, $env:NAME, printenv NAME), không bao giờ in toàn bộ môi trường."
+  owner: op-retry
+  kind: verb-refusal
+
 PROCESS_KILL_BY_NAME:
   title: "Kill by process name refused"
   title_vi: "Không được dừng tiến trình theo tên"
-  meaning_vi: "Lệnh bị chặn vì nó dừng tiến trình theo tên hoặc mẫu (taskkill /IM hay /FI, pkill, killall, Stop-Process -Name), tức là dừng cả Orca và tiến trình của mọi agent khác trên máy."
+  meaning_vi: "Lệnh bị chặn vì nó dừng tiến trình theo tên hoặc mẫu (taskkill /IM hay /FI, pkill, killall, Stop-Process -Name, wmic process ... delete) hoặc dừng tiến trình mà mục tiêu do một truy vấn tiến trình tìm ra (Get-CimInstance Win32_Process, Get-Process, ps | grep, pgrep rồi Stop-Process, kill, .Terminate()), tức là dừng cả Orca và tiến trình của mọi agent khác trên máy."
   causes_vi:
     - "Dùng taskkill /IM node.exe, pkill hoặc killall để dọn một lần chạy bị treo"
     - "Dùng Stop-Process -Name hoặc wmic process where name=... thay vì PID của chính mình"
-  nextStep_vi: "Lệnh không được chạy; chỉ dừng PID do chính mình khởi động (taskkill /PID, kill <pid>, Stop-Process -Id), tiến trình không phải của mình thì báo lại, không bao giờ dừng."
+    - "Lọc tiến trình theo CommandLine, đường dẫn hay tiến trình cha rồi đưa kết quả vào Stop-Process, kill hoặc taskkill /PID"
+  nextStep_vi: "Lệnh không được chạy; chỉ dừng PID do chính mình khởi động và đã ghi lại (taskkill /PID, kill <pid>, Stop-Process -Id), không bao giờ theo truy vấn; tiến trình không phải của mình thì báo lại, không bao giờ dừng."
   owner: op-retry
   kind: verb-refusal
 
@@ -10317,6 +10330,17 @@ unknown-option:
   nextStep_vi: "Bỏ tuỳ chọn; muốn thiên vị pool thì chủ đặt routing_bias trong define-goal."
   owner: runtime-core
   kind: verb-refusal
+
+unstamped-orphan:
+  title: "An unstamped orphan worktree awaits the owner's review"
+  title_vi: "Cây làm việc mồ côi không có dấu sở hữu đang chờ chủ xem xét"
+  meaning_vi: "Có một cây làm việc không mang dấu sở hữu của runtime (cây Orca không có comment starci:<kind>:<slot>, hoặc cây git dưới .starciwork/worktrees mà nhánh không ghi job nào), không có dòng registry, không còn terminal sống và đã quá thời gian chờ của chủ. GC không bao giờ tự gỡ cây này vì có thể đó là việc tay của chủ; nó ghi đúng một sự cố cho mỗi cây (machine_logs kind worktree.orphan-review) và báo lại ở mỗi lượt như một mục review."
+  causes_vi:
+    - "Cây do người hoặc công cụ ngoài runtime tạo rồi bị bỏ lại"
+    - "Cây của runtime bị mất dấu sở hữu hoặc nhánh mất mô tả job"
+  nextStep_vi: "Chủ xem sự cố worktree.orphan-review trong machine_logs rồi tự gỡ cây (còn việc chưa commit thì lấy ra trước) hoặc nhận lại nó; GC không làm thay."
+  owner: owner
+  kind: runtime-fault
 
 unread-peer:
   title: "Peer message unread"

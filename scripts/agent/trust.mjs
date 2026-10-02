@@ -447,7 +447,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 /* ------------------------------------------------------ the command guard */
 
 const GUARD_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'guards', 'command-guard.mjs');
-export const TOOL_GUARD_MARKER = 'command-guard.mjs';
+export const TOOL_GUARD_MARKER = 'command-guard.mjs', TOOL_GUARD_MATCHER = 'Bash|PowerShell', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
 /** The hook command every host runs: forward slashes, since Claude and Devin run hooks through Git Bash on Windows. */
 export const toolGuardCommand = (script = GUARD_SCRIPT) => `node "${String(script).replace(/\\/g, '/')}"`;
 const isGuardHandler = (h) => typeof h?.command === 'string' && h.command.includes(TOOL_GUARD_MARKER);
@@ -459,7 +459,7 @@ const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandl
  * runtime path) is replaced; every other hook is kept. `edit(doc)` -> true when it changed doc, in the same write.
  */
 export function assertJsonToolGuard({ file, command, matcher = null, edit = null, hooks }) {
-  const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: 30 }] };
+  const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: TOOL_GUARD_TIMEOUT_S }] };
   const holds = (d) => {
     const list = Array.isArray(d?.hooks?.PreToolUse) ? d.hooks.PreToolUse.filter(isGuardGroup) : [];
     return list.length === 1 && JSON.stringify(list[0]) === JSON.stringify(group);
@@ -613,7 +613,7 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
     const launchEnv = guard(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
     receipt.launchEnv = launchEnv.state ?? 'failed';
     if (!launchEnv.ok) receipt.errors.push({ file, error: launchEnv.error ?? launchEnv.state });
-    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: 'Bash|PowerShell', hooks }));
+    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
     receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
     if (!toolGuard.ok) receipt.errors.push({ file, error: toolGuard.error ?? toolGuard.state });
     if (consent.ok || launchEnv.ok || toolGuard.ok) excluded(file);

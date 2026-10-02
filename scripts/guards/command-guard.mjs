@@ -26,11 +26,16 @@
 //    consumes deliveries before the ledger records them; the Kernel reads through `api messages` / `api questions`
 //    and the runtime drains. Ops and [Worker]s keep it: Orca's worker protocol (modules/host/orca/api.yaml
 //    operationAgent) has them check their own Run's deliveries, which no ledger record depends on.
+//  - the environment: a command that writes the whole environment to output (env, printenv, bare set, export -p, declare -x,
+//    Get-ChildItem env:, [Environment]::GetEnvironmentVariables(), node -p process.env, python -c print(os.environ)), even
+//    filtered by grep or redacted by sed (ENV_DUMP, scripts/guards/env-dump-verdict.mjs); one named variable is read freely.
 //  - links: `ln`, `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and [IO.Directory]::Create*Link - an
 //    op never creates a link.
 //  - processes: a kill by image name or pattern (taskkill /IM or /FI, pkill, killall, Stop-Process -Name, wmic process
 //    where name=...), which also ends Orca and every other agent's processes of that name (a lane's taskkill of node.exe
-//    restarted Orca, 2026-10-01); an agent ends only the PIDs it started.
+//    restarted Orca, 2026-10-01); a kill whose targets come from a process query (Get-CimInstance Win32_Process,
+//    Get-Process, ps | grep, pgrep, then Stop-Process, kill, .Terminate()); an agent ends only the PIDs it started
+//    (scripts/guards/process-kill-verdict.mjs).
 //  - deletes: a recursive delete (rm -r, rmdir|rd /s, del /s, robocopy /MIR|/PURGE, Remove-Item -Recurse and its
 //    aliases), which follows a junction into the live tree; trees go through safeRemove.
 //  - workflow history: inside the workflow worktree its guard names (guard.workflowWorktree, contract change
@@ -51,7 +56,10 @@ import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';
 import { guardsRoot } from './guards-root.mjs';
 import { launchVerdict } from './launch-verdict.mjs';
-import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { envDumpVerdict } from './env-dump-verdict.mjs';
+import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
+import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -213,13 +221,18 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
     while (w.length && ASSIGNMENT.test(w[0])) { const [, k, v] = ASSIGNMENT.exec(w[0]); local[k] = v; w.shift(); }
     if (!w.length) { Object.assign(scopeEnv, local); continue; }
     let program = programOf(w[0]);
-    if (program === 'export' || program === 'set') { for (const a of w.slice(1)) { const m = ASSIGNMENT.exec(a); if (m) scopeEnv[m[1]] = m[2]; } continue; }
+    if (program === 'export' || program === 'set') {
+      if (w.length === 1 || (w.length === 2 && w[1] === '-p')) out.push({ program, args: w.slice(1), cwd: dir, env: scopeEnv, word: w[0], dialect });
+      for (const a of w.slice(1)) { const m = ASSIGNMENT.exec(a); if (m) scopeEnv[m[1]] = m[2]; } continue; }
     const cmdEnv = { ...scopeEnv, ...local };
     for (let guard = 0; guard < 6; guard += 1) {
       if (PREFIX_PROGRAMS.has(program)) { w = w.slice(1).filter((a, i, all) => !(i === 0 && /^-/.test(a) && all.length > 1)); }
       else if (program === 'env') {
+        const envWord = w[0];
         w = w.slice(1);
-        while (w.length && (/^-/.test(w[0]) || ASSIGNMENT.test(w[0]))) { const m = ASSIGNMENT.exec(w[0]); if (m) cmdEnv[m[1]] = m[2]; w.shift(); }
+        while (w.length && (/^-/.test(w[0]) || ASSIGNMENT.test(w[0]))) { const m = ASSIGNMENT.exec(w[0]); if (m) cmdEnv[m[1]] = m[2]; if (/^-[uCS]$/.test(w[0])) w.shift(); w.shift(); }
+        // `env` and `env -u NAME` with no command to run print the whole environment: they stay a command for ENV_DUMP.
+        if (!w.length) out.push({ program: 'env', args: [], cwd: dir, env: cmdEnv, word: envWord, dialect });
       } else if (program === 'xargs') {
         w = w.slice(1);
         while (w.length && /^-/.test(w[0])) { const takesValue = /^-(?:[IdEnLPs]|-(?:replace|delimiter|eof|max-args|max-lines|max-procs|max-chars|arg-file))$/.test(w[0]); w.shift(); if (takesValue) w.shift(); }
@@ -283,25 +296,6 @@ const linkVerdict = (program, args, word) => {
   return { code: 'LINK_CREATE', command: [word, ...args].join(' ').slice(0, 200),
     reason: 'an op worker never creates a junction, symlink or hard link - a link from a scratch tree into a live repository is followed by a recursive delete (git worktree remove, rm -rf, Remove-Item) and empties the live repository',
     remedy: 'work in your dispatched checkout with its own node_modules; a need for another tree or a linked dependency is reported (report blocked environment), never made' };
-};
-
-// A kill that selects processes by image name or pattern ends every process of that name on the machine: Orca, other
-// agents' workers, other lanes' test runs (a lane's `taskkill /F /IM node.exe` restarted Orca, 2026-10-01). An agent ends
-// only the PIDs it started: `taskkill /PID <pid>`, `kill <pid>`, `Stop-Process -Id <pid>`.
-const TASKKILL_SELECTOR = /^(?:\/\/?|-)(?:im|fi)$/i;
-const NAME_PARAMETER = /^-(?:n|na|nam|name|processname)(?::.*)?$/i;
-const POWERSHELL_STOP = new Set(['stop-process', 'spps']);
-const killVerdict = (program, args) => {
-  let how = null;
-  if (program === 'taskkill' && args.some((a) => TASKKILL_SELECTOR.test(a))) how = 'taskkill by image name or filter (/IM, /FI)';
-  else if (program === 'pkill' || program === 'killall') how = `${program}, which selects processes by name or pattern`;
-  // PowerShell's kill alias takes the full -Name/-ProcessName; a POSIX `kill -n <signal>` is not a name.
-  else if ((POWERSHELL_STOP.has(program) && args.some((a) => NAME_PARAMETER.test(a))) || (program === 'kill' && args.some((a) => /^-(?:name|processname)(?::.*)?$/i.test(a)))) how = 'Stop-Process -Name';
-  else if (program === 'wmic' && args.some((a) => /^process$/i.test(a)) && args.some((a) => /\bname\s*=|^name$/i.test(a))) how = 'wmic process selected by name';
-  if (!how) return null;
-  return { code: 'PROCESS_KILL_BY_NAME', command: [program, ...args].join(' ').slice(0, 200),
-    reason: `${how} ends every process of that name on the machine, including Orca and other agents' workers (a lane's taskkill of node.exe restarted Orca, 2026-10-01)`,
-    remedy: 'end only a PID you started yourself (taskkill /PID <pid>, kill <pid>, Stop-Process -Id <pid>); a process you did not start is reported, never killed' };
 };
 
 // A recursive delete follows a junction or symlink inside the tree and empties the live tree it points at (a Git for
@@ -442,10 +436,15 @@ const loadDeps = async () => {
  */
 export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null }) {
   const d = deps ?? await loadDeps();
-  for (const c of commandsOf(command, { cwd, env, dialect })) {
+  const commands = commandsOf(command, { cwd, env, dialect });
+  const byQuery = queryKillVerdict(commands, command);
+  if (byQuery) return { tool: 'process-query', ...byQuery };
+  for (const c of commands) {
+    const dump = envDumpVerdict(c);
+    if (dump) return { tool: c.program, ...dump };
     const link = linkVerdict(c.program, c.args, c.word);
     if (link) return { tool: c.program, ...link };
-    const kill = killVerdict(c.program, c.args);
+    const kill = nameKillVerdict(c.program, c.args);
     if (kill) return { tool: c.program, ...kill };
     const del = recursiveDeleteVerdict(c.program, c.args, c.dialect);
     if (del) return { tool: c.program, ...del };
