@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
@@ -22,10 +23,20 @@ const listFiles = (dir, base = dir) => fs.readdirSync(dir, { withFileTypes: true
 
 const gitStatus = cwd => execFileSync('git', ['status', '--porcelain=v1'], { cwd, encoding: 'utf8' });
 
-/** Docker answering is the one and only reason this proof may skip. */
+/** The Supabase CLI default local ports (api, db, studio, inbucket, analytics): the scaffold's own stack claims them. */
+const DEFAULT_STACK_PORTS = Object.freeze([54321, 54322, 54323, 54324, 54327]);
+const portBusy = (port) => new Promise((resolve) => {
+  const socket = net.connect({ host: '127.0.0.1', port });
+  socket.once('connect', () => { socket.destroy(); resolve(true); });
+  socket.once('error', () => resolve(false));
+});
+const busyPorts = (await Promise.all(DEFAULT_STACK_PORTS.map(async (port) => ((await portBusy(port)) ? port : null)))).filter((port) => port !== null);
+
+/** Docker answering is the one prerequisite; the other is that no stack holds the default ports (a busy host is never disturbed). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
-const skipReason = dockerProbe.status === 0 ? false
-  : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
+const skipReason = dockerProbe.status !== 0
+  ? `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`
+  : busyPorts.length > 0 ? `the default Supabase ports ${busyPorts.join(', ')} are held by another stack; this proof never shares or stops it` : false;
 
 test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
   let stopDatabase = () => {};
@@ -109,7 +120,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   const anonKey = local.ANON_KEY ?? local.PUBLISHABLE_KEY;
   assert.equal(typeof anonKey, 'string', 'supabase status returned a local anonymous key');
   assert.ok(anonKey.length > 0, 'the local anonymous key is not empty');
-  const response = await fetch('http://127.0.0.1:54321/rest/v1/profiles', {
+  assert.equal(typeof local.API_URL, 'string', 'supabase status returned the local API url');
+  const response = await fetch(`${local.API_URL}/rest/v1/profiles`, {
     headers: { accept: 'application/json', apikey: anonKey },
   });
   assert.ok([200, 401, 403].includes(response.status), `anonymous profiles request returned ${response.status}`);
