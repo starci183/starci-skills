@@ -482,7 +482,7 @@ export function assertJsonToolGuard({ file, command, matcher = null, edit = null
   return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
 }
 
-/** Devin's config.json: agent.model pinned to `model` (worker-start passes no model to Devin) and the command guard. */
+/** Devin's project config: the command guard, and agent.model. LIVE E7 (2026-10-02): Devin honours agent.model only in the user config (--config) or DEVIN_MODEL, NOT in <project>/.devin/config*.json, and Orca refuses a launch-time model for Devin, so this pin is advisory until a launch-env path exists (evidence: c0.review.md). */
 export function writeDevinProfile({ file, command, model = null, hooks }) {
   const pin = (d) => {
     if (!model || d.agent?.model === model) return false;
