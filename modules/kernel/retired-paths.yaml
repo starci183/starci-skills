@@ -974,6 +974,7 @@ moved:
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
+  - {symbol: workerDoneOf, replacedBy: 'nothing: settle reads the Dispatch with worker-show; the bridged worker_done rows stay as the audit echo (orchestrationMessagesOf)'}
   - {symbol: inventorySnapshot, replacedBy: 'nothing: the inventory_snapshots table had no writer and no reader (alpha5 item 1.8); it is gone from machine 0001-init.sql'}
   - {symbol: reapAgentProcess, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
   - {symbol: reapIfStillLive, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
