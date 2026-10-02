@@ -2,12 +2,10 @@
 //   which slot owns path P           slotOf(P) / classifyPath(P)   (an unknown path reports its nearest slot)
 //   is import A -> B allowed         importAllowed(A, B)           (tier matrix, cross-owner entry, cross-app, layers)
 //   which files are required         requiredFiles(P) / requiredPaths()
-//   is this path tracked             isTracked(P) / trackingOf(P)
-// The rule catalog (knowledge/hfs/rules.yaml, modules/schemas/hfs-rules.schema.yaml) loads through loadRuleCatalog / rules().
+//   is this path tracked             isTracked(P) / trackingOf(P); the rule catalog (knowledge/hfs/rules.yaml, modules/schemas/hfs-rules.schema.yaml) loads through loadRuleCatalog / rules().
 // Every check and lint rule of HFS reads knowledge/hfs/slots.yaml through this module; none keeps its own path
 // list. The manifest shape is modules/schemas/hfs-slots.schema.yaml and hfs.json is modules/schemas/hfs-repo.schema.yaml;
-// the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv
-// (tests/hfs/hfs-slots.spec.mjs proves the two agree).
+// the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv (tests/hfs/hfs-slots.spec.mjs proves the two agree).
 //
 // A product is ONE app repository: hfs.json at the app root has kind `app` and declares its two sides, `be` and `fe`, each in
 // the folder of that name. The resolver of the app answers for the whole tree: a root path with the slots of profile `app`,
@@ -21,6 +19,7 @@
 // `generated` (a copy written only by the slot's `generatedBy`), and a top-level `pending` list, the one shrink-only
 // allowlist of the runtime check (scripts/hfs/runtime-check.mjs). A runtime repository declares itself with
 // hfs.json {"hfs": <major>, "kind": "runtime", "project": <name>}.
+import { paramNamesOk } from './param-names.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -189,12 +188,7 @@ function manifestShapeProblems(m) {
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
     if (!isPlainObject(owners) || !Object.keys(owners).length || !Object.entries(owners).every(([key, list]) => key && Array.isArray(list) && list.every((o) => ownerId.test(String(o))) && new Set(list).size === list.length)) bad.push('ruleParams.be.infraOwners must map a non-empty specifier to a list of unique platform/<capability> or integrations/<provider> owners ([] means nowhere)');
-    const upperName = (v) => /^[A-Z][A-Za-z0-9]*$/.test(String(v));
-    const paramNameOk = (e) => isPlainObject(e) && ((e.type === undefined) !== (e.typeSuffix === undefined)) && upperName(e.type ?? e.typeSuffix)
-      && Array.isArray(e.names) && e.names.length > 0 && new Set(e.names).size === e.names.length && e.names.every((n) => /^[a-z][A-Za-z0-9]*$/.test(String(n)))
-      && (e.nameSuffix === undefined || upperName(e.nameSuffix)) && Object.keys(e).every((k) => ['type', 'typeSuffix', 'names', 'nameSuffix'].includes(k));
-    const paramKeys = Array.isArray(rp.be.paramNames) ? rp.be.paramNames.map((e) => `${e?.type !== undefined ? 'type' : 'typeSuffix'}:${e?.type ?? e?.typeSuffix}`) : [];
-    if (!Array.isArray(rp.be.paramNames) || !rp.be.paramNames.length || !rp.be.paramNames.every(paramNameOk) || new Set(paramKeys).size !== paramKeys.length) bad.push('ruleParams.be.paramNames must be a non-empty list of unique {type | typeSuffix, names, nameSuffix?} entries');
+    if (!paramNamesOk(rp.be.paramNames)) bad.push('ruleParams.be.paramNames must be a non-empty list of unique {type | typeSuffix, names, nameSuffix?} entries');
     const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
     if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
     if (!roleList(rp.be.bannedSuffixes)) bad.push('ruleParams.be.bannedSuffixes must be a non-empty list of unique kebab-case suffixes');

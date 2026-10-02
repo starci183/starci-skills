@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- New: `response-cookie-attributes` (R141 `BE_COOKIE_ATTRIBUTES`): a cookie written through the Express or Fastify response states `httpOnly: true`, `secure: true` and `sameSite` `lax` or `strict` in typed options, and `Set-Cookie` is never written as a header.
+- New: `injected-param-name` (R85): a parameter that injects a port of the table `ruleParams.be.paramNames` of the slot manifest (`Clock`, `Logger`, `Cache`, `CommandBus`, `QueryBus`, `EntityManager`, `*Options`) carries the name that table gives it.
+- Changed: `secret-compare-timing-safe` (R41) also recognises, by type, the `.digest()` of a crypto `Hash` or `Hmac`.
+- Changed: the texts of `unit-test-colocated` and the law headers name the four test kinds and the pattern files; the bundled runtime copies follow.
+
 ## 3.0.7 - 2026-10-01
 
 - Changed: the runtime layer check moves test-secrets onto api/sops/decrypt.mjs; bundled copies follow.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New: `hfs secret list|show|set|gen` (alpha.5 item 6.4), the canon command over the sealed secrets of `.starcistacks/<env>/secrets/<slug>.enc`, on the runtime's sops api (a new `seal` call: the value travels on stdin, never on an argument list). Replaces the plain `sops` commands of runbooks and KEYS.md files.
+- Changed: HFS_REQUIRED_FILE_MISSING now also carries what BE_REQUIRED_MODULE_MISSING reported, and BE_TEST_TOPOLOGY what HFS_TEST_KIND_RETIRED reported (one code per obligation); the bundled architecture machine follows `APP_GUARD` and `APP_FILTER` providers built by a helper outside the app root file.
 - Changed: the managed fe scripts (`dev:fe`, `start:<app>`, `build:fe`) run `next` from the app directory (`cd fe/apps/<app> && next ...`) so next-intl finds its request config; the fe skeleton reads the request locale through `next/root-params` (`experimental.rootParams`), pins the workspace root three levels above the app and uses the `.*[.].*` proxy matcher; the bundled runtime carries the `&&`/`||`-aware FE_SWR_KEY_IDENTITY check.
 ## Unreleased (C0 batch)
 

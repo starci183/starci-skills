@@ -15,6 +15,7 @@ npx hfs emit-contracts [--repo <dir>]         # write be/contracts/<app>/schema.
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard: staged .starciwork / .starcistacks paths, and the secrets guard over every staged file (read from the index)
+npx hfs secret list|show|set|gen ...              # the sealed secrets of .starcistacks/<env>/secrets (sops through the runtime's api): list names the keys, show decrypts one value, set seals the value read from stdin, gen seals a random one; --env, --key, --age, --bytes, --repo
 npx hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]   # a back-end service and its unit spec skeleton
 npx hfs new spec <file>.service.ts [--repo <dir>]                                                              # the spec skeleton of an existing service
 ```
