@@ -3,7 +3,7 @@ import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { QueueOptions } from "./queue.options"
 import type { QueueOutbox, QueueWorkerRegistry } from "./queue.port"
-import type { QueueTransport } from "./queue-transport.port"
+import type { QueueFactory, QueueTransport } from "./queue-transport.port"
 
 /** Token of the options of the queues, exported so a spec can provide it. */
 export const QUEUE_OPTIONS: unique symbol = Symbol("platform.queue.options")
@@ -19,6 +19,9 @@ export const QUEUE_TRANSPORT: unique symbol = Symbol("platform.queue.transport")
 
 /** Token of the entity managers of the connections whose outbox the relay reads, in the order the options name them. */
 export const QUEUE_RELAY_MANAGERS: unique symbol = Symbol("platform.queue.relay-managers")
+
+/** Token of the factory that builds the BullMQ objects, exported so a spec can provide it. */
+export const QUEUE_FACTORY: unique symbol = Symbol("platform.queue.factory")
 
 /** Injects the options of the queues. Parameter type: QueueOptions. */
 export const InjectQueueOptions = (): TypedParameterDecorator<QueueOptions> => injector<QueueOptions>(QUEUE_OPTIONS)
@@ -37,3 +40,6 @@ export const InjectQueueTransport = (): TypedParameterDecorator<QueueTransport> 
 /** Injects the entity managers the relay reads the outbox of. Parameter type: ReadonlyArray<EntityManager>. */
 export const InjectQueueRelayManagers = (): TypedParameterDecorator<ReadonlyArray<EntityManager>> =>
     injector<ReadonlyArray<EntityManager>>(QUEUE_RELAY_MANAGERS)
+
+/** Injects the factory that builds the BullMQ objects. Parameter type: QueueFactory. */
+export const InjectQueueFactory = (): TypedParameterDecorator<QueueFactory> => injector<QueueFactory>(QUEUE_FACTORY)

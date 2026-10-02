@@ -1,12 +1,12 @@
 import { DataSource } from "typeorm"
 import type { DatabaseConnectionOptions } from "./database.options"
-import type { ConnectionSource, OpenConnection } from "./database.port"
+import type { ConnectionSource } from "./database.port"
 
 /**
  * Opens the data source of one connection, uninitialized: its own migration ledger table (`<connection>_migrations`), the
  * schema changed only by migrations.
  */
-export const openConnectionSource: OpenConnection = (connection: DatabaseConnectionOptions): ConnectionSource =>
+export const openConnectionSource = (connection: DatabaseConnectionOptions): ConnectionSource =>
     new DataSource({
         type: "postgres",
         url: connection.url.reveal(),

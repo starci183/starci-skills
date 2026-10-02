@@ -1,0 +1,57 @@
+id: coverage-modules-logic
+effectiveAt: '2026-10-02T21:00:00+07:00'
+summary: >-
+  Lane C0 C4 COVERAGE (owner 2026-10-02): coverage is the modules' logic, not services and cli commands alone. A measured
+  file is a `<name>.<role>.ts` of a `ruleParams.be.logicRoles` role inside a slot whose `coverage` is `required` (the logic
+  of be/src/modules/**: domain, integrations, platform, projections), held at 100 per file on lines, branches, functions
+  and statements under v8. The one derivation is scripts/hfs/coverage-scope.mjs; `hfs sync` renders it into
+  be/jest.config.js (`starciJestConfig({ coverage: { roots, roles, excludes } })`), `sonar.coverage.exclusions` and
+  codecov.yml (the measured roots plus one component per service app and one platform, each at 100), and a hand edit of any
+  of the three is R204 HFS_COVERAGE_SCOPE_DRIFT; the old services-only COVERAGE_SOURCES / coverageScope / coverageExclusions
+  mechanism is retired. Every feature-tier file of a `ruleParams.be.thinRoles` role is thin (R203 BE_FEATURE_THIN): it maps
+  its parameters and makes ONE delegating call into modules/, is never measured and never unit-spec'd, and is proven by
+  integration and e2e; saga compensation paths owe e2e proof (R173 BE_SAGA_E2E_MISSING). A unit spec stays REQUIRED beside
+  every spec-required role of `ruleParams.be.unitRoles` (a `*.service.ts`, a cli command of be.cli) and beside a webhook or
+  realtime door with no service of its own; any other logic-role file of a measured slot may carry an optional colocated
+  `<name>.<role>.spec.ts` — it owes 100 per file, not a spec of its own. A leg admitted earlier settles on its old contract.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/coverage-modules-logic.yaml
+  - scripts/hfs/coverage-scope.mjs
+  - scripts/hfs/manifest-shape.mjs
+  - scripts/hfs/slots.mjs
+  - scripts/gates/unit-run.mjs
+  - scripts/checks/check-examples-ci.mjs
+  - packages/jest-preset/index.cjs
+  - packages/jest-preset/README.md
+  - packages/eslint/be/feature-thin.mjs
+  - packages/eslint/be/README.md
+  - packages/hfs/sync/index.mjs
+  - packages/hfs/sync/managed.mjs
+  - packages/hfs/templates/be/tool-config/jest.config.js
+  - packages/hfs/templates/app/quality-config/codecov.yml
+  - packages/hfs/README.md
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/be/cli.yaml
+  - knowledge/patterns/be/folder.yaml
+  - knowledge/patterns/be/index.yaml
+  - knowledge/patterns/be/transport.yaml
+  - knowledge/patterns/be/api.yaml
+  - knowledge/patterns/be/background.yaml
+  - knowledge/patterns/be/jobs.yaml
+  - knowledge/patterns/be/reactors.yaml
+  - knowledge/patterns/be/saga.yaml
+  - knowledge/patterns/be/webhooks.yaml
+  - knowledge/patterns/be/realtime.yaml
+  - knowledge/op-gate.yaml
+  - knowledge/sonar-gate.yaml
+  - modules/ops/ops/unit.verify.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - docs/backend-source-pattern.md
+  - docs/releasing.md
+  - examples/ecommerce-app/be/docs/guides/testing.md

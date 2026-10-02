@@ -91,8 +91,8 @@ describe("OrderPaymentService", () => {
     })
 
     describe("expireOverdue", () => {
-        it("expires the overdue pending orders and publishes order.expired for each in the same transaction", async () => {
-            const cutoff = new Date("2026-02-03T03:05:06.000Z")
+        it("expires the overdue pending orders of the window the payload names and publishes order.expired for each in the same transaction", async () => {
+            const cutoff = new Date("2026-02-03T02:05:06.000Z")
             const tx = fakeTransaction(
                 mockEntityManager({
                     query: [
@@ -106,7 +106,7 @@ describe("OrderPaymentService", () => {
             )
             const { service, bus } = await build(tx.em)
 
-            const result = await service.expireOverdue({ olderThanMs: 3_600_000, limit: 100 })
+            const result = await service.expireOverdue({ payload: { olderThanMs: 7_200_000 } })
 
             expect(result).toEqual({ expired: 2 })
             expect(tx.em.query).toHaveBeenCalledWith(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [cutoff, 100])
@@ -118,11 +118,21 @@ describe("OrderPaymentService", () => {
             expect(tx.commits).toBe(1)
         })
 
+        it("expires with the default payment window when the payload carries none", async () => {
+            const cutoff = new Date("2026-02-03T03:05:06.000Z")
+            const tx = fakeTransaction(mockEntityManager({ query: [EXPIRE_PENDING_ORDERS_PLACED_BEFORE, []] }))
+            const { service } = await build(tx.em)
+
+            expect(await service.expireOverdue({ payload: {} })).toEqual({ expired: 0 })
+
+            expect(tx.em.query).toHaveBeenCalledWith(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [cutoff, 100])
+        })
+
         it("publishes nothing when no order is overdue", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [EXPIRE_PENDING_ORDERS_PLACED_BEFORE, []] }))
             const { service, bus } = await build(tx.em)
 
-            expect(await service.expireOverdue({ olderThanMs: 3_600_000, limit: 100 })).toEqual({ expired: 0 })
+            expect(await service.expireOverdue({ payload: { olderThanMs: 3_600_000 } })).toEqual({ expired: 0 })
             expect(bus.writes).toEqual([])
         })
     })

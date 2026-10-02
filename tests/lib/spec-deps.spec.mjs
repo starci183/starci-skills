@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { specsDependingOn, reachableFrom } from '../../scripts/lib/spec-deps.mjs';
+import { dataRefsOf, specsDependingOn, reachableFrom } from '../../scripts/lib/spec-deps.mjs';
 
 function repo(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-spec-deps-'));
@@ -77,4 +77,19 @@ test('the CLI reads a large changed list from stdin (`-`): a tree move exceeds t
   const r = spawnSync(process.execPath, [cli, root, '-'], { input: `${changed.join('\n')}\n`, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.stdout.trim().split(/\r?\n/), ['tests/lib/leaf.spec.mjs']);
+});
+
+test('a spec that reads a data tree (a path string or path segments) depends on every file below it, though it imports none', (t) => {
+  const root = repo(t, {
+    'tests/drift.spec.mjs': "const EXAMPLE = path.join(ROOT, 'examples', 'ecommerce-app', 'be');\nconst TEMPLATES = path.join(ROOT, 'packages/hfs/templates/be/patterns');\n",
+    'tests/helpers/reads.mjs': "export const dir = ['knowledge', 'patterns', 'be'].join('/');\nexport const tree = path.join(ROOT, 'knowledge', 'patterns', 'be');\n",
+    'tests/uses-helper.spec.mjs': "import { tree } from './helpers/reads.mjs';\n",
+    'tests/plain.spec.mjs': "import assert from 'node:assert';\n",
+  });
+  const specs = ['tests/drift.spec.mjs', 'tests/uses-helper.spec.mjs', 'tests/plain.spec.mjs'];
+  assert.deepEqual(dataRefsOf("path.join(ROOT, 'examples', 'ecommerce-app', 'be') 'packages/hfs/templates/be/patterns/' 'node:fs' 'scripts/x'").sort(), ['examples/ecommerce-app/be', 'packages/hfs/templates/be/patterns']);
+  assert.deepEqual(specsDependingOn(root, ['examples/ecommerce-app/be/src/modules/platform/jobs/x.ts'], specs), ['tests/drift.spec.mjs']);
+  assert.deepEqual(specsDependingOn(root, ['packages/hfs/templates/be/patterns/jobs/a.ts.tpl'], specs), ['tests/drift.spec.mjs']);
+  assert.deepEqual(specsDependingOn(root, ['knowledge/patterns/be/jobs.yaml'], specs), ['tests/uses-helper.spec.mjs'], 'a helper under tests/ names the tree for the spec that imports it');
+  assert.deepEqual(specsDependingOn(root, ['examples/ecommerce-app/other/x.ts'], specs), [], 'a sibling tree is not below the named one');
 });

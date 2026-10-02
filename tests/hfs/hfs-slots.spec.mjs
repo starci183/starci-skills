@@ -469,6 +469,7 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     tracked: tracked
     tier: feature
     tests: unit-beside
+    coverage: none
     since: 2.2.0
 
 # Checks that read this manifest`) });

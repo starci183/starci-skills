@@ -30,7 +30,7 @@ import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
-import { TEMPLATES_DIR, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
+import { TEMPLATES_DIR, appSource, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
@@ -364,7 +364,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, file.content);
   }
-  const targets = renderTargets(declaration, presets, { manifest });
+  const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
   writeTargets(root, targets);
   if (app.edition === 'lite') {
     try {

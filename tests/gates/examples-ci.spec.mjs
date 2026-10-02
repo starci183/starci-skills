@@ -1,5 +1,6 @@
-// examples-ci.spec.mjs - every example app runs in the ONE root workflow through a derived matrix and has a Codecov flag over
-// the same coverage scope as its own codecov.yml, whose complement is its sonar.coverage.exclusions (scripts/checks/check-examples-ci.mjs, contract change examples-root-ci).
+// examples-ci.spec.mjs - every example app runs in the ONE root workflow through a derived matrix and has a Codecov flag, and a component per service app
+// plus platform, over the same coverage scope as its own codecov.yml and be/jest.config.js, whose complement is its sonar.coverage.exclusions (the slot manifest's
+// `coverage` field through scripts/hfs/coverage-scope.mjs; scripts/checks/check-examples-ci.mjs, contract change examples-root-ci).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,6 +11,8 @@ import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTarge
 import { readProperties } from '../../scripts/lib/properties.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
+import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
+import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -45,30 +48,49 @@ test('the root codecov flag of each app is its own codecov.yml scope under examp
   assert.deepEqual(rules.map((rule) => [rule.type, rule.target]), [['project', '100%'], ['patch', '100%']]);
 });
 
-test('every executable be file of each example is a service or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
+test('every executable be file of each full-edition example is measured or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
+  const manifest = loadSlotManifest();
   for (const app of coverageExampleApps(ROOT)) {
     const dir = path.join(ROOT, 'examples', app);
     const props = readProperties(path.join(dir, 'sonar-project.properties'));
     assert.ok(!('sonar.coverage.inclusions' in props), `${app}: Sonar has no coverage inclusions`);
     const excluded = props['sonar.coverage.exclusions'].split(',').flatMap(braceVariants).map(globExpression);
-    const services = parseYaml(fs.readFileSync(path.join(dir, 'codecov.yml'), 'utf8')).coverage.status.project.default.paths.map(globExpression);
+    const roots = parseYaml(fs.readFileSync(path.join(dir, 'codecov.yml'), 'utf8')).coverage.status.project.default.paths.map(globExpression);
     const files = execFileSync('git', ['ls-files', 'be'], { cwd: dir, encoding: 'utf8' }).trim().split('\n').filter((file) => /^be\/(?:src|apps)\/.*\.[cm]?[jt]sx?$/.test(file));
     assert.ok(files.length > 50, `${app}: the be tree is read`);
+    const measured = files.filter((file) => isMeasured(manifest, file.slice('be/'.length)));
     const both = [], neither = [];
     for (const file of files) {
-      const service = services.some((glob) => glob.test(file)), out = excluded.some((glob) => glob.test(file));
-      if (service && out) both.push(file);
-      if (!service && !out) neither.push(file);
+      const logic = measured.includes(file), out = excluded.some((glob) => glob.test(file));
+      if (logic && out) both.push(file);
+      if (!logic && !out) neither.push(file);
     }
-    assert.deepEqual(both, [], `${app}: a service is never excluded`);
+    assert.deepEqual(both, [], `${app}: a measured file is never excluded`);
     assert.deepEqual(neither, [], `${app}: every other executable be file is excluded`);
-    // The runtime's own scope (what Sonar measures) is exactly the services Codecov judges.
+    // The runtime's own scope (what Sonar measures) is exactly the files jest holds at 100, and Codecov's roots contain every one of them.
     const target = coverageTargetOf(coverageScopeOf(props));
-    assert.deepEqual(files.filter(target), files.filter((file) => services.some((glob) => glob.test(file))), `${app}: Sonar's coverage set = Codecov's`);
-    // Only the unit-tested roles are measured: the services, and the cli commands of the cli feature root.
-    assert.ok(files.filter(target).every((file) => file.endsWith('.service.ts') || (file.startsWith('be/src/features/cli/') && file.endsWith('.cli.ts'))));
-    assert.ok(files.filter(target).some((file) => file.endsWith('.cli.ts')), `${app}: its cli commands are measured`);
+    assert.deepEqual(files.filter(target), measured, `${app}: Sonar's coverage set = the measured set`);
+    assert.ok(measured.every((file) => roots.some((glob) => glob.test(file))), `${app}: every measured file is under a Codecov root`);
+    // Only the logic roles of be/src/modules are measured: never a feature, never a declaration.
+    const roles = manifest.ruleParams.be.logicRoles;
+    assert.ok(measured.every((file) => file.startsWith('be/src/modules/') && roles.some((role) => file.endsWith(`.${role}.ts`))));
+    assert.ok(measured.some((file) => file.endsWith('.service.ts')), `${app}: its services are measured`);
+    assert.ok(!files.filter(target).some((file) => file.startsWith('be/src/features/')), `${app}: features are thin and never measured`);
     assert.ok(excluded.some((glob) => glob.test('fe/apps/web/src/app/page.tsx')), `${app}: fe/ is outside coverage`);
+  }
+});
+
+test('the root codecov.yml holds one component per service app of each example plus its platform, each at 100, and each app\'s own codecov.yml holds the same ones', () => {
+  const root = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8'));
+  const rules = root.component_management.default_rules.statuses;
+  assert.deepEqual(rules.map((rule) => [rule.type, rule.target, rule.threshold]), [['project', '100%', '0%'], ['patch', '100%', '0%']]);
+  const ids = root.component_management.individual_components.map((component) => component.component_id);
+  assert.deepEqual(ids.filter((id) => id.startsWith('ecommerce-app-')), ['ecommerce-app-identity', 'ecommerce-app-order', 'ecommerce-app-billing', 'ecommerce-app-platform']);
+  assert.deepEqual(ids.filter((id) => id.startsWith('shape-slot-')), ['shape-slot-core', 'shape-slot-platform']);
+  for (const app of exampleApps(ROOT)) {
+    const own = parseYaml(fs.readFileSync(path.join(ROOT, 'examples', app, 'codecov.yml'), 'utf8')).component_management.individual_components;
+    const mine = root.component_management.individual_components.filter((component) => component.component_id.startsWith(`${app}-`));
+    assert.deepEqual(mine.map((component) => component.paths), own.map((component) => component.paths.map((glob) => `examples/${app}/${glob}`)), `${app}: root components = the app's own`);
   }
 });
 
@@ -124,11 +146,12 @@ test('a new example app is in the matrix at once, and the check fails until code
   let printed = '';
   examplesCiMain(['--matrix'], { root, out: (s) => { printed += s; } });
   assert.deepEqual(JSON.parse(printed), ['alpha', 'beta'], 'derived, never listed');
-  assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_CODECOV_DRIFT']);
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_CODECOV_DRIFT']);
   assert.equal(examplesCiMain([], { root, out: () => {} }), 1);
   examplesCiMain(['--write'], { root, out: () => {} });
   assert.deepEqual(codes(root), []);
-  assert.match(renderCodecov(root), /- name: beta\n {6}paths:\n {8}- "examples\/beta\/be\/src\/\*\*\/\*\.service\.ts"/);
+  assert.match(renderCodecov(root), /- name: beta\n {6}paths:\n {8}- "examples\/beta\/be\/src\/modules\/domain\/\*\/\*\*"/);
+  assert.match(renderCodecov(root), /- component_id: beta-platform\n/);
 });
 
 test('a hand-written matrix, a per-example workflow, an automatic e2e step and a missing manual trigger are refused', (t) => {
@@ -168,7 +191,7 @@ test('every deployable image is derived from hfs.json (full be+fe, lite be only)
   assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
 });
 
-test('the quality files of each example are rendered from the source preset: the app codecov.yml scope equals the root flag, and a hand edit is refused', (t) => {
+test('the quality files of each example are rendered from the source slot manifest: the app codecov.yml scope equals the root flag, and a hand edit is refused', (t) => {
   const root = fixture(t, ['alpha']);
   const targets = appQualityTargets('alpha', root);
   assert.deepEqual(targets.map((target) => target.path).sort(), [...APP_QUALITY_FILES].sort());

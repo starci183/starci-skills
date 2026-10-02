@@ -24,19 +24,25 @@ export interface ConnectionSource {
     destroy(): Promise<void>
 }
 
-/** Opens the data source of one connection, uninitialized; the caller initializes, uses and destroys it. */
-export type OpenConnection = (connection: DatabaseConnectionOptions) => ConnectionSource
+/**
+ * The port that opens the data source of one connection, uninitialized; the caller initializes, uses and destroys it.
+ * An object, not a bare function, so a unit spec doubles it with `mock<ConnectionOpener>()`.
+ */
+export interface ConnectionOpener {
+    /** Opens the data source of `connection`, uninitialized. */
+    open(connection: DatabaseConnectionOptions): ConnectionSource
+}
 
 /** Token of the options of the database capability: every connection the app declares, with its entities and migrations. */
 export const DATABASE_OPTIONS: unique symbol = Symbol("platform.database.options")
 
-/** Token of the function that opens the data source of one connection. */
+/** Token of the port that opens the data source of one connection. */
 export const CONNECTION_SOURCE: unique symbol = Symbol("platform.database.connection-source")
 
 /** Injects the options of the database capability. Parameter type: DatabaseOptions. */
 export const InjectDatabaseOptions = (): TypedParameterDecorator<DatabaseOptions> =>
     injector<DatabaseOptions>(DATABASE_OPTIONS)
 
-/** Injects the function that opens the data source of one connection. Parameter type: OpenConnection. */
-export const InjectConnectionSource = (): TypedParameterDecorator<OpenConnection> =>
-    injector<OpenConnection>(CONNECTION_SOURCE)
+/** Injects the port that opens the data source of one connection. Parameter type: ConnectionOpener. */
+export const InjectConnectionSource = (): TypedParameterDecorator<ConnectionOpener> =>
+    injector<ConnectionOpener>(CONNECTION_SOURCE)

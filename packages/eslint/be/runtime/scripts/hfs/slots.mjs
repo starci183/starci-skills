@@ -28,7 +28,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
+import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, roleListProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, optionalSlotProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
 import { declarationEdition, editionRuleParams, effectiveSlot, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
@@ -186,7 +186,7 @@ function manifestShapeProblems(m) {
   }
   const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
   const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
-  const BE_REQUIRED = ['fileLines', 'duplicateBlock', 'infraOwners', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'patternScenarios', 'kindPatterns', 'addKinds'];
+  const BE_REQUIRED = ['fileLines', 'duplicateBlock', 'infraOwners', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'logicRoles', 'thinRoles', 'patternScenarios', 'kindPatterns', 'addKinds'];
   const BE_KEYS = [...BE_REQUIRED, 'schemaAuthority', 'lite'];
   const keysOk = (obj, required, allowed) => Object.keys(obj).every((k) => allowed.includes(k)) && required.every((k) => k in obj);
   const liteOk = (lite, base) => lite === undefined || (isPlainObject(lite) && Object.keys(lite).length && Object.keys(lite).every((k) => k !== 'lite' && base.includes(k)));
@@ -195,7 +195,7 @@ function manifestShapeProblems(m) {
   else {
     if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || !keysOk(rp.be, BE_REQUIRED, BE_KEYS)
       || (rp.be.schemaAuthority !== undefined && !SCHEMA_AUTHORITIES.includes(rp.be.schemaAuthority))
-      || !liteOk(rp.be.lite, BE_KEYS)) bad.push(`ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, patternScenarios, kindPatterns and addKinds; optional: schemaAuthority (${SCHEMA_AUTHORITIES.join(' | ')}) and lite (overrides of the same keys)`); else bad.push(...unitRolesProblems(rp.be));
+      || !liteOk(rp.be.lite, BE_KEYS)) bad.push(`ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds; optional: schemaAuthority (${SCHEMA_AUTHORITIES.join(' | ')}) and lite (overrides of the same keys)`); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
     bad.push(...scenarioProblem(rp.be.patternScenarios), ...kindParamProblems(rp.be, m.triggerKinds));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;

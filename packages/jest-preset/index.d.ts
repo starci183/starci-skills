@@ -12,12 +12,24 @@ export { FakeClock } from "./clock"
 export { fakeIds, FakeIds } from "./ids"
 export { RefusalReason } from "./matchers"
 
-/** The whole jest config: projects `unit`, `integration`, `e2e` and `contract`. It takes no options; the repository config is a managed file. */
-export declare function starciJestConfig(): Config
+/** The coverage scope `hfs sync` renders from the slot manifest: the measured roots (a directory pattern per measured slot, a placeholder folder written as a star), the logic roles measured in them and the directories inside a root that are never measured (each ending in a double star). */
+export interface StarciCoverageScope {
+  readonly roots: readonly string[]
+  readonly roles: readonly string[]
+  readonly excludes: readonly string[]
+}
+export interface StarciJestOptions {
+  readonly coverage: StarciCoverageScope
+}
+/** The whole jest config: projects `unit`, `integration`, `e2e` and `contract`. It takes the coverage scope the managed repository config renders; without it it refuses. */
+export declare function starciJestConfig(options: StarciJestOptions): Config
 export declare const MODULE_NAME_MAPPER: Readonly<Record<string, string>>
-export declare function collectCoverageFrom(): string[]
+export declare function collectCoverageFrom(coverage: StarciCoverageScope): string[]
+/** The glob one measured root stands for: every file of a logic role below it. */
+export declare function rootGlob(root: string, roles: readonly string[]): string
+/** True when `root` holds a file the coverage `glob` matches (a threshold key that matches nothing is refused by jest). */
+export declare function hasCoverageSubjects(root: string, glob: string): boolean
 export declare function sonarExclusions(): string
-export declare const COVERAGE_SOURCES: string[]
 export declare const COVERAGE_EXCLUDES: string[]
 /** The compiler options the unit project overlays on the repository tsconfig so per-file 100 coverage of a decorated service is reachable. */
 export declare const UNIT_COMPILER_OPTIONS: Readonly<{ isolatedModules: false; importHelpers: true }>
