@@ -1304,3 +1304,43 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R139
+    code: "HFS_DOCKER_BUILD_CONTEXT"
+    law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOCKER_BUILD_CONTEXT"]
+    enforcers:
+      - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R140
+    code: "HFS_DOCKER_STAGES"
+    law: "An app Dockerfile is multi-stage: a stage named `build` and a last stage named `runtime`; the runtime stage ends as `USER node` and runs no build (`npm run build*`, tsc, next, turbo, nest); every install is `npm ci`, never `npm install`; a back-end runtime runs `npm ci --omit=dev --ignore-scripts` and a front-end runtime installs nothing."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOCKER_STAGES"]
+    enforcers:
+      - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R141
+    code: "HFS_DOCKER_ENTRY"
+    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node fe/apps/<app>/server.js`); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOCKER_ENTRY"]
+    enforcers:
+      - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R142
+    code: "HFS_DOCKER_BASE_PIN"
+    law: "Every FROM of an app Dockerfile is a prior stage, the one node base image of the canon (an exact node version on an exact alpine release, `NODE_IMAGE` in scripts/hfs/rules/docker.mjs), or an image pinned by `@sha256` digest; never a moving tag, never an unresolved build argument."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOCKER_BASE_PIN"]
+    enforcers:
+      - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R143
+    code: "HFS_DOCKER_SECRETS"
+    law: "No secret enters an image: no COPY or ADD of an `.env*` file (except `.env.example`) or of a path under `.starcistacks`, `.secrets`, `.volume`, a key, certificate or kubeconfig; no ADD of a URL; no ARG or ENV whose name is a credential (PASSWORD, SECRET, TOKEN, KEY, CREDENTIAL, PRIVATE), `NEXT_PUBLIC_*` excepted because it is published by design."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOCKER_SECRETS"]
+    enforcers:
+      - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}

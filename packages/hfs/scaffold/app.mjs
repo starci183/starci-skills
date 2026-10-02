@@ -22,7 +22,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
-import { TEMPLATES_DIR, renderTargets, writeTargets } from '../sync/index.mjs';
+import { TEMPLATES_DIR, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
@@ -207,6 +207,7 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: jsonText(feAppManifest(name, entry.name, pins)) })),
+    ...imageFiles(app),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
   ];
   for (const file of files) {

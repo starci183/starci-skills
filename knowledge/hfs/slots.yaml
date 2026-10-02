@@ -293,6 +293,26 @@ slots:
     tests: none
     managedBy: ci-workflows
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: app.ci-images
+    profiles: [app]
+    # Builds every image of the app (one matrix entry per declared app, path-filtered), never pushes: rendered by hfs sync.
+    path: ".github/workflows/images.yml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.dockerignore
+    profiles: [app]
+    # The one build-context filter of every image (the context is the app root): rendered by hfs sync; it keeps secrets and build output out.
+    path: .dockerignore
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: docker-ignore
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.github-meta
     profiles: [app]
     path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
@@ -494,18 +514,15 @@ slots:
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: repo.app-image
     profiles: [be, fe]
+    # One image per app: every declared app has its own Dockerfile (apps/<app>/Dockerfile), built from the APP ROOT (the folder with
+    # the one package.json). It is app-owned (hfs scaffold writes it once from templates/<side>/image) and judged by the docker rules.
+    # A Dockerfile anywhere else is owned by no slot.
     path: "apps/<app>/Dockerfile"
-    presence: optional
+    presence: required
     tracked: tracked
     tier: none
     tests: none
-  - id: repo.dockerignore
-    profiles: [be, fe]
-    path: .dockerignore
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
+    rules: [HFS_DOCKER_BUILD_CONTEXT, HFS_DOCKER_STAGES, HFS_DOCKER_ENTRY, HFS_DOCKER_BASE_PIN, HFS_DOCKER_SECRETS]
 
   # ----- never tracked: build output the tools need in place ---------------------------------------------
   - id: repo.build-output

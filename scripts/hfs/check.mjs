@@ -66,6 +66,7 @@ import { feContractFindings } from './rules/fe-contract-documents.mjs';
 import { integrationSpecFindings } from './rules/integration-specs.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
 import { monorepoFindings } from './rules/monorepo.mjs';
+import { dockerFindings } from './rules/docker.mjs';
 import { peerIntegrationFindings } from './rules/peer-integrations.mjs';
 import { pipelineFindings } from './rules/pipeline.mjs';
 import { proofCommandFindings } from './rules/proof-commands.mjs';
@@ -279,6 +280,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
       ...depFindings({ repoRoot, files: all }),
       ...peerIntegrationFindings({ repoRoot, files: all }),
       ...monorepoFindings({ repoRoot, files: all, repo }),
+      ...dockerFindings({ repoRoot, files: all, repo }),
       ...integrationSpecFindings({ repoRoot, files: all }),
       ...feContractFindings({ repoRoot, files: all }),
       ...pipelineFindings({ repoRoot, files, pins }),

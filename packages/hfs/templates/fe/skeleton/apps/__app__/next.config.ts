@@ -9,8 +9,9 @@ const withNextIntl = createNextIntlPlugin("./src/modules/i18n/request.ts")
 /** The npm workspace root (three levels above this app): Turbopack resolves the workspace packages from it, and output tracing is pinned to it. */
 const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 
-/** Next config of the {{app}} app: next-intl wired to the request config, root params on (the locale is read from the route). */
+/** Next config of the {{app}} app: the standalone output its image ships, next-intl wired to the request config, root params on (the locale is read from the route). */
 const nextConfig: NextConfig = {
+    output: "standalone",
     experimental: { rootParams: true },
     outputFileTracingRoot: WORKSPACE_ROOT,
     turbopack: { root: WORKSPACE_ROOT },
