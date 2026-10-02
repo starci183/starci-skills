@@ -1,0 +1,30 @@
+id: test-world-kafka-kraft
+effectiveAt: '2026-10-02T09:00:00+07:00'
+summary: >-
+  @starci/test-world 1.2.0 (owner: the event bus is real Kafka in KRaft mode, no ZooKeeper, no Redpanda, in the dev stacks,
+  the test world and prod; contexts may start as schemas of one Postgres). Kafka is own infrastructure and always runs real:
+  the stack definition must name exactly apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69
+  (KAFKA_IMAGE, the one pin agreed with the ecommerce .starcistacks), anything else is TEST_WORLD_STACK_DEFINITION, and
+  stacks.kafka cannot be fakedBy. The broker has 8 slot listeners each advertising its own toxiproxy port; a data slot
+  leases one, so a Kafka outage reaches its slot alone (the stack-wide Kafka proxy exception is removed). A slot's topics,
+  consumer groups and client ids begin with <namespace>. (w.kafka.group, w.kafka.clientId); readiness is an ApiVersions round
+  trip through the slot proxy; the per-file reset empties the slot's topics to the high watermark and deletes its idle groups;
+  teardown deletes only the slot's groups and topics. Postgres connections may share a database as schema-per-context
+  connections, each with its own schema and login role; reset and outage act on the context alone. The state protocol is
+  unchanged (2), so @starci/jest-preset 2.2.4 stays paired.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/test-world-kafka-kraft.yaml
+  - packages/test-world/src/stack/services/kafka.ts
+  - packages/test-world/src/stack/kafka-probe.ts
+  - packages/test-world/src/stack/index.ts
+  - packages/test-world/src/stack/naming.ts
+  - packages/test-world/src/stack/registry.ts
+  - packages/test-world/src/stack/services/postgresql.ts
+  - packages/test-world/src/nest/database-outage.ts
+  - packages/test-world/src/config/stack-file.ts
+  - packages/test-world/src/config/validate.ts
+  - packages/test-world/package.json
+  - packages/test-world/CHANGELOG.md
+  - packages/test-world/README.md
+  - knowledge/hfs/canon-pins.yaml

@@ -30,6 +30,16 @@ export interface StackImageRequest {
     readonly image: string
 }
 
+/** One Postgres connection as the stack provisions it: a database of its own, or a schema (with its own login) of a shared one. */
+export interface PostgresConnectionRequest {
+    readonly name: string
+    readonly extensions?: ReadonlyArray<string>
+    /** The logical database (default: `name`); connections naming one share it. */
+    readonly database?: string
+    /** The schema of a schema-per-context connection. */
+    readonly schema?: string
+}
+
 /** What one run asks of the stack. */
 export interface AttachRequest {
     /** The isolation identity. */
@@ -39,7 +49,7 @@ export interface AttachRequest {
     /** The services to attach to (starting them when the stack is not warm), each with its image. */
     readonly services: ReadonlyArray<StackImageRequest>
     /** Postgres: the connections (logical names) to give a database each; `extensions` are created in each database. */
-    readonly postgresql?: { readonly connections: ReadonlyArray<{ readonly name: string; readonly extensions?: ReadonlyArray<string> }> }
+    readonly postgresql?: { readonly connections: ReadonlyArray<PostgresConnectionRequest> }
     /** Keycloak: the realm import file (absolute) and the public client id for the password grant (default: detected in the file). */
     readonly keycloak?: { readonly realmFile: string; readonly clientId?: string }
     /** MinIO: logical bucket names to create (each stored as `<namespace.kebab>-<name>`). */
@@ -83,8 +93,20 @@ export interface ProxiedEndpoint {
 export interface RunPostgres extends ProxiedEndpoint {
     readonly user: string
     readonly password: string
-    /** Logical connection name to the stored database name (`<namespace.snake>_<connection>`). */
+    /** Logical connection name to the stored database name (`<namespace.snake>_<database>`; shared by the connections of one database). */
     readonly databases: Readonly<Record<string, string>>
+    /**
+     * The schema-per-context connections: their schema and their own login role (`<namespace.snake>_<connection>`, whose
+     * `search_path` is the schema). A connection absent here owns its database and uses the stack user.
+     */
+    readonly schemas: Readonly<Record<string, PostgresSchemaLogin>>
+}
+
+/** The login of one schema-per-context connection. */
+export interface PostgresSchemaLogin {
+    readonly schema: string
+    readonly user: string
+    readonly password: string
 }
 
 /** The provisioned Redis of a run. */
@@ -107,8 +129,16 @@ export interface RunQdrant extends ProxiedEndpoint {
     readonly collectionPrefix: string
 }
 
-/** The provisioned Kafka of a run. The broker advertises its proxied address, so the proxy of Kafka is stack-wide (documented exception). */
+/**
+ * The provisioned Kafka of a data slot. The broker has one listener per slot, each advertising its own proxied address, so
+ * the slot's proxy (`proxy`, `port`) carries every byte its clients exchange with the broker and an outage of it reaches this
+ * slot alone.
+ */
 export interface RunKafka extends ProxiedEndpoint {
+    /** The slot listener (1-based) leased to the namespace. */
+    readonly listener: number
+    /** Prefix of the slot's consumer groups and client ids (`<namespace.kebab>.`). */
+    readonly groupPrefix: string
     readonly topicPrefix: string
     /** Logical topic name to stored topic name. */
     readonly topics: Readonly<Record<string, string>>

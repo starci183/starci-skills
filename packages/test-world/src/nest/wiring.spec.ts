@@ -23,6 +23,7 @@ const context = (overrides: Partial<RunContext["infra"]> = {}): RunContext => ({
             user: "postgres",
             password: "p@ss/word",
             databases: { primary: "shop_a1b2c3_primary", order: "shop_a1b2c3_order" },
+            schemas: {},
         },
         keycloak: {
             host: "127.0.0.1",
@@ -58,6 +59,46 @@ test("databases are wired through the proxy port with the namespaced database na
     assert.equal(wiring.db["primary"]?.port, 30100)
     assert.equal(wiring.db["primary"]?.url, "postgres://postgres:p%40ss%2Fword@127.0.0.1:30100/shop_a1b2c3_primary")
     assert.equal(Object.keys(wiring.db).length, 2)
+})
+
+test("a schema-per-context connection is wired with its own login and schema in the shared database; the others use public", () => {
+    const base = context()
+    const postgresql = base.infra.postgresql
+    assert.ok(postgresql !== undefined)
+    const wiring = buildWiring({
+        ...base,
+        infra: {
+            ...base.infra,
+            postgresql: {
+                ...postgresql,
+                databases: { identity: "shop_a1b2c3_core", order: "shop_a1b2c3_core", primary: "shop_a1b2c3_primary" },
+                schemas: { identity: { schema: "identity", user: "shop_a1b2c3_identity", password: "s3cr/t" }, order: { schema: "ordering", user: "shop_a1b2c3_order", password: "x" } },
+            },
+        },
+    })
+    assert.equal(wiring.db["identity"]?.database, "shop_a1b2c3_core")
+    assert.equal(wiring.db["identity"]?.schema, "identity")
+    assert.equal(wiring.db["identity"]?.user, "shop_a1b2c3_identity")
+    assert.equal(wiring.db["identity"]?.url, "postgres://shop_a1b2c3_identity:s3cr%2Ft@127.0.0.1:30100/shop_a1b2c3_core")
+    assert.equal(wiring.db["order"]?.schema, "ordering")
+    assert.equal(wiring.db["primary"]?.schema, "public")
+    assert.equal(wiring.db["primary"]?.user, "postgres")
+})
+
+test("kafka wires the slot's topics, consumer groups and client ids under one prefix", () => {
+    const base = context()
+    const wiring = buildWiring({
+        ...base,
+        infra: {
+            ...base.infra,
+            kafka: { host: "127.0.0.1", port: 30105, directPort: 9092, proxy: "kafka-k-s2", image: "apache/kafka", container: "c", listener: 2, topicPrefix: "shop-a1b2c3-w2.", groupPrefix: "shop-a1b2c3-w2.", topics: { orders: "shop-a1b2c3-w2.orders" } },
+        },
+    })
+    assert.deepEqual(wiring.kafka.brokers, ["127.0.0.1:30105"])
+    assert.equal(wiring.kafka.topic("orders"), "shop-a1b2c3-w2.orders")
+    assert.equal(wiring.kafka.topic("audit"), "shop-a1b2c3-w2.audit")
+    assert.equal(wiring.kafka.group("billing"), "shop-a1b2c3-w2.billing")
+    assert.equal(wiring.kafka.clientId("api"), "shop-a1b2c3-w2.api")
 })
 
 test("keycloak urls derive from the proxied base and the namespaced realm", () => {

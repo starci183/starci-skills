@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { parse } from "yaml"
 import { TestWorldErrorCode, worldError } from "../errors"
 import type { StackImageRequest } from "../stack/contracts"
+import { KAFKA_IMAGE } from "../stack/naming"
 import { INFRA_SERVICES, type FakedService, type InfraName, type SiblingServiceDeclaration, type StacksDeclaration } from "./types"
 
 /** One service of the stack definition that has an image. */
@@ -90,7 +91,7 @@ const KIND_PATTERN: Readonly<Record<InfraName, string>> = {
     redis: "redis|valkey",
     minio: "minio",
     qdrant: "qdrant",
-    kafka: "kafka|redpanda|cp-kafka",
+    kafka: "kafka",
     keycloak: "keycloak",
 }
 
@@ -129,7 +130,7 @@ export const selectedInfraServices = (stacks: StacksDeclaration): ReadonlyArray<
 export const resolveInfraImages = (stacks: StacksDeclaration, definition: StackDefinition, stackDir = ".starcistacks/dev"): ReadonlyArray<StackImageRequest> =>
     selectedInfraServices(stacks).map((service) => {
         const override = asRecord(stacks[service])?.image
-        if (typeof override === "string" && override !== "") return { service, image: override }
+        if (typeof override === "string" && override !== "") return pinned({ service, image: override }, stackDir)
         const found = Object.entries(definition.services).find(([name, entry]) => matchesKind(service, name, entry.image))
         if (found === undefined) {
             const names = Object.entries(definition.services).map(([name, entry]) => `${name} (${entry.image})`)
@@ -138,8 +139,19 @@ export const resolveInfraImages = (stacks: StacksDeclaration, definition: StackD
                 `stacks.${service} is declared but the stack definition ${stackDir} has no ${service} service; it has: ${names.length === 0 ? "no services with an image" : names.join(", ")}. Add the service to a compose file under ${stackDir}/infra/compose or set stacks.${service}.image.`,
             )
         }
-        return { service, image: found[1].image }
+        return pinned({ service, image: found[1].image }, stackDir)
     })
+
+/** Kafka runs the ONE pinned image ({@link KAFKA_IMAGE}): no Redpanda, no cp-kafka, no tag without its digest. */
+const pinned = (request: StackImageRequest, stackDir: string): StackImageRequest => {
+    if (request.service === "kafka" && request.image !== KAFKA_IMAGE) {
+        throw worldError(
+            TestWorldErrorCode.StackDefinition,
+            `stacks.kafka resolves to ${request.image} in ${stackDir}; the StarCi event bus is Apache Kafka in KRaft mode at exactly ${KAFKA_IMAGE} (pinned by digest; no Redpanda, no cp-kafka, no undigested tag)`,
+        )
+    }
+    return request
+}
 
 /** The image of a sibling service `services.<name>`: the declaration's `image`, else the compose service of that name. */
 export const resolveSiblingImage = (name: string, declaration: SiblingServiceDeclaration, definition: StackDefinition, stackDir = ".starcistacks/dev"): string => {

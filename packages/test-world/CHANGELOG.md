@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.2.0 - 2026-10-02
+
+- Added: Kafka as real own infrastructure, Apache Kafka in KRaft mode only. The stack definition must name exactly
+  `apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69` (`KAFKA_IMAGE`, the one pin
+  shared with the dev stacks); Redpanda, cp-kafka and an undigested tag fail with `TEST_WORLD_STACK_DEFINITION`, and
+  `stacks.kafka` can never be `fakedBy`.
+- Added: per-slot Kafka. The broker has 8 slot listeners, each advertising its own toxiproxy port; a slot leases one
+  (`RunKafka.listener`), so `world.infra.kafka.cut()` reaches its slot alone (the stack-wide Kafka proxy exception is gone).
+  Topics, consumer groups and client ids of a slot begin with `<namespace>.`: `w.kafka.group(name)`, `w.kafka.clientId(name)`.
+  Readiness is the topics script on the INTERNAL listener plus an ApiVersions round trip through the slot's proxy (no Kafka
+  client dependency). Before each file the slot's topics are emptied up to the high watermark and its idle groups deleted;
+  teardown deletes only the slot's groups (waiting out a dead member's session timeout, then failing by name) and topics.
+- Added: schema-per-context Postgres. A connection may name a shared `database` and its `schema`: the connections of one
+  database share it (one copy per slot), each in its own schema with its own login role (`search_path` = the schema).
+  `w.db.<name>.schema`; reset empties only the context's schema; `infra.postgresql.connection(name).cut()` of a schema context
+  stops its login only (`NOLOGIN`), so the contexts beside it keep serving. Contexts sharing a database must each declare a
+  distinct schema (never `public` or `pg_*`).
+- Changed: extensions are created in `public` of each database.
+- Added: `apps.<name>.rawBody` (default false): the world creates that app with Nest's `rawBody`, as a `main.ts` that verifies
+  signed webhooks over the exact body (`request.rawBody`) does.
+- Added: `webhookApp` on the four payment fakes (sepay, payos, momo, vnpay): the declared app whose listener receives their
+  webhooks, for a world with several listening apps (default unchanged: the first listening app). An HTTP fake's `client`
+  now receives the declared options.
+- Added: crash reclaim. A run records on its lease what it provisioned, service by service; when its process dies (a crash,
+  a killed jest) the lease is kept, and the next attach (or `down`) claims it and tears it down through the same detach as a
+  normal run: its databases, roles, realm, Redis DB, buckets, topics, consumer groups, namespaces and proxies. One live
+  process claims a dead lease at a time; a dead lease that provisioned nothing is dropped as before. A Kafka teardown waits up
+  to 60 s (the default session timeout is 45 s) for a group whose dead member has not expired.
+- Fixed: the Kafka probe answers false when a cut proxy closes the connection without a reply (it left the promise pending).
+- Added: GraphQL subscriptions in the test API. `api.subscribe(operation, { variables, timeoutMs })` (and on any bound caller,
+  `api.as(token).subscribe(...)`) opens a graphql-ws (`graphql-transport-ws`) subscription at the app's GraphQL path on
+  Node's own WebSocket (no new dependency), with the caller's bearer as `connectionParams.authorization`. The handle has
+  `next(timeoutMs)` (waits for the next unread frame, TEST_WORLD_TIMED_OUT at the deadline), `frames()`, `errors()`,
+  `closed()` and `close()`; a refused connection rejects with its close code, and the world closes any subscription a spec
+  left open before the apps stop. For EX-KINDS (ecommerce realtime scenarios).
+- Changed: the SePay fake signs every delivery with a timestamp: `x-sepay-timestamp: <epoch ms>` and `x-sepay-signature:
+  sha256=<hmac of "<timestamp>.<exact body>">` (`sepaySignature`, `sepayVerifySignature`; the body-only `sepayBodySignature`
+  and `sepayVerifyBody` are removed). `replayWebhook(reference, { ageMs })` and `delayWebhook({ ..., ageMs })` deliver the
+  captured body validly re-signed `ageMs` in the past, so a spec proves the app's replay window refuses a stale delivery
+  (`failNext({ badSignature })` still covers a tampered signature). For EX-KINDS (ecommerce webhook scenarios).
+
 ## 1.1.0 - 2026-10-02
 
 - Added: per-worker data slots, so world spec files run in parallel. The globalSetup provisions N slots, N = min(jest

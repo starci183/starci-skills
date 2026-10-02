@@ -3,12 +3,22 @@ import { join } from "node:path"
 import { TestWorldErrorCode, worldError } from "../errors"
 import { realPause } from "./health"
 import type { Pause } from "./health"
-import type { StackLease } from "./contracts"
-import { PROXY_PORT_FIRST, PROXY_PORT_LAST } from "./naming"
+import type { Namespace, RunInfra, StackLease } from "./contracts"
+import { KAFKA_SLOT_LISTENERS, PROXY_PORT_FIRST, PROXY_PORT_LAST } from "./naming"
 
-/** A lease as the registry stores it: the public {@link StackLease} plus the shared containers the run uses (what `down` keeps). */
+/**
+ * A lease as the registry stores it: the public {@link StackLease}, the shared containers the run uses (what `down` keeps),
+ * and what the run provisioned so far (its namespace and infra, recorded service by service during the attach), so a run
+ * whose process died is reclaimed through the same teardown as a normal detach.
+ */
 export interface RegistryLease extends StackLease {
     readonly containers: ReadonlyArray<string>
+    /** The run's namespace, recorded at attach. */
+    readonly identity?: Namespace
+    /** What the run provisioned so far; a dead lease with it is reclaimed, never silently dropped. */
+    readonly infra?: RunInfra
+    /** The pid of the process reclaiming this dead lease, so two processes never tear one run down at once. */
+    readonly reclaimedBy?: number
 }
 
 /** A leased toxiproxy listen port. */
@@ -25,10 +35,12 @@ export interface RegistryData {
     readonly version: 1
     /** Generated secrets by container name. */
     secrets: Record<string, Record<string, string>>
-    /** Live leases; a lease whose pid is dead is dropped on every read. */
+    /** Leases; a dead one that provisioned something stays until it is reclaimed, a dead one that provisioned nothing is dropped on every read. */
     leases: Array<RegistryLease>
     /** Redis DB index by namespace (snake). */
     redisDbs: Record<string, number>
+    /** The Kafka slot listener (1-based) leased to each namespace. */
+    kafkaListeners: Record<string, number>
     /** Toxiproxy listen ports by proxy name. */
     proxyPorts: Record<string, ProxyPortLease>
     /** Free-form notes of provisioners (e.g. the users a Keycloak import seeded), by key. */
@@ -66,7 +78,7 @@ export interface LockOptions {
     readonly intervalMs?: number
 }
 
-const emptyData = (): RegistryData => ({ version: 1, secrets: {}, leases: [], redisDbs: {}, proxyPorts: {}, notes: {} })
+const emptyData = (): RegistryData => ({ version: 1, secrets: {}, leases: [], redisDbs: {}, kafkaListeners: {}, proxyPorts: {}, notes: {} })
 
 const REDIS_DB_COUNT = 16
 const ORPHAN_LOCK_MS = 5000
@@ -169,6 +181,7 @@ export class Registry {
                 secrets: isRecord(parsed.secrets) ? (parsed.secrets as RegistryData["secrets"]) : base.secrets,
                 leases: Array.isArray(parsed.leases) ? (parsed.leases as Array<RegistryLease>) : base.leases,
                 redisDbs: isRecord(parsed.redisDbs) ? (parsed.redisDbs as RegistryData["redisDbs"]) : base.redisDbs,
+                kafkaListeners: isRecord(parsed.kafkaListeners) ? (parsed.kafkaListeners as RegistryData["kafkaListeners"]) : base.kafkaListeners,
                 proxyPorts: isRecord(parsed.proxyPorts) ? (parsed.proxyPorts as RegistryData["proxyPorts"]) : base.proxyPorts,
                 notes: isRecord(parsed.notes) ? (parsed.notes as RegistryData["notes"]) : base.notes,
             }
@@ -184,12 +197,34 @@ export class Registry {
         renameSync(temporary, target)
     }
 
+    /**
+     * Claims the dead leases that provisioned something and are not being reclaimed by a live process: they are marked with
+     * this pid and answered; the caller tears each down (the stack's detach), which removes the lease.
+     */
+    async claimDead(): Promise<ReadonlyArray<RegistryLease>> {
+        return this.update((data) => {
+            const claimed: Array<RegistryLease> = []
+            data.leases = data.leases.map((lease) => {
+                if (this.isAlive(lease.pid) || lease.infra === undefined || lease.identity === undefined) return lease
+                if (lease.reclaimedBy !== undefined && lease.reclaimedBy !== this.pid && this.isAlive(lease.reclaimedBy)) return lease
+                const mine = { ...lease, reclaimedBy: this.pid }
+                claimed.push(mine)
+                return mine
+            })
+            return claimed
+        })
+    }
+
     private prune(data: RegistryData): RegistryData {
-        data.leases = data.leases.filter((lease) => this.isAlive(lease.pid))
+        // A dead lease that provisioned nothing has nothing to reclaim; one that did stays until it is torn down.
+        data.leases = data.leases.filter((lease) => this.isAlive(lease.pid) || (lease.infra !== undefined && lease.identity !== undefined))
         const namespaces = new Set(data.leases.map((lease) => lease.namespace))
         const runs = new Set(data.leases.map((lease) => lease.runId))
         for (const namespace of Object.keys(data.redisDbs)) {
             if (!namespaces.has(namespace)) delete data.redisDbs[namespace]
+        }
+        for (const namespace of Object.keys(data.kafkaListeners)) {
+            if (!namespaces.has(namespace)) delete data.kafkaListeners[namespace]
         }
         for (const [name, lease] of Object.entries(data.proxyPorts)) {
             if (lease.runId !== null && !runs.has(lease.runId)) delete data.proxyPorts[name]
@@ -224,6 +259,25 @@ export const leaseRedisDb = (data: RegistryData, namespace: string): number => {
 /** Frees the Redis DB index of a namespace. */
 export const releaseRedisDb = (data: RegistryData, namespace: string): void => {
     delete data.redisDbs[namespace]
+}
+
+/** The Kafka slot listener of a namespace: the existing lease, or the lowest free one (1-based). */
+export const leaseKafkaListener = (data: RegistryData, namespace: string): number => {
+    const existing = data.kafkaListeners[namespace]
+    if (existing !== undefined) return existing
+    const used = new Set(Object.values(data.kafkaListeners))
+    for (let listener = 1; listener <= KAFKA_SLOT_LISTENERS; listener += 1) {
+        if (!used.has(listener)) {
+            data.kafkaListeners[namespace] = listener
+            return listener
+        }
+    }
+    throw worldError(TestWorldErrorCode.InfrastructureFailed, `all ${KAFKA_SLOT_LISTENERS} kafka listeners are leased by live runs (${Object.keys(data.kafkaListeners).join(", ")})`)
+}
+
+/** Frees the Kafka slot listener of a namespace. */
+export const releaseKafkaListener = (data: RegistryData, namespace: string): void => {
+    delete data.kafkaListeners[namespace]
 }
 
 /** The listen port of a proxy: the existing lease, or the lowest free port of the range. */

@@ -60,13 +60,17 @@ export const buildWiring = (context: RunContext, options: WiringOptions = {}): W
     if (infra.postgresql !== undefined) {
         const { postgresql } = infra
         for (const [connection, database] of Object.entries(postgresql.databases)) {
+            const login = postgresql.schemas[connection]
+            const user = login?.user ?? postgresql.user
+            const password = login?.password ?? postgresql.password
             db[connection] = {
                 host: swapHost(postgresql.host, host),
                 port: postgresql.port,
-                user: postgresql.user,
-                password: postgresql.password,
+                user,
+                password,
                 database,
-                url: `postgres://${encodeURIComponent(postgresql.user)}:${encodeURIComponent(postgresql.password)}@${swapHost(postgresql.host, host)}:${postgresql.port}/${database}`,
+                schema: login?.schema ?? "public",
+                url: `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${swapHost(postgresql.host, host)}:${postgresql.port}/${database}`,
             }
         }
     }
@@ -131,6 +135,9 @@ export const buildWiring = (context: RunContext, options: WiringOptions = {}): W
             : ({
                   brokers: [`${swapHost(infra.kafka.host, host)}:${infra.kafka.port}`],
                   topicPrefix: infra.kafka.topicPrefix,
+                  groupPrefix: infra.kafka.groupPrefix,
+                  group: (name: string): string => `${infra.kafka?.groupPrefix ?? ""}${name}`,
+                  clientId: (name: string): string => `${infra.kafka?.groupPrefix ?? ""}${name}`,
                   topic: (name: string): string => infra.kafka?.topics[name] ?? `${infra.kafka?.topicPrefix ?? ""}${name}`,
               } satisfies WiredKafka),
     )
