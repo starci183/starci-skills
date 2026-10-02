@@ -1,0 +1,7 @@
+{
+  "project": "{{project}}",
+  "ports": {
+    "api": 3001,
+    "supabasePostgres": 5432
+  }
+}

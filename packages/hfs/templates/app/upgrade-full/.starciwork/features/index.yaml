@@ -1,0 +1,7 @@
+schema: work/catalog@1
+id: "{{project}}"
+description: Product catalog of the features directory. One entry per feature; every record of a feature lives under its directory.
+features:
+  - id: system-health
+    directory: features/system-health
+    description: The liveness probe the platform asks before it routes traffic to the app.
