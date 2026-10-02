@@ -7,6 +7,8 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Browser journey (owner ruling 5.6): the opt-in slot `app.browser` at the app root (`browser/playwright.config.ts`, `browser/journeys/*.ts`, `browser/stack.mjs`), declared by `"browser": true` in hfs.json; the managed script `test:browser` exists only then. The journey is the product's, not the front end's: `FE_NO_TESTS` still refuses tests and test tooling inside `fe/`. ecommerce-app has one journey (browse, add to cart, check out) that runs only through the `browser` job of `examples.yml` on `workflow_dispatch`.
+
 - Lane MONO U6 (examples CI): the root `examples.yml` builds the be and runs the fe through turbo, caches `.turbo`, and has an `images` job that builds every image of every example from `check-examples-ci.mjs --images` (never pushes). The root `codecov.yml`, each example's own `codecov.yml` and the complement in its `sonar-project.properties` are rendered from the source jest preset (`--write`; new codes `EXAMPLES_CI_IMAGES_NOT_DERIVED`, `EXAMPLES_CI_APP_QUALITY_DRIFT`).
 
 - Lane C1-TESTWORLD2: `@starci/test-world` 1.2.0. The event bus is real Apache Kafka in KRaft mode: one digest-pinned image (`apache/kafka:4.2.2@sha256:1213eb39...`, shared with the ecommerce stack), never faked; a broker listener and toxiproxy proxy per data slot, slot-prefixed topics, consumer groups and client ids, a per-file reset to the high watermark and a prefix-only teardown. Postgres contexts may start as schemas of one database (a schema and a login role per context; reset and outages act on the context alone). Contract change `test-world-kafka-kraft`.

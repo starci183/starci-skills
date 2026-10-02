@@ -155,6 +155,7 @@ zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailab
 | `fe/apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}`, `fe/apps/<app>/src/` | required, tracked; each FE app is the npm workspace `@<project>/<app>` with its own `package.json` (R144, R146) | `fe.app.next`, `fe.route`, `fe.feature`, ... |
 | `be/packages/<pkg>/`, `fe/packages/<pkg>/` | opt-in, tracked, must build; an npm workspace of the root `package.json` | `repo.packages`, `fe.package.*` |
 | `be/apps/<app>/Dockerfile`, `fe/apps/<app>/Dockerfile` | required per declared app, tracked, app-owned and judged by R187-R191 (`HFS_DOCKER_*`); a Dockerfile anywhere else is owned by no slot | `repo.app-image` |
+| `browser/{playwright.config.ts,journeys/*.ts,stack.mjs}` (app root) | opt-in by `"browser": true` in hfs.json, tracked; the product's browser journey (Playwright, run manually), never the front end's (`FE_NO_TESTS` still refuses tests and test tooling inside `fe/`); the managed script `test:browser` exists only when declared | `app.browser` |
 | `.dockerignore`, `.github/workflows/images.yml` (app root) | required, tracked, rendered by `hfs sync` | `app.dockerignore`, `app.ci-images` |
 | `be/docs/{adr,runbooks,guides}/`, `fe/docs/{adr,runbooks,guides}/` | opt-in, tracked, images at most 500 KB | `repo.docs`, `repo.docs-media` |
 | `node_modules`, `dist`, `.next`, `coverage`, `reports`, `test-results`, `next-env.d.ts`, `*.tsbuildinfo` | may exist, ignored | `app.build-output`, `repo.build-output` |
