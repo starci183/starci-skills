@@ -26,7 +26,7 @@ rules:
   - id: BE-SERVICES-1
     title: A service lives only at be/apps/<service> and no service imports its sibling
     kind: mandatory
-    hfsRules: [R143, R148, R145]
+    hfsRules: [R148, R153, R150]
     requirement: |-
       A back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `app.module.ts`, its Dockerfile) sharing the `be/src`
       libraries and the repository's one package.json; a Dockerfile or a package.json of its own anywhere else makes a second
@@ -51,7 +51,7 @@ rules:
   - id: BE-SERVICES-2
     title: Every image of a multi-service stack is pinned
     kind: mandatory
-    hfsRules: [R144]
+    hfsRules: [R149]
     requirement: |-
       In a product with more than one service every component `image` of the stack declaration is a digest (`@sha256:...`) or an
       exact version (`x.y.z`). An own service image is `<repo>/<service>:<x.y.z>` and is built from `be/apps/<service>/Dockerfile`;
@@ -73,7 +73,7 @@ rules:
   - id: BE-SERVICES-3
     title: The contract between services is vendored and checked against the provider
     kind: mandatory
-    hfsRules: [R146, R23, R113]
+    hfsRules: [R151, R23, R113]
     requirement: |-
       A synchronous API keeps its snapshot (`be/contracts/<service>/schema.graphql`, `openapi.json`; R23, R113). The async contract
       is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
@@ -99,7 +99,7 @@ rules:
   - id: BE-SERVICES-4
     title: An async consumer and every saga step have an e2e spec through the world
     kind: mandatory
-    hfsRules: [R147, R80]
+    hfsRules: [R152, R80]
     requirement: |-
       Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file
       `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps with `useTestWorld`, publishes the event (and redelivers it,

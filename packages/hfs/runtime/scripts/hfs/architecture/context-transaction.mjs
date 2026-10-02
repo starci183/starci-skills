@@ -2,7 +2,7 @@ import { contextModelOf } from './context-map.mjs';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R156 `context-transaction` (BE_CONTEXT_TRANSACTION). One transaction touches one context's connection. In the callback of
+ * R161 `context-transaction` (BE_CONTEXT_TRANSACTION). One transaction touches one context's connection. In the callback of
  * `<manager>.transaction(async (manager) => ...)`, where `<manager>` is proven to be the entity manager of connection C (an
  * `Inject<C>EntityManager` property or parameter), the code never:
  *   - uses the entity manager of another declared connection (proven by its injector's home file); or

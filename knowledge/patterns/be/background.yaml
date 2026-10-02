@@ -93,7 +93,7 @@ rules:
   - id: BE-BACKGROUND-4
     title: Producers publish through the event bus or a typed queue producer
     kind: mandatory
-    hfsRules: [R82, R90, R132]
+    hfsRules: [R82, R90, R137]
     requirement: |-
       A producer publishes an event with `eventBus.publish(event, tx)` or enqueues a job with a typed queue producer
       (`enqueueX(payload, tx)`), only from a domain service and only inside its transaction. See event-bus.yaml and queues.yaml.

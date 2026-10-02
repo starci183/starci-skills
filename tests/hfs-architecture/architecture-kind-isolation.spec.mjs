@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
-// R136 BE_KIND_ISOLATION: a feature whose owner slot names one trigger kind never imports a feature of another kind. The kinds are
+// R141 BE_KIND_ISOLATION: a feature whose owner slot names one trigger kind never imports a feature of another kind. The kinds are
 // read from the slot field `trigger` of the owner (api = be.feature, jobs = be.feature.jobs, reactors = be.feature.reactors), never from
 // a folder name; the same-kind and no-kind cases keep the older code BE_FEATURE_IMPORTS_FEATURE.
 

@@ -1,4 +1,4 @@
-// event-contract.mjs - the async contract between the services of one product (R146 HFS_EVENT_CONTRACT).
+// event-contract.mjs - the async contract between the services of one product (R151 HFS_EVENT_CONTRACT).
 // The one source of the contract is the typed event classes of a service, `be/src/modules/events/<service>/<event>.event.ts`:
 //   export interface OrderPlacedPayload { readonly orderId: string; readonly totalMinorUnits: number }
 //   export class OrderPlacedEvent extends BaseEvent {
