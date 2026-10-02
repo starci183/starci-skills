@@ -59,11 +59,11 @@ test('every lite workflow is structurally valid and pins each action version', (
 
 test('lite workflow semantics stay inside the declared no-test CI surface', () => {
   const ci = workflows['.github/workflows/ci.yml'];
-  const changes = ci.jobs.changes;
   const dbTypes = ci.jobs['db-types'];
-  assert.deepEqual(asArray(dbTypes.needs), ['changes']);
-  assert.match(String(dbTypes.if), /needs\.changes\.outputs\.migrations\s*==\s*'true'/);
-  assert.match(JSON.stringify(changes), /supabase\/migrations\/\*\*/);
+  assert.equal(ci.jobs.changes, undefined, 'no path-filter job: the tag run checks the database types unconditionally');
+  assert.deepEqual(asArray(dbTypes.needs), []);
+  assert.equal(dbTypes.if, undefined);
+  assert.deepEqual(Object.keys(ci.on), ['push', 'workflow_dispatch']);
 
   const runs = Object.values(workflows).flatMap(workflow => workflowSteps(workflow).map(step => step.run).filter(Boolean));
   for (const command of runs) {
