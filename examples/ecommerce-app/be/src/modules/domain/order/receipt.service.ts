@@ -3,58 +3,48 @@ import type { EntityManager } from "typeorm"
 import { InjectReceiptStorage } from "@modules/integrations/receipt-storage"
 import type { ReceiptLink, ReceiptStorage } from "@modules/integrations/receipt-storage"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
-import { InjectLogger } from "@modules/platform/logging"
-import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { OrderErrorCode } from "./errors/order.error"
-import type { ArchivedReceiptKey, ReceiptDocument, ReceiptLinkParams } from "./order.contracts"
-import { OrderLogEvent } from "./order.log-events"
+import type { ReceiptDocument, ReceiptLinkParams } from "./order.contracts"
+import type { PreparedReceipt, RecordReceiptArchivedParams } from "./receipt.contracts"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 
 @Injectable()
 /**
- * The receipts of placed orders, archived in object storage outside the order database. An order archives its receipt
- * right after it commits; the order never waits on the archive, so a storage that is down only delays the receipt: it is
- * archived on the buyer's first request for it instead. A buyer reads a receipt through a time-limited link.
+ * The receipts of paid orders, archived in object storage outside the order database by the send-receipt job. `prepareReceipt`
+ * builds the document of a paid order and `recordArchived` remembers the key the job stored it under; a buyer reads a receipt
+ * through a time-limited link, only once the order is paid and its receipt archived.
  */
 export class ReceiptService {
     constructor(
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectReceiptStorage() private readonly storage: ReceiptStorage,
-        @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** Archives the receipt of a committed order and records its key; a failure is logged and answers null. */
-    async archive(orderId: string): Promise<ArchivedReceiptKey> {
-        const order = await this.entityManager.findOneBy(OrderEntity, { id: orderId })
-        return order === null ? null : this.archiveOrder(order)
+    /** The receipt document of a paid order, or null when the order does not exist or is not paid. */
+    async prepareReceipt(orderId: string): Promise<PreparedReceipt | null> {
+        const order = await this.entityManager.findOneBy(OrderEntity, { id: orderId, status: "paid" })
+        if (order === null) return null
+        const document = await this.documentOf(order)
+        return { key: `receipts/${order.id}.json`, content: Buffer.from(JSON.stringify(document)) }
     }
 
-    /** A download link of the buyer's own receipt, archiving it first when the order has none yet. */
+    /** Remembers the key an order's receipt was stored under. */
+    async recordArchived(params: RecordReceiptArchivedParams): Promise<void> {
+        await this.entityManager.update(OrderEntity, { id: params.orderId }, { receiptKey: params.key })
+    }
+
+    /** A download link of the buyer's own receipt, once the order is paid and its receipt archived. */
     async link(
         params: ReceiptLinkParams,
     ): Promise<Outcome<ReceiptLink, OrderErrorCode.ReceiptNotFound | OrderErrorCode.ReceiptNotReady>> {
         const order = await this.entityManager.findOneBy(OrderEntity, { id: params.orderId, personId: params.personId })
         if (order === null) return refused(OrderErrorCode.ReceiptNotFound, { orderId: params.orderId })
-        const key = order.receiptKey ?? (await this.archiveOrder(order))
-        return key === null
+        return order.receiptKey === null
             ? refused(OrderErrorCode.ReceiptNotReady, { orderId: params.orderId })
-            : ok(this.storage.linkOf(key))
-    }
-
-    private async archiveOrder(order: OrderEntity): Promise<ArchivedReceiptKey> {
-        const key = `receipts/${order.id}.json`
-        try {
-            const document = await this.documentOf(order)
-            await this.storage.store({ key, content: Buffer.from(JSON.stringify(document)) })
-            await this.entityManager.update(OrderEntity, { id: order.id }, { receiptKey: key })
-            return key
-        } catch (cause) {
-            this.logger.error(OrderLogEvent.ReceiptArchiveFailed, cause, { orderId: order.id })
-            return null
-        }
+            : ok(this.storage.linkOf(order.receiptKey))
     }
 
     private async documentOf(order: OrderEntity): Promise<ReceiptDocument> {
