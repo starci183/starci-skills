@@ -141,7 +141,7 @@ rules:
   - id: FE-TYPING-6
     title: No casts
     kind: mandatory
-    hfsRules: [R18, R52, R67]
+    hfsRules: [R18, R52]
     requirement: |
       Double casts, `as GraphqlResult<T>` and any cast of a response are forbidden; `@ts-ignore` and `@ts-expect-error` do
       not exist. A component that ignores its props declares no parameter; `void props`, an underscore

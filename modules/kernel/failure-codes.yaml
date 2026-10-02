@@ -11414,7 +11414,7 @@ SEALED_FILE_IN_WORK:
   owner: other-op:work.author
   kind: check-finding
 
-# --- HFS rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 to R67 ---
+# --- HFS rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 up ---
 
 HFS_SLOT_UNDECLARED:
   title: "Every tracked path matches exactly one slot"
@@ -12276,7 +12276,7 @@ FE_NEXT_CONVENTIONS:
 HFS_RULES_INVALID:
   title: "HFS rule catalog is invalid"
   title_vi: "Danh mục luật HFS không hợp lệ"
-  meaning_vi: "Tệp knowledge/hfs/rules.yaml không đúng schema hoặc vi phạm một quy tắc ngữ nghĩa (thứ tự R01 đến R67, một mã lỗi chỉ thuộc một luật, luật chạy ở cổng land, luật pre-commit cũng chạy ở pre-push, cổng sonar đi cùng enforcer sonar), nên không luật nào được nạp."
+  meaning_vi: "Tệp knowledge/hfs/rules.yaml không đúng schema hoặc vi phạm một quy tắc ngữ nghĩa (thứ tự tăng dần, một mã lỗi chỉ thuộc một luật, luật chạy ở cổng land, luật pre-commit cũng chạy ở pre-push, cổng sonar đi cùng enforcer sonar), nên không luật nào được nạp."
   causes_vi:
     - "Sửa tay rules.yaml và gõ sai một trường"
     - "Thêm luật mà không đủ enforcer, cổng hoặc mã lỗi"
@@ -13938,4 +13938,37 @@ HFS_DOCKER_SECRETS:
     - "Vi phạm luật R191: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
+  kind: check-finding
+
+RT_FACT_FALSE:
+  title: "A machine-evaluated fact is false, or prose contradicts it"
+  title_vi: "Một sự thật máy kiểm được là sai, hoặc văn bản mâu thuẫn với nó"
+  meaning_vi: "Một sự thật trong knowledge/hfs/facts.yaml không đúng với knowledge/hfs/slots.yaml (nguồn duy nhất của hình dạng sản phẩm), hoặc một dòng trong knowledge, docs hay README nói điều ngược lại, ví dụ 'không có package.json' cho một ứng dụng fe vốn có package.json riêng. Văn bản chép lại điều khẳng định bằng lời khác sẽ lệch dần khỏi slots.yaml."
+  causes_vi:
+    - "Sửa slots.yaml mà không sửa sự thật hoặc câu văn tương ứng"
+    - "Một tài liệu chép lại điều khẳng định của slot bằng lời riêng và lời đó cũ đi"
+  nextStep_vi: "Người giám sát xóa câu văn mâu thuẫn và thay bằng mã sự thật hoặc mã slot; nếu sự thật sai thì sửa slots.yaml hoặc facts.yaml, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RULE_ID_UNKNOWN:
+  title: "A rule id that is not in the catalog"
+  title_vi: "Mã luật không có trong danh mục"
+  meaning_vi: "Một tệp được git theo dõi (tri thức, tài liệu, mã hoặc dữ liệu) nêu một mã luật R<số> mà knowledge/hfs/rules.yaml không có, hoặc một mã luật đã nghỉ hưu mà chỉ tệp lịch sử (contract-changes, CHANGELOG) mới được nêu. Mã luật ma làm người đọc và máy trỏ tới một luật không tồn tại."
+  causes_vi:
+    - "Một luật bị xóa hoặc đánh số lại mà các chỗ trích dẫn không được sửa theo"
+    - "Gõ nhầm mã luật"
+  nextStep_vi: "Người giám sát đổi trích dẫn sang luật hiện có của danh mục hoặc bỏ mã, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RULE_ID_GAP:
+  title: "A gap in the rule ids"
+  title_vi: "Khoảng trống trong dãy mã luật"
+  meaning_vi: "Dãy mã luật của knowledge/hfs/rules.yaml chạy từ R01 đến luật cuối nhưng thiếu một mã vừa không phải luật vừa không nằm trong danh sách retired. Mỗi mã vắng phải được khai báo là đã nghỉ hưu kèm lý do, và không bao giờ được dùng lại."
+  causes_vi:
+    - "Xóa một luật mà không ghi vào retired"
+    - "Đánh số lại khối luật làm bỏ qua một đoạn mã"
+  nextStep_vi: "Người giám sát thêm mã vào retired kèm lý do, hoặc khôi phục luật, qua một lane đã land."
+  owner: supervisor
   kind: check-finding

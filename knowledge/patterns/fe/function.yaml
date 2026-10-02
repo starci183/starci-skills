@@ -58,7 +58,7 @@ rules:
   - id: FE-FUNCTION-2
     title: The pure half takes { state, props, on } of atoms
     kind: mandatory
-    hfsRules: [R55, R67]
+    hfsRules: [R55]
     requirement: |
       A split unit's `component.tsx` exports XBase taking XBaseProps = `{ state, props, on }`. `state` is XState, a union of
       drawn shapes, each value one drawing the owner approved, and never a data status (pending, loading, failed, error,

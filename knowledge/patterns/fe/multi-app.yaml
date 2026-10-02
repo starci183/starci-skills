@@ -22,9 +22,11 @@ rules:
     kind: mandatory
     hfsRules: [R64, R01]
     requirement: |-
-      Each app is `fe/apps/<app>/` with its own `next.config.ts`, `tsconfig.json`, `postcss.config.mjs` and `src/` (no
-      `package.json`: the app root holds the one manifest), declared in `hfs.json` `sides.fe.apps` with kind `next`. An app never imports another app. Code that two apps need is a
-      `fe/packages/<pkg>` (see packages.yaml). Each app has its own `modules/{api,config,i18n,routes}`; a catalog shared across
+      Each app is `fe/apps/<app>/` — slot `fe.app.next`: an npm workspace of the app root with its own `package.json`
+      (named `@<project>/<app>`) — declared in `hfs.json` `sides.fe.apps` with kind `next`. An app never imports another app. Code that two apps need is a
+      `fe/packages/<pkg>` (see packages.yaml). Each app carries the required module instances of slot `fe.modules` and,
+      unless a shared api package owns it (slot `fe.package.api`), its own transport module (slot `fe.modules.api`); a
+      catalog shared across
       apps is exported by a package, and each app still declares its own default locale in `modules/i18n`.
     rationale: |-
       Independent apps build, deploy and fail separately, and a hidden import between apps makes one deploy break another.

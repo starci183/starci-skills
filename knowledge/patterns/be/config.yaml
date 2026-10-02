@@ -66,7 +66,7 @@ rules:
         write: 'export const parsePurchaseConfig = (env: EnvSource): PurchaseOptions => ({ holdSeconds: env.int("PURCHASE_HOLD_SECONDS", 900) })'
       - id: case-2
         when: A module and its consumer
-        write: 'be/apps/api/src/app.module.ts registers PurchaseModule.register({ isGlobal: true, ...options.purchase }); a service takes @InjectPurchaseOptions() private readonly options: PurchaseOptions.'
+        write: 'the app''s be/apps/<app>/src/app.module.ts registers PurchaseModule.register({ isGlobal: true, ...options.purchase }); a service takes @InjectPurchaseOptions() private readonly options: PurchaseOptions.'
     verification:
       automated:
         - BE_CONFIG_OWNER

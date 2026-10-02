@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up without gaps; count them, never type the count).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up; an id with no rule is listed under `retired` with its reason, never reused; count the rules, never type the count).
 #
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -1299,7 +1299,7 @@ rules:
       - {kind: eslint-be, id: no-ambient-id}
   - id: R143
     code: "HFS_MONO_WORKSPACES"
-    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
+    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), the app root holds the one `package-lock.json` and the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_MONO_WORKSPACES"]
@@ -1461,7 +1461,7 @@ rules:
       - {kind: eslint-be, id: projection-shape}
   - id: R163
     code: "HFS_SERVICE_PLACEMENT"
-    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app's own and a `fe/packages/<pkg>` workspace's, outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
+    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app root's and those of the fe workspaces (`fe/apps/<app>`, `fe/packages/<pkg>`), outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["HFS_SERVICE_PLACEMENT"]
@@ -1691,3 +1691,35 @@ rules:
     failureCodes: ["HFS_DOCKER_SECRETS"]
     enforcers:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R192
+    code: "RT_FACT_FALSE"
+    law: "Every claim of knowledge/hfs/facts.yaml holds against knowledge/hfs/slots.yaml (the one source of the product shape), and no prose of knowledge/**, docs/** or a README states the opposite of a fact (for example that an fe app lacks its own package.json, which fe.app.next requires); prose quotes a fact id or a slot id and never restates the claim."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_FACT_FALSE"]
+    enforcers:
+      - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
+  - id: R193
+    code: "RT_RULE_ID_UNKNOWN"
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP"]
+    enforcers:
+      - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
+retired:
+  - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
+  - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
+  - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R129, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R130, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R131, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R132, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R133, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R134, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R135, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R136, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R137, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}

@@ -2,8 +2,8 @@ schema: starci/knowledge-source@1
 id: be.folder
 title: Backend folder
 purpose: |-
-  Given backend code, which directory does it live in? Apply the HFS backend tree. Read knowledge/hfs/README.md section 5
-  for the tree and docs/backend-source-pattern.md for the code forms.
+  Given backend code, which directory does it live in? Apply the HFS backend tree: the `be.*` slots of
+  knowledge/hfs/slots.yaml are its machine form, and docs/backend-source-pattern.md states the code forms.
 appliesTo:
   - backend
 family: be
@@ -25,10 +25,13 @@ rules:
     kind: mandatory
     hfsRules: [R01, R02, R29, R89]
     requirement: |-
-      The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app. Apps own process composition only.
-      `be/src/features/<kind>/` owns what triggers the application, grouped by trigger kind (BE-FOLDER-2). `be/src/modules/<tier>/<capability>` owns
-      cohesive reusable capabilities where `<tier>` is exactly `domain` (business rules), `platform` (technical runtime) or
-      `integrations` (third-party provider or protocol). `be/src/tests/{e2e,fixtures}` holds non-unit tests and shared test data.
+      The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app (slots `be.app.api`,
+      `be.app.worker`, `be.app.cli`; the cli app is named cli). Apps own process composition only.
+      `be/src/features/<kind>/` owns what triggers the application, grouped by trigger kind (BE-FOLDER-2; the kinds are
+      `triggerKinds` of slots.yaml, one feature slot or root per kind). `be/src/modules/<tier>/<capability>` owns
+      cohesive reusable capabilities where `<tier>` is a module tier of `tiers.be` in slots.yaml: `domain` for business
+      rules, `platform` for technical runtime, `integrations` for a third-party provider or protocol, and the opt-in
+      pattern tiers it adds. `be/src/tests/` holds the non-unit tests and shared test data (the `be.tests.*` slots).
       Nothing else exists at `be/src/` level, and no teaching, mock or sandbox code lives under `be/src/`. No folder named `types`,
       `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` exists under `be/src/modules` or
       `be/src/features`: types live in `<name>.contracts.ts`, constants in the file that owns them, and a helper with no owner goes
@@ -63,16 +66,18 @@ rules:
     kind: mandatory
     hfsRules: [R29, R87, R147, R149]
     requirement: |-
-      `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a request
-      or a background transport triggers (api.yaml) and `features/cli/` for the one-off actions an operator runs (cli.yaml);
-      every further kind is its own root under `features/`. A kind never imports another kind, every kind imports only downward
-      into `src/modules/*`, and only `be/apps/*` composes a feature.
-      An api feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
-      `messages/`, and nothing else. `application/` holds the CQRS files of api.yaml and no folder named after a protocol. A
-      protocol lives in `transport/graphql`, `transport/http` or `transport/message`, each with exactly one Nest module
-      `<feature>-<protocol>.module.ts`, its resolvers, controllers or consumers, and `dto/` where the protocol has DTOs. A socket
-      gateway or a subscription is the realtime kind (`features/realtime/<channel>/`) and a provider webhook the webhooks kind
-      (`features/webhooks/<provider>/`).
+      `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a
+      request triggers (api.yaml, slot `be.feature`), `features/cli/` for the one-off actions an operator runs (cli.yaml,
+      slot `be.cli`), and one root under `features/` per further kind of `triggerKinds` in slots.yaml — the slots
+      `be.feature.webhooks`, `be.feature.realtime`, `be.feature.saga`, `be.feature.reactors` and `be.feature.jobs`, each
+      enabled by declaring its pattern in `hfs.json` `sides.be.patterns`. A kind never imports another kind, every kind
+      imports only downward into `src/modules/*`, and only `be/apps/*` composes a feature.
+      The shape of a feature root — its entries, `application/` and one `transport/<protocol>/` per protocol — is the
+      `requires`/`allows` of its kind's slot and nothing else. `application/` (slot `be.feature.application`) holds the
+      CQRS files of api.yaml and no folder named after a protocol. Each transport folder holds exactly one Nest module
+      `<feature>-<protocol>.module.ts`, its resolvers, controllers or consumers, and `dto/` where the slot has one (the
+      `be.transport.*` slots and each kind's own transport slots). A socket gateway or a subscription is the realtime
+      kind and a provider webhook the webhooks kind.
     rationale: |-
       The trigger decides which app composes the code, so grouping by trigger keeps each app's composition one folder and
       makes a cross-kind import visible from the path alone.
@@ -122,9 +127,10 @@ rules:
     hfsRules: [R30, R38, R85, R89]
     requirement: |-
       A domain, platform or integration capability has exactly one `index.ts` at its root, and only the parts it owns:
-      `<c>.module.ts` and `<c>.module-definition.ts` when DI registration is needed, `<c>.config.ts` and `<c>.options.ts` when it
-      is configured, `<c>.decorators.ts` (its injectors and tokens), `<c>.log-events.ts`, `<c>.cache-keys.ts`, `errors/`,
-      `messages/`, `persistence/`, `*.service.ts`, `*.policy.ts`, `*.contracts.ts` and colocated specs. Same-owner imports are
+      the closed `requires`/`allows` of its slot (`be.domain`, `be.platform`, `be.integrations`, or the pattern tiers'
+      `be.events`, `be.queues`, `be.projections`) — its module and module-definition when it registers providers, its
+      config and options when it is configured, and its errors (`be.errors`), messages (`be.domain.messages`) and
+      persistence (`be.persistence`) in their sub-slots. Same-owner imports are
       relative and never go through the owner's own `index.ts`; a nested `index.ts` does not exist. No empty conventional
       folder is created.
     rationale: |-
@@ -172,10 +178,11 @@ rules:
     kind: mandatory
     hfsRules: [R34, R35, R36]
     requirement: |-
-      Entities, constraints and migrations live in `persistence/` of the capability that owns the table (`domain/<c>/persistence/`,
-      or `platform/<c>/persistence/` for technical tables such as outbox, inbox and lease): `entities/<table>.entity.ts`,
-      `migrations/<epochMs13>-<kebab-name>.ts`, `<name>.sql.ts`, `<name>.rows.ts` and `connection.ts`. There is no
-      `persistence/index.ts` and no `*.repository.ts`. `platform/database` owns the connection mechanism and the connection
+      Entities, constraints and migrations live in `persistence/` of the capability that owns the table — slot
+      `be.persistence`, under a domain, platform or projections capability (`platform/<c>/persistence/` for technical
+      tables such as outbox, inbox and lease) — within the slot's closed `allows` (entities, epoch-named migrations, the
+      SQL and row files, `connection.ts`); there is no `persistence/index.ts` and no `*.repository.ts`.
+      `platform/database` owns the connection mechanism and the connection
       files; the app composes the explicit entity and migration lists. No feature transport owns a schema definition. See
       persistence.yaml.
     rationale: |-
@@ -198,12 +205,12 @@ rules:
     kind: mandatory
     hfsRules: [R47, R48]
     requirement: |-
-      Unit specs exist only for the unit-tested roles (test.yaml BE-TEST-1): `<name>.service.spec.ts` beside its
-      `<name>.service.ts` and `<name>.cli.spec.ts` beside its `<name>.cli.ts`; nothing else has a unit spec. Integration specs are
-      `be/src/tests/integration/<capability>/*.integration-spec.ts`, e2e specs `be/src/tests/e2e/<area>/*.e2e-spec.ts` and provider
-      contract specs `be/src/tests/contract/<provider>/*.contract-spec.ts`; the folder and the suffix agree. Test infrastructure
-      (containers, boot of the real apps, network-edge fakes) lives only in `be/src/tests/world/` and typed doubles and builders in
-      `be/src/tests/fixtures/`. There is no other test kind. Fixtures never import a feature and no `testing/` folder exists under
+      Unit specs exist only for the unit-tested roles (test.yaml BE-TEST-1, `ruleParams.be.unitRoles` of slots.yaml):
+      `<name>.service.spec.ts` beside its `<name>.service.ts` and `<name>.cli.spec.ts` beside its `<name>.cli.ts`;
+      nothing else has a unit spec. Integration, e2e and provider contract specs are the slots `be.tests.integration`,
+      `be.tests.e2e` and `be.tests.contract`; the folder and the suffix agree. Test infrastructure
+      (containers, boot of the real apps, network-edge fakes) lives only in slot `be.tests.world` and typed doubles and builders in
+      `be.tests.fixtures`. There is no other test kind. Fixtures never import a feature and no `testing/` folder exists under
       `be/src/modules`.
     rationale: |-
       Useful evidence checks invariants at their real boundary, and one placement rule keeps discovery mechanical.
