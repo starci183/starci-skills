@@ -1825,12 +1825,13 @@ rules:
       - {kind: hfs, id: db-config-types, at: scripts/hfs/rules/database.mjs}
   - id: R217
     code: "FE_SUPABASE_CLIENT_OWNER"
-    law: "The database has one door per side: `@supabase/ssr` and `@supabase/supabase-js` are imported and called only by the fe db owner (`fe.modules.db`, `fe.package.db`) and, on the back end, by `be.integrations.supabase`, and every client carries the committed `Database` type; the front end has no route handler beyond health/live and the auth callback slot."
+    law: "The database has one door per side: `@supabase/ssr` and `@supabase/supabase-js` are imported and called only by the fe db owner (`fe.modules.db`, `fe.package.db`) and, on the back end, by `be.integrations.supabase`, and every client carries the committed `Database` type; the front end has no route handler beyond health/live and the auth callback slot, and holds no credential: `fe/` names no service-role or `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD` value (public configuration is read once by `modules/config`)."
     kinds: [check, design]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["FE_SUPABASE_CLIENT_OWNER", "BE_SUPABASE_CLIENT_OWNER", "FE_ROUTE_HANDLER_FORBIDDEN"]
+    failureCodes: ["FE_SUPABASE_CLIENT_OWNER", "BE_SUPABASE_CLIENT_OWNER", "FE_ROUTE_HANDLER_FORBIDDEN", "FE_SERVICE_ROLE_FORBIDDEN"]
     enforcers:
       - {kind: machine, id: supabase-client-owner, at: scripts/hfs/architecture/supabase.mjs}
+      - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
   - id: R218
     code: "FE_DB_RESULT_TYPED"
     law: "A Supabase result is typed by `Database` inference and never swallowed: no explicit generic on `single`/`maybeSingle`/`returns`, no cast or non-null assertion on a result, every list read carries `.limit()` or a keyset bound, every awaited call reads `error` or hands the whole result to `toOutcome`, and a failure never becomes empty data."
@@ -1849,13 +1850,13 @@ rules:
       - {kind: machine, id: supabase-principal, at: scripts/hfs/architecture/supabase.mjs}
   - id: R220
     code: "HFS_LITE_SECRET_CUSTODY"
-    law: "A lite app holds no secret material in the tree and the front end holds no credential: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password, and `fe/` names no service-role or `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD` value (public configuration is read once by `modules/config`)."
+    editions: [lite]
+    law: "A lite app holds no secret material in the tree: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, and `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password; the one custody is the sealed `.starcistacks/<env>/secrets/<slug>.enc`."
     kinds: [check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["HFS_LITE_SECRET_CUSTODY", "FE_SERVICE_ROLE_FORBIDDEN"]
+    failureCodes: ["HFS_LITE_SECRET_CUSTODY"]
     enforcers:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
-      - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
 retired:
   - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}

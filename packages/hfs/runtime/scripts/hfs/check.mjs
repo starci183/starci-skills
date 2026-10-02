@@ -15,28 +15,28 @@
 //                                 and passed in as `extraFindings` (this module does not read the templates)
 //   HFS_SLOT_REQUIRED_MISSING     a file or directory a required slot (or an instance of one) must contain
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
-//   HFS_PLAINTEXT_SECRET          (R06, hfs-rules/secrets.mjs) a plaintext secret file or value in a tracked file; a `.enc` that is no sops envelope
-//   HFS_STACKS_SHAPE              (R10, hfs-rules/stacks.mjs) a `.starcistacks` path outside the standard shape, or a Sonar owner that is not the host
-//   HFS_CI_MISSING_CANON          (R13, hfs-rules/pipeline.mjs) CI without the pinned `hfs check`, pre-push without typecheck or lint
-//   HFS_DEP_VERSION_SKEW          (R14, hfs-rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
-//   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
-//   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
-//   FE_NO_TESTS                   (R97, hfs-rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
-//   HFS_LITE_SECRET_CUSTODY       (R220, hfs-rules/supabase-secrets.mjs) under edition lite: secret material or a forbidden custody path; the R06 scan itself runs for every edition
-//   HFS_EDITION_FORBIDDEN_PRESENT (L01, hfs-rules/edition.mjs) under edition lite: a test script, dependency or tool config in a
+//   HFS_PLAINTEXT_SECRET          (R06, rules/secrets.mjs) a plaintext secret file or value in a tracked file; a `.enc` that is no sops envelope
+//   HFS_STACKS_SHAPE              (R10, rules/stacks.mjs) a `.starcistacks` path outside the standard shape, or a Sonar owner that is not the host
+//   HFS_CI_MISSING_CANON          (R13, rules/pipeline.mjs) CI without the pinned `hfs check`, pre-push without typecheck or lint
+//   HFS_DEP_VERSION_SKEW          (R14, rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
+//   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
+//   BE_TEST_TOPOLOGY              (R47, rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
+//   FE_NO_TESTS                   (R97, rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
+//   HFS_LITE_SECRET_CUSTODY       (R220, rules/supabase-secrets.mjs) under edition lite: secret material or a forbidden custody path; the R06 scan itself runs for every edition
+//   HFS_EDITION_FORBIDDEN_PRESENT (R212, rules/edition.mjs) under edition lite: a test script, dependency or tool config in a
 //                                 package.json or the tree, or a declared worker app, event pattern or trigger kind lite does not have
 //   DB_MIGRATION_SHAPE ... DB_TYPES_DRIFT (R213-R216, rules/database.mjs, async: passed in as extraFindings) the Supabase migrations, policies, definer functions, buckets, config.toml and generated types
-//   BE_SPEC_PLACEMENT             (R102, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
-//   HFS_REPO_LOCAL_CHECK          (R103, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
-//   HFS_LINT_SUPPRESSION_FILE     (R104, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
-//   HFS_PROOF_COMMAND_FILE_MISSING (R105, hfs-rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
-//   HFS_PEER_INTEGRATION_MISSING  (R111, hfs-rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
-//   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
-//   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
+//   BE_SPEC_PLACEMENT             (R102, rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
+//   HFS_REPO_LOCAL_CHECK          (R103, rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
+//   HFS_LINT_SUPPRESSION_FILE     (R104, rules/lint-suppression.mjs) an eslint suppressions file, script or option
+//   HFS_PROOF_COMMAND_FILE_MISSING (R105, rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
+//   HFS_PEER_INTEGRATION_MISSING  (R111, rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
+//   BE_INTEGRATION_SPEC_MISSING   (R112, rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
+//   FE_GRAPHQL_CONTRACT           (R113, rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
 //   HFS_MONO_* (R143-R146, rules/monorepo.mjs) the monorepo shape; BE_CLI_REQUIRED (R147, rules/cli.mjs) the one cli app
-//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R163-R167, hfs-rules/services.mjs) the microservice policy of a product with more than one service
+//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R163-R167, rules/services.mjs) the microservice policy of a product with more than one service
 //   BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING, BE_KIND_DECLARATION, BE_KIND_EMPTY   (rules/app-root.mjs: event-bus.mjs and kinds.mjs) a typed event class the vendored contract does not list, a declared pattern whose proof scenarios have no test, and the trigger kinds of the features (declared, whole, never empty)
-//   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
+//   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG, HFS_COVERAGE_SCOPE_DRIFT   (R04, R11, R204) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
 //                                 both are passed in as `extraFindings`: this module reads no template and starts no tool
@@ -278,10 +278,10 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   const pins = readPins(root);
   findings.push(...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }));
 
-  // The tree checks of the rules that read file content or configuration (hfs-rules/*): whole-scope, cheap, no tool run.
+  // The tree checks of the rules that read file content or configuration (rules/*): whole-scope, cheap, no tool run.
   findings.push(
     ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
-    ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, manifest, withDeclaration: editionDeclaration }),
+    ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
   );

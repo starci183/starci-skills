@@ -58,8 +58,9 @@ test('the gate reads the slot resolver of the app: a slot the edition lacks or f
   for (const slotIds of [['be.feature', 'be.feature.application', 'be.transport.graphql'], ['be.feature.webhooks.http'], ['be.cli'], ['be.app.cli'], ['be.contract.graphql']]) {
     assert.equal(refuseInEdition({ resolver: lite, slotIds, command: 'add x' }), undefined, slotIds.join(', '));
   }
-  // under full the gate never fires, not even over the slots lite forbids
+  // under full the gate never fires over the slots lite forbids, and an id the view does not answer refuses exactly as under lite
   assert.equal(refuseInEdition({ resolver: full, slotIds: ['be.feature.saga', 'be.tests.world'], command: 'add saga' }), undefined);
+  refuses(full, ['be.no.such.slot'], 'add x');
 });
 
 test('a lite app refuses every add noun whose tree writes a slot lite does not have - exit 2, the exact message, nothing written', async () => {
@@ -100,15 +101,20 @@ test('a lite app refuses `new service` and `new spec` - the unit spec they write
 
 test('the nouns lite keeps are untouched: add api, add webhook and add cli still write their trees', async () => {
   const dir = repo(LITE);
+  // the lite api app the transports are composed into (the shapes add api / add webhook wire: the imports array and the parsed http-security options)
+  fs.mkdirSync(path.join(dir, 'be', 'apps', 'core', 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'app.module.ts'), ['import { Module } from "@nestjs/common"', '', '@Module({', '  imports: [', '  ],', '})', 'export class AppModule {}', ''].join('\n'));
+  fs.writeFileSync(path.join(dir, 'be', 'apps', 'core', 'src', 'main.ts'), ['import { parseHttpSecurityConfig } from "@modules/platform/http-security"', 'const options = { httpSecurity: parseHttpSecurityConfig(env) }', 'NestFactory.create(AppModule.register(options))', ''].join('\n'));
   const api = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--repo', dir]);
   assert.equal(api.code, 0, api.err);
-  assert.ok(exists(dir, 'be/src/features/api/checkout/transport/graphql/checkout-graphql.module.ts'));
+  assert.ok(exists(dir, 'be/src/features/api/checkout/transport/http/checkout-http.module.ts'));
   const webhook = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--repo', dir]);
   assert.equal(webhook.code, 0, webhook.err);
   assert.ok(exists(dir, 'be/src/features/webhooks/payment-gateway/transport/http/payment-gateway.webhook.ts'));
   // a lite app has no cli app until the first `add cli`, which bootstraps apps/cli and its static cli feature root, then wires the group in
   fs.mkdirSync(path.join(dir, 'be'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'be', 'nest-cli.json'), JSON.stringify({ collection: '@nestjs/schematics', monorepo: true, root: 'apps/api', sourceRoot: 'apps/api/src', projects: { api: { type: 'application', root: 'apps/api', entryFile: 'main', sourceRoot: 'apps/api/src' } } }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true, scripts: {}, dependencies: {}, devDependencies: {} }));
   const addCli = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
   assert.equal(addCli.code, 0, addCli.err);
   assert.ok(exists(dir, 'be/src/features/cli/requeue/requeue.cli.ts'));

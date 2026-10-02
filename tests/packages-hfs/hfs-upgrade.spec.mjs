@@ -7,6 +7,7 @@ import path from "node:path";
 import { main } from "../../packages/hfs/bin/hfs.mjs";
 import {
   UpgradeError,
+  fullEditionDeclaration,
   upgradeEdition,
 } from "../../packages/hfs/upgrade/index.mjs";
 import {
@@ -303,7 +304,7 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
     ".starciwork/features/index.yaml",
     "be/apps/cli/src/main.ts",
     "be/src/features/cli/migrate/subs/run.cli.ts",
-    "be/src/tests/world/",
+    "be/src/tests/tsconfig.json",
     "package-lock.json",
   ])
     assert.ok(
@@ -385,20 +386,12 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
   );
   assert.match(migrate, /"supabase\.cmd" : "supabase"/);
   assert.match(migrate, /spawnSync\(command, \["db", "push"\]/);
-  for (const directory of [
-    "world",
-    "fixtures",
-    "integration",
-    "e2e",
-    "contract",
-  ]) {
-    const files = fs.readdirSync(path.join(root, "be/src/tests", directory));
-    assert.deepEqual(
-      files,
-      [],
-      `tests/${directory} is empty: no placeholder or invented spec`,
+  for (const directory of ["world", "fixtures", "integration", "e2e", "contract"])
+    assert.equal(
+      fs.existsSync(path.join(root, "be/src/tests", directory)),
+      false,
+      `tests/${directory} is left for authored specs instead of an untracked empty directory`,
     );
-  }
 });
 
 test("the committed lite example has a read-only, additions-only full upgrade plan", async () => {
@@ -408,10 +401,23 @@ test("the committed lite example has a read-only, additions-only full upgrade pl
   const plan = await upgradeEdition({ root, to: "full", plan: true, presets: PRESETS });
   assert.deepEqual(contents(root), before, "planning the example changes no byte");
   assert.ok(plan.length > 0, "the full edition has additions to make");
-  const managed = new Set(["hfs.json", "sonar-project.properties", ".husky/pre-commit", ".husky/pre-push", ".github/workflows/ci.yml", ".github/workflows/images.yml", ".gitignore", "package.json", "package-lock.json"]);
+  const lite = JSON.parse(fs.readFileSync(path.join(root, "hfs.json"), "utf8"));
+  const full = fullEditionDeclaration(lite, MANIFEST);
+  const managed = new Set([
+    "hfs.json",
+    "package-lock.json",
+    "be/nest-cli.json",
+    ...renderTargets(full, PRESETS, { manifest: MANIFEST }).map(
+      (target) => target.path,
+    ),
+  ]);
   for (const step of plan) {
     if (step.op === "add") {
       assert.equal(before[step.path], undefined, `${step.path} is a new full-edition path`);
+      continue;
+    }
+    if (step.op === "rewrite-readme") {
+      assert.equal(step.path, "README.md");
       continue;
     }
     assert.ok(managed.has(step.path), `${step.op} touches only a managed declaration: ${step.path}`);

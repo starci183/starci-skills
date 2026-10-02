@@ -21,6 +21,7 @@ import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { codecovPaths, coverageComponents, jestCoverage, sonarCoverageExclusions } from '../runtime/scripts/hfs/coverage-scope.mjs';
 import { APP_SCOPE, SIDES, litePresenceOf, loadSlotManifest, resolveRepoDeclaration, slotInEdition } from '../runtime/scripts/hfs/slots.mjs';
+import { managedGroupOf } from '../runtime/scripts/hfs/edition-slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
@@ -66,7 +67,7 @@ export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest
   for (const slot of manifest.slots) {
     if (!slot.profiles.includes(scope) || !slotInEdition(manifest, slot, edition)) continue;
     if (edition === 'lite' && litePresenceOf(slot, scope) === 'forbidden') continue;
-    const group = edition === 'lite' ? (slot.liteManagedBy ?? slot.managedBy) : slot.managedBy;
+    const group = managedGroupOf(slot, edition);
     if (group === undefined) continue;
     const effectivePath = edition === 'lite' ? (slot.lite?.path ?? slot.path) : slot.path;
     for (const file of braceVariants(effectivePath)) {

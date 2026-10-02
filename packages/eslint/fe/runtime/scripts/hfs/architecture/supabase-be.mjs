@@ -2,7 +2,7 @@
 // JWT verification, pins the remote JWKS/issuer/audience/algorithms, and never trusts authorization claims from a body.
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
-import { chainParts, importedFrom, reportAt, unwrap } from './supabase-ast.mjs';
+import { importedFrom, reportAt, unwrap } from './supabase-ast.mjs';
 
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const BE_JWT_VERIFIED = 'BE_SUPABASE_JWT_VERIFIED';
@@ -38,6 +38,40 @@ const jwksArgument = (kit, checker, node) => {
     && jwksArgument(kit, checker, declaration.initializer));
 };
 
+const importedCall = (kit, checker, call) => {
+  const direct = kit.importBinding(checker, call.expression);
+  if (direct?.module === 'jwt-decode' && direct.name === 'default') return { module: direct.module, name: 'jwtDecode' };
+  if (direct) return direct;
+  if (!kit.ts.isPropertyAccessExpression(call.expression) || !kit.ts.isIdentifier(call.expression.expression)) return null;
+  const owner = kit.importBinding(checker, call.expression.expression);
+  return owner?.name === 'default' ? { module: owner.module, name: call.expression.name.text } : null;
+};
+
+const accessName = (ts, node) => {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
+  return null;
+};
+
+const requestLike = (ts, node) => {
+  const current = unwrap(ts, node);
+  if (ts.isIdentifier(current)) return /^(?:req|request)$/iu.test(current.text);
+  return (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) && accessName(ts, current) === 'request';
+};
+
+const fromRequestBody = (kit, checker, node, seen = new Set()) => {
+  const current = unwrap(kit.ts, node);
+  if (!current || seen.has(current)) return false;
+  seen.add(current);
+  if (kit.ts.isPropertyAccessExpression(current) || kit.ts.isElementAccessExpression(current)) {
+    if (accessName(kit.ts, current) === 'body' && requestLike(kit.ts, current.expression)) return true;
+    return fromRequestBody(kit, checker, current.expression, seen);
+  }
+  if (!kit.ts.isIdentifier(current)) return false;
+  return kit.declarationsOf(checker, current).some(declaration => kit.ts.isVariableDeclaration(declaration) && declaration.initializer
+    && fromRequestBody(kit, checker, declaration.initializer, seen));
+};
+
 export function checkBackendJwt(input) {
   const kit = machineKit(input);
   const { ts } = kit;
@@ -50,7 +84,7 @@ export function checkBackendJwt(input) {
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, (node) => {
       if (ts.isCallExpression(node)) {
-        const binding = kit.importBinding(checker, node.expression);
+        const binding = importedCall(kit, checker, node);
         if (binding && JWT_MODULES.has(binding.module) && ['decode', 'decodeJwt', 'jwtDecode'].includes(binding.name)) {
           reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `${binding.module}.${binding.name} decodes a token without proving its signature; use the Supabase JWKS verifier.`, { module: binding.module, method: binding.name });
         }
@@ -69,18 +103,18 @@ export function checkBackendJwt(input) {
           const issuer = property('issuer');
           const audience = values('audience');
           const algorithms = values('algorithms');
-          const good = jwksArgument(kit, checker, node.arguments[1]) && issuer !== null && audience?.includes('authenticated')
+          const good = jwksArgument(kit, checker, node.arguments[1]) && issuer != null && audience?.includes('authenticated')
             && algorithms !== null && algorithms.length > 0;
           if (!good) {
             reportAt(violations, kit, BE_JWT_VERIFIED, file, node, 'Supabase jwtVerify must use createRemoteJWKSet(...) and pin issuer, audience `authenticated`, and a non-empty algorithms list; jwtVerify then enforces signature and exp.');
           } else verifiedCalls += 1;
         }
       }
-      if (ts.isPropertyAccessExpression(node) && CLAIM_NAMES.has(node.name.text)) {
-        const parts = chainParts(ts, node.expression);
-        if (parts.includes('body')) reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `${node.name.text} is read from the request body; authorization claims come only from the verified token or the database.`, { claim: node.name.text });
+      if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && CLAIM_NAMES.has(accessName(ts, node))) {
+        const claim = accessName(ts, node);
+        if (fromRequestBody(kit, checker, node.expression)) reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `${claim} is read from the request body; authorization claims come only from the verified token or the database.`, { claim });
       }
-      if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && chainParts(ts, node.initializer).includes('body')) {
+      if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && fromRequestBody(kit, checker, node.initializer)) {
         for (const element of node.name.elements) {
           const property = element.propertyName ?? element.name;
           if (ts.isIdentifier(property) && CLAIM_NAMES.has(property.text)) reportAt(violations, kit, BE_JWT_VERIFIED, file, element, `${property.text} is destructured from the request body; authorization claims come only from the verified token or the database.`, { claim: property.text });

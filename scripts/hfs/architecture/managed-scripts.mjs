@@ -2,6 +2,8 @@
 // edition. Templates stay the source of truth; README presentation checks consume only this cached name set.
 import fs from 'node:fs';
 import path from 'node:path';
+import { managedGroupOf } from '../edition-slots.mjs';
+import { loadSlotManifest } from '../slots.mjs';
 
 const TEMPLATE_ROOTS = [
   path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'hfs', 'templates'),
@@ -13,8 +15,9 @@ const managedScriptCache = new Map();
 export function managedScriptNames(profile, edition = 'full') {
   const key = `${profile}:${edition}`;
   if (!managedScriptCache.has(key)) {
-    const group = edition === 'lite' ? 'package-scripts-lite' : 'package-scripts';
-    const templates = TEMPLATE_ROOTS.find((dir) => fs.existsSync(path.join(dir, profile, group, 'package.json')));
+    const slot = loadSlotManifest().slots.find((entry) => entry.id === `${profile}.package-manifest`);
+    const group = slot && managedGroupOf(slot, edition);
+    const templates = group && TEMPLATE_ROOTS.find((dir) => fs.existsSync(path.join(dir, profile, group, 'package.json')));
     if (!templates) throw Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
     const text = fs.readFileSync(path.join(templates, profile, group, 'package.json'), 'utf8')
       .replace(/^\{\{> ([\w./-]+)\}\}\r?\n/gmu, (_, partial) => fs.readFileSync(path.join(templates, partial), 'utf8'));

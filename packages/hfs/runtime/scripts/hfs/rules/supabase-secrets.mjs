@@ -1,6 +1,7 @@
 // supabase-secrets.mjs - L17 extends the one R06 secret scan for edition lite. It keeps the ordinary
 // HFS_PLAINTEXT_SECRET judgement, then adds the reduced lite custody tree and provider-shaped literals
 // which are meaningful only in the Supabase/FE surface. Findings name shapes, never captured values.
+import { Buffer } from 'node:buffer';
 import { secretFindings } from './secrets.mjs';
 import { found, readText } from './read.mjs';
 
@@ -13,20 +14,40 @@ const SECRETS_DIRECTORY = /^\.secrets(?:\/|$)/iu;
 const SEALED_HOME = /^\.starcistacks\/[^/]+\/secrets\/[^/]+\.enc$/iu;
 
 const LITE_SECRET_PATTERNS = Object.freeze([
-  { name: 'supabase-publishable-token', re: /\bsbp_[A-Za-z0-9_-]{20,}\b/u },
+  { name: 'supabase-personal-access-token', re: /\bsbp_[A-Za-z0-9_-]{20,}\b/u },
+  { name: 'supabase-publishable-key', re: /\bsb_publishable_[A-Za-z0-9_-]{20,}\b/u },
   { name: 'supabase-secret-token', re: /\bsb_secret_[A-Za-z0-9_-]{20,}\b/u },
-  // This catches a copied JWT/service token even when it is truncated before the second/third segment. The generic R06
-  // scanner already recognises a complete JWT; the wrapper below gives the more specific lite finding precedence.
-  { name: 'supabase-eyj-service-token', re: /\beyJ[A-Za-z0-9_.-]{60,}\b/u },
   { name: 'password-connection-string', re: /\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/@]+:[^@\s/${}]{8,}@/iu },
 ]);
+const JWT_CANDIDATE = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(?![A-Za-z0-9_-])/gu;
 
-const inSecretFreeTree = (repo, file) => repo.profile === 'fe' || file === 'fe' || file.startsWith('fe/')
-  || file === 'supabase' || file.startsWith('supabase/');
+const jsonObject = segment => {
+  try {
+    const value = JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
 
-/** L17 findings only. Full edition is unchanged: R06 remains its one custody scanner. */
+const validJwt = candidate => {
+  const [header, payload, signature, extra] = candidate.split('.');
+  if (extra !== undefined || !signature) return false;
+  const decodedHeader = jsonObject(header);
+  const decodedPayload = jsonObject(payload);
+  return typeof decodedHeader?.alg === 'string' && decodedHeader.alg.toLowerCase() !== 'none' && decodedPayload !== null;
+};
+
+const liteSecretPatterns = line => {
+  const names = LITE_SECRET_PATTERNS.filter(pattern => pattern.re.test(line)).map(pattern => pattern.name);
+  if ([...line.matchAll(JWT_CANDIDATE)].some(match => validJwt(match[0]))) names.push('supabase-eyj-service-token');
+  return names;
+};
+
+const inSecretFreeTree = (repo, file) => repo.profile === 'fe' || file.startsWith('fe/') || file.startsWith('supabase/');
+
+/** Raw L17 findings. The catalog-driven findings filter decides which editions judge them. */
 export function liteSecretCustodyFindings({ repoRoot, files, repo }) {
-  if ((repo.edition ?? 'full') !== 'lite') return [];
   const findings = [];
   for (const file of files) {
     if (repo.profile === 'app') {
@@ -46,10 +67,10 @@ export function liteSecretCustodyFindings({ repoRoot, files, repo }) {
     const seen = new Set();
     const lines = text.split(/\r?\n/u);
     for (let index = 0; index < lines.length; index += 1) {
-      for (const pattern of LITE_SECRET_PATTERNS) {
-        if (!pattern.re.test(lines[index]) || seen.has(pattern.name)) continue;
-        seen.add(pattern.name);
-        findings.push(found(LITE_SECRET_CUSTODY, file, `${file}:${index + 1} holds a provider-shaped secret (${pattern.name}); lite keeps no secret literal under fe/ or supabase/.`, { line: index + 1, pattern: pattern.name }));
+      for (const pattern of liteSecretPatterns(lines[index])) {
+        if (seen.has(pattern)) continue;
+        seen.add(pattern);
+        findings.push(found(LITE_SECRET_CUSTODY, file, `${file}:${index + 1} holds a provider-shaped secret (${pattern}); lite keeps no secret literal under fe/ or supabase/.`, { line: index + 1, pattern }));
       }
     }
   }
@@ -63,6 +84,6 @@ export function liteSecretCustodyFindings({ repoRoot, files, repo }) {
 export function supabaseSecretFindings(input) {
   const ordinary = secretFindings(input);
   const lite = liteSecretCustodyFindings(input);
-  const jwt = new Set(lite.filter(item => item.pattern === 'supabase-eyj-service-token').map(item => `${item.path}:${item.line ?? ''}`));
-  return [...ordinary.filter(item => !(item.pattern === 'jwt' && jwt.has(`${item.path}:${item.line ?? ''}`))), ...lite];
+  const liteJwtAuthority = (input.repo.edition ?? 'full') === 'lite';
+  return [...ordinary.filter(item => !(liteJwtAuthority && item.pattern === 'jwt' && inSecretFreeTree(input.repo, item.path))), ...lite];
 }

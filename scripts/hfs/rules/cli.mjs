@@ -14,6 +14,7 @@ export const CLI_APP = 'cli';
 const CLI_KIND = 'cli';
 const IMAGE = 'Dockerfile';
 const CLI_FEATURE_SLOT = 'be.cli';
+const CLI_APP_SLOT = 'be.app.cli';
 
 /** The findings of R147 over the tracked paths `files` (app-relative) of the app `repo`; `resolver` is the app's. */
 export function cliFindings({ files, repo, resolver }) {
@@ -25,8 +26,8 @@ export function cliFindings({ files, repo, resolver }) {
   const commandFiles = onBe.filter((file) => beResolver.classifyPath(file).slot === CLI_FEATURE_SLOT);
   const findings = [];
   const cliApps = be.apps.filter((app) => app.kind === CLI_KIND);
-  // Under edition lite schema migration is the Supabase CLI's job (slot be.app.cli is optional there): a connection no longer forces the cli app, a tracked command still does.
-  const migrates = (be.connections ?? []).length > 0 && repo.edition !== 'lite';
+  // Where the cli app is only optional (litePresence: schema migration is the Supabase CLI's job) a connection no longer forces it; a tracked command still does.
+  const migrates = (be.connections ?? []).length > 0 && beResolver.slot(CLI_APP_SLOT)?.presence !== 'optional';
   const needs = migrates || commandFiles.length > 0;
   const why = migrates ? `it declares the connection${be.connections.length === 1 ? '' : 's'} ${be.connections.map((c) => c.name).join(', ')} (their migrations run as \`cli migrate run\`)` : 'it tracks commands under be/src/features/cli/';
   if (needs && cliApps.length === 0) findings.push(found(CLI_REQUIRED, 'hfs.json', `the back end declares no cli app, but ${why}; declare { "name": "${CLI_APP}", "kind": "${CLI_KIND}" } in sides.be.apps and build be/apps/${CLI_APP} on nest-commander: every one-off action of the back end is one of its commands.`, { needs: why }));

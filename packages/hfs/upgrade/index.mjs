@@ -11,9 +11,11 @@ import {
   loadSlotManifest,
   resolveRepoDeclaration,
 } from "../runtime/scripts/hfs/slots.mjs";
+import { managedScriptNames } from "../runtime/scripts/hfs/architecture/managed-scripts.mjs";
 import { LOCK_STEP, npmLock } from "../scaffold/app.mjs";
 import {
   TEMPLATES_DIR,
+  appSource,
   checkTargets,
   imageFiles,
   loadHfs,
@@ -39,13 +41,6 @@ const FULL_DEV_DEPENDENCIES = Object.freeze([
   "ts-jest",
 ]);
 const FULL_DEPENDENCIES = Object.freeze(["nest-commander"]);
-const TEST_DIRECTORIES = Object.freeze([
-  "be/src/tests/world",
-  "be/src/tests/fixtures",
-  "be/src/tests/integration",
-  "be/src/tests/e2e",
-  "be/src/tests/contract",
-]);
 // Upgrade must render the full managed files before it can add/install the full-only Jest preset. These are the preset's two
 // public sync inputs; once apply resolves the new dependency, normal full sync reads them from @starci/jest-preset again.
 const UPGRADE_PRESETS = Object.freeze({
@@ -76,7 +71,46 @@ const fileText = (root, file) =>
     .replace(/\r\n/g, "\n");
 const sameText = (root, file, content) =>
   fs.existsSync(path.join(root, ...file.split("/"))) &&
-  fileText(root, file) === content.replace(/\r\n/g, "\n");
+    fileText(root, file) === content.replace(/\r\n/g, "\n");
+
+const readmeCommand = (name) =>
+  name === "test" ? "npm test" : `npm run ${name}`;
+
+/** Add only the top-level commands that the full managed scripts introduce, preserving every existing README byte around them. */
+function upgradedReadme(root) {
+  const file = path.join(root, "README.md");
+  if (!fs.existsSync(file)) return null;
+  const source = fs.readFileSync(file, "utf8");
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  const lines = source.split(/\r?\n/u);
+  const start = lines.findIndex((line) => /^## Development\s*$/u.test(line));
+  if (start < 0) return null;
+  const end = lines.findIndex(
+    (line, index) => index > start && /^## /u.test(line),
+  );
+  const stop = end < 0 ? lines.length : end;
+  const addedNames = [...managedScriptNames("app", "full")].filter(
+    (name) =>
+      !name.includes(":") && !managedScriptNames("app", "lite").has(name),
+  );
+  const section = lines.slice(start + 1, stop).join("\n");
+  const commands = addedNames
+    .map(readmeCommand)
+    .filter(
+      (command) =>
+        !new RegExp(
+          `^\\s*${command.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s*$`,
+          "mu",
+        ).test(section),
+    );
+  if (commands.length === 0) return null;
+  let insert = -1;
+  for (let index = start + 1; index < stop; index += 1)
+    if (/^\s*npm run\s+/u.test(lines[index])) insert = index + 1;
+  if (insert < 0) return null;
+  lines.splice(insert, 0, ...commands);
+  return lines.join(newline);
+}
 
 function readJson(root, file) {
   try {
@@ -215,6 +249,22 @@ function additions(full, hadCli, manifest) {
   return files;
 }
 
+/** The post-upgrade back-end source view used by the managed coverage render before those additions exist on disk. */
+function sourceWithAdditions(root, additions) {
+  const current = appSource(root);
+  const added = new Map(
+    additions
+      .filter(
+        (file) => file.path.startsWith("be/") && /\.[cm]?ts$/u.test(file.path),
+      )
+      .map((file) => [file.path.slice("be/".length), file.content]),
+  );
+  return {
+    files: [...new Set([...current.files, ...added.keys()])].sort(),
+    read: (file) => added.get(file) ?? current.read(file),
+  };
+}
+
 const publicStep = ({ op, path: file, why }) => ({ op, path: file, why });
 
 async function model({ root, to, presets, manifest }) {
@@ -228,10 +278,14 @@ async function model({ root, to, presets, manifest }) {
     (app) => app.kind === "cli" && app.name === "cli",
   );
   const full = fullEditionDeclaration(declaration, manifest);
+  const desired = additions(full, hadCli, manifest);
   const pins = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins;
   const upgradedPackage = pinnedPackage(root, pins);
   const resolvedPresets = presets ?? UPGRADE_PRESETS;
-  const managed = renderTargets(full, resolvedPresets, { manifest });
+  const managed = renderTargets(full, resolvedPresets, {
+    manifest,
+    source: sourceWithAdditions(root, desired),
+  });
   const packageTarget = managed.find(
     (target) => target.path === "package.json",
   );
@@ -267,6 +321,15 @@ async function model({ root, to, presets, manifest }) {
       kind: "file",
     },
   ];
+  const readme = upgradedReadme(root);
+  if (readme !== null)
+    steps.push({
+      op: "rewrite-readme",
+      path: "README.md",
+      why: "List the full edition's newly managed top-level scripts in Development without changing other README text.",
+      content: readme,
+      kind: "file",
+    });
   for (const result of targetResults) {
     if (result.status === "ok") continue;
     steps.push({
@@ -284,7 +347,6 @@ async function model({ root, to, presets, manifest }) {
       content: jsonText(nextPackage),
       kind: "file",
     });
-  const desired = additions(full, hadCli, manifest);
   for (const file of desired) {
     const target = path.join(root, ...file.path.split("/"));
     if (fs.existsSync(target)) {
@@ -315,14 +377,6 @@ async function model({ root, to, presets, manifest }) {
       content: nestCliText(full),
       kind: "file",
     });
-  for (const directory of TEST_DIRECTORIES)
-    if (!fs.existsSync(path.join(root, ...directory.split("/"))))
-      steps.push({
-        op: "add",
-        path: `${directory}/`,
-        why: "Create the empty full-edition test layer without a placeholder or spec body.",
-        kind: "directory",
-      });
   if (dependenciesChanged)
     steps.push({
       op: "rewrite-managed",
@@ -404,17 +458,7 @@ export async function upgradeEdition({
   try {
     for (const step of built.steps) {
       if (step.kind === "lock") continue;
-      if (step.kind === "directory") {
-        const target = path.join(
-          repoRoot,
-          ...step.path.slice(0, -1).split("/"),
-        );
-        ensureParent(repoRoot, path.join(target, "entry"), directories);
-        if (!fs.existsSync(target)) {
-          fs.mkdirSync(target);
-          directories.push(target);
-        }
-      } else if (step.kind === "managed") {
+      if (step.kind === "managed") {
         const target = built.managed.find(
           (candidate) => candidate.path === step.path,
         );

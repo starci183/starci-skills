@@ -32,12 +32,14 @@ export async function parseSql(text) {
  * `body` is wrapped in a probe function under a dollar tag that does not collide with the body's own tags.
  * Answers the PLpgSQL_function node; throws on a body that is not valid plpgsql.
  */
-export async function parsePlpgsqlBody(body) {
+export async function parsePlpgsqlBody(body, parameters = [], returnsVoid = true) {
   let i = 0;
   let tag = `$hfs_probe_${i}$`;
   while (body.includes(tag)) { i += 1; tag = `$hfs_probe_${i}$`; }
+  const args = parameters.map((parameter) => parameter?.FunctionParameter?.name).filter(Boolean)
+    .map((name) => `"${name.replace(/"/g, '""')}" text`).join(', ');
   const result = await (await loadPgParser()).parsePlPgSQLSync(
-    `create function hfs_probe() returns void language plpgsql as ${tag}${body}${tag};`,
+    `create function hfs_probe(${args}) returns ${returnsVoid ? 'void' : 'text'} language plpgsql as ${tag}${body}${tag};`,
   );
   return result?.plpgsql_funcs?.[0]?.PLpgSQL_function ?? null;
 }

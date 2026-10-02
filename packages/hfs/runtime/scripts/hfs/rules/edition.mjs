@@ -9,9 +9,8 @@
 //     saga) or its trigger kinds (saga, reactors, jobs, realtime). The forbidden names are DERIVED - a pattern, trigger or
 //     app kind is gone under lite exactly when every slot that carries it is litePresence: forbidden - so adding or
 //     restoring a kind is a manifest edit, not an edit here.
-// Full edition runs nothing: the rule answers [] and the tree is judged exactly as before.
+// The edition is never tested here: a full app's view forbids none of these names and keeps its tests, so the rule answers [].
 import { found, readJson } from './read.mjs';
-import { litePresenceOf } from '../slots.mjs';
 import { DEPENDENCY_SECTIONS, TEST_DEPENDENCY, TEST_RUNNER_COMMAND, TEST_SCRIPT_NAME, TEST_TOOL_FILE } from './fe-no-tests.mjs';
 
 export const HFS_EDITION_FORBIDDEN_PRESENT = 'HFS_EDITION_FORBIDDEN_PRESENT';
@@ -20,14 +19,14 @@ const PACKAGE_JSON = /(?:^|\/)package\.json$/;
 const TYPECHECK_TESTS = /^(?:pre|post)?typecheck:tests$/;
 
 /**
- * The names lite cannot declare: for each of `pattern`, `trigger` and `appKind`, the value is gone when every slot that
- * carries it is forbidden under lite. Reads the BASE manifest (slots before the edition filter) so a slot that still
- * exists but is forbidden in lite counts.
+ * The names the edition cannot declare: for each of `pattern`, `trigger` and `appKind`, the value is gone when every slot of
+ * the resolver's view that carries it is forbidden there. The view is the edition's own (full forbids none of them), so the
+ * rule needs no edition test: a full app has nothing gone.
  */
-function liteGone(manifest) {
+function editionGone(resolver) {
   const tally = new Map();
-  for (const slot of manifest.slots) {
-    const forbidden = slot.profiles.every((profile) => litePresenceOf(slot, profile) === 'forbidden');
+  for (const slot of resolver.slots()) {
+    const forbidden = slot.presence === 'forbidden';
     for (const field of ['pattern', 'trigger', 'appKind']) {
       if (slot[field] === undefined) continue;
       const key = `${field}:${slot[field]}`;
@@ -89,17 +88,18 @@ function declarationFindings(repo, gone) {
 }
 
 /**
- * L01 for one scope (the app root or one side), over `files` (scope-relative). A no-op outside lite. The declaration
+ * L01 for one scope (the app root or one side), over `files` (scope-relative). Both questions are answered by the
+ * resolver's view of the edition: the names gone from it, and whether any slot of it still has tests. The declaration
  * findings are judged from the be side (its apps, patterns and kinds): the root scope looks at sides.be, a standalone
  * be-side check at its own view. `withDeclaration: false` (a side scope of a whole-app check) skips them: the root scope
  * already reported them on hfs.json, and the side scope would only repeat them on a path that is not this side's.
  */
-export function editionFindings({ repoRoot, files, repo, resolver, manifest, withDeclaration = true }) {
-  if ((repo.edition ?? 'full') !== 'lite') return [];
-  const gone = liteGone(manifest);
+export function editionFindings({ repoRoot, files, repo, resolver, withDeclaration = true }) {
+  const gone = editionGone(resolver);
+  const noTestWorld = resolver.slots().every((slot) => slot.tests === 'none');
   const beView = !withDeclaration ? null : (repo.profile === 'app' ? repo.sides?.be : (repo.profile === 'be' ? repo : null));
   const findings = beView ? declarationFindings(beView, gone) : [];
-  for (const file of files) {
+  for (const file of noTestWorld ? files : []) {
     if (file.includes('node_modules/')) continue;
     if (PACKAGE_JSON.test(file)) {
       findings.push(...packageFindings(repoRoot, file));

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
+import { managedScriptNames } from '../../scripts/hfs/architecture/managed-scripts.mjs';
+import { managedGroupOf } from '../../scripts/hfs/edition-slots.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
 // The edition mechanism (L01, manifest 2.1.0): hfs.json names `edition: full|lite` (absent means full), and lite is the same
@@ -195,8 +197,9 @@ test('L01: under lite a test script, a test dependency, a test-tool file, a work
   assert.equal(findings.some((f) => f.path === 'be/apps/jobs/src/main.ts' && f.code === 'HFS_FORBIDDEN_PRESENT'), true);
   assert.equal(findings.some((f) => f.path === 'be/src/tests/e2e/x.e2e-spec.ts' && f.code === 'HFS_FORBIDDEN_PRESENT'), true);
   assert.equal(on('be/src/tests/e2e/x.e2e-spec.ts').length, 0, 'the slot layer owns the path finding');
-  // full edition runs nothing of this
-  const full = checkRepo({ repoRoot, declaration: app(), files: ['package.json', 'vitest.config.ts'], tree: false }).findings;
+  // the full view forbids none of it, so the same tree and the same declaration produce no edition finding (the rule tests no edition)
+  const fullDecl = { ...app(), sides: { be: liteDecl.sides.be, fe: FE } };
+  const full = checkRepo({ repoRoot, declaration: fullDecl, files, tree: false }).findings;
   assert.equal(full.some((f) => f.code === 'HFS_EDITION_FORBIDDEN_PRESENT'), false);
   assert.equal(full.some((f) => f.code === 'HFS_EDITION_INVALID'), false);
 });
@@ -208,6 +211,19 @@ test('L01: a clean lite app produces no edition finding', (t) => {
   const files = ['package.json', 'be/src/features/api/orders/index.ts', 'fe/apps/web/src/app/[locale]/page.tsx'];
   const findings = checkRepo({ repoRoot, declaration: app({ edition: 'lite', be: { ...BE, kinds: ['api', 'cli'] } }), files, tree: false }).findings;
   assert.equal(findings.some((f) => f.code.startsWith('HFS_EDITION')), false, JSON.stringify(findings.filter((f) => f.code.startsWith('HFS_EDITION'))));
+});
+
+test('managedGroupOf: the one template-group answer of sync and the README check - liteManagedBy in lite, managedBy otherwise', () => {
+  assert.equal(managedGroupOf({ managedBy: 'a', liteManagedBy: 'b' }, 'lite'), 'b');
+  assert.equal(managedGroupOf({ managedBy: 'a', liteManagedBy: 'b' }, 'full'), 'a');
+  assert.equal(managedGroupOf({ managedBy: 'a' }, 'lite'), 'a');
+  assert.equal(managedGroupOf({ liteManagedBy: 'b' }, 'full'), undefined);
+  assert.equal(managedGroupOf({ path: 'x' }, 'lite'), undefined);
+  const slot = loadSlotManifest().slots.find((entry) => entry.id === 'app.package-manifest');
+  for (const edition of ['full', 'lite']) {
+    const names = [...managedScriptNames('app', edition)];
+    assert.ok(names.length > 0, `${edition}: the group ${managedGroupOf(slot, edition)} names scripts`);
+  }
 });
 
 // ------------------------------------------------------------------------------- the rule catalog and the one findings filter
