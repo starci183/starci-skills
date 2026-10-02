@@ -50,4 +50,14 @@ describe("kafka wire probe", () => {
         }
         assert.equal(await kafkaAnswers("127.0.0.1", healthy.port, 500), false)
     })
+
+    it("answers false (never hangs) when the peer accepts and then closes without a reply, as a cut toxiproxy does", async () => {
+        const server = createServer((socket) => socket.destroy())
+        await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+        try {
+            assert.equal(await kafkaAnswers("127.0.0.1", (server.address() as AddressInfo).port, 5000), false)
+        } finally {
+            await new Promise<void>((resolve) => server.close(() => resolve()))
+        }
+    })
 })

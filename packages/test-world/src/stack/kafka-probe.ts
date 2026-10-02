@@ -35,12 +35,17 @@ export const kafkaAnswers = (host: string, port: number, timeoutMs = 5000): Prom
         const correlationId = Math.floor(Math.random() * 0x7fffffff)
         const socket = new Socket()
         let received = Buffer.alloc(0)
+        let settled = false
         const finish = (answer: boolean): void => {
+            if (settled) return
+            settled = true
             socket.destroy()
             resolve(answer)
         }
         socket.setTimeout(timeoutMs, () => finish(false))
         socket.once("error", () => finish(false))
+        // a peer that resets or ends the connection without answering (a cut proxy) is a no, never a promise left pending
+        socket.once("close", () => finish(false))
         socket.on("data", (chunk: Buffer) => {
             received = Buffer.concat([received, chunk])
             const response = apiVersionsResponse(received)
