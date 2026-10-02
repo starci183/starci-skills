@@ -55,6 +55,8 @@ export const jobWriteOwner = {
 /** The names the guarded-write contract fixes: the target job and the token the writer holds. */
 const TARGET = "jobId"
 const TOKEN = "expectedFencingToken"
+/** The property of a claimed job that holds the token it carries. */
+const CARRIED = "fencingToken"
 
 /** A property of a TypeScript type by name, or undefined. */
 const propertyOf = (type, name) => type.getProperty(name)
@@ -91,7 +93,8 @@ export const jobFenceRequired = {
                 if (!first) return
                 const tsNode = toTs(first)
                 const type = tsNode ? checker.getTypeAtLocation(tsNode) : undefined
-                if (!type || !propertyOf(type, TARGET)) return
+                // A parameter that already carries the token (the claimed job itself) is a derivation, not a write.
+                if (!type || !propertyOf(type, TARGET) || propertyOf(type, CARRIED)) return
                 if (!isRequiredNumber(checker, propertyOf(type, TOKEN), tsNode)) {
                     context.report({ node: first, messageId: "optionalToken", data: { method: node.key?.name ?? "this method", target: TARGET, token: TOKEN } })
                 }

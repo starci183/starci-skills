@@ -30,18 +30,20 @@ rules:
     hfsRules: [R137]
     requirement: |-
       `modules/platform/jobs` holds the job entity (`id`, `kind`, `status`, `currentStep`, `fencingToken`, `claimedBy`,
-      `leaseExpiresAt`, `payload`), `job-claim.service.ts` and the persistence of the table. `claim()` is one atomic statement
-      (`UPDATE jobs SET fencing_token = fencing_token + 1, claimed_by = $1, lease_expires_at = $2 WHERE id = $3 AND (status = 'ready' OR lease_expires_at < $4) RETURNING ...`,
-      a `SqlText` constant) and returns the bumped token. Nothing else writes the row: no `manager.update`, `increment`, `save`,
-      `insert`, `delete` or query-builder write on the job entity outside `platform/jobs`. The table exists on every connection
-      that runs jobs.
+      `leaseExpiresAt`, `payload`, a unique `jobKey`), `job-claim.service.ts` and the persistence of the table. `claim()` is one
+      atomic upsert keyed by the delivery (`INSERT ... ON CONFLICT (job_key) DO UPDATE SET fencing_token = jobs.fencing_token + 1 ... WHERE
+      status = 'failed' OR the lease expired ... RETURNING`, a `SqlText` constant): the job row is created by its first claim, the token is
+      bumped by the store and returned, and a done job or a live claim matches nothing. `JobRunnerService` calls it for every BullMQ
+      delivery (the job key is the BullMQ job id), then `process`, then the guarded `complete`. Nothing else writes the row: no
+      `manager.update`, `increment`, `save`, `insert`, `delete` or query-builder write on the job entity outside `platform/jobs`. The table
+      exists on every connection that runs jobs.
     rationale: |-
       A read-modify-write claim races, and a second writer defeats the fence. One owner and one atomic statement keep the token
       monotonic.
     cases:
       - id: case-1
         when: A worker picks up a job
-        write: 'const job = await this.claims.claim({ kind: "send-receipt", workerId, leaseMs })  // token = previous + 1'
+        write: 'const job = await this.claims.claim({ kind: "send-receipt", jobKey: delivery.id, payload, workerId, leaseMs })  // token = previous + 1'
     verification:
       automated:
         - BE_JOB_WRITE_OUTSIDE_OWNER
@@ -139,47 +141,80 @@ rules:
 files:
   - path: src/modules/platform/jobs/index.ts
     slot: be.platform.jobs
+    role: "Public surface of the capability."
+    template: jobs/platform/jobs.index.ts.tpl
   - path: src/modules/platform/jobs/jobs.module.ts
     slot: be.platform.jobs
+    role: "Dynamic module registered once per app that runs jobs, over the connection that holds the job table."
+    template: jobs/platform/jobs.module.ts.tpl
   - path: src/modules/platform/jobs/jobs.module-definition.ts
     slot: be.platform.jobs
+    template: jobs/platform/jobs.module-definition.ts.tpl
   - path: src/modules/platform/jobs/jobs.options.ts
     slot: be.platform.jobs
+    template: jobs/platform/jobs.options.ts.tpl
   - path: src/modules/platform/jobs/jobs.config.ts
     slot: be.platform.jobs
+    template: jobs/platform/jobs.config.ts.tpl
   - path: src/modules/platform/jobs/jobs.decorators.ts
     slot: be.platform.jobs
-    role: InjectJobClaims and its token.
+    role: "InjectJobClaims, InjectJobProcessorRegistry and their tokens."
+    template: jobs/platform/jobs.decorators.ts.tpl
   - path: src/modules/platform/jobs/jobs.contracts.ts
     slot: be.platform.jobs
-    role: ClaimedJob, GuardedWrite, RunKey.
+    role: "ClaimedJob, GuardedWrite (the token is required), RunKey."
+    template: jobs/platform/jobs.contracts.ts.tpl
   - path: src/modules/platform/jobs/jobs.port.ts
     slot: be.platform.jobs
-    role: JobClaims and JobStep ports.
+    role: "JobClaims, JobStep and JobProcessorRegistry ports."
     rules: [BE_JOB_FENCE_REQUIRED]
+    template: jobs/platform/jobs.port.ts.tpl
   - path: src/modules/platform/jobs/job-claim.service.ts
     slot: be.platform.jobs
-    role: The claim and the guarded writes; the only writer of the job row.
-    spec: src/modules/platform/jobs/job-claim.service.spec.ts
+    role: "The claim and the guarded writes; the only writer of the job row."
     rules: [BE_JOB_WRITE_OUTSIDE_OWNER]
+    template: jobs/platform/job-claim.service.ts.tpl
+  - path: src/modules/platform/jobs/job-claim.service.spec.ts
+    slot: be.platform.jobs
+    template: jobs/platform/job-claim.service.spec.ts.tpl
+  - path: src/modules/platform/jobs/job-runner.service.ts
+    slot: be.platform.jobs
+    role: "Subscribes processors to their queues; claim, process, complete or fail, fenced out means stop."
+    template: jobs/platform/job-runner.service.ts.tpl
+  - path: src/modules/platform/jobs/job-runner.service.spec.ts
+    slot: be.platform.jobs
+    template: jobs/platform/job-runner.service.spec.ts.tpl
   - path: src/modules/platform/jobs/fenced.processor.ts
     slot: be.platform.jobs
-    role: The base class every processor extends.
+    role: "The base class every processor extends."
+    template: jobs/platform/fenced.processor.ts.tpl
   - path: src/modules/platform/jobs/jobs.log-events.ts
     slot: be.platform.jobs
+    template: jobs/platform/jobs.log-events.ts.tpl
   - path: src/modules/platform/jobs/errors/jobs.error.ts
     slot: be.platform.jobs
-    role: JobFencedOut.
+    role: "JobFencedOut."
+    template: jobs/platform/jobs.error.ts.tpl
+  - path: src/modules/platform/jobs/messages/jobs.messages.ts
+    slot: be.platform.jobs
+    template: jobs/platform/jobs.messages.ts.tpl
   - path: src/modules/platform/jobs/persistence/connection.ts
     slot: be.persistence
-    role: The job entity array registered on every connection that runs jobs.
+    role: "The job entity array registered on every connection that runs jobs."
+    template: jobs/platform/persistence.connection.ts.tpl
   - path: src/modules/platform/jobs/persistence/entities/job.entity.ts
     slot: be.persistence
+    template: jobs/platform/persistence.job.entity.ts.tpl
   - path: src/modules/platform/jobs/persistence/jobs.sql.ts
     slot: be.persistence
-    role: The claim and guarded-write statements as SqlText constants.
+    role: "The claim and guarded-write statements as SqlText constants."
+    template: jobs/platform/persistence.jobs.sql.ts.tpl
+  - path: src/modules/platform/jobs/persistence/jobs.rows.ts
+    slot: be.persistence
+    template: jobs/platform/persistence.jobs.rows.ts.tpl
   - path: src/modules/platform/jobs/persistence/migrations/<epochMs13>-create-jobs.ts
     slot: be.persistence
+    template: jobs/platform/persistence.migration.ts.tpl
   - path: src/features/jobs/<job>/index.ts
     slot: be.feature.jobs
     template: jobs/job.index.ts.tpl

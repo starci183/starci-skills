@@ -12,8 +12,8 @@
 //   hfs add queue receipt                          modules/queues/receipt: the typed producer
 //   hfs add projection order-summary --connection order
 //
-// Body placeholders: for each variable `v` of the tree (job, step, event, ...) `{{v}}` is its kebab name, `{{V}}` its PascalCase and
-// `{{vCamel}}` its camelCase; the option `--service Class=module` gives `{{service}}` (the class) and `{{serviceModule}}`.
+// Body placeholders: for each variable `v` of the tree (job, step, event, ...) `@@v@@` is its kebab name, `@@V@@` its PascalCase and
+// `@@vCamel@@` its camelCase, `@@vUpper@@` its UPPER_SNAKE and `@@vSnake@@` its snake_case; the option `--service Class=module` gives `@@service@@` (the class) and `@@serviceModule@@`.
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadSlotManifest, readRepoDeclaration, ruleParams } from '../runtime/scripts/hfs/slots.mjs';
@@ -23,7 +23,7 @@ import { ScaffoldError, pascalOf } from './service.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const VARIABLE = /<([A-Za-z][A-Za-z0-9]*)>/g;
-const PLACEHOLDER = /\{\{([A-Za-z][A-Za-z0-9]*)\}\}/g;
+const PLACEHOLDER = /@@([A-Za-z][A-Za-z0-9]*)@@/g;
 const PLATFORM_PREFIX = 'src/modules/platform/';
 const TOPICS_DIR = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'patterns', 'be');
 const PATTERN_TEMPLATES = path.join(TEMPLATES_DIR, 'be', 'patterns');
@@ -102,7 +102,9 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   if (!fs.existsSync(declarationFile)) throw new ScaffoldError('HFS_ADD_NOT_AN_APP', 'hfs add runs at the app root (the folder of hfs.json)');
   const repo = readRepoDeclaration(manifest, repoRoot);
   if (!repo.sides?.be) throw new ScaffoldError('HFS_ADD_NO_BACK_END', 'this app has no back-end side');
-  const values = variablesOf({ spec, noun, name, options });
+  const nouns = [noun, ...(spec.also ?? [])];
+  const specs = nouns.map((each) => [each, params.addKinds[each]]);
+  const values = Object.assign({}, ...specs.map(([each, eachSpec]) => variablesOf({ spec: eachSpec, noun: each, name, options })), variablesOf({ spec, noun, name, options }));
   const stamp = String(now()).padStart(13, '0').slice(0, 13);
   const withStamp = { ...values, epochMs13: stamp };
   const forms = formsOf(withStamp);
@@ -110,22 +112,23 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
 
   const planned = [];
   const missingTemplates = [];
-  const consider = (entry, topic, instance) => {
+  const consider = (entry, topic, instance, shared = false) => {
     if (entry.optional === true) return;
     const target = fillPath(entry.path, withStamp);
     if (target === null) return;
     const absolute = path.join(beRoot, ...target.split('/'));
     // A platform capability is whole or absent: it exists when its index.ts does, and then none of its files is written again.
     if (!instance && fs.existsSync(path.join(beRoot, ...target.split('/').slice(0, 4), 'index.ts'))) return;
-    if (!instance && fs.existsSync(absolute)) return;
+    if ((!instance || shared) && fs.existsSync(absolute)) return;
     if (!entry.template) { missingTemplates.push(target); return; }
     const templateFile = path.join(PATTERN_TEMPLATES, ...entry.template.split('/'));
     if (!fs.existsSync(templateFile)) throw new ScaffoldError('HFS_ADD_TEMPLATE_MISSING', `${topic}.yaml names template ${entry.template} for ${entry.path}, which the package does not carry`);
     planned.push({ target, absolute, body: renderBody(fs.readFileSync(templateFile, 'utf8'), withStamp, forms, entry.template), instance });
   };
 
-  for (const entry of readTree(spec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, spec.topic, true);
-  for (const topic of new Set([spec.topic, ...topicsOfPatterns(spec.patterns)])) for (const entry of readTree(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
+  for (const [each, eachSpec] of specs) for (const entry of readTree(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, eachSpec.topic, true, each !== noun);
+  const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
+  for (const topic of new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)])) for (const entry of readTree(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
 
   const clash = planned.filter((file) => file.instance && fs.existsSync(file.absolute)).map((file) => file.target);
   if (clash.length) throw new ScaffoldError('HFS_ADD_EXISTS', `${noun} ${name} already exists: ${clash.join(', ')}`);
@@ -135,7 +138,7 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
     fs.writeFileSync(file.absolute, file.body);
   }
-  const registered = register({ declarationFile, spec });
+  const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
   return { created: planned.map((file) => `be/${file.target}`), registered };
 }
 

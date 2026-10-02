@@ -122,6 +122,7 @@ $defs:
                     trigger: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
                     patterns: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
                     needs: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
+                    also: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
                     defaults: {type: object}
               patternScenarios:
                 type: object

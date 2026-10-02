@@ -48,7 +48,8 @@ test('the files trees and the template bodies are one set: every named template 
   const named = new Set();
   for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
   const dir = path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'patterns');
-  const present = new Set(fs.readdirSync(dir).flatMap((topic) => fs.readdirSync(path.join(dir, topic)).map((file) => `${topic}/${file}`)));
+  const walk = (folder, prefix) => fs.readdirSync(path.join(dir, folder), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${folder}/${entry.name}`, prefix) : [`${folder}/${entry.name}`]));
+  const present = new Set(fs.readdirSync(dir).flatMap((topic) => walk(topic, topic)));
   assert.deepEqual([...named].filter((name) => !present.has(name)), [], 'a named template is missing');
   assert.deepEqual([...present].filter((name) => !named.has(name)), [], 'a template no files tree names is a second copy');
 });
@@ -59,6 +60,8 @@ test('hfs add job writes the job tree from the knowledge, registers the patterns
   const result = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/jobs/send-receipt';
+  assert.ok(exists(dir, 'be/src/modules/queues/send-receipt/send-receipt.queue.ts'), 'a job is the consumer of its queue: the queue is generated with it');
+  assert.match(read(dir, `${base}/send-receipt.processor.ts`), /readonly queue = SEND_RECEIPT_QUEUE/);
   for (const file of ['index.ts', 'send-receipt.module.ts', 'send-receipt.processor.ts', 'steps/send-receipt.step.ts']) {
     assert.ok(exists(dir, `${base}/${file}`), file);
     assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
@@ -126,13 +129,33 @@ test('hfs add queue and projection write their module trees; the projection need
   assert.deepEqual(hfsJson(dir).sides.be.patterns, ['projection', 'queue']);
 });
 
-test('hfs add generates a missing platform capability from its tree, and refuses (writing nothing) while the capability has no template', async () => {
+test('hfs add generates a missing platform capability from its templates: jobs and queue come with the first job and every file parses', async () => {
+  const dir = repo();
+  const result = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
+  assert.equal(result.code, 0, result.err);
+  for (const file of ['jobs/job-claim.service.ts', 'jobs/job-runner.service.ts', 'jobs/fenced.processor.ts', 'jobs/persistence/jobs.sql.ts', 'jobs/job-claim.service.spec.ts', 'queue/queue-relay.service.ts', 'queue/bullmq-queue-transport.client.ts', 'queue/persistence/queue.sql.ts', 'queue/queue-worker.service.spec.ts']) {
+    assert.ok(parses(read(dir, `be/src/modules/platform/${file}`)), `${file} parses`);
+  }
+  const createdFiles = result.out.split('\n').filter((line) => line.startsWith('created ')).map((line) => line.slice('created '.length));
+  const migration = createdFiles.find((file) => file.endsWith('-create-jobs.ts'));
+  assert.ok(migration, 'the jobs migration is created');
+  const stamp = /(\d{13})-create-jobs/.exec(migration)[1];
+  assert.match(read(dir, 'be/src/modules/platform/jobs/persistence/connection.ts'), new RegExp('jobsMigrations = \\[CreateJobs' + stamp + '\\]'));
+  assert.match(read(dir, 'be/src/modules/platform/jobs/job-claim.service.ts'), /fencing_token|runKey/);
+  for (const file of createdFiles) assert.ok(parses(read(dir, file)), file);
+  assert.deepEqual(hfsJson(dir).sides.be.patterns, ['fenced-job', 'queue']);
+  const second = await cli(['add', 'job', 'expire-orders', '--repo', dir]);
+  assert.equal(second.code, 0, second.err);
+  assert.doesNotMatch(second.out, /platform/, 'a capability that exists is not written again');
+});
+
+test('hfs add refuses (writing nothing) while a platform capability has no template yet', async () => {
   const dir = repo();
   const before = read(dir, 'hfs.json');
-  const refused = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
+  const refused = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--repo', dir]);
   assert.equal(refused.code, 2);
   assert.match(refused.err, /HFS_ADD_TEMPLATE_PENDING/);
-  assert.equal(exists(dir, 'be/src/features/jobs'), false, 'nothing was written');
+  assert.equal(exists(dir, 'be/src/features/reactors'), false, 'nothing was written');
   assert.equal(read(dir, 'hfs.json'), before, 'hfs.json is unchanged');
 });
 

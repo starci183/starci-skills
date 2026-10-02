@@ -1,1 +1,1 @@
-export { {{Job}}Module } from "./{{job}}.module"
+export { @@Job@@Module } from "./@@job@@.module"

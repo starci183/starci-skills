@@ -1,1 +1,1 @@
-export { {{Reactor}}MessageModule } from "./transport/message/{{reactor}}-message.module"
+export { @@Reactor@@MessageModule } from "./transport/message/@@reactor@@-message.module"

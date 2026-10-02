@@ -57,7 +57,7 @@ const CLAIMS = `import type { ClaimedJob, GuardedWrite, JobClaims } from "@modul
 test("job-fence-required: every guarded write requires its token, never casts around it and is never swallowed", () => {
     tester.run("job-fence-required", jobFenceRequired, {
         valid: [
-            { filename: OWNER_PORT, code: `import type { EntityManager } from "typeorm"\nimport type { ClaimedJob, GuardedWrite } from "./jobs.contracts"\nexport interface JobClaims {\n advance(write: GuardedWrite & { step: string }): Promise<void>\n complete(write: GuardedWrite): Promise<void>\n claim(params: { kind: string }): Promise<ClaimedJob | null>\n enqueue(tx: EntityManager, params: { kind: string }): Promise<string>\n}` },
+            { filename: OWNER_PORT, code: `import type { EntityManager } from "typeorm"\nimport type { ClaimedJob, GuardedWrite } from "./jobs.contracts"\nexport interface JobClaims {\n advance(write: GuardedWrite & { step: string }): Promise<void>\n complete(write: GuardedWrite): Promise<void>\n claim(params: { kind: string }): Promise<ClaimedJob | null>\n enqueue(tx: EntityManager, params: { kind: string }): Promise<string>\n runKey(job: ClaimedJob, step: string): string\n}` },
             { filename: STEP, code: `${CLAIMS}export const run = (claims: JobClaims, job: ClaimedJob) => claims.advance({ jobId: job.jobId, expectedFencingToken: job.fencingToken, step: "a" })` },
             { filename: STEP, code: `${CLAIMS}export const run = async (claims: JobClaims, write: GuardedWrite) => { try { await claims.complete(write) } catch (error) { throw error } }` },
             { filename: STEP, code: `export const run = async (work: () => Promise<void>) => { try { await work() } catch { return } }` },

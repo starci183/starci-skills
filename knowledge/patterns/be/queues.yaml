@@ -109,42 +109,93 @@ rules:
 files:
   - path: src/modules/platform/queue/index.ts
     slot: be.platform.queue
+    role: "Public surface of the capability (ports, config, module, entity arrays)."
+    template: queues/platform/queue.index.ts.tpl
   - path: src/modules/platform/queue/queue.module.ts
     slot: be.platform.queue
+    role: "Dynamic module registered once per app with the connections that enqueue and the schedulers."
+    template: queues/platform/queue.module.ts.tpl
   - path: src/modules/platform/queue/queue.module-definition.ts
     slot: be.platform.queue
+    template: queues/platform/queue.module-definition.ts.tpl
   - path: src/modules/platform/queue/queue.options.ts
     slot: be.platform.queue
+    template: queues/platform/queue.options.ts.tpl
   - path: src/modules/platform/queue/queue.config.ts
     slot: be.platform.queue
+    role: "Typed reader of the Redis and relay settings."
+    template: queues/platform/queue.config.ts.tpl
   - path: src/modules/platform/queue/queue.decorators.ts
     slot: be.platform.queue
-    role: InjectQueueOutbox and its token.
+    role: "InjectQueueOutbox, InjectQueueWorkerRegistry and their tokens."
+    template: queues/platform/queue.decorators.ts.tpl
   - path: src/modules/platform/queue/queue.contracts.ts
     slot: be.platform.queue
-    role: QueueDefinition, QueueJob, SchedulerDefinition.
+    role: "QueueSchedulerDefinition, QueueDelivery, QueueHandler."
+    template: queues/platform/queue.contracts.ts.tpl
   - path: src/modules/platform/queue/queue.port.ts
     slot: be.platform.queue
-    role: QueueOutbox port (write(tx, queue, payload)).
-  - path: src/modules/platform/queue/queue.service.ts
+    role: "QueueOutbox (write(tx, queue, payload)) and QueueWorkerRegistry ports."
+    template: queues/platform/queue.port.ts.tpl
+  - path: src/modules/platform/queue/queue-transport.port.ts
     slot: be.platform.queue
-    role: Outbox write, relay into BullMQ (jobId = outbox id), scheduler registration.
-    spec: src/modules/platform/queue/queue.service.spec.ts
+    role: "The BullMQ port."
+    template: queues/platform/queue-transport.port.ts.tpl
+  - path: src/modules/platform/queue/queue.policy.ts
+    slot: be.platform.queue
+    role: "Attempts, backoff and retention of BullMQ jobs."
+    template: queues/platform/queue.policy.ts.tpl
   - path: src/modules/platform/queue/queue.log-events.ts
     slot: be.platform.queue
-  - path: src/modules/platform/queue/errors/queue.error.ts
+    template: queues/platform/queue.log-events.ts.tpl
+  - path: src/modules/platform/queue/bullmq-queue-transport.client.ts
     slot: be.platform.queue
+    role: "The one bullmq importer."
+    template: queues/platform/bullmq-queue-transport.client.ts.tpl
+  - path: src/modules/platform/queue/queue-outbox.service.ts
+    slot: be.platform.queue
+    role: "Writes a job row through the caller's tx."
+    template: queues/platform/queue-outbox.service.ts.tpl
+  - path: src/modules/platform/queue/queue-outbox.service.spec.ts
+    slot: be.platform.queue
+    template: queues/platform/queue-outbox.service.spec.ts.tpl
+  - path: src/modules/platform/queue/queue-relay.service.ts
+    slot: be.platform.queue
+    role: "Relay of committed rows into BullMQ with jobId = the row id, per registered connection."
+    template: queues/platform/queue-relay.service.ts.tpl
+  - path: src/modules/platform/queue/queue-relay.service.spec.ts
+    slot: be.platform.queue
+    template: queues/platform/queue-relay.service.spec.ts.tpl
+  - path: src/modules/platform/queue/queue-worker.service.ts
+    slot: be.platform.queue
+    role: "The handler registry, the workers and the scheduler registration."
+    template: queues/platform/queue-worker.service.ts.tpl
+  - path: src/modules/platform/queue/queue-worker.service.spec.ts
+    slot: be.platform.queue
+    template: queues/platform/queue-worker.service.spec.ts.tpl
   - path: src/modules/platform/queue/persistence/connection.ts
     slot: be.persistence
+    role: "The outbox entity array registered on every connection that enqueues."
+    template: queues/platform/persistence.connection.ts.tpl
   - path: src/modules/platform/queue/persistence/entities/queue-outbox.entity.ts
     slot: be.persistence
+    template: queues/platform/persistence.queue-outbox.entity.ts.tpl
   - path: src/modules/platform/queue/persistence/queue.sql.ts
     slot: be.persistence
+    template: queues/platform/persistence.queue.sql.ts.tpl
+  - path: src/modules/platform/queue/persistence/queue.rows.ts
+    slot: be.persistence
+    template: queues/platform/persistence.queue.rows.ts.tpl
   - path: src/modules/platform/queue/persistence/migrations/<epochMs13>-create-queue-outbox.ts
     slot: be.persistence
+    template: queues/platform/persistence.migration.ts.tpl
   - path: src/modules/queues/<queue>/index.ts
     slot: be.queues
     template: queues/queue.index.ts.tpl
+  - path: src/modules/queues/<queue>/<queue>.module.ts
+    slot: be.queues
+    role: The Nest module that provides the typed producer.
+    template: queues/queue.module.ts.tpl
   - path: src/modules/queues/<queue>/<queue>.queue.ts
     slot: be.queues
     template: queues/queue.queue.ts.tpl
