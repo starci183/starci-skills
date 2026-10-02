@@ -10,7 +10,9 @@ const withNextIntl = createNextIntlPlugin("./src/modules/i18n/request.ts")
 const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 
 const nextConfig: NextConfig = {
+    output: "standalone",
     reactStrictMode: true,
+    experimental: { rootParams: true },
     // The shop is the authenticated app: it does not advertise the framework that serves it.
     poweredByHeader: false,
     outputFileTracingRoot: WORKSPACE_ROOT,

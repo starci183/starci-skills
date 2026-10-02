@@ -31,7 +31,10 @@ describe("fenced jobs (integration)", () => {
         let seen = 0
         return world.waitUntil(
             "the lease expired",
-            () => Promise.resolve((seen += 1)),
+            () => {
+                seen += 1
+                return Promise.resolve(seen)
+            },
             (observed) => observed >= 2,
         )
     }

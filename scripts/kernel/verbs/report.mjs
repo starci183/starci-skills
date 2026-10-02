@@ -33,14 +33,17 @@ import { send } from '../../api/orca/send.mjs';
 // one worker_done (an ask keeps its worker: no worker_done). A refile is a replay and sends nothing. The receipt is
 // payload.workerDone; a failed send is recorded, never fatal: settle then reads the Dispatch not settled and fences it.
 const WORKER_DONE_OUTCOME = { done: 'succeeded', partial: 'succeeded', failed: 'failed', blocked: 'failed' };
-function sendOpWorkerDone(ledger, job, payload, report, reportPath) {
+function sendOpWorkerDone(ledger, job, payload, report, reportPath, dispatchCapability) {
   const managed = payload?.managed;
   const outcome = WORKER_DONE_OUTCOME[report?.outcome];
   if (!outcome || !managed?.dispatchId || !managed?.taskId) return null;
   let sent;
-  try {
+  // Orca authenticates a worker_done with the Dispatch capability only the worker holds (its preamble: `--dispatch-capability dcap_...`;
+  // live E3, 2026-10-02: dispatch_capability_invalid without it). The op passes it to api report; it is never stored.
+  if (!dispatchCapability) sent = { ok: false, outcome: 'failed', errorCode: 'dispatch_capability_missing', error: 'api report was given no --dispatch-capability (the one in the op\'s Orca preamble)' };
+  else try {
     sent = send({ taskId: managed.taskId, dispatchId: managed.dispatchId, from: managed.agentTerminalHandle ?? null,
-      outcome, reportPath, subject: `${jobOpOf(job)} ${report.outcome}` });
+      outcome, reportPath, subject: `${jobOpOf(job)} ${report.outcome}`, dispatchCapability });
   } catch (error) { sent = { ok: false, outcome: 'failed', error: String(error?.message ?? error) }; }
   const workerDone = { at: Date.now(), outcome, ok: sent.ok === true, ...(sent.ok ? {} : { code: 'worker-done-unsent', errorCode: sent.errorCode ?? null, error: String(sent.error ?? '').slice(0, 300) }) };
   try {
@@ -65,7 +68,7 @@ export default {
   },
   async run({ ledger, args, repo, emit, internals }) {
     const { resolveJob, reportOwnedPaths, reportIdentityOf,
-      handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
+      handoverProofGate, skillRoot, reportFiledWake } = internals;
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
   const attempt = requireReportAttempt(db, job);
@@ -227,7 +230,7 @@ export default {
     jobId: job.job_id,
     dispatchId,
   });
-  const workerDone = sendOpWorkerDone(ledger, job, jobPayload, report, reportAbs);
+  const workerDone = sendOpWorkerDone(ledger, job, jobPayload, report, reportAbs, args['dispatch-capability'] ?? null);
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}), ...(workerDone ? { workerDone } : {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})${workerDone ? `; worker_done ${workerDone.outcome} ${workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`}` : ''}`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
@@ -237,7 +240,6 @@ export default {
   // detached and outside the op's identity, so a green done report settles without waiting for the Kernel's turn and
   // anything else is handed to the Kernel as needs-kernel-decision (scripts/kernel/settle/job-settle.mjs).
   if (!process.env.NODE_TEST_CONTEXT) startSettlerFor(repo, { workflowId: job.workflow_id, jobId: job.job_id });
-  releaseWorkerOnReport(ledger, job, jobPayload, report);
 
   },
 };

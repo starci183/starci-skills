@@ -184,7 +184,6 @@ retired:
   - {path: tests/check-db-openers.spec.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'the spec of scripts/checks/check-db-openers.mjs, superseded by RT_EXTERNAL_OWNER (tests/runtime-hfs-rules.spec.mjs)'}
   - {path: scripts/api/orca/task-create.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'scripts/api/orca/worker-start.mjs: worker-start --spec files the Task in the same call (contract change worker-start-spec)'}
   - {path: scripts/api/orca/dispatch-show.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'the worker-start receipt (result.worker.agentTerminalHandle), else worker-show result.dispatch.assigneeHandle (contract change worker-start-spec)'}
-  - {path: scripts/api/orca/task-list.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'nothing: the Task is settled by the op worker_done (scripts/api/orca/send.mjs); no runtime code lists Tasks (deep map REPLACE #9)'}
   - {path: tests/orca-tasks-reconcile.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'tests/managed-dispatch.spec.mjs (settle releases after worker_done; api reconcile --orca-tasks is gone)'}
   - {path: scripts/api/orca/request-show.mjs, retiredAt: 2026-10-02, removedIn: c1-batch7, replacedBy: 'scripts/api/orca/lib.mjs requestStateOf (orcaCall asks request-show itself after a lost receipt; the standalone wrapper had no reader)'}
   - {path: engine/db/migrations/machine/0002-worktrees-no-workflow-kind.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
@@ -211,6 +210,8 @@ retired:
   - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
   - {path: ui/run-cloudflared.ps1, retiredAt: 2026-10-02, removedIn: C2b, replacedBy: 'node ui/start.mjs --tunnel (the harness named tunnel through scripts/api/cloudflared/tunnel-run.mjs), registered as its scheduled task by scripts/reconciler/tunnel-task.mjs --install-task'}
   - {path: scripts/hfs/runtime-rules/pending.mjs, retiredAt: 2026-10-02, removedIn: H, replacedBy: 'modules/kernel/allowlist.yaml (the one allowlist, each entry with its reason) held by scripts/checks/check-one-allowlist.mjs; the finding-level pending ratchet is superseded: a runtime finding is fixed, never allowed'}
+  - {path: scripts/kernel/reap-agent-process.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1: no claude, codex or devin process of the terminal remains 10 s after it)'}
+  - {path: tests/kernel/reap-agent-process.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'tests/kernel-verbs-shared/managed-dispatch.spec.mjs (settle releases with worker-release only)'}
 moved:
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
@@ -658,7 +659,6 @@ moved:
   - {from: tests/quit-agent.spec.mjs, to: tests/kernel/quit-agent.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/quota-devin.spec.mjs, to: tests/agent-quota/quota-devin.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/ram-throttle.spec.mjs, to: tests/machine/ram-throttle.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/reap-agent-process.spec.mjs, to: tests/kernel/reap-agent-process.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-boot.spec.mjs, to: tests/reconciler/reconciler-boot.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-engine.spec.mjs, to: tests/reconciler/reconciler-engine.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-fleet.spec.mjs, to: tests/reconciler/reconciler-fleet.spec.mjs, movedIn: C7, quiesced: false}
@@ -984,6 +984,18 @@ moved:
   - {from: tests/reconciler/reconciler-fleet.spec.mjs, to: tests/reconciler/reconciler-workers.spec.mjs, movedIn: dv-c2-smells, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
+  - {symbol: workerDoneOf, replacedBy: 'nothing: settle reads the Dispatch with worker-show; the bridged worker_done rows stay as the audit echo (orchestrationMessagesOf)'}
+  - {symbol: inventorySnapshot, replacedBy: 'nothing: the inventory_snapshots table had no writer and no reader (alpha5 item 1.8); it is gone from machine 0001-init.sql'}
+  - {symbol: reapAgentProcess, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: reapIfStillLive, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: quitWorkerTerminal, replacedBy: 'worker-release of the managed Dispatch (no command-terminal job is live any more)'}
+  - {symbol: orcaAgents, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1); the GC keeps its orphan-agent sweep'}
+  - {symbol: reapOrphaned, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: modelPin, replacedBy: 'nothing: Devin ignores a project config pin and Orca refuses a launch-time model for it (live probe E7)'}
+  - {symbol: custodyOf, replacedBy: 'custodyOfRelease: the release receipt state, not a terminal read-back'}
+  - {symbol: closeDeadWorkerTerminal, replacedBy: 'releaseDeadWorker: the dead worker Dispatch is released'}
+  - {symbol: releaseWorkerOnReport, replacedBy: 'nothing: the op worker_done and the settle worker-release end the worker'}
+  - {symbol: reconcileReap, replacedBy: 'nothing: reconcile --reap is deleted with the reaper'}
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}
   - {symbol: closeOperationTask, replacedBy: 'the op worker_done (api report -> scripts/api/orca/send.mjs send) settles its Task and Dispatch (REPLACE #9)'}
   - {symbol: TASK_CLOSED_STATUS, replacedBy: 'the op worker_done settles the Task (REPLACE #9)'}

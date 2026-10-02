@@ -1,7 +1,7 @@
 // The orchestration drain (scripts/kernel/verbs/shared/worker-messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
 // workflow is read through Orca's consuming check naming the Kernel terminal, every message of a Delivery is written into
 // the ledger in ONE transaction, and the Delivery is acknowledged only after that commit. A replayed Delivery writes
-// nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the scripts/api/orca/check.mjs
+// nothing twice. worker_done rows are kept as the audit echo (settle reads the Dispatch, not these rows). The check is a fake of the scripts/api/orca/check.mjs
 // wrapper: nothing reaches a host.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
-import { drainWorkflowMessages, workerDoneOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/worker-messages.mjs';
+import { drainWorkflowMessages, orchestrationMessagesOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/worker-messages.mjs';
 
 const WF = 'wf-drain', JOB = 'job-drain', KERNEL = 'term-kernel', RUN = 'run-wf', DISPATCH = 'ctx_op';
 
@@ -78,13 +78,13 @@ test('a Delivery replayed after a lost ack writes nothing twice', (t) => {
   assert.equal(again.ok, true, again.error);
   assert.deepEqual([again.deliveries, again.questions, again.messages], [1, 0, 0], 'the replay is recognised by message id');
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM inbox WHERE kind='worker-question'").get().n, 1);
-  assert.equal(workerDoneOf(ledger.db, WF).length, 1);
+  assert.equal(orchestrationMessagesOf(ledger.db, WF, { type: 'worker_done' }).length, 1);
 });
 
-test('worker_done is handed to settlement with its job, outcome and report path', (t) => {
+test('worker_done is bridged as an audit row with its job, outcome and report path', (t) => {
   const ledger = fixture(t), trace = [];
   drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('m9', 'worker_done', { outcome: 'succeeded', reportPath: 'w/report.json' })]], trace) });
-  assert.deepEqual(workerDoneOf(ledger.db, WF).map(({ messageId, jobId, dispatchId, outcome, reportPath }) => ({ messageId, jobId, dispatchId, outcome, reportPath })),
+  assert.deepEqual(orchestrationMessagesOf(ledger.db, WF, { type: 'worker_done' }).map(({ messageId, jobId, dispatchId, outcome, reportPath }) => ({ messageId, jobId, dispatchId, outcome, reportPath })),
     [{ messageId: 'm9', jobId: JOB, dispatchId: DISPATCH, outcome: 'succeeded', reportPath: 'w/report.json' }]);
 });
 

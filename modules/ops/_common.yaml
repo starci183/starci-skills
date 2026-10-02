@@ -121,7 +121,7 @@ sections:
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a
         reply - nothing answers those channels and nothing records what they say. An operation never
         sends worker_done itself: api report, from the operation's own pane, sends exactly one after the
-        report row committed (succeeded for done/partial, failed for failed/blocked, none for ask), so
+        report row committed (the operation passes api report its Dispatch capability, the --dispatch-capability value of its Orca preamble) (succeeded for done/partial, failed for failed/blocked, none for ask), so
         Orca settles the operation's Task and Dispatch and settle only releases the worker."
       - Every selected workflow finishes through the kernel's gate/finish contract
         (modules/kernel/api.yaml `finish`), and that gate requires the owner's approval of the

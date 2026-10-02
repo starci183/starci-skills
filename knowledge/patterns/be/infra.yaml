@@ -69,7 +69,7 @@ rules:
   - id: BE-INFRA-3
     title: An integration is one folder that only it may call
     kind: mandatory
-    hfsRules: [R26, R38, R85]
+    hfsRules: [R26, R38, R85, R90]
     requirement: |-
       An integration is `be/src/modules/integrations/<provider>/` with `index.ts`, `<provider>.config.ts`,
       `<provider>.decorators.ts` (the SDK client token and `Inject<Provider>`), `<provider>.client.ts` (the only file that
@@ -85,6 +85,8 @@ rules:
     verification:
       automated:
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
         - BE_ERROR_HOME
         - BE_RAW_INJECT
         - BE_INFRA_OWNER

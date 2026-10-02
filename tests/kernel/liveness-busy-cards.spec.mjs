@@ -101,7 +101,7 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},
     jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-busy',dispatchId:HANDLE,terminalHandle:HANDLE,createdAt:dispatchedAt,
       payload:{opId:OP,title:'author the docs',records:['docs/readme.md'],owned_paths:['docs/'],provider,agent:provider,
-        orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},hierarchy:{runtime:{host:'orca',agent:provider,dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
+        orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},managed:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},hierarchy:{runtime:{host:'orca',agent:provider,dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+HOUR}]});
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
   ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
@@ -113,7 +113,8 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
   const orcaState=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
   const consumeReport=(at=Date.now()-30*MIN)=>ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at)
     VALUES(?,?,?,?,'done',?,?,?)`).run(WF,attemptId,HANDLE,JOB,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'docs authored'}),at,at-MIN);
-  return fn({repoRoot,ledger,run,job,leases,events,orcaState,consumeReport});
+  const releases=()=>{const f=path.join(root,'calls.jsonl');return fs.existsSync(f)?fs.readFileSync(f,'utf8').trim().split(String.fromCharCode(10)).filter(Boolean).map(l=>JSON.parse(l).argv).filter(a=>a.includes('worker-release')).length:0;};
+  return fn({repoRoot,ledger,run,job,leases,events,orcaState,consumeReport,releases});
 });
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
 
@@ -123,7 +124,7 @@ test('C: a worker polling one long bounded scan reads active; the frontier is en
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.frontier.wedgedJobs,s.frontier.nudgeReadyJobs],['engaged',false,[],[]]);
 },{screen:SONAR,provider:'devin'}));
 
-test('D: a done worker held by a peer-wait is released - terminal closed, lease back, job unsettled - and settle needs no live worker',t=>world(t,({run,job,leases,events,orcaState,consumeReport})=>{
+test('D: a done worker held by a peer-wait is released - terminal closed, lease back, job unsettled - and settle needs no live worker',t=>world(t,({run,job,leases,events,orcaState,consumeReport,releases})=>{
   consumeReport();
   const {incidentId}=out(run('incident','--workflow',WF,'--kind','peer-wait','--peer',PEER,'--holds',JOB,'--until-job','job-of-the-peer',
     '--detail','the closing pass waits for the peer seam to settle'));
@@ -137,8 +138,8 @@ test('D: a done worker held by a peer-wait is released - terminal closed, lease 
   assert.equal(r.status,0,r.stderr||r.stdout);
   const body=out(r);
   assert.deepEqual([body.releasedWhileHeld,body.custody.state,body.heldBy.incident,body.heldBy.peer,body.status],[true,'released',incidentId,PEER,'running']);
-  assert.ok(orcaState().quits.some(q=>q.handle===HANDLE && q.text==='/quit'),'the agent quit with its own CLI input');
-  assert.ok(orcaState().closed.includes(HANDLE),'its terminal closed');
+  assert.equal(orcaState().workerStates[HANDLE],'released','worker-release alone ended the agent and closed its terminal (no quit input, no tab close)');
+  assert.equal((orcaState().quits??[]).length,0,'no quit input is sent');
   assert.equal(leases().length,0,'its path lease is released');
   assert.equal(job().status,'running','the job stays unsettled');
   assert.equal(JSON.parse(job().payload_json).workerReleased.custody.state,'released');
@@ -156,13 +157,14 @@ test('D: a done worker held by a peer-wait is released - terminal closed, lease 
   assert.equal(run('incident','--workflow',WF,'--resolve',incidentId,'--detail','peer landed').status,0);
   assert.deepEqual(status(run).frontier.settleReadyJobs,[JOB]);
   assert.equal(out(run('reconcile','--job',JOB,'--release-worker')).alreadyReleased,true,'still released once the wait resolved');
-  const quits=orcaState().quits.length,closed=orcaState().closed.length;
+  const releasesBefore=releases();
   assert.equal(run('check','--job',JOB,'--checks',JSON.stringify({checks:[{name:'regression',command:'npm test',exitCode:1,evidence:'red'}]})).status,0);
   const settled=run('settle','--job',JOB,'--verdict','fail');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   const receipt=out(settled);
-  assert.deepEqual([receipt.status,receipt.terminalClosed.custody.state,receipt.terminalClosed.custody.proof],['failed','released','released-while-held']);
-  assert.deepEqual([orcaState().quits.length,orcaState().closed.length],[quits,closed],'nothing is quit or closed again');
+  assert.deepEqual([receipt.status,receipt.managedWorker.custody.state,receipt.managedWorker.custody.proof],['failed','released','released-while-held']);
+  assert.equal(releases(),releasesBefore,'the worker is not released again');
+  assert.equal((orcaState().quits??[]).length,0,'no quit input is ever sent');
   const proof=out(run('reconcile','--job',JOB,'--release-worker'));
   assert.deepEqual([proof.ok,proof.alreadyReleased],[true,true],'the release proof accepts an already-released worker');
 },{screen:CODEX_DONE,provider:'codex'}));

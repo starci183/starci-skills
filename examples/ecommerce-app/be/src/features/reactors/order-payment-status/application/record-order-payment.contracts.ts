@@ -5,6 +5,3 @@ export interface RecordOrderPaymentRequest {
     /** The order a bank transfer paid. */
     readonly orderId: string
 }
-
-/** The command answers nothing: its effect is the state the domain service wrote. */
-export type RecordOrderPaymentResult = void

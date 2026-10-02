@@ -1,0 +1,13 @@
+id: terminal-wait-proves-exit
+effectiveAt: '2026-10-02T17:00:00+07:00'
+summary: >-
+  ORCA PROVES A CLOSED TERMINAL'S EXIT (lane ORCA, alpha5 item 1.2). scripts/api/orca/terminal-wait.mjs wraps
+  the calls.yaml terminal-wait call (terminal wait, --for exit or tui-idle, --timeout-ms). Live probe (Orca 1.4.209, 2026-10-02): `--for exit`
+  answers within a second for an exited or a closed handle (satisfied true, status exited) and times out for a live one. close-verify's
+  closeAndVerify now takes its proof from that wait instead of polling `terminal show` after the close; polling stays only as the
+  fallback when Orca cannot answer the wait (host down, verb refused). The screen-proven wakes and nudges (T6: terminal send Enter,
+  wake-delivery, the frame classifiers of T2) stay: Orca proves `exit` and `tui-idle`, not that a turn started (E6).
+paths:
+  - scripts/api/orca/terminal-wait.mjs
+  - scripts/machine/close-verify.mjs
+  - modules/host/orca/calls.yaml

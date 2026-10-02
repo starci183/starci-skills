@@ -1,7 +1,10 @@
 services:
   order:
-    # See identity.yaml: same placeholder-image contract for the second service.
+    # See identity.yaml: the same built image and the same host-run split.
     image: ecommerce-app/order:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/order/Dockerfile
     profiles: [app]
     depends_on:
       - postgres

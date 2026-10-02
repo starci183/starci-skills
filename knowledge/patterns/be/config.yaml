@@ -25,7 +25,7 @@ rules:
   - id: BE-CONFIG-1
     title: One reader of the environment
     kind: mandatory
-    hfsRules: [R43]
+    hfsRules: [R43, R26, R90]
     requirement: |-
       `platform/config` owns `EnvSource`, the only code that touches `process.env`; it also resolves `<KEY>_FILE` indirection
       and offers the typed readers `env.string`, `env.int`, `env.bool`, `env.url`, `env.secret`, `env.enum`, `env.duration`,
@@ -42,14 +42,16 @@ rules:
     verification:
       automated:
         - BE_CONFIG_OWNER
-        - BE_INFRA_OWNER
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - BE_INFRA_OWNER
       manual: []
     relatedExamples: []
   - id: BE-CONFIG-2
     title: Config per capability, options through the injector
     kind: mandatory
-    hfsRules: [R43, R85]
+    hfsRules: [R43, R85, R45]
     requirement: |-
       Each capability or provider that needs configuration has `<c>.config.ts` exporting
       `parse<C>Config(env: EnvSource): <C>Options` (or `<C>Options | null` for an optional integration) built from the typed
@@ -66,18 +68,20 @@ rules:
         write: 'export const parsePurchaseConfig = (env: EnvSource): PurchaseOptions => ({ holdSeconds: env.int("PURCHASE_HOLD_SECONDS", 900) })'
       - id: case-2
         when: A module and its consumer
-        write: 'be/apps/api/src/app.module.ts registers PurchaseModule.register({ isGlobal: true, ...options.purchase }); a service takes @InjectPurchaseOptions() private readonly options: PurchaseOptions.'
+        write: 'the app''s be/apps/<app>/src/app.module.ts registers PurchaseModule.register({ isGlobal: true, ...options.purchase }); a service takes @InjectPurchaseOptions() private readonly options: PurchaseOptions.'
     verification:
       automated:
         - BE_CONFIG_OWNER
-        - BE_MODULE_SHAPE
         - BE_RAW_INJECT
+        - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
       manual: []
     relatedExamples: []
   - id: BE-CONFIG-3
     title: No default for a secret, a credential or an address; an optional integration is all-or-nothing
     kind: mandatory
-    hfsRules: [R44]
+    hfsRules: [R44, R43]
     requirement: |-
       A secret, credential, token, key, host, URL, port of a remote, bucket or database name has no default of any kind (no
       `""`, no `"localhost"`, no `"127.0.0.1"`, no `?? "http://..."`). Secrets are typed `Secret` by `env.secret`. Tunables
@@ -119,8 +123,10 @@ rules:
     verification:
       automated:
         - HFS_PLAINTEXT_SECRET
-        - HFS_STACKS_SHAPE
         - HFS_IDENTITY_CUSTODY
+        - SEALED_CUSTODY_LOCATION
+        - SEALED_FILE_IN_WORK
+        - HFS_STACKS_SHAPE
       manual:
         - Owner performs any key operation; verify the recipient in .sops.yaml is the shared master recipient the stack declaration names.
     relatedExamples: []

@@ -385,6 +385,18 @@ slots:
     tests: none
     managedBy: docker-ignore
     rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.browser
+    profiles: [app]
+    # The browser journey of the product (Playwright, owner ruling: one minimal journey per example app, run manually): the config, its
+    # journeys and the script that provisions the stack it runs against. It is the product's, never the front end's (FE_NO_TESTS keeps
+    # refusing any test or test tooling inside fe/). Declared by `browser: true` in hfs.json; the managed script `test:browser` exists only then.
+    path: "browser/"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [playwright.config.ts, journeys/]
+    allows: [playwright.config.ts, stack.mjs, "journeys/*.ts"]
   - id: app.github-meta
     profiles: [app]
     path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"

@@ -13,6 +13,3 @@ export interface PushOrderStatusRequest {
     /** When the order entered that state, ISO 8601. */
     readonly changedAt: string
 }
-
-/** The command answers nothing: its effect is the state the domain service wrote. */
-export type PushOrderStatusResult = void

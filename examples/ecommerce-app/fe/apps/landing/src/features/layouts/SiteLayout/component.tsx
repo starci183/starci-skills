@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Button, Footer, Text, TextAction } from "@starci/grammar/common"
+import { Button, Footer, NavLandmark, Text, TextAction } from "@starci/grammar/common"
 import { DisplayControls, SiteShell } from "@ecommerce/ui"
 import { siteLayoutClassNames } from "./classNames"
 
@@ -42,14 +42,14 @@ export const SiteLayoutBase = (props: SiteLayoutBaseProps) => (
         brand={props.props.brand}
         homeHref={props.props.homeHref}
         navigation={
-            <div role="navigation" aria-label={props.props.navLabel} className={siteLayoutClassNames.nav}>
+            <NavLandmark label={props.props.navLabel} layout="bar">
                 <TextAction href={props.props.catalogueHref} appearance="muted">
                     {props.props.catalogue}
                 </TextAction>
                 <TextAction href={props.props.aboutHref} appearance="muted">
                     {props.props.about}
                 </TextAction>
-            </div>
+            </NavLandmark>
         }
         actions={
             <div className={siteLayoutClassNames.actions}>

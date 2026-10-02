@@ -363,8 +363,8 @@ function sendPrompt(handle, text, adapter, io) {
 // <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).
 // Orca composes the launch (placement, the owner's per-agent default args, readiness, the Task from --spec) and owns
 // the worker's lifecycle; the runtime pre-trusts the directory, starts the worker with its spec (no task-create: a
-// failed start leaves no orphan Task), takes the agent terminal from the start receipt (result.worker.agentTerminalHandle)
-// or else from the attestation worker-show (result.dispatch.assigneeHandle) - there is no dispatch-show - gives it its
+// failed start leaves no orphan Task), takes the agent terminal from worker-show (result.dispatch.assigneeHandle; live Orca 1.4.209
+// has no result.worker in the start receipt, 2026-10-02) or from result.worker.agentTerminalHandle when present, gives it its
 // semantic title and attests the EFFECTIVE agent and model (worker-show) against what was routed. A card whose
 // `start.modelArgument` is false (devin) takes no model flag and is attested on its agent alone.
 // `request` is the launch's ledger identity (calls.yaml worker-start replay: request): the start's --retry-request id
@@ -396,8 +396,8 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
     model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
-  // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.
-  try { trust = orca.trust({ agent: provider, cwd: worktree, ...(!takesModel && model ? { model } : {}) }); }
+  // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).
+  try { trust = orca.trust({ agent: provider, cwd: worktree }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
   // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
   // --name, --setup); an existing worktree takes none (Orca refuses them there).

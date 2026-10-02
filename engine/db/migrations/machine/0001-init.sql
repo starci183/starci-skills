@@ -4,7 +4,7 @@
 -- vocabulary; blob_ref_columns - blob-referencing columns; ledgers/repositories - registered projects;
 -- agents/models - agent and model catalog; blobs/archives/gc_marks - content store and GC; sup_* - Supervisor;
 -- process_runs/engine_*/schedules/sla_episodes/invariant_violations - reconciler; services/seats/deliveries/
--- seat_turns/terminals/host_locks/claims/agent_sessions/inventory_snapshots - machine objects; throttle_*/
+-- seat_turns/terminals/host_locks/claims/agent_sessions - machine objects; throttle_*/
 -- host_samples/provider_*/pool_backoff/quotas/guard_*/host_*/budgets - capacity and spend; gc_*/lanes/land_*/
 -- pushes/worktrees/env_servers/uat_slots/connectors/ask_requests - worker operations; machine_logs/
 -- metrics_snapshots/notifications - observability; v_* - durable views.
@@ -431,7 +431,7 @@ CREATE TABLE IF NOT EXISTS invariant_violations(
 CREATE INDEX IF NOT EXISTS ix_inv_open ON invariant_violations(cleared_at,code);
 
 -- ---------------------------------------------------------------------------------------------------------
--- B3. Machine: services, seats, terminals, deliveries, turns, locks, claims, agent sessions, inventory
+-- B3. Machine: services, seats, terminals, deliveries, turns, locks, claims, agent sessions
 -- Ownership rule (no cross-DB transaction): machine resources (terminals, worktrees, locks) are owned by machine;
 -- op_attempts only POINTS to them (terminal_handle, worktree_path). Resource ctrl/GC reconcile drift both ways.
 -- ---------------------------------------------------------------------------------------------------------
@@ -557,14 +557,6 @@ CREATE TABLE IF NOT EXISTS agent_sessions(
   started_at INTEGER, ended_at INTEGER,
   transcript_sha  TEXT REFERENCES blobs(sha256), archive_ref TEXT, bytes INTEGER, archived_at INTEGER) STRICT;
 CREATE INDEX IF NOT EXISTS ix_agent_sessions_attempt ON agent_sessions(ledger_id,attempt_id);
-
--- inventory_snapshots (G15): inventory of processes/terminals/worktrees/temp dirs every N minutes, kept 7 days - leaks show up as growth.
-CREATE TABLE IF NOT EXISTS inventory_snapshots(
-  snap_at INTEGER NOT NULL,
-  kind    TEXT NOT NULL CHECK(kind IN ('process','terminal','worktree','temp-dir','lock')),
-  key     TEXT NOT NULL,                         -- pid:starttime | handle | path
-  owner   TEXT, rss_mb INTEGER, age_s INTEGER, detail TEXT,
-  PRIMARY KEY(snap_at,kind,key)) STRICT, WITHOUT ROWID;
 
 -- ---------------------------------------------------------------------------------------------------------
 -- B4. Resources: RAM/CPU, pool, provider, quota, guard, host leases, budget

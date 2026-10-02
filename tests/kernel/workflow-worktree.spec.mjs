@@ -70,7 +70,7 @@ function picture(root) {
 const rows = (env) => withMachine((m) => m.db.prepare('SELECT * FROM worktrees ORDER BY created_at').all(), { env });
 
 test("the spec names the Orca creation: wf-<id> off main with setup; the workflow branch is Orca's wf-<id>", () => {
-  const spec = workflowWorktreeSpec({ workflowId: 'wf-shop-k2', appRepo: path.resolve('/apps/shop') });
+  const spec = workflowWorktreeSpec({ workflowId: 'wf-shop-k2', appRepo: path.resolve('/apps/app') });
   assert.equal(spec.name, 'wf-wf-shop-k2');
   assert.equal(spec.baseBranch, 'main');
   assert.equal(spec.branch, 'wf-wf-shop-k2');
@@ -263,6 +263,27 @@ test('release is host-side: a release-pending worktree with live terminals stays
   assert.ok(!fs.existsSync(rec.path));
   assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`], { cwd: app }).status, 1, 'the merged workflow branch is deleted (branch -d)');
   assert.equal(workflowWorktreeOf(ctx, 'wf-fin'), null);
+});
+
+test('1.9: an rm Orca refuses for a live terminal leaves the release-pending row and tree; the GC retries once the Kernel terminal is closed', (t) => {
+  const { app, env, orca, ctx } = fixture(t);
+  const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-refused', appRepo: app }).record;
+  git(app, 'merge', '-q', '--ff-only', rec.branch);
+  assert.deepEqual(markReleasePending(ctx, 'wf-refused'), { ok: true });
+  const lookup = Object.assign(() => null, { workflowPhase: () => 'finished' });
+  // ps says no terminal is left, but the Kernel's own terminal (closed after the finish's receipt) still lives when the GC asks.
+  orca.refuseRm(true);
+  const first = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca }).find((i) => i.path && path.resolve(i.path) === rec.path);
+  assert.deepEqual([first?.reason, first?.ok], ['release-pending', false], JSON.stringify(first));
+  assert.match(String(first?.error ?? ''), /rm-failed/);
+  assert.ok(fs.existsSync(rec.path), 'the tree is untouched');
+  assert.equal(workflowWorktreeOf(ctx, 'wf-refused')?.releasePending, true, 'the row stays registered and release-pending');
+  // The Kernel terminal is closed (closeKernelTerminal): the next GC pass removes the tree and deletes the merged branch.
+  orca.refuseRm(false);
+  const second = gcWorktrees({ env, repos: [app], jobStatusOf: lookup, orca }).find((i) => i.path && path.resolve(i.path) === rec.path);
+  assert.deepEqual([second?.reason, second?.ok], ['release-pending', true], JSON.stringify(second));
+  assert.ok(!fs.existsSync(rec.path));
+  assert.equal(workflowWorktreeOf(ctx, 'wf-refused'), null);
 });
 
 test('an app repository Orca does not know yet is registered once, then the worktree is created', (t) => {

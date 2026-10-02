@@ -46,13 +46,14 @@ rules:
     verification:
       automated:
         - BE_INBOX_DEDUPE_MISSING
+        - BE_RAW_INJECT
       manual:
         - Trace that the claim executes on every path before the side effect, including an early return added later.
     relatedExamples: []
   - id: BE-IDEMPOTENCY-2
     title: The inbox is one table, owned by platform, shared by every door
     kind: mandatory
-    hfsRules: [R80, R35]
+    hfsRules: [R80, R35, R34]
     requirement: |-
       `platform/inbox` owns one table, `inbox_claims(id uuid primary key, source text not null, event_id text not null,
       claimed_at timestamptz not null)`, with a unique constraint on `(source, event_id)`, created by a migration under
@@ -71,6 +72,7 @@ rules:
         write: 'async claim(source, eventId) { try { await this.entityManager.insert(InboxClaimEntity, { source, eventId, claimedAt: this.clock.now() }); return true } catch (error) { if (isUniqueViolation(error)) return false; throw error } }'
     verification:
       automated:
+        - BE_INBOX_DEDUPE_MISSING
         - BE_SCHEMA_OWNER
         - BE_SCHEMA_AUTHORITY
       manual:

@@ -28,6 +28,11 @@ import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
+import { prosePathFindings } from './runtime-rules/prose-path.mjs';
+import { proseRestateFindings } from './runtime-rules/prose-restates.mjs';
+import { generatedBlockFindings } from './runtime-rules/generated-block.mjs';
+import { ruleIdFindings } from './runtime-rules/rule-ids.mjs';
+import { factFindings } from './runtime-rules/facts.mjs';
 import { externalOwnerFindings } from './runtime-rules/external-owner.mjs';
 import { nodeModulesLinkFindings } from './runtime-rules/node-modules-link.mjs';
 import { RETIRED_PATHS_FILE, pinnedFindings, retiredFindings } from './runtime-rules/retired.mjs';
@@ -103,6 +108,11 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...controlCharFindings(ctx),
     ...absolutePathRepoFindings(ctx),
     ...generatedUntrackedFindings(ctx),
+    ...factFindings(ctx),
+    ...ruleIdFindings(ctx),
+    ...generatedBlockFindings(ctx),
+    ...prosePathFindings(ctx),
+    ...proseRestateFindings(ctx),
   );
   let driftList = drift;
   if (drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot)) {

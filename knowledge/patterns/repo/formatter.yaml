@@ -42,7 +42,7 @@ rules:
   - id: REPO-FORMAT-2
     title: No formatting rules in ESLint
     kind: mandatory
-    hfsRules: [R19]
+    hfsRules: [R19, R16]
     requirement: |
       The ESLint factories contain no layout rule: not `indent`, `quotes`, `semi`, `object-curly-newline`,
       `array-element-newline`, `function-call-argument-newline`, and no rule that forces one import binding per line. Code is

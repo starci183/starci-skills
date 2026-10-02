@@ -46,13 +46,14 @@ rules:
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
       manual:
         - Trigger a render error and an unknown route and confirm the boundaries render and recover.
     relatedExamples: []
   - id: FE-BOUNDARY-2
     title: Boundaries render an Outcome, not an error status
     kind: mandatory
-    hfsRules: [R51, R53]
+    hfsRules: [R51, R53, R92]
     requirement: |-
       A boundary and a connected block turn an `Outcome` or a caught error into a slot through `toSlot(outcome)`; they never
       read `error.status`. A `refused` outcome shows the forbidden notice or navigates to sign-in, `unavailable` with
@@ -65,14 +66,23 @@ rules:
         write: toSlot gives isForbidden true; a primary slot shows the forbidden notice and a secondary slot unmounts.
     verification:
       automated:
-        - starci-fe/slot-status-through-slotview
         - FE_HTTP_STATUS_COLLAPSE
+        - FE_OUTCOME_KIND_UNHANDLED
+        - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual: []
     relatedExamples: []
   - id: FE-BOUNDARY-3
     title: Server first
     kind: mandatory
-    hfsRules: [R55]
+    hfsRules: [R55, R54]
     requirement: |-
       Route files (page, layout, template, loading, not-found) are server components. `"use client"` appears only in the
       `index.tsx` of a block that has interaction or client data hooks, in a leaf with intrinsic interaction, and in
@@ -92,8 +102,19 @@ rules:
     verification:
       automated:
         - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
         - FE_ROUTE_CLIENT_BOUNDARY
         - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
       manual:
         - Confirm the client bundle of a page contains only the interactive parts.
     relatedExamples: []

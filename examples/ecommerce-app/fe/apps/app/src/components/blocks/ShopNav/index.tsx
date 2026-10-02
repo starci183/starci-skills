@@ -5,9 +5,6 @@ import { useLocalePath } from "../../../hooks/navigation"
 import { SHOP_ROUTES } from "../../../modules/routes"
 import { ShopNavBase } from "./component"
 
-/** The shop nav takes nothing from its layout: it reads the locale and the current path itself. */
-type ShopNavProps = Record<never, never>
-
 /** The primary sections, in bar order; the labels live in the dictionary, the paths in SHOP_ROUTES. */
 const LINKS = [
     { href: SHOP_ROUTES.browse, key: "browse" },
@@ -21,8 +18,7 @@ const LINKS = [
  * `useLocalePath` comes from the i18n navigation, NOT `next/navigation` - the locale-aware helper returns the
  * locale-free path, so `isCurrent` keeps matching the locale-free `href` it always compared against.
  */
-export const ShopNav = (props: ShopNavProps) => {
-    void props
+export const ShopNav = () => {
     const t = useTranslations("shop.nav")
     const locale = useLocale()
     const pathname = useLocalePath()

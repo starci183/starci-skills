@@ -24,7 +24,7 @@ rules:
   - id: BE-LOGGING-1
     title: platform/logging exists and exposes one port
     kind: mandatory
-    hfsRules: [R40, R85, R90]
+    hfsRules: [R40, R85, R90, R02]
     requirement: |-
       `platform/logging` is a required platform capability. It exports the `Logger` port (`info`, `warn`,
       `error(event, fields)` and `error(event, cause, fields)`) and `InjectLogger()`. The default adapter writes one JSON line
@@ -41,9 +41,22 @@ rules:
     verification:
       automated:
         - BE_LOGGER_REQUIRED
-        - BE_INFRA_OWNER
         - BE_RAW_INJECT
+        - BE_INFRA_OWNER
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
       manual: []
     relatedExamples: []
   - id: BE-LOGGING-2

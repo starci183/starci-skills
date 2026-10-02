@@ -27,7 +27,7 @@
 //   foundations --repo <path> [--workflow <id>]
 //   foundation --repo <path> --workflow <id> (--claim <name> | --declare-dependent <name> | --land <name> --proof <s> | --declare-none)
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
-//   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
+//   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>] [--dispatch-capability <cap>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
 //   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
@@ -83,8 +83,6 @@ import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
-import { terminalSend } from '../api/orca/terminal-send.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
@@ -92,7 +90,7 @@ import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, latestAttemptOf, operationDispatchOf,
 } from './verbs/shared/rows.mjs';
 import { JOB_ROW, jobResultSql } from '../machine/job-row.mjs';
-import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
+import { kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
 import { foundationDutyFor } from './verbs/shared/foundation-duty.mjs';
 import { resolveJob, reportDispatchIdOf, REPORTABLE_JOB_STATUSES, requireDispatchedReportBinding, parseAttempt, reportIdentityOf } from './verbs/shared/report-binding.mjs';
@@ -101,13 +99,8 @@ import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
 import { slash } from '../lib/path-key.mjs';
-import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
-import { closeSelfSafe } from '../machine/close-verify.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
-import { reapAgentProcess } from './reap-agent-process.mjs';
-import { withLedgerRead } from '../connectors/lib.mjs';
-import { quitAgent } from './quit-agent.mjs';
 import { isLiveProofOp } from './ask-server.mjs';
 import {
   AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
@@ -182,7 +175,6 @@ import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } fro
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
-import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -301,7 +293,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker]
+  reconcile --job <job_id> [--drop --reason <text> | --dead-worker [--settle-failed] [--no-salvage] | --release-worker]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
@@ -371,7 +363,7 @@ const parseArgs = (argv) => {
     }
     if (API_EXT.flags.has(k.slice(2))) { a[k.slice(2)] = true; continue; }   // scripts/kernel/api-extensions.mjs
     const name = k.slice(2);
-    if (['json', 'spawn', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'drop', 'to-owner', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2279,9 +2271,6 @@ function raiseEnvironmentIncident(ledger, job, health) {
   return incidentId;
 }
 
-
-
-
 // One Orca Run per workflow, bound to the dedicated Kernel terminal. The Run
 // is created lazily by the first operation so Kernel boot stays independent of
 // launcher context. Every operation Task in that Run is therefore a semantic
@@ -2304,13 +2293,13 @@ const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = 
   }
   return { ...bound, kernelHandle };
 };
-// The terminal a dispatch created, recorded on the leased job before the launch waits on it
-// (payload.launchTerminal): a dispatch killed mid-spawn leaves a terminal that settle and
-// reconcile --dead-worker can still quit and close.
-const recordLaunchTerminal = (ledger, jobId, handle) => ledger.transaction(() => {
+// The terminal and Dispatch a dispatch created, recorded on the leased job before the launch waits on it
+// (payload.launchTerminal): a dispatch killed mid-spawn leaves a worker that settle and
+// reconcile --dead-worker can still release by its Dispatch.
+const recordLaunchTerminal = (ledger, jobId, handle, dispatchId = null) => ledger.transaction(() => {
   const row = ledger.db.prepare("SELECT payload_json FROM jobs WHERE job_id=? AND status='leased'").get(jobId);
   if (!row) return;
-  updateJob(ledger.db, { jobId, payload: { ...jobPayloadOf(row), launchTerminal: { handle, at: Date.now() } } });
+  updateJob(ledger.db, { jobId, payload: { ...jobPayloadOf(row), launchTerminal: { handle, ...(dispatchId ? { dispatchId } : {}), at: Date.now() } } });
 });
 function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflowRun } = {}) {
   const db = ledger.db;
@@ -2431,36 +2420,6 @@ const cleanupManagedWorker = (dispatchId) => {
 // them, so the cut could not be re-planned and the workflow sat still. The row
 // settles `cancelled` with the reason, and every queued job that waits on it
 // is named so the Kernel re-points or drops those too.
-// `reconcile --job <id> --reap`: a settled op whose terminal is still live -
-// settled before settle closed tabs and stopped leftover processes - is the
-// Kernel's to clean, not the supervisor's. Closes the terminal with its tab,
-// then stops the agent process when the close did not (reapIfStillLive).
-function reconcileReap(ledger, args, job) {
-  const db = ledger.db, jobId = job.job_id;
-  if (!FINAL_SETTLED.includes(job.status)) {
-    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --reap cleans only a settled job's leftover terminal`), { code: 'reap-not-settled' });
-  }
-  const payload = jobPayloadOf(job);
-  const handle = payload.managed?.agentTerminalHandle ?? payload.orca?.agentTerminalHandle ?? payload.hierarchy?.runtime?.terminalHandle
-    ?? (String(job.worker_id ?? '').startsWith('term_') ? job.worker_id : null);
-  if (!handle) throw Object.assign(new Error(`job ${jobId} names no op terminal`), { code: 'reap-no-terminal' });
-  let before = null;
-  try { before = terminalShow({ terminal: handle }); } catch { /* unreadable reads as not live */ }
-  if (!before?.ok || before.connected !== true) {
-    const out = { ok: true, jobId, handle, live: false };
-    emit(out, `reap ${jobId}: terminal ${handle} is not live; nothing to clean`, args.json);
-    return;
-  }
-  const closed = closeOperationTerminal(handle);
-  const reaped = reapIfStillLive(db, job, payload, handle, path.resolve(args.repo ?? process.cwd()));
-  let after = null;
-  try { after = terminalShow({ terminal: handle }); } catch { /* reported as unknown */ }
-  const result = { handle, closed: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(reaped ? { reaped } : {}), connected: after?.ok ? after.connected === true : null };
-  ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'terminal-reaped', payload: result });
-  const out = { ok: true, jobId, live: true, ...result };
-  emit(out, `reap ${jobId}: terminal ${handle} closed=${result.closed}${reaped ? ` reaped=${reaped.reaped}${reaped.pid ? ` pid ${reaped.pid}` : ''}` : ''} connected=${result.connected}`, args.json);
-}
-
 function reconcileDrop(ledger, args, job) {
   const db = ledger.db, jobId = job.job_id;
   if (job.status !== 'queued') {
@@ -2528,42 +2487,6 @@ const opRiskHints = (op) => {
   } catch { return null; }
 };
 const EVIDENCE_CAP = 40;
-// The dead worker's terminal is not left open behind the recovery: an agent
-// that exited leaves its host shell (a stray PowerShell tab per dead op), and
-// a requeue clears the bindings settle would have closed it by. It is closed
-// with its tab only on fresh proof that it is a bare shell or disconnected
-// (close-op-terminal.mjs closeExitedTerminal); an agent screen or an Orca that
-// does not answer leaves it open. A close attempt is recorded on the job as
-// 'dead-worker-terminal-closed'. Returns the close result, or null.
-// A quiet or wedged worker's agent is still alive at or behind its prompt: it quits itself first
-// (quit-agent.mjs), then its terminal is closed with its tab.
-// A terminal Orca refuses writes to ('unwritable') takes no quit input: it is closed at once.
-const closeQuietTerminal = (job, handle, liveness = 'quiet') => bestEffort(() => {
-  // A gate-loop worker still shows its host dialog, where a typed quit command is not read: Esc closes the
-  // dialog first (a loop menu that takes Esc as 'Keep' leaves the request halted at the prompt).
-  if (liveness === 'gate-loop') { bestEffort(() => terminalSend({ terminal: handle, text: '\x1b', enter: false })); sleepSync(500); }
-  const quit = liveness === 'unwritable' ? null : quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
-  const closed = closeOperationTerminal(handle);
-  return { handle, closed: closed?.ok === true || quit?.exited === true, proof: liveness === 'unwritable' ? 'unwritable' : `${liveness}-quit`, ...(quit ? { quit } : {}),
-    ...(closed?.tab ? { tab: closed.tab } : {}), ...(closed?.error ? { error: String(closed.error) } : {}) };
-}) ?? null;
-const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null, errorCode = null } = {}) => {
-  if (!handle) return null;
-  // A repeat after the close landed is a no-op, not a second close event.
-  const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
-    .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === tryOf(job) && p.handle === handle && p.closed === true);
-  if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
-  const mode = errorCode === TERMINAL_NOT_WRITABLE ? 'unwritable' : liveness;
-  const closed = ['quiet', 'wedged', 'gate-loop', 'unwritable', 'launch-abandoned'].includes(mode) ? closeQuietTerminal(job, handle, mode) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
-  if (closed?.proof && closed.proof !== 'gone') {
-    ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
-      payload: { opId: jobOpOf(job), attempt: tryOf(job), ...closed } });
-  }
-  return closed;
-};
-const closedNote = (closed) => !closed ? ''
-  : closed.closed ? `; terminal ${closed.handle} closed (${closed.proof}${closed.shellPrompt ? ` '${closed.shellPrompt}'` : ''})`
-  : closed.proof === 'gone' ? '' : `; terminal ${closed.handle} left open (${closed.reason ?? closed.error ?? 'close refused'})`;
 // A worker terminal a responding Orca calls gone (TERMINAL_GONE_CODES) died with its host when the
 // workflow's Kernel terminal went the same way: the Kernel seat still names a gone terminal, or the seat
 // was cleared for a gone terminal (kernel-stale-cleared) since this attempt's dispatch. That is an Orca
@@ -2609,13 +2532,10 @@ const hostTerminalWipeOf = (db, job, worker, sinceMs) => {
 function reconcileDeadWorker(ledger, args, job, repo) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job), payload = jobPayloadOf(job);
   const prior = jobResult(db, jobId) ?? {};
-  // A job recovered before its shell was closed: the recorded dead terminal of this attempt.
-  const recordedDeadTerminal = () => [...(Array.isArray(payload.deadWorkers) ? payload.deadWorkers : [])]
-    .reverse().find((entry) => entry?.attempt === tryOf(job) && entry?.terminal)?.terminal ?? null;
   if (job.status === 'queued' && prior.reason === 'dead-worker-requeued') {
-    const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
-    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: tryOf(job), ...(terminalClosed ? { terminalClosed } : {}) };
-    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${tryOf(job)})${closedNote(terminalClosed)}`, args.json);
+    const released = releaseDeadWorker(ledger, job);
+    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: tryOf(job), ...(released ? { managedWorker: released } : {}) };
+    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${tryOf(job)})${workerNote(released)}`, args.json);
     return;
   }
   if (job.status === 'effect_unknown' && prior.reason === 'dead-worker-fenced') {
@@ -2623,9 +2543,9 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     if (args['settle-failed'] && settleableEvidence(prior.evidence)) {
       return settleFailedNoReport(ledger, job, { workerProof: prior.worker ?? null, evidence: prior.evidence ?? [], dispatchId: prior.dispatchId ?? null, pathProof: prior.paths ?? null, repo, args });
     }
-    const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
-    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: tryOf(job), evidence: prior.evidence ?? [], ...(terminalClosed ? { terminalClosed } : {}) };
-    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it${closedNote(terminalClosed)}`, args.json);
+    const released = releaseDeadWorker(ledger, job);
+    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: tryOf(job), evidence: prior.evidence ?? [], ...(released ? { managedWorker: released } : {}) };
+    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it${workerNote(released)}`, args.json);
     return;
   }
   // Already settled failed-no-report (by the watchdog, or a repeat): the receipt names its retry.
@@ -2789,15 +2709,15 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     } catch { /* ledger proof stands; machine TTLs expire independently */ }
   }
   // After the recovery is written: the dead worker's shell is closed, never before.
-  const terminalClosed = closeDeadWorkerTerminal(ledger, job, workerProof.terminal, { liveness: worker.liveness, errorCode: worker.errorCode });
+  const released = releaseDeadWorker(ledger, job);
   const out = recovery === 'requeued'
     ? { ok: true, jobId, recovery, status: 'queued', attempt: tryOf(job), attemptConsumed: false, effectState: 'none', dispatchId,
-      leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(terminalClosed ? { terminalClosed } : {}) }
+      leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(released ? { managedWorker: released } : {}) }
     : { ok: true, jobId, recovery, status: 'effect_unknown', attempt: tryOf(job), effectState: result.effectState, dispatchId,
-      evidence: recorded, worker, paths: pathProof, ...(terminalClosed ? { terminalClosed } : {}) };
+      evidence: recorded, worker, paths: pathProof, ...(released ? { managedWorker: released } : {}) };
   emit(out, recovery === 'requeued'
-    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${tryOf(job)} queued (leases released: ${leasesReleased}) - route and dispatch it again${closedNote(terminalClosed)}`
-    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt${closedNote(terminalClosed)}`, args.json);
+    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${tryOf(job)} queued (leases released: ${leasesReleased}) - route and dispatch it again${workerNote(released)}`
+    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt${workerNote(released)}`, args.json);
 }
 
 // `reconcile --job <id> --dead-worker --settle-failed`: a dead worker's attempt settled with no
@@ -3327,8 +3247,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   // After the verdict is written: the managed worker is released (a dead op sent no worker_done, so
   // releaseManagedWorker fences its Dispatch with worker-stop first) and a plain terminal's dead shell or
   // quiet agent is closed. The op's Orca Task is Orca's: it settles with the Dispatch.
-  const managedWorker = settledPayload.managed?.dispatchId ? releaseManagedWorker(db, job, settledPayload, repo) : null;
-  const terminalClosed = settledPayload.managed ? null : closeDeadWorkerTerminal(ledger, job, handle, { liveness, errorCode: workerProof?.errorCode });
+  const managedWorker = heldDispatchOf(settledPayload) ? releaseManagedWorker(settledPayload) : null;
   if (managedWorker) {
     ledger.transaction(() => {
       const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
@@ -3340,11 +3259,11 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
   const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: tryOf(job),
     effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
-    ...(terminalClosed ? { terminalClosed } : {}), ...(managedWorker ? { managedWorker } : {}),
+    ...(managedWorker ? { managedWorker } : {}),
     artifacts, ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
   emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ` in a ${environment}: no business attempt spent` : ''}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
     + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.tryNo}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'}${retry?.incidentId ? `: owner-gate ${retry.incidentId}` : ''})`}`
-    + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}${closedNote(terminalClosed)}`
+    + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}`
     + `${pattern?.raised ? `; pattern incident ${pattern.incidentId} raised (${pattern.count} no-report deaths of ${op})` : ''}`, args?.json);
 }
 
@@ -3378,6 +3297,76 @@ const releasedWhileHeldOf = (payload) => (payload?.workerReleased?.custody?.stat
  * releases - which then needs no live worker (cmdSettle reuses payload.workerReleased). The Orca Task
  * settled with the op's own worker_done. Idempotent. One event 'worker-released-while-held'.
  */
+// ---- the release of a managed worker -------------------------------------------------------------------------
+// calls.yaml settle-dispatch: worker-release ALONE ends the agent (live smoke E1, Orca 1.4.209: no claude, codex or devin
+// process of the terminal remains 10 s after it, and the tab leaves `terminal list` with it). So there is no quit input, no tab
+// close, no process reaper and no terminal read-back. A Dispatch that settled itself (worker_done) is read first and only
+// released; one that did not (a dead op, a failed-no-report settle, an outcome_unknown, an unreadable answer) is fenced with
+// worker-stop before the release. A stop that classifies unknown is reconciled by a worker-show read and the residual state is
+// recorded (worker-abandon stays out of scope: it is legal only once the attempt's own terminal is proven closed). A release
+// that is not ok is repeated once: Orca's own recovery for release_unknown. A stop or release failure never un-settles the job.
+// `custody` is the release receipt's own state.
+const WORKER_SELF_SETTLED_STATES = new Set(['succeeded', 'failed', 'stopped', 'released']);
+// The Dispatch a job holds: the attested one (payload.managed), else the one a dispatch killed mid-launch recorded.
+const heldDispatchOf = (payload) => (payload?.managed?.dispatchId ? payload.managed
+  : payload?.launchTerminal?.dispatchId ? { dispatchId: payload.launchTerminal.dispatchId, agentTerminalHandle: payload.launchTerminal.handle ?? null } : null);
+// Custody is the release receipt's own state; when the release is not ok (Orca still answers retained for a worker whose
+// terminal already died: inc-eb9a21769d69, inc-a253fdf2deda) the exact agent terminal is READ back - a disconnected or gone
+// terminal proves the worker is gone. Nothing is closed by hand.
+const custodyOfRelease = (release, agentHandle = null) => {
+  if (release?.ok === true) return { state: 'released', proof: 'release-ok' };
+  if (agentHandle) {
+    let shown = null;
+    try { shown = terminalShow({ terminal: agentHandle }); } catch { shown = null; }
+    if (shown?.ok && shown.connected !== true) return { state: 'released', proof: 'terminal-disconnected', terminal: agentHandle };
+    if (shown && !shown.ok && !shown.hostUnavailable && TERMINAL_GONE_CODES.has(shown.errorCode)) return { state: 'released', proof: 'terminal-gone', terminal: agentHandle };
+    if (shown?.ok && shown.connected === true) return { state: 'retained', proof: 'terminal-connected', terminal: agentHandle };
+  }
+  return { state: 'unknown', proof: release ? `release-${release.state ?? release.outcome ?? 'refused'}` : 'release-unanswered' };
+};
+function releaseManagedWorker(settledPayload) {
+  const managed = heldDispatchOf(settledPayload);
+  const unknown = (e) => ({ ok: false, outcome: 'unknown', error: String(e?.message ?? e) });
+  let stop = null, release = null, retry = null, residual = null, before = null;
+  try { before = workerShow({ dispatch: managed.dispatchId }); } catch { before = null; }
+  const dispatchState = before?.ok ? before.state : null;
+  const workerDone = WORKER_SELF_SETTLED_STATES.has(dispatchState);
+  if (!workerDone) {
+    try { stop = workerStop({ dispatch: managed.dispatchId }); } catch (e) { stop = unknown(e); }
+  }
+  if (stop && (stop.ok !== true || stop.outcome === 'unknown')) {
+    try {
+      const shown = workerShow({ dispatch: managed.dispatchId });
+      residual = { ok: shown?.ok === true, state: shown?.state ?? null, effective: shown?.effective ?? null };
+    } catch (e) { residual = { error: String(e?.message ?? e) }; }
+  }
+  try { release = workerRelease({ dispatch: managed.dispatchId }); } catch (e) { release = unknown(e); }
+  if (release?.ok !== true) { try { retry = workerRelease({ dispatch: managed.dispatchId }); } catch (e) { retry = unknown(e); } }
+  const last = retry ?? release;
+  const shape = (r) => ({ ok: r?.ok === true, outcome: r?.outcome ?? null, state: r?.state ?? null, ...(r?.error ? { error: r.error } : {}) });
+  return {
+    dispatchId: managed.dispatchId,
+    dispatch: { state: dispatchState, workerDone, ...(before && !before.ok ? { unreadable: true } : {}) },
+    stop: stop ? shape(stop) : null,
+    release: shape(release),
+    ...(retry ? { retryRelease: shape(retry) } : {}),
+    ...(residual ? { residual } : {}),
+    custody: custodyOfRelease(last, managed.agentTerminalHandle ?? null),
+  };
+}
+// A dead worker's Dispatch is released once per attempt (a repeat of the recovery is a no-op, not a second release event).
+const releaseDeadWorker = (ledger, job) => {
+  const payload = jobPayloadOf(job);
+  if (!heldDispatchOf(payload)) return null;
+  const done = ledger.db.prepare("SELECT 1 AS hit FROM events WHERE entity_id=? AND kind='dead-worker-released' AND json_extract(payload_json,'$.attempt')=?").get(job.job_id, tryOf(job));
+  if (done) return { dispatchId: heldDispatchOf(payload).dispatchId, alreadyReleased: true };
+  const released = releaseManagedWorker(payload);
+  ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-released',
+    payload: { opId: jobOpOf(job), attempt: tryOf(job), dispatchId: released.dispatchId, custody: released.custody } });
+  return released;
+};
+const workerNote = (released) => !released || released.alreadyReleased ? '' : `; worker ${released.dispatchId} custody=${released.custody?.state ?? 'unknown'}`;
+
 function releaseHeldWorker(ledger, args, job, repo, held) {
   const db = ledger.db, jobId = job.job_id, payload = jobPayloadOf(job);
   const prior = releasedWhileHeldOf(payload);
@@ -3386,10 +3375,8 @@ function releaseHeldWorker(ledger, args, job, repo, held) {
     emit(out, `release-worker ${jobId}: already released while its settle is held (${prior.custody.proof}); nothing written`, args.json);
     return;
   }
-  let managedWorker = null, terminalClosed = null;
-  if (payload.managed?.dispatchId) managedWorker = releaseManagedWorker(db, job, payload, repo);
-  else if (job.worker_id) terminalClosed = quitWorkerTerminal(job.worker_id, payload);
-  const custody = (managedWorker ?? terminalClosed)?.custody ?? { state: 'released', proof: 'no-terminal-handle' };
+  const managedWorker = heldDispatchOf(payload) ? releaseManagedWorker(payload) : null;
+  const custody = managedWorker?.custody ?? { state: 'released', proof: 'no-dispatch' };
   const released = custody.state === 'released';
   const heldBy = { heldBecause: held.heldBecause, incident: held.incident, ...(held.peer ? { peer: held.peer } : {}) };
   let leasesReleased = 0, machineRefs = [];
@@ -3400,7 +3387,7 @@ function releaseHeldWorker(ledger, args, job, repo, held) {
     const at = Date.now();
     if (released) leasesReleased = releaseLeases(db, { jobId });
     updateJob(db, { jobId, at, payload: { ...stored,
-      ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}),
+      ...(managedWorker ? { managedWorker } : {}),
       ...(released ? { workerReleased: { at, heldBy, reportOutcome: held.reportOutcome, custody: { ...custody, whileHeld: true }, leasesReleased } } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-released-while-held',
       payload: { opId: jobOpOf(job), attempt: tryOf(job), heldBy, custody, leasesReleased, terminal: operationTerminalHandleOf(job, payload) } });
@@ -3410,7 +3397,7 @@ function releaseHeldWorker(ledger, args, job, repo, held) {
     catch { /* ledger rows are the record; machine TTLs expire on their own */ }
   }
   const out = { ok: released, jobId, status: job.status, releasedWhileHeld: released, heldBy, custody, leasesReleased,
-    ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) };
+    ...(managedWorker ? { managedWorker } : {}) };
   emit(out, `release-worker ${jobId}: ${released ? 'released' : 'NOT released'} while its settle is held by ${held.heldBecause} ${held.incident} (custody ${custody.state}${custody.proof ? ` ${custody.proof}` : ''}; leases released: ${leasesReleased}); the job stays ${job.status} for its settle`, args.json);
   if (!released) process.exitCode = 1;
 }
@@ -3422,23 +3409,21 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
     if (held) return releaseHeldWorker(ledger, args, job, repo, held);
     throw Object.assign(new Error(`job ${jobId} is ${job.status}; --release-worker proves the release of a settled job (settle releases its own), or releases the worker of a running job whose consumed report's settle an open owner-gate or peer-wait holds - none holds this one`), { code: 'release-worker-not-settled' });
   }
-  const recorded = payload.managed ? payload.managedWorker?.custody : payload.terminalClosed?.custody;
+  const recorded = payload.managedWorker?.custody;
   if (recorded?.state === 'released') {
     const out = { ok: true, jobId, alreadyReleased: true, custody: recorded };
     emit(out, `release-worker ${jobId}: already released (${recorded.proof}); nothing written`, args.json);
     return;
   }
-  let managedWorker = null, terminalClosed = null;
-  if (payload.managed?.dispatchId) managedWorker = releaseManagedWorker(db, job, payload, repo);
-  else if (job.worker_id) terminalClosed = quitWorkerTerminal(job.worker_id, payload);
+  const managedWorker = heldDispatchOf(payload) ? releaseManagedWorker(payload) : null;
   ledger.transaction(() => {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    updateJob(db, { jobId, payload: { ...stored, ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) } });
+    updateJob(db, { jobId, payload: { ...stored, ...(managedWorker ? { managedWorker } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-release-reconciled',
-      payload: { opId: jobOpOf(job), attempt: tryOf(job), custody: (managedWorker ?? terminalClosed)?.custody ?? null } });
+      payload: { opId: jobOpOf(job), attempt: tryOf(job), custody: managedWorker?.custody ?? null } });
   });
-  const custody = (managedWorker ?? terminalClosed)?.custody ?? null;
-  const out = { ok: custody?.state !== 'retained', jobId, custody, ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) };
+  const custody = managedWorker?.custody ?? null;
+  const out = { ok: custody?.state !== 'retained', jobId, custody, ...(managedWorker ? { managedWorker } : {}) };
   emit(out, `release-worker ${jobId}: custody ${custody?.state ?? 'unknown'}${custody?.proof ? ` (${custody.proof})` : ''}`, args.json);
   if (!out.ok) process.exitCode = 1;
 }
@@ -3775,113 +3760,6 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   return { ok: errors.length === 0, sessionReleased, artifacts, errors };
 }
 
-// Managed settle — calls.yaml settle-dispatch (orca-deep-map REPLACE #9): the op settled its own
-// Dispatch and Task with worker_done after api report, so settle only releases it. worker-show reads
-// the Dispatch first and its state is kept on the receipt (dispatch.state, the audit the closed Task
-// used to carry). Only a worker that did NOT settle itself - no worker_done (a dead op, a failed-no-report
-// settle), an outcome_unknown, or a state Orca does not answer - is fenced with worker-stop before the
-// release. A stop that classifies unknown is reconciled by a worker-show read and the residual state is
-// recorded (worker-abandon stays out of scope here — it is only legal once the attempt's own terminal is
-// proven closed). A stop/release failure never un-settles the job; the ledger row already stands.
-// The agent quits itself first with ITS OWN quit input (quit-agent.mjs; a
-// managed worker is not always Claude), so worker-stop/release find nothing
-// running. `custody` is the proof the worker is gone (custodyOf).
-// The worker states of a Dispatch that settled itself (worker_done succeeded/failed), was already fenced
-// (stopped), or is already released: none needs a worker-stop before the release.
-const WORKER_SELF_SETTLED_STATES = new Set(['succeeded', 'failed', 'stopped', 'released']);
-function releaseManagedWorker(db, job, settledPayload, repo) {
-  const managed = settledPayload.managed;
-  let stop = null, release = null, residual = null;
-  const managedQuit = quitAgent({ handle: managed.agentTerminalHandle ?? null, agent: agentOfJob(settledPayload) ?? 'claude' });
-  let before = null;
-  try { before = workerShow({ dispatch: managed.dispatchId }); } catch { before = null; }
-  const dispatchState = before?.ok ? before.state : null;
-  const workerDone = WORKER_SELF_SETTLED_STATES.has(dispatchState);
-  if (!workerDone) {
-    try { stop = workerStop({ dispatch: managed.dispatchId }); }
-    catch (e) { stop = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
-  }
-  if (stop && (stop.ok !== true || stop.outcome === 'unknown')) {
-    try {
-      const shown = workerShow({ dispatch: managed.dispatchId });
-      residual = { ok: shown?.ok === true, state: shown?.state ?? null, effective: shown?.effective ?? null };
-    } catch (e) { residual = { error: String(e?.message ?? e) }; }
-  }
-  try { release = workerRelease({ dispatch: managed.dispatchId }); }
-  catch (e) { release = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
-  // Orca answers release_unknown ("the agent terminal was closed but its
-  // process could not be confirmed stopped") while the Claude terminal is
-  // still connected; two settled nivo business.decide ops sat live as
-  // ORPHAN_TERMINAL until a second release closed them. Its own recovery is
-  // to repeat worker-release, so a release that is not ok is repeated once
-  // and the exact agent terminal is read back; a terminal still connected
-  // after that is closed by its exact handle and the receipt says so.
-  let agentTerminal = null;
-  const agentHandle = managed.agentTerminalHandle ?? null;
-  if (release?.ok !== true && agentHandle) {
-    const connectedNow = () => { try { const s = terminalShow({ terminal: agentHandle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
-    let retry = null;
-    try { retry = workerRelease({ dispatch: managed.dispatchId }); }
-    catch (e) { retry = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
-    agentTerminal = { handle: agentHandle, retryRelease: { ok: retry?.ok === true, state: retry?.state ?? null }, connected: connectedNow() };
-    if (agentTerminal.connected === true) {
-      const closed = closeOperationTerminal(agentHandle);
-      agentTerminal.closed = closed.ok === true;
-      agentTerminal.connected = connectedNow();
-    }
-  }
-  // worker-release closes the agent's pane, not its tab; the tab outlives it
-  // in Orca's layout and the session comes back under a new handle.
-  let agentTab = null;
-  if (agentHandle && !agentTerminal?.closed) agentTab = closeOperationTerminal(agentHandle, { tabOnly: true });
-  const reaped = agentHandle ? reapIfStillLive(db, job, settledPayload, agentHandle, repo) : null;
-  if (reaped) agentTerminal = { ...(agentTerminal ?? { handle: agentHandle }), reaped };
-  return {
-    dispatchId: managed.dispatchId,
-    dispatch: { state: dispatchState, workerDone, ...(before && !before.ok ? { unreadable: true } : {}) },
-    stop: stop ? { ok: stop.ok === true, outcome: stop.outcome ?? null, state: stop.state ?? null, ...(stop.error ? { error: stop.error } : {}) } : null,
-    release: { ok: release?.ok === true, outcome: release?.outcome ?? null, state: release?.state ?? null, ...(release?.error ? { error: release.error } : {}) },
-    ...(residual ? { residual } : {}),
-    ...(agentTerminal ? { agentTerminal } : {}),
-    ...(agentTab ? { agentTab: { tab: agentTab.tab ?? null, ok: agentTab.ok === true } } : {}),
-    ...(managedQuit ? { quit: managedQuit } : {}),
-    custody: custodyOf({ release, agentHandle }),
-  };
-}
-
-// A plain operation terminal's release: a still-connected agent quits with its own quit input and
-// its terminal closes; custody is read back (custodyOf). {handle, ok, quit?, tab?, error?, custody}.
-function quitWorkerTerminal(handle, payload) {
-  let shown = null;
-  try { shown = terminalShow({ terminal: handle }); } catch { shown = null; }
-  let quit = null, closed = null;
-  if (shown?.ok && shown.connected === true) {
-    quit = quitAgent({ handle, agent: agentOfJob(payload) });
-    closed = closeOperationTerminal(handle);
-  }
-  return { handle, ok: closed ? closed.ok === true : true, ...(quit ? { quit } : {}), ...(closed?.tab ? { tab: closed.tab } : {}),
-    ...(closed?.error ? { error: closed.error } : {}), custody: custodyOf({ release: closed ? { ok: closed.ok === true } : null, agentHandle: handle }) };
-}
-
-// Whether a settled op's worker is proven gone - read back, never inferred from Orca's release
-// answer: `released` when the release (worker-release, or the terminal close) said ok, or when the
-// exact agent terminal now reads disconnected or unknown to a running Orca. A dead worker's
-// terminal has nothing left to release, and Orca still answers release_unknown/retained for it:
-// settle receipts said "release unknown/retained" for workers whose leases were released, whose
-// Task was closed and whose terminal was disconnected (inc-eb9a21769d69, inc-a253fdf2deda,
-// inc-fbff1e65b60f, inc-d1c5a963c8bb). `retained` only while that terminal still reads connected;
-// `unknown` when Orca does not answer. {state, proof, terminal?}.
-function custodyOf({ release = null, agentHandle = null } = {}) {
-  if (release?.ok === true) return { state: 'released', proof: 'release-ok' };
-  if (!agentHandle) return { state: 'unknown', proof: 'no-terminal-handle' };
-  let shown = null;
-  try { shown = terminalShow({ terminal: agentHandle }); } catch { shown = null; }
-  if (shown?.ok && shown.connected !== true) return { state: 'released', proof: 'terminal-disconnected', terminal: agentHandle };
-  if (shown && !shown.ok && !shown.hostUnavailable && TERMINAL_GONE_CODES.has(shown.errorCode)) return { state: 'released', proof: 'terminal-gone', terminal: agentHandle };
-  if (shown?.ok && shown.connected === true) return { state: 'retained', proof: 'terminal-connected', terminal: agentHandle };
-  return { state: 'unknown', proof: shown?.hostUnavailable ? 'host-unavailable' : 'terminal-unreadable', terminal: agentHandle };
-}
-
 /* ------------------------------------------------------------- op IPC */
 // The op-IPC durability verbs: contracts out (kernel→worker, written at
 // dispatch), reports in (worker→kernel, filed by the worker), checks beside
@@ -3912,36 +3790,6 @@ function handoverProofGate(db, job, repo) {
 // run/task/dispatch/from from the job row; a file that claims a different
 // identity is report-invalid. --outcome is optional consistency: when given it
 // must equal the envelope's outcome.
-/**
- * RELEASE ON REPORT (owner 2026-09-28: "so when the kernel finishes its work it doesn't close the op itself?"): once `api report` validated and
- * filed an op's report, its worker has nothing left to do - the report and the evidence are in the ledger and files -
- * so the runtime closes it now instead of waiting for the Kernel's settle: the agent terminal is closed and verified
- * gone with its process tree (close-verify.mjs; from the op's own terminal a detached verifier does it after this
- * process exits). payload.workerReleased {at, by: 'report', ...} records it with custody `releasing`; settle still
- * runs its own verified close, which then only proves the release (and does it when it is missing, e.g. a failed
- * close or failed-no-report). Exception: an `ask` report keeps its worker - the answer arrives in that same session.
- * A managed worker is released by settle (worker-stop/-release). Best effort: a close failure never touches the report.
- */
-function releaseWorkerOnReport(ledger, job, payload, report) {
-  try {
-    if (report?.outcome === 'ask' || payload?.managed?.dispatchId) return null;
-    const handle = job.worker_id ?? payload?.orca?.agentTerminalHandle ?? payload?.launchTerminal?.handle ?? null;
-    if (!handle || releasedWhileHeldOf(payload)) return null;
-    const closed = closeSelfSafe(handle, { owner: 'report', tree: true });
-    const at = Date.now();
-    ledger.transaction(() => {
-      const fresh = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id);
-      const stored = parseJson(fresh?.payload_json) ?? {};
-      updateJob(ledger.db, { jobId: job.job_id, at, payload: { ...stored,
-        workerReleased: { at, by: 'report', handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached),
-          custody: { state: closed?.detached ? 'releasing' : closed?.ok ? 'closed-verified' : 'close-failed', proof: closed?.proof ?? null } } } });
-      ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'worker-released-on-report',
-        payload: { handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached), ok: closed?.ok ?? false, proof: closed?.proof ?? null } });
-    });
-    return closed;
-  } catch { return null; /* settle closes it; the tick GC reaps a leftover */ }
-}
-
 /* ---------------------------------------------------------------- check */
 // The verification half: upsert the re-run check results for an op attempt
 // (one row per workflow_id,op_id,attempt).
@@ -3976,56 +3824,11 @@ function attributeChecks(db, { repo, job, checks }) {
   });
 }
 
-/* ------------------------------------------------------ reap-agent-process */
-// A settled op's terminal that still reads connected after its close is an
-// agent process Orca could not stop (stop_unverified, no renderer pane). Five
-// such Claude/Codex workers ran hidden on a machine short of memory until the
-// supervisor matched and stopped them by hand. The match is the agent image
-// started inside the op's dispatch window, and only a single candidate is
-// stopped (scripts/kernel/reap-agent-process.mjs).
+/* ------------------------------------------------------ the worker's agent */
 // The worker's own agent CLI: its routed provider/model, else Claude for a managed Dispatch (the
 // managed pool's agent). A managed worker used to get Claude's quit input whatever it ran.
 const agentOfJob = (payload) => /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
   ?? (payload?.managed ? 'claude' : null);
-// The launches of every OTHER live agent this host's ledgers know - running, answering or leased
-// ops (their latest op-dispatched time; a leased one is launching now) and running kernels (their
-// latest boot/restart/adopt) - in this ledger and every config.yaml supervisor.repos ledger. The
-// reaper stops no candidate process that one of them may own (reap-agent-process.mjs: on
-// 2026-09-23 it killed live Codex workers of other ops, other workflows and other repos that
-// launched in the settled op's window). Null when a listed ledger cannot be read.
-const launchesIn = (db, exclude, now) => db.prepare("SELECT job_id,workflow_id,kind,status,updated_at FROM jobs WHERE status IN ('leased','running','answering')").all()
-  .filter((row) => row.job_id !== exclude)
-  .map((row) => ({ id: row.job_id, at: row.kind === 'kernel'
-    ? db.prepare(`SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND kind IN (${KERNEL_LAUNCH_EVENTS.map(() => '?').join(',')})`).get(row.workflow_id, ...KERNEL_LAUNCH_EVENTS)?.at ?? row.updated_at
-    : row.status === 'leased' ? now
-    : db.prepare("SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind='op-dispatched'").get(row.job_id)?.at ?? row.updated_at }));
-function liveAgentLaunches(db, { repo = null, exclude = null, now = Date.now() } = {}) {
-  try {
-    const launches = launchesIn(db, exclude, now);
-    const key = (p) => path.resolve(p).toLowerCase();
-    const seen = new Set(repo ? [key(repo)] : []);
-    let listed = [];
-    try { listed = (loadConfig()?.supervisor?.repos ?? []).map((r) => path.resolve(starciSourceRoot(), r)); } catch { listed = []; }
-    for (const other of listed) {
-      if (seen.has(key(other))) continue;
-      seen.add(key(other));
-      if (!fs.existsSync(ledgerFileFor(other))) continue;
-      const rows = withLedgerRead(other, (odb) => launchesIn(odb, exclude, now), null);
-      if (!rows) return null;
-      launches.push(...rows);
-    }
-    return launches;
-  } catch { return null; }
-}
-function reapIfStillLive(db, job, payload, handle, repo = null) {
-  let shown = null;
-  try { shown = terminalShow({ terminal: handle }); } catch { return null; }
-  if (!shown?.ok || shown.connected !== true) return null;
-  const dispatched = db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND entity_id=? AND kind='op-dispatched' ORDER BY seq DESC LIMIT 1").get(job.workflow_id, job.job_id)?.created_at ?? null;
-  const otherLaunches = liveAgentLaunches(db, { repo, exclude: job.job_id });
-  try { return reapAgentProcess({ agent: agentOfJob(payload), dispatchedAt: dispatched, otherLaunches }); }
-  catch (error) { return { reaped: false, reason: String(error?.message ?? error) }; }
-}
 // Path leases of a running job whose worker is not proven dead are renewed to a full
 // dispatchLeaseTtlMs once less than half of it is left (api status). Settle and the dead-worker
 // recovery still release them; only a worker nobody observes can outlive its fence.
@@ -4112,7 +3915,7 @@ const API_INTERNALS = Object.freeze({
   LAUNCH_GRACE_MS, workerCardOf, GATE_ANSWERED_EVENT, runningOpRevDriftOf,
   workerInputRowText, INPUT_ROW_PLACEHOLDER, runtimeOwnedInput, TERMINAL_NOT_WRITABLE, UNWRITABLE_EVENT,
   requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf,
-  handoverProofGate, reportFiledWake, releaseWorkerOnReport,
+  handoverProofGate, reportFiledWake,
   isCheckResultEnvelope, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck,
   summarizeCheckEvidence,
   normalizeProviderId, providerQuotaProbeCommand, providerRecoverCommand,
@@ -4131,11 +3934,11 @@ const API_INTERNALS = Object.freeze({
   configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf,
   isFanOutSlice, selectPool, blockingViewOf, parseYaml, fs, path,
   reconcileOrphanKernelJobs,
-  reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker,
+  reconcileDrop, reconcileReleaseWorker, reconcileDeadWorker,
   cleanupManagedWorker,
-  releaseManagedWorker, custodyOf, quitWorkerTerminal,
+  releaseManagedWorker, heldDispatchOf,
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
-  failureShapeOf, latestKernelJobOf, reapIfStillLive, recordOpRevDrift,
+  failureShapeOf, latestKernelJobOf, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
   settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });

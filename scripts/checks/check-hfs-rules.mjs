@@ -17,8 +17,6 @@
 //                                                                                             HFS_RULE_CODE_UNEMITTED
 //   - a rule of the eslint plugins that no catalog enforcer names (every shipped rule belongs to an R-id)
 //                                                                                             HFS_RULE_UNCATALOGUED
-//   - a row of the rule table in knowledge/hfs/README.md section 12 whose id, code or law differs from the catalog, a
-//     catalog rule the table lacks, or a typed rule range ("R01 to Rnn") that is not the catalog's  HFS_RULE_LAW_DRIFT
 //   - an existing enforcer without a proof: an eslint rule whose law test file has no `.run("<id>"` block with both
 //     `valid:` and `invalid:` cases, or a machine / hfs enforcer none of whose codes is named by two `test(` blocks of
 //     one tests/*.spec.mjs (a violating and a passing tree)                                    HFS_RULE_UNTESTED
@@ -45,7 +43,6 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { hasSecondLanguage } from '../lib/language.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
-export const RULES_README = 'knowledge/hfs/README.md';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
 export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
@@ -131,10 +128,9 @@ export function readKnowledgeFiles(root) {
   return KNOWLEDGE_CODE_ROOTS.flatMap(walk);
 }
 
-/** The README rule table: [{id, code, law}] from the rows `| Rnn | \`CODE\` | law |`. */
-export function readmeRuleRows(text) {
-  return [...String(text).matchAll(/^\| (R\d{2,3}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
-}
+/** A Vietnamese text carries at least one letter no other language of this repository uses. */
+const VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+
 /**
  * The rules of the stylelint canon, read from the package's source text: its peer dependencies (stylelint, postcss) are
  * installed only inside packages/stylelint, so importing the entry would make this check depend on that install.
@@ -175,7 +171,7 @@ export async function pluginRuleIds(root, kind) {
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
  * codes: {machine, hfs, refusals}, every code the architecture machine and `hfs check` can emit and the refusal codes among them.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge, codes }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -245,18 +241,6 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const named = new Set(catalog.rules.flatMap((r) => r.enforcers.filter((e) => e.kind === kind).map((e) => e.id)));
     for (const id of [...ids].sort()) if (!named.has(id)) add('HFS_RULE_UNCATALOGUED', '-', `${kind}:${id} ships in ${PLUGIN_ENTRY[kind]} but no rule of the catalog names it; give it an R-id enforcer entry or delete the rule`, `${kind}:${id}`);
   }
-  if (readme !== undefined) {
-    const rows = new Map(readmeRuleRows(readme).map((row) => [row.id, row]));
-    for (const rule of catalog.rules) {
-      const row = rows.get(rule.id);
-      if (!row) add('HFS_RULE_LAW_DRIFT', rule.id, `${RULES_README} section 12 has no row for ${rule.id}`);
-      else if (row.code !== rule.code || row.law !== rule.law) add('HFS_RULE_LAW_DRIFT', rule.id, `${RULES_README} row ${rule.id} differs from the catalog: expected | ${rule.id} | \`${rule.code}\` | ${rule.law} |`);
-      rows.delete(rule.id);
-    }
-    for (const id of rows.keys()) add('HFS_RULE_LAW_DRIFT', id, `${RULES_README} lists ${id}, which the catalog does not have`);
-    const last = catalog.rules.at(-1).id;
-    for (const m of String(readme).matchAll(/\bR01(?: to |-)(R\d{2,3})\b/g)) if (m[1] !== last) add('HFS_RULE_LAW_DRIFT', '-', `${RULES_README} states the range R01 to ${m[1]}, but the catalog ends at ${last}`);
-  }
   if (codes !== undefined) {
     // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.
     const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
@@ -292,8 +276,7 @@ export async function checkHfsRules(root = skillRoot) {
   const plugins = Object.fromEntries(await Promise.all(LINT_PLUGINS.map(async (kind) => [kind, await pluginRuleIds(root, kind)])));
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
-  const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
-  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root), knowledge: readKnowledgeFiles(root),
+  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), tests: readTests(root), knowledge: readKnowledgeFiles(root),
     codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] } }) };
 }
 

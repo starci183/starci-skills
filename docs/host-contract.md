@@ -92,9 +92,9 @@ spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
   ensureLaunchTrust(agent, worktree)   → the owner never answers a trust prompt
   worker-start(spec, worktree, --agent, [--model, --effort], run, from, --retry-request)
                                        → dispatchId + taskId (Orca filed the Task from --spec and injected it)
-                                         + result.worker.agentTerminalHandle
+                                         (+ result.worker.agentTerminalHandle when present: live 1.4.209 has no `worker` key)
   worker-show(dispatch)                → attestation: effective agent (and model, when pinned) = the route;
-                                         result.dispatch.assigneeHandle when the start receipt named no terminal
+                                         result.dispatch.assigneeHandle: the agent terminal when the start receipt named none (live: always)
   terminal rename(terminal, title)     → [Op] … / [Kernel] … / [Supervisor] main / [Worker] …
 startAgent({…, prompt, objective, entry, priorRunId, request})
   run-create(objective, from = entry, --retry-request)
@@ -193,7 +193,7 @@ green op is a checkpoint whose gate base is the previous checkpoint; the failing
 (gone from `orca worktree list`). Main's checkout is compared byte for byte before the run and after the removal:
 exactly the two green files are added, every other tracked file and the `node_modules` listing are unchanged.
 Each no-op file sits in a slot every scaffolded app owns (a be payload fixture under `be/src/tests/fixtures/`, an fe
-static file under `fe/apps/<first fe app>/public/`), so the finish gate's lint judges the smoke, never an invented folder.
+static file under the `public/` folder of the first fe app (`fe/apps/<app>/public/`)), so the finish gate's lint judges the smoke, never an invented folder.
 
 Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker

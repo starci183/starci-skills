@@ -55,7 +55,7 @@ test('a worker app listing a graphql module is BE_MODULE_SHAPE, while an api app
   });
   const found = hits(report);
   assert.equal(found.length, 1, JSON.stringify(found));
-  assert.ok(found.some(item => item.app === 'jobs' && item.protocol === 'graphql' && /composes message transports only/.test(item.message)));
+  assert.ok(found.some(item => item.app === 'jobs' && item.protocol === 'graphql' && /composes message, queue transports only/.test(item.message)));
 });
 
 test('an app listing a feature application module instead of its transport modules is BE_MODULE_SHAPE', t => {
@@ -81,7 +81,7 @@ const runCli = (t, files) => runArch(archFixture(t, {
 test('the cli app listing the cli root module, with one static module per group folder, raises no module-per-transport finding', t => {
   const report = runCli(t, {});
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
-  assert.equal(report.coverage.hfsMachine.modulePerTransport.appReferences, 3);
+  assert.equal(report.coverage.hfsMachine.modulePerTransport.appReferences, 2);
 });
 
 test('a second module in a cli group folder, a cli app listing a group module, and an api app listing the cli root are BE_MODULE_SHAPE', t => {

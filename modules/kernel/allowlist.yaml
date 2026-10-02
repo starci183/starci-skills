@@ -335,21 +335,40 @@ json-exceptions:
     - path: examples/ecommerce-app/turbo.json
       reason: >
         The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
-    - path: examples/shape-slot/apps/shape-slot/package.json
-      reason: npm package manifest for the shape-slot example app; the npm toolchain requires JSON.
-    - path: examples/shape-slot/apps/shape-slot/src/modules/i18n/messages/vi.json
-      reason: next-intl message catalogue for the shape-slot example; next-intl requires JSON.
-    - path: examples/shape-slot/apps/shape-slot/tsconfig.json
-      reason: TypeScript config for the shape-slot example app; tsc requires JSON.
+    - path: examples/shape-slot/be/nest-cli.json
+      reason: >
+        Nest CLI monorepo map inside the shape-slot back end; the nest toolchain reads JSON.
+    - path: examples/shape-slot/be/src/tests/tsconfig.json
+      reason: >
+        TypeScript config for the shape-slot back-end test tree (src/tests); tsc reads JSON (with comments).
+    - path: examples/shape-slot/be/tsconfig.build.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot back end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/be/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot back end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/fe/apps/shape-slot/package.json
+      reason: >
+        npm workspace manifest of the shape-slot monorepo; npm requires a JSON package.json.
+    - path: examples/shape-slot/fe/apps/shape-slot/src/modules/i18n/messages/vi.json
+      reason: >
+        i18n message catalog inside the shape-slot front-end source; the app i18n loader consumes JSON.
+    - path: examples/shape-slot/fe/apps/shape-slot/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot front end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/fe/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot front end; tsc reads JSON (with comments).
     - path: examples/shape-slot/hfs.json
       reason: >
         HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
     - path: examples/shape-slot/package-lock.json
-      reason: npm lockfile for the shape-slot example; the npm toolchain requires JSON.
+      reason: npm lockfile of the shape-slot root; npm writes JSON by contract.
     - path: examples/shape-slot/package.json
-      reason: npm package manifest for the shape-slot example; the npm toolchain requires JSON.
-    - path: examples/shape-slot/tsconfig.json
-      reason: TypeScript config for the shape-slot example; tsc requires JSON.
+      reason: npm package manifest of the shape-slot root; the npm toolchain requires JSON.
+    - path: examples/shape-slot/turbo.json
+      reason: >
+        The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
     - path: hfs.json
       reason: >
         HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
@@ -466,6 +485,8 @@ json-exceptions:
 # is a dead script, and an entry whose script is gone or that code now reads is a stale entry, so this
 # list only shrinks. Delete a script that nothing reads rather than declaring it.
 dead-script-entries:
+  - path: scripts/api/orca/task-list.mjs
+    reason: "typed call of modules/host/orca/calls.yaml that only the live smoke spec reads (tests/api-orca/orca-settle-live.spec.mjs, the E3 proof that a worker_done settles its Dispatch); no runtime code lists Tasks"
   - path: scripts/api/orca/project-setup-delete.mjs
     reason: "typed call of modules/host/orca/calls.yaml with no code importer; KEEP by owner ruling"
   - path: scripts/checks/check-entry.mjs

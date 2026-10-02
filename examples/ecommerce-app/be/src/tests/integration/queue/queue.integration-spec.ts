@@ -30,7 +30,10 @@ describe("queue (integration)", () => {
         let seen = 0
         return world.waitUntil(
             description,
-            () => Promise.resolve((seen += 1)),
+            () => {
+                seen += 1
+                return Promise.resolve(seen)
+            },
             (observed) => observed >= count,
         )
     }

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { CODECOV, WORKFLOW, appCoverageScope, checkExamplesCi, examplesCiMain, exampleApps, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
+import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, examplesCiMain, exampleApps, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
 import { readProperties } from '../../scripts/gates/sonar-local.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
@@ -17,9 +17,9 @@ const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
-  assert.deepEqual(apps, ['ecommerce-app']);
+  assert.deepEqual(apps, ['ecommerce-app', 'shape-slot']);
   for (const app of apps) assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', app, 'hfs.json'), 'utf8')).kind, 'app');
-  assert.ok(!apps.includes('shape-slot') && !apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
+  assert.ok(!apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   assert.deepEqual(flags.map((flag) => flag.name), apps);
@@ -82,7 +82,12 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   assert.ok(steps.some((entry) => String(entry.uses ?? '').startsWith('SonarSource/sonarqube-scan-action')));
   assert.ok(steps.some((entry) => /no Sonar server is configured/.test(String(entry.run ?? ''))));
   assert.ok(steps.findIndex((entry) => entry.run === 'npm test -- --ci') < steps.indexOf(upload));
+  const at = (run) => steps.findIndex((entry) => entry.run === run);
+  assert.ok(at('npm run codegen --silent') >= 0 && at('npm run codegen --silent') < at('npm run typecheck') && at('npm run typecheck') < at('npm run build:fe'), 'codegen runs before the type-check and the fe build');
 });
+
+/** The hfs.json of a fixture example: one api app and one Next app. */
+const declarationOf = (app) => JSON.stringify({ hfs: 2, kind: 'app', project: app, sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
 
 /** A fixture runtime: the jest preset, the hfs sync it renders through, and examples/ with the given apps. */
 function fixture(t, apps) {
@@ -93,7 +98,7 @@ function fixture(t, apps) {
     fs.copyFileSync(path.join(ROOT, 'packages', 'jest-preset', file), path.join(root, 'packages', 'jest-preset', file));
   for (const app of apps) {
     fs.mkdirSync(path.join(root, 'examples', app), { recursive: true });
-    fs.writeFileSync(path.join(root, 'examples', app, 'hfs.json'), JSON.stringify({ hfs: 2, kind: 'app', project: app }));
+    fs.writeFileSync(path.join(root, 'examples', app, 'hfs.json'), declarationOf(app));
   }
   fs.mkdirSync(path.join(root, 'examples', 'notes'), { recursive: true });
   fs.mkdirSync(path.join(root, '.github', 'workflows'), { recursive: true });
@@ -106,11 +111,11 @@ test('a new example app is in the matrix at once, and the check fails until code
   const root = fixture(t, ['alpha']);
   assert.deepEqual(codes(root), []);
   fs.mkdirSync(path.join(root, 'examples', 'beta'));
-  fs.writeFileSync(path.join(root, 'examples', 'beta', 'hfs.json'), JSON.stringify({ hfs: 2, kind: 'app', project: 'beta' }));
+  fs.writeFileSync(path.join(root, 'examples', 'beta', 'hfs.json'), declarationOf('beta'));
   let printed = '';
   examplesCiMain(['--matrix'], { root, out: (s) => { printed += s; } });
   assert.deepEqual(JSON.parse(printed), ['alpha', 'beta'], 'derived, never listed');
-  assert.deepEqual(codes(root), ['EXAMPLES_CI_CODECOV_DRIFT']);
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_APP_QUALITY_DRIFT', 'EXAMPLES_CI_CODECOV_DRIFT']);
   assert.equal(examplesCiMain([], { root, out: () => {} }), 1);
   examplesCiMain(['--write'], { root, out: () => {} });
   assert.deepEqual(codes(root), []);
@@ -130,4 +135,38 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
   fs.writeFileSync(file, original);
   fs.writeFileSync(path.join(root, '.github', 'workflows', 'alpha-e2e.yml'), 'name: alpha\njobs:\n  x:\n    steps:\n      - run: cd examples/alpha && npm test\n');
   assert.deepEqual(codes(root), ['EXAMPLES_CI_STRAY_WORKFLOW']);
+});
+
+test('every image of every example is derived from its hfs.json (one per be and fe app) and the images job builds from that output without pushing', (t) => {
+  assert.deepEqual(exampleImages(ROOT).map((image) => `${image.app}:${image.file}`), [
+    'ecommerce-app:be/apps/identity/Dockerfile', 'ecommerce-app:be/apps/order/Dockerfile', 'ecommerce-app:be/apps/billing/Dockerfile', 'ecommerce-app:be/apps/cli/Dockerfile',
+    'ecommerce-app:fe/apps/landing/Dockerfile', 'ecommerce-app:fe/apps/app/Dockerfile',
+    'shape-slot:be/apps/core/Dockerfile', 'shape-slot:be/apps/cli/Dockerfile', 'shape-slot:fe/apps/shape-slot/Dockerfile',
+  ]);
+  const root = fixture(t, ['alpha']);
+  let printed = '';
+  examplesCiMain(['--images'], { root, out: (s) => { printed += s; } });
+  assert.deepEqual(JSON.parse(printed), [{ app: 'alpha', name: 'core', file: 'be/apps/core/Dockerfile' }, { app: 'alpha', name: 'cli', file: 'be/apps/cli/Dockerfile' }, { app: 'alpha', name: 'web', file: 'fe/apps/web/Dockerfile' }]);
+  assert.deepEqual(codes(root), []);
+  const file = path.join(root, WORKFLOW);
+  const original = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, original.replace('push: false', 'push: true'));
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
+  fs.writeFileSync(file, original.replace('include: ${{ fromJSON(needs.apps.outputs.images) }}', 'include: [{ name: core }]'));
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
+  fs.writeFileSync(file, original.slice(0, original.indexOf('\n  images:')) + '\n');
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_IMAGES_NOT_DERIVED']);
+});
+
+test('the quality files of each example are rendered from the source preset: the app codecov.yml scope equals the root flag, and a hand edit is refused', (t) => {
+  const root = fixture(t, ['alpha']);
+  const targets = appQualityTargets('alpha', root);
+  assert.deepEqual(targets.map((target) => target.path).sort(), [...APP_QUALITY_FILES].sort());
+  for (const target of targets) assert.equal(fs.readFileSync(path.join(root, 'examples', 'alpha', target.path), 'utf8'), target.content);
+  assert.deepEqual(codes(root), []);
+  const sonar = path.join(root, 'examples', 'alpha', 'sonar-project.properties');
+  fs.writeFileSync(sonar, fs.readFileSync(sonar, 'utf8').replace('be/**/*.args.ts,', ''));
+  assert.deepEqual(codes(root), ['EXAMPLES_CI_APP_QUALITY_DRIFT']);
+  examplesCiMain(['--write'], { root, out: () => {} });
+  assert.deepEqual(codes(root), []);
 });

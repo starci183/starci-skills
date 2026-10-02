@@ -438,6 +438,18 @@ calls:
     required: [terminal]
     receipt: [result.terminal]
     note: Health probe — connected/writable/exitCause is how dispatch and restart decide a terminal is live.
+  terminal-wait:
+    command: terminal wait
+    kind: read
+    flags: [terminal, for, timeout-ms]
+    required: [terminal, for]
+    allowedValues:
+      for: [exit, tui-idle]
+    receipt: [result.wait]
+    note: >-
+      Orca proves the condition, the runtime does not poll for it. Live (1.4.209): `--for exit` answers within a second for an
+      exited or closed handle (satisfied true, status exited) and times out (error.code timeout) for a live one. close-verify uses it
+      to prove a closed terminal gone.
   terminal-read:
     command: terminal read
     kind: read

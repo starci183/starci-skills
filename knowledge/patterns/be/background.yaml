@@ -25,7 +25,7 @@ rules:
   - id: BE-BACKGROUND-1
     title: The owning api app runs it; a worker app only scales it apart
     kind: mandatory
-    hfsRules: [R46, R31]
+    hfsRules: [R46, R31, R32]
     requirement: |-
       An app of kind `worker` or `api` composes the message transport and the job processors of its own service (a separate worker app
       is opt-in, for a service that must scale its consumers on their own). Every message transport and processor is composed by at
@@ -42,6 +42,7 @@ rules:
         - BE_BACKGROUND_UNOWNED
         - BE_FEATURE_NOT_COMPOSED
         - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
       manual: []
     relatedExamples: []
   - id: BE-BACKGROUND-2
