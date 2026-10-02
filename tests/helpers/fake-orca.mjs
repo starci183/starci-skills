@@ -744,6 +744,8 @@ else if (verb === 'orchestration check') {
 else if (verb === 'orchestration send' && arg('type') === 'worker_done') {
   const dispatchId = arg('dispatch-id'), taskId = arg('task-id'), outcome = arg('outcome');
   if (!['succeeded', 'failed'].includes(outcome)) fail({ ok: false, error: { code: 'invalid_argument', message: 'worker_done requires --outcome succeeded or --outcome failed' } });
+  // Orca authenticates a worker_done with the worker's own Dispatch capability (live E3, 2026-10-02: dispatch_capability_invalid without it).
+  if (!/^dcap_/.test(arg('dispatch-capability') ?? '')) fail({ ok: false, error: { code: 'dispatch_capability_invalid', message: 'The dispatch capability is missing or invalid.' } });
   state.workerStates = { ...(state.workerStates || {}), [dispatchId]: outcome };
   state.settledTasks = { ...(state.settledTasks || {}), [taskId]: outcome === 'succeeded' ? 'completed' : 'failed' };
   for (const rows of Object.values(state.tasks || {})) for (const t of (Array.isArray(rows) ? rows : [])) if (t.id === taskId) t.status = state.settledTasks[taskId];

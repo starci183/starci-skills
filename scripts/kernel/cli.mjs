@@ -27,7 +27,7 @@
 //   foundations --repo <path> [--workflow <id>]
 //   foundation --repo <path> --workflow <id> (--claim <name> | --declare-dependent <name> | --land <name> --proof <s> | --declare-none)
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
-//   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
+//   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>] [--dispatch-capability <cap>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
 //   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
