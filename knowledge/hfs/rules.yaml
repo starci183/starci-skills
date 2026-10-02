@@ -1227,12 +1227,13 @@ rules:
       - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
   - id: R121
     code: "RT_GENERATED_DRIFT"
-    law: "A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what scripts/hfs/sync-runtime.mjs writes from the single source."
+    law: "A generated root of ruleParams.runtime.generated (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) is git-ignored output equal to what its generatedBy (scripts/hfs/sync-runtime.mjs) writes from the single source, and no git-tracked path lies under it."
     kinds: [check, codemod]
     gates: [land, runtime]
-    failureCodes: ["RT_GENERATED_DRIFT"]
+    failureCodes: ["RT_GENERATED_DRIFT", "GENERATED_UNTRACKED"]
     enforcers:
       - {kind: runtime, id: generated-drift, at: scripts/hfs/sync-runtime.mjs}
+      - {kind: runtime, id: generated-untracked, at: scripts/hfs/runtime-rules/generated-untracked.mjs}
   - id: R122
     code: "RT_CITED_PATH_MISSING"
     law: "A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."

@@ -43,7 +43,9 @@ export function checkRuntime({ root = skillRoot, json = false } = {}) {
   }
   out(`node --check: ${files.length} files, ${bad.length} failed`);
 
-  const runtime = runtimeCheck({ repoRoot: root, root, extraFindings: citedPathFindings(root) });
+  // The cites run lazily: runtimeCheck regenerates the git-ignored runtime copies first, and a live-prose cite of a
+  // path inside them must resolve on disk.
+  const runtime = runtimeCheck({ repoRoot: root, root, extraFindings: () => citedPathFindings(root) });
   for (const f of runtime.findings) err(line(f));
   if (runtime.ok) out(`OK: runtime HFS ${runtime.manifest} - ${runtime.tracked} tracked files, ${runtime.sources} sources`);
   else err(`runtime HFS: ${runtime.findings.length} error finding(s)`);

@@ -10,6 +10,8 @@
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
 //   node scripts/hfs/sync-runtime.mjs [--check]     --check exits 1 when a copy differs; npm run check judges the same
 //                                                            differences as RT_GENERATED_DRIFT (scripts/hfs/runtime-check.mjs)
+// The copies are generated, git-ignored output (GENERATED_UNTRACKED keeps them out of the index): nothing edits or commits
+// them, and the flows that read them — pack, the packages' own tests, the repo's check and its specs — regenerate them first.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,6 +122,24 @@ export function driftOfRuntime() {
   return problems;
 }
 
+/** Rewrite every generated copy under the runtime root to what BUNDLES say. Returns the file count. */
+export function syncRuntime() {
+  let count = 0;
+  for (const bundle of Object.keys(BUNDLES)) {
+    const bundleRoot = path.join(runtimeRoot, bundle);
+    // A generated copy is never a held artifact: nothing but this script writes it.
+    const removed = safeRemove(bundleRoot, { hold: () => null });
+    if (!removed.ok) throw new Error(`cannot clear ${bundle}: ${removed.errors.map((e) => e.message).join("; ")}`);
+    for (const [file, text] of expectedBundle(bundle)) {
+      const target = path.join(bundleRoot, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, text);
+      count += 1;
+    }
+  }
+  return count;
+}
+
 if (isMain(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const problems = driftOfRuntime();
@@ -127,19 +147,6 @@ if (isMain(import.meta.url)) {
     if (!problems.length) process.stdout.write(`OK: ${Object.keys(BUNDLES).length} runtime copies match the runtime\n`);
     process.exitCode = problems.length ? 1 : 0;
   } else {
-    let count = 0;
-    for (const bundle of Object.keys(BUNDLES)) {
-      const bundleRoot = path.join(runtimeRoot, bundle);
-      // A generated copy is never a held artifact: nothing but this script writes it.
-      const removed = safeRemove(bundleRoot, { hold: () => null });
-      if (!removed.ok) throw new Error(`cannot clear ${bundle}: ${removed.errors.map((e) => e.message).join("; ")}`);
-      for (const [file, text] of expectedBundle(bundle)) {
-        const target = path.join(bundleRoot, file);
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, text);
-        count += 1;
-      }
-    }
-    process.stdout.write(`runtime copies synced: ${count} files in ${Object.keys(BUNDLES).length} bundles\n`);
+    process.stdout.write(`runtime copies synced: ${syncRuntime()} files in ${Object.keys(BUNDLES).length} bundles\n`);
   }
 }

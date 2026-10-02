@@ -4615,6 +4615,17 @@ RT_RETIRED_PRESENT:
   owner: supervisor
   kind: check-finding
 
+GENERATED_UNTRACKED:
+  title: "Tracked path under a generated root"
+  title_vi: "Đường dẫn được git theo dõi dưới một gốc sinh tự động"
+  meaning_vi: "Một tệp được git theo dõi nằm dưới một gốc sinh tự động của ruleParams.runtime.generated (knowledge/hfs/runtime-slots.yaml). Một gốc như vậy chỉ chứa thứ generatedBy của nó ghi ra (scripts/hfs/sync-runtime.mjs cho các bản sao runtime/ của gói) và đã được gitignore, nên index không bao giờ được giữ một bản sao cũ."
+  causes_vi:
+    - "Commit các tệp runtime/ của gói như mã nguồn thay vì để sync-runtime.mjs tái tạo"
+    - "git add -f qua một mục .gitignore"
+  nextStep_vi: "Người giám sát chạy git rm -r --cached trên gốc sinh tự động đó và giữ mục .gitignore của nó; chỉ generatedBy ghi vào đó."
+  owner: supervisor
+  kind: check-finding
+
 RT_GENERATED_DRIFT:
   title: "Generated copy drifted"
   title_vi: "Bản sao sinh tự động bị lệch"
@@ -4622,7 +4633,7 @@ RT_GENERATED_DRIFT:
   causes_vi:
     - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
     - "Sửa tay một tệp trong thư mục runtime/ của gói"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
+  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs; các bản sao là kết quả sinh tự động đã gitignore nên không commit, và không sửa tay thư mục runtime/ của gói."
   owner: supervisor
   kind: check-finding
 

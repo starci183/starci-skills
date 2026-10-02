@@ -106,7 +106,8 @@ ruleParams:
     sourceName: "^[a-z0-9]+(-[a-z0-9]+)*$"
     oneOffNames: ["_*", "tmp-*", "fix-*", "*-backfill", "backfill-*", "migrate-*", "*-old", "*.bak*", "repair-*"]
     sharedBasenames: [lib.mjs, index.mjs]
-    # RT_GENERATED_DRIFT: the generated copies, declared once.
+    # RT_GENERATED_DRIFT and GENERATED_UNTRACKED: the generated copies, declared once. They are git-ignored output of the
+    # declared generatedBy; a checkout regenerates them and no path below them may be tracked.
     generated:
       - {root: packages/hfs/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/be/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
@@ -130,6 +131,7 @@ ruleParams:
       - {id: schema-shared, run: scripts/checks/check-schema-shared.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
       - {id: one-allowlist, run: scripts/checks/check-one-allowlist.mjs}
+      - {id: generated-untracked, run: scripts/checks/check-generated-untracked.mjs}
       - {id: work-deep, run: scripts/work/validate/check-work-deep.mjs}
       - {id: host-boundary, run: scripts/checks/check-host-boundary.mjs}
       - {id: module-yaml, run: scripts/checks/check-module-yaml.mjs}
@@ -582,14 +584,15 @@ slots:
   - id: runtime.package-runtime-copy
     profiles: [runtime]
     # Byte copies of runtime files a published package needs in a product repository; never edited, never imported by
-    # runtime code. The roots are ruleParams.runtime.generated.
+    # runtime code. The roots are ruleParams.runtime.generated: git-ignored output that pack, tests and the check
+    # regenerate; a tracked path below them is GENERATED_UNTRACKED.
     path: "packages/{hfs,eslint/be,eslint/fe}/runtime/"
-    presence: required
+    presence: optional
     tracked: generated
     generatedBy: scripts/hfs/sync-runtime.mjs
     tier: none
     tests: none
-    rules: [RT_GENERATED_DRIFT]
+    rules: [RT_GENERATED_DRIFT, GENERATED_UNTRACKED]
 
   # ----- dev stacks, examples, benchmark ---------------------------------------------------------------------
   - id: runtime.ext

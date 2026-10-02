@@ -21,6 +21,7 @@ import { tierFindings } from '../../scripts/hfs/runtime-rules/tier-direction.mjs
 import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-link.mjs';
 import { controlCharFinding } from '../../scripts/hfs/runtime-rules/control-chars.mjs';
 import { absolutePathFindings, absolutePathRepoFindings } from '../../scripts/hfs/runtime-rules/absolute-path.mjs';
+import { generatedUntrackedFindings } from '../../scripts/hfs/runtime-rules/generated-untracked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
@@ -330,6 +331,7 @@ slots:
   - {id: runtime.manifest, profiles: [runtime], path: knowledge/hfs/runtime-slots.yaml, presence: required, tracked: tracked, tier: none, tests: none}
   - {id: runtime.kernel, profiles: [runtime], path: scripts/kernel/, presence: required, tracked: tracked, tier: kernel, owner: true, tests: none}
   - {id: runtime.lib, profiles: [runtime], path: "scripts/lib/<name>.mjs", presence: optional, tracked: tracked, tier: base, tests: none}
+  - {id: runtime.generated-copy, profiles: [runtime], path: "packages/x/runtime/", presence: optional, tracked: generated, generatedBy: scripts/kernel/sync.mjs, tier: none, tests: none}
 `;
 
 /** A runtime fixture repository: hfs.json, the fixture manifest, and `files`. */
@@ -357,6 +359,25 @@ test('RT_GENERATED_DRIFT: a generated copy that differs from its generator fails
 
 test('RT_GENERATED_DRIFT: copies that equal their generator give no finding', (t) => {
   assert.deepEqual(codesOf(check(fixture(t, {}), { drift: [] }).findings), []);
+});
+
+test('GENERATED_UNTRACKED: a tracked file under a generated root fails the check', (t) => {
+  const r = check(fixture(t, { 'packages/x/runtime/copy.mjs': 'export const c = 1;\n' }));
+  assert.equal(r.ok, false);
+  assert.deepEqual(codesOf(r.findings), ['GENERATED_UNTRACKED']);
+  assert.equal(r.findings[0].path, 'packages/x/runtime/copy.mjs');
+});
+
+test('GENERATED_UNTRACKED: a generated copy on disk that git does not track gives no finding', (t) => {
+  // The fixture's files list is the tracked set: an ignored copy exists on disk but not in it.
+  const fx = fixture(t, {});
+  fs.mkdirSync(path.join(fx.dir, 'packages', 'x', 'runtime'), { recursive: true });
+  fs.writeFileSync(path.join(fx.dir, 'packages', 'x', 'runtime', 'copy.mjs'), 'export const c = 1;\n');
+  assert.deepEqual(codesOf(check(fx).findings), []);
+});
+
+test('GENERATED_UNTRACKED: a tracked file beside the generated root gives no finding', (t) => {
+  assert.deepEqual(generatedUntrackedFindings(ctxOf({}, { files: ['packages/x/runtime-other/file.mjs', 'packages/x/runtime'] })), []);
 });
 
 test('the runtime manifest has no allowlist block: a runtime finding is fixed, never allowed', () => {

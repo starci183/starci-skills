@@ -28,6 +28,8 @@
     "access": "public"
   },
   "scripts": {
+    "prepack": "node ../../hfs/prep-runtime.mjs",
+    "pretest": "node ../../hfs/prep-runtime.mjs",
     "test": "node --test \"*.spec.mjs\""
   },
   "keywords": [

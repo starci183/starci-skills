@@ -7,11 +7,13 @@
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
 //      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
-//      RT_ABSOLUTE_PATH, RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs)
+//      RT_ABSOLUTE_PATH, RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs) and
+//      GENERATED_UNTRACKED (no tracked path under a generated root)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
 //      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
 // The base revision is the merge-base of HEAD with main (else origin/main); without one, growth is not judged. Only error
-// findings fail. It never writes to the tree it judges.
+// findings fail. The generated copies are git-ignored output, so on this runtime it regenerates them before judging their
+// drift; it writes nothing else.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -19,7 +21,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { mergeBase } from '../api/git/merge-base.mjs';
 import { show } from '../api/git/show.mjs';
 import { checkRepo, readWhy, trackedFiles } from './check.mjs';
-import { GENERATED_DRIFT, driftOfRuntime } from './sync-runtime.mjs';
+import { GENERATED_DRIFT, driftOfRuntime, syncRuntime } from './sync-runtime.mjs';
+import { generatedUntrackedFindings } from './runtime-rules/generated-untracked.mjs';
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from './slots.mjs';
 import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
@@ -56,8 +59,10 @@ export function runtimeSources(files, params) {
 /**
  * The runtime check of the repository at `repoRoot` (default: this runtime). `files` overrides git ls-files (a dry run; no
  * tree walk), `base` the base revision ({sha, show(path) -> text|null} or null), `drift` the generated-copy differences
- * (a list of strings; default: scripts/hfs/sync-runtime.mjs driftOfRuntime when `repoRoot` is this runtime).
- * `extraFindings` are findings another emitter produced for the same tree.
+ * (a list of strings; default on this runtime: the copies are git-ignored, so syncRuntime() runs first and driftOfRuntime()
+ * judges what it leaves).
+ * `extraFindings` are findings another emitter produced for the same tree - or a () => list, run after the generated
+ * copies are synced so a disk-reading emitter (check-contract-cites) sees them on a checkout that lacked them.
  * Returns {ok, findings (errors), counts, manifest, tracked, sources, base}.
  */
 export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tree = files === undefined, base, drift, extraFindings = [], manifest } = {}) {
@@ -97,10 +102,17 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...nodeModulesLinkFindings(ctx),
     ...controlCharFindings(ctx),
     ...absolutePathRepoFindings(ctx),
+    ...generatedUntrackedFindings(ctx),
   );
-  const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
+  let driftList = drift;
+  if (drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot)) {
+    // The copies are git-ignored: a checkout without them is the normal state, so the check regenerates them first and a
+    // missing/stale/extra file afterwards is true drift. A sync failure reports as drift.
+    try { syncRuntime(); } catch (error) { driftList = [`the generator could not regenerate the copies: ${String(error?.message ?? error).split('\n')[0]}`]; }
+    driftList ??= driftOfRuntime();
+  }
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });
-  findings.push(...extraFindings);
+  findings.push(...(typeof extraFindings === 'function' ? extraFindings() : extraFindings));
 
   const why = readWhy(root, [...new Set(findings.map((f) => f.code))]);
   const withWhy = (f) => ({ ...f, titleVi: why[f.code]?.titleVi, whyVi: why[f.code]?.whyVi, nextStepVi: why[f.code]?.nextStepVi });

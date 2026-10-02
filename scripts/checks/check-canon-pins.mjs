@@ -31,6 +31,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE, loadPins } from '../gates/canon-pins.mjs';
+import { runScript } from '../api/node/run-script.mjs';
 
 const BINDING = Object.freeze({ version: 'CANON_BINDING_VERSION', digest: 'CANON_BINDING_DIGEST', invalid: 'CANON_BINDING_INVALID' });
 const DEP_KEYS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -65,6 +66,15 @@ export function checkCanonPins({ root = skillRoot } = {}) {
 /** Every code-pattern profile's canon binding against the canon source this runtime publishes; `pack` lists a package's published files. */
 export function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}) {
   const errors = [];
+  // The published file set includes the generated runtime copies (runtime/**): git-ignored, so they are regenerated
+  // before the pack list is read - an absent copy would leave it out of the digest.
+  if (pack === packedFiles) {
+    const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
+    if (fs.existsSync(syncScript)) {
+      const status = runScript(syncScript, [], { cwd: root });
+      if (status !== 0) errors.push(`${BINDING.invalid} the generated runtime copies could not be regenerated (node scripts/hfs/sync-runtime.mjs exited ${status})`);
+    }
+  }
   const pins = loadPins(root).pins ?? {};
   const profiles = parseYaml(fs.readFileSync(path.join(root, PROFILES_FILE), 'utf8'))?.profiles ?? {};
   for (const [profile, value] of Object.entries(profiles)) {
