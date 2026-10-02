@@ -22,13 +22,17 @@ const source = (ran: ReadonlyArray<string>) => {
     return double
 }
 
-const build = async (connections: ReadonlyArray<DatabaseConnectionOptions>, open: OpenConnection) => {
+const build = async (
+    connections: ReadonlyArray<DatabaseConnectionOptions>,
+    openSource: (target: DatabaseConnectionOptions) => ConnectionSource,
+) => {
     const logger = mock<Logger>()
+    const open: OpenConnection = jest.fn((target: DatabaseConnectionOptions) => openSource(target))
     const moduleRef = await Test.createTestingModule({
         providers: [
             MigrationRunnerService,
             { provide: DATABASE_OPTIONS, useValue: { connections } },
-            { provide: CONNECTION_SOURCE, useFactory: () => open },
+            { provide: CONNECTION_SOURCE, useValue: open },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
@@ -43,10 +47,7 @@ describe("MigrationRunnerService", () => {
             ["identity", identity],
             ["order", order],
         ])
-        const open: OpenConnection = jest.fn(
-            (target: DatabaseConnectionOptions) => sources.get(target.name) ?? source([]),
-        )
-        const { runner, logger } = await build([connection("identity"), connection("order")], open)
+        const { runner, logger } = await build([connection("identity"), connection("order")], (target) => sources.get(target.name) ?? source([]))
 
         await runner.run()
 

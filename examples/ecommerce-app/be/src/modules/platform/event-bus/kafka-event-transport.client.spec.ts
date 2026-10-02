@@ -1,16 +1,22 @@
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
-import { Kafka, logLevel } from "kafkajs"
-import type { Admin, Consumer, EachMessagePayload, IHeaders, Producer } from "kafkajs"
 import { IDS } from "@modules/platform/ids"
 import type { Ids } from "@modules/platform/ids"
 import { EventBusErrorCode } from "./errors/event-bus.error"
-import { EVENT_BUS_OPTIONS } from "./event-bus.decorators"
+import { EVENT_BUS_OPTIONS, KAFKA_FACTORY } from "./event-bus.decorators"
 import type { EventBusOptions } from "./event-bus.options"
-import type { InboundMessage, OutboundMessage } from "./event-transport.port"
+import type {
+    InboundMessage,
+    KafkaAdmin,
+    KafkaConsumedMessage,
+    KafkaConsumer,
+    KafkaDriver,
+    KafkaFactory,
+    KafkaMessageHeaders,
+    KafkaProducer,
+    OutboundMessage,
+} from "./event-transport.port"
 import { KafkaEventTransportClient } from "./kafka-event-transport.client"
-
-jest.mock("kafkajs", () => ({ Kafka: jest.fn(), logLevel: { NOTHING: 0 } }))
 
 const options: EventBusOptions = {
     brokers: ["broker-1.test:9092", "broker-2.test:9092"],
@@ -34,24 +40,20 @@ const eachMessagePayload = (
     offset: string,
     key: Buffer | null,
     value: Buffer | null,
-    headers?: IHeaders,
-): EachMessagePayload => ({
+    headers?: KafkaMessageHeaders,
+): KafkaConsumedMessage => ({
     topic: "events.order",
     partition,
-    message:
-        headers === undefined
-            ? { key, value, timestamp: "0", attributes: 0, offset, size: value?.length ?? 0 }
-            : { key, value, timestamp: "0", attributes: 0, offset, headers },
-    heartbeat: () => Promise.resolve(),
-    pause: () => () => undefined,
+    message: headers === undefined ? { key, value, offset } : { key, value, offset, headers },
 })
 
 const build = async () => {
-    const kafka = mock<Kafka>()
-    const producer = mock<Producer>()
-    const consumer = mock<Consumer>()
-    const admin = mock<Admin>()
+    const kafka = mock<KafkaDriver>()
+    const producer = mock<KafkaProducer>()
+    const consumer = mock<KafkaConsumer>()
+    const admin = mock<KafkaAdmin>()
     const ids = mock<Ids>()
+    const factory = mock<KafkaFactory>()
     producer.connect.mockResolvedValue(undefined)
     producer.sendBatch.mockResolvedValue([])
     producer.disconnect.mockResolvedValue(undefined)
@@ -66,32 +68,28 @@ const build = async () => {
     kafka.consumer.mockReturnValue(consumer)
     kafka.admin.mockReturnValue(admin)
     ids.next.mockReturnValue("read-1")
-    jest.mocked(Kafka).mockImplementation(() => kafka)
+    factory.create.mockReturnValue(kafka)
     const moduleRef = await Test.createTestingModule({
         providers: [
             KafkaEventTransportClient,
             { provide: EVENT_BUS_OPTIONS, useValue: options },
+            { provide: KAFKA_FACTORY, useValue: factory },
             { provide: IDS, useValue: ids },
         ],
     }).compile()
-    return { client: moduleRef.get(KafkaEventTransportClient), kafka, producer, consumer, admin, ids }
+    return { client: moduleRef.get(KafkaEventTransportClient), kafka, producer, consumer, admin, ids, factory }
 }
 
 describe("KafkaEventTransportClient", () => {
-    beforeEach(() => {
-        jest.clearAllMocks()
-    })
-
-    it("configures the Kafka client as the event-bus probe", async () => {
-        const { client } = await build()
+    it("configures the Kafka driver as the event-bus probe", async () => {
+        const { client, factory } = await build()
 
         expect(client.name).toBe("event-bus")
-        expect(Kafka).toHaveBeenCalledWith({
+        expect(factory.create).toHaveBeenCalledWith({
             clientId: "orders",
             brokers: ["broker-1.test:9092", "broker-2.test:9092"],
             connectionTimeout: 3000,
             requestTimeout: 3000,
-            logLevel: logLevel.NOTHING,
         })
     })
 

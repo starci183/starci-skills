@@ -127,9 +127,15 @@ describe("SagaService", () => {
                 mockEntityManager({ query: [readOf({ status: "compensated", version: 3 })] }),
             )
 
-            expect(await unknown.service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe("ignored")
-            expect(await completed.service.compensate({ ...RUN, eventId: "e-2", step: STEP, compensation })).toBe("ignored")
-            expect(await compensated.service.compensate({ ...RUN, eventId: "e-3", step: STEP, compensation })).toBe("ignored")
+            expect(await unknown.service.compensate({ ...RUN, eventId: "e-1", step: STEP, compensation })).toBe(
+                "ignored",
+            )
+            expect(await completed.service.compensate({ ...RUN, eventId: "e-2", step: STEP, compensation })).toBe(
+                "ignored",
+            )
+            expect(await compensated.service.compensate({ ...RUN, eventId: "e-3", step: STEP, compensation })).toBe(
+                "ignored",
+            )
 
             expect(compensation.run).not.toHaveBeenCalled()
         })

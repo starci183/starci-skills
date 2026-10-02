@@ -23,8 +23,13 @@ const file = (name: string, text: string): SeedFile => ({
     text: seedText(text),
 })
 
-const build = async (open: OpenConnection, read: ReadSeedFiles) => {
+const build = async (
+    openSource: (target: DatabaseConnectionOptions) => ConnectionSource,
+    readSeeds: (directory: string) => Promise<ReadonlyArray<SeedFile>>,
+) => {
     const logger = mock<Logger>()
+    const open: OpenConnection = jest.fn((target: DatabaseConnectionOptions) => openSource(target))
+    const read: ReadSeedFiles = jest.fn((directory: string) => readSeeds(directory))
     const moduleRef = await Test.createTestingModule({
         providers: [
             SeedRunnerService,
@@ -32,24 +37,25 @@ const build = async (open: OpenConnection, read: ReadSeedFiles) => {
                 provide: DATABASE_OPTIONS,
                 useValue: { connections: [connection("primary")] },
             },
-            { provide: CONNECTION_SOURCE, useFactory: () => open },
-            { provide: READ_SEED_FILES, useFactory: () => read },
+            { provide: CONNECTION_SOURCE, useValue: open },
+            { provide: READ_SEED_FILES, useValue: read },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { runner: moduleRef.get(SeedRunnerService), logger }
+    return { runner: moduleRef.get(SeedRunnerService), logger, read }
 }
 
 describe("SeedRunnerService", () => {
     it("reads the seeds of the named environment, runs them on their connections and logs the report", async () => {
         const primary = mock<ConnectionSource>()
-        const read: ReadSeedFiles = jest.fn(() =>
-            Promise.resolve([
-                file("primary-notes.sql", "INSERT INTO notes (body) VALUES ('a')"),
-                file("legacy-users.sql", "INSERT INTO users DEFAULT VALUES"),
-            ]),
+        const { runner, logger, read } = await build(
+            () => primary,
+            () =>
+                Promise.resolve([
+                    file("primary-notes.sql", "INSERT INTO notes (body) VALUES ('a')"),
+                    file("legacy-users.sql", "INSERT INTO users DEFAULT VALUES"),
+                ]),
         )
-        const { runner, logger } = await build(() => primary, read)
 
         await expect(runner.run("staging")).resolves.toBeUndefined()
 
@@ -63,8 +69,10 @@ describe("SeedRunnerService", () => {
     })
 
     it("reads the dev seeds when no environment is named", async () => {
-        const read: ReadSeedFiles = jest.fn(() => Promise.resolve([]))
-        const { runner, logger } = await build(() => mock<ConnectionSource>(), read)
+        const { runner, logger, read } = await build(
+            () => mock<ConnectionSource>(),
+            () => Promise.resolve([]),
+        )
 
         await expect(runner.run()).resolves.toBeUndefined()
 
