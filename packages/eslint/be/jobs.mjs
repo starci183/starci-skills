@@ -157,10 +157,10 @@ export const jobRunKey = {
 export const jobShape = {
     meta: {
         type: "problem",
-        docs: { description: "`<job>.processor.ts` of `features/jobs/<job>` declares a class extending `FencedProcessor`; `steps/<step>.step.ts` declares a class implementing `JobStep`; neither role exists elsewhere." },
+        docs: { description: "`<job>.processor.ts` of `features/jobs/<job>/transport/queue/` declares a class extending `FencedProcessor`; `steps/<step>.step.ts` declares a class implementing `JobStep`; neither role exists elsewhere." },
         schema: [],
         messages: {
-            processorPlacement: "`{{name}}` is in a `.processor.ts` file outside `features/jobs/<job>/`. A job processor lives only in its job folder, so the jobs kind stays one place.",
+            processorPlacement: "`{{name}}` is in a `.processor.ts` file outside `features/jobs/<job>/transport/queue/`. A job processor lives only in the queue transport of its job, so the jobs kind stays one place.",
             processorStem: "The processor of job `{{job}}` is `{{job}}.processor.ts`, but this file is `{{stem}}.processor.ts`.",
             notFenced: "`{{name}}` is a job processor that does not extend `FencedProcessor` of `platform/jobs`. The base class claims the job with a bumped fencing token and settles it through the guarded writes; a processor without it has no fence.",
             stepPlacement: "`{{name}}` implements `JobStep` outside `features/jobs/<job>/steps/<step>.step.ts`.",
@@ -174,7 +174,7 @@ export const jobShape = {
         const base = baseName(file)
         const isProcessorFile = base.endsWith(".processor.ts")
         const isStepFile = base.endsWith(".step.ts")
-        const inJob = found.slot === "be.feature.jobs"
+        const inJob = found.slot === "be.feature.jobs.queue"
         const inSteps = found.slot === "be.jobs.steps"
         const inPlatform = hfs.tierOf(file) === "platform" && ownerNameOf(hfs, file) === "jobs"
         const check = (node) => {

@@ -98,18 +98,18 @@ rules:
     kind: mandatory
     hfsRules: [R140, R136, R46]
     requirement: |-
-      `features/jobs/<job>/<job>.processor.ts` declares a class extending `FencedProcessor` (it claims, calls `process(job)` and
+      `features/jobs/<job>/transport/queue/<job>.processor.ts` declares a class extending `FencedProcessor` (it claims, calls `process(job)` and
       settles through the guarded writes); `steps/<step>.step.ts` declares a class implementing `JobStep`; `application/` holds
       plain CQRS. A domain service starts the job with a typed queue producer `enqueueX(payload, tx)` inside its transaction
       (queues.yaml). The jobs kind imports only `modules/*`: it never imports an api, saga or reactor feature, and it talks to
-      them through events. An app of kind `worker` or `api` composes the job module.
+      them through events. An app of kind `worker` or `api` composes the job queue module.
     rationale: |-
       One place and one base class mean a job cannot skip the fence, and the kind boundary keeps a long job from running inside a
       request.
     cases:
       - id: case-1
         when: A new background job send-receipt
-        write: 'features/jobs/send-receipt/{send-receipt.processor.ts, send-receipt.module.ts, steps/mail.step.ts, application/send-receipt.command.ts}'
+        write: 'features/jobs/send-receipt/{transport/queue/send-receipt.processor.ts, transport/queue/send-receipt-queue.module.ts, send-receipt.module.ts, steps/mail.step.ts, application/send-receipt.command.ts}'
     verification:
       automated:
         - BE_JOB_SHAPE
@@ -221,8 +221,12 @@ files:
   - path: src/features/jobs/<job>/<job>.module.ts
     slot: be.feature.jobs
     template: jobs/job.module.ts.tpl
-  - path: src/features/jobs/<job>/<job>.processor.ts
-    slot: be.feature.jobs
+  - path: src/features/jobs/<job>/transport/queue/<job>-queue.module.ts
+    slot: be.feature.jobs.queue
+    template: jobs/job.queue.module.ts.tpl
+    role: The queue transport module of the job; composed by an api or worker app, registers the processor.
+  - path: src/features/jobs/<job>/transport/queue/<job>.processor.ts
+    slot: be.feature.jobs.queue
     template: jobs/job.processor.ts.tpl
     role: The processor of one job; extends FencedProcessor.
     rules: [BE_JOB_SHAPE]

@@ -11,6 +11,10 @@ import { parseEventBusConfig } from "@modules/platform/event-bus"
 import type { EventBusConfig } from "@modules/platform/event-bus"
 import { parseHttpSecurityConfig } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
+import { parseJobsConfig } from "@modules/platform/jobs"
+import type { JobsConfig } from "@modules/platform/jobs"
+import { parseQueueConfig } from "@modules/platform/queue"
+import type { QueueConfig } from "@modules/platform/queue"
 
 /** Everything the order api needs from its environment, parsed once in main.ts. */
 export interface OrderAppOptions {
@@ -28,6 +32,10 @@ export interface OrderAppOptions {
     readonly httpSecurity: HttpSecurityOptions
     /** How often the expiry sweep runs and how long an order waits for its payment. */
     readonly orderExpiry: OrderExpiryOptions
+    /** Where Redis is and how the queue relay and workers run. */
+    readonly queue: QueueConfig
+    /** Who this worker is and how long a job claim lasts. */
+    readonly jobs: JobsConfig
 }
 
 /** Parses the order api options from the environment; a missing or malformed key stops the boot naming the key. */
@@ -38,6 +46,8 @@ export const parseOrderAppOptions = (env: EnvSource): OrderAppOptions => ({
     eventBus: parseEventBusConfig(env),
     receiptStorage: parseReceiptStorageConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
+    queue: parseQueueConfig(env),
+    jobs: parseJobsConfig(env),
     orderExpiry: {
         everyMs: env.duration("ORDER_EXPIRY_EVERY", 60_000),
         olderThanMs: env.duration("ORDER_PAYMENT_WINDOW", ORDER_PAYMENT_WINDOW_MS),

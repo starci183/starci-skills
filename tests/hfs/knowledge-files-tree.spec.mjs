@@ -20,8 +20,8 @@ const scenarioIds = new Set(Object.entries(scenarios).flatMap(([pattern, list]) 
 
 const topics = fs.readdirSync(PATTERNS).filter((name) => name.endsWith('.yaml')).map((name) => ({ name, doc: parse(fs.readFileSync(path.join(PATTERNS, name), 'utf8')) })).filter((topic) => Array.isArray(topic.doc?.files));
 
-test('the pattern topics that carry a files tree are the five event, queue, job, projection and reactor topics', () => {
-  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml']);
+test('the pattern topics that carry a files tree are the event, queue, job, projection, reactor, realtime, saga and webhook topics', () => {
+  assert.deepEqual(topics.map((topic) => topic.name).sort(), ['event-bus.yaml', 'jobs.yaml', 'projections.yaml', 'queues.yaml', 'reactors.yaml', 'realtime.yaml', 'saga.yaml', 'webhooks.yaml']);
 });
 
 for (const { name, doc } of topics) {

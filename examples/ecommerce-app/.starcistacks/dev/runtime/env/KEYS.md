@@ -54,6 +54,14 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `EVENT_BUS_TIMEOUT` | Deadline of one broker call | `3s` |
 | `ORDER_EXPIRY_EVERY` | Pause between two ticks of the order expiry scheduler | `1m` |
 | `ORDER_PAYMENT_WINDOW` | How long an order stays pending for its payment before it expires | `1h` |
+| `QUEUE_REDIS_HOST` | Redis host BullMQ talks to | none |
+| `QUEUE_REDIS_PORT` | Redis port | `6379` |
+| `QUEUE_PREFIX` | What every BullMQ key starts with | `queue` |
+| `QUEUE_RELAY_INTERVAL` | Pause between two relay passes over an empty queue outbox | `200ms` |
+| `QUEUE_RELAY_BATCH` | The most queue outbox rows one relay pass hands to BullMQ | `50` |
+| `QUEUE_CONCURRENCY` | Jobs one worker runs at the same time | `5` |
+| `JOBS_WORKER_ID` | The name a worker writes into `claimed_by` of a job it claims | `worker` |
+| `JOBS_LEASE` | How long a job claim lasts before a stalled job may be claimed again | `1m` |
 
 ## billing api (`apps/billing`)
 

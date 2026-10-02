@@ -61,15 +61,15 @@ test('hfs add job writes the job tree from the knowledge, registers the patterns
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/jobs/send-receipt';
   assert.ok(exists(dir, 'be/src/modules/queues/send-receipt/send-receipt.queue.ts'), 'a job is the consumer of its queue: the queue is generated with it');
-  assert.match(read(dir, `${base}/send-receipt.processor.ts`), /readonly queue = SEND_RECEIPT_QUEUE/);
-  for (const file of ['index.ts', 'send-receipt.module.ts', 'send-receipt.processor.ts', 'steps/send-receipt.step.ts']) {
+  assert.match(read(dir, `${base}/transport/queue/send-receipt.processor.ts`), /readonly queue = SEND_RECEIPT_QUEUE/);
+  for (const file of ['index.ts', 'send-receipt.module.ts', 'transport/queue/send-receipt.processor.ts', 'transport/queue/send-receipt-queue.module.ts', 'steps/send-receipt.step.ts']) {
     assert.ok(exists(dir, `${base}/${file}`), file);
     assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
   }
-  assert.match(read(dir, `${base}/send-receipt.processor.ts`), /export class SendReceiptProcessor extends FencedProcessor/);
+  assert.match(read(dir, `${base}/transport/queue/send-receipt.processor.ts`), /export class SendReceiptProcessor extends FencedProcessor/);
   assert.match(read(dir, `${base}/steps/send-receipt.step.ts`), /implements JobStep/);
   assert.match(read(dir, `${base}/steps/send-receipt.step.ts`), /step: "send-receipt"/);
-  assert.match(result.out, /created be\/src\/features\/jobs\/send-receipt\/send-receipt\.processor\.ts/);
+  assert.match(result.out, /created be\/src\/features\/jobs\/send-receipt\/transport\/queue\/send-receipt\.processor\.ts/);
   const declaration = hfsJson(dir);
   assert.deepEqual(declaration.sides.be.patterns, ['fenced-job', 'queue']);
   assert.deepEqual(declaration.sides.be.kinds, ['api', 'jobs']);
@@ -84,7 +84,7 @@ test('hfs add refuses an existing instance, writing nothing, and a second kind a
   assert.equal(again.code, 2);
   assert.match(again.err, /HFS_ADD_EXISTS/);
   assert.equal((await cli(['add', 'job', 'expire-orders', '--repo', dir])).code, 0);
-  assert.ok(exists(dir, 'be/src/features/jobs/expire-orders/expire-orders.processor.ts'));
+  assert.ok(exists(dir, 'be/src/features/jobs/expire-orders/transport/queue/expire-orders.processor.ts'));
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'jobs']);
 });
 

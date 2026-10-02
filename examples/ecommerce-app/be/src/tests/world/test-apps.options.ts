@@ -195,6 +195,8 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     eventBus: eventBusOptionsOf(w, "order"),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
+    queue: queueOptionsOf(w, `order${w.kafka.topicPrefix.replace(/\W/g, "")}`),
+    jobs: { workerId: "order-test", leaseMs: 30_000 },
     orderExpiry: { everyMs: ORDER_EXPIRY_TICK_MS, olderThanMs: ORDER_PAYMENT_WINDOW_TEST_MS },
 })
 

@@ -42,7 +42,7 @@ import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { HealthHttpModule } from "@features/health"
 import { InvoicingMessageModule } from "@features/invoicing"
-import { SepayWebhookModule } from "@features/webhooks/sepay"
+import { SepayHttpModule } from "@features/webhooks/sepay"
 import type { BillingAppOptions } from "./billing.options"
 
 @Module({})
@@ -112,7 +112,7 @@ export class AppModule {
                 }),
                 HealthHttpModule,
                 InvoicingMessageModule,
-                SepayWebhookModule,
+                SepayHttpModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

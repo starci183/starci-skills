@@ -18,7 +18,7 @@ entrypoint: pay-order.service.ts
 adapt:
   - One folder per queue under modules/queues/<queue>/.
   - A schedule is a job scheduler declared in the same queue file; there is no cron.
-  - The processor is features/jobs/<job>/<job>.processor.ts and dispatches one command.
+  - The processor is features/jobs/<job>/transport/queue/<job>.processor.ts and dispatches one command.
 dependencies:
   packages: []
   assumptions: |

@@ -41,18 +41,23 @@ import {
     eventBusEntities,
     eventBusMigrations,
 } from "@modules/platform/event-bus"
+import { JOBS_ERROR_KINDS, JOBS_MESSAGES, JobsModule, jobsEntities, jobsMigrations } from "@modules/platform/jobs"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
+import { QueueModule, queueEntities, queueMigrations } from "@modules/platform/queue"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
+import { orderExpirySchedulerOf } from "@modules/queues/order-expiry"
 import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
+import { ExpireOrdersQueueModule } from "@features/jobs/expire-orders"
+import { SendReceiptQueueModule } from "@features/jobs/send-receipt"
 import { OrderPaidLoyaltyMessageModule } from "@features/reactors/order-paid-loyalty"
 import { OrderPaymentStatusMessageModule } from "@features/reactors/order-payment-status"
 import { OrderStatusPushMessageModule } from "@features/reactors/order-status-push"
 import { OrderSummaryProjectionMessageModule } from "@features/reactors/order-summary-projection"
-import { OrderStatusRealtimeModule } from "@features/realtime/order-status"
+import { OrderStatusGraphqlModule } from "@features/realtime/order-status"
 import type { OrderAppOptions } from "./order.options"
 
 @Module({})
@@ -76,6 +81,7 @@ export class AppModule {
                         ORDER_MESSAGES,
                         RECEIPT_STORAGE_MESSAGES,
                         EVENT_BUS_MESSAGES,
+                        JOBS_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
                 }),
@@ -92,6 +98,7 @@ export class AppModule {
                         ORDER_ERROR_KINDS,
                         RECEIPT_STORAGE_ERROR_KINDS,
                         EVENT_BUS_ERROR_KINDS,
+                        JOBS_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
                 }),
@@ -111,6 +118,8 @@ export class AppModule {
                                 ...inboxEntities,
                                 ...sagaEntities,
                                 ...eventBusEntities,
+                                ...queueEntities,
+                                ...jobsEntities,
                             ],
                             migrations: [
                                 ...catalogMigrations,
@@ -121,6 +130,8 @@ export class AppModule {
                                 ...inboxMigrations,
                                 ...sagaMigrations,
                                 ...eventBusMigrations,
+                                ...queueMigrations,
+                                ...jobsMigrations,
                             ],
                         },
                     ],
@@ -136,6 +147,13 @@ export class AppModule {
                 LoyaltyModule.register({ isGlobal: true }),
                 OrderSummaryModule,
                 SagaModule.register({ isGlobal: true }),
+                QueueModule.register({
+                    isGlobal: true,
+                    ...options.queue,
+                    connections: [ORDER_ENTITY_MANAGER],
+                    schedulers: [orderExpirySchedulerOf(options.orderExpiry)],
+                }),
+                JobsModule.register({ isGlobal: true, ...options.jobs, connection: ORDER_ENTITY_MANAGER }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
                 ProbesModule.register({
@@ -151,7 +169,9 @@ export class AppModule {
                 OrderPaidLoyaltyMessageModule,
                 OrderStatusPushMessageModule,
                 OrderSummaryProjectionMessageModule,
-                OrderStatusRealtimeModule,
+                OrderStatusGraphqlModule,
+                ExpireOrdersQueueModule,
+                SendReceiptQueueModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

@@ -1379,7 +1379,7 @@ rules:
       - {kind: eslint-be, id: job-run-key}
   - id: R140
     code: "BE_JOB_SHAPE"
-    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
+    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/transport/queue/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_SHAPE"]
@@ -1547,7 +1547,7 @@ rules:
       - {kind: hfs, id: kind-empty, at: scripts/hfs/rules/kinds.mjs}
   - id: R161
     code: "BE_WEBHOOK_SHAPE"
-    law: "A provider webhook door (`src/features/webhooks/<provider>/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
+    law: "A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_SHAPE"]

@@ -1,1 +1,1 @@
-export { OrderStatusRealtimeModule } from "./order-status-realtime.module"
+export { OrderStatusGraphqlModule } from "./transport/graphql/order-status-graphql.module"

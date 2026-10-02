@@ -31,17 +31,17 @@ rules:
     hfsRules: [R01, R02, R47]
     requirement: |-
       A provider webhook lives in `be/src/features/webhooks/<provider>/` (slot `be.feature.webhooks`), enabled by declaring the pattern
-      `webhooks` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `<provider>-webhook.module.ts`, `<provider>.webhook.ts` (the
-      door), `<provider>.webhook.spec.ts` (its spec, the one non-service unit spec of the kind) and an optional `dto/` of typed
+      `webhooks` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `transport/http/<provider>-http.module.ts`, `transport/http/<provider>.webhook.ts` (the
+      door), `<provider>.webhook.spec.ts` (its spec, the one non-service unit spec of the kind) and an optional `transport/http/dto/` of typed
       payload classes (`<event>.request.ts`). Nothing else exists there: no application layer, no handler, no consumer. The kind
-      imports only `modules/*`, never another kind, and only an api-kind app composes `<provider>-webhook.module.ts`.
+      imports only `modules/*`, never another kind, and only an api-kind app composes `<provider>-http.module.ts`.
     rationale: |-
       A webhook is an external caller we do not control, so its door is kept apart from the api features a client uses. One place
       and one shape let a reader find every public signed door and its proof in one folder.
     cases:
       - id: case-1
         when: A new provider (a payment gateway)
-        write: 'features/webhooks/payment-gateway/ with index.ts, payment-gateway-webhook.module.ts, payment-gateway.webhook.ts, payment-gateway.webhook.spec.ts and dto/payment-notification.request.ts.'
+        write: 'features/webhooks/payment-gateway/ with index.ts, transport/http/payment-gateway-http.module.ts, transport/http/payment-gateway.webhook.ts, transport/http/payment-gateway.webhook.spec.ts and transport/http/dto/payment-notification.request.ts.'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
@@ -153,18 +153,18 @@ files:
   - path: src/features/webhooks/<provider>/index.ts
     slot: be.feature.webhooks
     role: The public surface of the kind folder, the module class an api-kind app composes.
-  - path: src/features/webhooks/<provider>/<provider>-webhook.module.ts
-    slot: be.feature.webhooks
+  - path: src/features/webhooks/<provider>/transport/http/<provider>-http.module.ts
+    slot: be.feature.webhooks.http
     role: Nest module of the door, composed only by an api-kind app.
-  - path: src/features/webhooks/<provider>/<provider>.webhook.ts
-    slot: be.feature.webhooks
+  - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts
+    slot: be.feature.webhooks.http
     role: The signed door, one controller with one POST handler.
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
-    spec: src/features/webhooks/<provider>/<provider>.webhook.spec.ts
-  - path: src/features/webhooks/<provider>/<provider>.webhook.spec.ts
-    slot: be.feature.webhooks
+    spec: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
+  - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
+    slot: be.feature.webhooks.http
     role: Unit spec of the door beside it.
-  - path: src/features/webhooks/<provider>/dto/<event>.request.ts
+  - path: src/features/webhooks/<provider>/transport/http/dto/<event>.request.ts
     slot: be.feature.webhooks.dto
     role: The typed, bounded provider payload.
     rules: [BE_INPUT_BOUNDED]

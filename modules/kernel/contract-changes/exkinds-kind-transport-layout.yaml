@@ -1,0 +1,32 @@
+id: exkinds-kind-transport-layout
+effectiveAt: '2026-10-02T12:00:00+07:00'
+summary: >-
+  Lane EX-KINDS (lead C2): the webhooks, realtime and jobs kinds follow the feature layers rules (feature-layout, module-per-transport,
+  background-unowned) instead of keeping module and door at the root of the kind folder. The kind root stays src/features/<kind>/<name>/
+  (the owner slot) and each door sits in its transport folder: webhooks transport/http/ (slots be.feature.webhooks.http, be.feature.webhooks.dto),
+  realtime transport/graphql/ and transport/websocket/ (be.feature.realtime.graphql, be.feature.realtime.websocket, be.feature.realtime.dto),
+  jobs transport/queue/ (new slot be.feature.jobs.queue, composedBy api and worker: <job>-queue.module.ts and <job>.processor.ts); the
+  application module <job>.module.ts of a job stays at the job root with its steps/ and application/. The door slot ids replace the old door
+  ids in KIND_DOOR_SLOTS and in the webhook-shape, webhook-verify-first, realtime-* and job-shape enforcers. The `hfs add job` template
+  tree (knowledge/patterns/be/jobs.yaml, templates/be/patterns/jobs) generates the queue module and moves the processor. R140 names the
+  new processor home.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/exkinds-kind-transport-layout.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - knowledge/patterns/be/webhooks.yaml
+  - knowledge/patterns/be/realtime.yaml
+  - knowledge/patterns/be/jobs.yaml
+  - packages/hfs/templates/be/patterns/jobs/job.index.ts.tpl
+  - packages/hfs/templates/be/patterns/jobs/job.module.ts.tpl
+  - packages/hfs/templates/be/patterns/jobs/job.queue.module.ts.tpl
+  - packages/hfs/templates/be/patterns/jobs/job.processor.ts.tpl
+  - packages/eslint/be/webhooks.mjs
+  - packages/eslint/be/realtime.mjs
+  - packages/eslint/be/jobs.mjs
+  - packages/eslint/be/transport.mjs
+  - packages/eslint/be/lib/transport-slots.mjs
+  - packages/eslint/be/lib/unit-spec.mjs
