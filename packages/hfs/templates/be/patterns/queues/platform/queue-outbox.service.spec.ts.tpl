@@ -37,7 +37,7 @@ describe("QueueOutboxService", () => {
             await expect(
                 tx.em.transaction(async (manager) => {
                     await outbox.write(manager, "mail", { id: "m-1" })
-                    throw failure
+                    return Promise.reject(failure)
                 }),
             ).rejects.toBe(failure)
 

@@ -22,5 +22,10 @@ export interface QueueDelivery {
     readonly attempt: number
 }
 
-/** Handles one delivery; a return completes the BullMQ job and a throw lets BullMQ retry it. */
-export type QueueHandler = (delivery: QueueDelivery) => Promise<void>
+/** The handler of one queue: it receives every delivery of the queue; a return completes the BullMQ job and a throw lets BullMQ retry it. */
+export interface QueueHandler {
+    /** The queue this handler consumes. */
+    readonly queue: string
+    /** Handles one delivery. */
+    handle(delivery: QueueDelivery): Promise<void>
+}

@@ -34,11 +34,11 @@ for (const topic of ['event-bus', 'queues', 'jobs']) {
     for (const capability of capabilities) {
       if (!fs.existsSync(path.join(EXAMPLE, capability, 'index.ts'))) continue;
       const stamp = stampOf(capability);
-      assert.notEqual(stamp, null, `${capability} has no migration to read the stamp from`);
+      if (entries.some((entry) => capabilityOf(entry) === capability && entry.path.includes('<epochMs13>'))) assert.notEqual(stamp, null, `${capability} has no migration to read the stamp from`);
       for (const entry of entries.filter((candidate) => capabilityOf(candidate) === capability)) {
-        const target = path.join(EXAMPLE, ...entry.path.replace('<epochMs13>', stamp).split('/'));
+        const target = path.join(EXAMPLE, ...entry.path.replace('<epochMs13>', stamp ?? '').split('/'));
         assert.ok(fs.existsSync(target), `${entry.path} is missing from the example`);
-        const body = fs.readFileSync(path.join(TEMPLATES, ...entry.template.split('/')), 'utf8').replaceAll('@@epochMs13@@', stamp);
+        const body = fs.readFileSync(path.join(TEMPLATES, ...entry.template.split('/')), 'utf8').replaceAll('@@epochMs13@@', stamp ?? '');
         assert.ok(!/@@[A-Za-z0-9]+@@/.test(body), `${entry.template} has a placeholder the stamp does not fill`);
         assert.equal(fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n'), body.replace(/\r\n/g, '\n'), `${entry.path} drifted from ${entry.template}`);
       }

@@ -4,7 +4,7 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { JobsError, JobsErrorCode } from "./errors/jobs.error"
 import type { ClaimedJob } from "./jobs.contracts"
-import { JOBS_MANAGER } from "./jobs.decorators"
+import { JOBS_MANAGERS } from "./jobs.decorators"
 import { JobClaimService } from "./job-claim.service"
 import { ADVANCE_JOB, CLAIM_JOB, COMPLETE_JOB, FAIL_JOB } from "./persistence/jobs.sql"
 
@@ -14,7 +14,18 @@ const build = async (manager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             JobClaimService,
-            { provide: JOBS_MANAGER, useValue: manager },
+            { provide: JOBS_MANAGERS, useValue: [manager] },
+            { provide: CLOCK, useValue: new FakeClock(AT) },
+        ],
+    }).compile()
+    return { claims: moduleRef.get(JobClaimService) }
+}
+
+const buildWithoutConnection = async () => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            JobClaimService,
+            { provide: JOBS_MANAGERS, useValue: [] },
             { provide: CLOCK, useValue: new FakeClock(AT) },
         ],
     }).compile()
@@ -115,6 +126,25 @@ describe("JobClaimService", () => {
 
             expect(claims.runKey(claimed, "send")).toBe("j-1:send:3")
             expect(claims.runKey({ ...claimed, fencingToken: 4 }, "send")).toBe("j-1:send:4")
+        })
+
+        it("refuses a step name that carries the separator, because the key would be ambiguous", async () => {
+            const { claims } = await build(mockEntityManager())
+
+            expect(() => claims.runKey(claimed, "send:twice")).toThrow(JobsError)
+            expect(() => claims.runKey(claimed, "send:twice")).toThrow(JobsErrorCode.RunKeyInvalid)
+        })
+    })
+
+    describe("registration", () => {
+        it("refuses to claim with no connection to hold the job table", async () => {
+            const { claims } = await buildWithoutConnection()
+
+            await expect(
+                claims.claim({ kind: "mail", jobKey: "k-1", payload: {}, workerId: "w-1", leaseMs: 1000 }),
+            ).rejects.toMatchObject({
+                code: JobsErrorCode.ConnectionMissing,
+            })
         })
     })
 })

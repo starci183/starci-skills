@@ -5,7 +5,7 @@ import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { EVENT_BUS_OPTIONS, EVENT_RELAY_MANAGERS, EVENT_TRANSPORT } from "./event-bus.decorators"
-import { EventBusLogEvent } from "./event-bus.log-events"
+import { OutboxLogEvent } from "@modules/platform/outbox"
 import type { EventBusOptions } from "./event-bus.options"
 import { EventRelayService } from "./event-relay.service"
 import type { EventTransport } from "./event-transport.port"
@@ -128,7 +128,9 @@ describe("EventRelayService", () => {
 
             expect(transport.send).toHaveBeenCalledTimes(1)
             expect(transport.wait).toHaveBeenCalledWith(100)
-            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.RelayFailed, failure)
+            expect(logger.error).toHaveBeenCalledWith(OutboxLogEvent.RelayFailed, failure, {
+                outbox: "event-bus",
+            })
         })
     })
 })

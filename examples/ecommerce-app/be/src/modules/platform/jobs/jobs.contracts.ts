@@ -47,4 +47,16 @@ export interface FailWrite extends GuardedWrite {
 }
 
 /** The idempotency key of an external effect: only `JobClaims.runKey` makes one. */
-export type RunKey = string & { readonly __runKey: unique symbol }
+export type RunKey = string & {
+    /** The brand that keeps a plain string from passing as a run key; it never exists at run time. */
+    readonly __runKey: unique symbol
+}
+
+/** The shape of a run key: `<jobId>:<step>:<fencingToken>`. */
+const RUN_KEY = /^[^:]+:[^:]+:\d+$/u
+
+/** True when the text has the shape of a run key; the one place a string becomes a `RunKey`. */
+export const isRunKey = (text: string): text is RunKey => RUN_KEY.test(text)
+
+/** What a claim answers: the claimed job, or null when the job is done or another worker holds a live claim. */
+export type ClaimResult = ClaimedJob | null

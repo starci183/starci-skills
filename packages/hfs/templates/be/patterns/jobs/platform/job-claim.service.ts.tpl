@@ -3,8 +3,18 @@ import type { EntityManager } from "typeorm"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { JobsError, JobsErrorCode } from "./errors/jobs.error"
-import type { AdvanceWrite, ClaimedJob, ClaimParams, FailWrite, GuardedWrite, RunKey } from "./jobs.contracts"
-import { InjectJobsManager } from "./jobs.decorators"
+import type { sql } from "@modules/platform/database"
+import { isRunKey } from "./jobs.contracts"
+import type {
+    AdvanceWrite,
+    ClaimedJob,
+    ClaimParams,
+    ClaimResult,
+    FailWrite,
+    GuardedWrite,
+    RunKey,
+} from "./jobs.contracts"
+import { InjectJobsManagers } from "./jobs.decorators"
 import type { JobClaims } from "./jobs.port"
 import { ADVANCE_JOB, CLAIM_JOB, COMPLETE_JOB, FAIL_JOB } from "./persistence/jobs.sql"
 import type { ClaimedRow } from "./persistence/jobs.rows"
@@ -17,14 +27,14 @@ import type { ClaimedRow } from "./persistence/jobs.rows"
  */
 export class JobClaimService implements JobClaims {
     constructor(
-        @InjectJobsManager() private readonly manager: EntityManager,
+        @InjectJobsManagers() private readonly managers: ReadonlyArray<EntityManager>,
         @InjectClock() private readonly clock: Clock,
     ) {}
 
     /** Claims the delivery; null when the job is done or another worker holds a claim that has not expired. */
-    async claim(params: ClaimParams): Promise<ClaimedJob | null> {
+    async claim(params: ClaimParams): Promise<ClaimResult> {
         const now = this.clock.now()
-        const rows: Array<ClaimedRow> = await this.manager.query(CLAIM_JOB, [
+        const rows: Array<ClaimedRow> = await this.writer().query(CLAIM_JOB, [
             params.kind,
             params.jobKey,
             params.workerId,
@@ -60,12 +70,26 @@ export class JobClaimService implements JobClaims {
 
     /** The idempotency key of one step of this claim: it includes the token, so a zombie's repeat is a different key than the live worker's. */
     runKey(job: ClaimedJob, step: string): RunKey {
-        return `${job.jobId}:${step}:${job.fencingToken}` as RunKey
+        const key = `${job.jobId}:${step}:${job.fencingToken}`
+        if (!isRunKey(key))
+            throw new JobsError({ code: JobsErrorCode.RunKeyInvalid, params: { jobId: job.jobId, step } })
+        return key
+    }
+
+    /** The entity manager of the connection that holds the job table. */
+    private writer(): EntityManager {
+        const [manager] = this.managers
+        if (manager === undefined) throw new JobsError({ code: JobsErrorCode.ConnectionMissing })
+        return manager
     }
 
     /** Runs a statement that updates only when the token still matches; no row updated means a newer worker owns the job. */
-    private async guarded(statement: string, parameters: Array<unknown>, write: GuardedWrite): Promise<void> {
-        const rows: Array<object> = await this.manager.query(statement, parameters)
+    private async guarded(
+        statement: ReturnType<typeof sql>,
+        parameters: Array<unknown>,
+        write: GuardedWrite,
+    ): Promise<void> {
+        const rows: Array<object> = await this.writer().query(statement, parameters)
         if (rows.length === 0) {
             throw new JobsError({
                 code: JobsErrorCode.FencedOut,
