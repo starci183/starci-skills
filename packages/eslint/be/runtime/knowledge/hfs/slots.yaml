@@ -469,6 +469,11 @@ slots:
              "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
              "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
     forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
+    # Lite keeps the grammar and brand drawing records only (workspace.yaml, brand/, shell/ and the ui screens of a feature); the UAT records are
+    # the forbidden slot below and a lite scaffold holds no features/ at all.
+    lite:
+      requires: [.gitignore, workspace.yaml]
+      allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml", "features/<feature>/ui/<name>/index.yaml", "features/<feature>/ui/<name>/assets/<approved-file>"]
     rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
   - id: app.starciwork.uat
     profiles: [app]
@@ -497,8 +502,8 @@ slots:
     # Lite runs one managed host: the reduced shape keeps the stack declaration, the environment descriptor and the sealed
     # secrets; infra/, runtime/ and seeds/ are the full edition's.
     lite:
-      requires: [application-stacks.yaml]
-      allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/secrets/<slug>.enc"]
+      requires: []
+      allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep"]
       forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_STACKS_IN_SIDE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
   - id: app.sops
@@ -1404,8 +1409,8 @@ slots:
     tracked: tracked
     tier: integrations
     owner: true
-    requires: [index.ts, supabase.config.ts, supabase.client.ts, supabase.jwks.ts]   # Secrets, no defaults (R44); the admin client; the token verification
-    allows: [index.ts, supabase.config.ts, supabase.client.ts, supabase.jwks.ts, errors/]
+    requires: [index.ts, supabase.config.ts, supabase.options.ts, supabase.decorators.ts, supabase.client.ts, supabase.jwks.ts]   # Secrets, no defaults (R44); the options and the named injector (R83); the admin client; the token verification
+    allows: [index.ts, supabase.config.ts, supabase.options.ts, supabase.decorators.ts, supabase.client.ts, supabase.jwks.ts, errors/]
     tests: unit-beside
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
     since: 2.1.0

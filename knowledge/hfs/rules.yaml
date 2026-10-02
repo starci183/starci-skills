@@ -1799,6 +1799,39 @@ rules:
     failureCodes: ["DB_CONFIG_POLICY", "DB_TYPES_DRIFT"]
     enforcers:
       - {kind: hfs, id: db-config-types, at: scripts/hfs/rules/database.mjs}
+  - id: R217
+    code: "FE_SUPABASE_CLIENT_OWNER"
+    law: "The database has one door per side: `@supabase/ssr` and `@supabase/supabase-js` are imported and called only by the fe db owner (`fe.modules.db`, `fe.package.db`) and, on the back end, by `be.integrations.supabase`, and every client carries the committed `Database` type; the front end has no route handler beyond health/live and the auth callback slot."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_SUPABASE_CLIENT_OWNER", "BE_SUPABASE_CLIENT_OWNER", "FE_ROUTE_HANDLER_FORBIDDEN"]
+    enforcers:
+      - {kind: machine, id: supabase-client-owner, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R218
+    code: "FE_DB_RESULT_TYPED"
+    law: "A Supabase result is typed by `Database` inference and never swallowed: no explicit generic on `single`/`maybeSingle`/`returns`, no cast or non-null assertion on a result, every list read carries `.limit()` or a keyset bound, every awaited call reads `error` or hands the whole result to `toOutcome`, and a failure never becomes empty data."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_DB_RESULT_TYPED", "FE_DB_ERROR_HANDLED"]
+    enforcers:
+      - {kind: machine, id: supabase-result, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R219
+    code: "FE_AUTH_SESSION_TRUST"
+    law: "The principal is verified, never trusted: server code never calls `auth.getSession()` (`getClaims()` through `getPrincipal()`, `auth.getUser()` for money, account security and role changes); a `write-*.ts` Server Action awaits `getPrincipal()` first, refuses an anonymous principal (the sign-in action is the one exception) and parses its input by a schema before any use; a back-end principal comes only from a Supabase access token verified against the project JWKS (signature, issuer, audience, expiry, pinned algorithm), never decoded unverified and never from the request body."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_AUTH_SESSION_TRUST", "FE_DB_WRITE_SHAPE", "BE_SUPABASE_JWT_VERIFIED"]
+    enforcers:
+      - {kind: machine, id: supabase-principal, at: scripts/hfs/architecture/supabase.mjs}
+  - id: R220
+    code: "HFS_LITE_SECRET_CUSTODY"
+    law: "A lite app holds no secret material in the tree and the front end holds no credential: root `.env*`, `secrets.env`, `.secrets/` and an `.enc` file outside `.starcistacks/<env>/secrets` are forbidden, `fe/` and `supabase/` hold no Supabase token, JWT or connection string with a password, and `fe/` names no service-role or `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD` value (public configuration is read once by `modules/config`)."
+    kinds: [check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_LITE_SECRET_CUSTODY", "FE_SERVICE_ROLE_FORBIDDEN"]
+    enforcers:
+      - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
+      - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
 retired:
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}

@@ -14117,3 +14117,103 @@ DB_TYPES_DRIFT:
   nextStep_vi: "Chạy `npm run contract:emit` và commit `supabase/types/database.types.ts` kết quả."
   owner: op-retry
   kind: check-finding
+
+FE_SUPABASE_CLIENT_OWNER:
+  title: "A front-end Supabase client, import or call is outside the db owner, or is not typed with `Database`"
+  title_vi: "Supabase client phía front end sai chủ sở hữu hoặc thiếu kiểu Database"
+  meaning_vi: "Import/call Supabase ở `<path>` không thuộc ô `fe.modules.db`/`fe.package.db`, hoặc client được tạo mà không mang kiểu `Database` đã sinh."
+  causes_vi:
+    - "Vi phạm L10: chỉ các ô db được import/call `@supabase/ssr` hay `@supabase/supabase-js`; mọi client là `SupabaseClient<Database>`/`create*Client<Database>`."
+  nextStep_vi: "Chuyển factory và truy vấn vào ô db đúng của app/gói, import API công khai của ô đó, và thêm kiểu `Database`; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_SUPABASE_CLIENT_OWNER:
+  title: "A back-end Supabase client, import or call is outside `be.integrations.supabase`, or is not typed with `Database`"
+  title_vi: "Supabase client phía back end sai chủ sở hữu hoặc thiếu kiểu Database"
+  meaning_vi: "Import/call Supabase ở `<path>` không thuộc `be.integrations.supabase`, hoặc client được tạo mà không mang kiểu `Database`."
+  causes_vi:
+    - "Vi phạm L10: back end dùng EntityManager cho dữ liệu; chỉ integration Supabase sở hữu Auth/Storage client và kiểu Database."
+  nextStep_vi: "Chuyển Auth/Storage client vào `be.integrations.supabase`, dùng API công khai của integration và thêm kiểu `Database`; dữ liệu thường đi qua EntityManager."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_RESULT_TYPED:
+  title: "A Supabase result is cast, explicitly generic, or an unbounded list read"
+  title_vi: "Kết quả Supabase bị ép kiểu hoặc truy vấn danh sách không giới hạn"
+  meaning_vi: "Truy vấn ở `<path>` dùng generic trên `single/maybeSingle/returns`, ép kiểu/non-null assertion, hoặc đọc danh sách không có `limit` hay biên keyset."
+  causes_vi:
+    - "Vi phạm L11: kiểu hàng phải suy ra từ `Database`; mọi đọc nhiều dòng phải có giới hạn tĩnh."
+  nextStep_vi: "Bỏ generic/cast/assertion, sửa type nguồn trong `database.types.ts`, và thêm `.limit()` hoặc biên keyset."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_ERROR_HANDLED:
+  title: "An awaited Supabase result drops `error` or collapses failure to empty data"
+  title_vi: "Kết quả Supabase bỏ qua error hoặc gộp lỗi thành dữ liệu rỗng"
+  meaning_vi: "Kết quả await ở `<path>` không đọc `error`, không được truyền nguyên vẹn vào `toOutcome`, hoặc dùng `data ?? []` nên `refused`/`unavailable` biến thành dữ liệu rỗng."
+  causes_vi:
+    - "Vi phạm L12: mọi `{data,error}` đi qua một Outcome có kiểu; không destructure chỉ data và không nuốt lỗi."
+  nextStep_vi: "Đọc và ánh xạ `error`, hoặc truyền toàn bộ result vào `toOutcome(result)` rồi xử lý đủ các nhánh Outcome."
+  owner: op-retry
+  kind: check-finding
+
+FE_SERVICE_ROLE_FORBIDDEN:
+  title: "A service-role or credential-shaped environment value enters the front end"
+  title_vi: "Service role hoặc biến môi trường bí mật đi vào front end"
+  meaning_vi: "`<path>` chứa identifier/string service_role hoặc đọc biến `*_SECRET`, `*_PRIVATE`, `*_TOKEN`, `*_PASSWORD`; public config không được khai báo qua chủ `modules/config`."
+  causes_vi:
+    - "Vi phạm L13: front end chỉ giữ URL, anon/publishable key và public config; service role luôn ở back end."
+  nextStep_vi: "Xóa credential khỏi fe/, chuyển thao tác đặc quyền qua use case back end, và khai báo public config tại `modules/config`."
+  owner: op-retry
+  kind: check-finding
+
+FE_AUTH_SESSION_TRUST:
+  title: "Server code trusts `getSession`, or a Server Action does not establish and refuse an anonymous principal"
+  title_vi: "Mã server tin getSession hoặc Server Action không xác thực principal"
+  meaning_vi: "`<path>` gọi `auth.getSession()` trên server, write action không bắt đầu bằng `await getPrincipal()`, không trả Outcome `refused` cho anonymous (trừ `fe.modules.db/auth/write-sign-in.ts` đang xác thực chính caller anonymous), hoặc mutation nhạy cảm không gọi `auth.getUser()`."
+  causes_vi:
+    - "Vi phạm L14: server dùng claims đã kiểm tra; write action xác thực principal trước mọi việc và mutation nhạy cảm kiểm tra user từ Auth server."
+  nextStep_vi: "Dùng `getPrincipal()`/`getClaims()`, từ chối anonymous bằng Outcome có kiểu, và gọi `auth.getUser()` cho tiền, bảo mật tài khoản hay đổi role."
+  owner: op-retry
+  kind: check-finding
+
+FE_DB_WRITE_SHAPE:
+  title: "A Supabase Server Action uses input before schema parsing, or a write module exports no action"
+  title_vi: "Server Action dùng input trước khi schema parse"
+  meaning_vi: "Write module ở `<path>` không export Server Action, hoặc tham số được dùng trước lần gọi `schema.parse`/`schema.safeParse` đầu tiên."
+  causes_vi:
+    - "Vi phạm phần write-shape của L14: input không được tin trước validation."
+  nextStep_vi: "Export action async trong `write-*.ts` và để lần dùng input đầu tiên là `schema.parse(input)` hoặc `schema.safeParse(input)`."
+  owner: op-retry
+  kind: check-finding
+
+FE_ROUTE_HANDLER_FORBIDDEN:
+  title: "A front-end route handler is not health/live or the Supabase auth callback slot"
+  title_vi: "Route handler phía front end không thuộc hai cửa được phép"
+  meaning_vi: "`<path>` là `route.ts` phía fe nhưng không phải `health/live` và không thuộc ô `fe.route.callback`."
+  causes_vi:
+    - "Vi phạm L15: webhook, cron, public API và callback bên thứ ba là feature của back end."
+  nextStep_vi: "Chuyển handler sang feature back end; chỉ giữ health/live và callback PKCE trong ô `fe.route.callback`."
+  owner: op-retry
+  kind: check-finding
+
+BE_SUPABASE_JWT_VERIFIED:
+  title: "A Supabase principal is derived without pinned JWKS verification, or authorization claims come from the request body"
+  title_vi: "JWT Supabase chưa được xác minh đầy đủ hoặc claim lấy từ request body"
+  meaning_vi: "`<path>` decode JWT không verify, gọi `jwtVerify` ngoài integration/thiếu JWKS, issuer, audience `authenticated` hay algorithm pin, hoặc đọc role/membership từ body."
+  causes_vi:
+    - "Vi phạm L16: principal chỉ đến từ access token đã verify signature/iss/aud/exp/algorithm hoặc được đọc lại từ DB."
+  nextStep_vi: "Dùng `createRemoteJWKSet` + `jwtVerify` trong `be.integrations.supabase`, pin issuer/audience/algorithms và bỏ mọi authorization claim từ body."
+  owner: op-retry
+  kind: check-finding
+
+HFS_LITE_SECRET_CUSTODY:
+  title: "Lite secret material or a forbidden custody path is present"
+  title_vi: "Bí mật hoặc đường dẫn lưu bí mật bị cấm trong edition lite"
+  meaning_vi: "`<path>` là root `.env*`, `secrets.env`, `.secrets/`, file `.enc` ngoài `.starcistacks/<env>/secrets`, hoặc fe/supabase chứa token Supabase/JWT hay connection string có mật khẩu."
+  causes_vi:
+    - "Vi phạm L17: lite có đúng một đường custody đã mã hóa và browser/Supabase tree không giữ secret literal."
+  nextStep_vi: "Không đọc hay in giá trị. Gỡ secret khỏi cây, xoay secret nếu đã lộ, rồi niêm phong bằng sops tại `.starcistacks/<env>/secrets/<slug>.enc`."
+  owner: owner
+  kind: check-finding

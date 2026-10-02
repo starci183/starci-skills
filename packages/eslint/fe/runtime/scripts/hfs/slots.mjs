@@ -317,6 +317,19 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 
 // ------------------------------------------------------------------------------------- declaration
 
+/** Shape problems of the optional hfs.json `supabase` block: the auth posture the app declares (L08 DB_CONFIG_POLICY compares supabase/config.toml with it). */
+function supabaseBlockProblems(block) {
+  if (block === undefined) return [];
+  if (!isPlainObject(block)) return ['supabase must be an object'];
+  const bad = [];
+  for (const key of Object.keys(block)) if (!['enableSignup', 'jwtExpiry', 'siteUrl', 'redirectUrls', 'forceRls'].includes(key)) bad.push(`supabase has unknown key ${key}`);
+  if (block.enableSignup !== undefined && typeof block.enableSignup !== 'boolean') bad.push('supabase.enableSignup must be true or false');
+  if (block.jwtExpiry !== undefined && !(Number.isInteger(block.jwtExpiry) && block.jwtExpiry > 0 && block.jwtExpiry <= 3600)) bad.push('supabase.jwtExpiry must be an integer of seconds, 3600 at most');
+  if (block.siteUrl !== undefined && (typeof block.siteUrl !== 'string' || !block.siteUrl.trim())) bad.push('supabase.siteUrl must be a URL string');
+  for (const key of ['redirectUrls', 'forceRls']) if (block[key] !== undefined && !(Array.isArray(block[key]) && block[key].every((v) => typeof v === 'string' && v.trim()))) bad.push(`supabase.${key} must be a list of strings`);
+  return bad;
+}
+
 /** Shape problems of a parsed hfs.json, in the words of modules/schemas/hfs-repo.schema.yaml. */
 function declarationShapeProblems(d) {
   const bad = [];
@@ -328,7 +341,8 @@ function declarationShapeProblems(d) {
     for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project'].includes(key)) bad.push(`unknown key ${key} (a runtime declaration is {hfs, kind, project})`);
     return bad;
   }
-  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'edition', 'sides', 'browser'].includes(key)) bad.push(`unknown key ${key}`);
+  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'edition', 'supabase', 'sides', 'browser'].includes(key)) bad.push(`unknown key ${key}`);
+  bad.push(...supabaseBlockProblems(d.supabase));
   if (d.browser !== undefined && d.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
   if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
   if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
@@ -869,7 +883,7 @@ function ruleCatalogProblems(d) {
     const at = `rules[${index}]`;
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
     // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
     if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
     else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
@@ -883,6 +897,7 @@ function ruleCatalogProblems(d) {
       return r[key];
     };
     enumList('kinds', RULE_KINDS);
+    if (r.editions !== undefined) enumList('editions', EDITIONS);
     const gates = enumList('gates', RULE_GATES);
     if (gates.length) {
       if (!gates.includes('land')) bad.push(`${label} must run at the land gate (every rule does)`);
@@ -949,6 +964,8 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     rule: (id) => byId.get(id) ?? null,
     /** The rule that owns this failure code (its own or a sub-check code), or null. */
     byCode: (code) => byCode.get(code) ?? null,
+    /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
+    judgedIn: (code, edition = 'full') => { const owner = byCode.get(code); return !owner?.editions || owner.editions.includes(edition); },
     /** The rules that run at a gate. */
     forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
     /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */
