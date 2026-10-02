@@ -63,14 +63,14 @@ const BASE = {
     "apps/identity/src/app.module.ts": registration([IDENTITY_ENTRY]),
     "apps/order/src/app.module.ts": registration([ORDER_ENTRY]),
     "apps/billing/src/app.module.ts": registration([BILLING_ENTRY]),
-    "apps/migrate/src/app.module.ts": registration([IDENTITY_ENTRY, ORDER_ENTRY, BILLING_ENTRY]),
+    "apps/cli/src/app.module.ts": registration([IDENTITY_ENTRY, ORDER_ENTRY, BILLING_ENTRY]),
 }
 const CONNECTIONS = [
     { name: "identity", envPrefix: "IDENTITY", owner: "identity", isolation: "database" },
     { name: "order", envPrefix: "ORDER", owner: "order", isolation: "schema" },
     { name: "billing", envPrefix: "BILLING", owner: "billing", isolation: "schema" },
 ]
-const APPS = [{ name: "identity", kind: "api" }, { name: "order", kind: "api" }, { name: "billing", kind: "api" }, { name: "migrate", kind: "migrate" }]
+const APPS = [{ name: "identity", kind: "api" }, { name: "order", kind: "api" }, { name: "billing", kind: "api" }, { name: "cli", kind: "cli" }]
 const repo = (t, files = {}, options = {}) => {
     const f = projectFixture({ files: { ...BASE, ...files }, declaration: { connections: options.connections ?? CONNECTIONS }, apps: options.apps ?? APPS })
     t.after(f.cleanup)
@@ -86,18 +86,18 @@ const bad = (f, files, list) => list.map(([rel, ...errors]) => {
 })
 
 // BE_CONTEXT_OWNER ----------------------------------------------------------------------------------------------------------
-test("context-owner: an app composes only the contexts it owns, the migrate app composes them all", (t) => {
+test("context-owner: an app composes only the contexts it owns, the cli app composes them all", (t) => {
     const files = {
         "apps/order/src/app.module.ts": registration([ORDER_ENTRY, BILLING_ENTRY]),
         "apps/billing/src/app.module.ts": registration([BILLING_ENTRY]),
-        "apps/migrate/src/app.module.ts": registration([IDENTITY_ENTRY, ORDER_ENTRY]),
+        "apps/cli/src/app.module.ts": registration([IDENTITY_ENTRY, ORDER_ENTRY]),
     }
     const f = repo(t, files)
     f.tester.run("context-owner", rules["context-owner"], {
         valid: ok(f, files, ["apps/identity/src/app.module.ts", "apps/billing/src/app.module.ts"]),
         invalid: [...bad(f, files, [
             ["apps/order/src/app.module.ts", ["import { billingEntities", /App order imports src\/modules\/domain\/billing, a capability of context billing owned by app billing/], ["@Module", /App order composes connection billing, the context owned by app billing/]],
-            ["apps/migrate/src/app.module.ts", ["import { Module }", /migrate app migrate does not compose connection billing/]],
+            ["apps/cli/src/app.module.ts", ["import { Module }", /cli app cli does not compose connection billing/]],
         ])],
     })
 })
@@ -109,7 +109,7 @@ test("context-owner: an app imports no capability of a context it does not own",
     }
     const f = repo(t, files)
     f.tester.run("context-owner", rules["context-owner"], {
-        valid: ok(f, files, ["apps/identity/src/app.module.ts", "apps/migrate/src/app.module.ts"]),
+        valid: ok(f, files, ["apps/identity/src/app.module.ts", "apps/cli/src/app.module.ts"]),
         invalid: [...bad(f, files, [
             ["apps/order/src/app.module.ts", ["import { IdentityService }", /App order imports src\/modules\/domain\/identity, a capability of context identity owned by app identity/]],
             ["apps/billing/src/app.module.ts", ["import { cartEntities as carts }", /App billing imports src\/modules\/domain\/cart, a capability of context order owned by app order/]],
@@ -194,7 +194,7 @@ test("context-platform-tables: the event-bus tables exist on every connection th
     const missing = {
         ...busFiles,
         "apps/order/src/app.module.ts": withBus([BUS_ORDER_ENTRY]),
-        "apps/migrate/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BILLING_ENTRY]),
+        "apps/cli/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BILLING_ENTRY]),
         [`${DOMAIN}/billing/publisher.service.ts`]: PUBLISHER,
     }
     const f = repo(t, missing)
@@ -206,7 +206,7 @@ test("context-platform-tables: the event-bus tables exist on every connection th
         ...busFiles,
         "apps/order/src/app.module.ts": withBus([BUS_ORDER_ENTRY]),
         "apps/billing/src/app.module.ts": withBus([BUS_BILLING_ENTRY]),
-        "apps/migrate/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BUS_BILLING_ENTRY]),
+        "apps/cli/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BUS_BILLING_ENTRY]),
         [`${DOMAIN}/billing/publisher.service.ts`]: PUBLISHER,
     }
     const g = repo(t, complete)
@@ -218,10 +218,10 @@ test("schema-owner: a per-connection platform capability registers on several co
         ...busFiles,
         "apps/order/src/app.module.ts": withBus([BUS_ORDER_ENTRY]),
         "apps/billing/src/app.module.ts": withBus([BUS_BILLING_ENTRY]),
-        "apps/migrate/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BUS_BILLING_ENTRY]),
+        "apps/cli/src/app.module.ts": withBus([IDENTITY_ENTRY, BUS_ORDER_ENTRY, BUS_BILLING_ENTRY]),
     }
     const f = repo(t, files)
-    f.tester.run("schema-owner", rules["schema-owner"], { valid: ok(f, files, ["apps/migrate/src/app.module.ts", `${PLATFORM}/event-bus/index.ts`]), invalid: [] })
+    f.tester.run("schema-owner", rules["schema-owner"], { valid: ok(f, files, ["apps/cli/src/app.module.ts", `${PLATFORM}/event-bus/index.ts`]), invalid: [] })
     const twice = {
         "apps/billing/src/app.module.ts": registration([BILLING_ENTRY, "{ name: ORDER_CONNECTION, entities: billingEntities }"]),
     }
@@ -262,11 +262,11 @@ test("context-owner: a registration literal in an app options file counts, an un
     const files = {
         "apps/order/src/order.options.ts": OPTIONS_FILE([ORDER_ENTRY, BILLING_ENTRY]),
         "apps/billing/src/billing.options.ts": OPTIONS_FILE([BILLING_ENTRY]),
-        "apps/migrate/src/app.module.ts": "import { Module } from '@nestjs/common';\nimport { DatabaseModule } from '../../../src/modules/platform/database';\nimport { orderEntities } from '../../../src/modules/domain/order';\ndeclare const name: string;\n@Module({ imports: [DatabaseModule.register({ connections: [{ name, entities: orderEntities }] })] })\nexport class AppModule {}\n",
+        "apps/cli/src/app.module.ts": "import { Module } from '@nestjs/common';\nimport { DatabaseModule } from '../../../src/modules/platform/database';\nimport { orderEntities } from '../../../src/modules/domain/order';\ndeclare const name: string;\n@Module({ imports: [DatabaseModule.register({ connections: [{ name, entities: orderEntities }] })] })\nexport class AppModule {}\n",
     }
     const f = repo(t, files)
     f.tester.run("context-owner", rules["context-owner"], {
-        valid: [...ok(f, files, ["apps/billing/src/billing.options.ts", "apps/migrate/src/app.module.ts"])],
+        valid: [...ok(f, files, ["apps/billing/src/billing.options.ts", "apps/cli/src/app.module.ts"])],
         invalid: [...bad(f, files, [["apps/order/src/order.options.ts", ["import { billingEntities", /App order imports src\/modules\/domain\/billing/], ["databases = [", /App order composes connection billing, the context owned by app billing/]]])],
     })
 })

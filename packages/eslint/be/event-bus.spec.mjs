@@ -15,11 +15,11 @@ const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["event
 
 const DOMAIN = at("src/modules/domain/order/placing.service.ts")
 const DOMAIN_SPEC = at("src/modules/domain/order/placing.service.spec.ts")
-const FEATURE = at("src/features/checkout/application/place-order.handler.ts")
+const FEATURE = at("src/features/api/checkout/application/place-order.handler.ts")
 const INTEGRATION = at("src/modules/integrations/foo/foo.client.ts")
-const CONSUMER = at("src/features/checkout/transport/message/order-placed.consumer.ts")
-const MISNAMED = at("src/features/checkout/transport/message/placed.consumer.ts")
-const NOT_TRANSPORT = at("src/features/checkout/application/order-placed.consumer.ts")
+const CONSUMER = at("src/features/api/checkout/transport/message/order-placed.consumer.ts")
+const MISNAMED = at("src/features/api/checkout/transport/message/placed.consumer.ts")
+const NOT_TRANSPORT = at("src/features/api/checkout/application/order-placed.consumer.ts")
 const QUEUE = at("src/modules/queues/mail/mail.queue.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
 
