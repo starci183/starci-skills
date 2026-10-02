@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
 import { INSPECTORS } from '../../scripts/cli/lib/debug-run.mjs';
-
-const catalog = { global: [{ name: 'json', type: 'boolean' }], groups: { debug: { owner: 'runtime', verbs: {
-  run: { group: 'debug', verb: 'run', impl: { script: 'scripts/cli/lib/debug-run.mjs' }, positional: [{ name: 'inspector', required: true, enum: Object.keys(INSPECTORS) }], flags: [], json: 'flag' },
-} } } };
 
 test('debug run resolves only documented read-only inspectors', () => {
   let call;

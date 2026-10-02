@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
-
-const catalog = { global: [{ name: 'json', type: 'boolean' }], groups: { supervisor: { owner: 'runtime', verbs: {
-  status: { group: 'supervisor', verb: 'status', impl: { script: 'scripts/supervisor/start-supervisor.mjs', args: ['--status'] }, flags: [], json: 'flag' },
-  start: { group: 'supervisor', verb: 'start', impl: { script: 'scripts/supervisor/start-supervisor.mjs' }, flags: [{ name: 'plan', type: 'boolean' }, { name: 'reason', type: 'string' }], json: 'flag' },
-  stop: { group: 'supervisor', verb: 'stop', impl: { script: 'scripts/supervisor/start-supervisor.mjs', args: ['--stop'] }, flags: [], json: 'flag' },
-} } } };
 
 test('supervisor verbs resolve only the public status/start/stop modes', () => {
   const calls = [];

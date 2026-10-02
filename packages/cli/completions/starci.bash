@@ -6,18 +6,28 @@ _starci() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     group="${COMP_WORDS[1]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "kernel help completion" -- "$cur") )
+        COMPREPLY=( $(compgen -W "app debug kernel runtime supervisor workflow help completion" -- "$cur") )
         return 0
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
+        app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
+        debug) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report contract-release coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "check doctor install status update validate version" -- "$cur") );;
+        supervisor) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
+        workflow) COMPREPLY=( $(compgen -W "define start status stop" -- "$cur") );;
             *) COMPREPLY=();;
         esac
         return 0
     fi
     case "$group" in
+            app) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            debug) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             kernel) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            runtime) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            supervisor) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            workflow) COMPREPLY=( $(compgen -W "" -- "$cur") );;
     esac
     COMPREPLY+=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") )
     return 0

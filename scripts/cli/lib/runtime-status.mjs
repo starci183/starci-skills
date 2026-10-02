@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { isMain } from '../../lib/is-main.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const normalizedHash = (file) => createHash('sha256').update(readFileSync(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+const normalizedHash = (file, read) => createHash('sha256').update(read(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 
 export function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = readFileSync } = {}) {
   const packageFile = path.join(runtimeRoot, 'package.json');
@@ -20,7 +20,7 @@ export function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = 
     const manifest = JSON.parse(read(manifestFile, 'utf8'));
     const changed = Object.entries(manifest.files ?? {}).filter(([relative, expected]) => {
       const file = path.join(runtimeRoot, relative);
-      return !exists(file) || normalizedHash(file) !== expected;
+      return !exists(file) || normalizedHash(file, read) !== expected;
     }).map(([relative]) => relative);
     return { ok: changed.length === 0, version, root: runtimeRoot, doctor: { manifest: 'present', changed } };
   } catch (error) {

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 export const RUNTIME_VERSION = '1.0.0-alpha.3';
 
-const statusOf = (result) => result?.error ? 1 : (result?.status ?? 1);
+const statusOf = (result) => typeof result === 'number' ? result : result?.error ? 1 : (result?.status ?? 1);
 
 /**
  * Install the pinned runtime package and run its own installer.

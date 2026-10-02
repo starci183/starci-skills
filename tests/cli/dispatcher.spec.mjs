@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
 import { main } from '../../packages/cli/src/main.mjs';
+import { installRuntime, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
 import { locateRuntime } from '../../packages/cli/src/runtime-locate.mjs';
 
 const global = [
@@ -77,6 +78,29 @@ test('runtime install is in-process and never locates or spawns a runtime', asyn
   assert.equal(installCall.force, true);
 });
 
+test('runtime installer exposes npm/fetch and process seams without network access', () => {
+  const home = path.resolve('fake-home');
+  const cwd = path.resolve('fake-repo');
+  const writes = [];
+  let npmCall;
+  let nodeCall;
+  const code = installRuntime({ cwd, home }, {
+    platform: 'linux',
+    exists: (file) => file.endsWith(path.join('scripts', 'install', 'install.mjs')),
+    mkdir: () => {},
+    write: (file, text) => { writes.push({ file, text }); },
+    chmod: () => {},
+    runNpm: (args, options) => { npmCall = { args, options }; return { status: 0 }; },
+    runNode: (args, options) => { nodeCall = { args, options }; return { status: 0 }; },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(npmCall.args.slice(0, 3), ['install', '--prefix', path.join(home, '.starci', 'runtime')]);
+  assert.equal(npmCall.args[3], `starci@${RUNTIME_VERSION}`);
+  assert.equal(nodeCall.args[1], 'init');
+  assert.ok(writes.some(({ file }) => file.endsWith(path.join('.starci', 'runtime.json'))));
+  assert.ok(writes.some(({ file }) => file.endsWith(path.join('.starci', 'bin', 'starci'))));
+});
+
 test('removed and bad commands are refusals, while runtime absence is exit 3', async () => {
   const removedOutput = capture();
   assert.equal(await main(['api', 'survey'], { ...removedOutput, catalog, retired }), 2);
@@ -109,4 +133,8 @@ test('runtime locate order is env, user record, then upward .claude', () => {
   assert.equal(locateRuntime({ ...deps, env: {} }).root, userRoot);
   present.delete(entry(userRoot));
   assert.equal(locateRuntime({ ...deps, env: {} }).root, localRoot);
+  present.delete(entry(localRoot));
+  const embeddedRoot = path.resolve('embedded-runtime');
+  present.add(entry(embeddedRoot));
+  assert.equal(locateRuntime({ ...deps, env: {}, embeddedRoot }).source, 'embedded');
 });

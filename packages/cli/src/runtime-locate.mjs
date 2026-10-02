@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const runtimeEntry = (root) => path.join(root, 'scripts', 'cli', 'main.mjs');
+const embeddedRuntimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const usableRoot = (candidate, exists) => {
   if (!candidate) return null;
@@ -11,7 +13,8 @@ const usableRoot = (candidate, exists) => {
 };
 
 /** Locate the runtime in the binding order: env, per-user record, upward .claude. */
-export function locateRuntime({ cwd = process.cwd(), env = process.env, home = os.homedir(), exists = existsSync, read = readFileSync } = {}) {
+export function locateRuntime({ cwd = process.cwd(), env = process.env, home = os.homedir(), exists = existsSync, read = readFileSync,
+  embeddedRoot = embeddedRuntimeRoot } = {}) {
   const fromEnv = usableRoot(env.STARCI_RUNTIME, exists);
   if (fromEnv) return { root: fromEnv, source: 'STARCI_RUNTIME' };
 
@@ -33,6 +36,8 @@ export function locateRuntime({ cwd = process.cwd(), env = process.env, home = o
     if (parent === directory) break;
     directory = parent;
   }
+  const embedded = usableRoot(embeddedRoot, exists);
+  if (embedded) return { root: embedded, source: 'embedded' };
   return null;
 }
 

@@ -13,6 +13,18 @@ import { splitCommand, validateArgs } from './validate-args.mjs';
 const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
 const CLI_VERSION = JSON.parse(readFileSync(packageFile, 'utf8')).version;
 
+const importHfs = async () => {
+  try {
+    return await import('@starci/hfs');
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND' || !String(error?.message ?? '').includes('@starci/hfs')) throw error;
+    // The StarCi runtime ships packages/cli and packages/hfs side by side without
+    // making the repository an npm workspace. Published @starci/cli resolves its
+    // normal exact dependency above; the embedded runtime uses this payload path.
+    return import(new URL('../../hfs/src/main.mjs', import.meta.url));
+  }
+};
+
 const writeTo = (target, text) => {
   if (typeof target === 'function') target(text);
   else target.write(text);
@@ -118,7 +130,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
 
   if (group.owner === '@starci/hfs') {
     try {
-      const hfs = await (io.importHfs ?? (() => import('@starci/hfs')))();
+      const hfs = await (io.importHfs ?? importHfs)();
       const entry = hfs.main ?? hfs.default?.main;
       if (typeof entry !== 'function') return fail(stderr, '@starci/hfs does not export main(argv, io)', 1);
       return Number(await entry([split.verb, ...args], {

@@ -1,16 +1,8 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
+import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
-
-const catalog = { global: [{ name: 'cwd', type: 'string' }, { name: 'json', type: 'boolean' }], groups: { workflow: {
-  owner: 'runtime', verbs: {
-    define: { group: 'workflow', verb: 'define', impl: { script: 'scripts/goal/define-goal.mjs' }, flags: [{ name: 'text', type: 'string', required: true }], json: 'flag' },
-    start: { group: 'workflow', verb: 'start', impl: { script: 'scripts/kernel/start-workflow.mjs' }, flags: [], json: 'flag' },
-    status: { group: 'workflow', verb: 'status', impl: { script: 'scripts/kernel/cli.mjs', args: ['status'] }, flags: [{ name: 'workflow', type: 'string', required: true }], json: 'flag' },
-    stop: { group: 'workflow', verb: 'stop', impl: { script: 'scripts/kernel/cli.mjs', args: ['archive'] }, flags: [{ name: 'workflow', type: 'string', required: true }, { name: 'reason', type: 'string', required: true }], json: 'flag' },
-  },
-} } };
 
 test('workflow catalog resolves fixed kernel verbs', () => {
   let call;

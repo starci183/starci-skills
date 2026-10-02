@@ -1,15 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
 import { main } from '../../scripts/cli/main.mjs';
-
-const catalog = { global: [{ name: 'cwd', type: 'string' }, { name: 'json', type: 'boolean' }, { name: 'quiet', type: 'boolean' }], groups: { runtime: {
-  owner: 'runtime', verbs: {
-    check: { group: 'runtime', verb: 'check', impl: { script: 'scripts/checks/check-runtime.mjs' }, flags: [], json: 'flag' },
-    install: { group: 'runtime', verb: 'install', impl: { script: 'scripts/install/install.mjs', args: ['init'] }, flags: [{ name: 'force', type: 'boolean' }], json: 'none' },
-    version: { group: 'runtime', verb: 'version', impl: { script: 'scripts/install/install.mjs', args: ['version'] }, flags: [], json: 'none' },
-    validate: { group: 'runtime', verb: 'validate', impl: { script: 'scripts/work/validate/work-validate.mjs' }, positional: [{ name: 'target', required: true }], flags: [{ name: 'strict', type: 'boolean' }], json: 'always' },
-  },
-} } };
 
 test('runtime catalog resolves handler, cwd and json once', () => {
   let call;
