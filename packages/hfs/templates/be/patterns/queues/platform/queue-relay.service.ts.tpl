@@ -4,7 +4,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { OutboxRelayService } from "@modules/platform/outbox"
+import { OutboxRelayPolicy } from "@modules/platform/outbox"
 import { InjectQueueOptions, InjectQueueRelayManagers, InjectQueueTransport } from "./queue.decorators"
 import type { QueueOptions } from "./queue.options"
 import type { QueueTransport } from "./queue-transport.port"
@@ -14,10 +14,10 @@ import type { QueueRow } from "./persistence/queue.rows"
 @Injectable()
 /**
  * The relay of the queue outbox: it adds each waiting row to BullMQ with the row id as the job id and marks the rows sent in the same
- * transaction (the loop is `OutboxRelayService`'s). A crash between the add and the mark adds the row again, which BullMQ ignores while
+ * transaction (the loop is `OutboxRelayPolicy`'s). A crash between the add and the mark adds the row again, which BullMQ ignores while
  * it holds the id and the job fence absorbs afterwards.
  */
-export class QueueRelayService extends OutboxRelayService<QueueRow> {
+export class QueueRelayService extends OutboxRelayPolicy<QueueRow> {
     protected readonly outbox = "queue"
 
     constructor(

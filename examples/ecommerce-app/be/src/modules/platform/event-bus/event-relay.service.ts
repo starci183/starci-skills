@@ -4,7 +4,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { OutboxRelayService } from "@modules/platform/outbox"
+import { OutboxRelayPolicy } from "@modules/platform/outbox"
 import { InjectEventBusOptions, InjectEventRelayManagers, InjectEventTransport } from "./event-bus.decorators"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventTransport, OutboundMessage } from "./event-transport.port"
@@ -22,10 +22,10 @@ const messageOf = (row: OutboxRow): OutboundMessage => ({
 @Injectable()
 /**
  * The relay of the event outbox: it hands the waiting rows of each connection to the broker and marks them sent in the same
- * transaction (the loop is `OutboxRelayService`'s). A crash between the send and the mark sends the row again, which the consumers
+ * transaction (the loop is `OutboxRelayPolicy`'s). A crash between the send and the mark sends the row again, which the consumers
  * absorb through their inbox.
  */
-export class EventRelayService extends OutboxRelayService<OutboxRow> {
+export class EventRelayService extends OutboxRelayPolicy<OutboxRow> {
     protected readonly outbox = "event-bus"
 
     constructor(

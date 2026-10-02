@@ -6,13 +6,11 @@ import { isRecord } from "@modules/platform/primitives"
 import { IdentityApiError, IdentityApiErrorCode } from "./errors/identity-api.error"
 import { InjectIdentityApiOptions } from "./identity-api.decorators"
 import type { IdentityApiOptions } from "./identity-api.options"
+import { IDENTITY_API_DOCUMENTS } from "./identity-api.contracts"
 import type { IdentitySessionLookup } from "./identity-api.contracts"
 
 /** The wire code the identity service answers when no live session matches a token. */
 const SESSION_INVALID_CODE = "SESSION_INVALID"
-
-const VERIFY_SESSION_QUERY =
-    "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }"
 
 @Injectable()
 /** The order service view of the identity service: it verifies bearer tokens over the identity GraphQL door and probes its health. */
@@ -68,7 +66,7 @@ export class IdentityApiClient implements Probe {
         try {
             return await callGraphql(this.http, {
                 url: `${this.options.url}/graphql`,
-                query: VERIFY_SESSION_QUERY,
+                query: IDENTITY_API_DOCUMENTS.verifySession,
                 variables: { input: { sessionToken } },
                 timeoutMs: this.options.timeoutMs,
             })
