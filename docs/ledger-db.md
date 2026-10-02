@@ -193,6 +193,6 @@ workflow. Blob files leave only through the GC sweep above. Machine sample table
 ## 8. Refusal discipline
 
 `modules/kernel/api.yaml` names every refusal a write verb prints, and
-`scripts/checks/check-api-surface.mjs` holds the two in step. A trigger refusal
+`scripts/checks/check-cli-parity.mjs` holds the two in step. A trigger refusal
 (`workflow-transition-unrecorded`, `unit-try-budget-exhausted`, `unit-already-passed`, …) reaches the
 caller as a typed reason: a routed fact, never an exception to route around.

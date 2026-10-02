@@ -280,7 +280,7 @@ decisions:
       - "the cause lies in the runtime or in another workflow (rca.actions tier supervisor): `api kernel-proposal`, or it is raised to a Supervisor DI automatically"
       - "the Kernel lacks the authority"
       - "a Kernel DI is overdue x2 (the SLA layer escalates it on its own, independent of the Kernel)"
-  citation: "modules/kernel/api-commands/decisions.yaml; scripts/kernel/verbs/decisions.mjs; scripts/machine/decisions.mjs"
+  citation: "modules/cli/commands/kernel/decisions.yaml; scripts/kernel/verbs/decisions.mjs; scripts/machine/decisions.mjs"
 
 tick:
   order:

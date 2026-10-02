@@ -121,7 +121,6 @@ export const loadCatalog = (root = skillRoot) => {
     for (const got of names) if (!GLOBAL_FLAG_NAMES.includes(got)) err(errors, '_global.yaml', `unknown global flag --${got}`);
   }
   const groups = [];
-  const seenVerbs = new Map();
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory()) continue;
     const gdir = path.join(dir, entry.name);
@@ -136,6 +135,7 @@ export const loadCatalog = (root = skillRoot) => {
       if (gdoc.owner !== undefined && !OWNERS.has(gdoc.owner)) err(errors, `${entry.name}/_group.yaml`, `owner must be ${[...OWNERS].join(' | ')}`);
     }
     const verbs = [];
+    const seenVerbs = new Map();
     for (const vf of fs.readdirSync(gdir).filter((x) => x.endsWith('.yaml') && !x.startsWith('_')).sort()) {
       const file = path.join(gdir, vf);
       const doc = checkVerb(errors, `${entry.name}/${vf}`, entry.name, read(file));

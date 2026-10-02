@@ -83,10 +83,10 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 node scripts/kernel/cli.mjs <verb> --repo <path> [...]
 ```
 
-`modules/kernel/api.yaml` `commands:` and `modules/kernel/api-commands/<verb>.yaml`
+`modules/kernel/api.yaml` and `modules/cli/commands/kernel/<verb>.yaml`
 together form the verb surface: one entry per verb naming what it reads, writes,
 returns and refuses. New verbs use `scripts/kernel/verbs/<verb>.mjs`.
-`scripts/checks/check-api-surface.mjs` checks both contract forms against the
+`scripts/checks/check-cli-parity.mjs` checks both contract forms against the
 core and extension code, and `cli.mjs --help` prints each verb with its arguments.
 
 Every write is one transaction + one hash-chained `events` row; every refusal

@@ -5,6 +5,7 @@ APP_GUARD	NestJS framework token name the checker looks for, not a code
 BAND_TOKEN_NAMES	export name of a token table in the grammar knowledge
 BLOCK_FOLDED	YAML scalar type name, not an error code
 BLOCK_LITERAL	YAML scalar type name, not an error code
+COMP_CWORD	bash completion env var in the generated _starci completion (scripts/cli/gen-catalog.mjs), not a code
 COMMON_GRAMMAR_COMPONENTS	name of a registry constant in the grammar package, not a code
 ENGINE_SCHEMA	constant naming the engine protocol marker (starci/engine@1), not an emitted code
 GLOBAL_ANALYSIS_TOKEN	SonarQube token type label passed when minting a token, not a failure code

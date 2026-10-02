@@ -38,7 +38,7 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    The verbs are the `commands:` keys below. Pure reads return projections
+    The verbs are the `modules/cli/commands/kernel/<verb>.yaml` catalog files. Pure reads return projections
     and touch no row (survey, hierarchy, peers, op-contract) and
     `estimate` computes slice sizing from modules/models/runtimes.yaml without
     reading the ledger at all; `observe` is the kernel's window onto its own
@@ -80,12 +80,12 @@ conventions:
     tool-unavailable), `rejected` (every
     dispatch launch failure) or `refused` (dispatch admission drift). The
     kebab string is the contract callers match on; each command's `refuses:`
-    below names the string it prints and every untyped refusal says so
+    names the string it prints and every untyped refusal says so
   exitCode: '0 ok / 1 refusal / 2 usage error'
   extensions: >-
     New verbs, boolean flags and status fields are FILES, never edits of cli.mjs's shared lists
     (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/verbs/<verb>.mjs with its contract
-    in modules/cli/commands/kernel/<verb>.yaml (what commands.<verb> here would hold); a status field is
+    in modules/cli/commands/kernel/<verb>.yaml (the former commands.<verb> of this file); a status field is
     scripts/kernel/status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
     `api extensions` lists them; check-cli-parity reads both forms
   writes: >-
@@ -180,11 +180,6 @@ conventions:
     - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events BEFORE dispatch'
     - 'kernel never reuses an op terminal — settle closes the worker terminal; a retry is a new job row at attempt+1'
     - 'kernel never mutates an op terminal outside nudge/settle — `api observe` is the only read of its screen (context, never proof; sending is `api nudge`, closing is `api settle`)'
-
-# ============================================================================
-# COMMANDS
-# ============================================================================
-commands: {}
 
 # ============================================================================
 # ASK LIFECYCLE — the events an `outcome: ask` report passes through after it

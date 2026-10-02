@@ -19,12 +19,13 @@ const GLOBAL_YAML = `flags:
   - {name: edition, type: enum, enum: [full]}
 `;
 const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n`;
+const flagSig = (f) => (typeof f === 'string' ? `{name: ${f}, type: string, required: true}` : `{name: ${f[0]}, type: ${f[1]}${f[2] ? ', required: true' : ''}}`);
 const verbYaml = (verb, flags) => `group: kernel
 verb: ${verb}
 owner: runtime
 summary: test verb ${verb}
 impl: {script: scripts/kernel/cli.mjs, args: [${verb}]}
-flags: [${flags.map((f) => `{name: ${f}, type: string, required: true}`).join(', ')}]
+flags: [${flags.map(flagSig).join(', ')}]
 exit: {0: ok, 1: refused, 2: bad usage}
 json: flag
 examples: ['starci kernel ${verb} --repo <path>']
@@ -47,6 +48,7 @@ const CLI_MJS = `const usage = (code) => {
 const main = async () => {
   switch (cmd) {
     case 'builtin': return 0;
+    case 'settle': return 0;
     default: return 2;
   }
 };
@@ -57,8 +59,9 @@ const fixture = (edit) => {
   const put = (rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
   put('modules/cli/commands/_global.yaml', GLOBAL_YAML);
   put('modules/cli/commands/kernel/_group.yaml', GROUP_YAML);
-  put('modules/cli/commands/kernel/probe.yaml', verbYaml('probe', ['workflow']));
+  put('modules/cli/commands/kernel/probe.yaml', verbYaml('probe', ['workflow', ['deep', 'boolean']]));
   put('modules/cli/commands/kernel/builtin.yaml', verbYaml('builtin', ['job']));
+  put('modules/cli/commands/kernel/settle.yaml', verbYaml('settle', ['job', ['sync-tail', 'boolean']]));
   put('scripts/kernel/cli.mjs', CLI_MJS);
   put('scripts/kernel/verbs/probe.mjs', verbModule('probe', 'probe --workflow <id> [--deep]', ['workflow']));
   put('scripts/kernel/api-boolean-flags.txt', 'sync-tail\n');
@@ -68,6 +71,7 @@ const fixture = (edit) => {
 
 test('the real tree: every catalog verb has a handler and doc, exit 0', () => {
   const report = checkCliParity(repoRoot);
+  assert.equal(report.rule, 'RT_CLI_VERB_PARITY');
   assert.deepEqual(report.findings, [], 'parity findings');
   assert.equal(report.ok, true);
   assert.ok(report.verbs.includes('kernel settle'), 'kernel settle is catalogued');
@@ -75,14 +79,14 @@ test('the real tree: every catalog verb has a handler and doc, exit 0', () => {
   assert.equal(run.status, 0, run.stdout + run.stderr);
 });
 
-test('a happy fixture passes; the absent hfs main skips the app group explicitly', () => {
-  const root = fixture((t, put) => {
-    put('modules/cli/commands/kernel/settle.yaml', verbYaml('settle', ['job', 'sync-tail']));
-  });
+test('a happy fixture passes and every resolved verb is reported', () => {
+  const root = fixture();
   try {
     const report = checkCliParity(root);
+    assert.equal(report.rule, 'RT_CLI_VERB_PARITY');
     assert.equal(report.ok, true, JSON.stringify(report.findings));
     assert.equal(report.skipped.length, 0, 'no app group catalogued in the fixture');
+    assert.deepEqual(report.verbs.sort(), ['kernel builtin', 'kernel probe', 'kernel settle']);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -93,6 +97,7 @@ test('an app group with no packages/hfs/src/main.mjs is skipped, not a finding',
 verb: lint
 owner: "@starci/hfs"
 summary: lint the app
+impl: null
 flags: []
 exit: {0: ok, 1: findings, 2: bad usage}
 json: flag
@@ -140,11 +145,11 @@ test('a usage or required flag the catalog lacks is a finding', () => {
 });
 
 test('a boolean flag of api-boolean-flags.txt in no catalog is a finding', () => {
-  const root = fixture();
+  const root = fixture((t, put) => put('scripts/kernel/api-boolean-flags.txt', 'sync-tail\nphantom-flag\n'));
   try {
     const report = checkCliParity(root);
     assert.equal(report.ok, false);
-    assert.ok(report.findings.some((f) => /--sync-tail is in no kernel verb/.test(f.detail)), JSON.stringify(report.findings));
+    assert.ok(report.findings.some((f) => /--phantom-flag is in no kernel verb/.test(f.detail)), JSON.stringify(report.findings));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -288,7 +288,7 @@ rejects:
       checkpoint, and workflow-foreign-change while the workflow worktree has
       a change under no live op's leases. Only the runtime commits: the pass
       commits exactly the op's owned paths as the workflow's checkpoint.
-    citation: "scripts/kernel/workflow-checkpoint.mjs checkpointOp, run by api settle (modules/kernel/api-commands/settle.yaml checkpoint)"
+    citation: "scripts/kernel/workflow-checkpoint.mjs checkpointOp, run by api settle (modules/cli/commands/kernel/settle.yaml checkpoint)"
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
     citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at api report and when settle files a --report"

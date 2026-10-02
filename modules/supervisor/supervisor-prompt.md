@@ -223,7 +223,7 @@ file leases, visible in /status and landed through the gate.
   (raci.mustNot): a [Worker] writes it in its staging checkout and you land it - through
   `node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
   records the experiment), or a worker job via `node scripts/supervisor/land.mjs --job <id>`. The gate cherry-picks onto current main in a
-  scratch worktree, runs node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-api-surface,
+  scratch worktree, runs node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-cli-parity,
   the named specs and the specs touching the changed files, requires a contract-changes entry with `paths` for any
   contract/schema/knowledge/op file, then fast-forwards live main and pushes. A red gate lands nothing.
 - Workers do the same in their own staging checkouts and finish with `workers.mjs report`; you land their commits.

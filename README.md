@@ -15,7 +15,7 @@ StarCi provides:
 - **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
   through one `node scripts/kernel/cli.mjs <verb>` call. `modules/kernel/api.yaml` and
-  `modules/kernel/api-commands/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
+  `modules/cli/commands/kernel/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
 - **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
   GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
   is the single host runtime loop (`modules/reconciler/reconciler.yaml`).

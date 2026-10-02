@@ -106,8 +106,8 @@ awaiting-approval ──► queued ──► running ──► finished ──�
 node scripts/kernel/cli.mjs <verb> --repo <path> [...]
 ```
 
-`modules/kernel/api.yaml` and `modules/kernel/api-commands/<verb>.yaml` name every verb with its
-arguments, reads, writes and refusals; `scripts/checks/check-api-surface.mjs` keeps them in step with
+`modules/kernel/api.yaml` and `modules/cli/commands/kernel/<verb>.yaml` name every verb with its
+arguments, reads, writes and refusals; `scripts/checks/check-cli-parity.mjs` keeps them in step with
 the code. A write verb records its request in `api_requests` (idempotency), runs one transaction and
 appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed fact, never a crash.
 `dispatch --spawn` is the only place an op agent is started: `scripts/agent/lib.mjs` runs one

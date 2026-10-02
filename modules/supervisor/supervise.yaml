@@ -333,7 +333,7 @@ landGate:
        refuses a pick that cannot apply before the waiter joins the queue; a conflict returns every file with its
        conflict hunks and the one fix (rebase onto main, resolve, land the new sha) - never a blind retry.
     2. Checks: node --check of every changed .mjs; YAML/JSON parse of changed files; check-module-yaml,
-       check-contract-cites and check-api-surface (red only when not already red the same way on main); the
+       check-contract-cites and check-cli-parity (red only when not already red the same way on main); the
        specs the worker named plus every spec naming a changed file (--test-concurrency=2, timeout
        runtimes.yaml allocation.landGate specsBaseMs + perSpecMs per spec); and a
        contract change the change adds or edits (its own file modules/kernel/contract-changes/<id>.yaml) whose `paths` cover every changed

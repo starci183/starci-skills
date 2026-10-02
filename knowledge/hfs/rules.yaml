@@ -1708,3 +1708,11 @@ rules:
     failureCodes: ["RT_CLI_VERB_PARITY"]
     enforcers:
       - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
+  - id: R200
+    code: "RT_CLI_APP_ONLY_TEMPLATES"
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and starci-test-stack commands, and any other starci group, are forbidden there."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]
+    enforcers:
+      - {kind: runtime, id: cli-app-only-templates, at: scripts/hfs/runtime-rules/app-cli-templates.mjs}

@@ -61,9 +61,9 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op}))}}),Date.now());
   });
-  // api(args[], extraEnv={}): STARCI_CALLER=runtime-settler makes `check` take the supplied exits as the
+  // api(args[], extraEnv={}): STARCI_CALLER=runtime-settler makes `record-checks` take the supplied exits as the
   // Kernel's own observations - without it a non-runtime caller re-runs runtime-command checks and the
-  // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/verbs/check.mjs).
+  // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/verbs/record-checks.mjs).
   const api=(args,extraEnv={})=>{
     const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_ENV_GATE:'off',...extraEnv}});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
