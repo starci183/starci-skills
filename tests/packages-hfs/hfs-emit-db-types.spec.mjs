@@ -154,3 +154,29 @@ test('generateDbTypes: starts the app stack, emits, stops what it started; a sta
   assert.throws(() => generateDbTypes({ root: dir, run: (file, args) => { stops.push(args[0]); return args[0] === 'gen' ? { status: 1, stdout: '', stderr: 'boom\n' } : { status: 0, stdout: '', stderr: '' }; } }), /boom/);
   assert.deepEqual(stops, ['start', 'gen', 'stop'], 'the stack is stopped even when the types failed');
 });
+
+test('generateDbTypes falls back from a missing supabase binary to the canon-pinned npx command through the injected runner', () => {
+  const dir = appRoot({ 'supabase/config.toml': CONFIG }, 'supabase');
+  for (const platform of ['linux', 'win32']) {
+    const calls = [];
+    const missing = Object.assign(new Error('spawn supabase ENOENT'), { code: 'ENOENT' });
+    const run = (file, args, options) => {
+      calls.push({ file, args, cwd: options?.cwd });
+      if (file === 'supabase') return { status: null, stdout: '', stderr: '', error: missing };
+      const operation = args[platform === 'win32' ? 6 : 2];
+      return operation === 'gen'
+        ? { status: 0, stdout: GENERATED, stderr: '' }
+        : { status: 0, stdout: '', stderr: '' };
+    };
+
+    assert.equal(generateDbTypes({ root: dir, run, platform }), GENERATED);
+    assert.deepEqual(calls.filter((call) => call.file === 'supabase').map((call) => call.args[0]), ['start', 'gen', 'stop']);
+    const fallbacks = calls.filter((call) => call.file !== 'supabase');
+    assert.deepEqual(fallbacks.map((call) => call.file), Array(3).fill(platform === 'win32' ? 'cmd.exe' : 'npx'));
+    const prefix = platform === 'win32'
+      ? ['/d', '/s', '/c', 'npx', '--yes', 'supabase@2.119.0']
+      : ['--yes', 'supabase@2.119.0'];
+    assert.deepEqual(fallbacks.map((call) => call.args.slice(0, prefix.length)), Array(3).fill(prefix));
+    assert.deepEqual(fallbacks.map((call) => call.cwd), Array(3).fill(dir));
+  }
+});

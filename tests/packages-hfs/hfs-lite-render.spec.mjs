@@ -8,7 +8,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_KIND, slotProblems } from '../../scripts/hfs/manifest-shape.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
-import { checkTargets, renderRepo, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { appSource, checkTargets, renderRepo, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
 import { sonarGateName } from '../../packages/hfs/sync/sonar-key.mjs';
 
@@ -115,9 +115,9 @@ test('the full managed render of both examples is the committed one (every manag
   for (const folder of ['examples/ecommerce-app', 'examples/shape-slot']) {
     const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, folder, 'hfs.json'), 'utf8'));
     const sonarKey = /^sonar.projectKey=(.+)$/m.exec(fs.readFileSync(path.join(ROOT, folder, 'sonar-project.properties'), 'utf8'))[1];
-    const targets = renderTargets(hfs, PRESETS, { manifest: MANIFEST, sonarKey });
+    const targets = renderTargets(hfs, PRESETS, { manifest: MANIFEST, sonarKey, source: appSource(path.join(ROOT, folder)) });
     assert.deepEqual(checkTargets(path.join(ROOT, folder), targets).filter(result => result.status !== 'ok'), [], folder);
-    assert.equal(aggregateHash(renderTargets({ ...hfs, edition: 'full' }, PRESETS, { manifest: MANIFEST, sonarKey })), aggregateHash(targets), `${folder} explicit full`);
+    assert.equal(aggregateHash(renderTargets({ ...hfs, edition: 'full' }, PRESETS, { manifest: MANIFEST, sonarKey, source: appSource(path.join(ROOT, folder)) })), aggregateHash(targets), `${folder} explicit full`);
   }
 });
 
