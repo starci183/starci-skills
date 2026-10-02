@@ -2,18 +2,20 @@ name: ci
 
 # The repository's own gate: `npm run check` (node --check over every runtime .mjs, the ops-registry
 # freshness check, the provider validator) then the full `npm test` suite, on the Node 22 line the
-# engines field requires. Runs on every push and pull request so a red tree shows up before review.
+# engines field requires. It runs ONCE per release, on the push of a v* tag (and when a person dispatches it), never on a branch push or a pull
+# request (docs/git-governance.md, rule CI_TRIGGERS_RELEASE_ONLY): the release flow runs the same suite locally first.
 
 on:
   push:
-  pull_request:
+    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   check-and-test:

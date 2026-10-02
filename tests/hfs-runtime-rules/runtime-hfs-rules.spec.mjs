@@ -13,6 +13,8 @@ import { parseSource } from '../../scripts/hfs/runtime-rules/source-ast.mjs';
 import { fileExternalFindings, ownerIdOf } from '../../scripts/hfs/runtime-rules/external-owner.mjs';
 import { fileBaseFindings } from '../../scripts/hfs/runtime-rules/base-pure.mjs';
 import { ciUploadFindings } from '../../scripts/hfs/runtime-rules/ci-upload.mjs';
+import { gitTriggerFindings, workflowTriggerFindings } from '../../scripts/hfs/runtime-rules/git-triggers.mjs';
+import { changelogSection, releaseNotesFindings, releaseNotesRepoFindings } from '../../scripts/hfs/runtime-rules/release-notes.mjs';
 import { callExportFinding, callFunctionName, contractCallIds } from '../../scripts/hfs/runtime-rules/api-shape.mjs';
 import { specPlacementFinding } from '../../scripts/hfs/runtime-rules/test-layout.mjs';
 import { nameFindings, sourceNameFindings } from '../../scripts/hfs/runtime-rules/source-name.mjs';
@@ -416,3 +418,55 @@ test('CI_UPLOAD_NOT_SILENT: every workflow of this repository, its examples and 
   assert.deepEqual(ciUploadFindings(ctxOf({}, { files, read: (f) => fs.readFileSync(path.join(ROOT, f), 'utf8') })), []);
 });
 
+// ------------------------------------------------------------------------------------------- CI_TRIGGERS_RELEASE_ONLY
+
+const triggers = (on, file = '.github/workflows/ci.yml') => workflowTriggerFindings({ path: file, text: `name: ci\non:\n${on}\njobs:\n  a:\n    steps:\n      - run: echo\n` });
+
+test('CI_TRIGGERS_RELEASE_ONLY: a branch push, a pull_request, a schedule, a filtered or unfiltered push and a missing block are refused', () => {
+  assert.deepEqual(codesOf(triggers('  push:\n  pull_request:')), ['CI_TRIGGERS_RELEASE_ONLY', 'CI_TRIGGERS_RELEASE_ONLY']);
+  assert.match(triggers('  push:\n    branches: [main]')[0].message, /filtered to `tags/);
+  assert.deepEqual(codesOf(triggers("  push:\n    tags: ['v*']\n    paths: ['src/**']")), ['CI_TRIGGERS_RELEASE_ONLY'], 'a path filter beside the tag filter');
+  assert.deepEqual(codesOf(triggers("  push:\n    tags: ['*']")), ['CI_TRIGGERS_RELEASE_ONLY'], 'every tag is not a release tag');
+  assert.match(triggers('  schedule:\n    - cron: "0 3 * * *"')[0].message, /`schedule` is not allowed/);
+  assert.deepEqual(codesOf(triggers('  workflow_call:')), ['CI_TRIGGERS_RELEASE_ONLY']);
+  assert.deepEqual(codesOf(triggers('  push')), ['CI_TRIGGERS_RELEASE_ONLY'], 'the scalar form is a branch push');
+  assert.deepEqual(codesOf(workflowTriggerFindings({ path: 'w.yml', text: 'name: x\njobs: {}\n' })), ['CI_TRIGGERS_RELEASE_ONLY'], 'no on block');
+});
+
+test('CI_TRIGGERS_RELEASE_ONLY: a release-tag push with workflow_dispatch (with inputs), a manual-only workflow and a template with placeholders are clean', () => {
+  assert.deepEqual(triggers("  push:\n    tags: ['v*']\n  workflow_dispatch:\n    inputs:\n      layers:\n        type: string"), []);
+  assert.deepEqual(triggers('  workflow_dispatch:'), []);
+  assert.deepEqual(workflowTriggerFindings({ path: 'packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml', text: "{{header}}\nname: ci\non:\n  push:\n    tags: ['v*']\n  workflow_dispatch:\njobs:\n  a:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version: {{nodeMajor}}\n" }), []);
+  assert.deepEqual(gitTriggerFindings(ctxOf({}, { files: ['tests/fixtures/w.yml', 'docs/notes.yml'], read: () => 'name: x\non: push\njobs: {}\n' })), [], 'only workflow files are read');
+});
+
+test('CI_TRIGGERS_RELEASE_ONLY: every workflow of this repository, its examples and the hfs templates starts only on a release tag or by hand', () => {
+  const folders = ['.github/workflows', 'packages/hfs/templates/app/ci-workflows/github/workflows', ...fs.readdirSync(path.join(ROOT, 'examples')).map((app) => `examples/${app}/.github/workflows`)];
+  const files = folders.filter((dir) => fs.existsSync(path.join(ROOT, dir))).flatMap((dir) => fs.readdirSync(path.join(ROOT, dir)).map((f) => `${dir}/${f}`));
+  assert.ok(files.length >= 8, 'the root, example and template workflows are read');
+  assert.deepEqual(gitTriggerFindings(ctxOf({}, { files, read: (f) => fs.readFileSync(path.join(ROOT, f), 'utf8') })), []);
+});
+
+// ------------------------------------------------------------------------------------------- RELEASE_NOTES
+
+const CHANGELOG = '# Changelog\n\n## [1.0.0-alpha.5] — in preparation\n\n- next\n\n## [1.0.0-alpha.4] — 2026-10-04\n\n- shipped (Added, Changed, Evidence)\n\n## [1.0.0-alpha.3] — 2026-09-30\n\n- older, PENDING(none)\n';
+
+test('RELEASE_NOTES: a release tag with no section, or with TODO, PENDING, TBD or in-preparation left in it, is refused', () => {
+  assert.deepEqual(codesOf(releaseNotesFindings({ tags: ['v1.0.0-alpha.9'], changelog: CHANGELOG })), ['RELEASE_NOTES']);
+  assert.match(releaseNotesFindings({ tags: ['v1.0.0-alpha.9'], changelog: CHANGELOG })[0].message, /has no `## \[1.0.0-alpha.9\]` section/);
+  assert.match(releaseNotesFindings({ tags: ['v1.0.0-alpha.5'], changelog: CHANGELOG })[0].message, /in preparation/);
+  assert.match(releaseNotesFindings({ tags: ['v1.0.0-alpha.3'], changelog: CHANGELOG })[0].message, /PENDING/);
+  assert.match(releaseNotesFindings({ tags: ['v1.0.0'], changelog: '## [1.0.0] — 2026\n\n- TBD(sha) and TODO\n' })[0].message, /TBD.*TODO|TODO.*TBD/);
+});
+
+test('RELEASE_NOTES: a finished section, a tag that is not a release tag and a HEAD with no tag are clean; the section is its own text only', () => {
+  assert.deepEqual(releaseNotesFindings({ tags: ['v1.0.0-alpha.4'], changelog: CHANGELOG }), []);
+  assert.deepEqual(releaseNotesFindings({ tags: ['preserve/old', 'pre-1.0.4-merge'], changelog: CHANGELOG }), [], 'not a release tag: not judged here (the release flow refuses to push it)');
+  assert.equal(changelogSection(CHANGELOG, '1.0.0-alpha.4').body.includes('older'), false);
+  assert.deepEqual(releaseNotesRepoFindings(ctxOf({}, { tagsAtHead: [], read: () => CHANGELOG })), []);
+  assert.deepEqual(codesOf(releaseNotesRepoFindings(ctxOf({}, { tagsAtHead: ['v1.0.0-alpha.5'], read: () => CHANGELOG }))), ['RELEASE_NOTES']);
+});
+
+test('the runtime manifest: every cut landed, so the shrink-only pending allowlist is empty', () => {
+  assert.deepEqual(MANIFEST.pending, [], 'a runtime finding is fixed, never allowlisted again');
+});

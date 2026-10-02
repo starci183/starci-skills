@@ -150,6 +150,12 @@ Every runtime change meets these rules on top of the commit bar:
 - Do not commit `config.yaml`, `settings.local.json`, `.starciwork/`, `node_modules/` or anything
   else `.gitignore` covers.
 
+## Pushing and releasing
+
+Lands fast-forward local main and never push. The remote moves once per release, main and one annotated `v*` tag together, through the release flow
+(`starci release cut`); CI runs only on that tag and when a person dispatches it. R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over
+unfinished CHANGELOG notes. The model, the refusals and the risks are in [git governance](docs/git-governance.md).
+
 ## Editing contracts and prose
 
 Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**` — says

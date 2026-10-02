@@ -14354,6 +14354,28 @@ CI_UPLOAD_NOT_SILENT:
   owner: supervisor
   kind: check-finding
 
+CI_TRIGGERS_RELEASE_ONLY:
+  title: "Workflow trigger other than a release tag or a person"
+  title_vi: "Workflow có trigger không phải tag phát hành hay người chạy tay"
+  meaning_vi: "Một workflow CI (gốc, ví dụ hoặc template của packages/hfs) khai báo trigger ngoài hai loại được phép: push của tag v* (không kèm branches, paths hay bộ lọc ignore) và workflow_dispatch. Push nhánh, pull_request, schedule hay workflow_call làm CI chạy ở mỗi lần đẩy thay vì một lần cho mỗi bản phát hành, và mọi app scaffold từ template sẽ thừa hưởng lỗi đó."
+  causes_vi:
+    - "Giữ trigger push hoặc pull_request của mô hình CI cũ"
+    - "Thêm bộ lọc branches hoặc paths vào push của tag"
+  nextStep_vi: "Người giám sát đặt on thành push với tags: ['v*'] và workflow_dispatch, sửa template trong packages/hfs/templates/app/ci-workflows rồi render lại ví dụ bằng starci app sync --write; không thêm trigger khác (docs/git-governance.md)."
+  owner: supervisor
+  kind: check-finding
+
+RELEASE_NOTES:
+  title: "Release tag without finished release notes"
+  title_vi: "Tag phát hành chưa có ghi chú phát hành hoàn chỉnh"
+  meaning_vi: "HEAD mang tag phát hành v<phiên bản> nhưng CHANGELOG.md không có mục ## [<phiên bản>], hoặc mục đó còn TODO, PENDING, TBD hay dấu in preparation. Thông điệp của tag và GitHub Release chính là mục này nên không được cắt tag khi nó chưa xong."
+  causes_vi:
+    - "Tạo tag trước khi viết xong mục CHANGELOG"
+    - "Còn sót dấu PENDING hoặc TBD của lane chưa land"
+  nextStep_vi: "Người giám sát hoàn tất mục CHANGELOG của phiên bản (xóa mọi dấu TODO, PENDING, TBD), commit rồi mới tạo lại tag chú thích trên commit phát hành; không dời hay xóa tag đã đẩy."
+  owner: supervisor
+  kind: check-finding
+
 EXAMPLES_CI_IMAGES_NOT_DERIVED:
   title: "The examples workflow does not build every image from a derived matrix"
   title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"

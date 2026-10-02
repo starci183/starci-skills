@@ -2609,6 +2609,26 @@ starci release clean-test --base origin/main
 
 Removed spellings: `node scripts/gates/package-clean-test.mjs`, `node .claude/scripts/gates/package-clean-test.mjs`
 
+### starci release cut
+
+cut the release, the only push of main with its annotated release tag
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--remote` | string |  |
+| `--branch` | string |  |
+| `--tag` | string |  |
+
+exit: 0 the release was cut and main plus its tag were pushed atomically; 1 refused (dirty tree, no or wrong tag, release notes incomplete, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
+
+json: flag
+
+```sh
+starci release cut
+starci release cut --repo <path> --tag v1.0.0-alpha.4 --json
+```
+
 ### starci release launch-smoke
 
 prove live nested-agent launch paths on an Orca host

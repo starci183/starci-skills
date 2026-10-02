@@ -23,7 +23,7 @@ _starci() {
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "install-task once restart start status stop up" -- "$cur") );;
-        release) COMPREPLY=( $(compgen -W "app-installs check clean-test launch-smoke proof publish sync-runtime" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut launch-smoke proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
@@ -511,6 +511,10 @@ _starci() {
         release:check:--only) return 0;;
         release:clean-test:--changed) return 0;;
         release:clean-test:--base) return 0;;
+        release:cut:--repo) return 0;;
+        release:cut:--remote) return 0;;
+        release:cut:--branch) return 0;;
+        release:cut:--tag) return 0;;
         release:launch-smoke:--app-repo) return 0;;
         release:launch-smoke:--entry) return 0;;
         release:launch-smoke:--timeout-ms) return 0;;
@@ -945,6 +949,7 @@ _starci() {
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --tag --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
         release:proof) COMPREPLY=( $(compgen -W "--repo --base --main --out --json --cwd --quiet --help --edition" -- "$cur") );;
         release:publish) COMPREPLY=( $(compgen -W "--publish --npm-user --poll-minutes --pre-land-ref --json --cwd --quiet --help --edition" -- "$cur") );;

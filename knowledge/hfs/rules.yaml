@@ -1875,7 +1875,32 @@ rules:
     failureCodes: ["RT_SLOT_ID_SHAPE"]
     enforcers:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
+  - id: R221
+    code: "CI_TRIGGERS_RELEASE_ONLY"
+    law: "The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CI_TRIGGERS_RELEASE_ONLY"]
+    enforcers:
+      - {kind: runtime, id: git-triggers, at: scripts/hfs/runtime-rules/git-triggers.mjs}
+  - id: R222
+    code: "RELEASE_NOTES"
+    law: "A release tag `v<version>` on HEAD has its CHANGELOG.md section `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark: the tag message and the GitHub Release are that section, so a tag is never cut over an unfinished or missing section."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RELEASE_NOTES"]
+    enforcers:
+      - {kind: runtime, id: release-notes, at: scripts/hfs/runtime-rules/release-notes.mjs}
 retired:
+  - {id: R212, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R213, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R214, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R215, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R216, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R217, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R218, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R219, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R220, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R123, reason: "RT_PENDING_STALE retired with the pending list itself: ruleParams.runtime.pending and its pending-ratchet enforcer are gone; nothing ratchets a tolerated-finding list"}

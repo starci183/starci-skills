@@ -1,0 +1,23 @@
+group: release
+verb: cut
+owner: runtime
+summary: cut the release, the only push of main with its annotated release tag
+impl:
+  script: scripts/cli/lib/release-cut.mjs
+flags:
+  - {name: repo, type: string, summary: the repository to release (default is the current directory)}
+  - {name: remote, type: string, summary: the remote to push to (default origin)}
+  - {name: branch, type: string, summary: the release branch (default main)}
+  - {name: tag, type: string, summary: the release tag v* to push (default is the one new annotated v* tag on HEAD)}
+exit:
+  "0": the release was cut and main plus its tag were pushed atomically
+  "1": refused (dirty tree, no or wrong tag, release notes incomplete, suite red, main moved, secret scan) and nothing was pushed
+  "2": bad usage
+json: flag
+examples:
+  - starci release cut
+  - starci release cut --repo <path> --tag v1.0.0-alpha.4 --json
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed: []
