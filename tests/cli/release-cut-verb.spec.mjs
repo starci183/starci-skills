@@ -43,3 +43,10 @@ test('a refused release is exit 1 with its verdict, a cut release is exit 0, --j
   assert.equal(seen.tag, 'v1.0.0');
   assert.equal(seen.repo, path.resolve('x'));
 });
+
+test('an asynchronous cutRelease (the L4 Sonar proof runs in-process) is awaited before the exit code is decided', async () => {
+  const slow = capture();
+  const code = await main(['--tag', 'v1.0.0'], { ...slow, cutRelease: async () => { await new Promise((resolve) => setImmediate(resolve)); return { ok: false, verdict: 'sonar', why: 'gate red' }; } });
+  assert.equal(code, 1);
+  assert.match(slow.value.out, /refused \(sonar\): gate red/);
+});
