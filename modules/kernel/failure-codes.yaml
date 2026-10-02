@@ -9325,15 +9325,6 @@ probe-failed:
   nextStep_vi: "Mạch vẫn ngắt cho tới hạn ghi trong thông báo. Chủ dự án kiểm tra khóa hoặc gói cước rồi thử lại."
   owner: owner
   kind: verb-refusal
-process-tree-lingers:
-  title: "Worker processes still running"
-  title_vi: "Tiến trình của thợ vẫn còn chạy"
-  meaning_vi: "Sau khi đóng terminal của thợ, vẫn còn tiến trình con chưa tắt hết."
-  causes_vi:
-    - "Tiến trình nền do thợ khởi chạy không thoát"
-  nextStep_vi: "Việc đóng terminal không được ghi nhận là sạch; lượt dọn định kỳ (tick GC) sẽ thu dọn tiến trình còn sót."
-  owner: runtime-core
-  kind: runtime-fault
 progress-stall:
   title: "Workflow progress has stalled"
   title_vi: "Tiến độ luồng công việc bị đứng"
