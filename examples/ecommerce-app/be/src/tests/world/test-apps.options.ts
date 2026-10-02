@@ -41,6 +41,10 @@ import type { IdentityAppOptions } from "../../../apps/identity/src/identity.opt
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
 const RATE_LIMIT_HIGH = 100_000
+
+/** The expiry sweep of the world ticks twice a second and expires an order pending for two seconds, so a spec watches one expire. */
+const ORDER_EXPIRY_TICK_MS = 500
+const ORDER_PAYMENT_WINDOW_TEST_MS = 2000
 const CALL_DEADLINE_MS = 5000
 const ALLOWED_ORIGINS: ReadonlyArray<string> = ["http://localhost:4069"]
 
@@ -174,6 +178,7 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     messaging: messagingOptionsOf(w),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
+    orderExpiry: { everyMs: ORDER_EXPIRY_TICK_MS, olderThanMs: ORDER_PAYMENT_WINDOW_TEST_MS },
 })
 
 /** The largest total the billing worker of the world invoices: small, so a spec can place an order it rejects. */

@@ -48,17 +48,23 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
 | `MESSAGING_REDIS_URL` | Redis URL of the queues the order events are published on (secret) | none |
 | `MESSAGING_TIMEOUT` | Deadline of one Redis command of a publisher | `3s` |
-| `MESSAGING_CONCURRENCY` | Messages one consumer handles at the same time (the order api consumes `billing.invoice-rejected`, billing consumes `order.placed`) | `1` |
+| `MESSAGING_CONCURRENCY` | Messages one consumer handles at the same time (the order api consumes `billing.invoice-rejected` and `billing.payment-confirmed`, billing consumes `order.placed`) | `1` |
+| `ORDER_EXPIRY_EVERY` | Pause between two ticks of the order expiry scheduler | `1m` |
+| `ORDER_PAYMENT_WINDOW` | How long an order stays pending for its payment before it expires | `1h` |
 
-## billing worker (`apps/billing`)
+## billing api (`apps/billing`)
 
-No listener: it consumes `order.placed` from the Redis queues and writes invoices.
+It listens for the signed webhook of the bank transfer notifier (`POST /webhooks/sepay`) and the readiness probe, and it consumes `order.placed` from the queues to write invoices. Its default-deny guard verifies bearer tokens through the identity service like the order api.
 
 | Key | Meaning | Default |
 | --- | --- | --- |
+| `BILLING_API_PORT` | Port the api listens on | none |
 | `BILLING_DB_URL` | Postgres URL of the `billing` connection (secret) | none |
+| `IDENTITY_API_URL`, `IDENTITY_API_TIMEOUT` | As on the order api | as above |
+| `SEPAY_WEBHOOK_SECRET` | Secret the bank transfer notifier signs its deliveries with: HMAC-SHA256 over `<timestamp>.<raw body>` in `x-sepay-signature`, the timestamp in `x-sepay-timestamp` (secret) | none |
+| `SEPAY_WEBHOOK_TOLERANCE` | How far a delivery's signed timestamp may be from now before it is refused as a replay | `5m` |
+| `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
 | `MESSAGING_REDIS_URL`, `MESSAGING_TIMEOUT`, `MESSAGING_CONCURRENCY` | As on the order api | as above |
-| `INVOICE_MAX_TOTAL_MINOR_UNITS` | The largest total one invoice may bill; a larger order is rejected and announced | `50000000` |
 
 ## keycloak (the stack's identity provider)
 
