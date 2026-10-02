@@ -48,8 +48,10 @@ rules:
         - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
         - HFS_UNUSED_EXPORT
+        - HFS_UNUSED_FILE
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-2
@@ -86,7 +88,8 @@ rules:
         when: A conventional file
         write: '@nestjs packages, then @modules and @features aliases, then ./ relative imports'
     verification:
-      automated: []
+      automated:
+        - HFS_FORMAT
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-4
@@ -108,8 +111,14 @@ rules:
     verification:
       automated:
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
         - ARCH_OWNER_CYCLE
         - BE_FEATURE_IMPORTS_FEATURE
+        - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Review same-source public API use, exports and actual DI identity.
@@ -117,7 +126,7 @@ rules:
   - id: BE-IMPORTS-5
     title: What a transport or handler imports
     kind: mandatory
-    hfsRules: [R26, R37, R88]
+    hfsRules: [R26, R37, R88, R28]
     requirement: |-
       A handler imports its message, its plain contracts, `platform/*` ports and the public APIs of domain capabilities. A
       resolver or controller imports its transport DTOs, the application messages of its own feature and `platform/cqrs`. No
@@ -127,8 +136,12 @@ rules:
     cases: []
     verification:
       automated:
-        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - BE_ENTITY_IN_CONTRACT
         - BE_TRANSPORT_SHAPE
+        - BE_FEATURE_IMPORTS_FEATURE
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-6
@@ -153,10 +166,11 @@ rules:
         write: Use `this.logger.info(PurchaseLogEvent.CheckoutOpened, { purchaseId })` on the injected Logger port.
     verification:
       automated:
-        - BE_CONFIG_OWNER
         - BE_LOGGER_REQUIRED
-        - BE_INFRA_OWNER
+        - BE_CONFIG_OWNER
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
+        - BE_INFRA_OWNER
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-7
@@ -175,5 +189,6 @@ rules:
     verification:
       automated:
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
       manual: []
     relatedExamples: []

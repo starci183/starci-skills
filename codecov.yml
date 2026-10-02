@@ -29,3 +29,7 @@ flag_management:
       paths:
         - "examples/ecommerce-app/be/src/**/*.service.ts"
         - "examples/ecommerce-app/be/src/features/cli/**/*.cli.ts"
+    - name: shape-slot
+      paths:
+        - "examples/shape-slot/be/src/**/*.service.ts"
+        - "examples/shape-slot/be/src/features/cli/**/*.cli.ts"

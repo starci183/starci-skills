@@ -19,7 +19,7 @@ rules:
   - id: FE-NAMING-1
     title: Unit folder and applicable exports
     kind: mandatory
-    hfsRules: [R01, R56]
+    hfsRules: [R01, R56, R91]
     requirement: |
       UI feature units live below features/pages, features/layouts or features/overlays. Reusable visual units live below
       components/blocks, components/composites, components/branches or components/leaves. The folder name is the public unit
@@ -51,8 +51,24 @@ rules:
         write: "Export X from the unit entry; do not invent XBase."
     verification:
       automated:
-        - starci-fe/export-matches-folder
         - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual:
         - Confirm split units use X and XBase and unsplit units do not add an empty forwarding twin.
     relatedExamples:
@@ -61,7 +77,7 @@ rules:
   - id: FE-NAMING-2
     title: Contracts and their parts
     kind: mandatory
-    hfsRules: [R56]
+    hfsRules: [R56, R92]
     requirement: |
       Public contract names follow their owning feature, module or visual unit. XProps is the connected X's input; XBaseProps
       is XBase's `{ state, props, on }`; XState is the union of drawn shapes; XData, XActions and XLabels are its parts;
@@ -89,8 +105,17 @@ rules:
         write: "SalesBlockProps in index.tsx; SalesBlockBaseProps = { state, props, on } in component.tsx"
     verification:
       automated:
-        - starci-fe/base-props-atom
-        - starci-fe/no-data-status-shape
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual: []
     relatedExamples:
       - connected-block
@@ -98,7 +123,7 @@ rules:
   - id: FE-NAMING-3
     title: Class-name exports
     kind: mandatory
-    hfsRules: [R61]
+    hfsRules: [R61, R92]
     requirement: |
       One role uses `...ClassName`; a map of roles uses `...ClassNames`; call-time variants use `get...ClassName`. Class
       strings hold Grammar scale classes only (see css.yaml).
@@ -116,16 +141,22 @@ rules:
         write: 'export const getBubbleClassName = (role: "user" | "assistant") => ...'
     verification:
       automated:
-        - class-names-in-colocated-file
-        - no-inline-class-name
         - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual: []
     relatedExamples: []
 
   - id: FE-NAMING-4
     title: Hooks, readers and cache keys
     kind: mandatory
-    hfsRules: [R56, R50]
+    hfsRules: [R56, R50, R21]
     requirement: |
       Every authored hook lives in hooks/<domain>/, starts with use, and names the lifecycle it owns; one hook per file, the
       file named after the hook. Read hooks are `useQuery<X>Swr` and write hooks `useMutate<X>Swr`; key constants are
@@ -157,7 +188,15 @@ rules:
       automated:
         - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
         - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
       manual: []
     relatedExamples:
       - connected-block
@@ -185,14 +224,15 @@ rules:
         when: "A name the framework mandates"
         write: "export const config = { matcher } in src/proxy.ts keeps its framework spelling"
     verification:
-      automated: []
+      automated:
+        - FE_ENV_OWNER
       manual: []
     relatedExamples: []
 
   - id: FE-NAMING-6
     title: Handlers, booleans, helpers
     kind: mandatory
-    hfsRules: [R56]
+    hfsRules: [R56, R91]
     requirement: |
       Pure-half action handlers are bare verbs inside `on`. Boolean props use is or has prefixes. Local helpers are camelCase;
       local sub-renders are PascalCase with their own props type.
@@ -213,7 +253,12 @@ rules:
         write: "const Turn = (props: TurnProps) => ..."
     verification:
       automated:
-        - handler-on-prefix
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual: []
     relatedExamples: []
 
@@ -236,5 +281,20 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
       manual: []
     relatedExamples: []

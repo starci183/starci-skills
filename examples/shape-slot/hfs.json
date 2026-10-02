@@ -1,8 +1,36 @@
 {
-  "hfs": 1,
-  "profile": "fe",
+  "hfs": 2,
+  "kind": "app",
   "project": "shape-slot",
-  "apps": [
-    { "name": "shape-slot", "kind": "next" }
-  ]
+  "sides": {
+    "be": {
+      "apps": [
+        {
+          "name": "core",
+          "kind": "api"
+        },
+        {
+          "name": "cli",
+          "kind": "cli"
+        }
+      ],
+      "kinds": ["api", "cli"],
+      "connections": [
+        {
+          "name": "primary",
+          "envPrefix": "PRIMARY_DB",
+          "owner": "core",
+          "isolation": "database"
+        }
+      ]
+    },
+    "fe": {
+      "apps": [
+        {
+          "name": "shape-slot",
+          "kind": "next"
+        }
+      ]
+    }
+  }
 }

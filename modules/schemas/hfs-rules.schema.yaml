@@ -45,6 +45,16 @@ properties:
     type: array
     minItems: 1
     items: {$ref: '#/$defs/rule'}
+  retired:
+    type: array
+    description: The ids of rules that no longer exist. Every id of R01 up to the last rule is a rule or listed here (RT_RULE_ID_GAP); a retired id is never reused and only history (contract changes, changelogs) may still name it (RT_RULE_ID_UNKNOWN).
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, reason]
+      properties:
+        id: {type: string, pattern: '^R[0-9]{2,3}$'}
+        reason: {type: string, minLength: 1}
 $defs:
   rule:
     type: object

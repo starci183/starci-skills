@@ -65,7 +65,7 @@ rules:
     verification:
       automated:
         - FE_STYLE_TOKEN_ONLY
-        - tokens-match-source
+        - FE_STYLE_SOURCE_UNRESOLVED
       manual:
         - Compare brand.css with the accepted brand record in both themes.
     relatedExamples: []
@@ -90,7 +90,9 @@ rules:
     verification:
       automated:
         - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
         - FE_NATIVE_FORM_CONTROL
+        - FE_NATIVE_IMAGE
       manual: []
     relatedExamples: []
   - id: FE-CSS-4
@@ -110,6 +112,7 @@ rules:
     verification:
       automated:
         - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
         - FE_PACKAGE_SHAPE
       manual:
         - Review the family entry against the Grammar anatomy.

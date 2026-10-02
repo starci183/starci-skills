@@ -25,7 +25,7 @@ rules:
   - id: BE-PROJECTIONS-1
     title: Only the projection writes its table
     kind: mandatory
-    hfsRules: [R161]
+    hfsRules: [R161, R86]
     requirement: |-
       The entity of a projection (`<name>.projection-entity.ts`) is written only by `<name>.projection.ts` of the same folder:
       no domain service, handler, reactor, job or other projection writes it. Its table, migrations and connection registration

@@ -14,13 +14,20 @@
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
 //   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
-//   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml from the render
+//   node scripts/checks/check-examples-ci.mjs --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
+//   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own codecov.yml and sonar-project.properties from the render
+//
+// The quality files of each example (codecov.yml, sonar-project.properties) are rendered here from the SOURCE jest preset of this repository, the
+// one the root codecov.yml flag already reads, so the root flag, the app's coverage paths and sonar.coverage.exclusions are one scope. The build
+// of every image of every example (never a push) is the `images` job, whose matrix is the --images output.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { coverageScope } from '../../packages/hfs/sync/index.mjs';
+import { coverageScope, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
+import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -46,6 +53,35 @@ export function appCoverageScope(app, root = ROOT) {
   const preset = createRequire(import.meta.url)(path.join(root, 'packages', 'jest-preset', 'index.cjs'));
   return coverageScope({ coverageSources: [...preset.COVERAGE_SOURCES] }).map((glob) => `examples/${app}/${glob}`);
 }
+
+/** The Sonar project key an example declares in its stack declaration, or its project name. */
+function sonarKeyOf(appRoot, project) {
+  try {
+    const keys = declaredSonarKeys(parseYaml(fs.readFileSync(path.join(appRoot, DECLARATION), 'utf8')), repositoryName(appRoot));
+    if (keys.length === 1) return keys[0];
+  } catch { /* no declaration: the project name stands in */ }
+  return project;
+}
+
+/** The quality files of an example rendered from the source preset: [{ path, content, mode, hash }] (codecov.yml, sonar-project.properties). */
+export function appQualityTargets(app, root = ROOT) {
+  const appRoot = path.join(root, 'examples', app);
+  const hfs = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
+  const preset = createRequire(import.meta.url)(path.join(root, 'packages', 'jest-preset', 'index.cjs'));
+  const presets = { sonarExclusions: preset.sonarExclusions(), coverageSources: [...preset.COVERAGE_SOURCES] };
+  return renderTargets(hfs, presets, { sonarKey: sonarKeyOf(appRoot, hfs.project) }).filter((target) => APP_QUALITY_FILES.includes(target.path));
+}
+export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties']);
+
+/** Every image of every example app, from its hfs.json: [{ app, name, file }] (be apps, then fe apps). */
+export function exampleImages(root = ROOT) {
+  return exampleApps(root).flatMap((app) => {
+    const sides = JSON.parse(fs.readFileSync(path.join(root, 'examples', app, 'hfs.json'), 'utf8')).sides ?? {};
+    return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
+  });
+}
+export const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
+export const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
 export function renderCodecov(root = ROOT) {
@@ -98,7 +134,7 @@ export function checkExamplesCi(root = ROOT) {
     const lister = jobs[MATRIX_JOB];
     if (!lister || !(lister.steps ?? []).some((step) => String(step.run ?? '').includes(MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
       add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
-    const matrixJobs = Object.entries(jobs).filter(([, job]) => job?.strategy?.matrix);
+    const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
     if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
     for (const [id, job] of matrixJobs) {
       if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
@@ -123,6 +159,21 @@ export function checkExamplesCi(root = ROOT) {
     const body = read(root, rel) ?? '';
     for (const app of apps) if (new RegExp(`examples/${app}\\b`).test(body)) add('EXAMPLES_CI_STRAY_WORKFLOW', rel, `runs examples/${app} outside ${WORKFLOW}; fold it into the examples matrix`);
   }
+  // The images job: its matrix is the --images output, it builds and never pushes.
+  if (doc) {
+    const images = doc.jobs?.[IMAGES_JOB];
+    const steps = images?.steps ?? [];
+    if (!images || !steps.some((step) => String(step.run ?? '').includes(IMAGES_COMMAND)) && !(doc.jobs?.[MATRIX_JOB]?.steps ?? []).some((step) => String(step.run ?? '').includes(IMAGES_COMMAND)))
+      add('EXAMPLES_CI_IMAGES_NOT_DERIVED', WORKFLOW, `a job ${IMAGES_JOB} must build every image of every example from the output of \`${IMAGES_COMMAND}\` (never a hand-written list)`);
+    else if (!String(images.strategy?.matrix?.include ?? '').includes('fromJSON(needs.') || steps.some((step) => String(step.with?.push) === 'true' || /docker push|--push/.test(String(step.run ?? ''))))
+      add('EXAMPLES_CI_IMAGES_NOT_DERIVED', `${WORKFLOW}#jobs.${IMAGES_JOB}`, 'the images matrix must be include: fromJSON of the derived output, and the job never pushes an image');
+  }
+  // The examples' own quality files are the render from the source preset.
+  for (const app of apps) for (const target of appQualityTargets(app, root)) {
+    const file = `examples/${app}/${target.path}`;
+    const have = read(root, file);
+    if (have === null || have.replace(/\r\n/g, '\n') !== target.content) add('EXAMPLES_CI_APP_QUALITY_DRIFT', file, `${file} differs from its render from the source jest preset: run node scripts/checks/check-examples-ci.mjs --write`);
+  }
   // codecov.yml is the render: one flag per app, paths from the coverage scope.
   const codecov = read(root, CODECOV);
   if (codecov === null) add('EXAMPLES_CI_CODECOV_MISSING', CODECOV, 'the root codecov.yml is missing: run node scripts/checks/check-examples-ci.mjs --write');
@@ -132,7 +183,13 @@ export function checkExamplesCi(root = ROOT) {
 
 export function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.stdout.write(s) } = {}) {
   if (argv.includes('--matrix')) { out(`${JSON.stringify(exampleApps(root))}\n`); return 0; }
-  if (argv.includes('--write')) { fs.writeFileSync(path.join(root, CODECOV), renderCodecov(root)); out(`examples-ci: wrote ${CODECOV} (${exampleApps(root).length} flags)\n`); return 0; }
+  if (argv.includes('--images')) { out(`${JSON.stringify(exampleImages(root))}\n`); return 0; }
+  if (argv.includes('--write')) {
+    fs.writeFileSync(path.join(root, CODECOV), renderCodecov(root));
+    for (const app of exampleApps(root)) for (const target of appQualityTargets(app, root)) fs.writeFileSync(path.join(root, 'examples', app, target.path), target.content);
+    out(`examples-ci: wrote ${CODECOV} (${exampleApps(root).length} flags) and each example's ${APP_QUALITY_FILES.join(', ')}\n`);
+    return 0;
+  }
   const { apps, findings } = checkExamplesCi(root);
   for (const finding of findings) out(`${finding.code} ${finding.path}: ${finding.message}\n`);
   out(findings.length ? `examples-ci: ${findings.length} finding(s)\n` : `OK: ${apps.length} example app(s) (${apps.join(', ')}) run in ${WORKFLOW} and have a flag in ${CODECOV}\n`);

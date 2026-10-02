@@ -23,14 +23,16 @@ rules:
   - id: FE-FOLDER-1
     title: Responsibility directories
     kind: mandatory
-    hfsRules: [R01, R02, R59, R64]
+    hfsRules: [R01, R02, R59, R64, R26, R54, R56, R91]
     requirement: |
-      The front end of every app (`fe/`) is an fe/apps/<app>/ monorepo even with one app, named by its role (for example
-      web), and all product source lives under fe/apps/<app>/src. An fe/src/ does not exist. Each Next source root
+      The front end of every app (`fe/`) is an fe/apps/<app>/ monorepo even with one app — each app declared in
+      `hfs.json` `sides.fe.apps` with kind `next` (slot `fe.app.next`; the scaffold writes `landing` and `app`) — and all
+      product source lives under fe/apps/<app>/src. An fe/src/ does not exist. Each Next source root
       (fe/apps/<app>/src) uses app/ for framework adapters; features/{pages,layouts,overlays} for route-facing product
       composition; components/{blocks,composites,branches,leaves} for product visuals; hooks/<domain> for React hooks;
-      and modules/<capability> for cohesive reusable technical and domain capabilities. Every app has the modules api,
-      config, i18n and routes, and one brand.css under modules/brand when it sets brand tokens. No other empty role
+      and modules/<capability> for cohesive reusable technical and domain capabilities. Every app carries the required
+      module instances of slot `fe.modules` and one brand.css under modules/brand when it sets brand tokens
+      (`fe.modules.brand`). No other empty role
       folder is required. Grammar remains a separate product-agnostic package. The only files that may sit directly in the
       source root (the directory holding app/) are the framework-pinned root files listed in frameworkPinnedRootFiles
       below: Next.js loads them from that exact place. Each is a thin framework adapter whose internal imports enter
@@ -81,7 +83,7 @@ rules:
           fe/apps/<app>/src/modules/api/ or fe/apps/<app>/src/modules/session/ with one explicit public index.ts entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
-        write: "fe/apps/<app>/src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
+        write: "an owner folder of slot `fe.components` under the layer it belongs to — for example fe/apps/<app>/src/components/leaves/<Name>/index.tsx"
       - id: case-4
         when: "A React hook"
         write: "fe/apps/<app>/src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
@@ -93,7 +95,7 @@ rules:
           fe/apps/<app>/src/modules/i18n/ and the adapter imports it; the names the framework mandates there
           (frameworkPinnedRootExports, for example export const config = { matcher }) keep their framework spelling
       - id: case-6
-        when: "Any other file or folder directly under the source root (fe/apps/<app>/src/i18n/request.ts, fe/apps/<app>/src/config.ts), and an fe/src/"
+        when: "Any other file or folder directly under the source root (an `i18n/request.ts` or a `config.ts` there), and an fe/src/"
         write: >
           Move it to its owner, for example fe/apps/<app>/src/modules/i18n/request.ts, and point framework configuration
           (fe/apps/<app>/next.config.ts) at the new path
@@ -105,13 +107,52 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
-        - HFS_SLOT_REQUIRED_MISSING
-        - FE_SOURCE_LAYOUT_INVALID
-        - FE_NEXT_CONVENTIONS
-        - FE_TIER_DIRECTION
-        - FE_CUSTOM_HOOK_LOCATION
-        - HFS_APPS_REQUIRED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
         - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - FE_I18N_PLACEMENT
+        - FE_I18N_NAVIGATION
+        - FE_I18N_FORMATTER
+        - FE_APP_ISOLATION
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual:
         - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.
     relatedExamples:
@@ -120,7 +161,7 @@ rules:
   - id: FE-FOLDER-2
     title: Discoverable files for one unit
     kind: mandatory
-    hfsRules: [R02, R55, R65]
+    hfsRules: [R02, R55, R65, R20, R92]
     requirement: |
       A split unit (a connected block, and a feature page, layout or overlay) uses index.tsx for the connected X and
       sibling component.tsx for the pure XBase, its XBaseProps and xDefaultState, plus XState when the shape is its own union
@@ -148,12 +189,40 @@ rules:
         write: "hooks/<domain>/useX.ts or modules/<capability>/...; do not create visual twins"
     verification:
       automated:
-        - class-names-in-colocated-file
-        - no-inline-class-name
-        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
         - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
         - HFS_SIZE_GROWTH
-        - starci-fe/base-import-pair
+        - HFS_SIZE_SOFT_BACKLOG
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm each file owns a real responsibility; do not add a component.tsx twin by habit.
     relatedExamples:
@@ -162,7 +231,7 @@ rules:
   - id: FE-FOLDER-3
     title: Route files adapt to one visual owner and every app has its boundaries
     kind: mandatory
-    hfsRules: [R53, R54, R55, R57]
+    hfsRules: [R53, R54, R55, R57, R26]
     requirement: |
       Route files under app/[locale]/ (page, layout, template, loading, not-found) are server components. A route may
       resolve framework server inputs (params, searchParams, headers, cookies), then mounts one page-level visual owner.
@@ -191,10 +260,27 @@ rules:
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
         - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
         - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
         - FE_OWNER_REACHABLE
+        - FE_ROUTE_HARDCODED
+        - FE_HREF_RESOLVES
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm visual routes have one page owner and redirect-only routes have no visual tree.
     relatedExamples: []
@@ -202,7 +288,7 @@ rules:
   - id: FE-FOLDER-4
     title: Hooks are hooks; readers and transport live in modules
     kind: mandatory
-    hfsRules: [R56, R50, R49]
+    hfsRules: [R56, R50, R49, R21, R26]
     requirement: |
       hooks/<domain>/ holds React hooks (use*.ts, one hook per file) and exactly one <domain>.shared.ts for shared
       non-hook helpers of that domain (key builders, token readers). A file in hooks/ that is not a hook and is not the shared
@@ -234,8 +320,19 @@ rules:
       automated:
         - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_ENV_OWNER
         - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm each lifecycle has one feature owner and transport mechanics have one module owner.
     relatedExamples:
@@ -273,7 +370,7 @@ rules:
   - id: FE-FOLDER-6
     title: Keep units cohesive
     kind: mandatory
-    hfsRules: [R49, R21]
+    hfsRules: [R49, R21, R91, R92]
     requirement: |
       A unit folder contains files that change for the same responsibility. Do not create generic helpers/ or utils/
       buckets inside components, read deployment configuration in presentation, or split files solely to meet a count.
@@ -300,9 +397,18 @@ rules:
     verification:
       automated:
         - FE_ENV_OWNER
-        - class-names-in-colocated-file
-        - no-inline-class-name
-        - no-helper-folder-in-components
+        - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm extraction is justified by ownership or lifecycle rather than file length or count.
     relatedExamples: []

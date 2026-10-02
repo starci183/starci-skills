@@ -27,7 +27,7 @@ rules:
   - id: BE-ARCHITECTURE-1
     title: Dependency direction follows the tier matrix
     kind: mandatory
-    hfsRules: [R26, R27, R28]
+    hfsRules: [R26, R27, R28, R30]
     requirement: |-
       Imports follow one matrix. An app may import features, domain, platform, integrations and packages. A feature may import
       domain, platform, integrations and packages, and never another feature. A domain capability may import other domain
@@ -54,19 +54,22 @@ rules:
     verification:
       automated:
         - BE_TIER_DIRECTION
-        - BE_FEATURE_IMPORTS_FEATURE
-        - ARCH_OWNER_CYCLE
+        - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
+        - ARCH_OWNER_CYCLE
+        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
-        - ARCH_INTERNAL_IMPORT_UNRESOLVED
-        - ARCH_DYNAMIC_DEPENDENCY_UNPROVEN
       manual:
         - Confirm that a proposed shared type belongs to platform or options rather than hiding an upward dependency.
     relatedExamples: []
   - id: BE-ARCHITECTURE-2
     title: Apps own bootstrap and composition only
     kind: mandatory
-    hfsRules: [R32, R33]
+    hfsRules: [R32, R33, R02]
     requirement: |-
       An app directory `be/apps/<app>/src` holds `main.ts` (at most 80 lines), `app.module.ts` (at most 250 lines, with
       `static register(options: AppOptions)`), and `<app>.options.ts`; an app has no spec of its own (BE-TEST-1). `main.ts`
@@ -89,13 +92,26 @@ rules:
         write: 'app.module.ts lists ClockModule.register({ isGlobal: true }), PurchaseModule.register({ isGlobal: true, ...options.purchase }), CheckoutGraphqlModule and the APP_GUARD and APP_FILTER providers.'
       - id: case-3
         when: A second process kind is needed
-        write: Add `be/apps/worker` (background scaled apart) and declare its kind in hfs.json sides.be.apps; a one-off action is a command of the one `be/apps/cli`; never grow the api app with either.
+        write: Add a `be.app.worker` app (background scaled apart) and declare its kind in hfs.json sides.be.apps; a one-off action is a command of the one `be/apps/cli`; never grow the api app with either.
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY
         - BE_APP_BUSINESS_ROLE
         - BE_ENTRYPOINT_ONLY_IN_APPS
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
       manual:
         - Verify that the e2e run of the app fails when a module or provider is missing.
     relatedExamples: []
@@ -104,7 +120,7 @@ rules:
     kind: mandatory
     hfsRules: [R30, R45]
     requirement: |-
-      Every capability module (`be/src/modules/{domain,platform,integrations}/<c>/<c>.module.ts`) is
+      Every capability module (the `<c>.module.ts` of a `be.domain`, `be.platform` or `be.integrations` owner) is
       `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
       `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal })).build()`.
       The generic `XOptions` is required; a capability without options declares `export type XOptions = Record<string, never>` in
@@ -139,14 +155,20 @@ rules:
     verification:
       automated:
         - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
         - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
       manual:
         - Review provider token, scope and lifetime through the e2e run of the app.
     relatedExamples: []
   - id: BE-ARCHITECTURE-4
     title: Application contracts do not depend on transport adapters
     kind: mandatory
-    hfsRules: [R29, R37]
+    hfsRules: [R29, R37, R88]
     requirement: |-
       Messages, handlers and their plain contracts in `application/` do not import transport DTOs, request or session framework
       context, generated GraphQL types or protocol decorators, and no ORM entity appears in a contract. Transport adapters under
@@ -164,6 +186,9 @@ rules:
     verification:
       automated:
         - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_ENTITY_IN_CONTRACT
         - BE_TRANSPORT_SHAPE
       manual:

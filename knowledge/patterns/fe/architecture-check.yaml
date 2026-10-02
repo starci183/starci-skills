@@ -24,7 +24,7 @@ rules:
   - id: FE-ARCHITECTURE-1
     title: Routes adapt framework inputs to one visual owner
     kind: mandatory
-    hfsRules: [R54, R57]
+    hfsRules: [R54, R57, R26]
     requirement: |-
       A visual route may resolve framework-owned server inputs such as params, searchParams, headers, cookies, a session
       read, redirects and notFound, then mounts one page-level visual owner. A route that only redirects or terminates
@@ -49,19 +49,27 @@ rules:
         write: Compose it in the route layout or the page owner.
     verification:
       automated:
-        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
         - FE_ROUTE_ONE_PAGE
         - FE_ROUTE_DRAWING_DECISION
-        - FE_ROUTE_FILES_THIN
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
         - FE_OWNER_REACHABLE
+        - FE_ROUTE_HARDCODED
+        - FE_HREF_RESOLVES
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm a route-level loader does not become product orchestration or duplicate client fetching.
     relatedExamples: []
   - id: FE-ARCHITECTURE-2
     title: Responsibilities point inward and downward, without cycles
     kind: mandatory
-    hfsRules: [R27, R64]
+    hfsRules: [R27, R64, R26, R30, R91]
     requirement: |-
       Dependencies follow the tiers of slots.yaml: route to feature, modules and packages; feature to components, hooks,
       modules and packages; components descend blocks to composites to branches to leaves (a layer imports only the layers
@@ -86,18 +94,25 @@ rules:
         write: Keep intrinsic focus, disclosure, drag, measurement or reduced-motion behavior local when it has no product-world or transport ownership.
     verification:
       automated:
-        - FE_TIER_DIRECTION
-        - FE_SOURCE_LAYOUT_INVALID
         - ARCH_OWNER_CYCLE
+        - FE_APP_ISOLATION
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual:
         - Classify the responsibility before treating a folder-to-folder edge as upward.
     relatedExamples: []
   - id: FE-ARCHITECTURE-3
     title: Split world ownership only when there is a boundary to own
     kind: mandatory
-    hfsRules: [R55, R56, R65]
+    hfsRules: [R55, R56, R65, R26, R92]
     requirement: |-
       Product data, session, locale and router decisions and transport lifecycle in a block belong to
       blocks/<Name>/index.tsx, and every nonempty render path reaches a resolved pure export from the sibling component.tsx.
@@ -120,24 +135,38 @@ rules:
         write: Call a function of modules/api, never fetch directly.
     verification:
       automated:
-        - FE_CONNECTED_BLOCK_RENDER_PAIR
-        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
         - FE_BLOCK_PRODUCT_HOOK_DEFINITION
         - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
         - FE_PURE_WORLD_HOOK
         - FE_PURE_WORLD_IMPORT
-        - FE_PURE_REACHES_DATA
-        - FE_WORLD_OWNER_RENDER_BOUNDARY
-        - FE_SIZE_AND_STATE_BUDGET
       manual:
         - Distinguish intrinsic browser interaction from product-world ownership before requiring a split.
     relatedExamples: []
   - id: FE-ARCHITECTURE-4
     title: Packages expose owned public APIs and apps stay independent
     kind: mandatory
-    hfsRules: [R63, R64]
+    hfsRules: [R63, R64, R26, R30]
     requirement: |-
       Discover application and package roots from manifests and tsconfig, including workspace globs. An app may consume
       declared package exports. A package never imports app internals, and cross-package consumers use the owning package's
@@ -158,18 +187,23 @@ rules:
         write: Keep it with that owner; sharing never requires two consumers.
     verification:
       automated:
-        - FE_APP_ISOLATION
         - FE_PACKAGE_SHAPE
+        - FE_APP_ISOLATION
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
+        - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
-        - ARCH_INTERNAL_IMPORT_UNRESOLVED
       manual:
         - Confirm the public export is semantically stable rather than merely reachable.
     relatedExamples: []
   - id: FE-ARCHITECTURE-5
     title: Features own scenarios and modules own reusable capabilities
     kind: mandatory
-    hfsRules: [R50, R52, R56]
+    hfsRules: [R50, R52, R56, R26, R30, R92]
     requirement: |-
       Features/{pages,layouts,overlays} own product composition. hooks/<domain> own React lifecycle functions and map
       module results to the product-facing contract. A module owns one cohesive reusable technical or domain capability and
@@ -190,11 +224,30 @@ rules:
         write: Use a feature or view literal union and map it to the transport enum in the data adapter.
     verification:
       automated:
-        - FE_TIER_DIRECTION
-        - FE_PURE_WORLD_IMPORT
-        - FE_WIRE_GENERATED
         - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_WIRE_GENERATED
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm generated wire types do not become the feature or presentation source of truth.
     relatedExamples: []

@@ -55,7 +55,7 @@ rules:
   - id: BE-PERSISTENCE-2
     title: The cli migrate command is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34, R147, R174]
+    hfsRules: [R33, R34, R147, R174, R02, R150]
     requirement: |-
       Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`), once per
       connection, before any api or worker process starts (a deploy runs the cli image as an init job), and through the test
@@ -72,11 +72,25 @@ rules:
         write: 'run the cli image as `cli migrate run` to completion, then start the api and worker apps.'
     verification:
       automated:
+        - BE_ENTRYPOINT_ONLY_IN_APPS
         - BE_SCHEMA_AUTHORITY
         - BE_CLI_REQUIRED
-        - BE_CLI_OWNER
         - BE_CONTEXT_OWNER
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - BE_CLI_OWNER
       manual:
         - Confirm the deployment runs the migrate step first and once.
     relatedExamples: []
@@ -119,7 +133,7 @@ rules:
   - id: BE-PERSISTENCE-4
     title: Raw SQL is a SqlText constant in the owner's persistence folder
     kind: mandatory
-    hfsRules: [R36, R68]
+    hfsRules: [R36, R68, R37]
     requirement: |-
       SQL text is a constant (or a function returning one) built with the `sql` tag from `platform/database`, living in
       `be/src/modules/{domain,platform}/<c>/persistence/<name>.sql.ts`; the tag returns the branded type `SqlText`. `.query()` on
@@ -203,7 +217,7 @@ rules:
   - id: BE-PERSISTENCE-7
     title: The database is reached through the named shared EntityManager
     kind: mandatory
-    hfsRules: [R83]
+    hfsRules: [R83, R85]
     requirement: |-
       Data access is `this.entityManager.<op>(Entity, ...)` on the injected shared manager, or `manager.<op>` inside a
       transaction callback, with the entity class passed by class and never by string name. Not used: `getRepository`,
@@ -233,7 +247,7 @@ rules:
   - id: BE-PERSISTENCE-8
     title: One physical database is one connection and one injector
     kind: mandatory
-    hfsRules: [R84]
+    hfsRules: [R84, R83]
     requirement: |-
       `hfs.json` `sides.be.connections` lists every bounded context as `{ "name": "<kebab>", "envPrefix": "<SNAKE>", "owner": "<api app>", "isolation": "database" | "schema" }`; the name is
       the logical database, never the engine (`primary`, `identity`, `order`), the owner is the one service app that composes it
@@ -345,7 +359,7 @@ rules:
   - id: BE-PERSISTENCE-11
     title: A connection is a bounded context with one owning service
     kind: mandatory
-    hfsRules: [R174]
+    hfsRules: [R174, R84]
     requirement: |-
       Every `hfs.json` `sides.be.connections` entry has an `owner` (an api or worker app declared in the same file) and an
       `isolation` (`database` or `schema`). An app passes to `DatabaseModule.register` only the connections it owns and imports
@@ -418,7 +432,7 @@ rules:
   - id: BE-PERSISTENCE-14
     title: Per-connection platform tables and projection placement
     kind: mandatory
-    hfsRules: [R178]
+    hfsRules: [R178, R35]
     requirement: |-
       Projections keep their tables under their owning context's connection, in `modules/projections/<name>/persistence/{entities,migrations}`.
       The outbox and inbox tables exist per connection that publishes or consumes (`platform/event-bus/persistence`,

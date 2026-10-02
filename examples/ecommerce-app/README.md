@@ -35,7 +35,7 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
 
 - `be/apps/<app>/src`: `main.ts` (parses the environment once), `app.module.ts` (`AppModule.register(options)`, every
   capability registered once with `isGlobal: true`), `<app>.options.ts`. An app only composes; the e2e world proves it boots.
-- `be/src/features/{identity,checkout,health}`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
+- `be/src/features/api/<feature>/`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
 - `be/src/modules/domain`: account, session, identity (guards), catalog, cart, order (checkout, cancellation and order services), payment, invoice (billing), member; each owns its business logic in its `*.service.ts`, its entities, migrations,
   `.sql.ts` constants and errors under `persistence/` and `errors/`.
 - `be/src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,
@@ -69,8 +69,8 @@ branches, functions or statements. From the parent `.claude` tree, run
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook,
 default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check); in the runtime repository
 it runs through `workflow_dispatch` of `.github/workflows/examples.yml`. On push and pull request that workflow runs this app's
-typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
-front-end build and the Sonar gate. The app's own `codecov.yml` and `ci.yml` are the app-repository form `hfs sync` renders; they
+typecheck (tsc over be, turbo over the fe workspaces), `hfs lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
+be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `hfs sync` renders; they
 run when the app is its own repository. Existing Work
 evidence retains its recorded revisions; the derived index reports stale proof where source or records changed.
 

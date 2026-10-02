@@ -1,7 +1,7 @@
 import "server-only"
 import createMiddleware from "next-intl/middleware"
 import { NextResponse, type NextRequest } from "next/server"
-import { routing } from "./index"
+import { routing } from "./routing"
 
 /** The first path segments of the API, the health probe and the framework: never locale-negotiated. */
 const UNNEGOTIATED_ROOTS: ReadonlySet<string> = new Set(["api", "health", "_next", "_vercel"])

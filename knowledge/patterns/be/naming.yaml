@@ -22,14 +22,15 @@ rules:
   - id: BE-NAMING-1
     title: Files are kebab-case with a role suffix from the closed list
     kind: mandatory
-    hfsRules: [R01, R29, R89]
+    hfsRules: [R01, R29, R89, R35]
     requirement: |-
       File basenames are kebab-case with a role suffix from this closed list; anything else is an R89 finding: `module`,
       `module-definition`, `decorators`, `options`, `config`, `connection`, `service`, `command`, `query`, `handler`,
       `contracts`, `port`, `resolver`, `controller`, `gateway`, `consumer`, `job`, `cli`, `input`, `type`, `args`, `request`,
       `response`, `mapper`, `policy`, `entity`, `sql`, `rows`, `error`, `messages`, `log-events`, `cache-keys`, `guard`,
-      `interceptor`, `filter`, `client`, `spec`, `e2e-spec`, `global-setup`; plus `index.ts`, `main.ts`, `app.module.ts` and
-      migrations. These suffixes are banned: `use-case`, `repository`, `store`, `worker`, `scheduler`, `cron`, `listener`,
+      `interceptor`, `filter`, `client`, `spec`, `e2e-spec`, `global-setup`; plus the names outside the role vocabulary that
+      `ruleParams.be.suffixes` of slots.yaml records — the owner `index.ts` entries, the `be.app.*` root files and the
+      `be.persistence` migrations. These suffixes are banned: `use-case`, `repository`, `store`, `worker`, `scheduler`, `cron`, `listener`,
       `dto`, `util`, `utils`, `helper`, `helpers`, `rules`, `types`, `constants`, `int-spec`, `harness-spec`, `test`. The slot
       manifest lists which suffixes each slot allows.
     rationale: |-
@@ -65,7 +66,23 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
         - BE_SCHEMA_OWNER
       manual: []
     relatedExamples: []
@@ -90,7 +107,12 @@ rules:
         write: PurchaseModule for a capability, CheckoutModule for the application module of a feature, CheckoutGraphqlModule per transport
     verification:
       automated:
+        - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-NAMING-3
@@ -146,8 +168,9 @@ rules:
         write: 'registerEnumType(Locale, { name: "Locale" }) in the transport that exposes it, not in the domain'
     verification:
       automated:
-        - BE_SOURCE_FORM
         - BE_LOGGER_REQUIRED
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-NAMING-5
@@ -174,8 +197,9 @@ rules:
         write: 'export const Public = (options: { reason: PublicReason }) => SetMetadata(PUBLIC_KEY, options)'
     verification:
       automated:
-        - BE_RAW_INJECT
+        - BE_SECRET_DEFAULT
         - BE_CONNECTION_DUPLICATE
+        - BE_RAW_INJECT
       manual: []
     relatedExamples: []
   - id: BE-NAMING-6
@@ -204,8 +228,13 @@ rules:
         write: 'get, run2, placeOrderV2'
     verification:
       automated:
+        - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_BACKGROUND_UNOWNED
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual: []
     relatedExamples: []
   - id: BE-NAMING-7
@@ -233,6 +262,7 @@ rules:
       automated:
         - BE_ENTITY_IN_CONTRACT
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-NAMING-8

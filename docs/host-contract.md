@@ -193,7 +193,7 @@ green op is a checkpoint whose gate base is the previous checkpoint; the failing
 (gone from `orca worktree list`). Main's checkout is compared byte for byte before the run and after the removal:
 exactly the two green files are added, every other tracked file and the `node_modules` listing are unchanged.
 Each no-op file sits in a slot every scaffolded app owns (a be payload fixture under `be/src/tests/fixtures/`, an fe
-static file under `fe/apps/<first fe app>/public/`), so the finish gate's lint judges the smoke, never an invented folder.
+static file under the `public/` folder of the first fe app (`fe/apps/<app>/public/`)), so the finish gate's lint judges the smoke, never an invented folder.
 
 Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker

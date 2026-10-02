@@ -11436,7 +11436,7 @@ SEALED_FILE_IN_WORK:
   owner: other-op:work.author
   kind: check-finding
 
-# --- HFS rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 to R67 ---
+# --- HFS rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 up ---
 
 HFS_SLOT_UNDECLARED:
   title: "Every tracked path matches exactly one slot"
@@ -12298,7 +12298,7 @@ FE_NEXT_CONVENTIONS:
 HFS_RULES_INVALID:
   title: "HFS rule catalog is invalid"
   title_vi: "Danh mục luật HFS không hợp lệ"
-  meaning_vi: "Tệp knowledge/hfs/rules.yaml không đúng schema hoặc vi phạm một quy tắc ngữ nghĩa (thứ tự R01 đến R67, một mã lỗi chỉ thuộc một luật, luật chạy ở cổng land, luật pre-commit cũng chạy ở pre-push, cổng sonar đi cùng enforcer sonar), nên không luật nào được nạp."
+  meaning_vi: "Tệp knowledge/hfs/rules.yaml không đúng schema hoặc vi phạm một quy tắc ngữ nghĩa (thứ tự tăng dần, một mã lỗi chỉ thuộc một luật, luật chạy ở cổng land, luật pre-commit cũng chạy ở pre-push, cổng sonar đi cùng enforcer sonar), nên không luật nào được nạp."
   causes_vi:
     - "Sửa tay rules.yaml và gõ sai một trường"
     - "Thêm luật mà không đủ enforcer, cổng hoặc mã lỗi"
@@ -12348,18 +12348,6 @@ HFS_RULE_ENFORCER_STALE:
   causes_vi:
     - "Lane viết luật ESLint đã land mà không gỡ status: planned"
   nextStep_vi: "Người giám sát gỡ status: planned của enforcer đó trong knowledge/hfs/rules.yaml qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
-HFS_RULE_LAW_DRIFT:
-  title: "Rule table in the HFS README differs from the catalog"
-  title_vi: "Bảng luật trong README lệch danh mục"
-  meaning_vi: "Bảng luật ở mục 12 của knowledge/hfs/README.md phải có đúng mỗi luật của knowledge/hfs/rules.yaml với cùng mã và cùng câu luật, và không ghi một khoảng R01..Rnn khác danh mục; hai bản khác nhau thì người đọc và máy hiểu luật khác nhau."
-  causes_vi:
-    - "Sửa câu luật ở một nơi"
-    - "Thêm luật mới vào danh mục mà không thêm dòng README"
-    - "Ghi số lượng luật bằng tay"
-  nextStep_vi: "Người giám sát chép câu luật từ rules.yaml vào dòng README (rules.yaml là nguồn), qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -13960,4 +13948,92 @@ HFS_DOCKER_SECRETS:
     - "Vi phạm luật R191: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
+  kind: check-finding
+
+RT_FACT_FALSE:
+  title: "A machine-evaluated fact is false, or prose contradicts it"
+  title_vi: "Một sự thật máy kiểm được là sai, hoặc văn bản mâu thuẫn với nó"
+  meaning_vi: "Một sự thật trong knowledge/hfs/facts.yaml không đúng với knowledge/hfs/slots.yaml (nguồn duy nhất của hình dạng sản phẩm), hoặc một dòng trong knowledge, docs hay README nói điều ngược lại, ví dụ 'không có package.json' cho một ứng dụng fe vốn có package.json riêng. Văn bản chép lại điều khẳng định bằng lời khác sẽ lệch dần khỏi slots.yaml."
+  causes_vi:
+    - "Sửa slots.yaml mà không sửa sự thật hoặc câu văn tương ứng"
+    - "Một tài liệu chép lại điều khẳng định của slot bằng lời riêng và lời đó cũ đi"
+  nextStep_vi: "Người giám sát xóa câu văn mâu thuẫn và thay bằng mã sự thật hoặc mã slot; nếu sự thật sai thì sửa slots.yaml hoặc facts.yaml, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RULE_ID_UNKNOWN:
+  title: "A rule id that is not in the catalog"
+  title_vi: "Mã luật không có trong danh mục"
+  meaning_vi: "Một tệp được git theo dõi (tri thức, tài liệu, mã hoặc dữ liệu) nêu một mã luật R<số> mà knowledge/hfs/rules.yaml không có, hoặc một mã luật đã nghỉ hưu mà chỉ tệp lịch sử (contract-changes, CHANGELOG) mới được nêu. Mã luật ma làm người đọc và máy trỏ tới một luật không tồn tại."
+  causes_vi:
+    - "Một luật bị xóa hoặc đánh số lại mà các chỗ trích dẫn không được sửa theo"
+    - "Gõ nhầm mã luật"
+  nextStep_vi: "Người giám sát đổi trích dẫn sang luật hiện có của danh mục hoặc bỏ mã, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RULE_ID_GAP:
+  title: "A gap in the rule ids"
+  title_vi: "Khoảng trống trong dãy mã luật"
+  meaning_vi: "Dãy mã luật của knowledge/hfs/rules.yaml chạy từ R01 đến luật cuối nhưng thiếu một mã vừa không phải luật vừa không nằm trong danh sách retired. Mỗi mã vắng phải được khai báo là đã nghỉ hưu kèm lý do, và không bao giờ được dùng lại."
+  causes_vi:
+    - "Xóa một luật mà không ghi vào retired"
+    - "Đánh số lại khối luật làm bỏ qua một đoạn mã"
+  nextStep_vi: "Người giám sát thêm mã vào retired kèm lý do, hoặc khôi phục luật, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_GENERATED_BLOCK_STALE:
+  title: "A generated README block or derived field differs from its source"
+  title_vi: "Khối README sinh tự động khác nguồn của nó"
+  meaning_vi: "Một khối giữa các dấu hfs:generated của knowledge/hfs/README.md (bản đồ ứng dụng, cây mã backend, ma trận tầng, cây mã frontend, danh mục luật) không bằng từng byte với bản dựng từ knowledge/hfs/slots.yaml và rules.yaml. Cùng cách đó, danh sách verification.automated của luật mẫu, slot của mục files: và mã code của mục why phải bằng đúng bản suy ra từ danh mục luật và slots.yaml. Sửa tay hoặc đổi nguồn mà không dựng lại làm văn bản nói khác nguồn."
+  causes_vi:
+    - "Sửa slots.yaml hoặc rules.yaml mà không chạy lại readme-blocks.mjs --write"
+    - "Sửa tay nội dung bên trong một khối sinh tự động"
+  nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write hoặc node scripts/hfs/derived-fields.mjs --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
+  owner: supervisor
+  kind: check-finding
+
+RT_PROSE_PATH_NO_SLOT:
+  title: "A path in prose that no slot owns"
+  title_vi: "Đường dẫn trong văn bản không thuộc slot nào"
+  meaning_vi: "Một đường dẫn sản phẩm (be/... hoặc fe/...) trong knowledge, docs hoặc README không được slot nào của knowledge/hfs/slots.yaml sở hữu và cũng không phải thư mục cha của một slot. Văn bản đã tự nghĩ ra một chỗ không có, hoặc giữ lại một chỗ mà slot không còn. Tên ứng dụng là tự do: tên ghi cứng phải là ứng dụng của ví dụ hoặc của starter, còn <tên> giữ chỗ thay cho mọi ứng dụng."
+  causes_vi:
+    - "Đổi hoặc xóa một slot mà văn bản vẫn nêu đường dẫn cũ"
+    - "Ghi tên ứng dụng theo vai trò (api, web) thay vì giữ chỗ"
+  nextStep_vi: "Người giám sát thay đường dẫn bằng mã slot, bằng <giữ chỗ> hoặc bằng tên ứng dụng của ví dụ, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PROSE_RESTATES_SLOTS:
+  title: "Prose restates the slots"
+  title_vi: "Văn bản chép lại các slot"
+  meaning_vi: "Một khối mã hoặc một dòng trong knowledge, docs hoặc README nêu từ ba đường dẫn sản phẩm mà slot sở hữu trở lên, hoặc một câu liệt kê từ ba tên tệp gốc hay tệp của phía mà các slot khai báo. Bản chép lại cũ đi so với slots.yaml; chỉ khối sinh tự động giữa các dấu hfs:generated mới được phép sao chép."
+  causes_vi:
+    - "Chép cây thư mục hoặc danh sách tệp của slots.yaml vào văn bản"
+    - "Liệt kê các tệp cấu hình của gốc ứng dụng trong một câu"
+  nextStep_vi: "Người giám sát thay bản chép bằng mã slot (slot app.format-config...) hoặc bằng một khối sinh tự động, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+EXAMPLES_CI_IMAGES_NOT_DERIVED:
+  title: "The examples workflow does not build every image from a derived matrix"
+  title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
+  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `node scripts/checks/check-examples-ci.mjs --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
+  causes_vi:
+    - "Danh sách image viết tay trong workflow, hoặc thiếu job images"
+    - "Một bước build có push: true hoặc docker push"
+  nextStep_vi: "Dựng lại job `images` với include: fromJSON của đầu ra `--images` và bỏ mọi thao tác push."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_APP_QUALITY_DRIFT:
+  title: "An example's codecov.yml or sonar-project.properties differs from its render"
+  title_vi: "codecov.yml hoặc sonar-project.properties của ví dụ lệch khỏi bản sinh"
+  meaning_vi: "Hai tệp chất lượng của mỗi ví dụ được sinh từ jest preset nguồn của repo này, cùng phạm vi coverage với cờ trong codecov.yml gốc; phạm vi loại trừ của Sonar là phần bù của nó."
+  causes_vi:
+    - "Preset nguồn đổi mà các tệp chưa được sinh lại"
+    - "Sửa tay tệp sinh ra"
+  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
+  owner: runtime-core
   kind: check-finding

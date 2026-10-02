@@ -349,6 +349,9 @@ const fixture = (t, files, pending = []) => {
   const pendingText = `pending:\n${pending.map((e) => `  - {path: "${e.path}", rule: ${e.rule}, lane: ${e.lane ?? 'C2a'}, since: 2026-10-01, reason: fixture}`).join('\n')}\n`;
   const all = { 'hfs.json': '{"hfs": 1, "kind": "runtime", "project": "fixture"}\n', [RUNTIME_MANIFEST_FILE]: `${FIXTURE_MANIFEST}${pending.length ? pendingText : 'pending: []\n'}`, 'scripts/kernel/cli.mjs': 'export const api = 1;\n', ...files };
   for (const [rel, body] of Object.entries(all)) { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), body); }
+  // RT_FACT_FALSE reads the facts file from the judged repo; the fixture has no fact, and the file is not one of its tracked paths.
+  fs.mkdirSync(path.join(dir, 'knowledge', 'hfs'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'knowledge', 'hfs', 'facts.yaml'), 'schema: starci/facts@1\nfacts: []\n');
   return { dir, files: Object.keys(all) };
 };
 const check = (fx, options = {}) => runtimeCheck({ repoRoot: fx.dir, root: ROOT, files: fx.files, tree: false, base: null, drift: [], ...options });

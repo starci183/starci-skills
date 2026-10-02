@@ -64,7 +64,7 @@ export class SagaService {
     async complete(params: CompleteSagaParams): Promise<SagaTransition> {
         if (!(await this.inbox.claim(sourceOf(params.saga), params.eventId))) return "duplicate"
         const state = await this.state(params)
-        if (state === null || state.status !== "running") return "ignored"
+        if (state?.status !== "running") return "ignored"
         return (await this.move(params, state, "completed")) === null ? "ignored" : "applied"
     }
 

@@ -25,12 +25,12 @@ rules:
   - id: BE-MESSAGES-1
     title: One keyed catalog per owner, read through MessageCatalog
     kind: mandatory
-    hfsRules: [R78]
+    hfsRules: [R78, R89]
     requirement: |-
       Text a user reads never sits in source as a literal: a `subject`, `title`, `body`, `text` or `message` property of a
       `notify`, `send` or `publish` call, and a `message`, `description` or `title` property of a transport response, all come
-      from `messages/<owner>.messages.ts` of the owner (`be/src/modules/{domain,platform,integrations}/<c>/messages/` or
-      `be/src/features/api/<f>/messages/`): one keyed entry per message, `vi` and `en` maps with the same keys, named `{{param}}`
+      from `messages/<owner>.messages.ts` of the owner (the `messages/` folder of slot `be.domain.messages` or
+      `be.feature.messages`): one keyed entry per message, `vi` and `en` maps with the same keys, named `{{param}}`
       interpolation for anything a literal built with `+` or a template. A class reads the catalog through
       `@InjectMessageCatalog() private readonly messages: MessageCatalog`, never by importing a catalog file. An error's display
       text is the entry `errors.<code>` (error.yaml). A short
@@ -53,6 +53,7 @@ rules:
       automated:
         - BE_USER_COPY_LITERAL
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual:
         - Confirm the vi and en text carry the same meaning and that an interpolated value cannot leak a secret or an internal id a client should not see.
     relatedExamples: []
@@ -83,6 +84,7 @@ rules:
     verification:
       automated:
         - BE_USER_COPY_LITERAL
+        - BE_RAW_INJECT
       manual:
         - Confirm a job resolves the recipient's own preference, never the acting operator's or a fixed default; confirm a header outside vi and en falls back to vi rather than throwing.
     relatedExamples: []

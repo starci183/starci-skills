@@ -55,6 +55,7 @@ rules:
     verification:
       automated:
         - HFS_DEP_VERSION_SKEW
+        - HFS_PACKAGE_MANAGER_MIXED
       manual: []
     relatedExamples: []
   - id: REPO-PINS-3
@@ -75,6 +76,8 @@ rules:
         write: The workflow runs `npm ci`; nothing checks out the runtime repository.
     verification:
       automated:
+        - HFS_CANON_PIN_DRIFT
         - HFS_CI_MISSING_CANON
+        - HFS_HOOKS_PATH_REDIRECTED
       manual: []
     relatedExamples: []
