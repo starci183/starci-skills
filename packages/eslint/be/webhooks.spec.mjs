@@ -8,7 +8,7 @@ import test from "node:test"
 import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
 import { rules, webhookShape, webhookVerifyFirst } from "./webhooks.mjs"
 
-const tester = typedTester({ declaration: { ...BE_DECLARATION, optionalSlots: ["be.webhooks", "be.realtime"] } })
+const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
 const DOOR = at("src/features/webhooks/payment/payment.webhook.ts")
 const OTHER_SLOT = at("src/features/plan/transport/http/payment.webhook.ts")
 const SPEC = at("src/features/webhooks/payment/payment.webhook.spec.ts")

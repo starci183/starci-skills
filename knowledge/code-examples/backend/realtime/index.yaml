@@ -1,0 +1,47 @@
+schema: starci/code-example@1
+id: realtime
+title: Read-and-push realtime door
+purpose: |
+  Show the realtime kind end to end for a GraphQL subscription: the door that injects only the
+  RealtimeHub and subscribes the client to a principal-scoped topic, the typed frame, its unit spec, and
+  the reactor consumer that pushes the frame after the domain event. Distinct from an api transport: a
+  realtime door has no bus, no query and no write. A socket gateway has the same shape with
+  WebSocketGateway and SubscribeMessage in a <channel>.gateway.ts.
+appliesTo: [backend]
+relatedRules:
+  - BE-REALTIME-1
+  - BE-REALTIME-2
+  - BE-REALTIME-3
+  - BE-REALTIME-4
+files:
+  - path: order-status.subscription.ts
+    role: The push door, one resolver with one subscription.
+  - path: order-status-changed.type.ts
+    role: The typed frame (dto/order-status-changed.type.ts in the feature).
+  - path: order-status.subscription.spec.ts
+    role: The door's own spec, with a recording hub double.
+  - path: order-status-push.consumer.ts
+    role: The reactor that feeds the hub after the domain event (features/reactors/<name>/transport/message/).
+entrypoint: order-status.subscription.ts
+adapt:
+  - Rename the channel, the topic prefix and the frame fields to the product's contract.
+  - Build the topic in one domain contract function so the door and the reactor cannot drift.
+  - For a socket, write <channel>.gateway.ts with WebSocketGateway and SubscribeMessage; the rules and the topic are the same.
+dependencies:
+  packages: ["@nestjs/graphql", "@nestjs/testing", "@starci/jest-preset"]
+  assumptions: |
+    The host provides the RealtimeHub (platform/realtime), CurrentPrincipal (domain/identity), the typed
+    OrderStatusChangedEvent and the event consumer registry. This folder shows the shapes, not those modules.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Does not show the websocket transport configuration or the realtime/* e2e scenarios; see
+    knowledge/patterns/be/realtime.yaml.
+provenance:
+  sources:
+    - knowledge/patterns/be/realtime.yaml
+  simplifications: |
+    A synthetic order status channel; the frame carries three fields.

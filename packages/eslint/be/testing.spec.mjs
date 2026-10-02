@@ -34,7 +34,7 @@ const typed = typedTester()
 /** The same slots with the feature kinds enabled: a webhook or realtime door carries its own spec beside it. */
 const kinds = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
-  settings: { starci: { hfs: fixtureHfs({ ...BE_DECLARATION, optionalSlots: ["be.webhooks", "be.realtime"] }) } },
+  settings: { starci: { hfs: fixtureHfs({ ...BE_DECLARATION, patterns: ["webhooks", "realtime"] }) } },
 })
 
 const UNIT = at("src/features/checkout/application/add-to-cart.handler.spec.ts")

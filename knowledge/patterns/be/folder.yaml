@@ -65,9 +65,9 @@ rules:
     requirement: |-
       A feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
       `messages/`, and nothing else. `application/` holds the CQRS files of cqrs.yaml and no folder named after a protocol. A
-      protocol lives in `transport/graphql`, `transport/http`, `transport/websocket`, `transport/schedule`,
+      protocol lives in `transport/graphql`, `transport/http`, `transport/schedule`,
       `transport/message` or `transport/cli`, each with exactly one Nest module `<feature>-<protocol>.module.ts`, its
-      resolvers, controllers, gateways, jobs, consumers or cli files, and `dto/` where the protocol has DTOs.
+      resolvers, controllers, jobs, consumers or cli files, and `dto/` where the protocol has DTOs. A socket gateway or a subscription is the realtime feature kind and a provider webhook the webhooks kind, each in its own folder under `features/`.
     rationale: |-
       Several entry protocols share one operation without importing transport DTOs into the application layer, and an app can
       compose only the transports it serves.

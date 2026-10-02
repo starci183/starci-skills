@@ -460,7 +460,7 @@ function machineOver({ scope, manifest, machine, changed }) {
 // --------------------------------------------------------------------------------------------------- explain
 
 const TEST_KIND = {
-  'unit-beside': 'a <name>.service.spec.ts beside each <name>.service.ts in this slot (only services are unit-tested)',
+  'unit-beside': 'a <name>.service.spec.ts beside each <name>.service.ts in this slot (only services are unit-tested; a webhook or realtime door has its own spec beside it)',
   e2e: 'an integration, e2e or contract spec covering the flow; no unit spec is required',
   none: 'no test is required for files in this slot',
 };

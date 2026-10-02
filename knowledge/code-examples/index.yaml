@@ -20,3 +20,26 @@ examples:
       - FE-FUNCTION-2
       - FE-FUNCTION-4
       - REF-FE-1
+  - id: webhooks
+    path: backend/webhooks
+    lane: backend
+    summary: |
+      A signed provider webhook: the door verifies the signature and replay window first and makes one
+      domain call; the domain intake claims the inbox and publishes the event in its transaction. The
+      door has no bus, no entity manager and no branch.
+    relatedRules:
+      - BE-WEBHOOK-1
+      - BE-WEBHOOK-2
+      - BE-WEBHOOK-3
+      - BE-WEBHOOK-4
+  - id: realtime
+    path: backend/realtime
+    lane: backend
+    summary: |
+      A read-and-push realtime door: a GraphQL subscription that injects only the RealtimeHub and
+      subscribes the client to a principal-scoped topic, fed by a reactor consumer. It writes nothing.
+    relatedRules:
+      - BE-REALTIME-1
+      - BE-REALTIME-2
+      - BE-REALTIME-3
+      - BE-REALTIME-4

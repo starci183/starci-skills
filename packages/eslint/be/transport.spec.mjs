@@ -21,7 +21,7 @@ import {
 
 const tester = typedTester()
 /** The fixture with the feature kinds enabled (a webhook door has its own slot). */
-const kinds = typedTester({ declaration: { ...BE_DECLARATION, optionalSlots: ["be.webhooks", "be.realtime"] } })
+const kinds = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
 const WEBHOOK = at("src/features/webhooks/payment/payment.webhook.ts")
 const T = "src/features/plan/transport"
 const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)

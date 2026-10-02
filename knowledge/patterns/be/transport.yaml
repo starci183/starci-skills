@@ -102,10 +102,11 @@ rules:
     kind: mandatory
     hfsRules: [R88, R89, R46, R90]
     requirement: |-
-      REST is only for signed webhooks, OAuth redirects and callbacks, health and readiness, and byte streams:
+      REST is only for OAuth redirects and callbacks, health and readiness, and byte streams:
       `transport/http/<action>.controller.ts`, DTOs `dto/<action>.{request,response}.ts`, versioned routes, no `@Res()`
-      passthrough except a byte stream. WebSocket: `transport/websocket/<channel>.gateway.ts`, the handshake authenticated by
-      `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Schedule:
+      passthrough except a byte stream. A provider webhook is not an api door: it is the webhooks feature kind
+      (`features/webhooks/<provider>/`, webhooks.yaml). A push channel, a WebSocket gateway or a GraphQL subscription, is the
+      realtime feature kind (`features/realtime/<channel>/`, realtime.yaml); an api feature has no `transport/websocket`. Schedule:
       `transport/schedule/<job>.job.ts` (background.yaml). Message: `transport/message/<event>.consumer.ts`
       (background.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
       kind `cli`.

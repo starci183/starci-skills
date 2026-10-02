@@ -180,6 +180,8 @@ ruleParams:
     patternScenarios:
       event-bus: [atomic-with-transaction, relay-only-after-commit, redelivery-then-dead-letter, duplicate-delivery-is-a-noop]
       queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
+      webhooks: [bad-signature-is-refused, replay-is-refused, accepted-delivery-publishes-once]
+      realtime: [subscriber-receives-push, foreign-topic-is-isolated, disconnect-releases-subscription]
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -750,6 +752,7 @@ slots:
     profiles: [be]
     path: "src/features/webhooks/<provider>/"
     presence: opt-in              # a provider webhook intake: verifies the signature and replay window, then hands the delivery to ONE domain intake method
+    pattern: webhooks             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/webhooks.yaml)
     tracked: tracked
     tier: feature
     owner: true
@@ -762,7 +765,8 @@ slots:
   - id: be.webhooks.dto
     profiles: [be]
     path: "src/features/webhooks/<provider>/dto/"
-    presence: optional
+    presence: opt-in
+    pattern: webhooks
     tracked: tracked
     tier: feature
     allows: ["<event>.request.ts"]   # the typed provider payload, validated and bounded (BE_INPUT_BOUNDED)
@@ -774,6 +778,7 @@ slots:
     profiles: [be]
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
+    pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
     tracked: tracked
     tier: feature
     owner: true
@@ -786,7 +791,8 @@ slots:
   - id: be.realtime.dto
     profiles: [be]
     path: "src/features/realtime/<channel>/dto/"
-    presence: optional
+    presence: opt-in
+    pattern: realtime
     tracked: tracked
     tier: feature
     allows: ["<name>.{args,type}.ts"]

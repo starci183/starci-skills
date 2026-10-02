@@ -8,7 +8,7 @@ import test from "node:test"
 import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
 import { realtimeReadOnly, realtimeShape, realtimeTopicScope, rules } from "./realtime.mjs"
 
-const tester = typedTester({ declaration: { ...BE_DECLARATION, optionalSlots: ["be.webhooks", "be.realtime"] } })
+const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
 const GATEWAY = at("src/features/realtime/order-status/order-status.gateway.ts")
 const SUBSCRIPTION = at("src/features/realtime/order-status/order-status.subscription.ts")
 const OTHER_SLOT = at("src/features/plan/transport/graphql/order-status.subscription.ts")

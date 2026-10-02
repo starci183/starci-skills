@@ -78,6 +78,10 @@ profiles:
       - BE-QUEUES-2
       - BE-QUEUES-3
       - BE-QUEUES-4
+      - BE-REALTIME-1
+      - BE-REALTIME-2
+      - BE-REALTIME-3
+      - BE-REALTIME-4
       - BE-RESILIENCE-1
       - BE-TEMPORAL-1
       - BE-TEST-1
@@ -94,6 +98,10 @@ profiles:
       - BE-TYPING-5
       - BE-TYPING-6
       - BE-TYPING-7
+      - BE-WEBHOOK-1
+      - BE-WEBHOOK-2
+      - BE-WEBHOOK-3
+      - BE-WEBHOOK-4
     sourceGlobs:
       - src/**/*.{ts,mts,cts,tsx}
       - apps/*/src/**/*.{ts,mts,cts,tsx}
@@ -576,6 +584,42 @@ profiles:
         sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
         rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
         guidance: knowledge/patterns/be/event-bus.yaml
+      - id: NEST-WEBHOOK-DOOR
+        sourceRuleIds: [BE-WEBHOOK-2]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: A provider webhook door is one signed controller that proves the delivery with the WebhookSignatureService as its first statement, injects only that service and domain services, and makes exactly one domain intake call.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/webhook-shape, starci-be/webhook-verify-first]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/webhooks.yaml
+          review: Review that the raw body, not a re-serialized one, is verified and that the replay window matches the provider's tolerance.
+        status: implemented
+      - id: NEST-WEBHOOK-OBSERVATION
+        sourceRuleIds: [BE-WEBHOOK-1, BE-WEBHOOK-3, BE-WEBHOOK-4]
+        rationale: These are tree checks of hfs check (the slot of the kind, the required files, BE_PATTERN_SPEC_MISSING) and the delivery rule of the inbox; whether each provider event maps to exactly one published event and whether a scenario proves the right behaviour is reviewed against the provider contract and a real run of the fake.
+        guidance: knowledge/patterns/be/webhooks.yaml
+      - id: NEST-REALTIME-DOOR
+        sourceRuleIds: [BE-REALTIME-1, BE-REALTIME-2, BE-REALTIME-3]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: A realtime file is one gateway or subscription door that injects only the RealtimeHub and subscribes the client to a topic built from its principal.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/realtime-shape, starci-be/realtime-read-only, starci-be/realtime-topic-scope]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/realtime.yaml
+          review: Confirm the frame type carries only what the principal may see and the reactor and the door share one topic builder.
+        status: implemented
+      - id: NEST-REALTIME-OBSERVATION
+        sourceRuleIds: [BE-REALTIME-4]
+        rationale: The three realtime scenarios are a tree check of hfs check (BE_PATTERN_SPEC_MISSING); whether a real client proves delivery, isolation and cleanup is reviewed against a real run.
+        guidance: knowledge/patterns/be/realtime.yaml
 
   next:
     title: StarCi Next.js code pattern

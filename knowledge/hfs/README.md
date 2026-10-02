@@ -184,12 +184,13 @@ be/src/features/<feature>/
   application/                           <action>.command.ts | <action>.query.ts, <action>.handler.ts, <action>.contracts.ts; no spec
   application/support/                   opt-in by need: helpers and types local to this one feature; no spec
   transport/graphql/                     <feature>-graphql.module.ts, <action>.resolver.ts, <action>.mapper.ts, dto/
-  transport/http/                        opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (webhooks, OAuth, health, byte streams)
-  transport/websocket/                   opt-in: <feature>-websocket.module.ts, <channel>.gateway.ts
+  transport/http/                        opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (OAuth, health, byte streams)
   transport/message/                     opt-in: <feature>-message.module.ts, <event>.consumer.ts
   transport/schedule/                    opt-in: <feature>-schedule.module.ts, <job>.job.ts
   transport/cli/                         opt-in: <feature>-cli.module.ts, <name>.cli.ts; composed only by an app of kind cli
   messages/                              opt-in: <feature>.messages.ts (vi and en copy)
+be/src/features/webhooks/<provider>/     opt-in (pattern webhooks): <provider>-webhook.module.ts, <provider>.webhook.ts, <provider>.webhook.spec.ts, dto/<event>.request.ts; imports only modules/*
+be/src/features/realtime/<channel>/      opt-in (pattern realtime): <channel>-realtime.module.ts, <channel>.gateway.ts or <x>.subscription.ts with its spec, dto/; reads and pushes only
 be/src/modules/domain/<capability>/      index.ts, module, module-definition, options, config, decorators, log-events, errors/, persistence/, messages/, services
 be/src/modules/platform/<capability>/    composition, config, errors, primitives, logging, clock, cqrs are required; database, http, retry, inbox, outbox, ... by need
 be/src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
@@ -415,7 +416,7 @@ no contract copy under `fe/`.
 
 ## 7. Tests
 
-- Backend, four kinds by folder and suffix (R47): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested); integration
+- Backend, four kinds by folder and suffix (R47): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested, plus the spec of a webhook or realtime door beside the door that has no service of its own); integration
   `be/src/tests/integration/<capability>/*.integration-spec.ts` (`useTestWorld({ modules })`, real database, no HTTP); e2e
   `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`useTestWorld({ apps })`); contract `be/src/tests/contract/<provider>/*.contract-spec.ts`
   (provider sandboxes, skipped without sandbox config).
