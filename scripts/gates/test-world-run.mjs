@@ -2,7 +2,7 @@
 // test-world-run.mjs - the test-world run summary (schema starci/test-world-run@1) e2e.verify and integration.verify attach
 // (knowledge/op-gate.yaml proofs.test-world, contract change op-mechanism-proofs).
 //
-//   node scripts/gates/test-world-run.mjs --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]
+//   starci gate test-world --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]
 //
 // Over the app at --root it records, and `api settle` re-reads (scripts/kernel/gate-settle.mjs):
 //   harness  the be jest config is @starci/jest-preset's starciJestConfig() (its world projects run on the preset's world
@@ -35,7 +35,7 @@ export const WORLD_PROJECTS = Object.freeze({
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const JEST_CONFIGS = ['be/jest.config.js', 'be/jest.config.cjs', 'be/jest.config.ts', 'jest.config.js', 'jest.config.cjs', 'jest.config.ts'];
 const DECLARATION = 'be/src/tests/world/test-world.config.ts';
-const USAGE = 'usage: test-world-run.mjs --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]';
+const USAGE = 'usage: starci gate test-world --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]';
 
 /** op-gate.yaml testWorld: {required[], forbidden[], outage[]}. */
 export function testWorldRules(runtime = runtimeRoot) {

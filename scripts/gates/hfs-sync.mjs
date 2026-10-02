@@ -5,7 +5,7 @@
 // .prettierrc, .prettierignore, the package.json scripts, the eslint one-liner) is a finding, not a silent divergence
 // (HFS decision 10). The managed-file findings are the ones `hfs check` reports (packages/hfs/sync/managed.mjs).
 //
-//   node scripts/gates/hfs-sync.mjs --repo <product repo> [--json]
+//   starci gate hfs-sync --repo <product repo> [--json]
 //
 // Findings (all catalogued in modules/kernel/failure-codes.yaml):
 //   HFS_MANAGED_FILE_DRIFT, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT
@@ -56,7 +56,7 @@ export async function checkHfsSync(root, { presets } = {}) {
 async function main(argv) {
   const at = argv.indexOf('--repo');
   if (at < 0 || !argv[at + 1]) {
-    process.stdout.write('usage: node scripts/gates/hfs-sync.mjs --repo <product repo> [--json]\n');
+    process.stdout.write('usage: starci gate hfs-sync --repo <product repo> [--json]\n');
     return 2;
   }
   const result = await checkHfsSync(path.resolve(argv[at + 1]));

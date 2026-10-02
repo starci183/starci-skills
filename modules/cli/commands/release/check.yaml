@@ -1,0 +1,23 @@
+group: release
+verb: check
+owner: runtime
+summary: run the one read-only release readiness gate
+impl: {script: scripts/gates/release-check.mjs}
+flags:
+  - {name: final, type: boolean, summary: include final identity and main-branch proofs}
+  - {name: only, type: list, summary: comma-separated proof ids to run}
+exit:
+  "0": release proofs are green or the selected subset passed
+  "1": one or more proofs are red
+  "2": a proof could not run or usage was invalid
+json: flag
+examples:
+  - starci release check
+  - starci release check --final --json
+  - starci release check --only publish-plan,canon-pins
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/release-check.mjs
+  - node .claude/scripts/gates/release-check.mjs
+  - npm run release:check

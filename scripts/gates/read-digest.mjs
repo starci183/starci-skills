@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // read-digest.mjs - the READ step of the op loop (knowledge/op-gate.yaml) and its digest (schema starci/read-digest@1).
 //
-//   node scripts/gates/read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]
+//   starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]
 //
 // For the files a slice will touch it prints, and records with their sha256, exactly what the slice must read before coding:
 //   - the slot map: `hfs explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
@@ -30,7 +30,7 @@ export const PATTERN_ROOT = 'knowledge/patterns';
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const EXAMPLES_PER_SLOT = 2;
 const firstLine = (text) => String(text ?? '').trim().split(/\r?\n/)[0];
-const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
+const USAGE = 'usage: starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
 export const KNOWLEDGE_ROOT = 'knowledge';
 
 let cache = null;

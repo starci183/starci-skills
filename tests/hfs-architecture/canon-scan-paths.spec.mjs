@@ -42,7 +42,7 @@ test('scoped architecture matches full findings while building only selected pro
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, '..', 'node_modules/typescript'), 'junction');
   const cli = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'gates', 'canon-scan.mjs');
   const run = paths => {
-    const args = [cli, '--root', root, '--profile', 'nest', '--machines', 'architecture', '--json', ...(paths ? ['--paths', paths] : [])];
+    const args = [cli, '--root', root, '--stack-kind', 'nest', '--machines', 'architecture', '--json', ...(paths ? ['--paths', paths] : [])];
     const result = spawnSync(process.execPath, args, { encoding: 'utf8' });
     assert.equal(result.status, 1, result.stderr || result.stdout);
     return JSON.parse(result.stdout);

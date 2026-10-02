@@ -1,0 +1,22 @@
+group: gate
+verb: test-world
+owner: runtime
+summary: run and judge one managed test-world project
+impl: {script: scripts/gates/test-world-run.mjs}
+flags:
+  - {name: root, type: string, summary: application root}
+  - {name: project, type: enum, enum: [e2e, integration, contract], required: true, summary: test-world project}
+  - {name: tests, type: string, summary: path pattern narrowing the selected specs}
+  - {name: out, type: string, summary: write the run summary to this file}
+exit:
+  "0": project is green
+  "1": findings or a red run remain
+  "2": summary could not be built or usage was invalid
+json: always
+examples:
+  - starci gate test-world --root <app> --project e2e --out test-world-run.json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/test-world-run.mjs
+  - node .claude/scripts/gates/test-world-run.mjs

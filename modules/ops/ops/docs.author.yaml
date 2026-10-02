@@ -11,8 +11,8 @@ params:
     max: 10
     setBy: owner
     doc:
-      en: "Rounds of FIX then the document gate (gate.mjs --profile docs) before the op stops: a gate still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml docChecks)."
-      vi: "Số vòng SỬA rồi chạy lại cổng tài liệu (gate.mjs --profile docs) trước khi op dừng: hết vòng cuối mà cổng vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml docChecks)."
+      en: "Rounds of FIX then the document gate (starci gate run --scope docs) before the op stops: a gate still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml docChecks)."
+      vi: "Số vòng SỬA rồi chạy lại cổng tài liệu (starci gate run --scope docs) trước khi op dừng: hết vòng cuối mà cổng vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml docChecks)."
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects: []
@@ -99,8 +99,8 @@ writes:
     path: STARCI_JOB_SCRATCH/doc-gate.json
     schema: starci/gate@1
     content:
-      en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
-      vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
+      en: "The last round's document gate (starci gate run --scope docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
+      vi: "Cổng tài liệu của vòng cuối (starci gate run --scope docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
 steps:
   - reads: [standard, target]
     writes: [read-digest]
@@ -149,8 +149,8 @@ steps:
   - reads: [standard, records]
     writes: [doc-gate]
     action:
-      en: "FORCE THE DOCUMENT CHECKS after writing: run node scripts/gates/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the findings per check (a document that is not English, a Work record with a dead surface or a stale proof, a cite of a file that does not exist, a JSON exception out of place); exit 2 means a check could not run and is never green. Still red after the last round: report blocked with the exact findings. Never report done while the document gate is red or could not run. REPORT with doc-gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA TÀI LIỆU sau khi viết: chạy node scripts/gates/gate.mjs --profile docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi theo từng bộ kiểm tra (tài liệu không phải tiếng Anh, bản ghi Work có bề mặt chết hoặc bằng chứng lỗi thời, trích dẫn tới tệp không tồn tại, ngoại lệ JSON sai chỗ); exit 2 là một bộ kiểm tra không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi cổng tài liệu đỏ hoặc không chạy được. BÁO CÁO kèm doc-gate.json và read-digest.json."
+      en: "FORCE THE DOCUMENT CHECKS after writing: run starci gate run --scope docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the findings per check (a document that is not English, a Work record with a dead surface or a stale proof, a cite of a file that does not exist, a JSON exception out of place); exit 2 means a check could not run and is never green. Still red after the last round: report blocked with the exact findings. Never report done while the document gate is red or could not run. REPORT with doc-gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA TÀI LIỆU sau khi viết: chạy starci gate run --scope docs --tree <app>/.starciwork --out $STARCI_JOB_SCRATCH/doc-gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi theo từng bộ kiểm tra (tài liệu không phải tiếng Anh, bản ghi Work có bề mặt chết hoặc bằng chứng lỗi thời, trích dẫn tới tệp không tồn tại, ngoại lệ JSON sai chỗ); exit 2 là một bộ kiểm tra không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi cổng tài liệu đỏ hoặc không chạy được. BÁO CÁO kèm doc-gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:

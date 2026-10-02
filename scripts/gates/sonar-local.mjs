@@ -1198,7 +1198,7 @@ export async function dashboard(cfg,options={}){
 
 // ---- CLI ------------------------------------------------------------------------------------------------
 
-const HELP=`Usage: node scripts/gates/sonar-local.mjs <command> [options]
+const HELP=`Usage: starci gate sonar <command> [options]
 
   status                                  server, container, custody presence and token validity
   ensure-project --key K [--name N]       create the project on the local server when it is missing;

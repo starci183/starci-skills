@@ -2,7 +2,7 @@
 // unit-run.mjs - the unit run summary (schema starci/unit-run@1) unit.verify attaches (knowledge/op-gate.yaml proofs.unit-kit,
 // contract change op-mechanism-proofs).
 //
-//   node scripts/gates/unit-run.mjs --root <app> [--out <file>]
+//   starci gate unit --root <app> [--out <file>]
 //
 // The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): only the unit-tested roles of the slot manifest
 // (ruleParams.be.unitRoles: every be/src/**/*.service.ts, every cli command be/src/features/cli/**/*.cli.ts) are unit-tested, one
@@ -32,7 +32,7 @@ export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
 export const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVICE_ROOT = 'be/src';
-const USAGE = 'usage: unit-run.mjs --root <app> [--out <file>]';
+const USAGE = 'usage: starci gate unit --root <app> [--out <file>]';
 
 /** op-gate.yaml unitKit: {required[], forbidden[]}. */
 export function unitKitRules(runtime = runtimeRoot) {

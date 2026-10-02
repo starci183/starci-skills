@@ -8,7 +8,7 @@
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view) and the project graph
 //                                (scripts/hfs/project-rule.mjs -> project-graph.mjs -> the architecture machine) its project rules share
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
-//   node scripts/hfs/sync-runtime.mjs [--check]     --check exits 1 when a copy differs; npm run check judges the same
+//   starci release sync-runtime [--check]     --check exits 1 when a copy differs; starci runtime check judges the same
 //                                                            differences as RT_GENERATED_DRIFT (scripts/hfs/runtime-check.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -123,7 +123,7 @@ export function driftOfRuntime() {
 if (isMain(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const problems = driftOfRuntime();
-    for (const p of problems) process.stderr.write(`${GENERATED_DRIFT} runtime copy drift: ${p} (run node scripts/hfs/sync-runtime.mjs)\n`);
+    for (const p of problems) process.stderr.write(`${GENERATED_DRIFT} runtime copy drift: ${p} (run starci release sync-runtime)\n`);
     if (!problems.length) process.stdout.write(`OK: ${Object.keys(BUNDLES).length} runtime copies match the runtime\n`);
     process.exitCode = problems.length ? 1 : 0;
   } else {

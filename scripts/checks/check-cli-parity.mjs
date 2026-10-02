@@ -21,6 +21,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 
@@ -33,12 +36,120 @@ ${RULE}: catalog <-> implementation parity of modules/cli/commands.
 Exit 0 agrees, 1 reports findings, 2 is a bad argument or unreadable source.`;
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const INTERNAL_FILE = 'modules/cli/commands/_internal.yaml';
+const ENTRY_EXT = /\.(?:[cm]?js|ts|sh)$/;
+const ENTRY_ROOT = /^(?:engine|scripts|ui|bin)\//;
+const PACKAGE_ENTRY = /^packages\/[^/]+\/(?:bin|src)\//;
+const ENTRY_EXEMPT = new Set(['packages/cli/bin/starci.mjs', 'packages/hfs/src/main.mjs']);
 
 class ParityInputError extends Error {}
 
 const read = (file) => {
   try { return fs.readFileSync(file, 'utf8'); } catch { throw new ParityInputError(`unreadable source: ${file}`); }
 };
+
+const posix = (file) => String(file).replace(/\\/g, '/');
+
+const codeOnly = (text) => {
+  let out = '', state = 'code', escaped = false, inClass = false, significant = '';
+  const blank = (char) => (char === '\n' ? '\n' : ' ');
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i], next = text[i + 1];
+    if (state === 'line') { if (char === '\n') { state = 'code'; out += '\n'; } else out += ' '; continue; }
+    if (state === 'block') { if (char === '*' && next === '/') { out += '  '; i += 1; state = 'code'; } else out += blank(char); continue; }
+    if (state === 'quote' || state === 'template') {
+      if (escaped) { escaped = false; out += blank(char); continue; }
+      if (char === '\\') { escaped = true; out += ' '; continue; }
+      const end = state === 'template' ? '`' : significant;
+      if (char === end) state = 'code';
+      out += blank(char);
+      continue;
+    }
+    if (state === 'regex') {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '[') inClass = true;
+      else if (char === ']') inClass = false;
+      else if (char === '/' && !inClass) state = 'code';
+      out += blank(char);
+      continue;
+    }
+    if (char === '/' && next === '/') { out += '  '; i += 1; state = 'line'; continue; }
+    if (char === '/' && next === '*') { out += '  '; i += 1; state = 'block'; continue; }
+    if (char === "'" || char === '"') { significant = char; state = 'quote'; out += ' '; continue; }
+    if (char === '`') { state = 'template'; out += ' '; continue; }
+    if (char === '/' && (!significant || /[=(:,!&|?{};\[\]]/.test(significant))) { state = 'regex'; inClass = false; out += ' '; continue; }
+    out += char;
+    if (!/\s/.test(char)) significant = char;
+  }
+  return out;
+};
+
+/** True only for the three entry gates owned by the registry contract. */
+export function hasEntryGate(source) {
+  const text = String(source ?? '');
+  if (text.startsWith('#!')) return true;
+  const code = codeOnly(text);
+  if (/\bisMain\s*\(\s*import\.meta\.url\s*\)/.test(code)) return true;
+  // A legacy entry may read argv directly at module scope. Function/default
+  // parameters and arrow helpers merely accepting argv are libraries, not mains.
+  let depth = 0;
+  for (const line of code.split(/\r?\n/)) {
+    const before = depth;
+    for (const char of line) {
+      if (char === '{') depth += 1;
+      else if (char === '}') depth = Math.max(0, depth - 1);
+    }
+    if (before === 0 && /\bprocess\.argv\b/.test(line) && !/\bfunction\b|=>/.test(line)) return true;
+  }
+  return false;
+}
+
+/** Parse _internal.yaml without routing it through the command-catalog loader. */
+export function loadInternalRegistry(root = DEFAULT_ROOT) {
+  const file = path.join(root, ...INTERNAL_FILE.split('/'));
+  let doc;
+  try { doc = parseYaml(read(file)); } catch (error) { throw new ParityInputError(`invalid ${INTERNAL_FILE}: ${error.message}`); }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc) || !Array.isArray(doc.internal)) {
+    throw new ParityInputError(`${INTERNAL_FILE}: "internal" must be a list`);
+  }
+  const entries = [];
+  for (let i = 0; i < doc.internal.length; i += 1) {
+    const item = doc.internal[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] is not a map`);
+    const keys = Object.keys(item);
+    for (const key of keys) if (!['path', 'why', 'usedBy'].includes(key)) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}] has unknown key "${key}"`);
+    if (typeof item.path !== 'string' || !item.path.trim()) throw new ParityInputError(`${INTERNAL_FILE}: internal[${i}].path must be a non-empty string`);
+    if (typeof item.why !== 'string' || !item.why.trim() || /[\r\n]/.test(item.why)) throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.why must be one short line`);
+    if (!Array.isArray(item.usedBy) || !item.usedBy.length || item.usedBy.some((value) => typeof value !== 'string' || !value.trim())) {
+      throw new ParityInputError(`${INTERNAL_FILE}: ${item.path}.usedBy must be a non-empty path list`);
+    }
+    entries.push({ path: posix(item.path), why: item.why, usedBy: item.usedBy.map(posix) });
+  }
+  return entries;
+}
+
+const fallbackFiles = (root) => {
+  const out = [];
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(file);
+      else out.push(posix(path.relative(root, file)));
+    }
+  };
+  for (const top of ['engine', 'scripts', 'ui', 'bin', 'packages']) walk(path.join(root, top));
+  return out;
+};
+
+const trackedFiles = (root) => {
+  try { return gitOutputOf(lsFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean).map(posix); }
+  catch { return fallbackFiles(root); }
+};
+
+const entryCandidate = (file) => ENTRY_EXT.test(file) && (ENTRY_ROOT.test(file) || PACKAGE_ENTRY.test(file));
 
 const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
 
@@ -85,7 +196,7 @@ export const kernelVerbModules = (root) => {
 };
 
 /** The whole parity report: {ok, findings, skipped, verbs}. */
-export function checkCliParity(root = DEFAULT_ROOT) {
+export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   const findings = [];
   const skipped = [];
   const bad = (what, detail) => findings.push({ rule: RULE, what, detail });
@@ -95,6 +206,38 @@ export function checkCliParity(root = DEFAULT_ROOT) {
     throw e;
   }
   const groups = new Map(cat.groups.map((g) => [g.group, g]));
+  const implScripts = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.script).filter(Boolean).map(posix)));
+  const routedEntries = new Set(implScripts);
+  for (const group of cat.groups) for (const verb of group.verbs) for (const spelling of verb.removed ?? []) {
+    const match = /^node\s+(?:\.claude[\\/])?((?:engine|scripts|ui|bin|packages[\\/][^\\/]+[\\/](?:bin|src))[\\/][^\s"']+)/.exec(spelling);
+    if (match) routedEntries.add(posix(match[1]));
+  }
+
+  // Every non-public entry point is declared once in _internal.yaml. The
+  // registry itself is deliberately outside catalog.mjs: it is not a route.
+  let internal = [];
+  try { internal = loadInternalRegistry(root); } catch (error) {
+    bad('internal', error.message);
+  }
+  const internalPaths = new Set();
+  for (const item of internal) {
+    if (internalPaths.has(item.path)) { bad(`internal:${item.path}`, 'internal entry is duplicated'); continue; }
+    internalPaths.add(item.path);
+    const absolute = path.join(root, ...item.path.split('/'));
+    if (!fs.existsSync(absolute)) { bad(`internal:${item.path}`, 'internal entry stale: file does not exist'); continue; }
+    if (!hasEntryGate(read(absolute))) bad(`internal:${item.path}`, 'internal entry stale: file has no entry gate');
+    if (implScripts.has(item.path)) bad(`internal:${item.path}`, 'internal entry stale: file is also a catalog verb implementation');
+  }
+
+  const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
+  for (const file of files ?? trackedFiles(root)) {
+    const rel = posix(file);
+    if (!entryCandidate(rel) || knownPublic.has(rel) || rel.startsWith('packages/cli/src/') || internalPaths.has(rel)) continue;
+    const absolute = path.join(root, ...rel.split('/'));
+    let source;
+    try { source = read(absolute); } catch { continue; }
+    if (hasEntryGate(source)) bad(`entry:${rel}`, 'entry script is neither a catalog verb nor listed internal');
+  }
 
   // kernel: impl script + resolvable handler (extension module or cli.mjs case)
   const cliFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');

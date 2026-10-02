@@ -1,0 +1,27 @@
+group: release
+verb: launch-smoke
+owner: runtime
+summary: prove live nested-agent launch paths on an Orca host
+impl: {script: scripts/kernel/launch-smoke.mjs}
+positional:
+  - {name: action, enum: [stage, mark], required: false, variadic: false}
+flags:
+  - {name: app-repo, type: string, summary: scratch app main checkout registered in Orca}
+  - {name: entry, type: string, summary: plain entry terminal for the smoke}
+  - {name: timeout-ms, type: number, summary: smoke deadline in milliseconds}
+  - {name: out, type: string, summary: write the smoke result to this file}
+  - {name: as, type: enum, enum: [supervisor, worker, kernel, op, opFe, opFail, critic], summary: internal smoke role for stage or mark}
+exit:
+  "0": smoke or role action passed
+  "1": smoke or role action failed
+  "2": bad usage or no entry terminal
+json: always
+examples:
+  - starci release launch-smoke --app-repo <scratch-app>
+  - starci release launch-smoke stage --as kernel
+  - starci release launch-smoke mark --as op
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/kernel/launch-smoke.mjs
+  - node .claude/scripts/kernel/launch-smoke.mjs

@@ -482,7 +482,7 @@ test('the no-op agent is the cheapest priced model a runtimes.yaml pool pins, wi
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {
   const parent = noopSpec({ role: 'op', script: 'scripts/kernel/launch-smoke.mjs' });
-  assert.match(parent, /node "scripts\/kernel\/launch-smoke\.mjs" stage --as op$/m, 'the command names only the role: nothing random to mistype');
+  assert.match(parent, /starci release launch-smoke stage --as op$/m, 'the command names only the role: nothing random to mistype');
   assert.match(parent, /timeout of at least 300 seconds/);
   assert.deepEqual(CHILDREN, { supervisor: ['worker'], kernel: ['op', 'opFe'], op: ['critic'] }, 'the smoke itself starts opFail, never a stage');
   for (const role of ['critic', 'opFe', 'opFail']) {

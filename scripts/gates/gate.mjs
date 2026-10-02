@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // gate.mjs - THE gate of a code-writing op and of the Kernel landing (schema starci/gate@1).
 //
-//   node scripts/gates/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
+//   starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
 //
 // An op forces it every round of its READ-CODE-CHECK-FIX-REPORT loop (knowledge/op-gate.yaml) and attaches the JSON it prints;
 // `api settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
@@ -33,7 +33,7 @@
 // 2026-09-30). A finding the base already has is counted as preexisting, never a finding of the op. Failing specs always block.
 // Exit 0 clean, 1 new findings, 2 a tool could not run (never a pass). stdout is the one JSON document.
 //
-//   node scripts/gates/gate.mjs --profile docs [--tree <app>/.starciwork] [--out <file>]
+//   starci gate run --scope docs [--tree <app>/.starciwork] [--out <file>]
 //
 // The DOCUMENT profile (knowledge/op-gate.yaml docChecks, owed by docs.author, knowledge.repair and work.author): every document
 // check runs from the runtime root - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites,
@@ -70,7 +70,7 @@ const TSC_BOUND = 'bounded-v1';
 /** A tsc project whose app root (or side) has no install, or no typescript inside it: never measured (exit 2). */
 const INSTALL_MISSING = 'GATE_INSTALL_MISSING';
 const LISTED_MAX = 500;
-const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | gate.mjs --profile docs [--tree <work root>] [--out <file>]';
+const USAGE = 'usage: starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | starci gate run --scope docs [--tree <work root>] [--out <file>]';
 export const DOC_PROFILE = 'docs';
 export const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
@@ -82,13 +82,16 @@ export function parseGateArgs(argv) {
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--main', '--tests', '--out', '--profile', '--tree'].includes(arg)) {
+    } else if (['--root', '--base', '--main', '--tests', '--out', '--tree'].includes(arg)) {
       if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
       opts[arg.slice(2)] = argv[++i];
+    } else if (arg === '--scope') {
+      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
+      opts.profile = argv[++i];
     } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
-  if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--profile must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
-  if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --profile ${DOC_PROFILE}; ${USAGE}`);
+  if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--scope must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
+  if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --scope ${DOC_PROFILE}; ${USAGE}`);
   return opts;
 }
 

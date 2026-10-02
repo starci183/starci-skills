@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // canon-scan.mjs — the measured canon debt of one product repository, and its conformance cut.
 //
-//   node scripts/gates/canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>]
+//   starci gate canon-scan --root <repo> [--stack-kind next|nest] [--families <csv>]
 //       [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture]
 //       [--fix] [--json]
 //
@@ -39,7 +39,7 @@ import { isMain } from '../lib/is-main.mjs';
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MACHINES = ['eslint', 'architecture'];
-const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
+const USAGE = 'usage: starci gate canon-scan --root <repo> [--stack-kind next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
 
 const csv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
@@ -52,7 +52,7 @@ export function parseCanonScanArgs(argv) {
     const key = argv[index];
     const take = () => { const value = argv[++index]; if (value === undefined) throw Error(`${key} needs a value; ${USAGE}`); return value; };
     if (key === '--root') out.root = take();
-    else if (key === '--profile') out.profile = take();
+    else if (key === '--stack-kind') out.profile = take();
     else if (key === '--families') out.families = csv(take()).filter((family) => family !== 'all');
     else if (key === '--paths') out.paths = csv(take()).map(prefixOf);
     else if (key === '--exclude') out.exclude = csv(take()).map(prefixOf);
@@ -67,7 +67,7 @@ export function parseCanonScanArgs(argv) {
   out.machines ??= out.families.length
     ? MACHINES.filter((machine) => (machine === 'architecture' ? out.families.includes('architecture') : out.families.some((family) => family !== 'architecture')))
     : [...MACHINES];
-  if (out.profile && !['next', 'nest'].includes(out.profile)) throw Error(`--profile must be next or nest; ${USAGE}`);
+  if (out.profile && !['next', 'nest'].includes(out.profile)) throw Error(`--stack-kind must be next or nest; ${USAGE}`);
   const unknown = out.machines.filter((machine) => !MACHINES.includes(machine));
   if (unknown.length || !out.machines.length) throw Error(`--machines takes ${MACHINES.join(', ')}; ${USAGE}`);
   if (out.fix && !out.paths.length) throw Error('--fix needs --paths: a codemod runs inside one slice only');
@@ -255,7 +255,7 @@ function detectProfile(root) {
     if (profile === 'be') return 'nest';
     if (profile === 'fe') return 'next';
   }
-  throw Object.assign(Error('cannot tell next from nest; pass --profile'), { code: 'PROFILE_UNKNOWN' });
+  throw Object.assign(Error('cannot tell next from nest; pass --stack-kind'), { code: 'PROFILE_UNKNOWN' });
 }
 
 function familyOf(ruleId, canonPrefix, ruleOwners) {

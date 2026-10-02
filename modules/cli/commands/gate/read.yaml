@@ -1,0 +1,23 @@
+group: gate
+verb: read
+owner: runtime
+summary: build the recorded READ digest for an operation
+impl: {script: scripts/gates/read-digest.mjs}
+flags:
+  - {name: root, type: string, summary: application root}
+  - {name: touch, type: list, summary: files the operation will touch}
+  - {name: read, type: list, summary: additional application files read}
+  - {name: knowledge, type: list, summary: runtime knowledge files read}
+  - {name: out, type: string, summary: write the digest to this file}
+exit:
+  "0": digest built
+  "2": digest could not be built or usage was invalid
+json: always
+examples:
+  - starci gate read --root <app> --touch be/src/app.service.ts --out read-digest.json
+  - starci gate read --knowledge knowledge/op-gate.yaml
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/read-digest.mjs
+  - node .claude/scripts/gates/read-digest.mjs

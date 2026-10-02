@@ -1,0 +1,20 @@
+group: gate
+verb: unit
+owner: runtime
+summary: run unit tests and judge per-subject coverage and test-kit use
+impl: {script: scripts/gates/unit-run.mjs}
+flags:
+  - {name: root, type: string, summary: application root}
+  - {name: out, type: string, summary: write the run summary to this file}
+exit:
+  "0": unit run is green
+  "1": findings or a red run remain
+  "2": summary could not be built or usage was invalid
+json: always
+examples:
+  - starci gate unit --root <app> --out unit-run.json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/unit-run.mjs
+  - node .claude/scripts/gates/unit-run.mjs

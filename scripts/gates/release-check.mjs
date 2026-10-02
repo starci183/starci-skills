@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// release-check.mjs - `npm run release:check`: the one release gate. It folds the readiness checklist and the batch-publish
+// release-check.mjs - `starci release check`: the one release gate. It folds the readiness checklist and the batch-publish
 // plan into runtime code; it prints GREEN only when every proof of the checklist holds, and it NEVER publishes (publishing is
-// scripts/gates/release-publish.mjs with --publish, a human step).
+// `starci release publish --publish`, a human step).
 //
-//   node scripts/gates/release-check.mjs [--final] [--only <id>,<id>] [--json]
+//   starci release check [--final] [--only <id>,<id>] [--json]
 //
 // Proofs, in order (id: what it proves; the checklist row it replaces):
 //   publish-plan   B1  every published package is at its pin and matches the registry (shasum, or content); nothing is left to publish
@@ -46,7 +46,7 @@ export function publishPlanProof({ root, registry }) {
   let plan;
   try { plan = buildPlan({ root, registry }); } catch (error) { return unrun('publish-plan', String(error?.message ?? error)); }
   const pending = plan.toPublish.map((r) => `${r.name}@${r.version}`);
-  const problems = [...plan.blockers, ...(pending.length ? [`${pending.length} package(s) still to publish: ${pending.join(', ')} (scripts/gates/release-publish.mjs, with --publish)`] : [])];
+  const problems = [...plan.blockers, ...(pending.length ? [`${pending.length} package(s) still to publish: ${pending.join(', ')} (starci release publish --publish)`] : [])];
   return result('publish-plan', problems.length === 0, problems.length ? problems.slice(0, 6).join(' | ') : `${plan.rows.length} package(s) at their pins and on the registry`, { plan });
 }
 
@@ -134,7 +134,7 @@ export function parseArgs(argv) {
     if (arg === '--final') opts.final = true;
     else if (arg === '--json') opts.json = true;
     else if (arg === '--only') opts.only = String(argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    else throw new Error(`unknown argument ${arg}; usage: release-check.mjs [--final] [--only <id>,<id>] [--json]`);
+    else throw new Error(`unknown argument ${arg}; usage: starci release check [--final] [--only <id>,<id>] [--json]`);
   }
   const known = [...PROOFS, ...FINAL_PROOFS];
   const bad = (opts.only ?? []).filter((id) => !known.includes(id));

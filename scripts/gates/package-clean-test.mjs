@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // package-clean-test.mjs - every published @starci package passes its own tests from a CLEAN install.
 //
-//   node scripts/gates/package-clean-test.mjs                      every package of the publish set
-//   node scripts/gates/package-clean-test.mjs --changed <file>...  only the packages those files belong to
-//   node scripts/gates/package-clean-test.mjs --base <rev>          only the packages the files changed in <rev>..HEAD belong to
+//   starci release clean-test                      every package of the publish set
+//   starci release clean-test --changed <file>...  only the packages those files belong to
+//   starci release clean-test --base <rev>         only the packages the files changed in <rev>..HEAD belong to
 //
 // The publish set is read, never listed by hand: every `group: starci` pin of knowledge/hfs/canon-pins.yaml with a
 // `source` is a published package, and the folder of that source is the package. For each one the proof:
@@ -48,7 +48,7 @@ const INSTALL_TIMEOUT_MS = 1_200_000;
 const TEST_TIMEOUT_MS = 1_800_000;
 /** npm's own words for a registry it could not reach: the proof did not run, the package is not judged. */
 const NETWORK = /\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH|ENOTCACHED)\b/;
-const USAGE = 'usage: package-clean-test.mjs [--changed <file>... | --base <rev>]';
+const USAGE = 'usage: starci release clean-test [--changed <file>... | --base <rev>]';
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const tail = (text, n = 30) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');

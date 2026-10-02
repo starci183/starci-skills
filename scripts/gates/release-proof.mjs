@@ -2,7 +2,7 @@
 // release-proof.mjs - the release proof (schema starci/release-proof@1) release.deliver attaches before a publish or a deploy
 // (knowledge/op-gate.yaml proofs.release, contract change op-mechanism-proofs).
 //
-//   node scripts/gates/release-proof.mjs --repo <released repository> --base <first commit of the release range>^ [--main <ref>] [--out <file>]
+//   starci release proof --repo <released repository> --base <first commit of the release range>^ [--main <ref>] [--out <file>]
 //
 // Every step is required and none may be skipped:
 //   app-installs  scripts/gates/release-app-installs.mjs: the published hfs scaffolds an app, the app installs FRESH from the
@@ -28,7 +28,7 @@ export const RELEASE_PROOF_SCHEMA = 'starci/release-proof@1';
 export const RELEASE_STEPS = Object.freeze(['app-installs', 'canon-pins', 'merge-guard', 'check']);
 export const STEP_STATUS = Object.freeze({ pass: 'pass', red: 'red', skipped: 'skipped', toolFailed: 'tool-failed' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const USAGE = 'usage: release-proof.mjs --repo <released repository> --base <commit> [--main <ref>] [--out <file>]';
+const USAGE = 'usage: starci release proof --repo <released repository> --base <commit> [--main <ref>] [--out <file>]';
 const tail = (text, n = 3) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join(' | ').slice(0, 600);
 
 const isApp = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'hfs.json'), 'utf8'))?.kind === 'app'; } catch { return false; } };
@@ -42,7 +42,7 @@ export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = 
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const skipped = output.split(/\r?\n/).filter((l) => /\bSKIPPED:/.test(l));
   const status = run.error || run.status === null ? STEP_STATUS.toolFailed : skipped.length ? STEP_STATUS.skipped : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
-  return { id: 'app-installs', command: 'node scripts/gates/release-app-installs.mjs', exit: run.status ?? null, status,
+  return { id: 'app-installs', command: 'starci release app-installs', exit: run.status ?? null, status,
     detail: skipped.length ? `a proof skipped: ${skipped.slice(0, 3).join(' | ')}` : tail(output) };
 }
 
@@ -70,17 +70,17 @@ export function mergeGuardStep({ repo, base, main = null }) {
   try {
     const from = resolveGateBase(repo, base);
     const guard = mergeGuard(repo, { base: from, mainTip: mainTipOf(repo, main) });
-    return { id: 'merge-guard', command: `gate.mjs mergeGuard ${from.slice(0, 12)}..HEAD`, exit: guard.errors.length ? 2 : guard.findings.length ? 1 : 0,
+    return { id: 'merge-guard', command: `starci gate run (merge guard ${from.slice(0, 12)}..HEAD)`, exit: guard.errors.length ? 2 : guard.findings.length ? 1 : 0,
       status: guard.errors.length ? STEP_STATUS.toolFailed : guard.findings.length ? STEP_STATUS.red : STEP_STATUS.pass, checked: guard.checked.length,
       detail: guard.errors.length ? guard.errors.join(' | ') : guard.findings.map((f) => f.message).slice(0, 5).join(' | ') };
   } catch (error) {
-    return { id: 'merge-guard', command: 'gate.mjs mergeGuard', exit: 2, status: STEP_STATUS.toolFailed, checked: 0, detail: String(error?.message ?? error) };
+    return { id: 'merge-guard', command: 'starci gate run (merge guard)', exit: 2, status: STEP_STATUS.toolFailed, checked: 0, detail: String(error?.message ?? error) };
   }
 }
 
 export function checkStep({ runtime = runtimeRoot, npm = defaultNpm } = {}) {
   const run = npm(['run', 'check'], { cwd: runtime });
-  return { id: 'check', command: 'npm run check', exit: run.status ?? null,
+  return { id: 'check', command: 'starci runtime check', exit: run.status ?? null,
     status: run.error || run.status === null ? STEP_STATUS.toolFailed : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
 }
 

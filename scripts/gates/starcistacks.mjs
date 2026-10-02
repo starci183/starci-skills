@@ -10,7 +10,7 @@
 // before it asks for any credential, and never asks the owner for what it declares `ownerAction: none`
 // with custody present.
 //
-//   node scripts/gates/starcistacks.mjs <repo-root> [--new] [--admitted-at <ISO|ms> [--op <op>]] [--json]
+//   starci gate starcistacks <repo-root> [--new] [--admitted-at <ISO|ms> [--op <op>]] [--json]
 //
 //   --new          the repository is being created by this leg (interface.scaffold, backend.scaffold,
 //                  package.scaffold): a missing declaration or services block is refused, not a suspect
@@ -479,7 +479,7 @@ export function ownerAskConflict({ repo, question } = {}) {
     if (!byName && !(byWord && ASK_WORDS.test(body))) continue;
     const custody = service.credentials.map((credential) => `${credential.custody.repository}/${credential.custody.path}`);
     return { service: id, provider: service.provider, declaration: slash(service.declaration), matched: byName ?? byWord,
-      message: `${id} (${service.provider}, ${service.mode}) is declared in ${slash(service.declaration)} with ownerAction none${custody.length ? ` and its credentials in custody (${custody.join(', ')})` : ` and auth ${service.auth}`}; the owner is never asked for it. ${id === 'sonar' ? 'Run scripts/gates/sonar-local.mjs (status, ensure-project, scan) - it reads host, project and token from the declaration and custody. ' : ''}CI wiring is ${service.ci.wiring ?? 'undeclared'}${service.ci.provisioning ? ` (${service.ci.provisioning})` : ''}.` };
+      message: `${id} (${service.provider}, ${service.mode}) is declared in ${slash(service.declaration)} with ownerAction none${custody.length ? ` and its credentials in custody (${custody.join(', ')})` : ` and auth ${service.auth}`}; the owner is never asked for it. ${id === 'sonar' ? 'Run starci gate sonar (status, ensure-project, scan) - it reads host, project and token from the declaration and custody. ' : ''}CI wiring is ${service.ci.wiring ?? 'undeclared'}${service.ci.provisioning ? ` (${service.ci.provisioning})` : ''}.` };
   }
   return null;
 }
@@ -498,7 +498,7 @@ async function admittedCodes(argv) {
   return { ok: true, codes, drop: [at, at + 1, ...(opAt >= 0 ? [opAt, opAt + 1] : [])] };
 }
 
-const USAGE = 'Usage: node scripts/gates/starcistacks.mjs <repo-root> [--new] [--admitted-at <ISO|epoch-ms> [--op <op>]] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
+const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--admitted-at <ISO|epoch-ms> [--op <op>]] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
 
 export async function checkStarciStacksMain(argv = []) {
   const admitted = await admittedCodes(argv);

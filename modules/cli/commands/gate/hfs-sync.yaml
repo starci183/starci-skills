@@ -1,0 +1,20 @@
+group: gate
+verb: hfs-sync
+owner: runtime
+summary: check an app's generated files and custody trees for drift
+impl: {script: scripts/gates/hfs-sync.mjs}
+flags:
+  - {name: repo, type: string, required: true, summary: product repository to check}
+exit:
+  "0": generated files and custody trees are clean
+  "1": findings remain
+  "2": bad usage
+json: flag
+examples:
+  - starci gate hfs-sync --repo <product-repo>
+  - starci gate hfs-sync --repo <product-repo> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/hfs-sync.mjs
+  - node .claude/scripts/gates/hfs-sync.mjs

@@ -1,0 +1,26 @@
+group: release
+verb: publish
+owner: runtime
+summary: plan or perform the owner-run package publication sequence
+impl: {script: scripts/gates/release-publish.mjs}
+flags:
+  - {name: publish, type: boolean, summary: perform the plan instead of reading it}
+  - {name: npm-user, type: string, summary: required logged-in npm account for publication}
+  - {name: poll-minutes, type: number, default: 15, summary: registry confirmation deadline per package}
+  - {name: pre-land-ref, type: string, summary: require HEAD to equal this pre-land commit}
+exit:
+  "0": plan is clear or publication completed
+  "1": a publication step failed
+  "2": bad usage or environment
+  "3": packages published but canon binding is not green
+  "4": plan has blockers
+json: none
+examples:
+  - starci release publish
+  - starci release publish --publish --npm-user <name>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/release-publish.mjs
+  - node .claude/scripts/gates/release-publish.mjs
+  - npm run release:publish

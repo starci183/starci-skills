@@ -40,7 +40,8 @@ const verbModule = (verb, usage, required) => `export default {
   run() { return { ok: true }; },
 };
 `;
-const CLI_MJS = `const usage = (code) => {
+const CLI_MJS = `#!/usr/bin/env node
+const usage = (code) => {
   console.error(\`use: node scripts/kernel/cli.mjs <cmd> --repo <path> [...]
   probe   --workflow <id> [--deep]\`);
   process.exit(code);
@@ -53,11 +54,15 @@ const main = async () => {
   }
 };
 `;
+const internalYaml = (entries = []) => entries.length ? `internal:
+${entries.map((entry) => `  - path: ${entry.path}\n    why: ${entry.why ?? 'fixture internal entry'}\n    usedBy: [${entry.usedBy ?? 'scripts/owner.mjs'}]`).join('\n')}\n` : 'internal: []\n';
+const writeInternal = (root, entries = []) => fs.writeFileSync(path.join(root, 'modules/cli/commands/_internal.yaml'), internalYaml(entries));
 
 const fixture = (edit) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-cli-parity-'));
   const put = (rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
   put('modules/cli/commands/_global.yaml', GLOBAL_YAML);
+  put('modules/cli/commands/_internal.yaml', internalYaml());
   put('modules/cli/commands/kernel/_group.yaml', GROUP_YAML);
   put('modules/cli/commands/kernel/probe.yaml', verbYaml('probe', ['workflow', ['deep', 'boolean']]));
   put('modules/cli/commands/kernel/builtin.yaml', verbYaml('builtin', ['job']));
@@ -130,6 +135,53 @@ test('a catalog verb with no handler is a finding', () => {
     const report = checkCliParity(root);
     assert.equal(report.ok, false);
     assert.ok(report.findings.some((f) => f.what === 'handler:kernel/ghost'));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('an entry script needs either a catalog route or an internal declaration', () => {
+  const root = fixture((t, put) => put('scripts/private.mjs', '#!/usr/bin/env node\nconsole.log("fixture");\n'));
+  try {
+    const red = checkCliParity(root);
+    assert.ok(red.findings.some((f) => f.what === 'entry:scripts/private.mjs'), JSON.stringify(red.findings));
+    writeInternal(root, [{ path: 'scripts/private.mjs' }]);
+    const green = checkCliParity(root);
+    assert.equal(green.ok, true, JSON.stringify(green.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a missing internal entry is stale, and becomes valid when its gated file exists', () => {
+  const root = fixture();
+  try {
+    writeInternal(root, [{ path: 'scripts/private.mjs' }]);
+    let report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => f.what === 'internal:scripts/private.mjs' && /does not exist/.test(f.detail)), JSON.stringify(report.findings));
+    fs.writeFileSync(path.join(root, 'scripts/private.mjs'), '#!/usr/bin/env node\n');
+    report = checkCliParity(root);
+    assert.equal(report.ok, true, JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('an internal entry without an entry gate is stale, and a gate repairs it', () => {
+  const root = fixture((t, put) => put('scripts/private.mjs', 'export const value = 1;\n'));
+  try {
+    writeInternal(root, [{ path: 'scripts/private.mjs' }]);
+    let report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => f.what === 'internal:scripts/private.mjs' && /no entry gate/.test(f.detail)), JSON.stringify(report.findings));
+    fs.writeFileSync(path.join(root, 'scripts/private.mjs'), '#!/usr/bin/env node\nexport const value = 1;\n');
+    report = checkCliParity(root);
+    assert.equal(report.ok, true, JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a catalog implementation cannot also be internal, and removing it from the registry repairs parity', () => {
+  const root = fixture();
+  try {
+    writeInternal(root, [{ path: 'scripts/kernel/cli.mjs' }]);
+    let report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => f.what === 'internal:scripts/kernel/cli.mjs' && /catalog verb implementation/.test(f.detail)), JSON.stringify(report.findings));
+    writeInternal(root);
+    report = checkCliParity(root);
+    assert.equal(report.ok, true, JSON.stringify(report.findings));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

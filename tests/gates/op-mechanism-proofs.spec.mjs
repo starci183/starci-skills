@@ -1,7 +1,7 @@
 // The mechanism proofs (knowledge/op-gate.yaml proofs/opProofs, contract change op-mechanism-proofs): every op whose job touches a
 // runtime mechanism attaches the document that mechanism prints, and `api settle` re-reads it (scripts/kernel/gate-settle.mjs
 // judgeJobProofs, runtime check op-proof) and refuses a done that lacks it, is red or could not run. One spec per refusal code,
-// the producers' own judgments (test-world-run.mjs, unit-run.mjs, release-proof.mjs, gate.mjs --profile docs, read-digest.mjs
+// the producers' own judgments (test-world-run.mjs, unit-run.mjs, release-proof.mjs, starci gate run --scope docs, read-digest.mjs
 // --knowledge), and api settle end to end for a documenting, a test-world and a reviewing op.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,10 +93,10 @@ test('doc-gate: missing (or a code gate) is op-doc-gate-missing, a check that ca
   assert.equal(judgeDocGate(greenDocGate()).status, 'pass');
 });
 
-test('gate.mjs --profile docs runs every docChecks script: exit 1 is a finding, a crash or another exit is a tool failure', () => {
-  assert.equal(parseGateArgs(['--profile', 'docs', '--tree', 'x']).profile, DOC_PROFILE);
-  assert.throws(() => parseGateArgs(['--profile', 'lint']), /--profile must be one of/);
-  assert.throws(() => parseGateArgs(['--tree', 'x']), /--tree belongs to --profile docs/);
+test('gate run --scope docs runs every docChecks script: exit 1 is a finding, a crash or another exit is a tool failure', () => {
+  assert.equal(parseGateArgs(['--scope', 'docs', '--tree', 'x']).profile, DOC_PROFILE);
+  assert.throws(() => parseGateArgs(['--scope', 'lint']), /--scope must be one of/);
+  assert.throws(() => parseGateArgs(['--tree', 'x']), /--tree belongs to --scope docs/);
   const checks = [{ id: 'a', script: 'a.mjs', tree: false }, { id: 'b', script: 'b.mjs', tree: true }];
   const seen = [];
   const answers = { 'a.mjs': { status: 0, stdout: 'ok' }, 'b.mjs': { status: 1, stdout: 'REFUSE docs/x.md:4 a refusal\n1 refused' } };
