@@ -3,13 +3,13 @@
 //   1. the checkout is on `main` with no tracked change (nothing is stashed, reset or cleaned);
 //   2. the release tag `v<version>` is named, is not on the remote yet, and is either absent or an annotated tag already on HEAD; any other tag is refused;
 //   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no TODO, PENDING or TBD left (scripts/hfs/runtime-rules/release-notes.mjs);
-//   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: every spec, lint, checks, tsc, images and the Sonar proof), each step to a log recorded in the result;
+//   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), each step to a log recorded in the result;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
 //   6. the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message, and main and the tag are pushed together, atomically: both refs move or neither does.
 // Exported function only: the CLI exposes it as `starci release cut`. Git goes through the scripts/api/git call files the CLI's git verbs use. Never stashes, resets, deletes or moves a tag, never pushes anything but main and that tag.
 // The heavy part (the suite and the push) runs inside ONE host-lock function, `withHostLock`: the RIGHTS lane's lock API replaces its body when it lands; until
-// then it runs the work directly. Seams (deps): git, suite, push, scan, changelog, lock.
+// then it runs the work directly. Seams (deps): git, suite, push, scan, changelog, lock; for the default suite also proofs, supplier, parity, parityDeps.
 import fs from 'node:fs';
 import path from 'node:path';
 import { catFile } from '../api/git/cat-file.mjs';
@@ -47,8 +47,8 @@ export function pushRefusal({ refs, branch = 'main' }) {
 /** Run `work` while holding the host's one heavy-run lock (one heavy run at a time). The lock API of the RIGHTS lane lands here; today it runs the work as is. */
 const withHostLock = (work) => work();
 
-/** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. */
-const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs ?? {} });
+/** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
+const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
 
 /**
  * Cut the release `tag` (v<version>) of `repo`: see the header. {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
