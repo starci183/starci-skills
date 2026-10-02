@@ -54,7 +54,6 @@ import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandR
 import { sha256File } from '../work/work-io.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
-
 export const AUTOPILOT_BY = 'autopilot';
 export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
 export const SUPERVISOR_GATE = 'supervisor-gate';
@@ -81,7 +80,6 @@ const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 const DRAW_REVIEW_KIND = 'draw-review';
 const DIRECTION_REVIEW_KIND = 'brand-direction-review';
 const DAY = 86_400_000;
-
 const num = (value, fallback) => positiveNumber(value, fallback, { orZero: true });
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
 

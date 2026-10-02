@@ -40,7 +40,6 @@ import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { positiveNumber } from '../../lib/number.mjs';
-
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkerScope } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
-import { unwrapEach } from './typescript.mjs';
+import { unwrapEach } from './ast-walks.mjs';
 
 /**
  * R47 `contract-fixture-guard` (BE_CONTRACT_UNGUARDED). A fake at the network edge serves payload fixtures; a fixture drifts

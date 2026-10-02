@@ -1,10 +1,7 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import {
-  commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind,
-  nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, relativePath, returnedExpressions,
-  selectedNode, tracedFrameworkKinds, UNPROVEN_FRAMEWORK, unwrapExpression, valueSymbol, violation,
-} from './typescript.mjs';
+import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, tracedFrameworkKinds, valueSymbol, violation } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';

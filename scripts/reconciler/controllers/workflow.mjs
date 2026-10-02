@@ -39,7 +39,6 @@ import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';
 import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
-
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const WORKFLOW_FILE = path.join(skillRoot, 'modules', 'reconciler', 'workflow.yaml');

@@ -11,7 +11,7 @@ import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,isUnderTempDir,localProjectsRoot,machineFileFor,newSpanId,newTraceId,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs';
-import { hasTable as sqliteHasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
+import { hasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
@@ -192,7 +192,6 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
 const makeTransaction=(db,label)=>{let inside=false;const tx=fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
-const hasTable=(db,name)=>sqliteHasTable(db,name);
 /** True when the ledger `db` holds `table`. */
 export const hasLedgerTable=hasTable;
 /** True when `table` of the ledger `db` has `column`. */
@@ -394,26 +393,6 @@ export function verifyEventChain(db,workflowId){
     prev=row.digest;
   }
   return {ok:true,count,brokenAt:null};
-}
-/**
- * The workflow's open items of an owed/resolved event pair (grammar proposals, asset slots): replay the kinds in seq
- * order — a `resolvedKind` row deletes the item `keyOf` names, an `owedKind` row sets `item(payload,row)`; a row
- * whose key is falsy is skipped. Returns the open items in first-seen order, [] when the table cannot be read.
- */
-export function openEventItems(db,workflowId,{owedKind,resolvedKind,keyOf,item}){
-  let rows=[];
-  try{rows=db.prepare('SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId,owedKind,resolvedKind);}
-  catch{return[];}
-  const open=new Map();
-  for(const row of rows){
-    let p={};
-    try{p=JSON.parse(row.payload_json??'{}')??{};}catch{p={};}
-    const key=keyOf(p);
-    if(!key)continue;
-    if(row.kind===resolvedKind){open.delete(key);continue;}
-    open.set(key,item(p,row));
-  }
-  return[...open.values()];
 }
 
 // --- workflows, lifecycle, goals ----------------------------------------------------------------------------

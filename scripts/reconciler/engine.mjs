@@ -56,7 +56,6 @@ import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs'; import { i
 import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
-
 const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
 const LOCK_NAME = 'reconciler';
@@ -70,7 +69,6 @@ export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, timeou
 const STALE_ACTION_MS = 150_000;
 /** The engine's connection checkpoints machine.sqlite's WAL this often (PASSIVE; it is the one checkpointer). */
 const CHECKPOINT_MS = 60_000;
-
 const selfFile = fileURLToPath(import.meta.url);
 
 /**

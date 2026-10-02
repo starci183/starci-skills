@@ -62,7 +62,6 @@ import { readEnv } from '../lib/env.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
-
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(SKILL_ROOT, 'scripts', 'kernel', 'launch-smoke.mjs');
@@ -155,8 +154,6 @@ const resultFile = (state, role) => path.join(dirs(state).results, `${role}.txt`
 const planFile = (state) => path.join(state, 'plan.json');
 const planOf = (state) => readJson(planFile(state));
 export const agentOf = (state, role) => readJson(agentFile(state, role));
-const settle = bestEffortCall;
-const settleAsync = bestEffortCallAsync;
 
 // ------------------------------------------------------------------ the workflow worktree
 /** The app-relative file an op role owns in the workflow worktree. */
@@ -262,7 +259,7 @@ function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRI
       ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, request, onCreated })
       : { ok: false, step: 'worktree', error: 'the workflow worktree was never created' };
   } else if (ROLES[role].side) {
-    const args = settle(() => orca.workflow.opArgs(orca.ctx, { workflowId: plan.workflow?.workflowId }));
+    const args = bestEffortCall(() => orca.workflow.opArgs(orca.ctx, { workflowId: plan.workflow?.workflowId }));
     const params = Array.isArray(args) ? worktreeParamsOf(args) : {};
     launched = params.worktree
       ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, request, onCreated })
@@ -343,7 +340,7 @@ export async function runStage({ role, state, orca, env = process.env, root = SK
     const wf = planOf(state)?.workflow;
     if (!wf?.path) return done({ ok: false, role, entry, error: 'the workflow worktree was never recorded (not in orca worktree list)' });
     const records = ops.map((c) => opRecordOf(c, wf.workflowId, wf.feApp));
-    concurrent = records.slice(1).every((next, i) => settle(() => orca.workflow.canDispatchConcurrently(records.slice(0, i + 1), next)) === true);
+    concurrent = records.slice(1).every((next, i) => bestEffortCall(() => orca.workflow.canDispatchConcurrently(records.slice(0, i + 1), next)) === true);
     if (!concurrent) return done({ ok: false, role, entry, concurrent, error: `the dispatcher refuses ${ops.join(' and ')} together (they must run in parallel across sides)` });
   }
   const launched = await Promise.all(children.map((c) => launchRole({ role: c, state, entry, orca, root, script })));
@@ -369,7 +366,7 @@ const settledOf = (o) => SETTLED_STATUS.has(String(o?.status)) || ENDED_STATE.ha
 
 /** The workflow's Orca worktree in `orca worktree list` (by its Orca id, else its path), or null. */
 function listedWorkflow(orca, appRepo, wf) {
-  const listed = settle(() => orca.worktreeList({ repo: `path:${slash(path.resolve(appRepo))}` }));
+  const listed = bestEffortCall(() => orca.worktreeList({ repo: `path:${slash(path.resolve(appRepo))}` }));
   const rows = listed?.worktrees ?? [];
   const key = (p) => (p ? slash(path.resolve(p)).toLowerCase() : null);
   const row = rows.find((w) => wf.orcaWorktreeId && w.id === wf.orcaWorktreeId) ?? rows.find((w) => wf.path && key(w.path) === key(wf.path)) ?? null;
@@ -388,9 +385,9 @@ async function driveWorkflow({ wf, state, orca, seen, entry, root, script }) {
   if (!wf.registered) return;
   for (const role of ['op', 'opFe']) {
     if (role in wf.checkpoints || !GREEN_STATUS.has(String(seen[role]?.status))) continue;
-    const base = await settleAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
-    const cp = await settleAsync(() => orca.workflow.checkpointOp(ctx, { workflowId: spec.workflowId, opId: role }));
-    const after = await settleAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
+    const base = await bestEffortCallAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
+    const cp = await bestEffortCallAsync(() => orca.workflow.checkpointOp(ctx, { workflowId: spec.workflowId, opId: role }));
+    const after = await bestEffortCallAsync(() => orca.workflow.gateBaseOf(ctx, spec.workflowId));
     wf.checkpoints[role] = cp?.sha ?? null;
     wf.gateBases[role] = { before: typeof base === 'string' ? base : base?.sha ?? null, after: typeof after === 'string' ? after : after?.sha ?? null };
     if (!cp?.sha) wf.problems.push(`checkpointOp ${role}: ${cp?.error ?? cp?.refusal ?? 'no sha'}`);
@@ -398,17 +395,17 @@ async function driveWorkflow({ wf, state, orca, seen, entry, root, script }) {
   if (!wf.failLaunched && wf.checkpoints.op && wf.checkpoints.opFe) {
     const fail = opRecordOf('opFail', spec.workflowId, spec.feApp);
     // Same side is serial: the dispatcher refuses opFail beside a running be op, and admits it beside the fe op.
-    wf.concurrency.beBeside = settle(() => orca.workflow.canDispatchConcurrently([opRecordOf('op', spec.workflowId, spec.feApp)], fail));
-    wf.concurrency.feBeside = settle(() => orca.workflow.canDispatchConcurrently([opRecordOf('opFe', spec.workflowId, spec.feApp)], fail));
-    wf.concurrency.sides = { op: settle(() => orca.workflow.sideOf(opRecordOf('op', spec.workflowId, spec.feApp))), opFe: settle(() => orca.workflow.sideOf(opRecordOf('opFe', spec.workflowId, spec.feApp))) };
+    wf.concurrency.beBeside = bestEffortCall(() => orca.workflow.canDispatchConcurrently([opRecordOf('op', spec.workflowId, spec.feApp)], fail));
+    wf.concurrency.feBeside = bestEffortCall(() => orca.workflow.canDispatchConcurrently([opRecordOf('opFe', spec.workflowId, spec.feApp)], fail));
+    wf.concurrency.sides = { op: bestEffortCall(() => orca.workflow.sideOf(opRecordOf('op', spec.workflowId, spec.feApp))), opFe: bestEffortCall(() => orca.workflow.sideOf(opRecordOf('opFe', spec.workflowId, spec.feApp))) };
     wf.failLaunched = true;
     const kernelTerminal = agentOf(state, 'kernel')?.terminal ?? null;
     if (kernelTerminal) await launchRole({ role: 'opFail', state, entry: kernelTerminal, orca, root, script });
     else wf.problems.push('opFail: the Kernel has no terminal to start it from');
   }
   if (wf.failLaunched && !wf.reset && SETTLED_STATUS.has(String(seen.opFail?.status))) {
-    const lastCheckpoint = settle(() => orca.workflow.of(ctx, spec.workflowId))?.checkpoint ?? null;
-    const r = await settleAsync(() => orca.workflow.preserveAndReset(ctx, { workflowId: spec.workflowId, opId: 'opFail' }));
+    const lastCheckpoint = bestEffortCall(() => orca.workflow.of(ctx, spec.workflowId))?.checkpoint ?? null;
+    const r = await bestEffortCallAsync(() => orca.workflow.preserveAndReset(ctx, { workflowId: spec.workflowId, opId: 'opFail' }));
     const file = ownedFileOf('opFail', spec.workflowId, spec.feApp);
     const head = orca.git(['rev-parse', 'HEAD'], wf.path);
     const status = orca.git(['status', '--porcelain', '--untracked-files=all'], wf.path);
@@ -476,11 +473,11 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
   if (!appRepo) return { ...out, error: 'no app repository: pass --app-repo <the main checkout of a scratch app registered in Orca>' };
   const feApp = feAppOf(appRepo);
   if (!feApp) return { ...out, error: `the app ${slash(appRepo)} declares no fe application in hfs.json (sides.fe.apps): the fe op has nowhere to write` };
-  const spec = settle(() => orca.workflow.spec({ workflowId, appRepo }));
+  const spec = bestEffortCall(() => orca.workflow.spec({ workflowId, appRepo }));
   if (!spec?.name) return { ...out, error: `workflowWorktreeSpec: ${spec?.error ?? 'no worktree spec'}` };
   // main's bytes before anything is created, then the workflow worktree, as start-workflow makes it before the Kernel.
   const before = mainManifest({ appRoot: appRepo, git: orca.git });
-  const ensured = await settleAsync(() => orca.workflow.ensure(orca.ctx, { workflowId, appRepo }));
+  const ensured = await bestEffortCallAsync(() => orca.workflow.ensure(orca.ctx, { workflowId, appRepo }));
   const rec = ensured?.ok ? ensured.record : null;
   if (!rec?.path) return { ...out, error: `ensureWorkflowWorktree: ${ensured?.reason ?? ensured?.error ?? 'no worktree'}${ensured?.detail ? ` (${ensured.detail})` : ''}` };
   const wf = { workflowId, feApp, appRepo: slash(appRepo), name: spec.name, branch: rec.branch, listed: false, registered: true, path: slash(rec.path),
@@ -504,18 +501,18 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
     cleaned = true;
     for (const role of CLEANUP_ORDER) {
       const a = agentOf(state, role);
-      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null, orcaId: a.workspaceOrcaId ?? null, branch: a.workspaceBranch ?? null }))?.ok === true;
+      const unplace = () => bestEffortCall(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null, orcaId: a.workspaceOrcaId ?? null, branch: a.workspaceBranch ?? null }))?.ok === true;
       if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
       if (!a?.dispatchId) continue;
-      const o = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
+      const o = observe(bestEffortCall(() => orca.workerShow({ dispatch: a.dispatchId })));
       const settled = settledOf(o);
-      const stop = settled ? null : settle(() => orca.workerStop({ dispatch: a.dispatchId }));
+      const stop = settled ? null : bestEffortCall(() => orca.workerStop({ dispatch: a.dispatchId }));
       // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
-      const first = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
-      const release = first?.ok ? first : settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      const first = bestEffortCall(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      const release = first?.ok ? first : bestEffortCall(() => orca.workerRelease({ dispatch: a.dispatchId }));
       // A worker that reported worker_done settled its Dispatch, and with it its own Task (worker-show status).
       const reported = SETTLED_STATUS.has(String(o.status));
-      const task = reported || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
+      const task = reported || !a.taskId ? null : bestEffortCall(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
       const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : reported ? 'by-worker_done' : null,
         ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
       if (a.workspace) entryOut.workspaceRemoved = unplace();
@@ -534,7 +531,7 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
       for (const role of Object.keys(ROLES)) {
         const a = agentOf(state, role);
         if (a?.dispatchId) {
-          seen[role] = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
+          seen[role] = observe(bestEffortCall(() => orca.workerShow({ dispatch: a.dispatchId })));
           if (!settledOf(seen[role])) open += 1;
           continue;
         }
@@ -565,8 +562,8 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
     for (const role of Object.keys(ROLES)) {
       const a = agentOf(state, role);
       if (!a?.dispatchId) { out.agents[role] = { launched: false, expectedDepth: ROLES[role].depth, error: a?.error ?? out.agents[role]?.error ?? readJson(stageFile(state, ROLES[role].parent ?? ''))?.error ?? 'never started' }; continue; }
-      const read = settle(() => orca.workerRead({ dispatch: a.dispatchId, limit: 20 }));
-      const o = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
+      const read = bestEffortCall(() => orca.workerRead({ dispatch: a.dispatchId, limit: 20 }));
+      const o = observe(bestEffortCall(() => orca.workerShow({ dispatch: a.dispatchId })));
       seen[role] = o;
       const parent = ROLES[role].parent;
       const creatorExpected = parent ? agentOf(state, parent)?.dispatchId ?? null : null;
@@ -583,10 +580,10 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
     // Every agent is released before the finish, so the host-side controller can remove the worktree their terminals ran in.
     cleanupAgents();
     if (wf.registered) {
-      wf.finish = await settleAsync(() => orca.workflow.finish(orca.ctx, { workflowId }));
+      wf.finish = await bestEffortCallAsync(() => orca.workflow.finish(orca.ctx, { workflowId }));
       // The finish never removes the worktree: it marks it release-pending, and the host-side controller removes it once
       // its terminals are released (link check, Orca's worktree removal, git branch -d). Main is compared after that.
-      const row = settle(() => orca.workflow.of(orca.ctx, workflowId));
+      const row = bestEffortCall(() => orca.workflow.of(orca.ctx, workflowId));
       wf.releasePending = row?.releasePending === true;
       let gone = null;
       for (const until = now() + releaseTimeoutMs; wf.finish?.ok;) {
@@ -598,7 +595,7 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
       }
       const branch = wf.branch ? orca.git(['branch', '--list', wf.branch], appRepo) : { ok: false };
       wf.removed = { ...(gone ?? { listed: null, pathExists: wf.path ? fs.existsSync(wf.path) : null }),
-        branchGone: branch.ok ? branch.stdout.trim() === '' : null, registry: settle(() => orca.workflow.of(orca.ctx, workflowId)) ?? null };
+        branchGone: branch.ok ? branch.stdout.trim() === '' : null, registry: bestEffortCall(() => orca.workflow.of(orca.ctx, workflowId)) ?? null };
       const after = mainManifest({ appRoot: appRepo, git: orca.git });
       if (before.ok && after.ok) {
         const diff = manifestDiff(before, after);
@@ -615,7 +612,7 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
     cleanupAgents();
     // A workflow that never finished, or a worktree the controller never removed, is still given back (link check,
     // Orca's worktree removal, the row closed).
-    if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await settleAsync(() => orca.workflow.release(orca.ctx, workflowId));
+    if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await bestEffortCallAsync(() => orca.workflow.release(orca.ctx, workflowId));
     safeRemove(state, { hold: artifactHoldReason });
   }
   for (const [name, roles] of Object.entries(PATHS)) {

@@ -30,7 +30,6 @@ import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, kindShapeProblems, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
-
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';

@@ -1,10 +1,7 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
-import {
-  commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol,
-  normalizedSymbolValue, programSourcesOf, referencedExports, relativePath, selectedNode,
-  unwrapExpression, valueSymbol,
-} from './typescript.mjs';
+import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
+import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const REGISTRATION_RULE_IDS = ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'];

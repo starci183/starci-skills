@@ -75,7 +75,6 @@ import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { shortHash } from '../lib/hash.mjs';
-
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
 const RETRY_LOOP_MIN = 4;

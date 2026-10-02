@@ -323,10 +323,8 @@ const loadUi = (uiDir) => {
 };
 
 /**
- * The loop directory's prelude both round kinds share: resolve `out` (default under the ui dir or the source's
- * directory), refuse a foreign or stopped loop, load the ui record and its archetype, and create the loop record on
- * first round. `extra` carries the component-round fields ({mode, product}) in the record's own key order.
- */
+ * The prelude both round kinds share: resolve `out`, refuse a foreign or stopped loop, load the ui record and its archetype,
+ * create the loop record on first round (`extra`: the component-round fields {mode, product}, in the record's key order). */
 const openLoop = (o, sourcePath, { settings, extra = {} }) => {
   const uiDir = o.ui ? path.resolve(o.ui) : null;
   const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(sourcePath), o.base, o.state));

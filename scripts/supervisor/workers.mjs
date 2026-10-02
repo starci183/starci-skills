@@ -95,10 +95,8 @@ const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
-
 const parse = parseJsonOr;
 const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
-const slug = (v) => slugify(v, { max: 40, fallback: 'fix' });
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
@@ -181,7 +179,7 @@ export function createJob(m, { cluster, title, files = [], incidents = [], specs
   if (!files.length) throw Error('a job needs --files <csv>: the explicit file leases');
   const open = jobsOf(m, OPEN_STATUSES).find((j) => j.payload.cluster === cluster);
   if (open) return { created: false, job: open };
-  const jobId = `fix-${slug(cluster)}-${crypto.randomBytes(3).toString('hex')}`;
+  const jobId = `fix-${slugify(cluster, { max: 40, fallback: 'fix' })}-${crypto.randomBytes(3).toString('hex')}`;
   const payload = { cluster, title: title ?? cluster, files: files.map(normPath), incidents, specs, brief, agent, self, spawnAttempts: 0 };
   m.transaction(() => {
     m.upsertSupJob({ jobId, kind: FIX_KIND, role: self ? 'supervisor' : 'worker', cluster, title: payload.title, status: 'queued', files: payload.files, brief: brief || null, payload });
@@ -432,7 +430,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
 
 /** The Supervisor's own staging checkout: a self job (no terminal) holding leases, landed through land.mjs. */
 export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now(), orca = orcaWorktreeClient }) {
-  const created = createJob(m, { cluster: `self-${slug(name)}`, title: name, files, self: true, now });
+  const created = createJob(m, { cluster: `self-${slugify(name, { max: 40, fallback: 'fix' })}`, title: name, files, self: true, now });
   const job = created.job;
   if (job.status === 'running' && job.payload.staging?.path && fs.existsSync(job.payload.staging.path)) return { ok: true, reused: true, jobId: job.job_id, ...job.payload.staging };
   const conflicts = leaseConflicts(m, job.payload.files, job.job_id);

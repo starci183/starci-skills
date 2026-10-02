@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { sha256File } from '../../engine/digest.mjs';
-import { openEventItems } from '../../engine/db/ledger.mjs';
+import { openEventItems } from '../lib/event-items.mjs';
 import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from './draw/draw-dna.mjs';
 import { isDir, isFile, slash } from './work-io.mjs';
 

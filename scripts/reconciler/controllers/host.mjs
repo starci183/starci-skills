@@ -59,7 +59,6 @@ import os from 'node:os';
  */
 const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
 const BOOT_EVERY_MS = 365 * 86_400_000;
-
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
 const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';

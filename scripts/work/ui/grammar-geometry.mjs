@@ -26,7 +26,6 @@ import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../li
 import { readEnv } from '../../lib/env.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 import { alphaOver } from '../../lib/color.mjs';
-
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
 export const FAMILIES = { starci: 'core', nivo: 'nivo' };
@@ -928,7 +927,6 @@ const INPUT_SKIP = new Set(['checkbox', 'radio', 'range', 'hidden', 'submit', 'b
 export const alphaOf = (c) => (c ? c[3] : 0);
 export const sameColor = (a, b, tol = 3) => Boolean(a && b) && Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol && Math.abs(a[3] - b[3]) <= 0.03;
 
-
 /** Index a snapshot: children, ancestors, composed backgrounds and the classified elements. */
 export function readSnapshot(snap) {
   const els = snap.elements;
@@ -1134,7 +1132,6 @@ export function parseViewport(text) {
   const m = String(text ?? '').match(/^(\d+)x(\d+)$/);
   return m ? { width: Number(m[1]), height: Number(m[2]) } : null;
 }
-
 
 function plain(g) {
   const strip = (v) => (v && typeof v === 'object' && 'declared' in v ? { value: v.value, px: v.px, declared: v.declared, trace: v.trace, file: v.file } : v);

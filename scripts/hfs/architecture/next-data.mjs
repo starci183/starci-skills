@@ -1,10 +1,8 @@
 import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { parseContract, installedSWR } from './next-data-contract.mjs';
-import {
-  anyDescendant, normalizedSymbol, normalizedSymbolValue, relativePath, selectedNode,
-  unwrapExpression, valueSymbol as sharedValueSymbol,
-} from './typescript.mjs';
+import { relativePath, unwrapExpression } from './typescript.mjs';
+import { anyDescendant, normalizedSymbol, normalizedSymbolValue, selectedNode, valueSymbol as sharedValueSymbol } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';

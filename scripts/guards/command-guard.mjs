@@ -61,7 +61,6 @@ import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
-
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 

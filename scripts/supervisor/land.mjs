@@ -86,7 +86,6 @@ import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs';
-
 const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
@@ -250,7 +249,6 @@ export function specRunEnv(parent = process.env) {
   delete env.NODE_TEST_CONTEXT;
   return withSwcCache(env);
 }
-const tail = (text, n = 25) => tailLines(text, n);
 
 /**
  * Remove ONE scratch this land made (never another land's: the name carries the pid and a per-attempt token) and drop
@@ -307,7 +305,7 @@ function treeCheck(dir, script) {
   if (!fs.existsSync(path.join(dir, script))) return { ok: true, skipped: true };
   const r = node([script], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
-  return { ok: r.ok, output: tail(full, 15), full };
+  return { ok: r.ok, output: tailLines(full, 15), full };
 }
 
 /**
@@ -399,8 +397,8 @@ function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
     if (!present.length) return { ok: true, failures: [], ran: [] };
     const r = runSpecFiles({ dir: scratch.dir, files: present, concurrency });
     if (r.error) return { ok: false, error: `base spec run did not finish: ${r.error}` };
-    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tail(r.stdout + r.stderr, 6)}` };
-    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tail(r.stdout + r.stderr, 6)}` };
+    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tailLines(r.stdout + r.stderr, 6)}` };
+    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tailLines(r.stdout + r.stderr, 6)}` };
     return { ok: true, failures: r.failures, ran: present };
   } finally { removeScratch(scratch.dir, { root }); }
 }
@@ -433,7 +431,7 @@ export function mirrorRun(dir) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return { ok: true, skipped: true };
   const r = node([MIRROR_CHECK, '--check'], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
-  return { ok: r.ok, output: tail(full, 15), full };
+  return { ok: r.ok, output: tailLines(full, 15), full };
 }
 
 /**
@@ -475,7 +473,7 @@ const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 export function packageProofCheck({ dir, base, runner = node }) {
   if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
   const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
-  return { name: 'package-clean-test', ok: r.ok, output: tail(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
+  return { name: 'package-clean-test', ok: r.ok, output: tailLines(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
 }
 
 const readSpecs = (dir) => {
@@ -513,7 +511,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   for (const f of present.filter((x) => x.endsWith('.mjs'))) {
     const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
-    checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tail(r.stderr, 10) }) });
+    checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tailLines(r.stderr, 10) }) });
   }
   for (const f of present.filter((x) => /\.(ya?ml|json)$/i.test(x))) {
     let ok = true, error = null;
@@ -571,7 +569,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   if (runSpecs && allSpecs.length && gate?.ok !== false) {
     const concurrency = gate?.concurrency || specConcurrency();
     const r = runSpecFiles({ dir, files: allSpecs, concurrency });
-    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) };
+    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tailLines(r.stdout + r.stderr, r.ok ? 6 : 40) };
     // Red: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
     // failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses.
     if (!r.ok) {
@@ -594,7 +592,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
 /** The gate-stability report run from the candidate's own script (scripts/supervisor/gate-stability.mjs --base --head). */
 function spawnGateStability({ runner, base, head, family }) {
   const r = node([runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
-  if (!r.ok) return { error: tail(r.stderr || r.stdout, 6) };
+  if (!r.ok) return { error: tailLines(r.stderr || r.stdout, 6) };
   try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
 
@@ -672,10 +670,10 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
           const again = (deps.gitHealth ?? gitHealth)({ root });
           if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
           result.attempts.push({ ...step, reason: 'git-failed' });
-          return { ...result, base, reason: 'git-failed', detail: tail(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
+          return { ...result, base, reason: 'git-failed', detail: tailLines(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
         }
         result.attempts.push({ ...step, reason: 'conflict' });
-        return { ...result, base, reason: 'conflict', detail: tail(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
+        return { ...result, base, reason: 'conflict', detail: tailLines(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
       }
       const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
       // The pick changes nothing: main already carries the change (a re-land of a landed commit).

@@ -73,9 +73,10 @@ import {
   reassertManager, recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
 } from '../connectors/lib.mjs';
 import {
-  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
+  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage,
   removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
 } from '../connectors/telegram.mjs';
+import { redact } from '../connectors/telegram-polite.mjs';
 import { ensureAskConnectors, publicBase } from '../connectors/tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from './progress-report.mjs';
 import { answerDrawReviewByReply, askClassOf } from '../kernel/ask-server.mjs';
@@ -85,9 +86,7 @@ import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
-
 const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
-
 export const BRIDGE_NAME = 'telegram-bridge';
 export const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;

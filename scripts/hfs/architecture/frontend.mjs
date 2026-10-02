@@ -3,10 +3,8 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { readJsonFile as readJson } from '../../lib/json.mjs';
 import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
-import {
-  exportTargetStrings, isUnshadowedCommonJsRequire, normalizedSymbolValue, reachableViolation, relativePath,
-  returnedExpressions as sharedReturnedExpressions, unwrapExpression,
-} from './typescript.mjs';
+import { exportTargetStrings, isUnshadowedCommonJsRequire, reachableViolation, relativePath, unwrapExpression } from './typescript.mjs';
+import { normalizedSymbolValue, returnedExpressions as sharedReturnedExpressions } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);

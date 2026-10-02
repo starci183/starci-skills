@@ -32,30 +32,28 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
-
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
 // beside it at .workspaces/projects/<name>/work.json. STARCI_SOURCE_ROOT points
 // the registry lookup at another Source — the seam for fixtures and for a
 // runtime copy (a worktree) that does not sit inside its Source.
 const sourceRoot = readEnv('STARCI_SOURCE_ROOT') ? path.resolve(readEnv('STARCI_SOURCE_ROOT')) : path.dirname(skillRoot);
-const arg = (n, d = null) => argvValue(process.argv, n, d);
-const projectName = arg('project');
-const repoArg = arg('repo');
-const text = arg('text');
-const title = arg('title');
+const projectName = argvValue(process.argv, 'project');
+const repoArg = argvValue(process.argv, 'repo');
+const text = argvValue(process.argv, 'text');
+const title = argvValue(process.argv, 'title');
 // --display-name: the human name the owner approves with the plan (Vietnamese, `<Product> · <what it does>`);
 // without it one is derived from the goal text and the product name (scripts/lib/display-names.mjs).
-const displayNameArg = arg('display-name');
-const reviseWorkflowId = arg('revise');
-const revisionReason = arg('reason', 'owner-approved plan-divergence correction');
-const approveRevision = arg('approve-revision');
-const routingBias = parseJson(arg('routing-bias', 'null'));
+const displayNameArg = argvValue(process.argv, 'display-name');
+const reviseWorkflowId = argvValue(process.argv, 'revise');
+const revisionReason = argvValue(process.argv, 'reason', 'owner-approved plan-divergence correction');
+const approveRevision = argvValue(process.argv, 'approve-revision');
+const routingBias = parseJson(argvValue(process.argv, 'routing-bias', 'null'));
 // Owner tunables per leg: {"<op>": {"<name>": <value>}}. Legality is the op
 // brief's business (api enqueue validates it); here the only rules are that the
 // flag parses as a map of maps and that every named op is in the derived chain.
 const legParams = (() => {
-  const raw = arg('params');
+  const raw = argvValue(process.argv, 'params');
   if (raw == null) return null;
   let parsed;
   try { parsed = JSON.parse(raw); } catch (e) { console.error(`--params is not JSON: ${e.message}`); process.exit(2); }
@@ -70,19 +68,19 @@ const planOnly = process.argv.includes('--plan');
 // The [Supervisor]'s bridging verbs (scripts/supervisor/bridge.mjs, modules/supervisor/bridging.yaml) define a
 // bridging workflow (--defined-by supervisor) or apply a leg revision (--approved-by supervisor) under autopilot:
 // both are recorded PROVISIONAL with the bridge id and reason, never as an owner approval.
-const definedBy = arg('defined-by');
-const approvedBy = arg('approved-by');
-const bridgeId = arg('bridge-id');
+const definedBy = argvValue(process.argv, 'defined-by');
+const approvedBy = argvValue(process.argv, 'approved-by');
+const bridgeId = argvValue(process.argv, 'bridge-id');
 if (definedBy != null && definedBy !== 'supervisor') { console.error(`--defined-by must be supervisor, got '${definedBy}'`); process.exit(2); }
 if (approvedBy != null && approvedBy !== 'supervisor') { console.error(`--approved-by must be supervisor, got '${approvedBy}'`); process.exit(2); }
 if ((definedBy || approvedBy) && !bridgeId) { console.error('--defined-by/--approved-by supervisor name the bridging record: --bridge-id <id>'); process.exit(2); }
 if (approvedBy && !approveRevision) { console.error('--approved-by supervisor goes with --approve-revision <preview-token>'); process.exit(2); }
-if (definedBy && arg('revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
-const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: arg('reason', null) } : null;
+if (definedBy && argvValue(process.argv, 'revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
+const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: argvValue(process.argv, 'reason', null) } : null;
 // A fresh owner-defined goal with --reason records the owner's approval and its chat reference on the goal
 // row, the inbox entry and the goal-defined event (e.g. a relaunch the owner ordered in chat).
-const ownerDefinition = !definedBy && !reviseWorkflowId && arg('reason') != null
-  ? { by: 'owner', source: 'owner-chat', reason: String(arg('reason')), assurance: 'conversation-context-not-authenticated' } : null;
+const ownerDefinition = !definedBy && !reviseWorkflowId && argvValue(process.argv, 'reason') != null
+  ? { by: 'owner', source: 'owner-chat', reason: String(argvValue(process.argv, 'reason')), assurance: 'conversation-context-not-authenticated' } : null;
 const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--reason <owner chat ref>] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }

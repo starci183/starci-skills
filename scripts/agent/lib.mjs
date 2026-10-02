@@ -359,7 +359,6 @@ function sendPrompt(handle, text, adapter, io) {
   }
 }
 
-
 // ---- the one agent launch --------------------------------------------------
 // Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
 // <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).

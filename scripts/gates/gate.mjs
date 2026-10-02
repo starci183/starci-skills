@@ -56,7 +56,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from './canon-digest.mjs';
 import { PROFILES_FILE, loadPins } from './canon-pins.mjs';
 import { gateBaseAt } from '../machine/workflow-tree.mjs';
-
 export const GATE_SCHEMA = 'starci/gate@1';
 export const LINT_SCHEMA = 'starci/lint@1';
 export const GATE_EXIT = Object.freeze({ clean: 0, findings: 1, toolFailed: 2 });

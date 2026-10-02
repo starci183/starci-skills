@@ -1,11 +1,7 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import {
-  anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind,
-  decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf,
-  referencedExports, relativePath, returnedExpressions, selectedNode, UNPROVEN_FRAMEWORK,
-  unwrapExpression, valueSymbol, violation,
-} from './typescript.mjs';
+import { referencedExports, relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';

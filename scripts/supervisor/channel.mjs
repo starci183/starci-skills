@@ -34,7 +34,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { argsOf } from '../connectors/lib.mjs';
-import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { botCall, DEFAULT_API_BASE, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { redact } from '../connectors/telegram-polite.mjs';
 import {
   ensureTelegramBridge, getSupervisor, heartbeatSupervisor, registerSupervisor,
 } from './telegram-bridge.mjs';

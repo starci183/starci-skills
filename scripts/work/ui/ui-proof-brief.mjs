@@ -331,7 +331,6 @@ function fontPx(knowledge, ruleId, scope) {
   return v?.px ?? null;
 }
 
-
 /** The brief as text. */
 export function briefText(b) {
   const lines = [];

@@ -26,7 +26,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
-import { openEventItems } from '../../engine/db/ledger.mjs';
+import { openEventItems } from '../lib/event-items.mjs';
 import { isDir, isFile } from './work-io.mjs';
 
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
