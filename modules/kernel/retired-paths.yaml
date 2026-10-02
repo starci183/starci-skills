@@ -6,7 +6,7 @@
 #
 # moved[]: a file that moved, one entry per move ({from, to, movedIn: the chunk, quiesced: true only for a pinned path moved
 # with the fleet stopped}); written by the move codemod of the runtime HFS migration. History may cite `from`, live prose
-# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again, and the pending ratchet keeps a moved file's entry.
+# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again.
 # retiredSymbols[]: a name replaced by an Orca built-in or another mechanism ({symbol, replacedBy}); RT_RETIRED_PRESENT
 # refuses a declaration of it in runtime production code (scripts/hfs/runtime-rules/retired.mjs).
 schema: starci/retired-paths@2
@@ -177,7 +177,7 @@ retired:
   - {path: .experiments/practices/2026-09-22-supervisor-round1.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'nothing: a practice note only benchmark/findings/fable.md cited; .experiments/ is forbidden in the runtime tree'}
   - {path: scripts/checks/check-layers.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs (ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml), run by scripts/hfs/runtime-check.mjs in npm run check'}
   - {path: modules/kernel/runtime-layers.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'knowledge/hfs/runtime-slots.yaml ruleParams.runtime.infraOwners and tiers.runtime'}
-  - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'the pending list of knowledge/hfs/runtime-slots.yaml (shrink-only, one entry per finding path and code, each with its chunk)'}
+  - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'modules/kernel/allowlist.yaml (the one shrink-only allowlist, each entry with its reason)'}
   - {path: tests/check-layers.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'tests/runtime-hfs-rules.spec.mjs (RT_EXTERNAL_OWNER over the runtime source, the spawn reading of scripts/lib/spawn-calls.mjs included)'}
   - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
   - {path: scripts/checks/check-db-openers.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'superseded by RT_EXTERNAL_OWNER (node:sqlite only in engine/db), scripts/hfs/runtime-rules/external-owner.mjs'}
@@ -210,6 +210,7 @@ retired:
   - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
   - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
   - {path: ui/run-cloudflared.ps1, retiredAt: 2026-10-02, removedIn: C2b, replacedBy: 'node ui/start.mjs --tunnel (the harness named tunnel through scripts/api/cloudflared/tunnel-run.mjs), registered as its scheduled task by scripts/reconciler/tunnel-task.mjs --install-task'}
+  - {path: scripts/hfs/runtime-rules/pending.mjs, retiredAt: 2026-10-02, removedIn: H, replacedBy: 'modules/kernel/allowlist.yaml (the one allowlist, each entry with its reason) held by scripts/checks/check-one-allowlist.mjs; the finding-level pending ratchet is superseded: a runtime finding is fixed, never allowed'}
 moved:
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
@@ -974,6 +975,13 @@ moved:
   - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
   - {from: scripts/kernel/settle-landed.mjs, to: scripts/kernel/owned-path-effects.mjs, movedIn: WFWT2, quiesced: false}
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
+  - {from: modules/kernel/failure-codes.not-codes, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: modules/schemas/json-exceptions.yaml, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: scripts/checks/dead-scripts.entries, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: scripts/reconciler/controllers/fleet.mjs, to: scripts/reconciler/controllers/workers.mjs, movedIn: dv-c2-smells, quiesced: false}
+  - {from: modules/reconciler/fleet.yaml, to: modules/reconciler/workers.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: ui/src/pages/work/fleet.tsx, to: ui/src/pages/work/workers.tsx, movedIn: dv-c2-smells, quiesced: false}
+  - {from: tests/reconciler/reconciler-fleet.spec.mjs, to: tests/reconciler/reconciler-workers.spec.mjs, movedIn: dv-c2-smells, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}

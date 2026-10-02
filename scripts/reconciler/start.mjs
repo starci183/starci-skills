@@ -12,7 +12,7 @@
 //      agent takes no --model on worker-start (agent card start.modelArgument false), Orca reachable;
 //   2. config: config.yaml is NEVER rewritten by a plain run; a profile that is not operational is a red row with the one
 //      command that fixes it. `--set-profile operational|observe` writes that one `reconciler` block (backup first) and
-//      then runs as usual (operational: job/host/workflow/resource active; gc/fleet/learning shadow unless configured);
+//      then runs as usual (operational: job/host/workflow/resource active; gc/workers/learning shadow unless configured);
 //   3. ui/dist rebuilt (npm run build in ui/) when any ui source is newer than the build, before harness-ui is started;
 //   4. the reconciler engine: started when down, restarted (planned, never a crash) when it runs --safe without a real
 //      crash loop behind it;
@@ -162,7 +162,7 @@ export function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), npm = runNpm } = 
 
 /**
  * config.yaml text with `reconciler:` set to a named profile: enabled, the profile, and (operational only) the explicit
- * controller entries the profile does not itself run active (an explicit gc/fleet/learning setting survives; an explicit
+ * controller entries the profile does not itself run active (an explicit gc/workers/learning setting survives; an explicit
  * shadow/off of job/host/workflow/resource is what the profile replaces; observe keeps none). Returns {text, changed}. Pure.
  */
 export function applyProfileText(text, profile = PROFILE) {

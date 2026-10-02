@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkShellConformance } from '../../scripts/work/ui/shell-conformance.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { mergeScan, nodeById, scanAppDir, sourceDrift, treeOf, usedI18nKeys } from '../../scripts/work/layout-tree.mjs';
 import { buildProduct, settledProduct } from '../fixtures/layout-tree.mjs';
 
@@ -13,7 +14,7 @@ import { buildProduct, settledProduct } from '../fixtures/layout-tree.mjs';
 // their values per locale. An unrelated key is never drift; a used key's edit or removal is.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
+const validateTree = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
 const CONSOLE = '/[locale]/(console)';
 const appOf = (record) => treeOf(record, 'app');
 const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.app });

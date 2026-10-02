@@ -92,5 +92,5 @@ which refuses a `done` leaf resting on `verificationSource: authored-claim`.
       deterministic, cited
 - [ ] Wrong business flow → re-run from owning Business/SRS boundary with fresh
       evidence — never relabeled as debt
-- [ ] `practices/` entry written after each fleet wave — what was practiced,
+- [ ] `practices/` entry written after each wave — what was practiced,
       observed, derived

@@ -143,7 +143,7 @@ after its `mode_changes` row, the throttle mode only after its `throttle_events`
 `service_events` and `leader_history` are never updated or deleted. A refused push always carries a
 `failure_signature`; an engine action keeps its full result, stdout and stderr as blobs.
 
-SQLite forbids a persistent view that reads an attached database, so fleet views run the same view on
+SQLite forbids a persistent view that reads an attached database, so cross-ledger views run the same view on
 each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a batch of ledgers
 (at most 9) is for manual queries only.
 

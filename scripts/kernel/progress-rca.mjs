@@ -109,25 +109,25 @@ export function priorities() {
 
 /**
  * How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
- * fleet RAM cap, the pools and its queued-ready work allow). Pure over `core` (the api status fields ramThrottle,
- * poolLoad) and the counts. {allowed, why, fleetFree, poolFree, cap}.
+ * worker RAM cap, the pools and its queued-ready work allow). Pure over `core` (the api status fields ramThrottle,
+ * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}.
  */
 export function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
   const rtCap = Number(rt?.maxParallelOps) || 20;
   const thr = core.ramThrottle ?? {};
   const effective = Number(thr.effectiveCap ?? rtCap);
-  const fleetRunning = Number(thr.running ?? running);
-  const fleetFree = Math.max(0, effective - fleetRunning);
+  const workersRunning = Number(thr.running ?? running);
+  const workersFree = Math.max(0, effective - workersRunning);
   const pools = rt?.runtimes ?? {};
   const load = core.poolLoad?.running ?? {};
   let poolFree = 0;
   for (const [id, p] of Object.entries(pools)) poolFree += Math.max(0, (Number(p?.maxParallel) || 0) - (Number(load[p?.target ?? id] ?? load[id]) || 0));
   const reserve = prio[workflowId]?.reserve || 0;
   const cap = reserve > 0 ? reserve : rtCap;
-  const add = Math.min(fleetFree, poolFree, queuedReady);
+  const add = Math.min(workersFree, poolFree, queuedReady);
   const allowed = Math.min(cap, running + add);
-  const binds = add === queuedReady ? 'queued-ready' : add === fleetFree ? `fleet RAM cap ${effective} (${fleetRunning} running fleet-wide)` : `pool slots (${poolFree} free; routed-but-undispatched jobs hold slots ${core.poolLoad?.routeHoldMs ? `for ${Math.round(core.poolLoad.routeHoldMs / 60_000)}m` : ''})`;
-  return { allowed, cap, fleetFree, poolFree, why: allowed >= cap ? `workflow cap ${cap}` : binds };
+  const binds = add === queuedReady ? 'queued-ready' : add === workersFree ? `worker RAM cap ${effective} (${workersRunning} running worker-wide)` : `pool slots (${poolFree} free; routed-but-undispatched jobs hold slots ${core.poolLoad?.routeHoldMs ? `for ${Math.round(core.poolLoad.routeHoldMs / 60_000)}m` : ''})`;
+  return { allowed, cap, workersFree, poolFree, why: allowed >= cap ? `workflow cap ${cap}` : binds };
 }
 
 /* ------------------------------------------------------------ progress */

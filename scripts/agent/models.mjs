@@ -485,7 +485,7 @@ const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().re
 // from the agent card, which for an Orca-managed provider without an account
 // list stays unresolved and keeps the circuit. Nothing else closes a circuit
 // early but `api provider-health --recover`.
-// The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one fleet-wide fact per provider;
+// The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one worker-wide fact per provider;
 // `db` (a ledger) is not read and stays in the signature for its callers.
 export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
   const key = providerKey(provider);

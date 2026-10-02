@@ -16,8 +16,7 @@
 // One loader, two manifest kinds. `kind: app` (the default; knowledge/hfs/slots.yaml) is the product standard above.
 // `kind: runtime` (knowledge/hfs/runtime-slots.yaml, schema starci/runtime-slots@<major>) is the standard of the StarCi
 // runtime repository itself: one profile `runtime`, no sides and no app kinds, slot ids runtime.<name>, the tracked value
-// `generated` (a copy written only by the slot's `generatedBy`), and a top-level `pending` list, the one shrink-only
-// allowlist of the runtime check (scripts/hfs/runtime-check.mjs). A runtime repository declares itself with
+// `generated` (a copy written only by the slot's `generatedBy`). A runtime repository declares itself with
 // hfs.json {"hfs": <major>, "kind": "runtime", "project": <name>}.
 import { paramNamesOk } from './param-names.mjs';
 import fs from 'node:fs';

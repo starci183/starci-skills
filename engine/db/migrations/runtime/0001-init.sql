@@ -1046,7 +1046,7 @@ SELECT 'job-'||j.status, j.workflow_id, j.job_id, j.op_id, j.updated_at, j.deadl
    AND (w.phase IS NULL OR w.phase NOT IN ('archived','finished'));
 
 -- H1: a filed report unsettled past SLA (green <= 3 min for settler; non-green <= 15 min for Kernel, then DI escalation).
--- A job in 'reported'/'deciding' past SLA does NOT count as holding a fleet slot (census reads this view to exclude it).
+-- A job in 'reported'/'deciding' past SLA does NOT count as holding a worker slot (census reads this view to exclude it).
 CREATE VIEW IF NOT EXISTS v_settle_overdue AS
 SELECT a.workflow_id, a.attempt_id, a.job_id, a.unit_id, a.op_id, a.report_outcome, j.status AS job_status,
        a.reported_at, (CAST(unixepoch('subsec')*1000 AS INTEGER) - a.reported_at) AS waiting_ms,

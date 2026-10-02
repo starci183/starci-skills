@@ -1,6 +1,6 @@
 // manifest-shape.mjs - the shape rules of an HFS slot manifest that both manifest kinds share, and the whole shape of a
-// manifest of kind runtime (knowledge/hfs/runtime-slots.yaml): the slot fields, the tier map, ruleParams.runtime and the
-// `pending` allowlist. scripts/hfs/slots.mjs (loadSlotManifest) is the only reader; it adds the app kind's own rules
+// manifest of kind runtime (knowledge/hfs/runtime-slots.yaml): the slot fields, the tier map and ruleParams.runtime.
+// scripts/hfs/slots.mjs (loadSlotManifest) is the only reader; it adds the app kind's own rules
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';
@@ -111,16 +111,12 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
 /** The owners of an external call in a runtime manifest: an api system folder (`api/<system>`, `api/*` any system) or the DB tier. */
 const INFRA_OWNER = /^(?:api\/(?:\*|[a-z][a-z0-9-]*)|engine\/db)$/;
 const RUNTIME_PARAM_KEYS = ['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'pinned', 'selfChecks'];
-const PENDING_KEYS = ['path', 'rule', 'lane', 'since', 'reason'];
-/** The chunk of the runtime migration that deletes a pending entry (C1..C8, a split chunk C2a/C2b). */
-const PENDING_LANE = /^C[1-8][ab]?$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const relPath = (v) => typeof v === 'string' && v.length > 0 && !v.startsWith('/') && !v.includes('..') && !v.includes('\\');
 
 /** Shape problems of a parsed manifest of kind runtime (knowledge/hfs/runtime-slots.yaml), in the words of modules/schemas/hfs-slots.schema.yaml. */
 export function runtimeShapeProblems(m) {
   const bad = [];
-  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'profiles', 'tiers', 'ruleParams', 'crossOwner', 'crossSystem', 'slots', 'pending', 'consumers']);
+  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'profiles', 'tiers', 'ruleParams', 'crossOwner', 'crossSystem', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/runtime-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/runtime-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -137,19 +133,6 @@ export function runtimeShapeProblems(m) {
   else bad.push(...runtimeParamProblems(rp.runtime));
   if (!Array.isArray(m.slots) || !m.slots.length) bad.push('slots must be a non-empty list');
   else m.slots.forEach((slot, index) => bad.push(...slotProblems(slot, index, RUNTIME_KIND)));
-  if (m.pending !== undefined) {
-    if (!Array.isArray(m.pending)) bad.push('pending must be a list');
-    else m.pending.forEach((entry, index) => {
-      const at = `pending[${index}]`;
-      if (!isPlainObject(entry)) { bad.push(`${at} is not a map`); return; }
-      for (const key of Object.keys(entry)) if (!PENDING_KEYS.includes(key)) bad.push(`${at}: unknown field ${key}`);
-      if (!relPath(entry.path)) bad.push(`${at}: path must be a repository-relative glob`);
-      if (!/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(String(entry.rule))) bad.push(`${at}: rule must be a finding code`);
-      if (!PENDING_LANE.test(String(entry.lane))) bad.push(`${at}: lane must be the chunk that removes it (C1..C8, C2a, C2b)`);
-      if (!DATE.test(String(entry.since))) bad.push(`${at}: since must be a date YYYY-MM-DD`);
-      if (typeof entry.reason !== 'string' || !entry.reason.trim()) bad.push(`${at}: reason is required`);
-    });
-  }
   if (m.consumers !== undefined && !strList(m.consumers)) bad.push('consumers must be a list of paths');
   return bad;
 }
@@ -188,18 +171,12 @@ export function tierMapProblems(profile, tiers) {
   return bad;
 }
 
-/** The semantic rules of a runtime manifest beyond the slot rules both kinds share: tier names, the schema major, unique pending entries. */
+/** The semantic rules of a runtime manifest beyond the slot rules both kinds share: tier names and the schema major. */
 export function runtimeSemanticProblems(m) {
   const bad = [];
   const tiers = m.tiers.runtime;
   for (const [tier, def] of Object.entries(tiers)) {
     for (const target of def.mayImport) if (!(target in tiers)) bad.push(`tiers.runtime.${tier}.mayImport names ${target}, which is not a runtime tier`);
-  }
-  const seen = new Set();
-  for (const entry of m.pending ?? []) {
-    const key = `${entry.path}\0${entry.rule}`;
-    if (seen.has(key)) bad.push(`pending names ${entry.path} for ${entry.rule} twice`);
-    seen.add(key);
   }
   const major = Number(m.version.split('.')[0]);
   if (String(m.schema) !== `starci/runtime-slots@${major}`) bad.push(`schema ${m.schema} does not carry the major of version ${m.version}`);

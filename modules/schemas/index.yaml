@@ -432,7 +432,7 @@ schemas:
     usedBy: [scripts/checks/check-contract-cites.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
     business:
       question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path or symbol stay gone?"
-      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, the pending ratchet across a move).
+      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED).
       whenNot: Never authorizes a live runtime reference to a deleted or moved file.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
@@ -629,7 +629,7 @@ schemas:
     usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
       question: "Is this example reusable — does it say what it adapts, needs and how to verify?"
-      whenNeeded: Curating example code into the knowledge fleet.
+      whenNeeded: Curating example code into the knowledge library.
       whenNot: Not example CODE itself — the manifest describing it.
       selectedBy: Knowledge authoring review.
 
@@ -807,18 +807,18 @@ schemas:
   # BUILD HELPERS
   # --------------------------------------------------------------------------
 
-  - id: starci/json-exceptions@1
-    file: modules/schemas/json-exceptions.yaml
-    dialect: prose-data
+  - id: starci/allowlist@1
+    file: modules/schemas/allowlist.schema.yaml
+    dialect: json-schema
     subsystem: build
-    governs: "Exact relative paths allowed to remain authored JSON — exact files, plus exact directories whose direct children are an append-only one-file-per-entry record; no wildcards; each entry carries a reason."
-    binds: the authored-JSON allowlist (rendered envs, realm imports, UAT run receipts, licenses...)
-    usedBy: [scripts/checks/check-json-exceptions.mjs (inventory-only; offenders listed)]
+    governs: "The ONE explicit allowlist of the runtime, modules/kernel/allowlist.yaml: every exception list a runtime check keeps is a named section (not-codes, json-exceptions, dead-script-entries, export-used), each entry carrying the reason the exception exists, each section shrink-only."
+    binds: "modules/kernel/allowlist.yaml sections and their {literal|path, reason} entries"
+    usedBy: [scripts/lib/allowlist.mjs (readAllowlist), scripts/checks/check-one-allowlist.mjs (sprawl guard)]
     business:
-      question: "Which JSON files are legitimate exceptions?"
-      whenNeeded: Adding any authored .json — it needs a listed exception with a reason, or it converts to YAML.
-      whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision, and a registered directory is a deliberate per-record decision (benchmark/snapshots).
-      selectedBy: The json-exceptions check at lint/gate time.
+      question: "Where is the exception a runtime check keeps — and why does it exist?"
+      whenNeeded: Any check that needs an exception list reads its section here; a new exception is an entry with a reason, never a new file.
+      whenNot: Never a second allowlist, baseline, pending or entries file — check-one-allowlist refuses one by name.
+      selectedBy: The reader's section name passed to scripts/lib/allowlist.mjs readAllowlist(kind).
 
   # --------------------------------------------------------------------------
   # KNOWN GAPS
@@ -841,6 +841,7 @@ moduleLocalDocumentKinds:
     governs: "This file is a schema document: it `describes` the record const its consumers stamp."
     files:
       - modules/schemas/agent-hierarchy.yaml
+      - modules/schemas/allowlist.schema.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/canon-pins.schema.yaml
       - modules/schemas/hfs-peer-integrations.schema.yaml

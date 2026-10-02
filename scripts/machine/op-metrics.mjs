@@ -440,7 +440,7 @@ const slim = (r) => ({ key: r.key, jobs: r.jobs, succeeded: r.succeeded, failed:
 export const snapshotPayload = (metrics, stuck = []) => ({ schema: 'starci/op-metrics-snapshot@1', windowMs: metrics.windowMs,
   totals: slim(metrics.totals), ops: metrics.ops.map(slim), stuck: stuckCounts(stuck) });
 
-/** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', fleet-wide). Returns snap_id. */
+/** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', worker-wide). Returns snap_id. */
 export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KIND, windowMs: payload?.windowMs ?? null, subject: SNAPSHOT_KIND, data: payload });
 /** The newest `limit` snapshots (machine.sqlite metrics_snapshots over the machine handle `m`), oldest first: [{at, ...payload}]. */
 export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')

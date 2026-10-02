@@ -59,7 +59,7 @@ export function archiveSessionFiles(paths, { archiveRoot, agent, apply } = {}) {
     LOCALAPPDATA: path.join(root, 'localappdata'),
   };
   delete env.ORCA_TERMINAL_HANDLE;
-  env.STARCI_TEST_MACHINE_FILE = path.join(root, 'machine.sqlite');  // fleet registry of this fixture only
+  env.STARCI_TEST_MACHINE_FILE = path.join(root, 'machine.sqlite');  // worker registry of this fixture only
   return { root, repo, trustHome, archiveRoot, stateFile, env, ledgerFile: ledgerFileFor(repo, { env }) };
 };
 

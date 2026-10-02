@@ -113,17 +113,17 @@ export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null,canon
 /**
  * The concurrent-operation ceiling one workflow is admitted at. Two declared numbers meet here and
  * the LOWER of them admits: the owner's `budgets.maxOps` (per workflow) and `maxParallelOps` from
- * modules/models/runtimes.yaml (fleet-wide). A null, absent or non-positive value is unbounded, so
- * a workflow with no owner budget still meets the fleet ceiling. A parallelism gear raises what
+ * modules/models/runtimes.yaml (worker-wide). A null, absent or non-positive value is unbounded, so
+ * a workflow with no owner budget still meets the worker ceiling. A parallelism gear raises what
  * `api estimate` requests and never raises either of these.
  */
 export function opSlotCeiling({maxOps=null,maxParallelOps=null}={}){
   const positive=value=>{const n=Number(value);return Number.isInteger(n)&&n>0?n:null;};
-  const owner=positive(maxOps),fleet=positive(maxParallelOps);
-  if(owner===null&&fleet===null)return {ceiling:null,source:null};
-  if(owner===null)return {ceiling:fleet,source:'maxParallelOps'};
-  if(fleet===null)return {ceiling:owner,source:'budgets.maxOps'};
-  return owner<=fleet?{ceiling:owner,source:'budgets.maxOps'}:{ceiling:fleet,source:'maxParallelOps'};
+  const owner=positive(maxOps),workers=positive(maxParallelOps);
+  if(owner===null&&workers===null)return {ceiling:null,source:null};
+  if(owner===null)return {ceiling:workers,source:'maxParallelOps'};
+  if(workers===null)return {ceiling:owner,source:'budgets.maxOps'};
+  return owner<=workers?{ceiling:owner,source:'budgets.maxOps'}:{ceiling:workers,source:'maxParallelOps'};
 }
 
 /**

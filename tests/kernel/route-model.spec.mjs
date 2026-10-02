@@ -98,7 +98,7 @@ test('Sol limited or dead routes the kernel to Claude Opus 5.5',t=>{
 
 test('an open provider circuit in the --repo ledger routes the kernel to Claude Opus 5.5',t=>{
   const repo=fixture(t).dir();
-  // The provider circuit is fleet-wide machine state (provider-health moved out of the ledger's signals table);
+  // The provider circuit is worker-wide machine state (provider-health moved out of the ledger's signals table);
   // --repo still gates the read on the repo having a ledger.
   const ledger=openLedger({file:ledgerFileFor(repo)});
   ledger.close();

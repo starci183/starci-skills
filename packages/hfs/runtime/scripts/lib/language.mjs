@@ -39,6 +39,8 @@ export const FAILURE_CODE_VIETNAMESE_FIELDS = Object.freeze(['title_vi', 'meanin
  *  - modules/ops/_labels.yaml: the op-label catalogue, one `{ vi, en }` pair per op (the `vi` field is the localized label).
  *  - modules/goal/archetypes.yaml: the Vietnamese phrase lexicons matched against owner input (the signal phrase sets, and the
  *    phrase lists of the archetype recognisers).
+ *  - modules/goal/source-phrases.yaml: the Vietnamese phrase lists runtime source matchers read through
+ *    scripts/lib/source-phrases.mjs (owner replies, report wording, product copy) - each leaf list under `phrases`.
  * An op manifest (modules/ops/ops/<id>.yaml, the starci/op@1 documents check-op-manifest types) is declared by
  * OP_MANIFEST_VIETNAMESE_FIELDS: its text objects are {en, vi} (modules/schemas/op.schema.yaml $defs text), and `vi` is the
  * owner's reading of the same rule.
@@ -50,6 +52,15 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
     fields: Object.freeze([
       'buildIntent', 'canonIntent', 'e2eIntent', 'uatIntent', 'proofNegation', 'integrationIntent', 'integrationNegation', 'brandIntent',
       'phrases', 'requires', 'excludes', 'backend', 'frontend', 'package',
+    ]),
+  }),
+  'modules/goal/source-phrases.yaml': Object.freeze({
+    fields: Object.freeze([
+      'prefer', 'avoid', 'negation', 'refused', 'accept', 'golden',
+      'missingPaths', 'grantTooNarrow', 'toolTimeout', 'testGap', 'checkerUnavailable',
+      'supervisorVerbs', 'ownerWord', 'orWord', 'beyondAuthority', 'ownerOnly', 'workerDied', 'contractConflict', 'decision',
+      'product', 'grammar', 'knowledge', 'sourceLabel', 'internalVocabulary', 'actor', 'success',
+      'wizard', 'form', 'dashboard', 'gap', 'anatomy', 'otpLabel',
     ]),
   }),
 });

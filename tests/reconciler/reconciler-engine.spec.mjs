@@ -168,10 +168,10 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
   assert.deepEqual(p.events.map((e) => e.kind), ['op-reported', 'land-succeeded', 'op-unrouted']);
   const controllers = [
     { name: 'job', routes: { 'op-reported': (ev) => `job:${ev.ledgerId}:${ev.entityId}` } },
-    { name: 'fleet', routes: { 'land-*': () => 'fleet:land', 'op-reported': () => { throw Error('bad route'); } } },
+    { name: 'workers', routes: { 'land-*': () => 'workers:land', 'op-reported': () => { throw Error('bad route'); } } },
   ];
   const routed = p.events.flatMap((ev) => routeEvent(ev, controllers));
-  assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:shop-be:op-1'], ['fleet', 'fleet:land']]);
+  assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:shop-be:op-1'], ['workers', 'workers:land']]);
   assert.equal(pollLedger(st.db, ledger, { reader: fixtureReader }).events.length, 0, 'the cursor moved');
   assert.equal(st.m.cursorOf(led.ledgerId), 4, 'the cursor is keyed by the ledger id');
 

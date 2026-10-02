@@ -458,20 +458,20 @@ const launchGraceOf = (db, job, { now }) => {
 // job has not been dispatched and holds nothing; everything from the lease
 // forward does, including a fenced launch whose effect may exist.
 const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
-// modules/models/runtimes.yaml — the pool cards and the fleet ceiling. Every
+// modules/models/runtimes.yaml — the pool cards and the worker ceiling. Every
 // concurrency number this gate reasons with comes from here, through the one
 // cached loader (engine/config.mjs runtimeProfile): a missing or unparsable
 // file throws, never reads as an empty document.
 const poolCardFor = (doc, target) => Object.entries(doc?.runtimes ?? {})
   .find(([poolId, runtime]) => (runtime?.target ?? poolId) === target)?.[1] ?? null;
-const fleetMaxParallelOps = () => {
+const workersMaxParallelOps = () => {
   const value = Number(runtimeProfile()?.maxParallelOps);
   return Number.isInteger(value) && value > 0 ? value : null;
 };
 /**
  * The owner's concurrent-operation budget. A missing, unparsable or schema-short config.yaml must
  * never stop a workflow from routing (the same tolerance start-workflow and route-model keep), so
- * an unreadable owner file leaves `maxOps` unbounded and the fleet ceiling admits alone.
+ * an unreadable owner file leaves `maxOps` unbounded and the worker ceiling admits alone.
  */
 const ownerMaxOps = () => {
   const owner = inspectOwnerConfig(ownerRoot);
@@ -489,7 +489,7 @@ const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
     `SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
        AND status IN (${SLOT_HOLDING_STATUSES.map(() => '?').join(',')})`
   ).get(workflowId, excludeJobId ?? '', ...SLOT_HOLDING_STATUSES).n;
-  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: fleetMaxParallelOps() });
+  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: workersMaxParallelOps() });
 };
 
 /**
@@ -930,11 +930,11 @@ function afterChainReaches(db, row, targetId) {
 /** runtimes.yaml allocation.routeHoldMs: how long a routed-but-queued job keeps its pool slot after its latest route. */
 const routeHoldMsOf = () => allocationMs('routeHoldMs');
 /**
- * Pool load fleet-wide, the one count `api route` (capacity) and `api status` (queuedBecause pool-full) both
+ * Pool load worker-wide, the one count `api route` (capacity) and `api status` (queuedBecause pool-full) both
  * reason with, so they agree: every non-settled job whose payload.model names a pool holds a slot of it - running,
  * leased and answering jobs always, and a routed-but-QUEUED one only while its latest route decision (payload.routedAt,
  * else its newest route-decided event) is younger than allocation.routeHoldMs. The hold lets sequential route calls of
- * one fan-out see the fleet filling instead of piling every slice onto the first preferred pool; past it, a job parked
+ * one fan-out see the workers filling instead of piling every slice onto the first preferred pool; past it, a job parked
  * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (nivo
  * 2026-09-28: devin 10/10 with 5 ops running). Re-routing a queued job refreshes its hold.
  * {byModel: {pool: n}, holders: Set<jobId>, routeHoldMs}; `excludeJobId` (the job being routed) holds nothing.
@@ -1819,7 +1819,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     ...(extra ?? {}),
     ...(opens ? { recover: failureKind === QUOTA_FAILURE_KIND ? providerQuotaProbeCommand(key) : providerRecoverCommand(key) } : {}),
   };
-  // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), fleet-wide.
+  // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), worker-wide.
   storeProviderCircuit(key, { value, expiresAt });
   return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };

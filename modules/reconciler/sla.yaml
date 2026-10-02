@@ -84,18 +84,18 @@ codes:
   # Added by lane rc-gc-resource (not in Appendix A): a running workflow with ready work and zero slots; its number is
   # modules/reconciler/resource.yaml capStarvedMs, carried on the clock.
   CAP_STARVED:              {slaMs: 900000, source: modules/reconciler/resource.yaml capStarvedMs, severity: warn, owner: resource-controller, autoAction: 'fair share gives the workflow a slot'}
-  # ---- Lanes, land and push (§9.6), fleet (§8.6), workflow worktrees (§16.7): fleet controller / lane rc-product-worktrees.
+  # ---- Lanes, land and push (§9.6), workers (§8.6), workflow worktrees (§16.7): workers controller / lane rc-product-worktrees.
   LANE_ABANDONED:           {slaMs: 86400000, severity: warn, owner: supervisor, autoAction: 'report, never delete'}
   LANE_CONFLICT_OVERDUE:    {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
-  LAND_QUEUE_STALL:         {slaMs: 1800000, severity: warn, owner: fleet-controller, autoAction: 'unstick the land queue'}
-  LAND_GATE_SLOW:           {slaKey: landGate.specsBaseMs, severity: warn, owner: fleet-controller, autoAction: 'none (reported); specsBaseMs + perSpecMs x n rides on the clock'}
+  LAND_QUEUE_STALL:         {slaMs: 1800000, severity: warn, owner: workers-controller, autoAction: 'unstick the land queue'}
+  LAND_GATE_SLOW:           {slaKey: landGate.specsBaseMs, severity: warn, owner: workers-controller, autoAction: 'none (reported); specsBaseMs + perSpecMs x n rides on the clock'}
   LAND_FAILED_UNOWNED:      {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
   PUSH_REFUSED_UNOWNED:     {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'push-refused DI'}
   LANE_GC_OVERDUE:          {slaKey: housekeeping.gcLaneGraceMs, severity: warn, owner: gc-controller, autoAction: 'GC the merged lane'}
   STAGING_LEAK:             {slaMs: 1800000, severity: warn, owner: gc-controller, autoAction: 'remove the job''s recorded Orca staging worktree'}
-  DERIVED_STALE:            {slaMs: 300000, severity: warn, owner: fleet-controller, autoAction: 'INV-L2: rebuild the derived dist after land'}
+  DERIVED_STALE:            {slaMs: 300000, severity: warn, owner: workers-controller, autoAction: 'INV-L2: rebuild the derived dist after land'}
   OWED_SLA_BREACH:          {slaKey: supervisorTick.actionSlaMs, severity: warn, owner: supervisor, autoAction: 'the owed DI escalates'}
-  PRODUCT_LAND_QUEUE_STALL: {slaMs: 1800000, severity: warn, owner: fleet-controller, autoAction: 'unstick the product land queue'}
+  PRODUCT_LAND_QUEUE_STALL: {slaMs: 1800000, severity: warn, owner: workers-controller, autoAction: 'unstick the product land queue'}
   PRODUCT_WORKTREE_LEAK:    {slaKey: housekeeping.gcLaneGraceMs, severity: warn, owner: gc-controller, autoAction: 'remove the landed product worktree'}
   IMPORTS_BROKEN_AFTER_MOVE: {slaMs: 0, severity: critical, owner: kernel, autoAction: 'the wave wire/repoint unit repairs the importers before the wave ends'}
 # A controller whose clock state is not a code names its mapping here (state -> code). Unknown states report as

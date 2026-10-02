@@ -22,7 +22,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
                                   ~/.starci/artifacts/<sha[0:2]>/<sha256>
                                                        ▲
    reconciler engine (one per host) ──► machine.sqlite ◄── engine/db/machine.mjs (the only writer)
-     Job, Workflow, Resource, Host, GC, Fleet, Learning controllers
+     Job, Workflow, Resource, Host, GC, Workers, Learning controllers
                                                        │
    harness UI (ui/server.mjs) ── read-only handles on both DBs and GET /api/blob/<sha>
 ```
@@ -61,7 +61,7 @@ The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/cli.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
 | `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
-| Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and fleet digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
+| Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and owner digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
 | Harness UI | One process | Serves the read-only views of both databases and `GET /api/blob/<sha>`. | Never writes, never calls an API verb, never talks to Orca for a closed terminal. |
 
@@ -132,7 +132,7 @@ whole host up and prints one green/red checklist (see "Start"). Every engine sta
 first). In shadow mode a controller computes and records what it would do and does nothing.
 
 `config.yaml` `reconciler.profile` sets every controller's default mode: `operational` runs Job, Host, Workflow and
-Resource `active` and GC, Fleet and Learning `shadow`; `observe` keeps all of them `shadow`; no profile means only the
+Resource `active` and GC, Workers and Learning `shadow`; `observe` keeps all of them `shadow`; no profile means only the
 explicit `controllers.<name>.mode` entries count. An explicit entry overrides the profile for that controller. Safe mode
 (`--safe`) forces every controller to `shadow`; it starts only after a real crash loop (more than `crashLoop.max`
 abnormal starts inside `crashLoop.windowMs`). Owner restarts, self-reload and land re-exec handovers, and a restart after
@@ -146,7 +146,7 @@ count.
 | Resource | RAM throttle and pool backoff (`throttle_state` with every change in `throttle_events`), provider quotas. |
 | Host | Services and their probes, the Kernel and Supervisor seats (`seats`, `deliveries`, `seat_turns`), periodic transcript snapshots. Replaces a seat only after proving it dead or deaf. |
 | GC | Blob mark-and-sweep per ledger with a 24 h grace, terminal and worktree collection, retention; every item's outcome is a `gc_items` row. |
-| Fleet | Cross-workflow Decision Items, land and push, owner digests. |
+| Workers | Cross-workflow Decision Items, land and push, owner digests. |
 | Learning | Measures outcomes per agent, model and op (`v_model_scorecard`). |
 
 Every periodic duty keeps its last run in `schedules`, so an engine restart never runs a duty early.

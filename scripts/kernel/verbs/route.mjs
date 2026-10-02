@@ -40,7 +40,7 @@ export default {
 
   // Concurrency admission BEFORE the pool decision: a route that lands on a
   // full workflow is a decision the kernel cannot spend. The ceiling is the
-  // lower of the owner's budgets.maxOps and the fleet's maxParallelOps.
+  // lower of the owner's budgets.maxOps and the workers' maxParallelOps.
   // A wait whose typed --until-* conditions already hold is released before the gates below read it.
   releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: job.workflow_id });
   // An owner-gate incident naming this job refuses first: no pool can run a
@@ -93,7 +93,7 @@ export default {
   const rtDoc = fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null;
   const pools = rtDoc?.runtimes ?? {};
   // Pool load (poolLoadOf, shared with api status): running, leased and answering jobs hold their pool slot, and a
-  // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the fleet filling
+  // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the workers filling
   // instead of piling every slice onto the first preferred pool. The job being routed holds nothing yet.
   const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
   const runningByModel = poolLoad.byModel;

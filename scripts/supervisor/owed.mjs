@@ -43,7 +43,7 @@
 //   node scripts/supervisor/owed.mjs acks [--json]
 //
 // Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
-// poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
+// poll.mjs prints the OWED lines every cycle; the Workers controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
 // fixed used to re-alert every hour: one workflow's brand.decide a1-a8 failed, fixed by

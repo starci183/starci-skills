@@ -772,7 +772,7 @@ test('Telegram routing: owner text lands in the Supervisor kernel inbox; channel
   assert.ok(!plan.text.includes('restart nivo please'), 'owner text is never typed into the terminal');
   const again = planWake({ now: Date.now(), lastTickAt: Date.now(), unread: inbox, wakes: [{ at: Date.now(), payload: { inbox: [inbox[0].id], delivered: true } }] });
   assert.deepEqual(again.tags, [], 'an announced message is not re-woken inside the window');
-  assert.deepEqual(planWake({ now: 10 * 60_000 + 1 }).tags, [], 'the Fleet controller owns the clock wake');
+  assert.deepEqual(planWake({ now: 10 * 60_000 + 1 }).tags, [], 'the Workers controller owns the clock wake');
   appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'stall-alert', text: 'STALL-ALERT x' }, { env });
   assert.equal(readInbox(SUPERVISOR_ID, env).at(-1).from, 'stall-alert');
 });

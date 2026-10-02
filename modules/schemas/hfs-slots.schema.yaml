@@ -301,19 +301,6 @@ $defs:
         type: array
         minItems: 1
         items: {$ref: '#/$defs/runtimeSlot'}
-      pending:
-        type: array
-        description: The one shrink-only allowlist of the runtime check. A finding matching an entry is reported at level pending; an entry that matches no finding is RT_PENDING_STALE, and an entry that covers a finding the base revision did not allow is RT_PENDING_ADDED.
-        items:
-          type: object
-          additionalProperties: false
-          required: [path, rule, lane, since, reason]
-          properties:
-            path: {type: string, minLength: 1}
-            rule: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
-            lane: {type: string, pattern: '^C[1-8][ab]?$'}
-            since: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
-            reason: {type: string, minLength: 1}
       consumers:
         type: array
         items: {type: string}

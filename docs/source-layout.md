@@ -231,13 +231,11 @@ chunk C2a.
 Every source file is read with the TypeScript AST (`scripts/hfs/runtime-rules/source-ast.mjs`,
 `scripts/lib/spawn-calls.mjs`); no text is grepped.
 
-The `pending` list of the manifest is the one allowlist. Each entry is `{path, rule, lane, since, reason}`: a glob, a
-finding code, the chunk of the migration (C1 to C8) that deletes it, and a date. A finding an entry allows is printed at
-level pending and never fails. The list only shrinks:
-
-- `RT_PENDING_STALE`: an entry that allows no finding, or names a code no runtime rule reports;
-- `RT_PENDING_ADDED`: an entry that allows a finding the base revision's list did not allow (the base is the merge-base
-  of HEAD with main). A file moved through `modules/kernel/retired-paths.yaml` `moved[]` keeps its allowance.
+The ONE allowlist of the runtime is `modules/kernel/allowlist.yaml` (schema `starci/allowlist@1`): every exception list
+a runtime check keeps is a named section of it — `not-codes`, `json-exceptions`, `dead-script-entries`, `export-used` —
+each entry carrying its reason, each section shrink-only. A reader loads its section through `scripts/lib/allowlist.mjs`
+(`readAllowlist(kind)`); `scripts/checks/check-one-allowlist.mjs` refuses any second allowlist, baseline, pending or
+entries file by name (`RT_ALLOWLIST_SPRAWL`).
 
 Files move with the codemod of the migration (`<tmp>/rh-move.mjs`, outside the repository), which
-runs `git mv`, rewrites relative imports and cited paths, rewrites the pending paths, and appends the `moved[]` entries.
+runs `git mv`, rewrites relative imports and cited paths, and appends the `moved[]` entries.

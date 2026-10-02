@@ -13,8 +13,8 @@
 # scripts and modules/kernel/failure-codes.yaml.
 #
 # Every rule is an error from 2.0. There is no baseline, allowlist or suppression file for a product. The runtime gate
-# (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only `pending`
-# list of that manifest, held by RT_PENDING_STALE and RT_PENDING_ADDED. Codes are quoted: the failure-code
+# (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only sections of
+# modules/kernel/allowlist.yaml, held by RT_ALLOWLIST_SPRAWL. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
 schema: starci/hfs-rules@2
 version: 2.0.0
@@ -1241,17 +1241,9 @@ rules:
     failureCodes: ["RT_CITED_PATH_MISSING"]
     enforcers:
       - {kind: runtime, id: cited-path, at: scripts/checks/check-contract-cites.mjs}
-  - id: R123
-    code: "RT_PENDING_STALE"
-    law: "Every entry of the pending list of knowledge/hfs/runtime-slots.yaml names a runtime finding code and still allows a finding, and no entry allows a finding the base revision's list did not allow: the list only shrinks."
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_PENDING_STALE", "RT_PENDING_ADDED"]
-    enforcers:
-      - {kind: runtime, id: pending-ratchet, at: scripts/hfs/runtime-rules/pending.mjs}
   - id: R124
     code: "RT_PINNED_PATH_MOVED"
-    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the fleet stopped."
+    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the workers stopped."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_PINNED_PATH_MOVED"]
@@ -1275,7 +1267,7 @@ rules:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
   - id: R127
     code: "RT_ABSOLUTE_PATH"
-    law: "No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text. A real path-parsing test vector goes to the pending list with a reason."
+    law: "No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_ABSOLUTE_PATH"]

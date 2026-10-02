@@ -69,7 +69,7 @@ UPPER_SNAKE literal, a `[CODE]` token in a message, a kebab literal in a `code:`
 `signal:` position, the last argument of `refuse(...)`, `hand('...')`, constant `*_REASONS|CODES|KINDS|CLASSES` lists) and
 refuses an emitted code with no entry, an entry no code emits, a malformed entry, an owner outside the set, an
 `other-op:<op>` naming an op that does not exist. A literal that only looks like a code (an env var name, a constant)
-goes to `modules/kernel/failure-codes.not-codes` with the reason.
+goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reason.
 
 ## Answers for the UI session
 

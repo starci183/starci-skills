@@ -25,7 +25,7 @@ export function runtimeProfile(){
   return structuredClone(runtimeProfileCache.profile);
 }
 /**
- * modules/models/runtimes.yaml `allocation` — where the fleet's operating numbers live: the dispatch lease
+ * modules/models/runtimes.yaml `allocation` — where the workers' operating numbers live: the dispatch lease
  * TTL, the liveness and cadence windows, the slicing weights, the failure cooldowns. Code reads them from
  * here; a literal copy of any of them in a source file would be a second authority.
  */

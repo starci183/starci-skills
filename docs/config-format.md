@@ -62,7 +62,7 @@ Optional keys:
   the Supervisor seat, optional chat digest cadence and managed product repositories; the reconciler
   Host and Workflow controllers own seat recovery and stall detection ([supervisor](supervisor.md);
   defaults `scripts/machine/home.mjs` `DEFAULTS`)
-- `reconciler` — `{enabled?, profile?, controllers?}`: `profile` `operational` (job, host, workflow, resource active; gc, fleet,
+- `reconciler` — `{enabled?, profile?, controllers?}`: `profile` `operational` (job, host, workflow, resource active; gc, workers,
   learning shadow) or `observe` (all shadow) sets every controller's default mode; `controllers.<name>.mode`
   (`off|shadow|active`) overrides one. The `start` skill applies and checks `operational` (docs/architecture.md "The reconciler")
 - `delegation` — `{asks, until, excludes?, note?}` or null: a named delegate answers owner asks until `until`;
@@ -111,7 +111,7 @@ Three rules hold at every gear:
 
 1. **`s` and `m` operations are always one agent.** The table applies to `l` and `xl` only.
 2. **A gear never raises a ceiling.** It raises only what `api estimate` *requests*. A pool's
-   `runtimes.<pool>.maxParallel`, the fleet's `maxParallelOps` and the workflow's `budgets.maxOps`
+   `runtimes.<pool>.maxParallel`, the workers' `maxParallelOps` and the workflow's `budgets.maxOps`
    all clamp it afterwards, and the lowest one admits.
 3. **Requested is not achievable.** `api estimate` returns `agentsRequested` from this table and
    `agentsAchievable` after the closure's disjoint path partition bounds it — a two-directory

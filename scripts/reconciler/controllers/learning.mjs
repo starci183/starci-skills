@@ -1,8 +1,8 @@
-// learning.mjs — the Learning controller (reconciler DESIGN §8.7, §18 step 7; lane rc-fleet-ui).
+// learning.mjs — the Learning controller (reconciler DESIGN §8.7, §18 step 7; lane rc-workers).
 //
 //   learning:tick  every resyncMs (30 min), and at once on runtime-invariant-violated: the invariant violations of the
 //                  window become learning items with signature `inv:<code>` (one item per code, its size the number of
-//                  violations), next to nothing else the old tick fed (the owed actions stay the Fleet controller's).
+//                  violations), next to nothing else the old tick fed (the owed actions stay the Workers controller's).
 //                  scripts/machine/lessons.mjs newHypotheses decides which signatures repeated >= minRepeats with no
 //                  open hypothesis -> ONE Supervisor DI `hypothesis` per signature; measureExperiments judges the
 //                  landed experiments -> ONE Supervisor DI `experiment-revert` per experiment whose revert is due.

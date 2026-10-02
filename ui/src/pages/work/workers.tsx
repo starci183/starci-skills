@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, CircleAlert } from 'lucide-react';
 import { refreshQuery, useApiQuery } from '../../api/query';
-import type { FleetViewV2, HostView } from '../../contract';
+import type { WorkersViewV2, HostView } from '../../contract';
 import { formatReason } from '../../i18n/vi';
 import { t } from '../../i18n/t';
 import { Card, CardContent } from '../../components/ui/card';
@@ -21,23 +21,23 @@ export const concept: Concept = 'C2';
 const healthNames: Record<string, string> = { engine: 'Engine', services: t('Services'), seats: t('Seats'), ram: 'RAM', sla: 'SLA', leaks: t('Leaks'), gc: t('Cleanup'), land: 'Land', providers: t('Providers') };
 const whoNames: Record<string, string> = { owner: t('The owner'), supervisor: 'Supervisor', kernel: 'Kernel', controller: 'Controller' };
 
-export function FleetPage() {
+export function WorkersPage() {
   const [project, setProject] = useState('all');
-  const fleet = useApiQuery<FleetViewV2>('/api/fleet?phase=all', { topics: ['fleet', 'decisions', 'system'], intervalMs: 20_000 });
-  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['fleet'], intervalMs: 60_000 });
+  const workers = useApiQuery<WorkersViewV2>('/api/workers?phase=all', { topics: ['workers', 'decisions', 'system'], intervalMs: 20_000 });
+  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['workers'], intervalMs: 60_000 });
   const host = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
-  const data = fleet.data ?? undefined;
+  const data = workers.data ?? undefined;
   const visibleWorkflows = (data?.workflows ?? []).filter(row => project === 'all' || row.project === project);
   const summary = data ? t('{live} workflows running · {bad} need handling · {owner} waiting for the owner', { live: data.counts.live, bad: data.counts.bad, owner: data.counts.ownerDecisions }) : t('Reading the situation…');
   const healthCount = data?.health.items.length ?? 0;
   return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-24 md:gap-8">
     <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('StarCi / overview')}</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t('Overview')}</h1><p className="text-sm text-muted-foreground">{summary}</p></header>
-    {fleet.error && <FeedbackState error onRetry={() => refreshQuery('/api/fleet?phase=all')}>{fleet.error}</FeedbackState>}
+    {workers.error && <FeedbackState error onRetry={() => refreshQuery('/api/workers?phase=all')}>{workers.error}</FeedbackState>}
     <KpiStrip summary={data?.summary} needsAttention={data?.counts.bad} />
     <ConceptBlock concept="C12" as="section"><div className="mb-3 flex items-center gap-2"><CircleAlert className="size-4" aria-hidden="true" /><h2 className="font-semibold">{t('Needs attention')}</h2><span className="text-sm text-muted-foreground">{data?.attention.length ?? '—'}</span></div>
-      <Card><CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">{data?.attention.length ? <Stagger className="divide-y">{data.attention.map((item, index) => <StaggerItem key={`${item.ref.kind}-${item.ref.id}-${index}`} className="py-3 first:pt-0 last:pb-0"><a href={item.ref.href} className="flex min-w-0 items-center gap-3 hover:text-primary"><StatusChip status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate text-sm" title={formatReason(item.reason)}>{formatReason(item.reason)}</span><span className="hidden text-xs text-muted-foreground sm:block">{whoNames[item.who] ?? item.who}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></a></StaggerItem>)}</Stagger> : fleet.loading ? <PageSkeleton label={t('Loading…')} /> : <FeedbackState>{t('Nothing needs attention.')}</FeedbackState>}</CardContent></Card>
+      <Card><CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">{data?.attention.length ? <Stagger className="divide-y">{data.attention.map((item, index) => <StaggerItem key={`${item.ref.kind}-${item.ref.id}-${index}`} className="py-3 first:pt-0 last:pb-0"><a href={item.ref.href} className="flex min-w-0 items-center gap-3 hover:text-primary"><StatusChip status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate text-sm" title={formatReason(item.reason)}>{formatReason(item.reason)}</span><span className="hidden text-xs text-muted-foreground sm:block">{whoNames[item.who] ?? item.who}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></a></StaggerItem>)}</Stagger> : workers.loading ? <PageSkeleton label={t('Loading…')} /> : <FeedbackState>{t('Nothing needs attention.')}</FeedbackState>}</CardContent></Card>
     </ConceptBlock>
-    <ConceptBlock concept="C2" as="section" className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Workflow</h2><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{visibleWorkflows.length} workflow</span><label className="sr-only" htmlFor="fleet-project">{t('Project')}</label><select id="fleet-project" value={project} onChange={event => setProject(event.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs"><option value="all">{t('All projects')}</option>{projects.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div></div>
+    <ConceptBlock concept="C2" as="section" className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Workflow</h2><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{visibleWorkflows.length} workflow</span><label className="sr-only" htmlFor="workers-project">{t('Project')}</label><select id="workers-project" value={project} onChange={event => setProject(event.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs"><option value="all">{t('All projects')}</option>{projects.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div></div>
       <Stagger key={project} className="grid gap-4 md:grid-cols-2">{visibleWorkflows.map(row => <StaggerItem key={`${row.project}/${row.id}`} className="min-w-0"><WorkflowCard row={row} /></StaggerItem>)}</Stagger>
       {data && visibleWorkflows.length === 0 && <FeedbackState>{t('No matching workflows.')}</FeedbackState>}
     </ConceptBlock>
@@ -52,4 +52,4 @@ export function FleetPage() {
   </div>;
 }
 
-export default FleetPage;
+export default WorkersPage;

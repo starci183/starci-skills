@@ -187,7 +187,7 @@ export default {
   'Final copy': 'Bản cuối',
   'Find text or /regex/': 'Tìm chữ hoặc /regex/',
   'Finished': 'Đã xong',
-  'Fleet-wide metrics': 'Số liệu toàn hệ thống',
+  'Worker metrics': 'Số liệu toàn hệ thống',
   'Follow live': 'Theo trực tiếp',
   'from the CLI transcript': 'từ transcript CLI',
   'Go': 'Đi',

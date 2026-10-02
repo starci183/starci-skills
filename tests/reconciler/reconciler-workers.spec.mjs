@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
-import fleet, { KEYS, reconcileFleet, waitCycles, planDeps, planOwed, planLand, planPush, overdueUrgent, DEFAULTS } from '../../scripts/reconciler/controllers/fleet.mjs';
+import workers, { KEYS, reconcileWorkers, waitCycles, planDeps, planOwed, planLand, planPush, overdueUrgent, DEFAULTS } from '../../scripts/reconciler/controllers/workers.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { digest, urgent, planUrgent, digestDue, composeDigest, URGENT_KEY_MS } from '../../scripts/reconciler/notifier.mjs';
 import { digestText } from '../../scripts/supervisor/actions.mjs';
@@ -13,7 +13,7 @@ import { translator } from '../../scripts/lib/i18n.mjs';
 
 const trv = translator('vi');
 
-// Lane rc-fleet-ui (LANES.md "Lane G", DESIGN.md §8.6, §10.2, §17.2): a wait cycle is ONE deadlock DI, an owed cluster
+// Lane rc-workers (LANES.md "Lane G", DESIGN.md §8.6, §10.2, §17.2): a wait cycle is ONE deadlock DI, an owed cluster
 // ONE Supervisor DI (the same key on every pass), and the Notifier sends one digest per window and one urgent message
 // per key per 6 h. Ledgers and Telegram are faked: the ctx is scripts/reconciler/testing.mjs fakeCtx, the push a stub.
 
@@ -22,13 +22,13 @@ const NOW = Date.parse('2026-09-28T10:00:00Z');
 const MIN = 60_000;
 // A ledger whose file exists (this spec) and a reader that is never queried: the deps/owed helpers are injected.
 const ledgers = [{ ledgerId: 'shop-be', repo: 'shop-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
-const ctxOf = (over = {}) => fakeCtx({ controller: 'fleet', now: () => NOW, ledgers, openReader: () => ({ close() {} }), ...over });
+const ctxOf = (over = {}) => fakeCtx({ controller: 'workers', now: () => NOW, ledgers, openReader: () => ({ close() {} }), ...over });
 
 test('the controller module follows the shared contract', () => {
-  assert.equal(fleet.name, 'fleet');
-  assert.deepEqual(fleet.concerns, ['fleet.owed', 'fleet.push', 'fleet.deps', 'notify.owner']);
-  assert.equal(typeof fleet.reconcile, 'function');
-  assert.equal(fleet.routes['land-*']({ kind: 'land-passed' }), KEYS.land);
+  assert.equal(workers.name, 'workers');
+  assert.deepEqual(workers.concerns, ['workers.owed', 'workers.push', 'workers.deps', 'notify.owner']);
+  assert.equal(typeof workers.reconcile, 'function');
+  assert.equal(workers.routes['land-*']({ kind: 'land-passed' }), KEYS.land);
 });
 
 test('waitCycles: a 2-workflow cycle is one cycle with a canonical order; a chain is none', () => {
@@ -41,8 +41,8 @@ test('a 2-workflow wait cycle opens exactly one deadlock DI for the Supervisor, 
   const graph = { edges: [{ from: 'wf-fe', to: 'wf-be', via: 'seam:api', strength: 'hard' }, { from: 'wf-be', to: 'wf-fe', via: 'peer-wait', strength: 'hard' }, { from: 'wf-x', to: 'wf-fe', strength: 'soft' }], findings: [] };
   const ctx = ctxOf();
   const deps = { dependencyGraph: () => graph, force: true };
-  const first = await reconcileFleet(KEYS.deps, ctx, { settings: DEFAULTS, deps });
-  const second = await reconcileFleet(KEYS.deps, ctx, { settings: DEFAULTS, deps });
+  const first = await reconcileWorkers(KEYS.deps, ctx, { settings: DEFAULTS, deps });
+  const second = await reconcileWorkers(KEYS.deps, ctx, { settings: DEFAULTS, deps });
   assert.equal(first.cycles, 1);
   const deadlocks = ctx.calls.decisions.filter((d) => d.kind === 'deadlock');
   assert.equal(deadlocks.length, 2, 'one per pass');
@@ -58,8 +58,8 @@ test('a 2-workflow wait cycle opens exactly one deadlock DI for the Supervisor, 
 test('the deps cadence: a second pass inside depsEveryMs does nothing', async () => {
   const ctx = ctxOf();
   const deps = { dependencyGraph: () => ({ edges: [], findings: [] }) };
-  assert.equal((await reconcileFleet(KEYS.deps, ctx, { settings: DEFAULTS, deps })).skipped, undefined);
-  assert.equal((await reconcileFleet(KEYS.deps, ctx, { settings: DEFAULTS, deps })).skipped, 'not-due');
+  assert.equal((await reconcileWorkers(KEYS.deps, ctx, { settings: DEFAULTS, deps })).skipped, undefined);
+  assert.equal((await reconcileWorkers(KEYS.deps, ctx, { settings: DEFAULTS, deps })).skipped, 'not-due');
 });
 
 test('hub-blocker and unowned-need findings are one cross-workflow DI each', () => {
@@ -84,8 +84,8 @@ test('an owed cluster opens one Supervisor DI keyed by the cluster, idempotent a
   assert.ok(plan.every((d) => d.decider === 'supervisor' && d.idempotencyKey === `owed:${d.entity.id}`));
   const ctx = ctxOf();
   const deps = { owed: Promise.resolve({ owedFindings: () => items }), cluster: Promise.resolve({ clusterOwed }), force: true };
-  await reconcileFleet(KEYS.owed, ctx, { settings: DEFAULTS, deps });
-  await reconcileFleet(KEYS.owed, ctx, { settings: DEFAULTS, deps });
+  await reconcileWorkers(KEYS.owed, ctx, { settings: DEFAULTS, deps });
+  await reconcileWorkers(KEYS.owed, ctx, { settings: DEFAULTS, deps });
   const keys = ctx.calls.decisions.map((d) => d.idempotencyKey);
   assert.equal(new Set(keys).size, plan.length, 'the same keys on the second pass');
   assert.deepEqual(planOwed({ clusters: clusters.map((c) => ({ ...c, fixedBy: 'abc1234' })), now: NOW }), []);
@@ -98,14 +98,14 @@ test('the land pass holds LAND_QUEUE_STALL while busy, LAND_FAILED_UNOWNED for t
   const calm = planLand({ now: NOW, land: { busy: false }, events: [{ kind: 'land-passed', id: 'lane-y', at: NOW }], dist: { ok: true, state: 'fresh' } });
   assert.deepEqual(calm.set, []);
   const ctx = ctxOf();
-  const r = await reconcileFleet(KEYS.land, ctx, { settings: DEFAULTS, deps: { landStatus: () => ({ busy: true, current: null }), landEvents: [], dist: { ok: true, state: 'fresh' } } });
+  const r = await reconcileWorkers(KEYS.land, ctx, { settings: DEFAULTS, deps: { landStatus: () => ({ busy: true, current: null }), landEvents: [], dist: { ok: true, state: 'fresh' } } });
   assert.deepEqual(r.clocks, ['LAND_QUEUE_STALL:land:queue']);
   assert.equal(ctx.calls.clock[0].state, 'LAND_QUEUE_STALL');
 });
 
 test('push: shadow only records the run; a refused repo is one push-refused DI', async () => {
   const ctx = ctxOf();
-  const r = await reconcileFleet(KEYS.push, ctx, { settings: DEFAULTS, deps: { force: true } });
+  const r = await reconcileWorkers(KEYS.push, ctx, { settings: DEFAULTS, deps: { force: true } });
   assert.equal(r.shadow, true);
   assert.equal(ctx.calls.run[0].args[0], 'scripts/supervisor/push-mains.mjs');
   const plan = planPush({ now: NOW, results: [{ repo: 'shop-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
@@ -123,7 +123,7 @@ test('a Supervisor DI escalated 3 times and past due is an urgent item; others a
 
 test('notify: in shadow the controller only records the notifier run', async () => {
   const ctx = ctxOf();
-  const r = await reconcileFleet(KEYS.notify, ctx, { settings: DEFAULTS, deps: { force: true } });
+  const r = await reconcileWorkers(KEYS.notify, ctx, { settings: DEFAULTS, deps: { force: true } });
   assert.equal(r.digest, 'shadow');
   assert.deepEqual(ctx.calls.run[0].args.slice(0, 3), ['scripts/reconciler/notifier.mjs', 'digest', '--send']);
 });
@@ -185,30 +185,30 @@ test('pure pieces: digestDue, planUrgent, composeDigest', () => {
 
 /* ------------------------------------------------------------ what only the deleted tick did */
 
-test('fleet:metrics records one op-health snapshot per window (telemetry, also in shadow) with the cached stuck waits', async () => {
+test('workers:metrics records one op-health snapshot per window (telemetry, also in shadow) with the cached stuck waits', async () => {
   const recorded = [];
   const om = await import('../../scripts/machine/op-metrics.mjs');
   const ctx = ctxOf({ status: { 'shop-be:wf-a': { stuck: [{ key: 'k', kind: 'queued-ready', severity: 'critical', ageMs: 1 }] } } });
   const db = { prepare: (sql) => ({ all: () => (/FROM workflows/.test(sql) ? [{ workflow_id: 'wf-a' }] : []) }), close() {} };
   ctx.openReader = () => db;
   const deps = { opMetrics: { ...om, jobRecords: () => [] }, recordSnapshot: async (p) => recorded.push(p) };
-  const r = await reconcileFleet(KEYS.metrics, ctx, { settings: DEFAULTS, deps });
+  const r = await reconcileWorkers(KEYS.metrics, ctx, { settings: DEFAULTS, deps });
   assert.equal(r.ok, true);
   assert.equal(recorded.length, 1);
   assert.equal(recorded[0].schema, 'starci/op-metrics-snapshot@1');
   assert.equal(recorded[0].stuck.critical, 1);
-  assert.equal((await reconcileFleet(KEYS.metrics, ctx, { settings: DEFAULTS, deps })).skipped, 'not-due');
+  assert.equal((await reconcileWorkers(KEYS.metrics, ctx, { settings: DEFAULTS, deps })).skipped, 'not-due');
 });
 
-test('fleet:direct: each direct commit on main is one runtime-defect Supervisor DI, only in the exclusive land-gate mode', async () => {
+test('workers:direct: each direct commit on main is one runtime-defect Supervisor DI, only in the exclusive land-gate mode', async () => {
   const commits = [{ sha: 'a'.repeat(40), subject: 'hotfix straight on main' }];
   const ctx = ctxOf();
-  const r = await reconcileFleet(KEYS.direct, ctx, { settings: DEFAULTS, deps: { force: true, landGateMode: 'exclusive', directCommits: () => commits } });
+  const r = await reconcileWorkers(KEYS.direct, ctx, { settings: DEFAULTS, deps: { force: true, landGateMode: 'exclusive', directCommits: () => commits } });
   assert.equal(r.direct, 1);
   assert.equal(ctx.calls.decisions[0].kind, 'runtime-defect');
   assert.equal(ctx.calls.decisions[0].idempotencyKey, `direct-commit:${'a'.repeat(40)}`);
   const shared = ctxOf();
-  assert.match((await reconcileFleet(KEYS.direct, shared, { settings: DEFAULTS, deps: { force: true, landGateMode: 'shared', directCommits: () => commits } })).skipped, /land gate shared/);
+  assert.match((await reconcileWorkers(KEYS.direct, shared, { settings: DEFAULTS, deps: { force: true, landGateMode: 'shared', directCommits: () => commits } })).skipped, /land gate shared/);
   assert.equal(shared.calls.decisions.length, 0);
 });
 

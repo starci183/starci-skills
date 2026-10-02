@@ -135,13 +135,13 @@ function compactHealth(machine) {
   ];
   return { ui: items.some(item => item.ui === 'bad') ? 'bad' : items.some(item => item.ui === 'warn') ? 'warn' : 'ok', items };
 }
-function fleet(store, url) {
+function workers(store, url) {
   const workflows = workflowRows(store).filter(row => url.searchParams.get('phase') === 'all' || !['finished', 'archived'].includes(row.phase));
   const attentionRows = attention(store);
   const machine = store.machine.db;
   const violationsOpen = one(machine, 'SELECT count(*) AS n FROM invariant_violations WHERE cleared_at IS NULL')?.n ?? 0;
   const health = compactHealth(machine);
-  const summary = fleetSummary(store);
+  const summary = workersSummary(store);
   return { attention: attentionRows, workflows, health, summary, counts: {
     live: workflows.filter(row => row.phase === 'running').length,
     bad: workflows.filter(row => row.ui === 'bad').length,
@@ -171,7 +171,7 @@ export function usageDetail(db, { wf = null, attempt = null } = {}) {
   const sources = many(db, `SELECT DISTINCT source FROM llm_usage u WHERE ${where}`, arg).map(r => r.source);
   return { recorded: byModel.length > 0, byModel, byOp, rows, sources, total: usageTotal(byModel) };
 }
-/** Usage since a timestamp for one ledger: grouped per provider, model, op and Vietnam-time day (fleet KPI and analytics). */
+/** Usage since a timestamp for one ledger: grouped per provider, model, op and Vietnam-time day (worker KPI and analytics). */
 export function usageSince(db, since, project = null) {
   const q = (key, join = '') => many(db, `SELECT ${key} AS k,${usageSums('u.')} FROM llm_usage u ${join} WHERE u.at>=? GROUP BY 1`, since);
   return { project,
@@ -189,7 +189,7 @@ export function mergeUsage(lists) {
   }
   return [...map.values()];
 }
-function fleetSummary(store) {
+function workersSummary(store) {
   const since = Date.now() - DAY;
   const rows = ledgerRows(store, (row, db) => many(db, 'SELECT attempt_id,workflow_id,op_id,model,pool,agent,verdict,report_outcome,reported_at,dispatched_at,settled_at,end_state FROM v_op_history WHERE dispatched_at>=? OR (settled_at IS NULL AND end_state IS NULL)', since).map(a => ({ ...a, project: row.name })));
   const open = rows.filter(attemptOpen);
@@ -350,13 +350,13 @@ function decisionLog(store, url) {
 export function handleWork(request, response, store, url) {
   const pathname = url.pathname;
   if (!store.machine) {
-    if (pathname.startsWith('/api/fleet') || pathname.startsWith('/api/projects') || pathname.startsWith('/api/workflows') || pathname === '/api/decisions/log') {
+    if (pathname.startsWith('/api/workers') || pathname.startsWith('/api/projects') || pathname.startsWith('/api/workflows') || pathname === '/api/decisions/log') {
       sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true;
     }
     return false;
   }
-  if (pathname === '/api/fleet') {
-    sendJson(request, response, fleet(store, url), { sources: [
+  if (pathname === '/api/workers') {
+    sendJson(request, response, workers(store, url), { sources: [
       ...source('machine', 'v_engine_health', 'v_sla_open', 'invariant_violations', 'v_open_sup_decisions', 'v_seats', 'metrics_snapshots'),
       ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_units', 'v_decision_rows'))], stale: staleOf(store) });
     return true;

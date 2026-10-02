@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const readYaml = rel => parseYaml(fs.readFileSync(path.join(root, rel), 'utf8'));
@@ -43,7 +44,7 @@ test('the scope.define kind carries the feature record, not work/node', () => {
 });
 
 test('work/feature@1 accepts a bounded scope under extensions.work3.scope and still refuses state', () => {
-  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(featureSchema);
+  const validate = addWorkCommon(new Ajv2020({ allErrors: true, strict: false })).compile(featureSchema);
   const feature = {
     schema: 'work/feature@1', id: 'collab', title: 'Collab coordinates people and modules in one conversation.',
     description: 'Synthetic feature record for a layout test.',
@@ -111,7 +112,7 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
   const scope = featureSchema.$defs.scope.properties;
   for (const field of ['nodes', 'deps', 'exclusions', 'openQuestions']) assert.deepEqual(setup[field], scope[field], `${field} drifted from $defs.scope`);
   assert.deepEqual(Object.keys(setup.request.properties), Object.keys(scope.request.properties).filter(k => k !== 'workflow'));
-  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(catalogSchema);
+  const validate = addWorkCommon(new Ajv2020({ allErrors: true, strict: false })).compile(catalogSchema);
   const catalog = { schema: 'work/catalog@1', id: 'shop', description: 'Synthetic catalog for a layout test.',
     features: [{ id: 'repository-foundation', directory: 'features/repository-foundation', description: 'Baseline.' }] };
   const entry = {

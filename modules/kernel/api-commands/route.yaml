@@ -78,10 +78,10 @@ route:
   returns: '{ok:true, jobId, kind, difficulty, bias, lineageAdjust?, decision:{model, modelId, effort, routeChain, routeRejected}}'
   maxOps: >-
     the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) —
-    the owner's per-workflow budget and the fleet-wide one, lower wins
+    the owner's per-workflow budget and the worker-wide one, lower wins
     (engine/admission.mjs opSlotCeiling). A slot is held from the lease forward: leased,
     running, answering and the fenced effect_unknown. A queued job holds none. An unreadable
-    owner config leaves budgets.maxOps unbounded and the fleet ceiling admits alone; a
+    owner config leaves budgets.maxOps unbounded and the worker ceiling admits alone; a
     parallelism gear never raises either number. Pool maxParallel is a separate fence the
     capacity block above applies
   refuses:

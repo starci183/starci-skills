@@ -1,6 +1,6 @@
 # index.yaml — modules/models coverage manifest.
 # Business frame: one page answering "what model targets exist, which file
-# describes each, and which the fleet actually routes automatically."
+# describes each, and which the workers actually route automatically."
 # Coverage contract for the coherence sweep: every key of
 # modules/models/runtimes.yaml runtimes AND every key of
 # modules/models/registry.yaml targets has a profile here.

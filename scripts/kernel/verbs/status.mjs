@@ -110,7 +110,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
-  // Pool load fleet-wide - the same count `api route` reasons with (poolLoadOf), so status and route agree.
+  // Pool load worker-wide - the same count `api route` reasons with (poolLoadOf), so status and route agree.
   const poolLoad = poolLoadOf(db, { now });
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// notifier.mjs — the ONE owner-bound sender (reconciler DESIGN §10.2, §17.2, §19; lane rc-fleet-ui).
+// notifier.mjs — the ONE owner-bound sender (reconciler DESIGN §10.2, §17.2, §19; lane rc-workers).
 //
-// Two channels, nothing else reaches the owner's Telegram once the Fleet controller owns notify.owner:
+// Two channels, nothing else reaches the owner's Telegram once the Workers controller owns notify.owner:
 //   digest   at most once per allocation.supervisorTick.ownerDigestMs: progress per workflow (units that passed their
 //            gates, units/hour, ETA, why slow), what was fixed, what is being handled, what waits on the owner (only
 //            credentials at the end and the handover), the GC line, open invariant violations by code, the AUTO lands
@@ -16,7 +16,7 @@
 //   node scripts/reconciler/notifier.mjs digest [--send] [--force] [--json]
 //   node scripts/reconciler/notifier.mjs urgent --class <class> --key <key> --text "<text>" [--send] [--json]
 //
-// The Fleet controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
+// The Workers controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -163,7 +163,7 @@ export async function digestInputs({ env = process.env, now = Date.now(), repos 
   const gc = await supervisorRead((m) => m.db.prepare("SELECT msg FROM machine_logs WHERE actor='gc' AND kind='gc.summary' ORDER BY seq DESC LIMIT 1").get()?.msg ?? null, null, env);
   let actions = [], owed = null;
   try { const a = await import('../supervisor/actions.mjs'); owed = a.latestOwedActions({ env }); } catch { owed = null; }
-  // The op-health trend: the Fleet controller's supervisor-op-metrics snapshots (op-metrics.mjs currentTrend).
+  // The op-health trend: the Workers controller's supervisor-op-metrics snapshots (op-metrics.mjs currentTrend).
   let trend = null;
   try { trend = await (await import('../machine/op-metrics.mjs')).currentTrend({ env, language: await languageOf() }); } catch { trend = null; }
   return { progress, ownerWaits, violations, gc, trend, actions, owed };

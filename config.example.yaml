@@ -23,7 +23,7 @@ effort: medium
 #     null inherits `effort`.
 # Owner default: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
 kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6-sol}], effort: high}
-# parallel — the one knob for how wide the fleet runs. `gear` indexes the agent
+# parallel — the one knob for how wide the workers run. `gear` indexes the agent
 # table in modules/models/runtimes.yaml allocation.slicing.size: a long (`l`)
 # operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for
 # `xl.agents[gear]`; `s` and `m` operations are always one agent. Declared gears
@@ -175,7 +175,7 @@ claudeDebug:
 # reconciler.would rows, runs nothing) | active (acts; the old loop yields that duty via scripts/reconciler/owns.mjs).
 # profile — the operational default of every controller, so a host is never left all-shadow by accident:
 #   operational  job, host, workflow, resource active (they settle jobs, start services and seats, wake stalled
-#                workflows, throttle); gc, fleet, learning shadow. The `start` skill applies and checks it.
+#                workflows, throttle); gc, workers, learning shadow. The `start` skill applies and checks it.
 #   observe      every controller shadow (read-only; a debugging or audit host).
 #   (absent)     only the explicit controllers.<name>.mode entries count; an unnamed controller is off.
 # controllers.<name>.mode overrides the profile for that one controller (e.g. gc: {mode: active}).

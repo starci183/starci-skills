@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DYNAMIC_ROOTS, ENTRIES_FILE, deadScriptFindings, checkDeadScripts } from '../../scripts/checks/check-dead-scripts.mjs';
+import { DYNAMIC_ROOTS, deadScriptFindings, checkDeadScripts } from '../../scripts/checks/check-dead-scripts.mjs';
+import { ALLOWLIST_FILE } from '../../scripts/lib/allowlist.mjs';
+
+/** An allowlist fixture document carrying only a dead-script-entries section of {path, reason} pairs. */
+const allowlistWith = (entries) => `schema: starci/allowlist@1\ndead-script-entries:\n${entries.map(([path, reason]) => `  - {path: ${path}, reason: "${reason}"}`).join('\n')}\n`;
 
 // RED18: a runtime script is alive only when something executable names it. A doc, README, YAML prose line, retired-paths
 // entry, contract-change or benchmark finding is not a reader.
@@ -62,14 +66,14 @@ test('a directory the runtime loads by listing it is alive without a named reade
 test('a declared CLI entry is alive; an entry whose script is gone or that code now reads is stale', () => {
   assert.deepEqual(run({
     'scripts/checks/cli.mjs': '',
-    [ENTRIES_FILE]: '# header\nscripts/checks/cli.mjs\tCLI run by the owner\n',
+    [ALLOWLIST_FILE]: allowlistWith([['scripts/checks/cli.mjs', 'CLI run by the owner']]),
   }), []);
   assert.deepEqual(codes(run({
     'scripts/checks/gone.mjs': '',
     'scripts/checks/used.mjs': '',
     'scripts/lib/user.mjs': "import '../checks/used.mjs';",
     'package.json': '{"scripts":{"x":"node scripts/lib/user.mjs"}}',
-    [ENTRIES_FILE]: 'scripts/checks/used.mjs\tCLI\nscripts/checks/missing.mjs\tCLI\n',
+    [ALLOWLIST_FILE]: allowlistWith([['scripts/checks/used.mjs', 'CLI'], ['scripts/checks/missing.mjs', 'CLI']]),
   })), [['RT_DEAD_SCRIPT', 'scripts/checks/gone.mjs'], ['RT_DEAD_ENTRY', 'scripts/checks/used.mjs'], ['RT_DEAD_ENTRY', 'scripts/checks/missing.mjs']]);
 });
 

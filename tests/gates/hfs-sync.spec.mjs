@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { starciworkGitignoreText } from '../../scripts/lib/starciwork-boundary.mjs';
 import {
   BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, coverageExclusions, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
@@ -24,7 +25,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const require = createRequire(import.meta.url);
 const jestPreset = require('../../packages/jest-preset/index.cjs');
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
+const validateWorkspace = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
 const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();

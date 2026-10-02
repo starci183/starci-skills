@@ -1,6 +1,6 @@
 // runtime-hfs-rules.spec.mjs - the runtime HFS check (scripts/hfs/runtime-check.mjs) and its rule modules
 // (scripts/hfs/runtime-rules/*): for every runtime rule of knowledge/hfs/rules.yaml a violating case and a passing one,
-// read from source texts and small fixture trees, plus the pending ratchet (stale, added, a moved file keeps its entry).
+// read from source texts and small fixture trees.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +18,6 @@ import { nameFindings, sourceNameFindings } from '../../scripts/hfs/runtime-rule
 import { pinnedFindings, retiredFindings } from '../../scripts/hfs/runtime-rules/retired.mjs';
 import { sizeFindings } from '../../scripts/hfs/runtime-rules/size.mjs';
 import { tierFindings } from '../../scripts/hfs/runtime-rules/tier-direction.mjs';
-import { applyPending, pendingMatcher } from '../../scripts/hfs/runtime-rules/pending.mjs';
 import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-link.mjs';
 import { controlCharFinding } from '../../scripts/hfs/runtime-rules/control-chars.mjs';
 import { absolutePathFindings, absolutePathRepoFindings } from '../../scripts/hfs/runtime-rules/absolute-path.mjs';
@@ -187,7 +186,7 @@ test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesce
   assert.deepEqual(codesOf(loose), ['RT_PINNED_PATH_MOVED'], 'a pinned pattern (scripts/api/orca/<call>.mjs) moves only quiesced');
 });
 
-test('RT_PINNED_PATH_MOVED: every pinned path present, or one moved with the fleet quiesced, is clean', () => {
+test('RT_PINNED_PATH_MOVED: every pinned path present, or one moved with the workers quiesced, is clean', () => {
   assert.deepEqual(pinnedFindings(ctxOf({}, { files: PINNED_FILES })), []);
   const moved = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES.filter((p) => p !== 'scripts/reconciler/boot.mjs'), 'scripts/reconciler/start-boot.mjs'], retiredPaths: { moved: [{ from: 'scripts/reconciler/boot.mjs', to: 'scripts/reconciler/start-boot.mjs', quiesced: true }] } }));
   assert.deepEqual(moved, []);
@@ -288,15 +287,6 @@ test('RT_ABSOLUTE_PATH: a path built from os.tmpdir() or the runtime root is cle
   assert.deepEqual(abs('tests/y.spec.mjs', "import os from 'node:os';\nimport path from 'node:path';\nconst tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-'));\nconst prompt = `PS ${tmp}> `;\nconst repo = path.join(tmp, 'repo');\n"), []);
 });
 
-test('RT_ABSOLUTE_PATH: a real path-parsing vector is allowed only by a pending entry with a reason', () => {
-  const findings = absolutePathFindings('tests/path-parse.spec.mjs', `assert.equal(parse('${CR}:${BS}${BS}x'), 1);\n`);
-  assert.deepEqual(codesOf(findings), ['RT_ABSOLUTE_PATH']);
-  const pending = [{ path: 'tests/path-parse.spec.mjs', rule: 'RT_ABSOLUTE_PATH', lane: 'ABSPATH', since: '2026-10-02', reason: 'feeds the Windows path parser its drive input' }];
-  const judged = applyPending({ findings, pending, basePending: pending, codes: new Set(['RT_ABSOLUTE_PATH']) });
-  assert.deepEqual(judged.errors, []);
-  assert.equal(judged.allowed[0].level, 'pending');
-});
-
 test('RT_ABSOLUTE_PATH: the repo scan reads tracked files through ctx.read', () => {
   const texts = { 'scripts/a.mjs': `export const a = '${DR}:/x';\n`, 'scripts/b.mjs': "export const b = 'ok';\n" };
   const found = absolutePathRepoFindings({ files: Object.keys(texts), read: (p) => texts[p] ?? null });
@@ -342,18 +332,15 @@ slots:
   - {id: runtime.lib, profiles: [runtime], path: "scripts/lib/<name>.mjs", presence: optional, tracked: tracked, tier: base, tests: none}
 `;
 
-/** A runtime fixture repository: hfs.json, the fixture manifest (with `pending`), and `files`. */
-const fixture = (t, files, pending = []) => {
+/** A runtime fixture repository: hfs.json, the fixture manifest, and `files`. */
+const fixture = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-hfs-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const pendingText = `pending:\n${pending.map((e) => `  - {path: "${e.path}", rule: ${e.rule}, lane: ${e.lane ?? 'C2a'}, since: 2026-10-01, reason: fixture}`).join('\n')}\n`;
-  const all = { 'hfs.json': '{"hfs": 1, "kind": "runtime", "project": "fixture"}\n', [RUNTIME_MANIFEST_FILE]: `${FIXTURE_MANIFEST}${pending.length ? pendingText : 'pending: []\n'}`, 'scripts/kernel/cli.mjs': 'export const api = 1;\n', ...files };
+  const all = { 'hfs.json': '{"hfs": 1, "kind": "runtime", "project": "fixture"}\n', [RUNTIME_MANIFEST_FILE]: FIXTURE_MANIFEST, 'scripts/kernel/cli.mjs': 'export const api = 1;\n', ...files };
   for (const [rel, body] of Object.entries(all)) { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), body); }
   return { dir, files: Object.keys(all) };
 };
 const check = (fx, options = {}) => runtimeCheck({ repoRoot: fx.dir, root: ROOT, files: fx.files, tree: false, base: null, drift: [], ...options });
-const SPAWNING_LIB = { 'scripts/lib/run.mjs': `import { spawnSync } from '${CP}';\nexport const run = () => spawnSync('git', ['status']);\n` };
-const manifestWith = (pending) => `${FIXTURE_MANIFEST}pending:\n${pending.map((e) => `  - {path: "${e.path}", rule: ${e.rule}, lane: C2a, since: 2026-10-01, reason: base}`).join('\n')}\n`;
 
 test('runtimeCheck: a clean fixture tree is ok with no finding', (t) => {
   const r = check(fixture(t, { 'scripts/lib/clip.mjs': 'export const clip = (s) => s;\n' }));
@@ -372,46 +359,6 @@ test('RT_GENERATED_DRIFT: copies that equal their generator give no finding', (t
   assert.deepEqual(codesOf(check(fixture(t, {}), { drift: [] }).findings), []);
 });
 
-test('pending: a finding its entry names reports at level pending and never fails', (t) => {
-  const r = check(fixture(t, SPAWNING_LIB, [{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]));
-  assert.equal(r.ok, true, JSON.stringify(r.findings));
-  assert.ok(r.pending.length >= 2 && r.pending.every((f) => f.code === 'RT_EXTERNAL_OWNER' && f.level === 'pending' && f.lane === 'C2a'));
-});
-
-test('RT_PENDING_STALE: an entry that allows no finding fails the check', (t) => {
-  const r = check(fixture(t, { 'scripts/lib/clip.mjs': 'export const clip = (s) => s;\n' }, [{ path: 'scripts/lib/clip.mjs', rule: 'RT_EXTERNAL_OWNER' }]));
-  assert.equal(r.ok, false);
-  assert.deepEqual(codesOf(r.findings), ['RT_PENDING_STALE']);
-  const unknown = check(fixture(t, SPAWNING_LIB, [{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }, { path: 'scripts/lib/run.mjs', rule: 'NOT_A_RUNTIME_CODE' }]));
-  assert.deepEqual(codesOf(unknown.findings), ['RT_PENDING_STALE'], 'a code no runtime rule reports is stale');
-});
-
-test('RT_PENDING_ADDED: adding an entry the base revision did not have fails the check; the list only shrinks', (t) => {
-  const fx = fixture(t, SPAWNING_LIB, [{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]);
-  const r = check(fx, { base: baseRev({ [RUNTIME_MANIFEST_FILE]: manifestWith([]) }) });
-  assert.equal(r.ok, false);
-  assert.deepEqual(codesOf(r.findings), ['RT_PENDING_ADDED']);
-  const widened = check(fx, { base: baseRev({ [RUNTIME_MANIFEST_FILE]: manifestWith([{ path: 'scripts/lib/other.mjs', rule: 'RT_EXTERNAL_OWNER' }]) }) });
-  assert.deepEqual(codesOf(widened.findings), ['RT_PENDING_ADDED'], 'retargeting an entry to a new path is an addition');
-});
-
-test('RT_PENDING_ADDED: an entry the base had, a narrowed one, and one that follows a moved file are clean', (t) => {
-  const fx = fixture(t, SPAWNING_LIB, [{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]);
-  assert.deepEqual(check(fx, { base: baseRev({ [RUNTIME_MANIFEST_FILE]: manifestWith([{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]) }) }).findings, []);
-  assert.deepEqual(check(fx, { base: baseRev({ [RUNTIME_MANIFEST_FILE]: manifestWith([{ path: 'scripts/lib/{run,walk}.mjs', rule: 'RT_EXTERNAL_OWNER' }]) }) }).findings, [], 'a narrowed brace list allows a subset');
-  const moved = fixture(t, { ...SPAWNING_LIB, 'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/kernel/run.mjs, to: scripts/lib/run.mjs, movedIn: C3, quiesced: false}\nretiredSymbols: []\n' }, [{ path: 'scripts/lib/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]);
-  const r = check(moved, { base: baseRev({ [RUNTIME_MANIFEST_FILE]: manifestWith([{ path: 'scripts/kernel/run.mjs', rule: 'RT_EXTERNAL_OWNER' }]) }) });
-  assert.deepEqual(codesOf(r.findings).filter((c) => c.startsWith('RT_PENDING')), [], 'a moved file keeps its allowance through moved[]');
-});
-
-test('applyPending: matching is by code and path glob, a trailing / covers a directory', () => {
-  assert.ok(pendingMatcher(old('scripts', 'kernel', 'api-verbs', ''))(old('scripts', 'kernel', 'api-verbs', 'x.mjs')));
-  assert.ok(pendingMatcher('tests/*.spec.mjs')('tests/a.spec.mjs') && !pendingMatcher('tests/*.spec.mjs')('tests/x/a.spec.mjs'));
-  const { errors, allowed } = applyPending({ findings: [{ code: 'RT_SOURCE_NAME', level: 'error', path: 'scripts/a.mjs' }], pending: [{ path: 'scripts/a.mjs', rule: 'RT_API_SHAPE', lane: 'C6' }], codes: new Set(['RT_SOURCE_NAME', 'RT_API_SHAPE']) });
-  assert.deepEqual(allowed, []);
-  assert.deepEqual(errors.map((f) => f.code), ['RT_SOURCE_NAME', 'RT_PENDING_STALE'], 'an entry of another code allows nothing and is stale');
-});
-
-test('the runtime manifest: every cut landed, so the shrink-only pending allowlist is empty', () => {
-  assert.deepEqual(MANIFEST.pending, [], 'a runtime finding is fixed, never allowlisted again');
+test('the runtime manifest has no allowlist block: a runtime finding is fixed, never allowed', () => {
+  assert.equal(MANIFEST.pending, undefined, 'the pending mechanism is gone; exceptions live in modules/kernel/allowlist.yaml sections');
 });

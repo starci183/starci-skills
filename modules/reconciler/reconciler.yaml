@@ -41,8 +41,8 @@ controllers:
       async list(ctx) { return [keys]; },            // the periodic resync
       async reconcile(key, ctx) { ... },             // idempotent: read, then act through ctx
     };
-  names: [job, host, gc, resource, workflow, fleet, learning]
-  lanes: {job: rc-job, host: rc-host, gc: rc-gc-resource, resource: rc-gc-resource, workflow: rc-sla-workflow, fleet: rc-fleet-ui, learning: rc-fleet-ui}
+  names: [job, host, gc, resource, workflow, workers, learning]
+  lanes: {job: rc-job, host: rc-host, gc: rc-gc-resource, resource: rc-gc-resource, workflow: rc-sla-workflow, workers: rc-workers, learning: rc-workers}
   slaLayer: scripts/reconciler/sla.mjs slaPass(ctx), every 30 s when the module exists (lane rc-sla-workflow); its ctx mode follows the workflow controller
 
 # concern -> controller: the same map as scripts/reconciler/owns.mjs CONCERN_OWNER (tests/reconciler/reconciler-owns.spec.mjs checks it).
@@ -65,10 +65,10 @@ concerns:
   workflow.stall-wake: workflow
   workflow.progress: workflow
   workflow.ask-repark: workflow
-  fleet.owed: fleet
-  fleet.push: fleet
-  fleet.deps: fleet
-  notify.owner: fleet
+  workers.owed: workers
+  workers.push: workers
+  workers.deps: workers
+  notify.owner: workers
   learning.tick: learning
   sla.report: workflow
 
@@ -82,8 +82,8 @@ routing:
     op-reported: 'job:<ledgerId>:<jobId>'
     op-dispatched: ['job:<ledgerId>:<jobId>', 'resource:host']
     incident-raised: 'workflow:<ledgerId>:<wf>'
-    kernel-proposal: 'fleet:proposals'
-    land-*: 'fleet:land'
+    kernel-proposal: 'workers:proposals'
+    land-*: 'workers:land'
   owner: each controller declares its own routes; this file only summarises them
 
 workqueue:
@@ -100,7 +100,7 @@ shadow:
     call at most once per 10 minutes) and answers {ok: true, shadow: true}. ctx.owns() is false: nobody does the
     duty, so a controller is only left in shadow for a first trial. --safe (crash loop) runs every active controller
     as shadow. Every controller lands in shadow; flipping one to active is a separate config change (order: job, host,
-    gc, resource, workflow, fleet, learning), each after >= 30 min of shadow with `boot.mjs --status` clean.
+    gc, resource, workflow, workers, learning), each after >= 30 min of shadow with `boot.mjs --status` clean.
   rollback: git revert of the change (there is no old loop to take a duty back); config.yaml reconciler.controllers.<name>.mode off stops the controller
 
 writes:

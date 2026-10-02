@@ -1,6 +1,6 @@
 # Profile: codex-agent — the OpenAI Codex pool (unattended command terminals).
 # Business frame: the generalist workhorse with the widest role coverage, the
-# Sol fallback for think work when Claude is unavailable, AND the fleet's only
+# Sol fallback for think work when Claude is unavailable, AND the workers' only
 # image generator. Owns the interface.asset route and is the interface.draw fallback behind Devin
 # (owner ruling 2026-09-27); it is also the draw loop's independent critic (runtimes.yaml drawLoop.critic).
 

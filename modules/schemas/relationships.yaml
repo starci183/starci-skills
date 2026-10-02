@@ -149,8 +149,8 @@ schemaToSubsystem:
     note: "read directly as authored sources — contracts of the shipped knowledge/ tree."
 
   build:            # build helpers
-    schemas: [json-exceptions]
-    note: "source-only by design — the one file no consumer projects."
+    schemas: [allowlist]
+    note: "source-only by design — the one allowlist no consumer projects."
 
 # ----------------------------------------------------------------------------
 # Reading order for an agent that must WRITE a governed document:

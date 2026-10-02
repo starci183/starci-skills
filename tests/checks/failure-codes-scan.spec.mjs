@@ -13,7 +13,7 @@ function fixture(t, source) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-failure-codes-scan-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
-  write('modules/kernel/failure-codes.not-codes', '# none\n');
+  write('modules/kernel/allowlist.yaml', 'schema: starci/allowlist@1\nnot-codes: []\n');
   write('scripts/land.mjs', source);
   write('modules/models/kinds.yaml', 'vocabularies: {}\n');
   write('engine/db/migrations/runtime/0001-init.sql', '');

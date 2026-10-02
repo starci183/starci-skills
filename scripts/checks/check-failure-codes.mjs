@@ -9,14 +9,16 @@
 //   - a catalog entry no code emits any more (a retired code leaves the catalog),
 //   - an entry with a missing or malformed field, or an owner outside the closed set.
 // What counts as an emitted code (see `emittedCodes`):
-//   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
-//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var;
+//   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in the not-codes
+//          section of modules/kernel/allowlist.yaml (environment variables, Node/SQLite error names, key names)
+//          and any name the code itself reads as an env var;
 //   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
 //          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readAllowlist } from '../lib/allowlist.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
@@ -35,8 +37,7 @@ const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/check-failure-codes.mj
 
 /** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
 const NOT_CODE_PREFIX = /^(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|SONAR|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
-const NOT_CODES_FILE = 'modules/kernel/failure-codes.not-codes';
-const readNotCodes = (base) => new Set(fs.readFileSync(path.join(base, NOT_CODES_FILE), 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split(/\t/)[0].trim()));
+const readNotCodes = (base) => new Set(readAllowlist('not-codes', base).map((entry) => entry.literal));
 
 const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';
 function* walk(dir) {

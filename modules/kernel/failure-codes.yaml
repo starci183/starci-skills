@@ -4425,11 +4425,11 @@ RT_DEAD_SCRIPT:
 RT_DEAD_ENTRY:
   title: "Stale dead-scripts entry"
   title_vi: "Mục khai báo CLI đã lỗi thời"
-  meaning_vi: "Danh sách scripts/checks/dead-scripts.entries nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
+  meaning_vi: "Mục dead-script-entries của modules/kernel/allowlist.yaml nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
   causes_vi:
     - "Script đã bị xóa nhưng mục khai báo còn lại"
     - "Script đã được nối vào mã nên không còn là CLI độc lập"
-  nextStep_vi: "Người giám sát xóa dòng đó khỏi dead-scripts.entries qua một lane đã land."
+  nextStep_vi: "Người giám sát xóa dòng đó khỏi mục dead-script-entries của modules/kernel/allowlist.yaml qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4545,7 +4545,7 @@ RT_EXTERNAL_OWNER:
   causes_vi:
     - "Gọi spawnSync/execFile hay fetch trực tiếp trong tầng nghiệp vụ hoặc trong scripts/lib"
     - "Một tệp api của hệ thống này khởi chạy chương trình của hệ thống khác"
-  nextStep_vi: "Người giám sát chuyển lời gọi vào một tệp lệnh của scripts/api/<hệ thống>/ rồi gọi hàm đó, qua lane của chunk ghi trong mục pending; mục pending được xóa cùng commit."
+  nextStep_vi: "Người giám sát chuyển lời gọi vào một tệp lệnh của scripts/api/<hệ thống>/ rồi gọi hàm đó, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -4556,7 +4556,7 @@ RT_TIER_DIRECTION:
   causes_vi:
     - "Một dịch vụ dùng chung nằm ở tầng cao hơn nơi dùng nó"
     - "Thư viện cơ sở import mã nghiệp vụ"
-  nextStep_vi: "Người giám sát chuyển phần dùng chung xuống tầng được phép (machine, lib) hoặc đảo chiều phụ thuộc, qua lane của chunk ghi trong mục pending."
+  nextStep_vi: "Người giám sát chuyển phần dùng chung xuống tầng được phép (machine, lib) hoặc đảo chiều phụ thuộc, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -4637,25 +4637,14 @@ RT_CITED_PATH_MISSING:
   owner: supervisor
   kind: check-finding
 
-RT_PENDING_STALE:
-  title: "Pending entry is stale"
-  title_vi: "Mục pending đã cũ"
-  meaning_vi: "Một mục trong danh sách pending của knowledge/hfs/runtime-slots.yaml không còn cho phép phát hiện nào (khoản nợ đã trả) hoặc ghi một mã mà không luật runtime nào báo."
+RT_ALLOWLIST_SPRAWL:
+  title: "A second allowlist or baseline file exists"
+  title_vi: "Có thêm một tệp allowlist hay baseline thứ hai"
+  meaning_vi: "Một tệp được git theo dõi trông giống một danh sách cho phép ngoài modules/kernel/allowlist.yaml — theo hậu tố tên (.pending, .entries, .not-codes) hoặc theo tên (exceptions, baseline, allowlist trong một tệp yaml/json/txt), hoặc một tệp danh sách trần trong scripts/checks mà một reader nạp. Mọi ngoại lệ của một kiểm tra runtime là một mục có lý do trong một section của allowlist duy nhất."
   causes_vi:
-    - "Lane đã sửa vi phạm nhưng quên xóa mục pending"
-    - "Gõ sai mã luật trong mục pending"
-  nextStep_vi: "Người giám sát xóa mục đó trong cùng commit đã sửa vi phạm."
-  owner: supervisor
-  kind: check-finding
-
-RT_PENDING_ADDED:
-  title: "Pending list grew"
-  title_vi: "Danh sách pending bị nới rộng"
-  meaning_vi: "Một mục pending cho phép một phát hiện mà danh sách pending của bản gốc (merge-base với main) không cho phép. Danh sách chỉ được thu hẹp: vi phạm mới phải được sửa, không được ghi thêm."
-  causes_vi:
-    - "Thêm mục pending để làm xanh kiểm tra thay vì sửa mã"
-    - "Mở rộng glob của một mục có sẵn"
-  nextStep_vi: "Người giám sát sửa vi phạm mới và bỏ phần mở rộng của danh sách pending; một tệp được chuyển chỗ giữ quyền của nó qua moved[] trong retired-paths.yaml."
+    - "Một lane tạo tệp danh sách riêng thay vì thêm mục vào section của modules/kernel/allowlist.yaml"
+    - "Một tệp allowlist cũ chưa được xóa sau khi nội dung của nó chuyển vào allowlist chung"
+  nextStep_vi: "Người giám sát chuyển các mục (kèm nguyên lý do) vào section tương ứng của modules/kernel/allowlist.yaml qua scripts/lib/allowlist.mjs rồi xóa tệp riêng đó trong cùng commit."
   owner: supervisor
   kind: check-finding
 
@@ -4687,7 +4676,7 @@ RT_ABSOLUTE_PATH:
   causes_vi:
     - "Một lane ghi đường dẫn máy của nó vào mã, tài liệu, tri thức, ví dụ hoặc dữ liệu thử"
     - "Một spec dựng fixture từ ổ đĩa ghi cứng thay vì thư mục tạm của nó"
-  nextStep_vi: "Người giám sát đổi đường dẫn thành đường dẫn tương đối hoặc tên giữ chỗ (<runtime>/..., %LOCALAPPDATA% chưa khai triển), cho mã lấy đường dẫn từ gốc runtime, os.tmpdir(), cấu hình hoặc hàm gốc trạng thái, và cho spec dựng fixture từ thư mục tạm; vector kiểm thử phân tích đường dẫn thật thì ghi vào pending kèm lý do."
+  nextStep_vi: "Người giám sát đổi đường dẫn thành đường dẫn tương đối hoặc tên giữ chỗ (<runtime>/..., %LOCALAPPDATA% chưa khai triển), cho mã lấy đường dẫn từ gốc runtime, os.tmpdir(), cấu hình hoặc hàm gốc trạng thái, và cho spec dựng fixture từ thư mục tạm."
   owner: supervisor
   kind: check-finding
 
@@ -4697,8 +4686,30 @@ RT_PINNED_PATH_MOVED:
   meaning_vi: "Một đường dẫn được ghim (ruleParams.runtime.pinned: được lưu ngoài git trong hook, settings, tác vụ định kỳ, prompt) không còn tồn tại mà không có mục moved[] trong retired-paths.yaml, hoặc được chuyển bằng một mục moved[] không có quiesced: true."
   causes_vi:
     - "Đổi tên một tệp mà hook hay tác vụ định kỳ đang trỏ tới"
-    - "Chuyển tệp khi fleet còn đang chạy"
-  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi fleet đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
+    - "Chuyển tệp khi các worker còn đang chạy"
+  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi các worker đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
+  owner: supervisor
+  kind: check-finding
+
+RT_SCHEMA_NOT_SHARED:
+  title: "Work schema block duplicated"
+  title_vi: "Khối schema Work bị lặp"
+  meaning_vi: "Một khối YAML giống hệt nhau (từ 5 dòng trở lên) xuất hiện trong từ 3 lược đồ work-*.schema.yaml trở lên, thay vì nằm một lần trong modules/schemas/work-common.schema.yaml và được tham chiếu bằng $ref urn:work:common:1."
+  causes_vi:
+    - "Chép một khối lược đồ từ family này sang family khác thay vì đưa nó vào work-common"
+    - "Thêm schema work mới bằng cách sao chép nguyên một schema cũ"
+  nextStep_vi: "Đưa khối vào $defs của modules/schemas/work-common.schema.yaml và thay mỗi bản lặp bằng {$ref: 'urn:work:common:1#/$defs/<tên>'}, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_OP_FIELD_NOT_COMMON:
+  title: "Op field restates a shared fragment"
+  title_vi: "Trường op chép lại mảnh dùng chung"
+  meaning_vi: "Một trường trong modules/ops/ops/*.yaml chép nguyên văn một mảnh đã khai báo trong mục shared: của modules/ops/_common.yaml, trong khi marker shared của mergeOpShared (scripts/lib/op-shared.mjs) dựng lại đúng giá trị đó."
+  causes_vi:
+    - "Viết giá trị literal thay vì đánh dấu path: shared, placeholders.<khoá>: shared hoặc graphPolicy.location: shared"
+    - "Sửa op mà không biết mảnh đã được khai báo trong _common.yaml"
+  nextStep_vi: "Thay giá trị literal bằng marker shared tương ứng; một trường op cần giá trị khác mảnh chung thì giữ literal là đúng, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 

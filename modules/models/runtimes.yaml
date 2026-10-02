@@ -23,7 +23,7 @@ purpose: |-
 # scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
 # `capacity.maxParallel` has drifted from it. Every other contract cites this file instead of
 # restating a number.
-# `maxParallelOps` is the fleet-wide ceiling across every workflow; `budgets.maxOps` in the owner's
+# `maxParallelOps` is the worker-wide ceiling across every workflow; `budgets.maxOps` in the owner's
 # config.yaml is the per-workflow one. The lower of the two admits: engine/admission.mjs
 # opSlotCeiling takes min(budgets.maxOps, maxParallelOps) and scripts/kernel/cli.mjs refuses
 # route/dispatch with `max-ops` at it.
@@ -200,7 +200,7 @@ allocation:
   # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
   # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
   # routes them one after the other with plain api route (a Kernel --prefer/--avoid is ignored, owner
-  # decision 2026-09-25) so the fleet spreads over the lanes instead of piling onto the first pool. A
+  # decision 2026-09-25) so the workers spread over the lanes instead of piling onto the first pool. A
   # hands-on slice (payload.cut) walks the scaffold order, Devin first (owner decision 2026-09-25): each
   # routed slice is already counted before the next one is routed, and a pool that reaches its share
   # passes the next slice down the order.
@@ -223,7 +223,7 @@ allocation:
     size:
       l:  {from: {files: 12, assertions: 40},  agents: {1: 3, 2: 5}}
       xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
-  # The fleet's operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
+  # The workers' operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
   # them and kernel contracts cite the key rather than restating the number, so each one is changed here
   # and nowhere else.
   dispatchLeaseTtlMs: 1800000
@@ -279,7 +279,7 @@ allocation:
   # within probeTimeoutMs. alertRepeatMs: one
   # alert key reaches the inbox and Telegram at most once per window. actionSlaMs: an owed action (scripts/supervisor/
   # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
-  # ownerDigestMs: the Fleet Notifier's periodic owner digest goes out at most this often.
+  # ownerDigestMs: the Owner Notifier's periodic owner digest goes out at most this often.
   supervisorTick:
     everyMs: 1800000
     host: {maxNode: 300, maxGit: 100}

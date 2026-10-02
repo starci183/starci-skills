@@ -235,7 +235,7 @@ export function digestText({ actions = [], owed = null, learning = [], trend = n
 }
 
 /**
- * Build a read-only preview of the owner's digest. The Fleet Notifier owns delivery.
+ * Build a read-only preview of the owner's digest. The Owner Notifier owns delivery.
  */
 export async function ownerDigest({ env = process.env, now = Date.now(), language = null } = {}) {
   const read = readSupervisor((m) => {
@@ -278,9 +278,9 @@ if (isMain(import.meta.url)) {
       const r = recordAction({ item: value('item'), action: value('action'), reason: value('reason'), workflowId: value('workflow'), refs: (value('refs') ?? '').split(',').filter(Boolean), until });
       console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}${r.until ? ` (held until ${new Date(r.until).toISOString()})` : ''}`);
     } else if (verb === 'digest') {
-      if (argv.includes('--send') || argv.includes('--force')) throw Object.assign(Error('digest delivery belongs to the Fleet Notifier; run digest without --send or --force for a preview'), { code: 'action-incomplete' });
+      if (argv.includes('--send') || argv.includes('--force')) throw Object.assign(Error('digest delivery belongs to the Owner Notifier; run digest without --send or --force for a preview'), { code: 'action-incomplete' });
       const r = await ownerDigest();
-      console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- preview only; the Fleet Notifier sends the owner digest`);
+      console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- preview only; the Owner Notifier sends the owner digest`);
     } else {
       console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
       process.exitCode = 2;

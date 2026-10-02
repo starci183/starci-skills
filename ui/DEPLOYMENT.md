@@ -21,7 +21,7 @@ The tunnel runs with `node start.mjs --tunnel` (cloudflared `tunnel --config %US
 
 ## Verification
 
-1. Without Authorization: `/` returns HTML; `/api/contract`, `/api/fleet` and `/api/health` return read-only envelopes.
+1. Without Authorization: `/` returns HTML; `/api/contract`, `/api/workers` and `/api/health` return read-only envelopes.
 2. A workflow has its DAG from `/api/workflows/:project/:wf/graph`. An attempt has its transcript, checks, diff and evidence blobs from `/api/attempts/:project/:id` and its subroutes. Do not take diffs from the live working tree.
 3. The tunnel has registered edge connections; the DNS of `harness.starci.org` points at the tunnel ID.
 4. Over HTTPS: a visitor who is not signed in can view the dashboard; JSON uses ETag/304 and blobs by SHA use immutable caching. A POST to the API returns 405.

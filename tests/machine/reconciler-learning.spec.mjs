@@ -4,7 +4,7 @@ import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
 import learning, { KEY, violationItems, planLearning, reconcileLearning, DEFAULTS } from '../../scripts/reconciler/controllers/learning.mjs';
 import { newHypotheses, measureExperiments } from '../../scripts/machine/lessons.mjs';
 
-// Lane rc-fleet-ui (LANES.md "Lane G", DESIGN.md §8.7): the invariant violations of the window are learning items
+// Lane rc-workers (LANES.md "Lane G", DESIGN.md §8.7): the invariant violations of the window are learning items
 // with signature inv:<code>; two violations of one code open ONE hypothesis DI for the Supervisor, a signature that
 // already has an open hypothesis opens none, and in shadow the recording pass is only a would-row.
 

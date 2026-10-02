@@ -813,7 +813,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
       m.openSupDecision(specsRedOnMainDecision({ redOnMain, root, commits, now: Date.now() }));
     } catch { /* the land_runs row carries the advisory */ }
   }
-  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
+  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the workers:push duty retries).
   if (pushOwedOf(result)) {
     const why = result.push.refused ?? result.push.error ?? 'push failed';
     try {

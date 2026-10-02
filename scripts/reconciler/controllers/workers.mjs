@@ -1,32 +1,32 @@
-// fleet.mjs — the Fleet controller (reconciler DESIGN §8.6, §10.2, §17.2; lane rc-fleet-ui). Cross-workflow and
-// fleet-wide work that no single workflow owns, as Supervisor Decision Items instead of tick text:
+// workers.mjs — the Workers controller (reconciler DESIGN §8.6, §10.2, §17.2; lane rc-workers). Cross-workflow and
+// worker-wide work that no single workflow owns, as Supervisor Decision Items instead of tick text:
 //
-//   fleet:deps    every depsEveryMs: the wait-for graph of every product ledger (scripts/kernel/dependency-graph.mjs
+//   workers:deps    every depsEveryMs: the wait-for graph of every product ledger (scripts/kernel/dependency-graph.mjs
 //                 hard edges: peer waits, typed waits, seam dependencies) -> a cycle is ONE `deadlock` DI (options: a
 //                 seam stub, a Supervisor bridge, lower one branch's priority); a hub-blocker / unowned-need finding is
 //                 ONE `cross-workflow` DI.
-//   fleet:owed    every owedEveryMs: owed.mjs owedFindings -> cluster.mjs clusterOwed -> ONE Supervisor DI per open
-//                 cluster (replaces the tick's OWED ACTIONS block and its SLA inbox text while the engine owns fleet.owed).
-//   fleet:land    land.mjs landStatus -> clock LAND_QUEUE_STALL while a land holds the gate; the newest land-failed with
+//   workers:owed    every owedEveryMs: owed.mjs owedFindings -> cluster.mjs clusterOwed -> ONE Supervisor DI per open
+//                 cluster (replaces the tick's OWED ACTIONS block and its SLA inbox text while the engine owns workers.owed).
+//   workers:land    land.mjs landStatus -> clock LAND_QUEUE_STALL while a land holds the gate; the newest land-failed with
 //                 no later land-passed -> clock LAND_FAILED_UNOWNED (the SLA layer turns a clock past its slaMs into
 //                 a violation). On land-* events, also the post-land derivation: the grammar dist against its source
 //                 (scripts/checks/check-grammar-dist.mjs, the check of commit 25b23059d) -> clock DERIVED_STALE.
-//   fleet:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused
+//   workers:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused
 //                 keyed (repo, failure signature, head), carrying the full push/hook output blob; push-mains itself holds
 //                 back a repo refused again at the same head (exponential backoff), so an identical refusal escalates once.
 // Every periodic key is claimed in the durable `schedules` table (scripts/reconciler/schedules.mjs, MB-01).
-//   fleet:metrics every metricsEveryMs: the op-health snapshot (scripts/machine/op-metrics.mjs aggregate over every
+//   workers:metrics every metricsEveryMs: the op-health snapshot (scripts/machine/op-metrics.mjs aggregate over every
 //                 product ledger + the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics
 //                 event - the trend line of the digest and of `op-metrics.mjs` reads these (the deleted tick wrote them).
 //                 Telemetry, not an action: recorded in shadow too, like the SLA clocks.
-//   fleet:direct  every directEveryMs, only in the exclusive land-gate mode (config.yaml supervisor.landGate.mode): each
+//   workers:direct  every directEveryMs, only in the exclusive land-gate mode (config.yaml supervisor.landGate.mode): each
 //                 first-parent commit on .claude main that no gate land produced (scripts/supervisor/direct-commits.mjs)
 //                 is ONE Supervisor DI (kind runtime-defect, key direct-commit:<sha>): revert and re-land through the gate.
-//   fleet:notify  every notifyEveryMs: the owner digest through scripts/reconciler/notifier.mjs (ctx.run: shadow sends
+//   workers:notify  every notifyEveryMs: the owner digest through scripts/reconciler/notifier.mjs (ctx.run: shadow sends
 //                 nothing), plus the urgent channel for the Supervisor DIs overdue x3.
 //
 // Idempotent: a DI's key names what it is about (the cycle's members, the cluster id, the repo), so a second pass
-// re-opens nothing (decisions.mjs keeps one live DI per key). Numbers: modules/reconciler/fleet.yaml.
+// re-opens nothing (decisions.mjs keeps one live DI per key). Numbers: modules/reconciler/workers.yaml.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,16 +38,16 @@ import { translator } from '../../lib/i18n.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const FLEET_FILE = path.join(ROOT, 'modules', 'reconciler', 'fleet.yaml');
-export const KEYS = Object.freeze({ deps: 'fleet:deps', owed: 'fleet:owed', land: 'fleet:land', push: 'fleet:push', metrics: 'fleet:metrics', direct: 'fleet:direct', notify: 'fleet:notify' });
+export const WORKERS_FILE = path.join(ROOT, 'modules', 'reconciler', 'workers.yaml');
+export const KEYS = Object.freeze({ deps: 'workers:deps', owed: 'workers:owed', land: 'workers:land', push: 'workers:push', metrics: 'workers:metrics', direct: 'workers:direct', notify: 'workers:notify' });
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000, metricsEveryMs: 1_800_000, directEveryMs: 900_000,
   decisionDueMs: 3_600_000, landStallMs: 1_800_000, landFailedMs: 3_600_000, derivedMs: 300_000, urgentOverdueEscalations: 3 });
 const SUPERVISOR = 'supervisor';
 /** push-mains runs every repository in sequence, each push up to PUSH_TIMEOUT_MS (push-mains.mjs); boot.mjs DRAIN_GRACE_MS covers it. */
 export const PUSH_RUN_TIMEOUT_MS = 1_800_000;
 
-/** modules/reconciler/fleet.yaml over DEFAULTS; a missing or bad number keeps its default. */
-export function fleetSettings(file = FLEET_FILE) {
+/** modules/reconciler/workers.yaml over DEFAULTS; a missing or bad number keeps its default. */
+export function workersSettings(file = WORKERS_FILE) {
   let doc = {};
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   const out = { ...DEFAULTS };
@@ -57,13 +57,13 @@ export function fleetSettings(file = FLEET_FILE) {
 
 /* ------------------------------------------------------------ pure planners */
 
-/** A Supervisor DI (DESIGN §10.3) the Fleet controller opens. Pure. */
-export function fleetDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
+/** A Supervisor DI (DESIGN §10.3) the Workers controller opens. Pure. */
+export function workersDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
   return {
     schema: 'starci/decision-item@1', idempotencyKey: key, kind, decider: 'supervisor', ledger: SUPERVISOR,
     ...(productLedger ? { productLedger } : {}), ...(workflowId ? { productWorkflowId: workflowId } : {}),
     entity, summary: clipLine(summary, 300), evidence: evidence.filter(Boolean).slice(0, 8).map((ref) => ({ ref: clipLine(ref, 400) })),
-    options, openedBy: 'fleet-controller', openedAt: now, dueAt: now + dueMs, escalateTo: 'owner', escalations: 0, status: 'open',
+    options, openedBy: 'workers-controller', openedAt: now, dueAt: now + dueMs, escalateTo: 'owner', escalations: 0, status: 'open',
   };
 }
 
@@ -111,7 +111,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = 'vi
   const decisions = [];
   for (const cycle of waitCycles(edges)) {
     const via = cycle.map((wf, i) => edges.find((e) => e.from === wf && e.to === cycle[(i + 1) % cycle.length])).filter(Boolean);
-    decisions.push(fleetDecision({
+    decisions.push(workersDecision({
       kind: 'deadlock', key: `deadlock:${cycle.join('+')}`, now, dueMs: settings.decisionDueMs, productLedger: ledgerOf(cycle[0]),
       entity: { type: 'workflow', id: cycle.join('+') },
       summary: tr('A circular wait across {count} workflows: {cycle} -> {first}', { count: cycle.length, cycle: cycle.join(' -> '), first: cycle[0] }),
@@ -126,7 +126,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = 'vi
   for (const g of graphs) for (const f of g.findings ?? []) {
     if (!['hub-blocker', 'unowned-need'].includes(f.kind)) continue;
     const wfs = [...new Set(f.workflows ?? [])].sort();
-    decisions.push(fleetDecision({
+    decisions.push(workersDecision({
       kind: 'cross-workflow', key: `cross-workflow:${f.kind}:${wfs.join('+')}`, now, dueMs: settings.decisionDueMs, productLedger: g.ledgerId, workflowId: wfs[0] ?? null,
       entity: { type: 'workflow', id: wfs.join('+') || g.ledgerId }, summary: `${f.kind}: ${f.summary ?? ''}`,
       evidence: [f.summary, f.proposal?.why].filter(Boolean),
@@ -141,7 +141,7 @@ export function planOwed({ clusters = [], now, settings = DEFAULTS, language = '
   const tr = translator(language);
   return clusters.filter((c) => !c.fixedBy).map((c) => {
     const first = c.items?.[0] ?? {};
-    return fleetDecision({
+    return workersDecision({
       kind: first.class === 'owner' ? 'supervisor-ruling' : 'runtime-defect', key: `owed:${c.id}`, now, dueMs: settings.decisionDueMs,
       productLedger: first.repo ? path.basename(first.repo) : null, workflowId: c.workflows?.[0] ?? null,
       entity: { type: 'owed-cluster', id: c.id },
@@ -189,7 +189,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = 'v
     if (!repo || !head || !signature) { incomplete.push({ repo: repo || null, head: head || null, signature: signature || null }); continue; }
     const why = r.refused ?? r.error;
     decisions.push({
-      ...fleetDecision({
+      ...workersDecision({
         kind: 'push-refused', key: `push-refused:${repo}:${sigId(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
         entity: { type: 'repo', id: repo }, summary: tr('Push to main refused at {repo} ({signature}{repeat}): {why}', { repo, signature, repeat: r.repeat > 1 ? tr(', attempt {n} at the same head', { n: r.repeat }) : '', why }),
         evidence: [String(why ?? ''), r.outputSha ? tr('blob:{sha} (the full push/hook output, {bytes} bytes)', { sha: r.outputSha, bytes: r.outputBytes ?? '?' }) : null, `head ${r.head}`],
@@ -205,7 +205,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = 'v
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
 export function planDirect({ commits = [], now, settings = DEFAULTS, language = 'vi' }) {
   const tr = translator(language);
-  return commits.map((c) => fleetDecision({
+  return commits.map((c) => workersDecision({
     kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,
     entity: { type: 'commit', id: String(c.sha).slice(0, 12) },
     summary: tr('Direct commit on main bypassing the land gate: {sha} {subject}', { sha: String(c.sha).slice(0, 9), subject: c.subject ?? '' }),
@@ -234,13 +234,13 @@ function withReaders(ctx, fn) {
   try { return fn(readers); } finally { for (const r of readers) { try { r.db.close(); } catch { /* closed */ } } }
 }
 
-const dutyOf = (key) => String(key).replace(/^fleet:/, '');
+const dutyOf = (key) => String(key).replace(/^workers:/, '');
 /**
  * Whether `key` is due (every `ms`), claimed in the engine's durable `schedules` table (MB-01: an engine restart
  * or reload never runs a duty early; the in-memory "first pass is always due" ran the 30-min push every ~6 min).
  */
 function due(ctx, key, ms, now) {
-  try { return claimDue(ctx, { controller: 'fleet', duty: dutyOf(key), intervalMs: ms, now }).due; }
+  try { return claimDue(ctx, { controller: 'workers', duty: dutyOf(key), intervalMs: ms, now }).due; }
   catch { return false; }
 }
 
@@ -269,7 +269,7 @@ const languageOf = async (deps) => {
   try { const { loadConfig } = await import('../../../engine/config.mjs'); return loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
 };
 
-export async function reconcileFleet(key, ctx, { settings = fleetSettings(), deps = {} } = {}) {
+export async function reconcileWorkers(key, ctx, { settings = workersSettings(), deps = {} } = {}) {
   const now = ctx.now();
   const force = deps.force === true;
   const language = await languageOf(deps);
@@ -298,7 +298,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     let dist = deps.dist ?? null;
     if (!dist && !deps.landStatus) { try { dist = (await import('../../gates/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
     const plan = planLand({ land, events, dist, now, settings });
-    for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'fleet', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
+    for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'workers', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
     for (const c of plan.clear) await ctx.clear(c.entity, c.state);
     return { ok: true, key, clocks: plan.set.map((c) => `${c.state}:${c.entity}`), cleared: plan.clear.length };
   }
@@ -308,7 +308,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     if (r?.shadow) return { ok: true, key, shadow: true };
     const results = Array.isArray(r?.value) ? r.value : [];
     const plan = planPush({ results, now, settings, language });
-    if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.fleet.push-key-incomplete', incomplete: plan.incomplete });
+    if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.workers.push-key-incomplete', incomplete: plan.incomplete });
     return { ok: r?.ok !== false, key, actionId: r?.actionId ?? null, pushed: results.filter((x) => x.pushed).length, held: results.filter((x) => x.held).length, ...(await openAll(ctx, plan)) };
   }
   if (key === KEYS.metrics) {
@@ -360,17 +360,17 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
 }
 
 export default {
-  name: 'fleet',
-  concerns: ['fleet.owed', 'fleet.push', 'fleet.deps', 'notify.owner'],
+  name: 'workers',
+  concerns: ['workers.owed', 'workers.push', 'workers.deps', 'notify.owner'],
   resyncMs: DEFAULTS.resyncMs,
   concurrency: DEFAULTS.concurrency,
   // A land event re-reads the land gate and the derived dist at once; the other keys keep their own cadence.
   routes: { 'land-*': () => KEYS.land },
   list: async () => Object.values(KEYS),
   async reconcile(key, ctx) {
-    const r = await reconcileFleet(key, ctx, { settings: fleetSettings() });
-    // The claimed run's outcome (fleet:land is event-driven, not a schedule).
-    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx, { controller: 'fleet', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
+    const r = await reconcileWorkers(key, ctx, { settings: workersSettings() });
+    // The claimed run's outcome (workers:land is event-driven, not a schedule).
+    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx, { controller: 'workers', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
     return r;
   },
 };
