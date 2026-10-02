@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
+import { crossesSide } from './side-boundary.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
@@ -483,9 +484,7 @@ function typeScriptContext(config, loaded, paths) {
         || (config.repository && isInside(config.repository, actualTarget) && !slash(actualTarget).includes('/node_modules/'));
       // A side of an app (config.root is be/ or fe/) imports nothing of the app outside itself: the root holds no source, the other
       // side is another program, and a declared read (sides.fe.reads, be/contracts/) is codegen input, never an import.
-      const crossesSide = config.packageRoot !== undefined && config.packageRoot !== config.root
-        && isInside(config.packageRoot, actualTarget) && !isInside(config.root, actualTarget) && !slash(actualTarget).includes('/node_modules/');
-      if (internal && crossesSide) {
+      if (internal && crossesSide(config, actualTarget)) {
         errors.push({
           ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
           project: project.relative,

@@ -4,7 +4,7 @@
 import { secretFindings } from './secrets.mjs';
 import { found, readText } from './read.mjs';
 
-export const LITE_SECRET_CUSTODY = 'HFS_LITE_SECRET_CUSTODY';
+const LITE_SECRET_CUSTODY = 'HFS_LITE_SECRET_CUSTODY';
 
 const LOCKFILE = /(^|\/)package-lock\.json$/u;
 const ROOT_ENV = /^\.env(?:\..*)?$/iu;
@@ -12,7 +12,7 @@ const SECRETS_ENV = /^secrets\.env$/iu;
 const SECRETS_DIRECTORY = /^\.secrets(?:\/|$)/iu;
 const SEALED_HOME = /^\.starcistacks\/[^/]+\/secrets\/[^/]+\.enc$/iu;
 
-export const LITE_SECRET_PATTERNS = Object.freeze([
+const LITE_SECRET_PATTERNS = Object.freeze([
   { name: 'supabase-publishable-token', re: /\bsbp_[A-Za-z0-9_-]{20,}\b/u },
   { name: 'supabase-secret-token', re: /\bsb_secret_[A-Za-z0-9_-]{20,}\b/u },
   // This catches a copied JWT/service token even when it is truncated before the second/third segment. The generic R06

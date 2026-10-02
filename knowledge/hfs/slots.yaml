@@ -1070,6 +1070,9 @@ slots:
     requires: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
     allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
     tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
+    lite:                         # a lite app has no test world: the door and its module only
+      requires: ["<provider>-http.module.ts", "<provider>.webhook.ts"]
+      allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", dto/]
     composedBy: [api]
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
     since: 1.0.0
@@ -1225,6 +1228,7 @@ slots:
     # Lite keeps the shared-EntityManager persistence (raw SqlText + rows types over the generated Database row types) but the
     # schema authority is supabase/migrations (ruleParams.be.lite.schemaAuthority): no TypeORM entity and no be migration.
     lite:
+      requires: []                 # no TypeORM arrays to re-export: the persistence of a lite capability is its sql and rows files
       allows: ["<name>.sql.ts", "<name>.rows.ts", connection.ts]
       forbids: [index.ts, "<name>.repository.ts", entities/, migrations/]
     tests: none

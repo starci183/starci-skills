@@ -28,8 +28,11 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, connectionShapeProblems, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
-import { declaredSlotEnabled, kindParamProblems, kindShapeProblems, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
+import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, kindParamProblems, optionalSlotProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
+import { declarationShapeProblems } from './declaration-shape.mjs';
+import { declarationEdition, editionRuleParams, effectiveSlot, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition.mjs';
+export { litePresenceOf, slotInEdition } from './edition.mjs';
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
@@ -216,18 +219,6 @@ function manifestShapeProblems(m) {
   return bad;
 }
 
-/** The presence of `slot` under edition lite for `profile`: `litePresence`, else the slot's own presence. */
-export function litePresenceOf(slot, profile) {
-  const lp = slot.litePresence;
-  if (lp === undefined) return slot.presence;
-  return isPlainObject(lp) ? (lp[profile] ?? slot.presence) : lp;
-}
-
-/** Whether `slot` exists under `edition` of `manifest` (default: the manifest's own editions). */
-export function slotInEdition(manifest, slot, edition) {
-  return (slot.editions ?? manifest.editions ?? EDITIONS).includes(edition);
-}
-
 /** The rules a JSON Schema cannot state: unique ids, tiers named and reachable, app kinds, variables, no duplicate pattern. */
 function manifestSemanticProblems(m) {
   const bad = [];
@@ -317,64 +308,6 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 
 // ------------------------------------------------------------------------------------- declaration
 
-/** Shape problems of the optional hfs.json `supabase` block: the auth posture the app declares (L08 DB_CONFIG_POLICY compares supabase/config.toml with it). */
-function supabaseBlockProblems(block) {
-  if (block === undefined) return [];
-  if (!isPlainObject(block)) return ['supabase must be an object'];
-  const bad = [];
-  for (const key of Object.keys(block)) if (!['enableSignup', 'jwtExpiry', 'siteUrl', 'redirectUrls', 'forceRls'].includes(key)) bad.push(`supabase has unknown key ${key}`);
-  if (block.enableSignup !== undefined && typeof block.enableSignup !== 'boolean') bad.push('supabase.enableSignup must be true or false');
-  if (block.jwtExpiry !== undefined && !(Number.isInteger(block.jwtExpiry) && block.jwtExpiry > 0 && block.jwtExpiry <= 3600)) bad.push('supabase.jwtExpiry must be an integer of seconds, 3600 at most');
-  if (block.siteUrl !== undefined && (typeof block.siteUrl !== 'string' || !block.siteUrl.trim())) bad.push('supabase.siteUrl must be a URL string');
-  for (const key of ['redirectUrls', 'forceRls']) if (block[key] !== undefined && !(Array.isArray(block[key]) && block[key].every((v) => typeof v === 'string' && v.trim()))) bad.push(`supabase.${key} must be a list of strings`);
-  return bad;
-}
-
-/** Shape problems of a parsed hfs.json, in the words of modules/schemas/hfs-repo.schema.yaml. */
-function declarationShapeProblems(d) {
-  const bad = [];
-  if (!isPlainObject(d)) return ['hfs.json is not an object'];
-  if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
-  if (!NAME.test(String(d.project))) bad.push('project must be a project name');
-  if (d.kind === RUNTIME_KIND) {
-    // The StarCi runtime repository: no sides and no apps; its tree is the runtime manifest's.
-    for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project'].includes(key)) bad.push(`unknown key ${key} (a runtime declaration is {hfs, kind, project})`);
-    return bad;
-  }
-  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'edition', 'supabase', 'sides', 'browser'].includes(key)) bad.push(`unknown key ${key}`);
-  bad.push(...supabaseBlockProblems(d.supabase));
-  if (d.browser !== undefined && d.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
-  if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
-  if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
-  const names = new Map();
-  for (const side of PROFILES) {
-    const s = d.sides[side];
-    const at = `sides.${side}`;
-    if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
-    if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
-    else s.apps.forEach((app, i) => {
-      if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
-      // The root scripts name every app (start:<app>), so an app name is unique across both sides.
-      else if (names.has(app.name)) bad.push(`app ${app.name} is declared twice (${names.get(app.name)} and ${side})`);
-      else names.set(app.name, side);
-    });
-    if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    bad.push(...patternShapeProblems(s, at, NAME), ...kindShapeProblems(s, at, NAME));
-    if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
-    if (s.connections !== undefined) {
-      if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
-      if (shape.length) bad.push(...shape);
-      else {
-        if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
-        for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
-      }
-    }
-  }
-  return bad;
-}
-
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
 
 /** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
@@ -399,7 +332,7 @@ function sideProblems(manifest, side, s) {
  * its two sides under `sides`), or with `side` that side's view: the declaration a check of the side folder runs under.
  */
 export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLARATION_FILE, side = null } = {}) {
-  const problems = declarationShapeProblems(declaration);
+  const problems = declarationShapeProblems(declaration, PROFILES);
   if (problems.length) declarationInvalid(problems, file);
   if (declaration.kind !== manifestKind(manifest)) declarationInvalid([`hfs.json is of kind ${declaration.kind}, but the manifest it is judged by is of kind ${manifestKind(manifest)}`], file);
   if (declaration.hfs !== manifest.major)
@@ -419,8 +352,8 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       manifestVersion: manifest.version,
     });
   }
-  const edition = declaration.edition ?? 'full';
-  if (!(manifest.editions ?? EDITIONS).includes(edition)) fail('HFS_EDITION_INVALID', `hfs.json edition is ${JSON.stringify(declaration.edition)}; the editions this manifest knows are ${(manifest.editions ?? EDITIONS).join(', ')} (absent means full)`, { file, edition: declaration.edition });
+  const { edition, known, valid } = declarationEdition(manifest, declaration);
+  if (!valid) fail('HFS_EDITION_INVALID', `hfs.json edition is ${JSON.stringify(declaration.edition)}; the editions this manifest knows are ${known.join(', ')} (absent means full)`, { file, edition: declaration.edition });
   const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
   if (bad.length) declarationInvalid(bad, file);
   if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
@@ -492,19 +425,6 @@ export function readRepoDeclaration(manifest, repoRoot) {
 // ------------------------------------------------------------------------------------------- resolver
 
 const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
-
-/**
- * The slot as `edition` sees it: under lite the `lite` overlay fields win, the presence is `litePresence` (a forbidden one
- * makes the slot external) and `tests` is none - a lite repository has no test world.
- */
-function effectiveSlot(slot, profile, edition) {
-  if (edition !== 'lite') return slot;
-  const { lite, litePresence, ...base } = slot;
-  const presence = litePresenceOf(slot, profile);
-  // forbidden pairs with external; a slot lite relaxes from forbidden holds a normal tracked path again.
-  const tracked = presence === 'forbidden' ? 'external' : (slot.tracked === 'external' ? 'tracked' : slot.tracked);
-  return { ...base, ...(lite ?? {}), presence, tracked, tests: 'none' };
-}
 
 /**
  * The four questions for one scope: the app root (profile app, root paths) or one side (profile be or fe, paths relative to the
@@ -836,10 +756,7 @@ export function createSlotResolver(manifest, repo) {
 export function ruleParams(manifest, profile, edition = 'full') {
   const profiles = manifestKind(manifest) === RUNTIME_KIND ? [RUNTIME_KIND] : PROFILES;
   if (!profiles.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
-  const { lite, ...base } = manifest.ruleParams[profile];
-  const merged = edition === 'lite' && lite ? { ...base, ...lite } : base;
-  const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
-  return deepFreeze(structuredClone(merged));
+  return editionRuleParams(manifest.ruleParams[profile], edition);
 }
 
 /**
@@ -897,7 +814,7 @@ function ruleCatalogProblems(d) {
       return r[key];
     };
     enumList('kinds', RULE_KINDS);
-    if (r.editions !== undefined) enumList('editions', EDITIONS);
+    bad.push(...ruleEditionProblems(r, label));
     const gates = enumList('gates', RULE_GATES);
     if (gates.length) {
       if (!gates.includes('land')) bad.push(`${label} must run at the land gate (every rule does)`);
@@ -965,7 +882,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     /** The rule that owns this failure code (its own or a sub-check code), or null. */
     byCode: (code) => byCode.get(code) ?? null,
     /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
-    judgedIn: (code, edition = 'full') => { const owner = byCode.get(code); return !owner?.editions || owner.editions.includes(edition); },
+    judgedIn: (code, edition = 'full') => judgedInEdition(byCode.get(code), edition),
     /** The rules that run at a gate. */
     forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
     /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */

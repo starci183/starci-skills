@@ -6,6 +6,7 @@ import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
 import { readTextFile } from '../../lib/read-text.mjs';
+import { managedScriptNames } from './managed-scripts.mjs';
 
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
@@ -198,26 +199,6 @@ function privateHost(hostname) {
 // The scripts the README Development section shows; each is required only when the managed package-scripts template of the
 // profile (packages/hfs/templates/<profile>/package-scripts/package.json, the one source of the managed script names) has it.
 const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
-// The templates sit beside the runtime in a checkout (packages/hfs/templates) and one level above the bundled runtime of @starci/hfs.
-const TEMPLATE_ROOTS = [path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'hfs', 'templates'), path.resolve(import.meta.dirname, '..', '..', '..', '..', 'templates')];
-const managedScriptCache = new Map();
-
-/**
- * The script names of the managed package-scripts template of a profile and edition (lite renders its own group). The template holds a
- * {{appScripts}} placeholder and `{{> partial}}` lines, so it is read by key with its partials expanded, not parsed as JSON.
- */
-function managedScriptNames(profile, edition = 'full') {
-  const key = `${profile}:${edition}`;
-  if (!managedScriptCache.has(key)) {
-    const group = edition === 'lite' ? 'package-scripts-lite' : 'package-scripts';
-    const templates = TEMPLATE_ROOTS.find(dir => fs.existsSync(path.join(dir, profile, group, 'package.json')));
-    if (!templates) throw Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
-    const text = fs.readFileSync(path.join(templates, profile, group, 'package.json'), 'utf8').replace(/^\{\{> ([\w./-]+)\}\}\r?\n/gmu, (_, partial) => fs.readFileSync(path.join(templates, partial), 'utf8'));
-    managedScriptCache.set(key, new Set([...text.matchAll(/^\s*"([A-Za-z0-9:_.-]+)":\s*"/gmu)].map(match => match[1])));
-  }
-  return managedScriptCache.get(key);
-}
-
 /** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
 function scriptCommand(name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');

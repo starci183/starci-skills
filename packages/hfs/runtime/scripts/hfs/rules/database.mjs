@@ -38,12 +38,11 @@
 //                           block declares them - the config states nothing the app did not declare.
 //   DB_TYPES_DRIFT      (L09) the committed database.types.ts equals the text `emitTypes()` regenerates now; the
 //                           emit is injected (chunk E wires it to contract:emit) and the rule is silent without it.
-import { lsTree } from '../../api/git/ls-tree.mjs';
-import { mergeBase } from '../../api/git/merge-base.mjs';
-import { show } from '../../api/git/show.mjs';
-import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { found, readJson, readText } from './read.mjs';
 import { parsePlpgsqlBody, parseSql } from '../sql/pg-parse.mjs';
+import { configFindings, parseToml, typesFindings } from './database-config.mjs';
+import { defaultGit, migrationShapeFindings } from './database-migrations.mjs';
+export { migrationStamp } from './database-migrations.mjs';
 
 export const DB_MIGRATION_SHAPE = 'DB_MIGRATION_SHAPE';
 export const DB_RLS_REQUIRED = 'DB_RLS_REQUIRED';
@@ -54,16 +53,13 @@ export const DB_STORAGE_POLICY = 'DB_STORAGE_POLICY';
 export const DB_CONFIG_POLICY = 'DB_CONFIG_POLICY';
 export const DB_TYPES_DRIFT = 'DB_TYPES_DRIFT';
 
-export const MIGRATIONS_DIR = 'supabase/migrations';
+const MIGRATIONS_DIR = 'supabase/migrations';
 export const CONFIG_FILE = 'supabase/config.toml';
 export const TYPES_FILE = 'supabase/types/database.types.ts';
 
-const MIGRATION_NAME = /^(\d{14})_([a-z0-9]+(?:-[a-z0-9]+)*)\.sql$/;
 const POLICY_ACTIONS = ['select', 'insert', 'update', 'delete', 'all'];
 const WRITE_COMMANDS = new Set(['all', 'insert', 'update', 'delete']);
 const PUBLIC_READ_SUFFIX = '_public_read';
-const ENV_REF = /^env\([A-Za-z_][A-Za-z0-9_]*\)$/;
-const PUBLIC_KEYS = new Set(['anon_key', 'publishable_key', 'public_key']);
 
 // Dynamic SQL source literals building a create|alter|drop of a table, policy or function, or a grant/revoke.
 const DYNAMIC_DDL = [
@@ -147,97 +143,6 @@ function plpgsqlDynamicQueries(root) {
 /** The plpgsql AST of a body string, or null when it cannot be read (the caller reports it opaque). */
 async function plpgsqlOf(body) {
   try { return await parsePlpgsqlBody(body); } catch { return null; }
-}
-
-// ------------------------------------------------------------------------------------------------ L02
-
-/** `<ts14>` -> the UTC instant it names, or null when the digits are no real time (month 13, day 32, ...). */
-export function migrationStamp(text) {
-  const [year, month, day, hour, minute, second] = [Number(text.slice(0, 4)), ...[4, 6, 8, 10, 12].map((at) => Number(text.slice(at, at + 2)))];
-  const stamp = Date.UTC(year, month - 1, day, hour, minute, second);
-  const date = new Date(stamp);
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-    && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second ? stamp : null;
-}
-
-/** The three git reads L02 makes, through the api/git call files: (args, {cwd}) -> {ok, stdout}; a spec injects a fake of the same shape. */
-function defaultGit(args, { cwd }) {
-  const [verb, ...rest] = args;
-  const env = withoutGitLocalEnv(process.env);
-  if (verb === 'merge-base') { const sha = mergeBase(cwd, rest[0], rest[1]); return { ok: sha !== null, stdout: sha ?? '' }; }
-  const call = verb === 'ls-tree' ? lsTree : show;
-  const r = call(rest, { cwd, env, maxBuffer: 64 * 1024 * 1024 });
-  return { ok: !r.error && r.status === 0, stdout: r.stdout };
-}
-
-/** run one git verb through the injected runner; answers {ok, stdout}. */
-const runGit = (git, repoRoot, args) => Promise.resolve(git(args, { cwd: repoRoot })).then((r) => ({ ok: r?.ok === true, stdout: String(r?.stdout ?? '') }));
-
-/** The merge-base of HEAD with `base` (else origin/main, else main), or null when none resolves - the clean fallback. */
-async function baseShaOf(git, repoRoot, base) {
-  for (const ref of base ? [base] : ['origin/main', 'main']) {
-    const r = await runGit(git, repoRoot, ['merge-base', 'HEAD', ref]);
-    if (r.ok && r.stdout.trim()) return { ref, sha: r.stdout.trim() };
-  }
-  return null;
-}
-
-/** The file names under supabase/migrations/ of the tree `sha` names (empty when the tree has none). */
-async function baseMigrationNames(git, repoRoot, sha) {
-  const r = await runGit(git, repoRoot, ['ls-tree', '-r', '--name-only', '-z', sha, '--', MIGRATIONS_DIR]);
-  if (!r.ok) return [];
-  return r.stdout.split('\0').map((p) => p.split('/').pop()).filter(Boolean);
-}
-
-/** The committed text of `file` at `sha`, or null when the blob does not exist there. */
-async function baseFileText(git, repoRoot, sha, file) {
-  const r = await runGit(git, repoRoot, ['show', `${sha}:${file}`]);
-  return r.ok ? r.stdout : null;
-}
-
-/** Byte-compare folded on line endings and a trailing blank tail (a runner may trim stdout). */
-const sameText = (a, b) => a !== null && b !== null && a.replace(/\r\n/g, '\n').trimEnd() === b.replace(/\r\n/g, '\n').trimEnd();
-
-/** L02: name, stamp, ordering and immutability of supabase/migrations/*.sql. */
-async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {
-  const findings = [];
-  const local = migrations.map((file) => ({ file, name: file.split('/').pop(), match: MIGRATION_NAME.exec(file.split('/').pop()) }));
-  const stamps = new Map();
-  for (const entry of local) {
-    if (!entry.match) {
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is not named <ts14>_<kebab>.sql; a migration is created by \`npm run db:new\` (supabase migration new), never renamed by hand`, { expected: '<ts14>_<kebab>.sql' }));
-      continue;
-    }
-    const stamp = migrationStamp(entry.match[1]);
-    if (stamp === null) {
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} carries ${entry.match[1]}, which is no valid UTC time; the stamp is the real creation time`, { stamp: entry.match[1] }));
-      continue;
-    }
-    if (stamp > now()) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, in the future; a migration stamp is the real UTC creation time so ordering is the CLI's, not a hand-picked date`, { stamp: entry.match[1] }));
-    if (stamps.has(stamp)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} shares stamp ${entry.match[1]} with ${stamps.get(stamp)}; stamps are strictly increasing`, { stamp: entry.match[1], other: stamps.get(stamp) }));
-    stamps.set(stamp, entry.file);
-  }
-  const baseSha = await baseShaOf(git, repoRoot, base);
-  if (!baseSha) return findings;
-  const baseNames = await baseMigrationNames(git, repoRoot, baseSha.sha);
-  const onBase = new Set(baseNames);
-  const baseStamps = baseNames.map((name) => MIGRATION_NAME.exec(name)?.[1]).filter(Boolean).map(migrationStamp).filter((s) => s !== null);
-  const baseMax = baseStamps.length ? Math.max(...baseStamps) : null;
-  for (const entry of local) {
-    if (!entry.match) continue;
-    const stamp = migrationStamp(entry.match[1]);
-    if (onBase.has(entry.name)) {
-      const committed = await baseFileText(git, repoRoot, baseSha.sha, entry.file);
-      const current = readText(repoRoot, entry.file);
-      if (!sameText(current, committed)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} differs from its content on ${baseSha.ref}; a migration on the base branch is immutable - write a new migration`, { base: baseSha.ref }));
-    } else if (baseMax !== null && stamp !== null && stamp <= baseMax) {
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, not after every migration on ${baseSha.ref} (latest ${String(new Date(baseMax).toISOString())}); a new migration sorts after the base ones`, { stamp: entry.match[1], base: baseSha.ref }));
-    }
-  }
-  for (const name of baseNames) {
-    if (!local.some((entry) => entry.name === name)) findings.push(found(DB_MIGRATION_SHAPE, `${MIGRATIONS_DIR}/${name}`, `${MIGRATIONS_DIR}/${name} exists on ${baseSha.ref} but is gone here; a migration on the base branch is immutable - restore it`, { base: baseSha.ref }));
-  }
-  return findings;
 }
 
 // ------------------------------------------------------------------------------------------------ shared extraction
@@ -504,100 +409,6 @@ function storageFindings(file, facts) {
     }
   }
   return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L08
-
-/** Every [path, leafKey, value] of a TOML document, tables walked depth first (arrays of tables flattened). */
-function tomlEntries(value, path = []) {
-  if (!value || typeof value !== 'object') return [];
-  if (Array.isArray(value)) return value.flatMap((item) => tomlEntries(item, path));
-  return Object.entries(value).flatMap(([key, child]) => {
-    const at = [...path, key];
-    if (child && typeof child === 'object') {
-      if (Array.isArray(child)) {
-        if (child.every((item) => item && typeof item === 'object' && !Array.isArray(item))) return child.flatMap((item) => tomlEntries(item, at));
-      } else return tomlEntries(child, at);
-    }
-    return [[at.join('.'), key, child]];
-  });
-}
-
-const isCredentialKey = (key) => {
-  const leaf = key.toLowerCase();
-  return ['secret', 'client_id', 'key', 'password', 'token'].includes(leaf)
-    || /_(secret|password|token|client_id|api_key)$/.test(leaf)
-    || (leaf.endsWith('_key') && !PUBLIC_KEYS.has(leaf));
-};
-
-/** The 1-based line the leaf key is assigned at, best effort for a finding. */
-const tomlLine = (text, key) => {
-  const rx = new RegExp(`^\\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*=`, 'm');
-  const match = rx.exec(text);
-  return match ? text.slice(0, match.index).split('\n').length : undefined;
-};
-
-/** The parsed TOML of `text`, or null when it does not parse (the caller reports it once). */
-async function parseToml(text) {
-  try {
-    const module = await import('smol-toml');
-    return (module.default?.parse ?? module.parse)(text);
-  } catch {
-    return null;
-  }
-}
-
-function configFindings({ file, text, toml, supabase }) {
-  const findings = [];
-  for (const [at, key, value] of tomlEntries(toml)) {
-    if (!isCredentialKey(key)) continue;
-    const line = tomlLine(text, key);
-    if (typeof value !== 'string' || !ENV_REF.test(value)) {
-      findings.push(found(DB_CONFIG_POLICY, file, `${file}${line ? `:${line}` : ''} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
-    }
-  }
-  const auth = toml?.auth ?? {};
-  if (auth.jwt_expiry !== undefined && (typeof auth.jwt_expiry !== 'number' || auth.jwt_expiry > 3600)) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry)}; the access token lives at most 3600 seconds`, { key: 'auth.jwt_expiry' }));
-  }
-  if (!supabase) return findings;
-  const declared = {
-    enableSignup: supabase.enableSignup, jwtExpiry: supabase.jwtExpiry, siteUrl: supabase.siteUrl,
-    redirectUrls: Array.isArray(supabase.redirectUrls) ? supabase.redirectUrls : undefined,
-  };
-  if (declared.jwtExpiry !== undefined && auth.jwt_expiry !== declared.jwtExpiry) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry ?? 'absent')}; hfs.json supabase.jwtExpiry declares ${declared.jwtExpiry}`, { key: 'auth.jwt_expiry', declared: declared.jwtExpiry }));
-  }
-  if (declared.enableSignup !== undefined) {
-    if (auth.enable_signup !== declared.enableSignup) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.enable_signup is ${JSON.stringify(auth.enable_signup ?? 'absent')}; hfs.json supabase.enableSignup declares ${declared.enableSignup} - the invite posture is a checked fact, not a doc claim`, { key: 'auth.enable_signup', declared: declared.enableSignup }));
-    if (auth.email?.enable_signup !== undefined && auth.email.enable_signup !== declared.enableSignup) {
-      findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.email.enable_signup is ${JSON.stringify(auth.email.enable_signup)}; hfs.json supabase.enableSignup declares ${declared.enableSignup}`, { key: 'auth.email.enable_signup', declared: declared.enableSignup }));
-    }
-  }
-  if (declared.siteUrl !== undefined && auth.site_url !== declared.siteUrl) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.site_url is ${JSON.stringify(auth.site_url ?? 'absent')}; hfs.json supabase.siteUrl declares ${declared.siteUrl}`, { key: 'auth.site_url', declared: declared.siteUrl }));
-  }
-  if (declared.redirectUrls !== undefined) {
-    for (const url of Array.isArray(auth.additional_redirect_urls) ? auth.additional_redirect_urls : []) {
-      if (!declared.redirectUrls.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls holds ${url}, which hfs.json supabase.redirectUrls does not declare; the config states nothing the app did not declare`, { key: 'auth.additional_redirect_urls', url }));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L09
-
-async function typesFindings({ repoRoot, files, emitTypes, declaration }) {
-  if (typeof emitTypes !== 'function') return [];
-  const tracked = new Set(files);
-  let emitted;
-  try { emitted = await emitTypes({ repoRoot, declaration }); } catch (error) {
-    return [found(DB_TYPES_DRIFT, TYPES_FILE, `${TYPES_FILE} cannot be verified: the types emit failed (${String(error?.message ?? error).split('\n').filter(Boolean).slice(0, 3).join(' | ')})`, { drift: 'emit-failed' })];
-  }
-  const committed = tracked.has(TYPES_FILE) ? readText(repoRoot, TYPES_FILE) : null;
-  if (committed === null) return [found(DB_TYPES_DRIFT, TYPES_FILE, `${TYPES_FILE} is not committed; run \`npm run contract:emit\` and commit the generated types`, { drift: 'not-committed' })];
-  if (!sameText(committed, String(emitted))) return [found(DB_TYPES_DRIFT, TYPES_FILE, `${TYPES_FILE} differs from what \`contract:emit\` generates from the migrations now; run \`npm run contract:emit\` and commit the result`, { drift: 'stale' })];
-  return [];
 }
 
 // ------------------------------------------------------------------------------------------------ the rule entry

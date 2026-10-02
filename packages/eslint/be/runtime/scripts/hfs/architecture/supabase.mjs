@@ -1,5 +1,7 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
+import { callName, chainParts, contextTypesClient, isDatabaseType, isSupabaseCall, isSupabaseValue, moduleNameOf, reportAt, signatureFromSupabase, supabaseClientType, SUPABASE_MODULES, unwrap } from './supabase-ast.mjs';
+import { checkBackendJwt } from './supabase-be.mjs';
 
 /**
  * L10-L16, the slot-driven Supabase machine. Supabase is one data transport with one owner on each side:
@@ -25,9 +27,6 @@ const FE_SERVICE_ROLE = 'FE_SERVICE_ROLE_FORBIDDEN';
 const FE_SESSION_TRUST = 'FE_AUTH_SESSION_TRUST';
 const FE_WRITE_SHAPE = 'FE_DB_WRITE_SHAPE';
 const FE_ROUTE_HANDLER = 'FE_ROUTE_HANDLER_FORBIDDEN';
-const BE_JWT_VERIFIED = 'BE_SUPABASE_JWT_VERIFIED';
-
-const SUPABASE_MODULES = new Set(['@supabase/ssr', '@supabase/supabase-js']);
 const FE_DB_SLOTS = new Set(['fe.modules.db', 'fe.package.db']);
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const FE_CONFIG_SLOT = 'fe.modules.config';
@@ -35,119 +34,8 @@ const SUPABASE_CALLS = new Set(['from', 'rpc']);
 const QUERY_TERMINALS = new Set(['single', 'maybeSingle', 'returns']);
 const QUERY_WRITES = new Set(['insert', 'update', 'upsert', 'delete']);
 const KEYSET_BOUNDS = new Set(['gt', 'gte', 'lt', 'lte']);
-const JWT_MODULES = new Set(['jose', 'jsonwebtoken', 'jwt-decode']);
-const CLAIM_NAMES = new Set(['role', 'roles', 'membership', 'memberships']);
-
 const supabaseStandardApplies = input => input.graph.resolver.repo.edition === 'lite'
   || input.graph.resolver.repo.providers?.includes('supabase') === true;
-
-const moduleNameOf = (ts, node) => {
-  if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) return node.moduleSpecifier.text;
-  if (!ts.isCallExpression(node)) return null;
-  const dynamic = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-  const required = ts.isIdentifier(node.expression) && node.expression.text === 'require';
-  return (dynamic || required) && node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0]) ? node.arguments[0].text : null;
-};
-
-const importedFrom = (kit, checker, node, modules, names = null) => {
-  const binding = kit.importBinding(checker, node);
-  return Boolean(binding && modules.has(binding.module) && (names === null || names.has(binding.name)));
-};
-
-const declarationFromSupabase = declaration => /(?:^|\/)node_modules\/@supabase\/(?:ssr|supabase-js)(?:\/|$)/u
-  .test(String(declaration?.getSourceFile?.().fileName ?? '').replace(/\\/gu, '/'));
-
-const typeFromSupabase = (checker, node) => {
-  let type;
-  try { type = checker.getTypeAtLocation(node); } catch { return false; }
-  const queue = [type];
-  const seen = new Set();
-  while (queue.length) {
-    const item = queue.shift();
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    if ([item.symbol, item.aliasSymbol].some(symbol => symbol?.declarations?.some(declarationFromSupabase))) return true;
-    if (item.types) queue.push(...item.types);
-    if (item.target && item.target !== item) queue.push(item.target);
-  }
-  return false;
-};
-
-const signatureFromSupabase = (checker, call) => {
-  try { return declarationFromSupabase(checker.getResolvedSignature(call)?.declaration); } catch { return false; }
-};
-
-const unwrap = (ts, node) => {
-  let current = node;
-  while (current && (ts.isParenthesizedExpression(current) || ts.isAwaitExpression(current) || ts.isAsExpression(current)
-    || ts.isTypeAssertionExpression(current) || ts.isNonNullExpression(current))) current = current.expression;
-  return current;
-};
-
-const isSupabaseValue = (kit, checker, node) => {
-  const current = unwrap(kit.ts, node);
-  if (!current) return false;
-  if (importedFrom(kit, checker, current, SUPABASE_MODULES)) return true;
-  if (kit.ts.isCallExpression(current) && signatureFromSupabase(checker, current)) return true;
-  return typeFromSupabase(checker, current);
-};
-
-const callName = (ts, call) => ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : null;
-
-const chainParts = (ts, expression) => {
-  const names = [];
-  let current = unwrap(ts, expression);
-  while (current) {
-    if (ts.isCallExpression(current)) {
-      if (ts.isPropertyAccessExpression(current.expression)) {
-        names.unshift(current.expression.name.text);
-        current = unwrap(ts, current.expression.expression);
-        continue;
-      }
-      current = unwrap(ts, current.expression);
-      continue;
-    }
-    if (ts.isPropertyAccessExpression(current)) {
-      names.unshift(current.name.text);
-      current = unwrap(ts, current.expression);
-      continue;
-    }
-    break;
-  }
-  return names;
-};
-
-const isSupabaseCall = (kit, checker, node) => kit.ts.isCallExpression(node)
-  && (signatureFromSupabase(checker, node) || isSupabaseValue(kit, checker, kit.ts.isPropertyAccessExpression(node.expression) ? node.expression.expression : node.expression));
-
-const isDatabaseType = (ts, node) => {
-  if (!node) return false;
-  if (ts.isTypeReferenceNode(node)) {
-    const name = ts.isIdentifier(node.typeName) ? node.typeName.text : node.typeName.right.text;
-    return name === 'Database';
-  }
-  return false;
-};
-
-const supabaseClientType = (kit, checker, node) => {
-  if (!node || !kit.ts.isTypeReferenceNode(node)) return false;
-  const name = kit.ts.isIdentifier(node.typeName) ? node.typeName : null;
-  return Boolean(name && importedFrom(kit, checker, name, SUPABASE_MODULES, new Set(['SupabaseClient'])));
-};
-
-const contextTypesClient = (kit, checker, call) => {
-  let parent = call.parent;
-  while (parent && (kit.ts.isParenthesizedExpression(parent) || kit.ts.isAsExpression(parent))) {
-    if (kit.ts.isAsExpression(parent) && supabaseClientType(kit, checker, parent.type) && isDatabaseType(kit.ts, parent.type.typeArguments?.[0])) return true;
-    parent = parent.parent;
-  }
-  return kit.ts.isVariableDeclaration(parent) && supabaseClientType(kit, checker, parent.type)
-    && isDatabaseType(kit.ts, parent.type.typeArguments?.[0]);
-};
-
-const reportAt = (violations, kit, ruleId, file, node, message, extra = {}) => {
-  violations.push({ ruleId, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
-};
 
 function checkClientOwnership(input, { slots, ruleId }) {
   const kit = machineKit(input);
@@ -493,93 +381,6 @@ function checkFrontendAuthAndRoutes(input) {
     }
   }
   return { violations, coverage: { status: 'checked', actions, routes } };
-}
-
-const objectLiteral = (kit, checker, node) => {
-  const current = unwrap(kit.ts, node);
-  if (kit.ts.isObjectLiteralExpression(current)) return current;
-  if (!kit.ts.isIdentifier(current)) return null;
-  for (const declaration of kit.declarationsOf(checker, current)) {
-    if (kit.ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      const value = unwrap(kit.ts, declaration.initializer);
-      if (kit.ts.isObjectLiteralExpression(value)) return value;
-    }
-  }
-  return null;
-};
-
-const staticStrings = (kit, checker, node) => {
-  const current = unwrap(kit.ts, node);
-  if (kit.ts.isStringLiteralLike(current)) return [current.text];
-  if (kit.ts.isArrayLiteralExpression(current) && current.elements.every(element => kit.ts.isStringLiteralLike(element))) return current.elements.map(element => element.text);
-  const value = kit.stringValue(checker, current);
-  return value === null ? null : [value];
-};
-
-const jwksArgument = (kit, checker, node) => {
-  const current = unwrap(kit.ts, node);
-  if (kit.ts.isCallExpression(current)) return importedFrom(kit, checker, current.expression, new Set(['jose']), new Set(['createRemoteJWKSet']));
-  if (!kit.ts.isIdentifier(current)) return false;
-  return kit.declarationsOf(checker, current).some(declaration => kit.ts.isVariableDeclaration(declaration) && declaration.initializer
-    && jwksArgument(kit, checker, declaration.initializer));
-};
-
-function checkBackendJwt(input) {
-  const kit = machineKit(input);
-  const { ts } = kit;
-  const violations = [];
-  const integrations = [...input.graph.files.values()].filter(file => file.slot === BE_SUPABASE_SLOT);
-  if (!integrations.length) return { violations, coverage: { status: 'not-applicable', integrationFiles: 0, verifiedCalls: 0 } };
-  let verifyCalls = 0;
-  let verifiedCalls = 0;
-  for (const file of input.graph.files.values()) {
-    const checker = kit.checkerOf(file.sourceFile);
-    kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node)) {
-        const binding = kit.importBinding(checker, node.expression);
-        if (binding && JWT_MODULES.has(binding.module) && ['decode', 'decodeJwt', 'jwtDecode'].includes(binding.name)) {
-          reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `${binding.module}.${binding.name} decodes a token without proving its signature; use the Supabase JWKS verifier.`, { module: binding.module, method: binding.name });
-        }
-        if (binding?.module === 'jose' && binding.name === 'jwtVerify') {
-          verifyCalls += 1;
-          if (file.slot !== BE_SUPABASE_SLOT) {
-            reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `jwtVerify is called outside ${BE_SUPABASE_SLOT}; the integration is the one token verifier.`);
-            return true;
-          }
-          const options = objectLiteral(kit, checker, node.arguments[2]);
-          const property = name => options ? kit.propertyOf(options, name) : null;
-          const values = name => {
-            const entry = property(name);
-            return entry ? staticStrings(kit, checker, kit.valueOfProperty(entry)) : null;
-          };
-          const issuer = property('issuer');
-          const audience = values('audience');
-          const algorithms = values('algorithms');
-          const good = jwksArgument(kit, checker, node.arguments[1]) && issuer !== null && audience?.includes('authenticated')
-            && algorithms !== null && algorithms.length > 0;
-          if (!good) {
-            reportAt(violations, kit, BE_JWT_VERIFIED, file, node, 'Supabase jwtVerify must use createRemoteJWKSet(...) and pin issuer, audience `authenticated`, and a non-empty algorithms list; jwtVerify then enforces signature and exp.');
-          } else verifiedCalls += 1;
-        }
-      }
-      if (ts.isPropertyAccessExpression(node) && CLAIM_NAMES.has(node.name.text)) {
-        const parts = chainParts(ts, node.expression);
-        if (parts.includes('body')) reportAt(violations, kit, BE_JWT_VERIFIED, file, node, `${node.name.text} is read from the request body; authorization claims come only from the verified token or the database.`, { claim: node.name.text });
-      }
-      if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && chainParts(ts, node.initializer).includes('body')) {
-        for (const element of node.name.elements) {
-          const property = element.propertyName ?? element.name;
-          if (ts.isIdentifier(property) && CLAIM_NAMES.has(property.text)) reportAt(violations, kit, BE_JWT_VERIFIED, file, element, `${property.text} is destructured from the request body; authorization claims come only from the verified token or the database.`, { claim: property.text });
-        }
-      }
-      return true;
-    });
-  }
-  if (verifyCalls === 0) {
-    const anchor = integrations.find(file => path.posix.basename(file.rel).endsWith('.jwks.ts')) ?? integrations[0];
-    reportAt(violations, kit, BE_JWT_VERIFIED, anchor, anchor.sourceFile, `${BE_SUPABASE_SLOT} has no jose.jwtVerify call backed by createRemoteJWKSet.`);
-  }
-  return { violations, coverage: { status: 'checked', integrationFiles: integrations.length, verifyCalls, verifiedCalls } };
 }
 
 export function checkFrontendSupabase(input) {

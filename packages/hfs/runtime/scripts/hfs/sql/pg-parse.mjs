@@ -12,7 +12,7 @@ let loading = null;
  * The libpg-query module (wasm build), initialized once per process. A bare dynamic import so the package can be
  * absent until a supabase/ tree exists to judge; the caller reports the load failure, not this module.
  */
-export function loadPgParser() {
+function loadPgParser() {
   loading ??= (async () => {
     const module = await import('libpg-query');
     const lib = module.default?.parseSync ? module.default : module;
