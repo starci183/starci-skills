@@ -1,8 +1,8 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
 
 /** Gives orders the payment lifecycle: pending until a bank transfer pays them or they expire, and the instant they were paid. */
-export class AddOrderPaymentLifecycle1789800008000 implements MigrationInterface {
-    name = "AddOrderPaymentLifecycle1789800008000"
+export class AddOrderPaymentLifecycle1789800010000 implements MigrationInterface {
+    name = "AddOrderPaymentLifecycle1789800010000"
 
     /** Widens the status check and adds the paid-at column. */
     async up(queryRunner: QueryRunner): Promise<void> {
