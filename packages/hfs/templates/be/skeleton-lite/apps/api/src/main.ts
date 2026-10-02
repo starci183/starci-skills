@@ -20,7 +20,7 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()
-    app.useGlobalPipes(new RequestValidationService())
+    app.useGlobalPipes(app.get(RequestValidationService))
     await app.listen(options.server.port)
     createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, {
         service: "api",

@@ -39,6 +39,13 @@ for delete
 to authenticated
 using (owner_id = (select auth.uid()));
 
+create policy "{{table}}_app_be_select"
+on public.{{tableSql}}
+for select
+to app_be
+using (owner_id is not null);
+
 revoke all on table public.{{tableSql}} from public, anon;
 grant select, insert, delete on table public.{{tableSql}} to authenticated;
 grant update (updated_at) on table public.{{tableSql}} to authenticated;
+grant select on table public.{{tableSql}} to app_be;

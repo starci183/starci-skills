@@ -25,4 +25,5 @@ on public.@@table@@ for update to app_be
 using (provider = '@@provider@@')
 with check (provider = '@@provider@@');
 
+revoke all on table public.@@table@@ from public, anon, authenticated;
 grant select, insert, update on table public.@@table@@ to app_be;

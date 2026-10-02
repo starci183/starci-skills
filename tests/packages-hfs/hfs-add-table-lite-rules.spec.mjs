@@ -147,8 +147,10 @@ test("add table --fe stays database- and architecture-clean for every accepted t
     assert.match(sql, /owner_id uuid not null references auth\.users \(id\) on delete cascade/);
     assert.match(sql, new RegExp(`create index ${item.table}_owner_id_idx on public\\.${sqlTable} \\(owner_id\\)`));
     assert.match(sql, new RegExp(`create trigger ${item.table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}`));
+    assert.match(sql, new RegExp(`create policy "${item.table}_app_be_select"[\\s\\S]*to app_be[\\s\\S]*using \\(owner_id is not null\\)`));
     assert.match(sql, new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`));
     assert.match(sql, new RegExp(`grant update \\(updated_at\\) on table public\\.${sqlTable} to authenticated`));
+    assert.match(sql, new RegExp(`grant select on table public\\.${sqlTable} to app_be`));
     if (RESERVED.has(item.table)) {
       assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
     }
@@ -161,7 +163,7 @@ test("add table --fe stays database- and architecture-clean for every accepted t
       "utf8",
     );
     assert.match(service, /\(principalId: string, id: string\)/);
-    assert.match(service, /\[id, principalId\]/);
+    assert.match(service, /requireOwnedRow[^\n]+this\.entityManager, [A-Z0-9_]+, id, principalId,/);
     assert.match(statement, /WHERE id = \$1 AND owner_id = \$2 LIMIT 1/);
     for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
       const text = fs.readFileSync(path.join(root, ...file.split("/")), "utf8");

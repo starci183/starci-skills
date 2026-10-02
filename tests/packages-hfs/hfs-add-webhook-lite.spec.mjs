@@ -179,6 +179,7 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
   assert.match(migration, /payload jsonb not null/i);
   assert.match(migration, /processed_at timestamptz/i);
   assert.match(migration, /to app_be/i);
+  assert.match(migration, /revoke all on table public\.calendar_inbox from public, anon, authenticated/i);
   assert.doesNotMatch(migration, /service_role/i);
 
   const sql = fs.readFileSync(

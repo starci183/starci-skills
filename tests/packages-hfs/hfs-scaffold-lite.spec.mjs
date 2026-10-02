@@ -119,14 +119,13 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppHomePage/index.tsx',
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
-  'fe/apps/web/src/hooks/auth/index.ts', 'fe/apps/web/src/hooks/auth/useAuthRefresh.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
   'fe/apps/web/src/modules/config/index.ts', 'fe/apps/web/src/modules/db/auth/read-session.ts',
   'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/auth/write-sign-out.ts',
   'fe/apps/web/src/modules/db/browser.ts',
   'fe/apps/web/src/modules/db/index.ts', 'fe/apps/web/src/modules/db/outcome.ts',
-  'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/schema.ts',
-  'fe/apps/web/src/modules/db/server.ts',
+  'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/server.ts',
+  'fe/apps/web/src/modules/db/validation/validation.mapper.ts',
   'fe/apps/web/src/modules/i18n/index.ts', 'fe/apps/web/src/modules/i18n/messages/vi.json',
   'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/i18n/routing.ts',
   'fe/apps/web/src/modules/routes/index.ts', 'fe/apps/web/src/modules/routes/safe-next-path.ts',
@@ -189,6 +188,8 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   ].sort());
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
   const baselineSql = fs.readFileSync(path.join(root, ...'supabase/migrations/20261002123456_baseline.sql'.split('/')), 'utf8');
+  assert.match(baselineSql, /drop role if exists app_be;\s*create role app_be login noinherit;/);
+  assert.match(baselineSql, /grant usage on schema public to app_be/);
   assert.match(baselineSql, /create function private\.set_updated_at\(\)[\s\S]*returns trigger[\s\S]*language plpgsql[\s\S]*set search_path = ''/);
   assert.doesNotMatch(baselineSql, /security definer/);
   assert.match(baselineSql, /create trigger profiles_set_updated_at[\s\S]*before update on public\.profiles[\s\S]*execute function private\.set_updated_at\(\)/);

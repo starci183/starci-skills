@@ -45,7 +45,7 @@ test("safeNextPath keeps callback redirects on the request origin", () => {
 })
 
 test("the shared schemas bound UUIDs and sign-in credentials before transport", () => {
-  const { rowSchema, signInInputSchema } = evaluateTemplate("modules/db/schema.ts")
+  const { rowSchema, signInInputSchema } = evaluateTemplate("modules/db/validation/validation.mapper.ts")
   for (const id of [
     "123e4567-e89b-12d3-a456-426614174000",
     "123E4567-E89B-12D3-A456-426614174000",
@@ -70,7 +70,7 @@ test("the shared schemas bound UUIDs and sign-in credentials before transport", 
   assert.equal(signInInputSchema.safeParse(form("a@example.com", "p".repeat(257))).success, false)
 
   const writer = fs.readFileSync(TABLE_TEMPLATE, "utf8")
-  assert.match(writer, /import \{ rowSchema \} from "\.\.\/schema"/)
+  assert.match(writer, /import \{ rowSchema \} from "\.\.\/validation\/validation\.mapper"/)
   assert.match(writer, /if \(!parsed\.success\) return dbFailure\("invalid", "\{\{table\}\}-input"\)/)
 })
 
@@ -84,11 +84,12 @@ test("sign-out uses the server client while the browser client refresh hook stay
   assert.match(signOut, /await writeSignOut\(\)/)
 
   const browser = templateText("modules/db/browser.ts")
-  assert.match(browser, /export const createBrowserDbClient/)
+  assert.match(browser, /const createBrowserDbClient/)
+  assert.match(browser, /createBrowserDbClient\(\)\.auth\.onAuthStateChange\(refresh\)/)
+  assert.match(browser, /subscription\.unsubscribe\(\)/)
   assert.doesNotMatch(browser, /auth\.signOut/)
 
-  const refresh = templateText("hooks/auth/useAuthRefresh.ts")
-  assert.match(refresh, /createBrowserDbClient\(\)\.auth\.onAuthStateChange\(\(\) => router\.refresh\(\)\)/)
-  assert.match(refresh, /subscription\.unsubscribe\(\)/)
-  assert.match(templateText("app/[locale]/providers.tsx"), /useAuthRefresh\(\)/)
+  const providers = templateText("app/[locale]/providers.tsx")
+  assert.match(providers, /subscribeToAuthRefresh\(\(\) => router\.refresh\(\)\)/)
+  assert.doesNotMatch(providers, /\.auth\./)
 })

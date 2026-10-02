@@ -5,7 +5,7 @@ import type { Database } from "../../../../../../../supabase/types/database.type
 import { getPrincipal } from "../principal"
 import { dbFailure } from "../outcome"
 import type { DbOutcome } from "../outcome"
-import { rowSchema } from "../schema"
+import { rowSchema } from "../validation/validation.mapper"
 import { insertRow } from "../server"
 
 /** One {{table}} row returned after a successful write. */

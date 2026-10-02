@@ -1,3 +1,6 @@
+drop role if exists app_be;
+create role app_be login noinherit;
+
 create schema if not exists private;
 
 revoke all on schema private from public, anon, authenticated;
@@ -47,6 +50,7 @@ using ((select auth.uid()) = id)
 with check ((select auth.uid()) = id);
 
 grant usage on schema public to authenticated;
+grant usage on schema public to app_be;
 revoke all on table public.profiles from public, anon;
 grant select, insert on table public.profiles to authenticated;
 grant update (display_name) on table public.profiles to authenticated;

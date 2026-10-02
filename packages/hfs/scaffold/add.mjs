@@ -223,7 +223,15 @@ function wireLiteWebhookConfig({ repoRoot, app, provider }) {
   const relative = `be/apps/${app}/src/main.ts`;
   const file = path.join(repoRoot, ...relative.split('/'));
   let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
-  text = text.replace('import { parseHttpSecurityConfig } from "@modules/platform/http-security"', 'import { parseHttpSecurityConfig, parseWebhookProviderConfig } from "@modules/platform/http-security"');
+  const httpSecurityImport = /^import \{ ([^}]+) \} from "@modules\/platform\/http-security"$/m;
+  const importMatch = httpSecurityImport.exec(text);
+  if (!importMatch) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find the HTTP security import in ${relative}`);
+  const imported = importMatch[1].split(',').map(symbol => symbol.trim()).filter(Boolean);
+  if (!imported.includes('parseWebhookProviderConfig')) {
+    const configIndex = imported.indexOf('parseHttpSecurityConfig');
+    imported.splice(configIndex < 0 ? imported.length : configIndex + 1, 0, 'parseWebhookProviderConfig');
+    text = text.replace(httpSecurityImport, `import { ${imported.join(', ')} } from "@modules/platform/http-security"`);
+  }
   const providerKey = /^[a-z][a-z0-9]*$/.test(provider) ? provider : JSON.stringify(provider);
   const providerLine = `                ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
   if (!text.includes(providerLine)) {

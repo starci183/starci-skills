@@ -5,7 +5,7 @@ import { getPrincipal } from "../principal"
 import { createServerDbClient } from "../server"
 import { dbFailure, dbOk, toOutcome } from "../outcome"
 import type { DbOutcome } from "../outcome"
-import { signInInputSchema } from "../schema"
+import { signInInputSchema } from "../validation/validation.mapper"
 
 /** Result exposed to the client boundary after sign-in. */
 export interface SignInResult {

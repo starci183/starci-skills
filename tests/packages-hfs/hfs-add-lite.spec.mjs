@@ -135,7 +135,7 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   );
   assert.match(
     read(root, "be/src/modules/domain/orders/orders.service.ts"),
-    /\[id, principalId\]/,
+    /requireOwnedRow<Pick<OrdersRow, "id">>\(this\.entityManager, FIND_ORDERS, id, principalId,/,
   );
   assert.match(
     read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"),
@@ -393,7 +393,7 @@ test("the lite API skeleton installs one typed global validation pipe", () => {
     new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/errors/http-security.error.ts", import.meta.url),
     "utf8",
   );
-  assert.match(main, /app\.useGlobalPipes\(new RequestValidationService\(\)\)/);
+  assert.match(main, /app\.useGlobalPipes\(app\.get\(RequestValidationService\)\)/);
   assert.ok(main.indexOf("useGlobalPipes") < main.indexOf("await app.listen"));
   assert.match(validation, /whitelist: true/);
   assert.match(validation, /forbidNonWhitelisted: true/);
