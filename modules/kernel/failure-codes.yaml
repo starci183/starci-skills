@@ -13239,3 +13239,14 @@ HFS_MONO_WORKSPACE_DEP:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
   owner: op-retry
   kind: check-finding
+
+BE_SQL_RETURNING_SHAPE:
+  title: "UPDATE or DELETE with RETURNING is not wrapped in a SELECT"
+  title_vi: "UPDATE hoặc DELETE có RETURNING chưa được bọc trong SELECT"
+  meaning_vi: "EntityManager.query của TypeORM trả về câu UPDATE hoặc DELETE có RETURNING dưới dạng [các dòng, số dòng bị ảnh hưởng] chứ không phải danh sách dòng, nên nơi gọi đọc kết quả như danh sách dòng sẽ đọc sai mà unit spec giả lập SQL không thấy được (saga kẹt, kho không được trả). Bộ kiểm tra đọc từng hằng SqlText trong .sql.ts và từ chối câu bắt đầu bằng UPDATE hoặc DELETE mà có RETURNING ở cấp ngoài cùng; INSERT ... RETURNING và RETURNING nằm trong CTE đã bọc thì hợp lệ."
+  causes_vi:
+    - "UPDATE stock SET ... WHERE ... RETURNING id, qty chạy thẳng bằng manager.query rồi đọc rows[0]"
+    - "DELETE ... RETURNING id trả về [rows, count]"
+  nextStep_vi: "Viết lại thành WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed để kết quả luôn là danh sách dòng, và thêm một spec e2e chạy câu lệnh trên cơ sở dữ liệu thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding

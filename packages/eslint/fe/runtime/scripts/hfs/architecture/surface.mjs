@@ -33,6 +33,7 @@ export const LINT_ENFORCERS = Object.freeze([
   enforcer('app-composition-only', BE, ['BE_APP_COMPOSITION_ONLY', 'BE_APP_BUSINESS_ROLE'], 'An app only composes modules and holds no business role.'),
   enforcer('entrypoint-only-in-apps', BE, ['BE_ENTRYPOINT_ONLY_IN_APPS'], 'NestFactory and bootstrap live only in an app main file.'),
   enforcer('schema-owner', BE, ['BE_SCHEMA_OWNER'], 'Each entity array is registered by one owner across all apps.'),
+  enforcer('sql-returning', BE, ['BE_SQL_RETURNING_SHAPE'], 'An UPDATE or DELETE with RETURNING is wrapped in a CTE SELECT, because EntityManager.query returns it as [rows, count].'),
   enforcer('context-owner', BE, ['BE_CONTEXT_OWNER'], 'An app composes only the contexts (connections) it owns; the migration apps compose all of them.'),
   enforcer('context-coupling', BE, ['BE_CONTEXT_COUPLING'], 'Contexts are never coupled by a relation, a foreign key or an import; only by events.'),
   enforcer('context-transaction', BE, ['BE_CONTEXT_TRANSACTION'], 'One transaction touches one context connection.'),

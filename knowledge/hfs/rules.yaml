@@ -1344,3 +1344,11 @@ rules:
     failureCodes: ["BE_CONTEXT_PLATFORM_TABLES"]
     enforcers:
       - {kind: eslint-be, id: context-platform-tables}
+  - id: R136
+    code: "BE_SQL_RETURNING_SHAPE"
+    law: "A `sql` constant that UPDATEs or DELETEs with RETURNING is wrapped as `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed`, because EntityManager.query returns a bare UPDATE or DELETE with RETURNING as `[rows, affectedCount]`, not as rows."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_SQL_RETURNING_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: sql-returning}
