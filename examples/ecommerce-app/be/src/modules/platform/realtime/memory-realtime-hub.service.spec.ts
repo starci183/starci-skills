@@ -55,7 +55,7 @@ describe("MemoryRealtimeHubService", () => {
         it("never delivers a value the topic does not accept", async () => {
             const hub = await build()
             const stream = hub.subscribe(topicOf("order-status:b-1:o-1"))[Symbol.asyncIterator]()
-            const untyped: RealtimeTopic<object> = { name: "order-status:b-1:o-1", accepts: (frame): frame is object => true }
+            const untyped: RealtimeTopic<object> = { name: "order-status:b-1:o-1", accepts: (frame): frame is object => typeof frame === "object" }
 
             hub.publish(untyped, { unrelated: true })
             hub.publish(topicOf("order-status:b-1:o-1"), { orderId: "o-1", status: "paid" })
