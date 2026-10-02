@@ -205,7 +205,7 @@ test('hfs add saga writes the saga kind tree with its orchestrator, step, compen
   const result = await cli(['add', 'saga', 'fulfil', '--owner', 'shop', '--from', 'billing', '--failed', 'invoice-rejected', '--done', 'invoice-issued', '--service', 'FulfilService=@modules/domain/fulfil', '--repo', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/saga/fulfil';
-  const files = ['index.ts', 'fulfil.module.ts', 'fulfil.saga.service.ts', 'fulfil.saga.service.spec.ts', 'fulfil.saga-state.ts', 'fulfil.saga.log-events.ts', 'steps/fulfil.saga-step.ts', 'compensations/fulfil.compensation.ts', 'application/undo-fulfil.command.ts', 'application/undo-fulfil.contracts.ts', 'application/undo-fulfil.handler.ts', 'application/compensate-fulfil.command.ts', 'application/compensate-fulfil.contracts.ts', 'application/compensate-fulfil.handler.ts', 'application/complete-fulfil.command.ts', 'application/complete-fulfil.contracts.ts', 'application/complete-fulfil.handler.ts', 'transport/message/invoice-rejected.consumer.ts', 'transport/message/invoice-issued.consumer.ts', 'transport/message/fulfil-message.module.ts'];
+  const files = ['index.ts', 'fulfil.module.ts', 'fulfil.saga.service.ts', 'fulfil.saga.service.spec.ts', 'fulfil.saga-state.ts', 'steps/fulfil.saga-step.ts', 'compensations/fulfil.compensation.ts', 'application/undo-fulfil.command.ts', 'application/undo-fulfil.contracts.ts', 'application/undo-fulfil.handler.ts', 'application/compensate-fulfil.command.ts', 'application/compensate-fulfil.contracts.ts', 'application/compensate-fulfil.handler.ts', 'application/complete-fulfil.command.ts', 'application/complete-fulfil.contracts.ts', 'application/complete-fulfil.handler.ts', 'transport/message/invoice-rejected.consumer.ts', 'transport/message/invoice-issued.consumer.ts', 'transport/message/fulfil-message.module.ts'];
   for (const file of files) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
   const service = read(dir, `${base}/fulfil.saga.service.ts`);
   assert.ok(service.includes('export class FulfilSagaService'));
@@ -255,7 +255,7 @@ test('hfs add cli writes a command group with its first sub-command and register
   const base = 'be/src/features/cli/requeue';
   for (const file of ['requeue.cli.ts', 'requeue.cli.spec.ts', 'requeue.module.ts', 'subs/run.cli.ts', 'subs/run.cli.spec.ts']) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
   assert.match(read(dir, `${base}/requeue.cli.ts`), /export class RequeueCli extends CommandRunner/);
-  assert.ok(read(dir, `${base}/subs/run.cli.ts`).includes('await this.deadLetterService.requeue()'));
+  assert.ok(read(dir, `${base}/subs/run.cli.ts`).includes('await this.deadLetterService.run()'));
   const module = read(dir, 'be/src/features/cli/cli.module.ts');
   assert.ok(module.includes('import { RequeueModule } from "./requeue/requeue.module"'));
   assert.ok(module.includes('imports: [MigrateModule, RequeueModule]'));

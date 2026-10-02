@@ -3,8 +3,11 @@ import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { openConnectionSource } from "./connection-source.client"
-import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "./database.port"
+import { CONNECTION_SOURCE, DATABASE_OPTIONS, READ_SEED_FILES } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
+import { MigrationRunnerService } from "./migration-runner.service"
+import { readSeedFiles } from "./seed-connections.client"
+import { SeedRunnerService } from "./seed-runner.service"
 import { PRIMARY_CONNECTION } from "./primary.connection"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
 
@@ -54,9 +57,18 @@ export class DatabaseModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 ...managers,
+                MigrationRunnerService,
+                SeedRunnerService,
                 { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
+                { provide: READ_SEED_FILES, useValue: readSeedFiles },
             ],
-            exports: [DATABASE_OPTIONS, CONNECTION_SOURCE, ...managers.map((manager) => manager.provide)],
+            exports: [
+                DATABASE_OPTIONS,
+                CONNECTION_SOURCE,
+                MigrationRunnerService,
+                SeedRunnerService,
+                ...managers.map((manager) => manager.provide),
+            ],
         }
     }
 }

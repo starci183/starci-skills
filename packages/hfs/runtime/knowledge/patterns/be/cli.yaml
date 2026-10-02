@@ -75,9 +75,9 @@ rules:
       group `@Command` with its `subCommands`), `<group>/<group>.module.ts` and `<group>/subs/<name>.cli.ts` (a `@SubCommand`
       class extending `CommandRunner`), one command per file. The cli feature root is a feature, so every module of it is a
       static `@Module({ imports, providers })` with no module definition, no options file and no `register`: `CliModule`
-      imports each group module and a group module provides its commands. A command takes its inputs from a platform
-      capability (the connections through `InjectDatabaseOptions()` and their opener through `InjectConnectionSource()` of
-      `platform/database`) or from a nest-commander `@Option` of its own (`cli seed run --env <name>`). The suffix is
+      imports each group module and a group module provides its commands. A command makes its one delegating call on an
+      injected runner service of the modules (the migrate and seed runners of `platform/database`) and takes its options
+      from a nest-commander `@Option` of its own (`cli seed run --env <name>`). The suffix is
       `.cli.ts`, because `.command.ts` is the CQRS message (api.yaml).
     rationale: |-
       A fixed group and sub-command layout maps the command line `cli <group> <command>` to one file path, so an operator
@@ -87,10 +87,10 @@ rules:
         when: The migrate group
         write: |-
           // be/src/features/cli/migrate/migrate.cli.ts
-          @Command({ name: "migrate", subCommands: [RunMigrationsCli], description: "Schema migrations of every connection" })
-          /** The migrate group; runs nothing itself. */
+          @Command({ name: "migrate", subCommands: [RunCli], description: "Schema migrations of every connection" })
+          /** The migrate group; without a sub-command it shows its help. */
           export class MigrateCli extends CommandRunner {
-              async run(): Promise<void> {}
+              async run(): Promise<void> { this.command.help() }
           }
       - id: case-2
         when: A `@SubCommand` declared in src/modules/platform/database/reindex.cli.ts or in features/api/
@@ -167,7 +167,7 @@ rules:
     cases:
       - id: case-1
         when: The migrate command
-        write: 'features/cli/migrate/subs/run.cli.ts (`@SubCommand({ name: "run" })`, `RunMigrationsCli extends CommandRunner`) runs the migrations of every connection of CliOptions in order and fails the process on the first error; run.cli.spec.ts beside it.'
+        write: 'features/cli/migrate/subs/run.cli.ts (`@SubCommand({ name: "run" })`, `RunCli extends CommandRunner`) makes one call on `MigrationRunnerService` of `platform/database`, which migrates every connection in order and fails the process on the first error; run.cli.spec.ts beside it.'
       - id: case-2
         when: A module runs `dataSource.runMigrations()` at boot of an api app
         write: 'Refused (BE_SCHEMA_AUTHORITY): only the cli and the test world run migrations.'
@@ -237,7 +237,7 @@ files:
   - path: src/features/cli/migrate/subs/run.cli.ts
     slot: be.cli
     optional: true
-    role: "`cli migrate run`: runs the migrations of every connection; the only migration runner"
+    role: "`cli migrate run`: one delegating call on the migration runner of `platform/database`, the one runner of the schema"
     rules:
       - BE_CLI_COMMAND_SHAPE
       - BE_SCHEMA_AUTHORITY
@@ -260,7 +260,7 @@ files:
   - path: src/features/cli/seed/subs/run.cli.ts
     slot: be.cli
     optional: true
-    role: "`cli seed run [--env <name>]`: runs the seed files of .starcistacks/<env>/seeds on the connection each names"
+    role: "`cli seed run [--env <name>]`: one delegating call on the seed runner of `platform/database`"
     rules:
       - BE_CLI_COMMAND_SHAPE
     spec: src/features/cli/seed/subs/run.cli.spec.ts
@@ -284,7 +284,7 @@ files:
       - BE_MODULE_SHAPE
   - path: src/features/cli/<group>/subs/run.cli.ts
     slot: be.cli
-    role: the first sub-command of the group; it calls the domain service
+    role: the first sub-command of the group; one delegating call on the injected runner service
     template: cli/sub.run.cli.ts.tpl
     rules:
       - BE_CLI_COMMAND_SHAPE

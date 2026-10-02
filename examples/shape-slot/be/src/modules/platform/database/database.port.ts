@@ -2,6 +2,7 @@ import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { DatabaseConnectionOptions, DatabaseOptions } from "./database.options"
 import type { SqlText } from "./database.sql"
+import type { ReadSeedFiles } from "./seed-connections.client"
 
 /** One applied migration, as the data source answers it. */
 export interface AppliedMigration {
@@ -40,3 +41,10 @@ export const InjectDatabaseOptions = (): TypedParameterDecorator<DatabaseOptions
 /** Injects the function that opens the data source of one connection. Parameter type: OpenConnection. */
 export const InjectConnectionSource = (): TypedParameterDecorator<OpenConnection> =>
     injector<OpenConnection>(CONNECTION_SOURCE)
+
+/** Token of the function that reads the seed files of a directory. */
+export const READ_SEED_FILES: unique symbol = Symbol("platform.database.read-seed-files")
+
+/** Injects the function that reads the seed files of a directory. Parameter type: ReadSeedFiles. */
+export const InjectReadSeedFiles = (): TypedParameterDecorator<ReadSeedFiles> =>
+    injector<ReadSeedFiles>(READ_SEED_FILES)

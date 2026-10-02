@@ -8,6 +8,7 @@ import { DATABASE_MANAGERS, DatabaseProbe } from "./database-probe.service"
 import { openConnectionSource } from "./connection-source.client"
 import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
+import { MigrationRunnerService } from "./migration-runner.service"
 import { IDENTITY_CONNECTION } from "./identity.connection"
 import { IDENTITY_ENTITY_MANAGER } from "./identity.decorators"
 import { ORDER_CONNECTION } from "./order.connection"
@@ -68,10 +69,12 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 },
                 ...managers,
                 DatabaseProbe,
+                MigrationRunnerService,
                 { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
             ],
             exports: [
                 DatabaseProbe,
+                MigrationRunnerService,
                 DATABASE_OPTIONS,
                 CONNECTION_SOURCE,
                 ...managers.map((manager) => manager.provide),
