@@ -441,7 +441,7 @@ slots:
   - id: runtime.domain
     profiles: [runtime]
     # One capability per folder; owners import each other without cycles.
-    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,i18n,work}/"
+    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work}/"
     presence: required
     tracked: tracked
     tier: domain
