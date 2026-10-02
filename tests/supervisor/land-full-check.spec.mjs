@@ -9,8 +9,8 @@ import { spawnSync } from 'node:child_process';
 import { runChecks } from '../../scripts/supervisor/land.mjs';
 import { FULL_CHECK_ENTRY, fullCheck as fullCheckWith } from '../../scripts/supervisor/land-full-check.mjs';
 
-const runner = (cmd, args, { cwd, timeout }) => {
-  const r = spawnSync(cmd, args, { cwd, timeout, encoding: 'utf8', windowsHide: true });
+const runner = (args, { cwd, timeout }) => {
+  const r = spawnSync(process.execPath, args, { cwd, timeout, encoding: 'utf8', windowsHide: true });
   return { ok: r.status === 0, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') };
 };
 const fullCheck = (dir) => fullCheckWith(dir, runner);

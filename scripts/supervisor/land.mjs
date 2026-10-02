@@ -524,7 +524,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
     const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
     checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
   }
-  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir, run)]) if (step) checks.push(step);
+  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
   let coverage;
   try {
     const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;

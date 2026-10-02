@@ -412,11 +412,6 @@ test('applyPending: matching is by code and path glob, a trailing / covers a dir
   assert.deepEqual(errors.map((f) => f.code), ['RT_SOURCE_NAME', 'RT_PENDING_STALE'], 'an entry of another code allows nothing and is stale');
 });
 
-test('the runtime manifest: every pending entry names its chunk, a date and a runtime code', () => {
-  assert.ok(MANIFEST.pending.length > 0);
-  for (const e of MANIFEST.pending) {
-    assert.match(e.lane, /^C[1-8][ab]?$/, JSON.stringify(e));
-    assert.match(e.since, /^\d{4}-\d{2}-\d{2}$/);
-    assert.ok(e.reason.trim().length > 10);
-  }
+test('the runtime manifest: every cut landed, so the shrink-only pending allowlist is empty', () => {
+  assert.deepEqual(MANIFEST.pending, [], 'a runtime finding is fixed, never allowlisted again');
 });

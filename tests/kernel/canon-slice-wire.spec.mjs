@@ -18,7 +18,7 @@ import { canonCutPlanOf, canonRedispatchOf, canonSettleFollowUpOf, relocationOf,
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const CUT_SEAM = path.join(ROOT, 'scripts', 'kernel', 'cut-seam.mjs');
+const SEAM_POLICY = path.join(ROOT, 'scripts', 'kernel', 'seam-policy.mjs');
 const SRC = 'apps/app/src';
 const shells = `${SRC}/components/product-shells`;
 const route = `${SRC}/app/[locale]/(console)/layout.tsx`;
@@ -97,8 +97,8 @@ test('the canon-wire and resume params are kernel-set code.refactor params; the 
   const shared = String(brief.blockers.find((blocker) => blocker.code === 'SCOPE_WIDENING').condition.en).replace(/\s+/g, ' ');
   assert.match(shared, /reports done listing each such finding as owedToWire/);
   const cut = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'driver-loop.yaml'), 'utf8')).tick.enqueue.cutExecution.replace(/\s+/g, ' ');
-  assert.match(cut, /scripts\/kernel\/cut-seam\.mjs canon-plan --scan <that canon-scan json> --cut-id <id>/);
-  assert.match(cut, /scripts\/kernel\/cut-seam\.mjs canon-redispatch --repo ROOT --job <job>/);
+  assert.match(cut, /scripts\/kernel\/seam-policy\.mjs canon-plan --scan <that canon-scan json> --cut-id <id>/);
+  assert.match(cut, /scripts\/kernel\/seam-policy\.mjs canon-redispatch --repo ROOT --job <job>/);
 });
 
 test('a blocked slice is redone from its committed state: --retry-of with its patch head as resumeFrom', (t) => {
@@ -118,7 +118,7 @@ test('a blocked slice is redone from its committed state: --retry-of with its pa
     assert.equal(redo.admissionBase, 'e406d812396f841ffa883627c3789039618cfb26');
     assert.equal(redo.command, `api enqueue --workflow ${workflowId} --op code.refactor --paths ${[...owned, `${SRC}/features/layouts/Sidebar`].join(',')} --cut-id fe-canon --cut-ordinal 7 --cut-total 34 --retry-of ${jobId} --params '{"resumeFrom":"17297b729069697b405f475754a4cbc829b8dbf1","admissionBase":"e406d812396f841ffa883627c3789039618cfb26"}'`);
   } finally { ledger.close(); }
-  const cli = spawnSync(process.execPath, [CUT_SEAM, 'canon-redispatch', '--repo', repo, '--job', jobId], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  const cli = spawnSync(process.execPath, [SEAM_POLICY, 'canon-redispatch', '--repo', repo, '--job', jobId], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(JSON.parse(cli.stdout).command, /--retry-of op-code\.refactor-7e9f7e20c1 --params '\{"resumeFrom":"17297b7/);
 });
@@ -128,7 +128,7 @@ test('the canon-plan CLI prints the enqueue commands from a canon-scan record', 
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'scan.json');
   fs.writeFileSync(file, JSON.stringify(scan({ seamOwnsFeatures: true })));
-  const cli = spawnSync(process.execPath, [CUT_SEAM, 'canon-plan', '--scan', file, '--cut-id', 'fe-canon'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  const cli = spawnSync(process.execPath, [SEAM_POLICY, 'canon-plan', '--scan', file, '--cut-id', 'fe-canon'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.equal(cli.status, 0, cli.stderr);
   const plan = JSON.parse(cli.stdout);
   assert.equal(plan.total, 3);

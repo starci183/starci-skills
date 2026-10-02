@@ -158,7 +158,7 @@ export function matchAlias(pattern, spec) {
  * One pass over a repository working tree: {files, edges: [{from, spec, kind, file?}]}. `only` limits the files
  * READ (their imports) to that set; resolution still sees every file on disk. `readFile(rel)` is a seam.
  */
-export function scanImports(root, { only = null, list = lsFiles, readFile = null } = {}) {
+export function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
   const files = trackedSources(root, { list });
   const onDisk = (rel) => { try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; } };
   const isDir = (rel) => { try { return fs.statSync(path.join(root, rel)).isDirectory(); } catch { return false; } };
