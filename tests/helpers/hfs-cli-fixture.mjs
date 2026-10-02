@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../../scripts/hfs/rules/monorepo.mjs';
 import { loadSonarGate } from '../../scripts/gates/sonar-gate.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -45,8 +46,14 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
     if (!fs.existsSync(target)) fs.writeFileSync(target, text);
   };
   const write = (relative, text) => { const target = path.join(dir, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
-  // The one package.json of the app: the fe side's next-intl stack is a dependency of it (R59).
-  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, dependencies: { 'next-intl': PINS['next-intl'].version } })}\n`);
+  // The one package.json of the app, the monorepo root (R127): the fe workspaces, npm as the package manager, turbo pinned.
+  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], devDependencies: { turbo: PINS.turbo.version } })}\n`);
+  // Each fe app is a workspace (R128) that declares its own next-intl stack (R59, R130).
+  for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/package.json`, `${JSON.stringify({ name: feAppPackageName(declaration.project, app.name), private: true, scripts: FE_APP_SCRIPTS, dependencies: { 'next-intl': PINS['next-intl'].version } }, null, 2)}\n`);
+  // The Nest monorepo of the declared be apps (R129), the default project the first api app.
+  const beApps = declaration.sides.be.apps;
+  const defaultApp = beApps.find((app) => app.kind === 'api') ?? beApps[0];
+  put('be/nest-cli.json', `${JSON.stringify({ $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${defaultApp.name}`, sourceRoot: `apps/${defaultApp.name}/src`, projects: Object.fromEntries(beApps.map((app) => [app.name, { type: 'application', root: `apps/${app.name}`, entryFile: 'main', sourceRoot: `apps/${app.name}/src` }])) }, null, 2)}\n`);
   writeTargets(dir, renderTargets(declaration, PRESETS));
   // The file a rule reads the content of that the render does not write: the be side's stack declaration.
   put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);

@@ -186,14 +186,27 @@ slots:
     rules: [HFS_README_*]
   - id: app.package-manifest
     profiles: [app]
-    # The one package.json of the app: every dependency of both sides and every script; npm workspaces only for fe/packages/*.
+    # The one package.json of the app, at the app root: be's dependencies and every tool, and every script; npm workspaces are
+    # exactly fe/apps/* and fe/packages/* (HFS_MONO_WORKSPACES), each with its own package.json. be has no package.json of its own.
     path: package.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
     managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
-    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES, HFS_MONO_WORKSPACE_DEP]
+  - id: app.task-graph
+    profiles: [app]
+    # The turbo task graph of the app (build, dev, lint, typecheck over the fe workspaces; build depends on ^build and caches
+    # .next and dist): rendered by hfs sync from templates/app/task-graph/turbo.json, judged for drift by hfs check. turbo needs
+    # it beside the root package.json and lockfile.
+    path: turbo.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: task-graph
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES]
   - id: app.lockfile
     profiles: [app]
     path: package-lock.json
@@ -413,11 +426,13 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
   - id: be.nest-cli
     profiles: [be]
+    # The Nest monorepo of the back end: `monorepo: true` and one project per declared be app (apps/<app>, even for one service).
     path: nest-cli.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
+    rules: [HFS_MONO_NEST_PROJECTS]
   - id: be.tool-config-local
     profiles: [be]
     path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.prettierrc.*,prettier.config.*,jest.config.ts,jest.config.mjs,jest.config.cjs,jest.config.json,jest.config.e2e.js}"
@@ -442,22 +457,14 @@ slots:
     tests: none
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TS_STRICT]
-  - id: fe.tool-config-repo
-    profiles: [fe]
-    # The one tool file a preset cannot render because it carries the repository's own facts: turbo.json (its task graph).
-    path: turbo.json
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
   - id: fe.tool-config-local
     profiles: [fe]
-    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*}"
+    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*,turbo.json}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
+    goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); the task graph is the app root's turbo.json (app.task-graph); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.docs
     profiles: [be, fe]
@@ -929,16 +936,18 @@ slots:
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next
     profiles: [fe]
-    path: "apps/<app>/{next.config.ts,tsconfig.json,postcss.config.mjs}"
+    # Each fe app is an npm workspace: its package.json is @<project>/<app> with its own runtime dependencies and the fixed
+    # workspace scripts (HFS_MONO_FE_WORKSPACE); turbo runs them.
+    path: "apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}"
     appKind: next
     presence: required
     tracked: tracked
     tier: none
     minInstances: 1
-    requires: [next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
+    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
                "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
-    rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
+    rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS, HFS_MONO_FE_WORKSPACE, HFS_MONO_WORKSPACE_DEP]
   - id: fe.app-optional
     profiles: [fe]
     path: "apps/<app>/public/"

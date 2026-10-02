@@ -207,6 +207,9 @@ exceptions:
   - path: packages/hfs/templates/app/package-scripts/package.json
     reason: >
       Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/app/task-graph/turbo.json
+    reason: >
+      Managed app-root turbo task graph template @starci/hfs writes into a product repository (slot app.task-graph); turbo reads only turbo.json.
   - path: packages/hfs/templates/be/tool-config/src/tests/tsconfig.json
     reason: >
       TypeScript config template for the back-end test tree (src/tests) @starci/hfs writes into a product repository; tsc reads JSON (with comments).

@@ -53,21 +53,44 @@ async function lint(app) {
   return { code, report: JSON.parse(out) };
 }
 
+/** The fe workspaces of the app (the root package.json workspaces fe/apps/* and fe/packages/*) that hold a package.json, app-relative. */
+function workspacesOf(app) {
+  const patterns = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).workspaces ?? [];
+  return patterns.flatMap((pattern) => {
+    const base = path.join(app, ...pattern.replace(/\/\*$/, '').split('/'));
+    if (!fs.existsSync(base)) return [];
+    return fs.readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory() && fs.existsSync(path.join(base, entry.name, 'package.json')))
+      .map((entry) => `${pattern.replace(/\/\*$/, '')}/${entry.name}`);
+  }).sort();
+}
+
 /**
  * The scaffold's own root `typecheck` script, step by step: `npm run <script>` runs that root script's command, `tsc <args>` the app's
- * TypeScript (always --noEmit: a spec writes no build output). Returns the compiler's error lines.
+ * TypeScript (always --noEmit: a spec writes no build output), and `turbo run typecheck` the `typecheck` script of every fe workspace
+ * from its own folder (the task graph runs exactly those; the linked install holds no turbo binary). Returns the compiler's error lines.
  */
 function typecheck(app) {
   const scripts = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts;
   const tsc = path.join(app, 'node_modules', 'typescript', 'bin', 'tsc');
   const errors = [];
-  const step = (command) => {
+  const step = (command, cwd = app) => {
     const [tool, ...args] = command.trim().split(/\s+/);
     if (tool === 'npm' && args[0] === 'run') return step(scripts[args[1]]);
-    if (tool === 'node') { execFileSync(process.execPath, args, { cwd: app, stdio: 'pipe' }); return; }
-    assert.equal(tool, 'tsc', `the typecheck script runs only codegen and tsc, not ${command}`);
-    const run = spawnSync(process.execPath, [tsc, ...args.filter((arg) => arg !== '--noEmit'), '--noEmit', '--pretty', 'false'], { cwd: app, encoding: 'utf8' });
-    errors.push(...`${run.stdout}${run.stderr}`.split(/\r?\n/).filter((line) => /error TS\d+/.test(line)));
+    if (tool === 'node') { execFileSync(process.execPath, args, { cwd, stdio: 'pipe' }); return; }
+    if (tool === 'turbo') {
+      assert.deepEqual(args, ['run', 'typecheck'], `the typecheck script runs the typecheck task of every workspace, not ${command}`);
+      for (const workspace of workspacesOf(app)) {
+        const own = JSON.parse(fs.readFileSync(path.join(app, workspace, 'package.json'), 'utf8')).scripts?.typecheck;
+        assert.equal(typeof own, 'string', `${workspace} has a typecheck script`);
+        step(own, path.join(app, workspace));
+      }
+      return;
+    }
+    assert.equal(tool, 'tsc', `the typecheck script runs only codegen, tsc and the workspaces' typecheck, not ${command}`);
+    const run = spawnSync(process.execPath, [tsc, ...args.filter((arg) => arg !== '--noEmit'), '--noEmit', '--pretty', 'false'], { cwd, encoding: 'utf8' });
+    // A workspace's compiler names its files from the workspace folder: the line is made app-relative like the root's.
+    const prefix = cwd === app ? '' : `${path.relative(app, cwd).split(path.sep).join('/')}/`;
+    errors.push(...`${run.stdout}${run.stderr}`.split(/\r?\n/).filter((line) => /error TS\d+/.test(line)).map((line) => `${prefix}${line}`));
   };
   for (const command of scripts.typecheck.split('&&')) step(command);
   return errors;
@@ -339,11 +362,13 @@ test('the scaffolded fe builds with the root build:fe script: next-intl finds it
   const toRuntime = path.relative(path.join(app, 'fe', 'apps', 'web'), RUNTIME).split(path.sep).join('/');
   edit(app, 'fe/apps/web/next.config.ts', '"..", "..", "..")', `${JSON.stringify(toRuntime)})`);
 
-  // The root `build:fe` script as npm runs it, step by step: the codegen script, then `(cd <app dir> && next build)` per Next app.
+  // The root `build:fe` script as npm runs it, step by step: the codegen script, then the turbo build of every fe app workspace,
+  // which runs that workspace's `build` script (`next build`) from its folder (the linked install holds no turbo binary).
   const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['build:fe'];
   const next = path.join(app, 'node_modules', 'next', 'dist', 'bin', 'next');
-  const dirs = [...script.matchAll(/\(cd (\S+) && next build\)/g)].map((match) => match[1]);
-  assert.equal(script.replace(/\(cd \S+ && next build\)/g, '').replace(/[\s&]/g, ''), 'npmruncodegen--silent', `build:fe runs only codegen and one (cd <app dir> && next build) per app: ${script}`);
+  assert.equal(script, 'npm run codegen --silent && turbo run build --filter=./fe/apps/*', `build:fe runs codegen and the turbo build of the fe app workspaces: ${script}`);
+  const dirs = workspacesOf(app).filter((workspace) => workspace.startsWith('fe/apps/'));
+  for (const dir of dirs) assert.equal(JSON.parse(fs.readFileSync(path.join(app, dir, 'package.json'), 'utf8')).scripts.build, 'next build', `${dir} builds with next build`);
   execFileSync(process.execPath, ['scripts/codegen.mjs'], { cwd: app, stdio: 'pipe' });
   let built = 0;
   for (const dir of dirs) {

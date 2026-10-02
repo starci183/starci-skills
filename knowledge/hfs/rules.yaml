@@ -1272,3 +1272,35 @@ rules:
     failureCodes: ["RT_CONTROL_CHARACTER"]
     enforcers:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
+  - id: R127
+    code: "HFS_MONO_WORKSPACES"
+    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_WORKSPACES"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R128
+    code: "HFS_MONO_FE_WORKSPACE"
+    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_FE_WORKSPACE"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R129
+    code: "HFS_MONO_NEST_PROJECTS"
+    law: "The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `\"monorepo\": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{\"type\": \"application\", \"root\": \"apps/<app>\", \"sourceRoot\": \"apps/<app>/src\"}`."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_NEST_PROJECTS"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R130
+    code: "HFS_MONO_WORKSPACE_DEP"
+    law: "An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `\"*\"`; the app root `package.json` never declares a workspace package."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}

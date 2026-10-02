@@ -293,7 +293,7 @@ test('FE side with two apps', () => {
   const owner = (p) => fe.classifyPath(p).slot;
   assert.equal(owner('apps/web/next.config.ts'), 'fe.app.next');
   assert.equal(owner('apps/web/tsconfig.json'), 'fe.app.next');
-  assert.equal(fe.classifyPath('apps/admin/package.json').status === 'owned' && owner('apps/admin/package.json') === 'fe.app.next', false, 'an fe app has no package.json of its own');
+  assert.equal(owner('apps/admin/package.json'), 'fe.app.next', 'each fe app is an npm workspace with its own package.json');
   assert.equal(owner('apps/web/public/logo.svg'), 'fe.app-optional');
   assert.equal(fe.classifyPath('apps/web/vitest.config.ts').status, 'no-slot', 'the fe side has no test configuration slot: FE_NO_TESTS owns the path');
   assert.equal(owner('apps/web/src/app/[locale]/page.tsx'), 'fe.route');
@@ -315,16 +315,15 @@ test('FE side with two apps', () => {
   assert.equal(fe.classifyPath('apps/admin/src/modules/cart/index.ts').bindings.app, 'admin');
   // required paths are expanded per declared app
   const paths = fe.requiredPaths().paths.map((e) => e.path);
-  for (const name of ['web', 'admin']) for (const p of [`apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
+  for (const name of ['web', 'admin']) for (const p of [`apps/${name}/package.json`, `apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
     assert.equal(paths.includes(p), true, `missing ${p}`);
   assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
   assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no managed file');
-  // the tool configuration of the fe side: managed files, the side's own turbo.json, and the forbidden ones
+  // the tool configuration of the fe side: managed files and the forbidden ones (a turbo.json is the app root's task graph, app.task-graph)
   for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(owner(file), 'fe.tool-config', file);
   for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(paths.includes(file), true, `${file} is required`);
   for (const file of ['vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts']) assert.equal(fe.classifyPath(file).status, 'no-slot', file);
-  assert.equal(owner('turbo.json'), 'fe.tool-config-repo');
-  for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
+  for (const file of ['turbo.json', '.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
   for (const file of ['package.json', 'package-lock.json', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'repo.side-root-forbidden', `${file} is the app root's`);
   assert.equal(fe.slot('fe.tool-config-local').presence, 'forbidden');
   assert.equal(fe.slot('fe.tool-config').managedBy, 'tool-config');

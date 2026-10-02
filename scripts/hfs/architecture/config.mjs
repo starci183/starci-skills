@@ -120,9 +120,10 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
         }
         candidates = next;
       }
-      if (!candidates.length) throw Error(`Workspace pattern matched no package directories: ${normalized}.`);
       // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
-      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve.
+      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve. A `*`
+      // pattern may match nothing: every app declares the same workspaces (fe/apps/*, fe/packages/*, HFS_MONO_WORKSPACES) whether
+      // or not it has a package yet, and the root patterns are held to that fixed list by the rule, not here.
       const wildcard = segments.includes('*');
       for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, !wildcard);
     }
