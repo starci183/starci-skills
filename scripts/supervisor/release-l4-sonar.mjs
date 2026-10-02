@@ -11,7 +11,8 @@ import path from 'node:path';
 import { containerInspect } from '../api/docker/container-inspect.mjs';
 import { containerLifecycle } from '../api/docker/container-lifecycle.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { dashboard, resolveConfig, scan, scrub, sonarUp } from '../gates/sonar-local.mjs';
+import { dashboard, resolveConfig, scan, scrub } from '../gates/sonar-local.mjs';
+import { sonarUp } from '../gates/sonar-status.mjs';
 
 const READY_MS = 5 * 60_000;
 const READY_POLL_MS = 5_000;

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
+import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
 import { exampleApps, planL4, runL4 } from '../../scripts/supervisor/release-l4.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
@@ -283,4 +284,13 @@ test('sonar: only a pass is a proof: a disabled or blocked Sonar, or a thrown ga
   const proof = await sonarSupplier([APP], thrown.deps).proofs['shop: sonar']();
   assert.equal(proof.ok, false);
   assert.match(fs.readFileSync(proof.log, 'utf8'), /scanner exploded/);
+});
+
+test('sonarUp: only a 200 with status UP is up; any other state, status or a failed fetch is not', async () => {
+  const cfg = (fetch) => ({ host: 'http://sonar.test', timeoutMs: 1000, fetch });
+  const answer = (status, body) => async () => ({ status, json: async () => body });
+  assert.equal(await sonarUp(cfg(answer(200, { status: 'UP' }))), true);
+  assert.equal(await sonarUp(cfg(answer(200, { status: 'STARTING' }))), false);
+  assert.equal(await sonarUp(cfg(answer(503, { status: 'UP' }))), false);
+  assert.equal(await sonarUp(cfg(async () => { throw new Error('ECONNREFUSED'); })), false);
 });
