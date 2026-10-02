@@ -8,8 +8,10 @@
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
 //   6. the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message, and main and the tag are pushed together, atomically: both refs move or neither does.
 // Exported function only: the CLI exposes it as `starci release cut`. Git goes through the scripts/api/git call files the CLI's git verbs use. Never stashes, resets, deletes or moves a tag, never pushes anything but main and that tag.
-// The heavy part (the suite and the push) runs inside ONE host-lock function, `withHostLock`: the RIGHTS lane's lock API replaces its body when it lands; until
-// then it runs the work directly. Seams (deps): git, suite, push, scan, changelog, lock; for the default suite also proofs, supplier, parity, parityDeps.
+// The heavy part (the suite and the push) runs under the host lock (scripts/machine/host-lock.mjs, role release): a held lock refuses the cut and names its owner.
+// After the tag is made and before the push, the L4 record of HEAD is written (scripts/guards/release-record.mjs): the pre-push hook of the runtime and of every app
+// lets main and a v* tag through only when that record exists for HEAD and names the tag. Seams (deps): git, suite, push, scan, changelog, lock, recordL4; for the default
+// suite also proofs, supplier, parity, parityDeps (the L4 row brings its own Sonar proofs and Linux parity step: scripts/supervisor/release-l4.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { catFile } from '../api/git/cat-file.mjs';
@@ -22,6 +24,8 @@ import { tag as gitTag } from '../api/git/tag.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
+import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
+import { writeL4Record } from '../guards/release-record.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
@@ -44,8 +48,10 @@ export function pushRefusal({ refs, branch = 'main' }) {
   return null;
 }
 
-/** Run `work` while holding the host's one heavy-run lock (one heavy run at a time). The lock API of the RIGHTS lane lands here; today it runs the work as is. */
-const withHostLock = (work) => work();
+/** Run `work` while holding the host's one heavy-run lock (one heavy run at a time, role release); a held lock returns {ok: false, reason: 'held', owner} instead of the work's result. */
+const withHostLock = (work) => holdHostLock({ role: 'release', purpose: 'release-cut' }, work);
+const heldBy = (r) => (r && !Array.isArray(r) && r.ok === false && r.reason === 'held' ? r.owner ?? {} : null);
+const heldWhy = (o) => `the host lock is held by ${o.role ?? 'another heavy run'}${o.purpose ? ` (${o.purpose})` : ''}${o.pid ? ` pid ${o.pid}` : ''}: wait for it, never delete the lock by hand`;
 
 /** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
 const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
@@ -83,7 +89,9 @@ export function cutRelease({ repo, remote = 'origin', branch = 'main', tag = nul
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
   const lock = deps.lock ?? withHostLock;
-  const steps = lock(() => (deps.suite ?? defaultSuite)(repo, deps));
+  const ran = lock(() => (deps.suite ?? defaultSuite)(repo, deps));
+  if (heldBy(ran)) return refuse('host-lock-held', heldWhy(heldBy(ran)));
+  const steps = ran;
   out.suite = steps;
   const red = steps.filter((s) => !s.ok);
   if (red.length) return refuse('suite-red', `${red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ')} red: fix, land, and cut again (logs: ${red.map((s) => s.log).filter(Boolean).join(', ')})`);
@@ -106,7 +114,11 @@ export function cutRelease({ repo, remote = 'origin', branch = 'main', tag = nul
   const refs = [branch, `refs/tags/${tag}`];
   const refusal = pushRefusal({ refs });
   if (refusal) return refuse('push-refused', refusal);
+  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent) });
+  if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
+  out.l4Record = recorded.file ?? null;
   const pushed = lock(() => (deps.push ?? push)(['--atomic', remote, ...refs], { cwd, timeout: 600_000 }));
+  if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
   return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push`, pushed: true };
 }

@@ -1,0 +1,153 @@
+# command-policy.yaml - the ONE rule table of what an agent may run on the host (rule R223 RIGHTS_ROLE_DENIED).
+# Two entry points read this table and nothing else: the PreToolUse command guard (scripts/guards/command-guard.mjs: Claude
+# and Devin) and the PATH shim wrappers an Orca worker terminal puts first on PATH (scripts/guards/command-policy.mjs
+# shimDecision: every agent kind, Codex and Cursor included). A rule is data here; the few matchers that need a real parse
+# (a push refspec, a tag read form, a whole-suite glob, a test file list) are named in `match` and live in rights.mjs.
+#
+# Side effects go through `starci <group> <verb>`: an agent is allowed the read-only commands below, the runtime's own verbs
+# and the file edits of its worktree (file rights, R224); every other raw tool is refused with the starci verb to use.
+# The owner (no role) and the release role are never refused. Unknown programs are refused (default deny).
+#
+# `use` names the allowed path (a verb of the CLI catalog, modules/cli/commands); the CLI lane edits the verbs, this file stays
+# the single place.
+roles:
+  bound: [op, lead, supervisor, coordinator]
+  # roles that may run a targeted `node --test <explicit spec files>` (L1 while working on the runtime); an op uses its gate
+  node-test: [lead, supervisor, coordinator]
+  # ops that may run a whole suite (the full unit / full e2e of an app)
+  suite-ops: [unit.verify, e2e.verify]
+  # the only refs a coordinator or the supervisor may push (backup namespace, explicit refspecs)
+  backup-roles: [coordinator, supervisor]
+  backup-ref: '^refs/backup/\S+$'
+# The runtime's own verbs: the surface every other path is steered to. `api` and `hfs` are the pre-CLI spellings; the CLI lane
+# removes them when it lands the unified catalog.
+runtime: [starci, api, hfs]
+# The kernel's transitional entry (node scripts/kernel/cli.mjs <verb>); removed with the CLI catalog.
+node-scripts: [scripts/kernel/cli.mjs]
+# Release path: refused to every bound role.
+release:
+  verbs: [cut, publish]
+  scripts: [release:cut, release:publish]
+  use: starci release cut (owner-approved; bumps, runs the full suite once, tags and pushes main with its tag atomically)
+# Programs that cannot change state, with any arguments.
+read: [ls, dir, cat, type, head, tail, wc, uniq, cut, tr, diff, cmp, comm, rg, grep, egrep, fgrep, echo, printf, pwd, cd, pushd, popd, which, where, whoami, hostname,
+  stat, file, realpath, readlink, dirname, basename, date, true, false, test, '[', expr, sleep, seq, basename, md5sum, sha1sum, sha256sum, shasum, cksum, od, xxd, hexdump,
+  jq, yq, column, nl, rev, tac, fold, fmt, join, paste, split-none, env-none, get-content, gc, get-childitem, gci, get-item, gi, select-string, sls, test-path, resolve-path,
+  get-location, set-location, sl, write-output, write-host, measure-object, sort-object, where-object, select-object, format-table, ft, convert-to-json, convertfrom-json,
+  get-date, get-command, gcm, get-process-none, out-string, out-null, tee-object-none]
+# Read-only unless one of the options makes them write.
+guarded-read:
+  find: [-delete, -exec, -execdir, -ok, -okdir, -fprint, -fprint0, -fprintf, -fls]
+  sed: []   # sed -i is an in-place file edit inside the worktree: the file rights (R224) judge its target, like cp and mv
+  sort: [-o, --output]
+  awk: [-i, inplace]
+  gawk: [-i, inplace]
+  xargs: []
+  # static analysis: read-only when it does not write back or emit
+  eslint: [--fix, --fix-type]
+  prettier: [--write, -w]
+  stylelint: [--fix]
+  tsc: []
+  node: []
+# tsc and prettier are read-only only in their checking forms.
+require-flag:
+  tsc: ['--noEmit', '-noEmit']
+  prettier: ['--check', '-c', '--list-different', '-l']
+# File mutations inside the worktree: allowed here; the file rights (R224 protected zone, op never writes the runtime checkout)
+# judge the targets.
+scoped-write: [mkdir, cp, mv, rm, rmdir, touch, tee, install, truncate, copy, move, del, erase, ren, rename, new-item, ni, set-content, sc, add-content, ac, out-file, remove-item, ri,
+  copy-item, cpi, move-item, mi, clear-content, clc, rename-item, rni, mklink-none,
+  # process control: a kill by PID of a process the agent started passes here; the older guard rules (PROCESS_KILL_BY_NAME, process-query kills) refuse the rest
+  kill, taskkill, stop-process, spps, tasklist, ps, get-process, gps, printenv]
+git:
+  # read-only subcommands
+  read: [status, log, diff, show, rev-parse, ls-files, ls-tree, cat-file, blame, grep, describe, shortlog, rev-list, merge-base, for-each-ref, name-rev, ls-remote, show-ref,
+    check-ignore, diff-tree, diff-index, diff-files, count-objects, whatchanged, version, help, var, verify-commit, verify-tag, range-diff, cherry, show-branch, instaweb-none]
+  # subcommands whose read forms pass (match names the parse in rights.mjs)
+  list-forms: [branch, tag, stash, worktree, remote, config, reflog, notes]
+  # denied subcommands: code, and the starci verb to use
+  deny:
+    commit: {code: RIGHTS_GIT_COMMIT, use: starci git commit}
+    add: {code: RIGHTS_GIT_COMMIT, use: starci git commit}
+    rm: {code: RIGHTS_GIT_COMMIT, use: starci git commit}
+    mv: {code: RIGHTS_GIT_COMMIT, use: starci git commit}
+    push: {code: RIGHTS_GIT_PUSH, use: 'starci git backup (refs/backup/* only); main and its tag move only through starci release cut'}
+    tag: {code: RIGHTS_GIT_TAG, use: starci release cut (the only tag maker; housekeeping marks are refs/backup/* or refs/salvage/*, never tags)}
+    merge: {code: RIGHTS_GIT_SYNC, use: starci git sync (merge main into the lane) or starci git land (coordinator)}
+    rebase: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    pull: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    fetch: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    checkout: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    switch: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    reset: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    restore: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    clean: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    cherry-pick: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    revert: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    am: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    apply: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    stash: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    worktree: {code: RIGHTS_GIT_SYNC, use: starci git sync (a worktree is created and removed by the runtime, never by hand)}
+    branch: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    update-ref: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    gc: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    reflog: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    config: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    remote: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    notes: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    submodule: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    init: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    clone: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+npm:
+  programs: [npm, pnpm, yarn, bun]
+  read: [view, v, info, show, ls, list, la, ll, outdated, explain, why, root, prefix, bin, help, search, whoami, ping, '-v', '--version', 'config get', 'config list', pack-dry]
+  deny:
+    publish: {code: RIGHTS_NPM_PUBLISH, use: starci release cut (packages are published once per release from the release commit)}
+    unpublish: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
+    deprecate: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
+    dist-tag: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
+    ci: {code: RIGHTS_NPM_CI_UNLOCKED, use: 'the runtime installs dependencies under the host lock (starci gate run, starci app sync); a manual npm ci is the owner''s'}
+    install: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run); a manual install is the owner''s'}
+    i: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
+    add: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: a new dependency is a canon pin (knowledge/hfs/canon-pins.yaml)'}
+    update: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: dependency versions are canon pins'}
+    uninstall: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: dependency versions are canon pins'}
+    test: {code: RIGHTS_RAW_TOOL, use: 'starci gate unit --root <app> (the op gate selects the specs of the change)'}
+    t: {code: RIGHTS_RAW_TOOL, use: 'starci gate unit --root <app>'}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app> (or the starci app verb of the script: starci app lint, starci app sync)'}
+    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app>'}
+    start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
+    exec: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app>'}
+    link: {code: RIGHTS_RAW_TOOL, use: 'a link is never made by an agent'}
+    rebuild: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
+    prune: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
+    dedupe: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
+# Side-effecting tools with no read form: refused whole, each with the starci verb to use.
+raw-tools:
+  docker: {use: 'starci app stack (the stack of the app: up, down, status)'}
+  docker-compose: {use: 'starci app stack'}
+  podman: {use: 'starci app stack'}
+  kubectl: {use: 'starci app stack'}
+  k3d: {use: 'starci app stack'}
+  supabase: {use: 'starci app stack (the local Supabase stack of a lite app)'}
+  gh: {use: 'starci release cut (the GitHub release is created from the CHANGELOG section of the tag); anything else is the owner''s'}
+  schtasks: {use: 'starci reconciler task (the scheduled task of the runtime)'}
+  shutdown: {use: 'ask the owner: a worker never shuts the host down'}
+  reboot: {use: 'ask the owner: a worker never reboots the host'}
+  jest: {use: 'starci gate unit --root <app>'}
+  vitest: {use: 'starci gate unit --root <app>'}
+  mocha: {use: 'starci gate unit --root <app>'}
+  playwright: {use: 'starci gate run --root <app> (the e2e proof of the app)'}
+  cypress: {use: 'starci gate run --root <app>'}
+  pytest: {use: 'starci gate unit --root <app>'}
+  turbo: {use: 'starci gate run --root <app>'}
+  nest: {use: 'starci gate run --root <app>'}
+  curl: {use: 'ask the owner or use the starci verb of the service (a worker does not call the network by hand)'}
+  wget: {use: 'ask the owner or use the starci verb of the service'}
+  ssh: {use: 'ask the owner'}
+  scp: {use: 'ask the owner'}
+# Orca: reads pass; every mutation goes through the runtime verbs.
+orca:
+  read: [check, worker-show, worker-list, worker-read, inbox, run-show, run-list, task-show, task-list, status, list, read, show, tail, get, wait-none]
+  groups-read: [terminal, worktree, repo, orchestration]
+  use: 'starci kernel / starci supervisor / starci orca verbs (dispatch, report, worker start and release are runtime verbs)'

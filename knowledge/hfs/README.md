@@ -34,7 +34,7 @@ READs the pattern files of the slots it touches before it codes (`knowledge/op-g
 1. **One source of law.** The slot manifest and the rule catalog in `.claude` are the only rules. An app carries no rule
    of its own, no allowlist, no baseline, no suppression file and no local copy of a canon config.
 2. **Growth is addition.** A new kind of content is a new slot. A slot is never edited in place inside a major.
-3. **One machine at every gate.** Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`), the Kernel's landing
+3. **One machine at every gate.** Pre-commit, the op gate (`scripts/gates/gate.mjs`), the Kernel's landing
    and CI run the same `@starci/hfs` at the pinned version. There is no rule only agents can run.
 4. **Zero findings is necessary, not sufficient.** An app is done only when the behavioural conditions in section 11
    also hold: the real application boots, every feature is composed, every owner is mounted, the contracts match, the
@@ -613,7 +613,7 @@ no contract copy under `fe/`.
   CI; the e2e workflow is `workflow_dispatch` only (R12). `test:contract` is never part of `test` or `test:e2e`.
 - Backend: one `be/jest.config.js` (preset `@starci/jest-preset`) with exactly the projects `unit`, `integration`, `e2e`
   and `contract`; ts-jest `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs
-  and fixtures included) at pre-push and CI and by `typecheck:tests` (`be/src/tests/tsconfig.json`) for the world,
+  and fixtures included) by the op gate and CI and by `typecheck:tests` (`be/src/tests/tsconfig.json`) for the world,
   integration, e2e and contract trees. `test:integration`, `test:e2e` and `test:contract` are each
   `npm run typecheck:tests && cd be && jest --selectProjects <name>`; `test` is `cd be && jest --selectProjects unit --coverage` (per-file 100 on the measured scope `hfs sync` renders: the files of the `ruleParams.be.logicRoles` roles inside the slots whose `coverage` is `required`, R204). Every script runs from the app root.
 - A backend e2e boots the real apps through the world; it never hand-assembles a lane module. Fixtures are typed
@@ -651,7 +651,7 @@ no contract copy under `fe/`.
   `@ts-ignore`, no `@ts-expect-error` (R18). Every `@starci/*` package is installed from the npm registry at the exact
   version of `canon-pins.yaml` (`packages/README.md`).
 - **Formatter.** Prettier only: `printWidth` 120, `tabWidth` 4, `semi` false, `singleQuote` false, `trailingComma`
-  `all`. No ESLint formatting rule exists. Pre-commit runs `prettier --check` on the staged files, pre-push and CI `npm run format:check` (R19).
+  `all`. No ESLint formatting rule exists. Pre-commit runs `prettier --check` on the staged files, CI `npm run format:check` (R19).
 - **Pins.** `canon-pins.yaml` holds exact versions. One version per dependency across the root and workspace manifests, root `overrides` for
   react, next and grammar, no nested copies (R14, R15). Raising a version is a change in `.claude` first, then each app
   moves to the new pin in its own upgrade lane. `tsconfig` extends `@starci/tsconfig` with `strict`, `noUncheckedIndexedAccess`,
@@ -668,8 +668,8 @@ no contract copy under `fe/`.
 
 | Gate | Runs | Target | Rules |
 | --- | --- | --- | --- |
-| PC pre-commit | `hfs work-hygiene` (staged `.starciwork` and `.starcistacks` paths, the secrets guard), `typecheck`, ESLint per side on the staged files, stylelint on the staged CSS of `fe/`, `prettier --check` on the staged files, the unit specs of `be/` the staged files touch | seconds | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
-| PP pre-push | `typecheck`, `lint` (`hfs lint`), `format:check`, the unit specs of `be/` affected since `origin/main` | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
+| PC pre-commit | L0 only: `hfs work-hygiene` (staged `.starciwork` and `.starcistacks` paths, the secrets guard), ESLint per side on the staged files, stylelint on the staged CSS of `fe/`, `prettier --check` on the staged files; no typecheck and no test run (the op gate does types and the targeted specs) | seconds | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
+| PP pre-push | the release gate check, no test run, no typecheck, lint or format: `refs/backup/*` is allowed; `main` and `v*` tags only when HEAD carries an annotated `v[0-9]*` tag and the release cut recorded the full suite of HEAD (`<git common dir>/starci-release/<HEAD sha>.l4.json`); anything else is refused (`RIGHTS_PUSH_NOT_RELEASE`) | seconds | none |
 | OS op settle | the op gate `scripts/gates/gate.mjs` over the op's changed files, forced every round of the op loop: the merge guard, `hfs lint --changed`, `codegen` and package builds, `tsc` per owning tsconfig, the slice's specs; only findings new against the base block (the workflow's previous checkpoint); `api settle` re-reads the attached gate JSON and READ digest and refuses a red `done` | per op | every file-level and owner-level rule in scope |
 | LG land | the workflow's finish, the only time main is touched: `gate.mjs` over the whole workflow branch against its merge-base with main (merge guard included), `review.verify` of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed; a green op before it is only a checkpoint on `wf-<workflowId>` | per workflow | as OS, over the whole branch, against the newest main |
 | CI GitHub | `npm ci`, `npm run lint -- --sonar reports/lint.sonar.json` (the pinned `hfs lint`), `format:check`, `typecheck`, `npm test` (unit with the per-file coverage threshold), `build:be`, `build:fe`, the Sonar scan and gate | | every rule |
@@ -706,7 +706,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R10 | `HFS_STACKS_SHAPE` | `.starcistacks` has the standard shape and the host Sonar owner. | product |
 | R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL, importing the be lcov with the logic of be/src/modules (the coverage scope derived from the slot manifest) as the only coverage scope. | product |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. | product |
-| R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. | product |
+| R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `hfs lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky. | product |
 | R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, a root `overrides` pin included, and npm is the only package manager. | product |
 | R15 | `HFS_CANON_PIN_DRIFT` | Canon packages and frameworks match `canon-pins.yaml`. | product |
 | R16 | `HFS_TOOL_CONFIG_LOCAL` | Configs only call the factories; no local rules. | product |
@@ -886,4 +886,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R211 | `RT_SLOT_ID_SHAPE` | A slot id follows the grammar its manifest declares, read from the manifest not from a list: dot-separated lowercase kebab segments, a first segment of naming.prefixes in knowledge/hfs/slots.yaml (profiles in knowledge/hfs/runtime-slots.yaml), <side>.app.<kind> naming a kind of appKinds.<side>, and every deeper id extending a declared id - an explicit parent field, or a family at least two slots share; a lone deep orphan invents a family. The role-suffix vocabulary holds no synonym pairs: a profile's suffixes never share a word with bannedSuffixes, no naming.refusedPairs pair is live in suffixes on both sides, and naming.sameConceptPairs is the one declared exception (step + saga-step), live on both sides or dropped; naming.glossary binds the five incoming-thing names (consumer, subscription, webhook, processor, handler) to their distinct kinds. | runtime |
 | R221 | `CI_TRIGGERS_RELEASE_ONLY` | The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run. | runtime |
 | R222 | `RELEASE_NOTES` | A release tag `v<version>` on HEAD has its CHANGELOG.md section `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark: the tag message and the GitHub Release are that section, so a tag is never cut over an unfinished or missing section. | runtime |
+| R223 | `RIGHTS_ROLE_DENIED` | By the caller's role, the command guard refuses git push, git tag, raw git commit/add/rm/mv, raw git synchronization writes, npm publish, a whole-suite run outside the release cut and unit.verify/e2e.verify, npm ci without the host lock, a release cut, and raw side-effecting tools; modules/kernel/command-policy.yaml is the one rule table read by both the PreToolUse guard and the PATH shim. | runtime |
+| R224 | `RIGHTS_PROTECTED_ZONE` | The protected zone declared once in modules/kernel/protected-zone.yaml is edited only by the owner path; a supervisor self-upgrade files an owner proposal, and an op never writes the .claude runtime checkout. | runtime |
+| R225 | `RT_HOOK_SHAPE` | The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags) and runs no npm test, jest, typecheck or lint. | runtime |
 <!-- hfs:generated-end rules -->

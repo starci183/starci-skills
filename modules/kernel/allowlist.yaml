@@ -513,6 +513,8 @@ dead-script-entries:
     reason: "validator CLI (docs/verify-proof.md); a spec reads it"
   - path: scripts/work/validate/work-change.mjs
     reason: "validator CLI of work records (docs); a spec reads it"
+  - path: scripts/guards/git-hooks.mjs
+    reason: "generated runtime hook installer with no current code importer; the CLI lane's `starci runtime link` verb is its future reader"
 
 # Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
 export-used: []
