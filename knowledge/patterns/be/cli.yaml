@@ -8,6 +8,7 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+pattern: cli
 provenance:
   reviewedAt: 2026-10-02
   sources:
@@ -24,8 +25,8 @@ rules:
     kind: mandatory
     hfsRules: [R136, R90, R46]
     requirement: |-
-      `features/cli/<command>/transport/cli/<name>.cli.ts` is registered through `platform/cli`, maps the arguments and flags to a request,
-      dispatches exactly one command or query on the bus and prints the typed result; it holds no business decision. Only an app of kind `cli`
+      `features/cli/<command>/transport/cli/<name>.cli.ts` is registered with `platform/cli` (the registry its cli module hands the entry to), maps the arguments and flags to a request,
+      dispatches exactly one command or query on the bus and answers an exit code; it holds no business decision. Only an app of kind `cli`
       composes it, and it imports no feature of another kind. A command that must be safe to run twice says so in its handler through an
       idempotent write, and a long operation enqueues a job (queues.yaml) instead of looping in the shell.
     rationale: |-
@@ -62,28 +63,61 @@ rules:
       manual: []
     relatedExamples: [cli]
 files:
+  - path: src/modules/platform/cli/index.ts
+    slot: be.platform.cli
+    role: The public surface of the command line capability.
+    template: cli/platform/cli.index.ts.tpl
+  - path: src/modules/platform/cli/cli.module.ts
+    slot: be.platform.cli
+    template: cli/platform/cli.module.ts.tpl
+  - path: src/modules/platform/cli/cli.port.ts
+    slot: be.platform.cli
+    template: cli/platform/cli.port.ts.tpl
+  - path: src/modules/platform/cli/cli.contracts.ts
+    slot: be.platform.cli
+    template: cli/platform/cli.contracts.ts.tpl
+  - path: src/modules/platform/cli/cli.decorators.ts
+    slot: be.platform.cli
+    template: cli/platform/cli.decorators.ts.tpl
+  - path: src/modules/platform/cli/cli-runner.service.ts
+    slot: be.platform.cli
+    role: Keeps the registered commands and runs the one the operator names.
+    template: cli/platform/cli-runner.service.ts.tpl
+  - path: src/modules/platform/cli/cli-runner.service.spec.ts
+    slot: be.platform.cli
+    template: cli/platform/cli-runner.service.spec.ts.tpl
   - path: src/features/cli/<command>/index.ts
     slot: be.feature.cli
     role: The public surface of the command; only a cli app imports it.
+    template: cli/command.index.ts.tpl
   - path: src/features/cli/<command>/<command>.module.ts
     slot: be.feature.cli
-    role: Composes the application and the cli transport.
+    role: Composes the application of the command.
+    template: cli/command.module.ts.tpl
   - path: src/features/cli/<command>/application/<action>.command.ts
     slot: be.feature.application
-    role: The command (or `.query.ts`) the entry dispatches.
+    role: The command (or a `.query.ts`) the entry dispatches.
+    template: cli/application.command.ts.tpl
   - path: src/features/cli/<command>/application/<action>.handler.ts
     slot: be.feature.application
-    role: Authorizes, then calls the domain service of its context.
+    role: Calls the domain service of its context.
+    template: cli/application.handler.ts.tpl
   - path: src/features/cli/<command>/application/<action>.contracts.ts
     slot: be.feature.application
     role: The plain request and result types of the action.
-  - path: src/features/cli/<command>/transport/cli/<name>.cli.ts
+    template: cli/application.contracts.ts.tpl
+  - path: src/features/cli/<command>/transport/cli/<command>.cli.ts
     slot: be.feature.transport.cli
-    role: The entry maps arguments, dispatches one message and prints the result.
+    role: The entry maps arguments, dispatches one message and answers the exit code.
+    template: cli/cli.cli.ts.tpl
     rules: [BE_TRANSPORT_SHAPE, BE_ENTRYPOINT_ONLY_IN_APPS]
   - path: src/features/cli/<command>/transport/cli/<command>-cli.module.ts
     slot: be.feature.transport.cli
-    role: One module for the cli transport of the command.
+    role: One module for the cli transport of the command; it registers the entry with the command line.
+    template: cli/cli.module.ts.tpl
   - path: src/tests/e2e/<area>/<command>.e2e-spec.ts
     slot: be.tests.e2e
     role: The command run on the booted cli app, with its effect, a repeat and a bad argument.
+    optional: true
+    spec: cli/effect-then-exit-zero, cli/repeat-is-safe, cli/bad-argument-exits-nonzero
+    rules: [BE_PATTERN_SPEC_MISSING]

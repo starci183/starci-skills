@@ -110,48 +110,63 @@ files:
     slot: be.feature
     role: The public surface of the feature; only apps import it.
     rules: [BE_PUBLIC_SURFACE]
+    template: api/feature.index.ts.tpl
   - path: src/features/<feature>/<feature>.module.ts
     slot: be.feature
-    role: Composes the application and the transport modules.
+    role: Composes the application handlers.
+    template: api/feature.module.ts.tpl
   - path: src/features/<feature>/application/<action>.command.ts
     slot: be.feature.application
     role: One command (or `.query.ts`) carrying one `params` field.
+    template: api/application.command.ts.tpl
   - path: src/features/<feature>/application/<action>.handler.ts
     slot: be.feature.application
-    role: Overrides `process`, authorizes, then calls the domain service of its context.
+    role: Overrides `process` and calls the domain service of its context.
+    template: api/application.handler.ts.tpl
   - path: src/features/<feature>/application/<action>.contracts.ts
     slot: be.feature.application
     role: The plain request and result types of the action.
+    template: api/application.contracts.ts.tpl
   - path: src/features/<feature>/transport/graphql/<action>.resolver.ts
     slot: be.transport.graphql
     role: The GraphQL door of one operation; dispatches one message.
     rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
+    template: api/graphql.resolver.ts.tpl
   - path: src/features/<feature>/transport/graphql/dto/<action>.input.ts
     slot: be.transport.graphql
     role: The bounded input of the operation.
     rules: [BE_INPUT_BOUNDED]
+    template: api/graphql.input.ts.tpl
   - path: src/features/<feature>/transport/graphql/dto/<action>.type.ts
     slot: be.transport.graphql
     role: The typed output of the operation.
+    template: api/graphql.type.ts.tpl
   - path: src/features/<feature>/transport/graphql/<action>.mapper.ts
     slot: be.transport.graphql
     role: Maps the input to the request and the result to the type.
+    template: api/graphql.mapper.ts.tpl
   - path: src/features/<feature>/transport/graphql/<feature>-graphql.module.ts
     slot: be.transport.graphql
     role: One module for the whole GraphQL transport of the feature.
+    template: api/graphql.module.ts.tpl
   - path: src/features/<feature>/transport/http/<action>.controller.ts
     slot: be.transport.http
     role: A REST door, only where GraphQL cannot serve (health, byte streams, the operation route).
+    optional: true
     rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
   - path: src/features/<feature>/transport/http/<feature>-http.module.ts
     slot: be.transport.http
     role: One module for the whole HTTP transport of the feature.
+    optional: true
   - path: src/features/<feature>/messages/<feature>.messages.ts
     slot: be.feature.messages
     role: The keyed vi and en text of the feature.
+    optional: true
   - path: contracts/<app>/schema.graphql
     slot: be.contract.graphql
     role: The emitted GraphQL snapshot of the app; a stale file fails the full check.
+    optional: true
   - path: src/tests/e2e/<area>/<action>.e2e-spec.ts
     slot: be.tests.e2e
     role: The operation on the booted app, refusal and unauthenticated call included.
+    optional: true

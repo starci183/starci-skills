@@ -11,7 +11,7 @@
  *          (the constructed TYPE decides, not a `*Error` name); the built-in `Error` family itself is left for
  *          internal invariants;
  *       2. a `subject`/`title`/`body`/`text`/`message` property of an object handed to an outbound port - a call on a
- *          receiver whose type is declared by an `integrations` owner or by `platform/messaging` (the receiver's type
+ *          receiver whose type is declared by an `integrations` owner or by `platform/event-bus` or `platform/queue` (the receiver's type
  *          decides, not a method name such as `send`);
  *       3. a `message`/`description`/`title` property of an object literal built in a transport slot.
  *
@@ -52,9 +52,9 @@ const isCustomError = (program, checker, type) => {
     return extendsError(type)
 }
 
-/** Whether a receiver's type is declared by an `integrations` owner or by `platform/messaging`: an outbound port. */
+/** Whether a receiver's type is declared by an `integrations` owner or by `platform/event-bus` or `platform/queue`: an outbound port. */
 const isOutboundPort = (context, hfs, node) =>
-    typeOrigins(context, node).some((origin) => origin.module === null && (hfs.tierOf(origin.file) === "integrations" || (hfs.tierOf(origin.file) === "platform" && ownerNameOf(hfs, origin.file) === "messaging")))
+    typeOrigins(context, node).some((origin) => origin.module === null && (hfs.tierOf(origin.file) === "integrations" || (hfs.tierOf(origin.file) === "platform" && ["event-bus", "queue"].includes(ownerNameOf(hfs, origin.file) ?? ""))))
 
 /** User-facing text is looked up in the catalog by key, never written where it is used. */
 export const userCopyThroughCatalog = {

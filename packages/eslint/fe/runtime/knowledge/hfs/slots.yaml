@@ -131,8 +131,8 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/queue, platform/messaging]   # platform/messaging: interim BullMQ transport of the ecommerce example until platform/event-bus lands; pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
-      "@nestjs/bullmq": [platform/queue, platform/messaging]
+      bullmq: [platform/queue]               # pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
+      "@nestjs/bullmq": [platform/queue]
       kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
       "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
       eventemitter2: []
@@ -179,6 +179,7 @@ ruleParams:
       queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
       fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
       projection: [recompute-is-idempotent, replay-rebuilds]
+      cli: [effect-then-exit-zero, repeat-is-safe, bad-argument-exits-nonzero]
     # BE_KIND_DECLARATION: the patterns an app that uses a trigger kind declares in hfs.json sides.be.patterns; the platform capabilities of those
     # patterns (the slots of tier platform that name the pattern) must exist.
     kindPatterns:
@@ -187,7 +188,7 @@ ruleParams:
       realtime: []
       reactors: [event-bus]
       jobs: [fenced-job, queue]
-      cli: []
+      cli: [cli]
     # hfs add <noun> <name>: the pattern topic (knowledge/patterns/be/<topic>.yaml) whose files tree is generated, the path variable of the
     # instance, what it registers in hfs.json, the options it needs (--<option>), the other nouns generated with it under the same name (a job is
 # the consumer of its queue, so `also: [queue]`) and the defaults of the other variables ("@name" = the name).
@@ -196,6 +197,8 @@ ruleParams:
       reactor: {topic: reactors, variable: reactor, trigger: reactors, patterns: [event-bus], needs: [event, from, service], defaults: {action: "@name"}}
       queue: {topic: queues, variable: queue, patterns: [queue]}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
+      api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
+      cli: {topic: cli, variable: command, trigger: cli, patterns: [cli], needs: [service], defaults: {action: "@name"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -949,7 +952,8 @@ slots:
   - id: be.feature.cli
     profiles: [be]
     path: "src/features/cli/<command>/"
-    presence: optional            # an operator command line: dispatches one command or query, composed only by an app of kind cli
+    presence: opt-in              # an operator command line: dispatches one command or query, composed only by an app of kind cli
+    pattern: cli                  # declaring the pattern (hfs.json sides.be.patterns) enables the kind and its platform capability (knowledge/patterns/be/cli.yaml)
     trigger: cli
     tracked: tracked
     tier: feature
@@ -1006,6 +1010,18 @@ slots:
     tests: unit-beside
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
+  - id: be.platform.cli
+    profiles: [be]
+    path: "src/modules/platform/cli/"
+    presence: opt-in
+    pattern: cli                  # the command line of an app of kind cli: a registry the command modules register with and the runner the app entry calls
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, cli.module.ts, cli.port.ts, cli.contracts.ts, cli-runner.service.ts, cli-runner.service.spec.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   - id: be.projections
     profiles: [be]
     path: "src/modules/projections/<name>/"

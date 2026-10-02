@@ -37,7 +37,7 @@
 //                                            one placeholder it per public method. Never overwrites a file.
 //   hfs new spec <file>.service.ts [--repo <dir>]
 //                                            the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
-//   hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
+//   hfs add <api|cli|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
 //                                            it registers the patterns and the trigger kind in hfs.json (sides.be.patterns, sides.be.kinds). Never overwrites a file (scaffold/add.mjs).
@@ -70,7 +70,7 @@ hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
-hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
+hfs add <api|cli|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection']);

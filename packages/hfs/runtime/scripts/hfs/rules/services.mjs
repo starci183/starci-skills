@@ -8,8 +8,7 @@
 //   R145 HFS_SERVICE_STACK_DECLARATION  each api or worker app of a multi-service product is a `role: service` component of the stack;
 //   R146 HFS_EVENT_CONTRACT         the async contract is vendored: `be/contracts/<service>/events.json` equals the provider's
 //                                   `apps/<service>/src/events.ts` table (an event may declare `compensates: "<event>"`), every event a
-//                                   consumer's `apps/<app>/src/consumes.ts` names exists in that snapshot at the same version, and every queue
-//                                   a consumer defines with `defineQueue` of platform/messaging is listed in a consumes table;
+//                                   consumer's `apps/<app>/src/consumes.ts` names exists in that snapshot at the same version;
 //   R147 BE_ASYNC_SPEC_MISSING      every consumed event (a consumes.ts entry) is named by an e2e spec through `useTestWorld`; the spec of a
 //                                   saga step (an event whose contract says `compensates`) also names the compensated event, so the whole
 //                                   flow is driven, not the undo alone.

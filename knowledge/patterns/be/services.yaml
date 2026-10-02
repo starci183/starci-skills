@@ -79,8 +79,7 @@ rules:
       is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
       and its snapshot `be/contracts/<service>/events.json` (`starci/event-contract@1`), emitted by `npm run contract:emit`. A
       consumer states what it reads in the literal `CONSUMES` table of `apps/<app>/src/consumes.ts` (service, event, version); each
-      entry must exist in the provider's snapshot at that version, and every queue a consumer defines with `defineQueue` of
-      `platform/messaging` is listed in a consumes table. A breaking change bumps the event version in the provider and
+      entry must exist in the provider's snapshot at that version. A breaking change bumps the event version in the provider and
       fails every consumer that has not followed.
     rationale: |-
       The consumer is judged against the provider's committed contract, not against the provider's source, so a change in either is a
