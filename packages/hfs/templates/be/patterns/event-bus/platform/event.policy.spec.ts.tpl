@@ -14,8 +14,8 @@ import {
     topicOf,
 } from "./event.policy"
 
-describe("event policy", () => {
-    it("declares the delivery budget and protocol headers", () => {
+describe("event policies", () => {
+    it("declares the delivery and wire constants", () => {
         expect({
             attempts: ATTEMPTS,
             backoffMs: BACKOFF_MS,
@@ -37,17 +37,31 @@ describe("event policy", () => {
         })
     })
 
-    it("derives the service and every topic from the event name", () => {
-        expect(serviceOf("orders.placed")).toBe("orders")
-        expect(serviceOf("orders")).toBe("orders")
-        expect(topicOf("run-1.", "orders.placed")).toBe("run-1.events.orders")
-        expect(retryTopicOf("run-1.", "orders.placed")).toBe("run-1.events.orders.retry")
-        expect(deadLetterTopicOf("run-1.", "orders.placed")).toBe("run-1.events.orders.dlq")
+    it.each([
+        ["order.created", "order"],
+        ["order", "order"],
+        ["", ""],
+    ])("reads the service of %s", (eventName, service) => {
+        expect(serviceOf(eventName)).toBe(service)
     })
 
-    it("doubles the retry backoff after every failed attempt", () => {
-        expect(backoffMs(1)).toBe(500)
-        expect(backoffMs(2)).toBe(1000)
-        expect(backoffMs(4)).toBe(4000)
+    it("builds the main topic from the prefix and event service", () => {
+        expect(topicOf("run-1.", "order.created")).toBe("run-1.events.order")
+    })
+
+    it("builds the retry topic from the main topic", () => {
+        expect(retryTopicOf("run-1.", "order.created")).toBe("run-1.events.order.retry")
+    })
+
+    it("builds the dead-letter topic from the main topic", () => {
+        expect(deadLetterTopicOf("run-1.", "order.created")).toBe("run-1.events.order.dlq")
+    })
+
+    it.each([
+        [1, 500],
+        [2, 1000],
+        [4, 4000],
+    ])("doubles the backoff after delivery %i", (attempt, delay) => {
+        expect(backoffMs(attempt)).toBe(delay)
     })
 })

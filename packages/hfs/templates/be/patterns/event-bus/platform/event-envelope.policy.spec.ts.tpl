@@ -23,13 +23,7 @@ const buildPing = (eventId: string, payload: PingPayload): PingEvent => new Ping
 describe("event envelope policies", () => {
     describe("readEnvelope", () => {
         it("reads the event id and payload of an envelope", () => {
-            expect(
-                readEnvelope({
-                    eventId: "event-1",
-                    payload: { note: "hello" },
-                    ignored: true,
-                }),
-            ).toEqual({
+            expect(readEnvelope({ eventId: "event-1", payload: { note: "hello" }, ignored: true })).toEqual({
                 eventId: "event-1",
                 payload: { note: "hello" },
             })
@@ -46,11 +40,7 @@ describe("event envelope policies", () => {
 
     describe("readEnvelopeText", () => {
         it("parses an envelope and names its event", () => {
-            const envelope = {
-                eventId: "event-1",
-                eventName: "probe.ping",
-                payload: { note: "hello" },
-            }
+            const envelope = { eventId: "event-1", eventName: "probe.ping", payload: { note: "hello" } }
 
             expect(readEnvelopeText(JSON.stringify(envelope))).toEqual({
                 eventName: "probe.ping",
@@ -62,10 +52,7 @@ describe("event envelope policies", () => {
         it.each([JSON.stringify([]), JSON.stringify({ eventName: 1 })])(
             "keeps a parsed JSON value without a text event name unnamed",
             (value) => {
-                expect(readEnvelopeText(value)).toMatchObject({
-                    eventName: "",
-                    cause: null,
-                })
+                expect(readEnvelopeText(value)).toMatchObject({ eventName: "", cause: null })
             },
         )
 
