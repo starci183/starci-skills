@@ -142,6 +142,7 @@ ruleParams:
       - {id: clones, run: scripts/checks/check-clones.mjs}
       - {id: export-used, run: scripts/checks/check-export-used.mjs}
       - {id: env, run: scripts/checks/check-env.mjs}
+      - {id: specs, run: scripts/checks/check-specs.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
