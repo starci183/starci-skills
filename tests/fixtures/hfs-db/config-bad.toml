@@ -1,0 +1,17 @@
+# supabase/config.toml violating L08: literal credentials, an over-long JWT, and auth values the app did not declare.
+[api]
+enabled = true
+schemas = ["public"]
+
+[auth]
+site_url = "https://undeclared.example.com"
+jwt_expiry = 86400
+enable_signup = true
+additional_redirect_urls = ["https://evil.example.com"]
+
+[auth.external.github]
+client_id = "literal-client-id"
+secret = "literal-secret"
+
+[auth.external.apple]
+secret = "env(APPLE_SECRET)"
