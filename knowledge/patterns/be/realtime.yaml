@@ -34,7 +34,7 @@ rules:
       `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `<channel>-realtime.module.ts`, ONE door and its spec: either
       `<channel>.gateway.ts` (one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`) with
       `<channel>.gateway.spec.ts`, or `<x>.subscription.ts` (one `@Resolver` class whose operations are `@Subscription`) with
-      `<x>.subscription.spec.ts`, plus optional `dto/` (`<name>.{args,type}.ts`). A door carries no query, mutation, field
+      `<x>.subscription.spec.ts`, plus optional `dto/` (`<name>.{input,type,args}.ts`). A door carries no query, mutation, field
       resolver or REST route. The kind imports only `modules/*`, never another kind, and only an api-kind app composes its module.
     rationale: |-
       One file per door keeps a protocol's machinery in one place, and keeping queries and mutations out guarantees that what a

@@ -797,7 +797,7 @@ slots:
     pattern: realtime
     tracked: tracked
     tier: feature
-    allows: ["<name>.{args,type}.ts"]
+    allows: ["<name>.{input,type,args}.ts"]
     tests: none
     composedBy: [api]
     rules: [BE_INPUT_BOUNDED]
