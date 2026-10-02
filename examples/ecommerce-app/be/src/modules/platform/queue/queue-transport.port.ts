@@ -14,22 +14,42 @@ export interface QueueTransport {
     close(): Promise<void>
 }
 
+/** The Redis a driver object connects to. */
+export interface BullmqRedis {
+    /** The host. */
+    readonly host: string
+    /** The port. */
+    readonly port: number
+    /** BullMQ answers to commands only through a client that does not retry on its own. */
+    readonly maxRetriesPerRequest: number | null
+}
+
 /** The Redis options every queue and worker of the app shares. */
 export interface BullmqConnection {
     /** The key prefix of the app. */
     readonly prefix: string
     /** The Redis the driver connects to. */
-    readonly connection: {
-        readonly host: string
-        readonly port: number
-        readonly maxRetriesPerRequest: number | null
-    }
+    readonly connection: BullmqRedis
 }
 
 /** The options a worker is built with: the shared connection plus its concurrency. */
 export interface BullmqWorkerOptions extends BullmqConnection {
     /** How many jobs the worker runs at a time. */
     readonly concurrency: number
+}
+
+/** The wait between two tries of a job. */
+export interface BullmqBackoff {
+    /** The backoff shape. */
+    readonly type: string
+    /** The first wait, in milliseconds. */
+    readonly delay: number
+}
+
+/** How long a finished job is kept. */
+export interface BullmqRetention {
+    /** The seconds a finished job is kept. */
+    readonly age: number
 }
 
 /** The options the transport fixes on every job it adds. */
@@ -39,9 +59,15 @@ export interface BullmqJobOptions {
     /** How many times BullMQ tries the job. */
     readonly attempts: number
     /** The wait between two tries. */
-    readonly backoff: { readonly type: string; readonly delay: number }
+    readonly backoff: BullmqBackoff
     /** How long a finished job is kept. */
-    readonly removeOnComplete: { readonly age: number }
+    readonly removeOnComplete: BullmqRetention
+}
+
+/** The options a scheduler fixes on the jobs it fires. */
+export interface BullmqSchedulerJobOptions {
+    /** How many times BullMQ tries the tick. */
+    readonly attempts: number
 }
 
 /** The job a scheduler fires. */
@@ -51,7 +77,7 @@ export interface BullmqJobTemplate {
     /** The payload of every tick. */
     readonly data: object
     /** The options of every tick. */
-    readonly opts: { readonly attempts: number }
+    readonly opts: BullmqSchedulerJobOptions
 }
 
 /** A queue as the transport uses it. */

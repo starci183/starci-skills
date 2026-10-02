@@ -7,7 +7,7 @@
  * call into the modules (a service, the command or query bus, the event bus, a queue producer). No branch,
  * loop, `try` or `throw` on business data and no computation lives in it - the logic belongs to the modules,
  * where every file is unit-covered at 100, and orchestration (step order, compensation, claim, fencing,
- * retry) belongs to the platform. A `mapper` file holds only property mapping: `*.mapper.ts` calls and `new`
+ * retry) belongs to the platform. A `mapper` file holds only property mapping: `*.mapper.ts` calls, `new`, and the shape conversions `map` and `toISOString`
  * expressions, no delegating call at all.
  *
  * Kind comes from the SLOT and the TIER (`hfs.tierOf(filename)`, `hfs.ruleParams.thinRoles`), the role from
@@ -55,6 +55,9 @@ const roleOf = (filename) => /\.([a-z][a-z0-9-]*)\.ts$/.exec(baseName(filename))
 
 /** The `WebhookSignatureService` of `platform/http-security` - the `verify` a webhook door may call. */
 const isSignatureReceiver = (context, node) => isOwnedType(context, node, { name: "WebhookSignatureService", capability: "http-security", tier: "platform" })
+
+/** The shape conversions a mapper may make on a value it received: a collection mapped item by item and a date written as text. They decide nothing and compute nothing. */
+const MAPPER_SHAPE_METHODS = new Set(["map", "toISOString"])
 
 /** The `JobClaims` port of `platform/jobs` - the fence a job step records itself through (`advance`, `runKey`): bookkeeping the fenced-job pattern requires, free beside the step's one delegating call. */
 const isClaimsReceiver = (context, node) => isOwnedType(context, node, { name: "JobClaims", capability: "jobs", tier: "platform" })
@@ -154,6 +157,10 @@ export const featureThin = {
         const classify = (call) => {
             const callee = call.callee
             if (callee.type === "Identifier" && isMapperCall(callee)) return "free"
+            const member = callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee : null
+            if (mapperFile && member !== null && MAPPER_SHAPE_METHODS.has(member.property.name) && injectedMemberOf(member.object, call) === null) return "free"
+            // a cli group command shows its help without a sub-command: the `help` of the command nest-commander gives it
+            if (role === "cli" && member !== null && member.property.name === "help" && member.object.type === "MemberExpression" && member.object.object.type === "ThisExpression" && member.object.property.type === "Identifier" && member.object.property.name === "command") return "free"
             if (mapperFile) return "call"
             if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && injectedMemberOf(callee.object, call) !== null) {
                 if (isLoggerReceiver(context, callee.object)) return "free"

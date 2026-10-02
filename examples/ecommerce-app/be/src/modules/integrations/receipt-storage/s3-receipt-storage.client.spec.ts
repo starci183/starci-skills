@@ -4,10 +4,10 @@ import { CLOCK } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
 import { HTTP_CLIENT, HttpError, HttpErrorCode } from "@modules/platform/http"
 import type { HttpClient } from "@modules/platform/http"
-import { isRunKey } from "@modules/platform/jobs/jobs.contracts"
+import { isRunKey } from "@modules/platform/jobs"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { ReceiptStorageErrorCode } from "./errors/receipt-storage.error"
+import { ReceiptStorageError, ReceiptStorageErrorCode } from "./errors/receipt-storage.error"
 import { RECEIPT_STORAGE_OPTIONS } from "./receipt-storage.decorators"
 import { ReceiptStorageLogEvent } from "./receipt-storage.log-events"
 import type { ReceiptStorageOptions } from "./receipt-storage.options"
@@ -15,7 +15,7 @@ import { S3ReceiptStorageClient } from "./s3-receipt-storage.client"
 
 const AT = "2026-10-01T12:00:00.000Z"
 const RUN_KEY_TEXT = "job-1:store-receipt:7"
-if (!isRunKey(RUN_KEY_TEXT)) throw new Error("the test run key must be valid")
+if (!isRunKey(RUN_KEY_TEXT)) throw new ReceiptStorageError({ code: ReceiptStorageErrorCode.Unavailable })
 const RUN_KEY = RUN_KEY_TEXT
 
 const options: ReceiptStorageOptions = {

@@ -80,6 +80,18 @@ export type KafkaConsumerSubscription =
     | { readonly topics: Array<string>; readonly fromBeginning?: boolean }
     | { readonly topic: string; readonly fromBeginning?: boolean }
 
+/** The record of a consumed message as the driver hands it over. */
+export interface KafkaConsumedRecord {
+    /** The offset on the partition, as text. */
+    readonly offset: string
+    /** The partition key. */
+    readonly key: Buffer | null
+    /** The serialized value. */
+    readonly value: Buffer | null
+    /** The headers; a message of the old wire format has none. */
+    readonly headers?: KafkaMessageHeaders
+}
+
 /** A message as the driver hands it to the eachMessage callback. */
 export interface KafkaConsumedMessage {
     /** The topic the message was read from. */
@@ -87,16 +99,7 @@ export interface KafkaConsumedMessage {
     /** The partition. */
     readonly partition: number
     /** The record. */
-    readonly message: {
-        /** The offset on the partition, as text. */
-        readonly offset: string
-        /** The partition key. */
-        readonly key: Buffer | null
-        /** The serialized value. */
-        readonly value: Buffer | null
-        /** The headers; a message of the old wire format has none. */
-        readonly headers?: KafkaMessageHeaders
-    }
+    readonly message: KafkaConsumedRecord
 }
 
 /** The callbacks a consumer runs per message; the only one the transport sets. */

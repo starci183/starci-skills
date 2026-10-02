@@ -118,6 +118,22 @@ export class Door {
     }
 }`,
             },
+            // a mapper may map a collection item by item and write a date as text: shape conversions that decide nothing
+            {
+                filename: MAPPER,
+                code: `export const toCart = (view: { items: Array<{ id: string }>; at: Date }) => ({ lines: view.items.map((item) => ({ id: item.id })), at: view.at.toISOString() })`,
+            },
+            // a cli group command shows its help through the command nest-commander gives it
+            {
+                filename: CLI,
+                code: `export class Door {
+    command = { help: () => undefined }
+
+    async run(): Promise<void> {
+        this.command.help()
+    }
+}`,
+            },
             // a mapper maps properties and calls another mapper
             {
                 filename: MAPPER,
@@ -184,6 +200,8 @@ export class Door {
             { filename: DECLARATION_FILE, code: `export declare const x: number` },
         ],
         invalid: [
+            // the shape conversions are a mapper's: any other call on a value is still refused there
+            { filename: MAPPER, code: `export const toId = (input: { ids: Array<string> }) => ({ first: input.ids.reduce((a, b) => a + b, "") })`, errors: [{ messageId: "call" }, { messageId: "compute" }] },
             // the JobClaims fence is free only in a job step: a processor that calls it and a service is orchestrating
             {
                 filename: PROCESSOR,

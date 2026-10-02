@@ -88,9 +88,8 @@ describe("BullmqQueueTransportClient", () => {
             concurrency: 3,
         })
         const processor = factory.worker.mock.calls[0]?.[1]
-        if (typeof processor !== "function") throw new Error("expected a BullMQ processor")
-        await processor(mock<BullmqJob>({ id: "job-1", data: { orderId: "order-1" }, attemptsMade: 2 }))
-        await processor(mock<BullmqJob>({ id: undefined, data: { orderId: "order-2" }, attemptsMade: 0 }))
+        await processor?.(mock<BullmqJob>({ id: "job-1", data: { orderId: "order-1" }, attemptsMade: 2 }))
+        await processor?.(mock<BullmqJob>({ id: undefined, data: { orderId: "order-2" }, attemptsMade: 0 }))
 
         expect(handler.handle).toHaveBeenNthCalledWith(1, {
             id: "job-1",

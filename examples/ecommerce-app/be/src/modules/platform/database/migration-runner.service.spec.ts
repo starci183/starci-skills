@@ -48,7 +48,10 @@ describe("MigrationRunnerService", () => {
             ["identity", identity],
             ["order", order],
         ])
-        const { runner, logger } = await build([connection("identity"), connection("order")], (target) => sources.get(target.name) ?? source([]))
+        const { runner, logger } = await build(
+            [connection("identity"), connection("order")],
+            (target) => sources.get(target.name) ?? source([]),
+        )
 
         await runner.run()
 

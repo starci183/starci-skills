@@ -4,8 +4,7 @@ import { Secret } from "@modules/platform/config"
 import type { CacheKey } from "./cache.contracts"
 import { RedisCacheClient } from "./redis-cache.client"
 import { CacheErrorCode } from "./errors/cache.error"
-import { REDIS_FACTORY } from "./cache.decorators"
-import { MODULE_OPTIONS_TOKEN } from "./cache.module-definition"
+import { CACHE_OPTIONS, REDIS_FACTORY } from "./cache.decorators"
 import type { CacheOptions } from "./cache.options"
 import type { RedisDriver, RedisFactory } from "./cache.port"
 
@@ -29,7 +28,7 @@ const build = async (status: RedisDriver["status"] = "wait") => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             RedisCacheClient,
-            { provide: MODULE_OPTIONS_TOKEN, useValue: options },
+            { provide: CACHE_OPTIONS, useValue: options },
             { provide: REDIS_FACTORY, useValue: factory },
         ],
     }).compile()

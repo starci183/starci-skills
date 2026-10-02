@@ -11,7 +11,7 @@ const claimedJob: ClaimedJob = {
 
 class MailProcessor extends FencedProcessor {
     readonly queue = "mail"
-    readonly processed: ClaimedJob[] = []
+    readonly processed: Array<ClaimedJob> = []
 
     process(job: ClaimedJob): Promise<void> {
         this.processed.push(job)

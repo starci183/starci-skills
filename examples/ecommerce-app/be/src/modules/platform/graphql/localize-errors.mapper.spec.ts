@@ -1,12 +1,18 @@
 import type { GraphQLRequestContext, GraphQLRequestContextWillSendResponse, GraphQLResponse } from "@apollo/server"
 import { mock } from "@starci/jest-preset"
 import type { GraphQLFormattedError } from "graphql"
+import { DomainError } from "@modules/platform/errors"
 import type { ErrorsService } from "@modules/platform/errors"
 import type { RequestLocale } from "@modules/platform/i18n"
 import type { GraphqlContext } from "./graphql.contracts"
 import { localizeError, localizeErrorsPlugin } from "./localize-errors.mapper"
 
 type IncrementalBody = Extract<GraphQLResponse["body"], { kind: "incremental" }>
+
+type SpecErrorCode = "SPEC_INVARIANT"
+
+/** The failure of a spec invariant that cannot fire while the subject keeps its contract. */
+class SpecError extends DomainError<SpecErrorCode> {}
 
 const singleResponse = (errors?: ReadonlyArray<GraphQLFormattedError>): GraphQLResponse =>
     mock<GraphQLResponse>({ body: { kind: "single", singleResult: { errors } } })
@@ -36,7 +42,7 @@ const sendResponse = async (
         mock<GraphQLRequestContext<GraphqlContext>>(),
     )
     if (listener === undefined || listener === null || listener.willSendResponse === undefined) {
-        throw new Error("the plugin did not register willSendResponse")
+        throw new SpecError({ code: "SPEC_INVARIANT" })
     }
     await listener.willSendResponse(context)
 }
@@ -124,7 +130,7 @@ describe("localizeErrorsPlugin", () => {
 
         expect(requestLocale.of).toHaveBeenCalledWith("en-US,en;q=0.9")
         expect(errors.text).toHaveBeenCalledWith("ORDER_NOT_FOUND", { orderId: "o-1" }, "en")
-        if (response.body.kind !== "single") throw new Error("the response stopped being a single result")
+        if (response.body.kind !== "single") throw new SpecError({ code: "SPEC_INVARIANT" })
         expect(response.body.singleResult.errors).toEqual([unchanged, { ...coded, message: "The order was not found" }])
     })
 })

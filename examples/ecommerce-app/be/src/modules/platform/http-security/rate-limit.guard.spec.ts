@@ -2,7 +2,7 @@ import type { ExecutionContext } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
 import type { ThrottlerStorage } from "@nestjs/throttler"
 import { mock } from "@starci/jest-preset"
-import { HttpSecurityErrorCode } from "./errors/http-security.error"
+import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import type { OperationRequest } from "./http-security.contracts"
 import type { RateLimitOptions } from "./http-security.options"
 import { RateLimit, RateLimitGuard, RateTier, throttlerOptionsOf } from "./rate-limit.guard"
@@ -37,9 +37,13 @@ const build = async () => {
 
 const configuredTiers = () => {
     const options = throttlerOptionsOf(rateLimit)
-    if (Array.isArray(options)) throw new Error("expected named throttler options")
+    if (Array.isArray(options)) {
+        throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid })
+    }
     const [defaultTier, strictTier] = options.throttlers
-    if (defaultTier === undefined || strictTier === undefined) throw new Error("expected both rate tiers")
+    if (defaultTier === undefined || strictTier === undefined) {
+        throw new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid })
+    }
     return { options, defaultTier, strictTier }
 }
 
