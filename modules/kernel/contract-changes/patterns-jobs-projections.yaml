@@ -1,11 +1,11 @@
 id: patterns-jobs-projections
 effectiveAt: '2026-10-02T16:00:00+07:00'
 summary: >-
-  Lane PATTERNS (lead C1), unit U3: fenced jobs, projections and reactors. R137 BE_JOB_WRITE_OUTSIDE_OWNER (ESLint `job-write-owner`) keeps the
-  job row writable only by platform/jobs, R138 BE_JOB_FENCE_REQUIRED (`job-fence-required`) requires expectedFencingToken in the type of every
-  guarded write, forbids casting around it and a catch that hides JobFencedOut, R139 BE_JOB_RUN_KEY (`job-run-key`) makes every integration call
-  of a step carry the RunKey made by JobClaims.runKey, R140 BE_JOB_SHAPE (`job-shape`) fixes the processor and step shape, R141
-  BE_PROJECTION_WRITE_OWNER (`projection-write-owner`) and R142 BE_PROJECTION_SHAPE (`projection-shape`) fix the read-model writer and the
+  Lane PATTERNS (lead C1), unit U3: fenced jobs, projections and reactors. R142 BE_JOB_WRITE_OUTSIDE_OWNER (ESLint `job-write-owner`) keeps the
+  job row writable only by platform/jobs, R143 BE_JOB_FENCE_REQUIRED (`job-fence-required`) requires expectedFencingToken in the type of every
+  guarded write, forbids casting around it and a catch that hides JobFencedOut, R144 BE_JOB_RUN_KEY (`job-run-key`) makes every integration call
+  of a step carry the RunKey made by JobClaims.runKey, R145 BE_JOB_SHAPE (`job-shape`) fixes the processor and step shape, R146
+  BE_PROJECTION_WRITE_OWNER (`projection-write-owner`) and R147 BE_PROJECTION_SHAPE (`projection-shape`) fix the read-model writer and the
   recompute/get vocabulary. Slots be.platform.jobs, be.jobs.steps, be.projections (opt-in, patterns fenced-job and projection), the
   kind roots be.feature.jobs and be.feature.reactors; ruleParams.be.patternScenarios gains fenced-job and projection. The schedule transport
   (be.transport.schedule, *.job.ts, platform/scheduling) is DELETED: a schedule is a BullMQ job scheduler of a queue, and BE_BACKGROUND_UNOWNED

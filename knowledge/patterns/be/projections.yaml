@@ -25,7 +25,7 @@ rules:
   - id: BE-PROJECTIONS-1
     title: Only the projection writes its table
     kind: mandatory
-    hfsRules: [R141]
+    hfsRules: [R146]
     requirement: |-
       The entity of a projection (`<name>.projection-entity.ts`) is written only by `<name>.projection.ts` of the same folder:
       no domain service, handler, reactor, job or other projection writes it. Its table, migrations and connection registration
@@ -47,7 +47,7 @@ rules:
   - id: BE-PROJECTIONS-2
     title: A projection speaks recompute and get, and hides its entity
     kind: mandatory
-    hfsRules: [R142]
+    hfsRules: [R147]
     requirement: |-
       Every public method of the projection class is `recompute*` (an idempotent write from the source facts that can replay from
       scratch) or `get*` (a read). The `index.ts` of the projection exports the class and its contracts, never the entity. A feature
@@ -68,7 +68,7 @@ rules:
   - id: BE-PROJECTIONS-3
     title: A projection publishes nothing and is kept current by a reactor or a job
     kind: mandatory
-    hfsRules: [R132, R136]
+    hfsRules: [R137, R141]
     requirement: |-
       A projection never publishes an event or enqueues a job (`eventBus.publish` and queue producers are refused outside
       `modules/domain`). A reactor under `features/reactors/<name>-projection/` consumes the source event and dispatches a command
@@ -90,7 +90,7 @@ rules:
   - id: BE-PROJECTIONS-4
     title: A declared projection is proven on the test world
     kind: mandatory
-    hfsRules: [R135]
+    hfsRules: [R140]
     requirement: |-
       An app that declares `projection` has tests titled `projection/<scenario>: ...` for `recompute-is-idempotent` (the same recompute
       twice leaves one identical row) and `replay-rebuilds` (dropping the table and replaying the events rebuilds the same rows).
@@ -108,7 +108,7 @@ rules:
   - id: BE-PROJECTIONS-5
     title: A projection stays inside the context that serves the read
     kind: mandatory
-    hfsRules: [R155]
+    hfsRules: [R160]
     requirement: |-
       A projection sits on the connection of one context. Its entity declares no relation and its migration no foreign key onto a table
       of another context, and no file of the projection imports a file of a capability of another context (its entities, services or SQL).

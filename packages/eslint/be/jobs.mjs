@@ -1,6 +1,6 @@
 /**
- * The rules that hold the fenced-job pattern (catalog R137 `BE_JOB_WRITE_OUTSIDE_OWNER`, R138 `BE_JOB_FENCE_REQUIRED`,
- * R139 `BE_JOB_RUN_KEY`, R140 `BE_JOB_SHAPE`).
+ * The rules that hold the fenced-job pattern (catalog R142 `BE_JOB_WRITE_OUTSIDE_OWNER`, R143 `BE_JOB_FENCE_REQUIRED`,
+ * R144 `BE_JOB_RUN_KEY`, R145 `BE_JOB_SHAPE`).
  *
  * A background job is a row whose `fencingToken` the claim bumps. A worker that lost its claim (a zombie) holds a stale token, so every
  * write to the row is guarded by `expectedFencingToken` and an external effect carries an idempotency key that includes the token.

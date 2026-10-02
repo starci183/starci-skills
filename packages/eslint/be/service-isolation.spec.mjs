@@ -1,5 +1,5 @@
 /**
- * Twin tests for the service-isolation rule (R148).
+ * Twin tests for the service-isolation rule (R153).
  *
  *   node --test service-isolation.spec.mjs
  *
@@ -31,7 +31,7 @@ test("the rule is published under its name at error", () => {
   assert.equal(recommended["starci-be/service-isolation"], "error")
 })
 
-test("R148: a service app imports no sibling service app", () => {
+test("R153: a service app imports no sibling service app", () => {
   tester.run("service-isolation", serviceIsolation, {
   valid: [
     { name: "a service app imports its own files", filename: IN_ORDER, code: 'import { options } from "./order.options"\nexport const x = options\n' },

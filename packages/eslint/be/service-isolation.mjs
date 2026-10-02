@@ -1,5 +1,5 @@
 /**
- * The rule that keeps the services of one product apart (catalog R148 `BE_SERVICE_ISOLATION`).
+ * The rule that keeps the services of one product apart (catalog R153 `BE_SERVICE_ISOLATION`).
  *
  * A back-end service is a Nest app at `be/apps/<service>/` of the one repository; services share the `be/src` libraries and talk
  * to each other only through the wire (a client of the sibling's API, or the events of its vendored contract under

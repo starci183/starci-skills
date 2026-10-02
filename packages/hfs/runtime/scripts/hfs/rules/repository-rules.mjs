@@ -1,6 +1,6 @@
-// repository-rules.mjs - the tree-rule findings `hfs check` runs over the tracked files of one app: the monorepo shape (R127-R130), the event
-// contract of the bounded contexts (R157), the typed event classes and the pattern proof scenarios (R131, R135), the trigger kinds (R159, R160), the integration specs (R112),
-// the front-end GraphQL documents (R113), the microservice policy (R143-R147) and the saga canon (R149-R153). One place composes them, so
+// repository-rules.mjs - the tree-rule findings `hfs check` runs over the tracked files of one app: the monorepo shape (R128-R131), the event
+// contract of the bounded contexts (R162), the typed event classes and the pattern proof scenarios (R136, R140), the trigger kinds (R164, R165), the integration specs (R112),
+// the front-end GraphQL documents (R113), the microservice policy (R148-R152) and the saga canon (R154-R158). One place composes them, so
 // check.mjs does not grow with every rule family.
 import { contractCompatFindings } from './contract-compat.mjs';
 import { eventClassContractFindings, patternSpecFindings } from './event-bus.mjs';

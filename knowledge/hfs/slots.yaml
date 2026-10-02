@@ -631,7 +631,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R146 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R151 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
     profiles: [be]
@@ -640,7 +640,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R157 BE_CONTRACT_BREAKING)
+    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R162 BE_CONTRACT_BREAKING)
     rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -723,7 +723,7 @@ slots:
   - id: be.feature.saga
     profiles: [be]
     path: "src/features/<feature>/saga/"
-    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R149 to R153); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R154 to R158); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
     presence: opt-in
     tracked: tracked
     tier: feature
@@ -866,7 +866,7 @@ slots:
   - id: be.persistence
     profiles: [be]
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
-    # R158: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # R163: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
     perConnection: [event-bus, jobs]
     presence: optional

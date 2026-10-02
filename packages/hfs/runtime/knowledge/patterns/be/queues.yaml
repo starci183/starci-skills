@@ -27,7 +27,7 @@ rules:
   - id: BE-QUEUES-1
     title: A queue is a typed producer that writes the outbox in the caller's transaction
     kind: mandatory
-    hfsRules: [R132, R134]
+    hfsRules: [R137, R139]
     requirement: |-
       Each queue is a folder `be/src/modules/queues/<queue>/` with `<queue>.queue.ts` (a class whose methods are the typed
       producers `enqueueX(payload, tx: EntityManager)`), optional `<queue>.contracts.ts` (payload types and the queue name) and
@@ -91,7 +91,7 @@ rules:
   - id: BE-QUEUES-4
     title: A declared queue pattern is proven on the test world
     kind: mandatory
-    hfsRules: [R135]
+    hfsRules: [R140]
     requirement: |-
       An app that declares `queue` has tests titled `queue/<scenario>: ...` for `enqueue-atomic-with-transaction`,
       `relay-job-id-is-outbox-id` and `scheduler-fires-once`, run against a real Redis.

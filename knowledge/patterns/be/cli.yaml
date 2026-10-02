@@ -22,7 +22,7 @@ rules:
   - id: BE-CLI-1
     title: A cli entry dispatches one message and is composed by a cli app
     kind: mandatory
-    hfsRules: [R136, R90, R46]
+    hfsRules: [R141, R90, R46]
     requirement: |-
       `features/cli/<command>/transport/cli/<name>.cli.ts` is registered through `platform/cli`, maps the arguments and flags to a request,
       dispatches exactly one command or query on the bus and prints the typed result; it holds no business decision. Only an app of kind `cli`
