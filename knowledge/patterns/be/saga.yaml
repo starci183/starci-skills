@@ -28,22 +28,22 @@ files:
     slot: be.feature.saga
     suffix: saga.service
     role: 'The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it (`<saga>.saga.service.spec.ts`, unit-beside). It lists the steps and compensations, imports them all and moves the run through `platform/saga`; it decides nothing.'
-    rules: [R149, R150]
+    rules: [R154, R155]
   - path: be/src/features/<feature>/saga/<saga>.saga-state.ts
     slot: be.feature.saga
     suffix: saga-state
     role: 'The typed state of a run, with `status` and `version: number`, the fence.'
-    rules: [R150]
+    rules: [R155]
   - path: be/src/features/<feature>/saga/steps/<step>.saga-step.ts
     slot: be.feature.saga.steps
     suffix: step
     role: 'One step. Names its event (`readonly event = "<name>"`) and dispatches one command.'
-    rules: [R149, R151]
+    rules: [R154, R156]
   - path: be/src/features/<feature>/saga/compensations/<step>.compensation.ts
     slot: be.feature.saga.compensations
     suffix: compensation
     role: The compensation of the step of the same name; REQUIRED for every step. Names the failure event and dispatches one command.
-    rules: [R149, R151, R153]
+    rules: [R154, R156, R158]
   - path: be/src/features/<feature>/application/<action>.{command,handler,contracts}.ts
     slot: be.feature.application
     suffix: command, handler, contracts
@@ -53,25 +53,25 @@ files:
     slot: be.transport.message
     suffix: consumer
     role: 'A thin door that hands the delivery, with its `eventId`, to a command; the saga takes it through the inbox.'
-    rules: [R80, R88, R152]
+    rules: [R80, R88, R157]
   - path: be/contracts/<service>/events.json
     slot: be.contract.events
     role: 'Every event of the saga, emitted from the publisher''s events.ts; a compensating event declares `compensates`.'
-    rules: [R146, R151]
+    rules: [R151, R156]
   - path: be/src/modules/platform/saga/
     slot: be.platform
     role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` (unit-tested to 100%).'
-    rules: [R150, R80]
+    rules: [R155, R80]
   - path: be/src/tests/e2e/<area>/<name>.e2e-spec.ts
     slot: be.tests.e2e
     suffix: e2e-spec
     role: One spec per compensation path that names the compensation event and injects a failure through the world (an infra or app outage, a fake's failNext), then reads the compensated state back; plus one spec from the api call to the final state.
-    rules: [R153, R147]
+    rules: [R158, R152]
 rules:
   - id: BE-SAGA-1
     title: Every step has a compensation, and the orchestrator lists them all
     kind: mandatory
-    hfsRules: [R149]
+    hfsRules: [R154]
     requirement: |-
       A saga is `be/src/features/<feature>/saga/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
       `compensations/<step>.compensation.ts`: every step has a compensation of the same name and every compensation a step,
@@ -94,7 +94,7 @@ rules:
   - id: BE-SAGA-2
     title: The state of a run is typed, versioned and moved only through the fenced store
     kind: mandatory
-    hfsRules: [R150, R80, R152]
+    hfsRules: [R155, R80, R157]
     requirement: |-
       `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator moves a run only
       through `platform/saga`: a transition names the version it read and moves it by one, and takes its event through the
@@ -117,7 +117,7 @@ rules:
   - id: BE-SAGA-3
     title: Every event of a step or compensation is in a vendored contract
     kind: mandatory
-    hfsRules: [R151, R146]
+    hfsRules: [R156, R151]
     requirement: |-
       A step and a compensation each declare `readonly event = "<name>"`; both events are declared in a vendored contract
       (`be/contracts/<service>/events.json`), and the contract of the compensation's event declares `compensates: "<event of
@@ -139,7 +139,7 @@ rules:
   - id: BE-SAGA-4
     title: Every compensation path has an e2e spec that injects a failure
     kind: mandatory
-    hfsRules: [R153, R147]
+    hfsRules: [R158, R152]
     requirement: |-
       For each compensation, `be/src/tests/e2e/<area>/*.e2e-spec.ts` boots the real apps through `useTestWorld`, names the
       compensation's event, injects a failure through the world (`during`, `cut` or `latency` of an infra service or an app, a

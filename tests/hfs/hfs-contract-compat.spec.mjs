@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { breakingChanges, contractCompatFindings, CONTRACT_BREAKING } from '../../scripts/hfs/rules/contract-compat.mjs';
 
-// R157 BE_CONTRACT_BREAKING: an event contract evolves only additively against its pinned previous copy.
+// R162 BE_CONTRACT_BREAKING: an event contract evolves only additively against its pinned previous copy.
 
 const contract = (events) => ({ schema: 'starci/event-contract@1', service: 'order', events });
 const PLACED = { stream: 'order-events', version: 1, payload: { eventId: 'string', orderId: 'string', totalCents: 'number', note: 'string?' } };

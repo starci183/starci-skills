@@ -4,11 +4,11 @@ summary: >-
   Owner decision 2026-10-02 (bounded contexts, alpha.4). A connection of hfs.json is a bounded context: every
   `sides.be.connections` entry gains a required `owner` (the api or worker app that composes it) and `isolation`
   (`database` or `schema`; a schema context reads `<PREFIX>_SCHEMA`, and the split to its own database is an env
-  change). New rules, all errors: R154 BE_CONTEXT_OWNER (an app composes only the connections and capabilities of the
-  contexts it owns, the cli composes all), R155 BE_CONTEXT_COUPLING (no cross-context entity relation, migration
-  foreign key or import), R156 BE_CONTEXT_TRANSACTION (one transaction touches one context's connection), R157
+  change). New rules, all errors: R159 BE_CONTEXT_OWNER (an app composes only the connections and capabilities of the
+  contexts it owns, the cli composes all), R160 BE_CONTEXT_COUPLING (no cross-context entity relation, migration
+  foreign key or import), R161 BE_CONTEXT_TRANSACTION (one transaction touches one context's connection), R162
   BE_CONTRACT_BREAKING (events.json against its pinned events.pin.json evolves only additively, a breaking change is
-  `<event>.v2`) and R158 BE_CONTEXT_PLATFORM_TABLES (a perConnection platform capability, the event-bus outbox and the
+  `<event>.v2`) and R163 BE_CONTEXT_PLATFORM_TABLES (a perConnection platform capability, the event-bus outbox and the
   job table, has its tables on every connection that uses it). R86 BE_SQL_TABLE_OWNER now reads only the tables of its
   own context (a cross-context JOIN is refused), R84 BE_CONNECTION_DUPLICATE allows two schema contexts in one
   database with different schemas, and R35 BE_SCHEMA_OWNER lets a perConnection platform capability register on several
