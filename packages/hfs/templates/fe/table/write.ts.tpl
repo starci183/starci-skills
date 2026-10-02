@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import type { Database } from "../../../../../../../supabase/types/database.types"
 import { getPrincipal } from "../principal"
@@ -6,6 +6,7 @@ import { createServerDbClient } from "../server"
 import { dbFailure, toOutcome } from "../outcome"
 import type { DbOutcome } from "../outcome"
 
+/** One {{table}} row returned after a successful write. */
 export type {{Name}}Row = Database["public"]["Tables"]["{{table}}"]["Row"]
 
 interface Create{{Name}}Input {
@@ -40,6 +41,8 @@ const create{{Name}}Schema = {
 
 /** Creates one {{table}} row for the verified principal. */
 export const write{{Name}} = async (input: unknown): Promise<DbOutcome<{{Name}}Row>> => {
+    "use server"
+
     const principal = await getPrincipal()
     if (principal.kind !== "ok") return dbFailure("refused", "principal")
     const parsed = create{{Name}}Schema.safeParse(input)

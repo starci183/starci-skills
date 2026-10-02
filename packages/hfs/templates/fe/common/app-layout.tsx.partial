@@ -1,0 +1,8 @@
+export const AppLayout = async (props: AppLayoutProps) => {
+    const t = await getTranslations("app.shell")
+    return (
+        <SiteShell brand={t("brand")} homeHref={APP_ROUTES.home}>
+            {props.content}
+        </SiteShell>
+    )
+}

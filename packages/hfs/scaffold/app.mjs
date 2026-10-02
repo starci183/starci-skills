@@ -30,7 +30,7 @@ import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
-import { TEMPLATES_DIR, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
+import { TEMPLATES_DIR, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
@@ -84,6 +84,7 @@ const LITE_STARTER_SIDES = Object.freeze({
     apps: [{ name: 'api', kind: 'api' }],
     kinds: ['api'],
     connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' }],
+    reads: ['supabase/types/'],
   }),
   fe: Object.freeze({ apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/', 'supabase/types/'] }),
 });
@@ -140,7 +141,7 @@ const FE_APP_DEPENDENCIES = Object.freeze({
 /** The sole lite FE workspace owns its Supabase clients directly; no shared FE package is emitted. */
 const LITE_FE_APP_DEPENDENCIES = Object.freeze({
   '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@supabase/ssr': null,
-  '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+  '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': '^0.0.1',
 });
 
 /**
@@ -250,6 +251,12 @@ function fill(source, vars, file) {
   });
 }
 
+/** Let sync's renderer expand partials first while leaving every source placeholder for `fill` to validate or preserve. */
+const PARTIAL_VARIABLES = new Proxy(Object.create(null), {
+  get: (_target, key) => `{{${String(key)}}}`,
+  getOwnPropertyDescriptor: (_target, key) => ({ configurable: true, value: `{{${String(key)}}}` }),
+});
+
 /** The be skeleton folder of the one cli app (slot be.app.cli: always named `cli`), written only when hfs.json declares it. */
 const CLI_APP_DIR = 'apps/cli/';
 const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cli' && entry.name === 'cli');
@@ -274,14 +281,14 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
   const prefix = scope === 'app' ? '' : `${scope}/`;
   const files = [];
   for (const rel of listFiles(dir).filter(include)) {
-    const source = fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n');
+    const source = render(fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n'), PARTIAL_VARIABLES);
     const once = { project: app.project, ...vars };
     const output = candidate => candidate.split(PROJECT_DIR).join(app.project).split(TIMESTAMP).join(vars.timestamp);
     if (!rel.includes(APP_DIR)) {
       if (scope === 'be' && rel.startsWith(CLI_APP_DIR) && !declaresCliApp(app)) continue;
-      const feApp = scope === 'fe' ? apps.find(entry => rel.startsWith(`apps/${entry.name}/`)) : undefined;
-      if (scope === 'fe' && rel.startsWith('apps/') && !feApp) continue;
-      const appVars = feApp ? { app: feApp.name, appPascal: pascal(feApp.name) } : {};
+      const fixedApp = apps.find(entry => rel.startsWith(`apps/${entry.name}/`));
+      if (scope === 'fe' && rel.startsWith('apps/') && !fixedApp) continue;
+      const appVars = fixedApp ? { app: fixedApp.name, appPascal: pascal(fixedApp.name) } : {};
       files.push({ path: `${prefix}${output(rel)}`, content: fill(source, { ...once, ...appVars }, `${directory}/${rel}`) });
       continue;
     }

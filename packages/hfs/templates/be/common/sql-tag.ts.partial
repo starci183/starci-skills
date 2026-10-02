@@ -1,0 +1,5 @@
+export const sql = (strings: TemplateStringsArray, ...identifiers: ReadonlyArray<SqlIdent>): SqlText => {
+    const text = strings.reduce((built, part, index) => `${built}${part}${identifiers[index] ?? ""}`, "")
+    assertSqlText(text)
+    return text
+}

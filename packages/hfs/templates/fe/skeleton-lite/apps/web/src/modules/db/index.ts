@@ -1,3 +1,5 @@
+import "server-only"
+
 export { createBrowserDbClient } from "./browser"
 export { getPrincipal } from "./principal"
 export type { Principal } from "./principal"

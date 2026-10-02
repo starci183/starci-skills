@@ -137,7 +137,7 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
   const original = fs.readFileSync(file, 'utf8');
   fs.writeFileSync(file, original.replace('app: ${{ fromJSON(needs.apps.outputs.apps) }}', 'app: [alpha]'));
   assert.deepEqual(codes(root), ['EXAMPLES_CI_MATRIX_NOT_DERIVED']);
-  fs.writeFileSync(file, original.replace(/\n {8}if: \$\{\{ github\.event_name == 'workflow_dispatch' && contains\(inputs\.layers, 'e2e'\) \}\}/, ''));
+  fs.writeFileSync(file, original.replace(/\n {8}if: .*contains\(inputs\.layers, 'e2e'\).*$/m, ''));
   assert.deepEqual(codes(root), ['EXAMPLES_CI_STACK_LAYER_AUTOMATIC']);
   fs.writeFileSync(file, original.replace(/\n {2}workflow_dispatch:\n[\s\S]*?default: integration-and-e2e\n/, '\n'));
   assert.ok(codes(root).includes('EXAMPLES_CI_NO_MANUAL_TRIGGER'));

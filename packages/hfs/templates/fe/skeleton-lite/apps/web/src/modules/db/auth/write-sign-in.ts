@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import { getPrincipal } from "../principal"
 import { createServerDbClient } from "../server"
@@ -33,6 +33,8 @@ export interface SignInResult {
 
 /** Schema-checks credentials, signs in through the server client and returns a typed outcome. */
 export const writeSignIn = async (input: FormData): Promise<DbOutcome<SignInResult>> => {
+    "use server"
+
     const principal = await getPrincipal()
     if (principal.kind === "ok") return dbOk({ userId: principal.value.id })
     const parsed = signInInputSchema.safeParse(input)

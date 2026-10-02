@@ -24,3 +24,4 @@ export const AppHomePage = async () => {
         />
     )
 }
+import "server-only"

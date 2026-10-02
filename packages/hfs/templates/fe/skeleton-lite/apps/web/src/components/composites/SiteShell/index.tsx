@@ -10,12 +10,4 @@ type SiteShellProps = {
 }
 
 /** The app chrome: grammar boundary, wordmark header and routed body. */
-export const SiteShell = (props: SiteShellProps) => (
-    <GrammarRoot className={siteShellClassNames.frame}>
-        <WorkspaceShell
-            primaryLabel={props.brand}
-            header={<TopBar brand={<TextAction href={props.homeHref}>{props.brand}</TextAction>} />}
-            primary={<PageContainer measure="reading">{props.children}</PageContainer>}
-        />
-    </GrammarRoot>
-)
+{{> fe/common/site-shell.tsx.partial}}

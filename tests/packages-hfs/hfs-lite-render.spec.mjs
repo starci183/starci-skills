@@ -71,6 +71,7 @@ test('the lite managed set has no test or coverage world and carries the databas
   const hookText = `${targets['.husky/pre-commit'].content}\n${targets['.husky/pre-push'].content}`;
   assert.doesNotMatch(hookText, /test:affected|jest|playwright|vitest/);
   assert.match(targets['.gitignore'].content, /^supabase\/\.temp\/$/m);
+  assert.match(targets['.gitignore'].content, /^supabase\/\.branches\/$/m);
   const ci = parseYaml(targets['.github/workflows/ci.yml'].content);
   assert.ok(ci.jobs['db-types']);
   assert.match(String(ci.jobs['db-types'].if), /migrations/);
@@ -91,7 +92,7 @@ test('the lite managed set has no test or coverage world and carries the databas
   assert.doesNotMatch(sonar, /coverage|lcov|sonar\.tests|test\.inclusions/i);
   const codegen = targets['scripts/codegen.mjs'].content;
   assert.equal((codegen.match(/execFileSync\(/g) ?? []).length, 1);
-  assert.match(codegen, /'db:types'/);
+  assert.match(codegen, /["']db:types["']/);
 });
 
 test('lite render needs no Jest preset, writeTargets reaches a no-op, and managed drift uses the same render', async t => {

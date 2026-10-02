@@ -1,6 +1,7 @@
 import createMiddleware from "next-intl/middleware"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { sessionCookieOptions } from "@/modules/config"
 import { refreshSession } from "@/modules/db/auth/read-session"
 import { routing } from "@/modules/i18n"
 import { APP_ROUTES } from "@/modules/routes"
@@ -27,10 +28,16 @@ export const proxy = async (request: NextRequest): Promise<NextResponse> => {
     destination.pathname = APP_ROUTES.home
     destination.searchParams.set("next", request.nextUrl.pathname)
     const redirect = NextResponse.redirect(destination)
-    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie)
+    for (const cookie of response.cookies.getAll()) {
+        redirect.cookies.set(cookie.name, cookie.value, {
+            ...cookie,
+            ...sessionCookieOptions,
+        })
+    }
     return redirect
 }
 
+/** Routes that pass through session refresh and locale negotiation. */
 export const config = {
     matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
 }

@@ -11,3 +11,10 @@ export const supabaseUrl = (): string => required("NEXT_PUBLIC_SUPABASE_URL", pr
 /** The public anonymous key; RLS remains the authority for every request. */
 export const supabaseAnonKey = (): string =>
     required("NEXT_PUBLIC_SUPABASE_ANON_KEY", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
+/** Security attributes applied whenever the app writes a Supabase session cookie. */
+export const sessionCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+} as const

@@ -1,9 +1,12 @@
+import "server-only"
+
 import { cache } from "react"
 import type { Database } from "../../../../../../../supabase/types/database.types"
 import { createServerDbClient } from "../server"
 import { toOutcome } from "../outcome"
 import type { DbOutcome } from "../outcome"
 
+/** One {{table}} row from the generated database contract. */
 export type {{Name}}Row = Database["public"]["Tables"]["{{table}}"]["Row"]
 
 /** Reads a bounded page of {{table}} rows visible to the current RLS principal. */

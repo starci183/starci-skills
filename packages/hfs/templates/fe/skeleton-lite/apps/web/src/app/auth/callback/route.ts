@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { exchangeAuthCode } from "@/modules/db/auth/read-session"

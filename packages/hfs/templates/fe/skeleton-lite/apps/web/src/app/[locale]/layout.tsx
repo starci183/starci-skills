@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
-import { Providers } from "@/components/branches/Providers"
 import { AppLayout, appLayoutMetadata } from "@/features/layouts/AppLayout"
 import { readLocaleSegment } from "@/modules/i18n/request"
+import { Providers } from "./providers"
 import "../globals.css"
 import "../../modules/brand/brand.css"
 

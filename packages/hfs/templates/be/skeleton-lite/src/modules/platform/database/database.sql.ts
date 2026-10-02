@@ -27,17 +27,7 @@ function assertSqlIdent(_value: string): asserts _value is SqlIdent {
 }
 
 /** Builds SQL text whose only substitutions are already checked identifiers. */
-export const sql = (strings: TemplateStringsArray, ...identifiers: ReadonlyArray<SqlIdent>): SqlText => {
-    const text = strings.reduce((built, part, index) => `${built}${part}${identifiers[index] ?? ""}`, "")
-    assertSqlText(text)
-    return text
-}
+{{> be/common/sql-tag.ts.partial}}
 
 /** Checks a dynamic identifier against the names the caller allows and brands it. */
-export const ident = (name: string, allowed: ReadonlyArray<string>): SqlIdent => {
-    if (!IDENT_PATTERN.test(name) || !allowed.includes(name)) {
-        throw new DatabaseError({ code: DatabaseErrorCode.IdentifierRejected })
-    }
-    assertSqlIdent(name)
-    return name
-}
+{{> be/common/sql-ident.ts.partial}}

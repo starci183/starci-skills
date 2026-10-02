@@ -221,9 +221,9 @@ function wireLiteWebhookConfig({ repoRoot, app, provider }) {
   const providerKey = /^[a-z][a-z0-9]*$/.test(provider) ? provider : JSON.stringify(provider);
   const providerLine = `                ${providerKey}: parseWebhookProviderConfig(env, ${JSON.stringify(formsOf({ provider }).providerUpper)}),`;
   if (!text.includes(providerLine)) {
-    const empty = '        httpSecurity: parseHttpSecurityConfig(env),';
-    if (text.includes(empty)) {
-      text = text.replace(empty, ['        httpSecurity: {', '            ...parseHttpSecurityConfig(env),', '            webhooks: {', providerLine, '            },', '        },'].join('\n'));
+    const empty = /httpSecurity:\s*parseHttpSecurityConfig\(env\)/;
+    if (empty.test(text)) {
+      text = text.replace(empty, ['httpSecurity: {', '            ...parseHttpSecurityConfig(env),', '            webhooks: {', providerLine, '            },', '        }'].join('\n'));
     } else {
       const found = /^\s*webhooks: \{$/m.exec(text);
       if (!found) throw new ScaffoldError('HFS_ADD_WIRE_INVALID', `add webhook could not find httpSecurity options in ${relative}`);

@@ -55,7 +55,6 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/cqrs/cqrs.handler.ts', 'be/src/modules/platform/cqrs/cqrs.log-events.ts',
   'be/src/modules/platform/cqrs/cqrs.module-definition.ts', 'be/src/modules/platform/cqrs/cqrs.module.ts',
   'be/src/modules/platform/cqrs/cqrs.options.ts', 'be/src/modules/platform/cqrs/index.ts',
-  'be/src/modules/platform/database/connection-source.client.ts',
   'be/src/modules/platform/database/database.module-definition.ts',
   'be/src/modules/platform/database/database.module.ts', 'be/src/modules/platform/database/database.options.ts',
   'be/src/modules/platform/database/database.port.ts', 'be/src/modules/platform/database/database.sql.ts',
@@ -79,6 +78,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/http-security/index.ts',
   'be/src/modules/platform/http-security/messages/http-security.messages.ts',
   'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts',
+  'be/src/modules/platform/http-security/webhook-signature.service.ts',
   'be/src/modules/platform/i18n/bundle-message-catalog.service.ts',
   'be/src/modules/platform/i18n/i18n.contracts.ts', 'be/src/modules/platform/i18n/i18n.decorators.ts',
   'be/src/modules/platform/i18n/i18n.module-definition.ts', 'be/src/modules/platform/i18n/i18n.module.ts',
@@ -93,9 +93,12 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/next.config.ts', 'fe/apps/web/package.json', 'fe/apps/web/postcss.config.mjs',
   'fe/apps/web/src/app/[locale]/error.tsx', 'fe/apps/web/src/app/[locale]/layout.tsx',
   'fe/apps/web/src/app/[locale]/loading.tsx', 'fe/apps/web/src/app/[locale]/not-found.tsx',
-  'fe/apps/web/src/app/[locale]/page.tsx', 'fe/apps/web/src/app/auth/callback/route.ts',
+  'fe/apps/web/src/app/[locale]/page.tsx', 'fe/apps/web/src/app/[locale]/providers.tsx',
+  'fe/apps/web/src/app/auth/callback/route.ts',
   'fe/apps/web/src/app/global-error.tsx', 'fe/apps/web/src/app/globals.css',
-  'fe/apps/web/src/app/health/live/route.ts', 'fe/apps/web/src/components/branches/Providers/index.tsx',
+  'fe/apps/web/src/app/health/live/route.ts',
+  'fe/apps/web/src/components/blocks/SignInForm/component.tsx',
+  'fe/apps/web/src/components/blocks/SignInForm/index.tsx',
   'fe/apps/web/src/components/composites/ErrorNotice/index.tsx',
   'fe/apps/web/src/components/composites/GlobalErrorNotice/index.tsx',
   'fe/apps/web/src/components/composites/LoadingNotice/index.tsx',
@@ -111,6 +114,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
   'fe/apps/web/src/features/pages/SignInPage/index.tsx',
+  'fe/apps/web/src/modules/api/index.ts', 'fe/apps/web/src/modules/api/outcome.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
   'fe/apps/web/src/modules/config/index.ts', 'fe/apps/web/src/modules/db/auth/read-session.ts',
   'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/browser.ts',
@@ -151,6 +155,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) =>
       apps: [{ name: 'api', kind: 'api' }],
       kinds: ['api'],
       connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' }],
+      reads: ['supabase/types/'],
     },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/', 'supabase/types/'] },
   });
@@ -166,7 +171,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) =>
   const web = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'apps', 'web', 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys(web.dependencies).sort(), [
     '@heroui/react', '@heroui/styles', '@starci/grammar', '@supabase/ssr', '@supabase/supabase-js',
-    'next', 'next-intl', 'react', 'react-dom',
+    'next', 'next-intl', 'react', 'react-dom', 'server-only',
   ].sort());
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
   assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined)), renderTargets(declaration, undefined).map(target => ({
