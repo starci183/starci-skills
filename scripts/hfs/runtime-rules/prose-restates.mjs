@@ -10,7 +10,7 @@ import { loadSlotManifest } from '../slots.mjs';
 import { createProseResolver, pathTokens } from './prose-path.mjs';
 
 export const CODE = 'RT_PROSE_RESTATES_SLOTS';
-export const PATH_LIMIT = 3;
+const PATH_LIMIT = 3;
 const PROSE = /^(?:knowledge\/(?!code-examples\/|grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$|hfs\/facts\.yaml$|hfs\/rules\.yaml$).+\.(?:ya?ml|md)|docs\/.+\.md|(?!examples\/|.+\/templates\/)(?:.+\/)?README\.md)$/;
 const GENERATED = /<!-- hfs:generated (\S+) -->[\s\S]*?<!-- hfs:generated-end \1 -->/g;
 

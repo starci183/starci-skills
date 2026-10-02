@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, examplesCiMain, exampleApps, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
-import { readProperties } from '../../scripts/gates/sonar-local.mjs';
+import { readProperties } from '../../scripts/lib/properties.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { execFileSync } from 'node:child_process';

@@ -28,7 +28,6 @@ export const INFRASTRUCTURE_CODES = Object.freeze({
   HFS_RULE_CODE_UNEMITTED: 'scripts/checks/check-hfs-rules.mjs',
   HFS_RULE_UNCATALOGUED: 'scripts/checks/check-hfs-rules.mjs',
   HFS_RULE_UNTESTED: 'scripts/checks/check-hfs-rules.mjs',
-  HFS_RULE_LAW_DRIFT: 'scripts/checks/check-hfs-rules.mjs',
   HFS_RULE_CODE_UNCATALOGUED: 'scripts/checks/check-hfs-rules.mjs',
   HFS_RULE_CODE_UNOWNED: 'scripts/checks/check-hfs-rules.mjs',
 });
