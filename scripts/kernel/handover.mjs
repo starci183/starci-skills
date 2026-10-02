@@ -230,7 +230,7 @@ export function handoverReason(handover, workflowId) {
   }
   if (handover?.state === 'answered' && ask) {
     if (ask.decision === 'approve' && ask.byOwner) {
-      return `the owner approved handover ask ${ask.dispatchId}; enqueue handover.review again (it reads the approval through api survey --deliveries and files done), then api check and api settle --verdict pass record handover-approved; then api finish`;
+      return `the owner approved handover ask ${ask.dispatchId}; enqueue handover.review again (it reads the approval through api survey --deliveries and files done), then api record-checks and api settle --verdict pass record handover-approved; then api finish`;
     }
     if (ask.decision === 'approve') {
       return `handover ask ${ask.dispatchId} was answered approve by ${ask.answeredBy ?? 'a delegate'}, and only the owner approves a handover; enqueue handover.review again so the owner is asked`;

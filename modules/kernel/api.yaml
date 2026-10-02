@@ -12,7 +12,7 @@
 # The op IPC is durable: contracts out (dispatch writes the contracts row,
 # the worker reads it back via `api op-contract`), reports in (the worker
 # files `api report`; the kernel integrates it via `api consume-report`),
-# checks beside them (`api check` records the kernel's re-run). Report and
+# checks beside them (`api record-checks` records the kernel's re-run). Report and
 # contract truth lives in runtime.sqlite through these verbs.
 #
 # Sources (all under .claude/, relative to the skill root):
@@ -54,7 +54,7 @@ about:
     persisted) -> dispatch (contract row written, leases held; or reconcile a
     pre-contract effect_unknown launch back to the same queued attempt) -> worker
     files `api report` -> kernel `api consume-report` -> kernel re-runs
-    checks -> `api check` -> `api settle` (consumption enforced — settle
+    checks -> `api record-checks` -> `api settle` (consumption enforced — settle
     marks the report consumed if the kernel did not).
   sources:
     - scripts/kernel/cli.mjs
@@ -85,9 +85,9 @@ conventions:
   extensions: >-
     New verbs, boolean flags and status fields are FILES, never edits of cli.mjs's shared lists
     (scripts/kernel/api-extensions.mjs): a verb is scripts/kernel/verbs/<verb>.mjs with its contract
-    in modules/kernel/api-commands/<verb>.yaml (what commands.<verb> here would hold); a status field is
+    in modules/cli/commands/kernel/<verb>.yaml (what commands.<verb> here would hold); a status field is
     scripts/kernel/status/<key>.mjs; a boolean flag is a line of scripts/kernel/api-boolean-flags.txt.
-    `api extensions` lists them; check-api-surface reads both forms
+    `api extensions` lists them; check-cli-parity reads both forms
   writes: >-
     every mutation runs inside BEGIN IMMEDIATE and appends its event —
     events is hash-chained (engine/db/ledger.mjs EVENTS_DIGEST_TRIGGER), so a
@@ -110,13 +110,13 @@ conventions:
     binding is the op's one identity (scripts/guards/op-context.mjs resolves its job, scratch and provider
     from it for the scripts an op runs); (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, messages, reply, peers, notify, inbox,
-    settle, check, consume-report, serve-ask, retire-ask, incident, provider-health, finish, archive) refuses `op-context-refused` before it runs, and `report`
+    settle, record-checks, consume-report, serve-ask, retire-ask, incident, provider-health, finish, archive) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
     binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
     job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
     shell permissions can still open the ledger file or unset the marker and call from a terminal
     Orca does not attribute to it. Nothing it reads that way is authority: only a filed report plus
-    the Kernel's own `api check` settles, and a ledger claim quoted from a screen is never evidence.
+    the Kernel's own `api record-checks` settles, and a ledger claim quoted from a screen is never evidence.
     Nothing an op needs is only in the ledger: the packet carries the owner's goal statement
     (context.goal {revision, statement, amendment?} of the revision the job is bound to), so `api op-contract --json` answers what
     workers opened the file for (nivo auth inc-26b260e101e4). `messages` is a kernel verb too.

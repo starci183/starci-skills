@@ -1,0 +1,43 @@
+group: kernel
+verb: inbox
+owner: runtime
+summary: the workflow's pending inbox items; --ack records a disposition
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - inbox
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: ack
+    type: string
+  - name: disposition
+    type: string
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel inbox --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api inbox
+  - node scripts/kernel/cli.mjs inbox
+reads: peer-message inbox rows addressed to --workflow, and the latest 20 it sent
+writes: without --ack nothing. --ack sets that pending row status applied, disposition_json
+  {disposition, by, at} and applied_at, and appends 'peer-message-acked' {key, from, kind,
+  disposition} on --workflow; the sender reads the disposition back in its own `api inbox` sent list
+returns: "{ok:true, workflowId, pending:[{key, from, fromTitle, kind, subject, body, replyTo,
+  refs[], at}], sent:[{key, to, kind, subject, replyTo, at, status, disposition, appliedAt}] newest
+  first}  | --ack: {ok:true, workflowId, acked:{key, from, kind, subject, disposition}, pending:<n
+  left>}"
+refuses:
+  - workflow-unknown
+  - peer-message-unknown: --ack names no peer message in this workflow's inbox
+  - peer-message-not-pending: already acked (the existing disposition is quoted) or closed by finish
+  - disposition-missing: --disposition is blank (absent is a usage error, exit 2)
+usedBy: drive — every wake reads it before planning; each message is acted on and acked with what was done

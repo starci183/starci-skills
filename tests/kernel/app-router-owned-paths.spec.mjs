@@ -236,7 +236,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   const filed=fx.run('report','--job',routes,'--report',reportFile);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
   // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.
-  const checked=spawnSync(process.execPath,[API,'check','--repo',fx.repo,'--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}),'--json'],
+  const checked=spawnSync(process.execPath,[API,'record-checks','--repo',fx.repo,'--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}),'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...fx.env,STARCI_CALLER:'runtime-settler'}});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
 

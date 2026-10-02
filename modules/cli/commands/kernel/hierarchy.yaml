@@ -1,0 +1,42 @@
+group: kernel
+verb: hierarchy
+owner: runtime
+summary: project the agent hierarchy (starci/agent-hierarchy@1) of a workflow
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - hierarchy
+flags:
+  - name: workflow
+    type: string
+    required: true
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel hierarchy --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api hierarchy
+  - node scripts/kernel/cli.mjs hierarchy
+reads: workflow row plus every Kernel/Op job payload for the workflow
+writes: nothing — pure projection
+returns:
+  schema: starci/agent-hierarchy@1
+  workflow: "{nodeId, role: workflow, workflowId, title, status, generation}"
+  nodes: "[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,verdict,runtime:\
+    {host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}] —
+    verdict is result_json.verdict (pass|fail|blocked|awaiting-owner), null while unsettled"
+  edges: "[{parentNodeId,childNodeId,relation: coordinates|dispatches}]"
+identityRules:
+  - titles such as [Kernel]/[Op], tab order and parentPaneKey never define ownership
+  - the workflow Run coordinator handle is the Kernel terminal; worker-start owns managed Task
+    injection and is never followed by a second dispatch
+  - every agent is a worker-start worker with an Orca Task/Dispatch; worker_id is its Dispatch id
+refuses:
+  - workflow-unknown
+usedBy: Orca/sidebar integrations and workflow monitors that need a semantic agent tree

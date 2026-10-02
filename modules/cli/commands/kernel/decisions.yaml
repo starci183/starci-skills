@@ -1,0 +1,138 @@
+# The contract of `api decisions` (scripts/kernel/verbs/decisions.mjs): Decision Items (reconciler DESIGN §10.3,
+# §11; contract change decision-items). The store logic is scripts/machine/decisions.mjs.
+group: kernel
+verb: decisions
+owner: runtime
+summary: "Decision Items: read them first every wake"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - decisions
+flags:
+  - name: workflow
+    type: string
+  - name: list
+    type: boolean
+  - name: all
+    type: boolean
+  - name: next
+    type: boolean
+  - name: open
+    type: boolean
+  - name: kind
+    type: string
+  - name: summary
+    type: string
+  - name: by
+    type: string
+  - name: entity-type
+    type: string
+  - name: entity-id
+    type: string
+  - name: decider
+    type: enum
+    enum:
+      - kernel
+      - supervisor
+      - owner
+  - name: due-ms
+    type: string
+  - name: key
+    type: string
+  - name: evidence-file
+    type: string
+  - name: evidence
+    type: string
+  - name: evidence-json
+    type: string
+  - name: allowed-verbs
+    type: string
+  - name: options-json
+    type: string
+  - name: severity
+    type: string
+  - name: item
+    type: string
+  - name: claim
+    type: string
+  - name: resolve
+    type: string
+  - name: verb
+    type: string
+  - name: decision
+    type: string
+  - name: note
+    type: string
+  - name: escalate
+    type: string
+  - name: to
+    type: enum
+    enum:
+      - supervisor
+      - owner
+  - name: reason
+    type: string
+exit:
+  "0": listed or recorded
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel decisions --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api decisions
+  - node scripts/kernel/cli.mjs decisions
+purpose: 'The one durable channel for "someone must decide": controllers and the SLA layer open a
+  Decision Item (DI, starci/decision-item@1) for the Kernel, the Supervisor opens a
+  supervisor-ruling DI instead of typing a notice (scripts/supervisor/notify.mjs), and a doorbell
+  only reminds the seat that DIs wait. The Kernel reads `api decisions --workflow <wf>` FIRST every
+  wake and resolves each item with one of its allowedVerbs and the `api decide` id it acted under. A
+  DI past dueAt is escalated once; past dueAt x2 it is escalated to the Supervisor
+  (scripts/machine/decisions.mjs escalateDue). A claim holds a DI for 15 minutes.'
+reads:
+  - inbox kind decision
+writes:
+  - inbox kind decision (status open|claimed|resolved|escalated|superseded)
+  - events decision-opened / decision-claimed / decision-resolved / decision-escalated /
+    decision-expired / decision-superseded
+rules:
+  idempotent: an --open whose key (--key, default <kind>:<entity-type>:<entity-id>) already has a DI
+    returns that DI; a new occurrence needs a new key
+  decider: --decider defaults by kind - cap-starved, quota-exhausted, runtime-defect, cross-workflow,
+    deadlock, seat-unrecoverable, service-quarantined, experiment-revert, hypothesis, push-refused
+    and kernel-proposal are the Supervisor's (resource, host, fleet and learning policy); every
+    other kind is the Kernel's
+  supersede: a supervisor-ruling --open supersedes the live Kernel DIs on the same entity (status
+    superseded, event decision-superseded)
+  claim: one live claimer per DI for 15 minutes; an expired claim reads open again (event
+    decision-expired on the next claim)
+  supervisorClaim: a --by supervisor claim of a decider-kernel DI needs the DI escalated, or its kind
+    cross-workflow|deadlock
+  decisionsFirst: an open, unclaimed decider-kernel DI older than 2 minutes (never a
+    supervisor-ruling; a job DI only while its job still waits on the Kernel) makes api route,
+    dispatch, enqueue and dispatch-ready refuse decisions-first with the oldest item and its
+    copy-paste commands (scripts/machine/decisions.mjs refuseDecisionsFirst); a command carrying
+    --resolves <that DI id>, and the children of graph-edit and redesign, pass. --next prints that
+    item alone
+  autoClose: every list closes a supervisor-ruling opened before the Kernel's latest runtime-rev ack
+    and a job DI whose job no longer waits on the Kernel (resolution by runtime); api archive and
+    api finish resolve every live DI of their workflow in the same transaction before the phase
+    flips (resolution by runtime, verb workflow-archived | workflow-finished, event
+    decision-resolved auto:true), and a DI of an archived or finished workflow is never listed,
+    escalated, rung or digested
+  allowedVerbs: a DI that lists allowedVerbs is resolved only by --verb whose first word is one of theirs
+refusals:
+  decision-kind-invalid: --kind is not a starci/decision-item@1 kind
+  decision-decider-invalid: --decider is not kernel|supervisor|owner
+  decision-incomplete: a required field is missing (--summary; --by; --verb for --resolve)
+  workflow-unknown: --workflow is not in this ledger
+  decision-unknown: no DI with that id
+  decision-closed: the DI is already resolved, superseded or expired
+  decision-held-by-other: another actor holds a live claim on the DI
+  decision-not-escalated: the Supervisor claimed a Kernel DI that is neither escalated nor cross-workflow
+  decision-verb-not-allowed: --verb is not one of the DI's allowedVerbs
+  decision-evidence-invalid: --evidence-file is missing or --evidence-json is not an array
+kernelOnly: true

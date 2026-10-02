@@ -208,7 +208,7 @@ test('a lint MEASUREMENT leg with findings settles pass (even filed failed), and
   const w=world(t,{legs:['review.verify','test.author','code.refactor'],workspace:false});
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   w.report('lint','failed',{checks:CANON_CHECKS,rootCause:{node:'code.refactor',self:false,category:'pending-upstream-repair',claim:'canon debt awaits the refactor legs',evidence:['574 findings']}});
-  const checked=w.api(['check','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
+  const checked=w.api(['record-checks','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   assert.deepEqual([checked.body.checkEvidence.passed,checked.body.checkEvidence.failed,checked.body.checkEvidence.green],[3,0,true],'the measured findings count as a completed measurement');
   const refused=w.api(['settle','--job','lint','--verdict','fail']);
@@ -226,7 +226,7 @@ test('a measurement whose checker did not run fails as a tool error and retries;
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   const broken=[{...CANON_CHECKS[0],exitCode:3,evidence:'a selected machine could not run'}];
   w.report('lint','failed',{checks:broken});
-  w.api(['check','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
+  w.api(['record-checks','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
   let next=w.api(['settle','--job','lint','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-tool-error-retries','tool']);
   // The final gate: a code.refactor settled before it, so findings are findings of the build.

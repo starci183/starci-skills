@@ -1,0 +1,18 @@
+group: supervisor
+verb: status
+owner: runtime
+summary: print whether the Supervisor seat is enabled and healthy
+impl:
+  script: scripts/supervisor/start-supervisor.mjs
+  args: [--status]
+flags: []
+exit:
+  "0": status printed
+  "1": status could not be read
+  "2": bad usage
+json: flag
+examples:
+  - starci supervisor status
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

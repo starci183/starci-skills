@@ -188,7 +188,7 @@ export default {
     const recordedChecks = (Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : []).map((check) => (measurementLeg ? markMeasured(check) : check));
     checkEvidence = summarizeCheckEvidence(Array.isArray(checksEnvelope?.checks) ? { ...checksEnvelope, checks: recordedChecks } : checksEnvelope);
     const result = { verdict, report: null, at: payload.settledAt, checkEvidence, ...(checkpoint ? { checkpoint } : {}) };
-    // Every red check was a peer's change (api check peerBlocked): the attempt is the peer's to
+    // Every red check was a peer's change (api record-checks peerBlocked): the attempt is the peer's to
     // unblock, not this op's failure - retry accounting spends no business attempt on it
     // (engine/admission.mjs retryDisposition) and the routes hand it to the peer.
     const peerChecks = recordedChecks.filter(isPeerBlockedCheck);

@@ -13939,3 +13939,25 @@ HFS_DOCKER_SECRETS:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
   kind: check-finding
+
+RT_CLI_CATALOG_DRIFT:
+  title: "Generated CLI catalog outputs drifted"
+  title_vi: "Các đầu ra catalog CLI sinh tự động bị lệch"
+  meaning_vi: "Một đầu ra sinh từ catalog của modules/cli/commands (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) khác với nội dung mà scripts/cli/gen-catalog.mjs sinh ra: thiếu, cũ, hoặc đã sửa tay."
+  causes_vi:
+    - "Sửa một file catalog trong modules/cli/commands mà quên chạy gen-catalog --write"
+    - "Sửa tay một đầu ra sinh tự động thay vì sửa catalog nguồn"
+  nextStep_vi: "Người giám sát chạy node scripts/cli/gen-catalog.mjs --write rồi commit cả catalog lẫn các đầu ra; không sửa tay tệp đã sinh."
+  owner: supervisor
+  kind: check-finding
+
+RT_CLI_VERB_PARITY:
+  title: "CLI catalog and implementation disagree"
+  title_vi: "Catalog CLI và cài đặt không khớp nhau"
+  meaning_vi: "Catalog của modules/cli/commands và code lệch nhau: một verb của catalog không có handler (impl.script thiếu, không có verbs/<verb>.mjs, không có case trong cli.mjs) hoặc không có tài liệu; một verb module của kernel hoặc một case của cli.mjs không có file catalog; một --flag trong usage:/required của module verb hay trong api-boolean-flags.txt không nằm trong flags của catalog."
+  causes_vi:
+    - "Thêm một verb module trong scripts/kernel/verbs mà quên file modules/cli/commands/kernel/<verb>.yaml"
+    - "Đổi usage hoặc required của một verb mà không cập nhật flags của catalog"
+  nextStep_vi: "Người giám sát đồng bộ hai phía: thêm file catalog cho verb mới, sửa flags của catalog theo usage/required, hoặc xóa verb khỏi catalog khi handler đã bị xóa."
+  owner: supervisor
+  kind: check-finding

@@ -7,11 +7,7 @@
   "engines": {
     "node": ">=22.13.0"
   },
-  "bin": {
-    "starci": "bin/starci.mjs"
-  },
   "files": [
-    "bin/",
     "init/",
     "ext/",
     "skills/",
@@ -51,9 +47,9 @@
     "access": "public"
   },
   "scripts": {
-    "check": "node bin/starci.mjs check",
+    "check": "node packages/cli/bin/starci.mjs runtime check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --test \"tests/**/*.spec.mjs\"",
-    "starci": "node bin/starci.mjs",
+    "starci": "node packages/cli/bin/starci.mjs",
     "release:check": "node scripts/gates/release-check.mjs",
     "release:publish": "node scripts/gates/release-publish.mjs"
   },

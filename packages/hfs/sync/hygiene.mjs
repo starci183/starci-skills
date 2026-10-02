@@ -122,6 +122,6 @@ export async function runWorkHygiene({ cwd = process.cwd(), out = line => proces
   const ledgerFindings = await ledgerHygieneFindings(cwd);
   const all = [...findings, ...ledgerFindings];
   for (const finding of all) out(`${finding.code} ${finding.file} ${finding.message}`);
-  out(`hfs work-hygiene: ${checked} staged file(s) checked, ${findings.length} finding(s), ${ledgerFindings.length} ledger finding(s)`);
+  out(`starci app hygiene: ${checked} staged file(s) checked, ${findings.length} finding(s), ${ledgerFindings.length} ledger finding(s)`);
   return all.length ? 1 : 0;
 }

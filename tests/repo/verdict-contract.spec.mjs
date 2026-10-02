@@ -75,7 +75,7 @@ test('settle accepts the contract verdicts pass|fail|blocked',async t=>{
       const filed=runApi(['report','--repo',repo,'--job',jobId,'--report',reportFile(scratch,outcome),'--json']);
       assert.equal(filed.status,0,filed.stderr||filed.error?.message);
       if(verdict==='pass'){
-        const checked=runApi(['check','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json'],{env:{STARCI_CALLER:'runtime-settler'}});
+        const checked=runApi(['record-checks','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json'],{env:{STARCI_CALLER:'runtime-settler'}});
         assert.equal(checked.status,0,checked.stderr||checked.error?.message);
       }
       const r=runApi(['settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json']);

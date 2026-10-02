@@ -1,0 +1,44 @@
+# The contract of `api dispatch-ready` (scripts/kernel/verbs/dispatch-ready.mjs): the parallelism push.
+group: kernel
+verb: dispatch-ready
+owner: runtime
+summary: route + dispatch queued-ready units up to api status progress.allowedParallel
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - dispatch-ready
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: max
+    type: string
+  - name: dry-run
+    type: boolean
+  - name: foreground
+    type: boolean
+exit:
+  "0": pushed (or started)
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel dispatch-ready --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api dispatch-ready
+  - node scripts/kernel/cli.mjs dispatch-ready
+purpose: Route and dispatch this workflow's queued-ready units up to api status
+  progress.allowedParallel (the fleet RAM cap, the pools, the workflow's priority reserve) in one
+  call, through the ordinary api route + api dispatch --spawn (every admission refusal holds). A
+  unit whose shape already failed for a shape cause is skipped. Without --foreground it runs
+  detached and answers with its result file.
+writes:
+  - through api route/dispatch
+  - events kernel-dispatch-push
+  - logs kind decision
+  - the push result <kernel scratch>/dispatch/<push>.json (op-prompt.mjs kernelScratchDirOf: OS temp
+  - outside every repository)
+kernelOnly: true

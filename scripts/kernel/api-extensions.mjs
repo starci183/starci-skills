@@ -10,13 +10,13 @@
 //                                            required: [flag] or (args) => [flag]; flags: its boolean flags;
 //                                            ledger false: run without opening the repo ledger;
 //                                            run({ledger, args, repo, emit, need, caller, ext}) (may be async)
-//   modules/kernel/api-commands/<verb>.yaml  its contract (what `commands.<verb>` of api.yaml would hold)
+//   modules/cli/commands/kernel/<verb>.yaml  its catalog contract (what `commands.<verb>` of api.yaml would hold)
 //   scripts/kernel/status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}
 //                                            ctx {ledger, db, wf, workflowId, args, repo, now, core}; a null/undefined
 //                                            value adds nothing; `lines` adds human lines to `api status`
 //   scripts/kernel/api-boolean-flags.txt     one boolean flag per line (any verb); merge=union, order free
 //
-// The verbs, flags and fields already in cli.mjs stay where they are; check-api-surface reads both.
+// The verbs, flags and fields already in cli.mjs stay where they are; check-cli-parity reads both.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

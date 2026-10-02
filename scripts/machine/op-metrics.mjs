@@ -349,7 +349,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   for (const jobId of settleReady) {
     const job = jobRow.get(jobId);
     push({ kind: 'deferred-settle', cause: 'settle-ready', jobId, opId: job?.op_id ?? null, since: firstJobEventAt(db, jobId, ['report-consumed', 'report-filed']) ?? Number(job?.updated_at),
-      owner: 'kernel', detail: 'report consumed, not settled: api check + api settle' });
+      owner: 'kernel', detail: 'report consumed, not settled: api record-checks + api settle' });
   }
   // Who moves each queued job: a job a gate or wait holds is that item's owner; a dependency is whoever moves the
   // job it waits on (followed through the chain), so N dependants of one held job are ONE item naming that owner.

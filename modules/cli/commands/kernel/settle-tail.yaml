@@ -1,0 +1,41 @@
+# The contract of `api settle-tail` (scripts/kernel/verbs/settle-tail.mjs): the settle's async tail (owner ruling
+# settle-runtime-service, 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
+group: kernel
+verb: settle-tail
+owner: runtime
+summary: run the async tail of a settled job (artifact index, evidence, retention)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - settle-tail
+flags:
+  - name: job
+    type: string
+    required: true
+exit:
+  "0": done or already running
+  "1": failed (left queued for retry)
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel settle-tail --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api settle-tail
+  - node scripts/kernel/cli.mjs settle-tail
+purpose: "Run the heavy half of a settle for one settled job, off the settle's path: session
+  retention, the Telegram media sender, the input re-baseline, artifact indexing with its evidence
+  copy and typed logs. api settle queues it under <ledger dir>/settle-tail/<jobId>.json and starts
+  it detached; it can neither block nor fail the settle. A failed run is logged and retried by the
+  runtime settler (scripts/kernel/settle/job-settle.mjs) until allocation.settler.tail.maxAttempts."
+writes:
+  - events settle-tail-done / settle-tail-failed
+  - job_artifacts
+  - jobs.payload_json sessionReleased
+  - contracts.context_json inputs
+refusals:
+  job-unknown: no such job (its queue file is dropped)
+  job-not-settled: the job is not settled yet - the tail runs only after its settle
+kernelOnly: true

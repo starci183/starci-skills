@@ -55,7 +55,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/contract-changes/draw-new-rule.yaml', "id: draw-new-rule\neffectiveAt: '2026-09-27T20:00:00+07:00'\nsummary: \"The draw brief gained a rule\"\nreach: new-legs\nops: [interface.draw]\n");
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
-  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/kernel/api-commands/k${i}.yaml`, `k: ${i}\n`);
+  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/cli/commands/kernel/k${i}.yaml`, `k: ${i}\n`);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
   const C = git(root, 'rev-parse', 'HEAD');
   return { root, A, B, C, checkout: (rev) => git(root, 'checkout', '-q', rev) };

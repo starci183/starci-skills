@@ -974,6 +974,10 @@ moved:
   - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
   - {from: scripts/kernel/settle-landed.mjs, to: scripts/kernel/owned-path-effects.mjs, movedIn: WFWT2, quiesced: false}
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
+  - {from: modules/kernel/api-commands/, to: modules/cli/commands/kernel/, movedIn: c3-cli, quiesced: false}
+  - {from: scripts/checks/check-api-surface.mjs, to: scripts/checks/check-cli-parity.mjs, movedIn: c3-cli, quiesced: false}
+  - {from: scripts/kernel/verbs/check.mjs, to: scripts/kernel/verbs/record-checks.mjs, movedIn: c3-cli, quiesced: false}
+  - {from: tests/checks/check-api-surface.spec.mjs, to: tests/cli/cli-parity.spec.mjs, movedIn: c3-cli, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
   - {symbol: workerDoneOf, replacedBy: 'nothing: settle reads the Dispatch with worker-show; the bridged worker_done rows stay as the audit echo (orchestrationMessagesOf)'}

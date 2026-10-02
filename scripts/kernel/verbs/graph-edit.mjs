@@ -73,7 +73,7 @@ export default {
   verb: 'graph-edit',
   required: ['workflow', 'edit'],
   kernelOnly: true,
-  usage: '  graph-edit --workflow <id> --decision <id> --edit drop|widen|wire|continue|reorder|split|merge|params|scan|recut|undo ...   the Kernel\'s light, logged, reversible unit edits (modules/kernel/api-commands/graph-edit.yaml)',
+  usage: '  graph-edit --workflow <id> --decision <id> --edit drop|widen|wire|continue|reorder|split|merge|params|scan|recut|undo ...   the Kernel\'s light, logged, reversible unit edits (modules/cli/commands/kernel/graph-edit.yaml)',
   async run({ ledger, args, repo, emit }) {
     const db = ledger.db, wf = args.workflow, edit = String(args.edit), now = Date.now();
     if (!EDITS.includes(edit)) throw refuse(`--edit must be one of ${EDITS.join('|')}`, 'edit-invalid');

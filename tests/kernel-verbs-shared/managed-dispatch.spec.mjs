@@ -245,7 +245,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal(JSON.stringify(jobRow(fx.repo,jobId)).includes('dcap_fake'),false,'the capability is never stored on the job');
   assert.deepEqual([json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.outcome,json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.ok],['succeeded',true],'api report sent the worker_done and the job keeps its receipt');
   fx.env.STARCI_CALLER='runtime-settler';
-  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
+  const checked=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
     checks:[{name:'validator',command:'managed validation',exitCode:0,evidence:'green'}],
   }),'--json');
   delete fx.env.STARCI_CALLER;
@@ -326,7 +326,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
     schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
   assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--dispatch-capability','dcap_fake','--json').status,0);
   fx.env.STARCI_CALLER='runtime-settler';
-  assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
+  assert.equal(fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
   delete fx.env.STARCI_CALLER;
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(s.status,0,s.stderr||s.stdout);

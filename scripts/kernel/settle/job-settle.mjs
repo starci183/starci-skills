@@ -20,7 +20,7 @@
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
-// path as the Kernel's: `api check --checks-file` (the re-run results) then `api settle --verdict pass`, so every
+// path as the Kernel's: `api record-checks --checks-file` (the re-run results) then `api settle --verdict pass`, so every
 // refusal of settle (landed proof, cut checks, draw acceptance, handover approval ...) still holds; a refusal hands the
 // job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
 // partial report fails, a blocked or ask report settles blocked, a done report whose RAW re-run is red fails (claim
@@ -260,7 +260,7 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
 }
 
 /**
- * Is this reported job green? {green, reason?, detail?, checks?: envelope for api check (null: already recorded), via}
+ * Is this reported job green? {green, reason?, detail?, checks?: envelope for api record-checks (null: already recorded), via}
  * Seams: rerun (rerunCheck), canon (canonSliceCheck).
  */
 export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env,
@@ -313,7 +313,7 @@ export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
  * - never the exit the worker declared, never a check the Kernel recorded by hand. A declared red that is not
  * re-verifiable is the worker's own admission (declared-check-red, still subject to canon parity). A checker that could
  * not run is unavailable (H7): {green:false, unavailable:true}, never red. A red re-run carries its raw checks
- * envelope, so the settler records it (api check) before it settles the claim overruled.
+ * envelope, so the settler records it (api record-checks) before it settles the claim overruled.
  */
 async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, record }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
@@ -528,7 +528,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         if (dryRun) { out.settled.push({ jobId: item.jobId, via: verdict.via, dryRun: true }); continue; }
         if (verdict.checks) {
           const file = checksFile(fresh, verdict.checks);
-          const checked = api(['check', '--repo', path.resolve(repo), '--job', fresh.jobId, '--checks-file', file], { env });
+          const checked = api(['record-checks', '--repo', path.resolve(repo), '--job', fresh.jobId, '--checks-file', file], { env });
           try { fs.rmSync(file, { force: true }); } catch { /* temp */ }
           if (!checked.ok) { out.kernel.push(handToKernel(ledger, fresh, { reason: 'check-refused', code: checked.code, detail: [checked.error] }, { now: now() })); continue; }
         }

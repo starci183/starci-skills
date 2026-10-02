@@ -23,7 +23,7 @@
 // Runtime churn (2026-09-28: ~12 .claude lands in 90 min each made the fe-canon Kernel re-read and ack): a new
 // runtime rev asks the Kernel to re-read (kernelRev.stale, the wake line, the reread next action) ONLY when the land
 // touched the Kernel's own contract - KERNEL_CONTRACT_FILES (kernel-prompt.md, driver-loop.yaml, api.yaml,
-// api-commands/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
+// cli/commands/kernel/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
 // contract change with reach new-legs|follow-up that applies to it (its ops, an every-op change, or its paths in
 // that set). Every other land (reconciler, ui, gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code
 // silently. Coalescing: a re-read that touches no KERNEL_CONTRACT_FILES waits until REV_ACK_COALESCE_MS after the
@@ -47,7 +47,7 @@ export const OP_REV_DRIFT = 'op-rev-drift';
 export const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 /** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
-export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/kernel/api-commands', 'modules/kernel/owner-rulings.yaml']);
+export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
 /** A re-read of op contracts / contract changes alone is asked at most once per this window after the last ack. */
 export const REV_ACK_COALESCE_MS = 30 * 60_000;
 /** Contract changes with these reaches can require a Kernel re-read. */

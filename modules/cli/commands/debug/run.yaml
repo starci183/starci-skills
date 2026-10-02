@@ -1,0 +1,24 @@
+group: debug
+verb: run
+owner: runtime
+summary: run one allowlisted read-only runtime inspector
+impl:
+  script: scripts/cli/lib/debug-run.mjs
+positional:
+  - name: inspector
+    enum: [orca-status, runtime-status, supervisor-status]
+    required: true
+    variadic: false
+flags: []
+exit:
+  "0": inspector completed cleanly
+  "1": inspector found a problem or could not read its source
+  "2": unknown inspector or bad usage
+json: flag
+examples:
+  - starci debug run orca-status
+  - starci debug run runtime-status --json
+  - starci debug run supervisor-status
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

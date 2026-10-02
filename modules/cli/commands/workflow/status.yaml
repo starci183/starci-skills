@@ -1,0 +1,27 @@
+group: workflow
+verb: status
+owner: runtime
+summary: the workflow projection — phase, frontier, leases and pending owner asks
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - status
+flags:
+  - name: repo
+    type: string
+    summary: "repository whose .starciwork ledger holds the workflow (default: the working directory)"
+  - name: workflow
+    type: string
+    required: true
+    summary: the workflow_id
+exit:
+  "0": projection printed
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci workflow status --workflow <id>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed: []

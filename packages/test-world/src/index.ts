@@ -3,7 +3,7 @@
  *
  * A repository declares its world once in `src/tests/world/test-world.config.ts` with {@link defineTestWorld} and its specs
  * call the `useTestWorld` that declaration exports. The jest globalSetup/globalTeardown are the thin re-exports of
- * `@starci/test-world/global-setup` and `/global-teardown`; the warm docker stack is run by the `starci-test-stack` bin.
+ * `@starci/test-world/global-setup` and `/global-teardown`; the warm docker stack is run by `starci app stack`.
  */
 export { defineTestWorld } from "./config/define"
 export type { DefinedTestWorld } from "./config/define"

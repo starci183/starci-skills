@@ -1691,3 +1691,20 @@ rules:
     failureCodes: ["HFS_DOCKER_SECRETS"]
     enforcers:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  # R192-R197 belong to sibling chunks of lane/dv-c3-cli; this chunk owns R198 and R199.
+  - id: R198
+    code: "RT_CLI_CATALOG_DRIFT"
+    law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_CATALOG_DRIFT"]
+    enforcers:
+      - {kind: runtime, id: cli-catalog-drift, at: scripts/cli/gen-catalog.mjs}
+  - id: R199
+    code: "RT_CLI_VERB_PARITY"
+    law: "The CLI catalog of modules/cli/commands and the implementation agree: every catalog verb has a handler and a doc, every kernel verb module and cli.mjs dispatch case has a catalog file, and every --flag a verb module names (usage, required, api-boolean-flags.txt) is a catalog flag."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_VERB_PARITY"]
+    enforcers:
+      - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}

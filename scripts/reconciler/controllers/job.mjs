@@ -10,7 +10,7 @@
 //   held worker (frontier.heldWorkerJobs)       -> api reconcile --job <id> --release-worker                job.worker
 //   reported, not yet settled or handed over    -> the runtime settler for this job                          job.settle
 //                                                  (node scripts/kernel/settle/job-settle.mjs --repo R --job J: reconcileJobSettle -
-//                                                  consume, re-verify or canon parity, api check + api settle; wrapped, never
+//                                                  consume, re-verify or canon parity, api record-checks + api settle; wrapped, never
 //                                                  re-implemented)
 //   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
 //   answering                                   -> api questions --workflow (bridge) + DI worker-question    job.consume-check
@@ -81,7 +81,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
       WORKER_RELEASE_LEAK: num(sla.WORKER_RELEASE_LEAK, 60_000),
     },
     health: Object.fromEntries(Object.entries(HEALTH_DEFAULTS).map(([k, v]) => [k, num(doc.health?.[k], v)])),
-    allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
+    allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'record-checks', 'reconcile', 'enqueue', 'incident'],
   };
 }
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
@@ -295,7 +295,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
       return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
     case 'settle':
-      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api check + settle, release).
+      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };

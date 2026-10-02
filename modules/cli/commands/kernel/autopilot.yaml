@@ -1,0 +1,118 @@
+group: kernel
+verb: autopilot
+owner: runtime
+summary: record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - autopilot
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: sweep
+    type: boolean
+  - name: bundle
+    type: boolean
+  - name: checklist
+    type: boolean
+  - name: lang
+    type: enum
+    enum:
+      - vi
+      - en
+  - name: set
+    type: enum
+    enum:
+      - on
+      - off
+  - name: reason
+    type: string
+  - name: defer-to-handover
+    type: boolean
+  - name: op
+    type: string
+  - name: class
+    type: enum
+    enum:
+      - credential
+      - real-money
+      - shared-system
+      - owner-decision
+  - name: detail
+    type: string
+  - name: fields
+    type: string
+  - name: stub
+    type: string
+  - name: job
+    type: string
+  - name: release
+    type: string
+  - name: defer-leg
+    type: string
+  - name: reopen
+    type: string
+  - name: handover-answer
+    type: string
+  - name: note
+    type: string
+  - name: extend-budget
+    type: string
+  - name: by
+    type: enum
+    enum:
+      - supervisor
+      - kernel
+      - autopilot
+    default: supervisor
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel autopilot --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api autopilot
+  - node scripts/kernel/cli.mjs autopilot
+reads: modules/models/runtimes.yaml allocation.autopilot; the workflow's asks, incidents, jobs and
+  autopilot-* events; the product records a gate reads (draw loop, rationale, brand.direction) -
+  scripts/kernel/autopilot-run.mjs
+writes: "Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-rulings.yaml). Only
+  autopilot-* events, autopilot answer receipts (starci/ask-answer@1, answeredBy autopilot - never
+  owner) and supervisor-gate incidents. Without a mode it prints the status autopilot block. --sweep
+  runs what every api status runs (autopilot.mjs autopilotSweep): each pending ask is answered
+  provisionally (draw-review / brand-direction-review whose machine gates pass:
+  autopilot-provisional + ask-answered with provisional:true and acceptance {provisional, by:
+  autopilot, receipt: <gate evidence>}), answered redraw/revise with the gate findings
+  (autopilot-redraw, at most redrawBudget per record; a stale ask spends none), taken on its
+  recommendation (autopilot-recommended) or deferred to handover (autopilot-deferred-to-handover
+  {deferClass, fields, stubPath, owed}: credential, real-money, shared-system, owner-decision -
+  nothing is sent to the owner); every open owner-gate is re-routed to the Supervisor
+  (autopilot-gate-rerouted, kind supervisor-gate); a supervisor-gate older than
+  supervisorGateTimeoutMs defers what it holds (autopilot-deferred); a spent budget opens one
+  supervisor-gate holding ['*']; the owner's handover credential checklist answer supersedes the
+  credential asks it supplied (autopilot-credentials-supplied). --bundle prints the final review
+  bundle (starci/autopilot-bundle@1, \"backlog awaiting the owner's review\"; also in api survey
+  --deliveries .autopilot). --checklist prints the ONE end-of-flow credential question
+  (provision.ask subject handover-credentials). --set records a per-workflow override
+  (autopilot-configured). --defer-to-handover records an owner-only need without an ask. --release
+  puts a deferred ask back in the owner's queue (end of flow). --defer-leg is the Supervisor
+  deferring a leg to the final review. --reopen re-opens one provisional acceptance from the owner's
+  handover answer: the handover ask must be answered by the owner (owner-claim.mjs ownerAnswerProof)
+  and the owner's note is copied from that receipt (autopilot-provisional-reopened); nextActions
+  then retries only that op. --extend-budget raises the caps (autopilot-budget-extended)"
+returns: "{ok:true, workflowId, ...} - the projection, the sweep result, the bundle, the checklist
+  question or the recorded event payload"
+refuses:
+  - workflow-unknown
+  - "reason-missing: --set, --release, --defer-leg and --extend-budget need --reason"
+  - "class-invalid / defer-incomplete: --defer-to-handover needs --class, --op and --detail"
+  - "deferral-unknown: --release names no open deferred-to-handover item"
+  - "owner-claim-unproven: --reopen needs a handover ask the owner answered"
+usedBy: the Supervisor (fixes, decisions, budgets) and the Kernel (--checklist,
+  --defer-to-handover); api status runs the sweep on every read

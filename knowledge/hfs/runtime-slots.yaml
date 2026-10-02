@@ -124,7 +124,8 @@ ruleParams:
     selfChecks:
       - {id: ops-registry, run: scripts/route/build-ops-registry.mjs, args: [--check]}
       - {id: providers, run: scripts/checks/check-providers.mjs}
-      - {id: api-surface, run: scripts/checks/check-api-surface.mjs}
+      - {id: cli-catalog-drift, run: scripts/cli/gen-catalog.mjs, args: [--check]}
+      - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
       - {id: work-deep, run: scripts/work/validate/check-work-deep.mjs}
@@ -384,13 +385,13 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
   - id: runtime.kernel-verbs
     profiles: [runtime]
-    # One file per modules/kernel/api-commands/<verb>.yaml (check-api-surface).
+    # One file per modules/cli/commands/kernel/<verb>.yaml (check-cli-parity).
     path: "scripts/kernel/verbs/<verb>.mjs"
     presence: required
     tracked: tracked
     tier: inherit
     tests: none
-    requires: ["/modules/kernel/api-commands/<verb>.yaml"]
+    requires: ["/modules/cli/commands/kernel/<verb>.yaml"]
     rules: [RT_TIER_DIRECTION]
   - id: runtime.supervisor
     profiles: [runtime]
@@ -424,7 +425,7 @@ slots:
   - id: runtime.domain
     profiles: [runtime]
     # One capability per folder; owners import each other without cycles.
-    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work}/"
+    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work,cli}/"
     presence: required
     tracked: tracked
     tier: domain
@@ -472,7 +473,16 @@ slots:
   # ----- contracts, knowledge, docs, skills ---------------------------------------------------------------------
   - id: runtime.contracts
     profiles: [runtime]
-    path: "modules/{kernel,goal,ops,host,models,reconciler,schemas,supervisor}/"
+    path: "modules/{cli,kernel,goal,ops,host,models,reconciler,schemas,supervisor}/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [RT_CITED_PATH_MISSING]
+  - id: runtime.cli-catalog
+    profiles: [runtime]
+    # The unified starci CLI catalog (scripts/cli/catalog.mjs validates; gen-catalog.mjs generates packages/cli + docs/cli.md from it).
+    path: "modules/cli/commands/{_global.yaml,<group>/_group.yaml,<group>/<verb>.yaml}"
     presence: required
     tracked: tracked
     tier: none
@@ -576,7 +586,7 @@ slots:
   - id: runtime.package
     profiles: [runtime]
     # A published @starci package: its own layout under its own package.json; specs beside the source as <name>.spec.*.
-    path: "packages/{fe-kit,grammar,heroicons,hfs,jest-preset,prettier-config,stylelint,test-world,tsconfig,eslint/be,eslint/fe}/"
+    path: "packages/{cli,fe-kit,grammar,heroicons,hfs,jest-preset,prettier-config,stylelint,test-world,tsconfig,eslint/be,eslint/fe}/"
     presence: required
     tracked: tracked
     tier: package

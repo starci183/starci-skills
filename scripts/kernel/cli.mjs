@@ -29,7 +29,7 @@
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
 //   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>] [--dispatch-capability <cap>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
-//   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
+//   record-checks --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
 //   (enqueue also takes [--after <jobId>,...]: jobs that must settle succeeded first)
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
@@ -215,7 +215,7 @@ const isCheckResultEnvelope = (value) => {
     return true;
   });
 };
-// A red check api check marked `advisory` (a check or finding code a contract change added after
+// A red check api record-checks marked `advisory` (a check or finding code a contract change added after
 // the leg was admitted) is a suspect, and one it marked `peerBlocked` (its failing files are a
 // peer's change, scripts/kernel/gate-attribution.mjs) is the peer's: neither counts passed or
 // failed, and a pass still needs at least one green check.
@@ -233,7 +233,7 @@ const summarizeCheckEvidence = (value) => {
   if (isCheckResultEnvelope(value)) {
     const advisory = value.checks.filter(isAdvisoryCheck).length;
     const peerBlocked = value.checks.filter(isPeerBlockedCheck).length;
-    // A measurement leg's check that ran and measured findings (api check marks it `measured`,
+    // A measurement leg's check that ran and measured findings (api record-checks marks it `measured`,
     // scripts/kernel/verify-failure.mjs) is a completed measurement: it counts passed.
     const measured = value.checks.filter(isMeasuredCheck).length;
     const declared = value.checks.filter(isDeclaredGreen).length, unavailable = value.checks.filter(isUnavailableCheck).length;
@@ -298,7 +298,7 @@ const usage = (code) => {
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
-  messages  --workflow <id> [--all]   every orchestration message on the workflow's Runs (read-only; the 'You have N orchestration messages' notice)
+  messages  --workflow <id>   every orchestration message on the workflow's Runs (read-only; the 'You have N orchestration messages' notice)
   reply    --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
   peers    --workflow <id>
   notify   --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply|follow-up>
@@ -310,7 +310,7 @@ const usage = (code) => {
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
-  check    --job <job_id> (--checks '<json>' | --checks-file <path>)
+  record-checks --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
   retire-ask --workflow <id> --dispatch <id> --reason <text>
@@ -2583,7 +2583,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       AND (dispatch_id=? OR attempt_id=(SELECT max(attempt_id) FROM op_attempts WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`)
     .get(job.workflow_id, reportDispatchIdOf(db, job), jobId);
   if (report) {
-    const next = report.consumed_at ? 'api check, then api settle' : 'api consume-report, api check, then api settle';
+    const next = report.consumed_at ? 'api record-checks, then api settle' : 'api consume-report, api record-checks, then api settle';
     const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker,
       report: { dispatchId: report.dispatch_id, outcome: report.outcome, consumed: Boolean(report.consumed_at) }, next };
     emit(out, `reconcile ${jobId}: the dead worker filed report ${report.dispatch_id} (${report.outcome}); nothing written - ${next}`, args.json);
@@ -2604,8 +2604,8 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     if (salvage?.salvaged) {
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'report-salvaged',
         payload: { opId: op, attempt: tryOf(job), file: salvage.salvaged.file, outcome: salvage.salvaged.outcome, liveness: worker.liveness, tried: salvage.tried.length } });
-      const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'api consume-report, api check, then api settle' };
-      emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - api consume-report, api check, then api settle`, args.json);
+      const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'api consume-report, api record-checks, then api settle' };
+      emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - api consume-report, api record-checks, then api settle`, args.json);
       return;
     }
   }
@@ -2918,7 +2918,7 @@ const openRouteGate = (ledger, job, detail, route) => {
 /** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
 const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && /^\.starciwork\//.test(p));
 /**
- * The report's own red checks, attributed like api check attributes the Kernel's (gate-attribution.mjs):
+ * The report's own red checks, attributed like api record-checks attributes the Kernel's (gate-attribution.mjs):
  * {peer:true, checks[], peers[], routes[]} when every red check (at least one) names files and reads
  * `peer`, and no check the Kernel recorded for this attempt read `own`; else {peer:false, reason}.
  */
@@ -3057,7 +3057,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
     // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db and another
     // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
-    // report's own checks pin on a peer's change settles peer-blocked like api check's (no business
+    // report's own checks pin on a peer's change settles peer-blocked like api record-checks's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
     const foreignRoot = envelope?.rootCause && envelope.rootCause.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
     if (foreignRoot && route.then === 'retry' && targets.length === 1 && targets[0] === op) {

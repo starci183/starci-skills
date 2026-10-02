@@ -4,10 +4,10 @@
 // in via --hosts). Nothing here is a framework the tree depends on at run time. The CLI has no
 // dependencies and needs Node 22.13+.
 //
-//   npx starci init            install the tree into ./.claude and write the bootstrap
-//   npx starci update          bring an installed tree to this package's version
-//   npx starci doctor          run the tree's own validators on the installed copy
-//   npx starci version
+//   starci runtime install     install the tree into ./.claude and write the bootstrap
+//   starci runtime update      bring an installed tree to this package's version
+//   starci runtime doctor      run the tree's own validators on the installed copy
+//   starci runtime version
 //
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
@@ -239,11 +239,11 @@ function checkInstalledProtocol(manifest) {
   const marker = manifest?.installProtocol;
   const object = marker && typeof marker === 'object' && !Array.isArray(marker);
   if (!object || marker.schema !== INSTALL_PROTOCOL_SCHEMA || engineRank(marker.engine) === null) {
-    throw new Error(`${MANIFEST} does not record this installer's protocol; remove .claude by hand and run init - older trees are cleaned manually, never upgraded in place`);
+    throw new Error(`${MANIFEST} does not record this installer's protocol; remove .claude by hand and run starci runtime install - older trees are cleaned manually, never upgraded in place`);
   }
   const installed = engineRank(marker.engine), current = engineRank(requireEngineSchema());
   if (installed > current) throw new Error(`installed workflow protocol ${marker.engine} is newer than supported ${requireEngineSchema()}`);
-  if (installed < current) throw new Error(`installed workflow protocol ${marker.engine} predates ${requireEngineSchema()}; remove .claude by hand and run init - older trees are cleaned manually, never upgraded in place`);
+  if (installed < current) throw new Error(`installed workflow protocol ${marker.engine} predates ${requireEngineSchema()}; remove .claude by hand and run starci runtime install - older trees are cleaned manually, never upgraded in place`);
 }
 
 // Authored documentation roots are never cleanup targets: notes an earlier payload installed stay for
@@ -374,7 +374,7 @@ export function update(opts, log = console.log) {
   const target = path.resolve(opts.dir, '.claude');
   safePayloadTarget(target);
   const manifest = readManifest(target);
-  if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run init first`);
+  if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run starci runtime install first`);
   checkInstalledProtocol(manifest);
   const profile = selectedProfile(opts);
   const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, opts) : null;
@@ -418,7 +418,7 @@ export function doctor(opts, log = console.log) {
   // The kernel api gate is the modernity marker of the current layout: a tree without it is not an
   // installed StarCi runtime, no matter what else is present.
   if (!existsSync(path.join(target, 'scripts', 'kernel', 'cli.mjs'))) {
-    throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/cli.mjs; run init first`);
+    throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/cli.mjs; run starci runtime install first`);
   }
   const testsDir = path.join(target, 'tests');
   const specs = existsSync(testsDir) ? readdirSync(testsDir, { recursive: true }).map((name) => String(name).split(path.sep).join('/')).filter((name) => name.endsWith('.spec.mjs')).sort() : [];
@@ -449,12 +449,12 @@ export function doctor(opts, log = console.log) {
 
 const HELP = `${pkg.name} ${pkg.version}
 
-  npx ${pkg.name} init   [--dir <repo>] [--force] [--no-bootstrap] [--hosts claude,devin]
-  npx ${pkg.name} update [--dir <repo>] [--force] [--hosts claude,devin]
-  npx ${pkg.name} doctor [--dir <repo>] [--quick]
-  npx ${pkg.name} version
+  starci runtime install [--cwd <repo>] [--force] [--no-bootstrap] [--hosts claude,devin]
+  starci runtime update  [--cwd <repo>] [--force] [--hosts claude,devin]
+  starci runtime doctor  [--cwd <repo>] [--quick]
+  starci runtime version
 
-init    copies the runnable source payload into <repo>/.claude, then records the install manifest.
+install copies the runnable source payload into <repo>/.claude, then records the install manifest.
         Seeds an untracked .claude/config.yaml from config.example.yaml; installs the entry skills
         (define-goal, start-kernel) into the host's .devin/skills/ and .agents/skills/ dirs when they
         exist; writes the managed StarCi entry into AGENTS.md — CLAUDE.md/DEVIN.md copies only when
@@ -466,7 +466,7 @@ update  replaces current runtime paths; locally changed current files are kept u
         new version. Manifest-owned files the payload no longer ships are removed when unchanged;
         changed or unowned files are preserved. Product .starciwork ledgers and owner config are
         never cleanup targets. An install recorded under any other protocol is not upgraded in
-        place: remove .claude by hand and run init.
+        place: remove .claude by hand and run starci runtime install.
 doctor  runs the installed tree's own tests/*.spec.mjs and reports drift against the manifest.
         --quick runs the core kernel/ledger subset when those specs ship.
 entry   one AGENTS.md prompt-entry: define-goal / start-kernel lifecycle skills. A bootstrap carrying

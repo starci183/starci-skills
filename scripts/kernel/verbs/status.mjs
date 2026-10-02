@@ -460,7 +460,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       : frontierState === 'worker-question'
       ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked or escalated to the coordinator through Orca and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
-      ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
+      ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api record-checks and api settle for each before yielding`
       : frontierState === 'worker-dead'
       ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} read running but their worker can never file a report; run api reconcile --job <id> --dead-worker --settle-failed for each (the watchdog does it on its next tick)`
       : frontierState === 'worker-wedged'

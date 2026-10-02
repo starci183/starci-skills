@@ -1,0 +1,19 @@
+group: runtime
+verb: check
+owner: runtime
+summary: judge the runtime tree — node --check, the runtime HFS check, the retained self-checks
+impl:
+  script: scripts/checks/check-runtime.mjs
+flags: []
+exit:
+  "0": every step passed
+  "1": a check failed or found error findings
+  "2": bad usage
+json: flag
+examples:
+  - starci runtime check
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci check

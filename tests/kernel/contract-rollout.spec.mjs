@@ -155,17 +155,17 @@ const fixture=t=>{
   return {repo,wf,api,ok,seed,read,leg};
 };
 
-test('api check records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
+test('api record-checks records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
   const fx=fixture(t);
   fx.leg('job-old-draw','interface.draw',T_TREE+60_000);
   fx.leg('job-new-draw','interface.draw',Date.now());
   const checks=JSON.stringify({checks:[{name:'unit',exitCode:0},{name:'shell-conformance',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE'],evidence:'desktop only'}]});
-  const old=fx.ok(['check','--job','job-old-draw','--checks',checks]);
+  const old=fx.ok(['record-checks','--job','job-old-draw','--checks',checks]);
   assert.deepEqual(old.checkEvidence,{observed:2,passed:0,failed:0,green:false,declared:1,advisory:1});
   assert.deepEqual(old.advisory,[{name:'shell-conformance',changes:['part-review-matrix']}]);
   const stored=fx.read(db=>JSON.parse(db.prepare("SELECT summary_json FROM check_runs WHERE job_id=? AND name='shell-conformance' ORDER BY check_id DESC LIMIT 1").get('job-old-draw').summary_json).entry);
   assert.match(stored.advisory.reason,/added by part-review-matrix after this leg was admitted/);
-  const current=fx.ok(['check','--job','job-new-draw','--checks',checks]);
+  const current=fx.ok(['record-checks','--job','job-new-draw','--checks',checks]);
   assert.deepEqual(current.checkEvidence,{observed:2,passed:0,failed:1,green:false,declared:1},'a leg admitted after the change is held to it');
   assert.equal(current.advisory,undefined);
 

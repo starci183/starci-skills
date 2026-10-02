@@ -2,8 +2,8 @@
 // draw-gates.mjs — every gate an interface.draw pass is judged by, run locally in one command BEFORE the drawer reports
 // (lane op-draw, 2026-09-28). Measured 2026-09-27: 18 interface.draw jobs failed after the drawer reported, most on a
 // gate it never ran or ran differently from the runtime (a strict validate of a whole ui tree, a hand-picked ui-proof
-// score, the owner gate mistaken for a failure). This runs exactly what api settle and api check run, in their order,
-// and prints the report.checks entries - each red one with `failing` (the implicated files), so api check attributes
+// score, the owner gate mistaken for a failure). This runs exactly what api settle and api record-checks run, in their order,
+// and prints the report.checks entries - each red one with `failing` (the implicated files), so api record-checks attributes
 // a red gate on a record outside the job's owned paths instead of spending the attempt on it.
 //
 //   node scripts/work/draw-gates.mjs --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure]
@@ -17,7 +17,7 @@
 //                     (DRAW_METRICS_FAILED / DRAW_METRICS_UNVERIFIED / DRAW_FEEDBACK_UNADDRESSED). --no-remeasure
 //                     skips it (it renders; the settle still runs it).
 //   validate-strict   bin/starci.mjs validate <ui dir> --strict: each refused record is named in `failing`; a refusal
-//                     in a child record outside the job's owned paths is attributed foreign by api check.
+//                     in a child record outside the job's owned paths is attributed foreign by api record-checks.
 //   shell-conformance scripts/work/ui/shell-conformance.mjs <ui dir>.
 //   draw-layer        scripts/work/draw/draw-layer.mjs over every live part (standard principles of every drawing, owner
 //                     2026-09-28): DRAW_NESTED_VARIANT on its rendered DOM, DRAW_MEASURE_UNCAPPED on its record's
@@ -45,7 +45,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const rel = (repo, p) => slash(path.relative(repo, p));
 const uniq = (xs) => [...new Set(xs.filter(Boolean))];
 
-/** The command line a gate is re-run by (the evidence names it, api check records it). */
+/** The command line a gate is re-run by (the evidence names it, api record-checks records it). */
 const cmd = (script, args) => `node ${slash(path.join(SKILL_ROOT, script))} ${args.join(' ')}`;
 
 /** The repo-relative file a finding implicates: its path, else the record. */

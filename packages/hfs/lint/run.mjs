@@ -1,12 +1,12 @@
-// hfs lint - the ONE lint entry and the ONE report of a StarCi app.
+// starci app lint - the ONE lint entry and the ONE report of a StarCi app.
 //
-//   hfs lint [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
+//   starci app lint [--cwd <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 //
 // It runs at the app root (the folder of hfs.json), over the app (or over the app-relative files named by --changed):
 //   1. ESLint once per side, from the side folder, through the app's own install and that side's eslint.config.mjs (be/ the be canon,
 //      fe/ the fe canon: the per-file rules and the project-graph rules of the architecture machine, findings on the line of the
 //      offending TypeScript file); each side lints only its own files, so the be rules never see fe/ and the fe rules never see be/;
-//   2. `hfs check` for what has no TypeScript file to sit on (the tree, managed files, pins, CI, contracts, docs, .starciwork), root and sides;
+//   2. `starci app check` for what has no TypeScript file to sit on (the tree, managed files, pins, CI, contracts, docs, .starciwork), root and sides;
 //   3. stylelint over the fe side's stylesheets (sync STYLE_GLOB), from fe/ with its stylelint.config.mjs.
 // Their findings become one list of one shape (`starci/lint@1`), every path app-relative. `--format json` prints that report on stdout;
 // `--sonar <file>` writes the same findings as THE Sonar Generic Issue Import file (engine ids starci-hfs, eslint, stylelint in one
@@ -39,16 +39,17 @@ export function workspaceOf(workspace) {
   return rel;
 }
 
-/** The flags of `hfs lint`; `--changed` takes every argument up to the next flag. */
+/** The flags of `starci app lint`; `--changed` takes every argument up to the next flag. */
 export function parseLintArgs(argv) {
-  const opts = { changed: null, fix: false, format: 'text', repo: undefined, sonar: undefined, workspace: undefined };
+  const opts = { changed: null, fix: false, format: 'text', sonar: undefined, workspace: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(posix(argv[++i]));
     } else if (arg === '--fix') opts.fix = true;
-    else if (['--format', '--repo', '--sonar', '--workspace'].includes(arg)) {
+    else if (arg === '--json') opts.format = 'json';
+    else if (['--format', '--sonar', '--workspace'].includes(arg)) {
       if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}`);
@@ -97,7 +98,7 @@ const byLocation = (a, b) => `${a.path ?? ''}:${String(a.line ?? 0).padStart(7, 
 const onSide = (changed, side) => changed.filter((file) => file.startsWith(`${side}/`)).map((file) => file.slice(side.length + 1));
 
 /**
- * Run the whole lint of the app at `repoRoot`. `hfsCheck(repoRoot)` returns the `hfs check` result (`{ findings, tracked }`); the CLI
+ * Run the whole lint of the app at `repoRoot`. `hfsCheck(repoRoot)` returns the `starci app check` result (`{ findings, tracked }`); the CLI
  * injects it. Returns `{ report, sonar, exit }`; `sonar` is the merged Generic Issue Import document.
  */
 export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = () => [] }) {
@@ -115,8 +116,8 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   const engines = {};
 
   let app = null;
-  try { app = readRepoDeclaration(loadSlotManifest(), repoRoot); } catch (error) { errors.push(`hfs lint runs at the app root: ${String(error?.message ?? error)}`); }
-  if (app && !app.sides) { errors.push(`${repoRoot} is the ${app.side} side of an app; hfs lint runs at the app root, the folder of hfs.json`); app = null; }
+  try { app = readRepoDeclaration(loadSlotManifest(), repoRoot); } catch (error) { errors.push(`starci app lint runs at the app root: ${String(error?.message ?? error)}`); }
+  if (app && !app.sides) { errors.push(`${repoRoot} is the ${app.side} side of an app; starci app lint runs at the app root, the folder of hfs.json`); app = null; }
   if (opts.workspace !== undefined && workspace === null) app = null;
   if (workspace !== null && !fs.existsSync(path.join(repoRoot, workspace, 'package.json'))) { errors.push(`--workspace ${workspace} holds no package.json; it is not a workspace of this app`); app = null; }
   /** The workspace folder relative to the fe side folder (apps/<app> or packages/<pkg>). */
@@ -159,7 +160,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   // 2. The app check: root and sides.
   let checked = { findings: [] };
   if (app) {
-    try { checked = await hfsCheck(repoRoot); } catch (error) { errors.push(`hfs check could not run: ${String(error?.message ?? error)}`); }
+    try { checked = await hfsCheck(repoRoot); } catch (error) { errors.push(`starci app check could not run: ${String(error?.message ?? error)}`); }
   }
   const repoErrors = checked.findings.filter((finding) => finding.level === 'error');
   // A workspace lint keeps only the app findings inside the workspace; the rest belong to the root lint of the whole app.
@@ -189,5 +190,5 @@ export function printLintText(report, out) {
   for (const f of report.findings) out(`${f.path ?? '-'}${f.line ? `:${f.line}${f.column ? `:${f.column}` : ''}` : ''}  ${f.engine}/${f.rule}  ${f.message}\n`);
   for (const e of report.errors) out(`ERROR ${e}\n`);
   const per = Object.keys(report.engines).map((engine) => `${engine} ${report.findings.filter((f) => f.engine === engine).length}`).join(', ');
-  out(`\nhfs lint: ${report.counts.error} finding${report.counts.error === 1 ? '' : 's'} (${per})${report.errors.length ? `, ${report.errors.length} tool error${report.errors.length === 1 ? '' : 's'}` : ''}\n`);
+  out(`\nstarci app lint: ${report.counts.error} finding${report.counts.error === 1 ? '' : 's'} (${per})${report.errors.length ? `, ${report.errors.length} tool error${report.errors.length === 1 ? '' : 's'}` : ''}\n`);
 }

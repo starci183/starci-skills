@@ -1,0 +1,248 @@
+group: kernel
+verb: settle
+owner: runtime
+summary: "settle a consumed report: pass, fail or blocked verdict"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - settle
+flags:
+  - name: job
+    type: string
+    required: true
+  - name: verdict
+    type: enum
+    enum:
+      - pass
+      - fail
+      - blocked
+    required: true
+  - name: tool-error
+    type: boolean
+  - name: report
+    type: string
+  - name: sync-tail
+    type: boolean
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel settle --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api settle
+  - node scripts/kernel/cli.mjs settle
+failureClass: "A fail settle records result_json.failureClass {class, reason}
+  (scripts/kernel/verify-failure.mjs classifyFailure over the filed report, the recorded checks and
+  the lineage's previous attempt) and the route shape carries it as `class`
+  (modules/models/kinds.yaml vocabularies.failureClasses): environment, tool, findings, product,
+  deterministic, transient. Only transient runs failed-retries-the-same-op; a product or findings
+  failure whose rootCause resolves to a build op (an op name, rootCause.op, or a Work record id
+  whose repository role picks backend.implement / interface.implement) enqueues a repair of THAT op
+  - reopening the job that already owns the record, else a fresh job on the record's owner paths
+  carrying payload.repairFor - and the verify again behind it (nextStep.kind repair,
+  nextStep.owner). A failure with no repairable owner gates for the owner with its class instead of
+  a blind retry."
+measurementLeg: A review.verify job in mode lint is a MEASUREMENT leg unless params.lintRole says
+  gate, or (auto) a build op of its workflow settled succeeded before it was enqueued. `api check`
+  marks its checks whose nonzero exit is a measured result (canon-scan 1, gate.mjs 1/2, lint 1 - not
+  canon-scan 2/3 or a run that did not execute) as measured and they count passed; settle --verdict
+  pass accepts its report even when filed `failed` for findings alone (result.measurement), and
+  settle --verdict fail on findings alone is refused measurement-findings-are-the-result unless
+  --tool-error says a checker did not run.
+checkpoint: "No op commits: in a workflow worktree the runtime is the only committer. As the LAST
+  step of a pass, once every other settle refusal passed, settle commits exactly the op's owned
+  paths on the workflow branch as the workflow's checkpoint (scripts/kernel/workflow-checkpoint.mjs
+  checkpointOp, event workflow-checkpoint; workflow-foreign-commit when the branch head is not the
+  last checkpoint, workflow-foreign-change when a change lies under no live op's leases); a fail or
+  blocked verdict preserves the op's owned paths and any foreign change to
+  preserved/<workflowId>/<op> and resets them (preserveAndReset, event workflow-op-preserved). The
+  op's gate JSON must measure against the previous checkpoint (op-gate-base-mismatch). The receipt
+  and result_json carry `checkpoint`."
+reads: the job row (complete identity + lease_token); the reports row for the job''s dispatch_id -
+  the kernel consumed it earlier via `api consume-report`; the report file; the ops declared checks;
+  the checks row the kernel''s re-run recorded
+writes: jobs.status -> succeeded|failed|awaiting_owner + result_json {verdict,...} (a blocked
+  verdict settles failed; the typed blocker rides the report; a blocked verdict on a filed `ask`
+  report settles awaiting_owner with verdict awaiting-owner - verdict-contract.yaml
+  retryAccounting.ownerWait); the reports row''s consumed_at is set - consumption the kernel did not
+  mark via `api consume-report` is enforced by settle itself, so a report is never settled
+  unconsumed; lease and budget_reservation rows released - a settle frees the slot; the worker
+  terminal is closed (terminal-close for a command terminal; worker-release for a managed worker,
+  preceded by worker-stop only when worker-show reads the Dispatch not settled by the op's own
+  worker_done - managedWorker.dispatch {state, workerDone} on the receipt and the job payload). The
+  op's Orca Task settled with its Dispatch (the op sent worker_done after api report); settle never
+  issues task-update. A settled op leaves no live terminal, worker or open Task
+  (modules/kernel/start-workflow.yaml orcaTree is the rule); events 'op-settled' {verdict}; the
+  settled op's agent session files may then move under the archive root (scripts/machine/home.mjs
+  archiveRoot) keeping their relative path - a move, never a delete, and never the live kernel's own
+  session or one whose terminal is still open (the per-op session release at settle). Worker-visible
+  only as 'the session transcript may live under archiveRoot after settle'
+validates: "The reports ROW is the durable verdict - filed by `api report`, integrated by `api
+  consume-report`; the done-marker/message is only the wake-up and the file is the bound artifact
+  (modules/kernel/verdict-contract.yaml envelope). validateOpReport runs starci/op-report@1 at
+  filing (`api report`; alpha.3: the reports row of the job's attempt is the ONLY report, a --report
+  path is ignored with a warning): outcome's payload present, files inside the job's owned_paths,
+  identity bound to the job. `pass` records only after the declared checks re-ran green (`api check`
+  row) - evidence is bytes on disk, never words in a summary (verdict-contract.yaml accepts). A
+  filed envelope's outcome normally agrees with the verdict (pass<->done, fail<->failed|partial,
+  blocked<->blocked|ask). The report is a worker claim, not authority: a recorded red Kernel check
+  may overrule `done` to `fail`, settle the attempt and release its worker. Any other contradiction
+  refuses 'verdict-outcome-mismatch'; a dispatch with no filed report at all (a dead worker) still
+  settles on the kernel's verdict, recorded reportFiled:false. The job moves along job_transitions
+  (reported -> succeeded|failed; running -> failed with no report), the result is recorded on the
+  attempt (settle_json, verdict, settled_by kernel or settler), the report is consumed, the unit
+  moves done|failed, and the Work yaml files the report names are cited (work_citations). A job that
+  was never dispatched is refused job-not-dispatched (reconcile --drop)."
+handover: "A `pass` of a handover.review job is the owner's approval turned into a ledger fact.
+  Settle reads the latest handover ask filed before this attempt and its serve-ask answer receipt
+  (scripts/kernel/handover.mjs handoverApprovalOf): the ask must be answered, the receipt bound to
+  that ask, the picked option approve, and both the receipt and the ask-answered event must name
+  answeredBy owner - a delegated answer never approves - and no business job (any op but
+  handover.review) may have settled after the ask was filed. Then, after op-settled, it appends
+  `handover-approved` {jobId, dispatchId (the answered ask), answeredBy, at (the answer time),
+  askJobId, receiptPath, lastBusinessSettleSeq} and returns handoverApproved on the receipt; `api
+  finish` reads that event."
+artifacts: "After every settle - pass, fail, blocked and failed-no-report - and for every job `api
+  archive` drops after it ran, what the settler owns of the attempt is indexed into job_artifacts
+  (scripts/kernel/job-artifacts.mjs indexJobArtifacts), bytes in the blob store, keyed (attempt_id,
+  name), origin settler: patch.diff (git format-patch over the owned paths: from the landed sha,
+  else the report head, labelled unlanded; written in a private temp directory, never in the
+  repository), patch.json + patch.assets/* (the same diff pre-structured, subkind patch-json) and
+  recordings/* (the Playwright video, trace and screenshots its uat-slots runs wrote under
+  STARCI_UAT_RECORDINGS_ROOT). The op's own outputs were filed by api report. Every new artifact of
+  the attempt gets its artifact_proofs row (claims, code sha, dependency digests;
+  scripts/kernel/proof-integrity.mjs) and the settle appends `artifacts-indexed` {jobId, attemptId,
+  indexed, added, proofs, byKind, bySubkind, artifacts:[{id, name, sha256}]} - the events digest
+  chain covers every artifact - and returns `artifacts` on the receipt; an index failure never
+  un-settles. Nothing is copied into .starciwork/kernel-evidence any more."
+proofMedia: "A pass of an op whose manifest declares policy.proofMedia {images, video:
+  required|when-browser} owes that visual proof among the files it names, checked before anything is
+  written: at least `images` images, and a video when video is required or a browser ran (a trace or
+  video was produced, or a recorded check drove a browser). A leg admitted before contract change
+  job-proof-media settles as it was admitted."
+cutSet: "A cut pass records result.cutSet {id, total, closesSet, open[]} on the job and the
+  op-settled event. The closing pass (closesSet true) also appends `cut-set-closed` {op, cut,
+  closedBy, ordinal, check: full-regression-final}: the set counts done only there, after the
+  unchanged full gates ran green over every ordinal. `api status` cutSets names the pass that will
+  close each open set before it happens."
+peerBlocked: "When the recorded checks hold a peerBlocked check and no failed one, result_json and
+  the op-settled event carry peerBlocked {checks[], peers[], routes[]}. A fail or blocked settle so
+  marked spends no business attempt (engine/admission.mjs retryDisposition retryClass peer-blocked),
+  never demotes the pool (lineage-route.mjs cause peer-blocked) and is no step of an OWED retry-loop
+  or repeat-check. The Kernel runs each route: `api incident --kind peer-wait --peer <wf>
+  --until-job <job>:succeeded` for a peer's in-flight change, `api incident --kind shared-blocker
+  --introduced-by <sha>` for a landed one; a sibling job of its own workflow is sequenced, not
+  waited on."
+nextStep: "A fail verdict that no peer check caused runs its route (scripts/kernel/cli.mjs
+  enqueueNextStep over modules/models/kinds.yaml routes) in the settle's transaction: the route key
+  is verdict no-report when no report was filed, verdict rejected for a done claim the checks
+  overruled, else the report outcome; an explicit `from` wins over `any`. It fires at most `limit`
+  times per node group - the failed job's retry lineage, counted from each row's
+  result_json.nextStep since that route's last owner gate. It queues retryReason.auto jobs: `retry`
+  (the same op, --retry-of the failed job), `repair` (the latest job of the route's target op on the
+  same records - `lane.build` is the build step of the reporter's lane - run again, and for then
+  reopen|pause the reporter again --after it) or `root-verify` (the report's rootCause.node names
+  another op with a job: a read-only review.verify owning only that job's .starciwork record paths,
+  payload.rootVerify {node, claim, of, rootJob}, and the reporter again --after it). Past the limit,
+  or on a needUser route, it opens an owner-gate incident holding the failed job alone. The step is
+  recorded as result_json.nextStep {kind:retry|repair|root-verify|owner-gate|none, route, limit,
+  firing, counted?, jobs[], incidentId?, rootCause?, reason} (kind also peer-blocked|root-elsewhere)
+  and a 'failure-routed' event. A host terminal wipe (reconcile.settleFailed environment) fires with
+  counted:false. A report whose rootCause.self is false and whose route would re-run the same op
+  (partial, failed) is never re-run blind when no job of this workflow can verify the root: when
+  every red check of the report names files that attribute peer (as api check attributes) and no
+  Kernel check read own, the step is peer-blocked {rootCause, jobs:[]} and result_json.peerBlocked
+  {checks, peers, routes, source:report} is recorded (no business attempt; run the settle's
+  peerBlocked routes); otherwise root-elsewhere {rootCause, jobs:[], reason}: nothing is queued,
+  counted:false, and status nextActions names the failed job, so the Kernel hands the root to its
+  owner (a shared-blocker, a widened owned-paths re-enqueue for a scope gap) before it enqueues the
+  op again"
+returns: "{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome,
+  checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]},
+  cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed,
+  managedWorker?, checkpoint?:{kind, sha, committed, scope, files} | {kind, preservedRef, resetTo,
+  sha}}"
+opRevDrift: "WARN, never a refusal: when the op's contract files changed on the runtime between the
+  rev the leg was dispatched under (contracts.context_json.contract.runtimeSha) and the current
+  HEAD, settle appends one op-rev-drift event {op, attempt, from, to, files} (typed log warning
+  op-rev-drift, api status opRevDrift) and returns it as opRevDrift; the leg is judged as admitted"
+refuses:
+  - "job-not-dispatched: the job never crossed dispatch (queued, ready or leased); retire it with
+    api reconcile --drop"
+  - pass-report-missing: pass requires the exact filed done report; a dead or silent worker cannot earn pass
+  - checks-not-green: pass requires at least one independently recorded green check and zero red checks
+  - cut-checks-missing: "a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or
+      the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is
+      the one that leaves no other ordinal of {op, cut id} open - every other ordinal's latest job
+      already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule
+      (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which
+      case applies"
+  - verdict-outcome-mismatch: the filed envelope outcome contradicts the verdict and no red Kernel check
+      proves a done claim false
+  - "handover-not-approved: a handover.review pass without the owner's approve receipt for the
+    latest handover ask, with a delegated (non-owner) answer, or with a business settle after that
+    ask was filed (settle.handover); nothing is written and the job keeps its status"
+  - job-settled: job already settled - a duplicate settle is refused, never double-counted (an
+      effect_unknown job MAY settle again - it is not a settled status)
+  - "report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict
+    re-proves the report binding first, exactly as `report` binding declares"
+  - 'draw-not-accepted (field `reason`): an interface.draw pass admitted after contract change
+    draw-adopt-gate whose bound assets - the files it wrote and every one it adopted, inherited or
+    found already there, and every live drawing of each ui record they belong to - fail the draw
+    acceptance (scripts/work/draw/draw-acceptance.mjs): DRAW_ASSET_NOT_TOKEN_RENDERED (no
+    draw-render receipt, or image-gen provenance: generation.tool image_gen.imagegen on a drawing, a
+    draws entry not provenance.tool draw-render, an imagegen-provenance assertion, a ui-mockup
+    prompt), DATA_STATUS_DRAWN, DRAW_NOT_SHAPES (no ui.shapes, a drawing of no shape, a draws or
+    selected-matrix entry naming a screen and no XBase#state), DRAW_NOT_REDRAWN (nothing
+    token-rendered and no recipe-rendered record: adopted or reused evidence alone), and
+    scripts/work/draw/draw-quality.mjs per bound record - SHAPE_DUPLICATE (two states of one XBase
+    one status band apart), DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL,
+    DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED (codes a contract change added
+    after the leg was admitted are dropped as suspects). Prints {ok:false, jobId, op,
+    reason:"draw-not-accepted", codes, findings:[{code, path, detail}] (first 50), findingCount,
+    records} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches
+    the draw to redraw through draw-render, or settles it fail'
+  - 'draw-metrics-failed (field `reason`): an interface.draw pass admitted after contract change
+    draw-loop-dna whose draw acceptance holds, but whose live parts fail when the RUNTIME re-renders
+    each from its render source and re-runs every machine metric itself
+    (scripts/work/draw-loop-settle.mjs, scripts/work/draw-loop.mjs verifyRecordParts): the capture,
+    the DNA gate (draw-dna.mjs), the taste metrics (draw-taste.mjs), copy/badges/actions, the brand
+    palette, grammar geometry, the ui-proof score and (contract change draw-devin-rationale) the
+    decision evidence - rationale.json, data-why, every measured value covered, resolvable rule ids,
+    a redline per part (scripts/work/draw/draw-rationale.mjs DRAW_RATIONALE_MISSING) -
+    DRAW_METRICS_FAILED, or DRAW_METRICS_UNVERIFIED when a metric cannot run (fail closed). Prints
+    {ok:false, jobId, op, reason:"draw-metrics-failed", codes, findings (first 50), findingCount,
+    records, loops:[{loop, best, outcome}]} and exits 1; the draw is blocked with these remaining
+    failures and its best round, never passed. A settled interface.draw job of any verdict also
+    records one grammar-proposal-filed event per grammar proposal it carries
+    (scripts/work/grammar-proposal.mjs; status proposed, never accepted by the runtime) and its
+    receipt lists them as grammarProposals'
+  - 'work-hygiene-red (field `reason`): a pass admitted after contract change work-hygiene-gate that
+    changed files under .starciwork/ or .starcistacks/ (the files its report names plus every file
+    its commits changed since its base) whose files fail scripts/work/validate/work-hygiene.mjs, the
+    check the product repo pre-commit hook also runs: WORK_YAML_UNPARSEABLE (engine/yaml.mjs cannot
+    read it), WORK_VALIDATE_REFUSED (work-validate --strict of the record directory, judged on the
+    changed files only), WORK_SECRET_FILE, WORK_SECRET_PATTERN, WORK_SECRET_LITERAL,
+    WORK_ACCOUNT_LITERAL (a non-.enc file carries a secret or a literal login). Prints {ok:false,
+    jobId, op, reason:"work-hygiene-red", codes, findings:[{code, file, line, detail}] (first 50),
+    findingCount, files} and exits 1; nothing is written and the job keeps its status. The op fixes
+    the files and commits, then the Kernel settles again'
+  - 'PROOF_MEDIA_MISSING (field `reason`): a pass whose files lack the visual proof its op owes
+    (settle.proofMedia). Prints {ok:false, jobId, op, reason:"PROOF_MEDIA_MISSING", missing:[image
+    (n/min) | video], detail:{images, videos, traces, browserRan, owes}} and exits 1; nothing is
+    written and the job keeps its status. The Kernel re-dispatches the op to capture the screenshots
+    (and its browser video) into its evidence and name them in report.files'
+  - 'EVIDENCE_HOST_PATH (field `reason`): a pass whose Work evidence files (a record evidence.yaml,
+    a draw prompt, a visual review, an assets JSON under .starciwork) still hold a hard-coded
+    absolute host path (drive path, user-profile path, expanded AppData path). Prints {ok:false,
+    jobId, op, reason:"EVIDENCE_HOST_PATH", missing:[<file>:<line> <path>], detail:{files, hits,
+    advice}}; the job stays as it was. Rewrite the named evidence with repo-relative paths or
+    <worktree>, <runtime>, <tmp>, <home> (scripts/lib/host-path.mjs normalizeHostPaths), then settle
+    again. The matcher is the one runtime rule RT_ABSOLUTE_PATH uses.'
+usedBy: "drive.settle - last step of the op lifecycle: consume-report -> check re-runs -> api check
+  -> settle; a refused settle is a routed verdict (usually retry), never silent loss"

@@ -107,7 +107,7 @@ const otherNode = (rc, op) => rc && typeof rc.node === 'string' && rc.node.trim(
 /**
  * The failure class of one failed attempt.
  *   report      the filed starci/op-report@1 envelope (may be null: no report)
- *   checks      the kernel-recorded checks of the attempt (api check), else the report's
+ *   checks      the kernel-recorded checks of the attempt (api record-checks), else the report's
  *   measurement true for a measurement leg (isMeasurementLeg)
  *   prior       the previous attempt of the same lineage: {report, checks} or null
  * Returns {class, reason, stated?}.

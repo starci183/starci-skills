@@ -14,7 +14,7 @@ import { isContractChangesPath, entryFileOf, CONTRACT_CHANGES_DIR } from '../../
 import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { landCommits, runChecks, governedPaths } from '../../scripts/supervisor/land.mjs';
 import { loadApiExtensions, statusExtras, readFlagsFile, extensionVerbNames } from '../../scripts/kernel/api-extensions.mjs';
-import { checkApiSurface } from '../../scripts/checks/check-api-surface.mjs';
+import { checkCliParity } from '../../scripts/checks/check-cli-parity.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const tmp = (t, prefix) => {
@@ -174,15 +174,15 @@ test('api extensions load from files: verbs, flags, status fields; a bad module 
   assert.deepEqual(readFlagsFile(path.join(root, 'absent.txt')), []);
 });
 
-test('cli.mjs dispatches an extension verb and check-api-surface counts it', () => {
+test('cli.mjs dispatches an extension verb and check-cli-parity counts it', () => {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/cli.mjs'), 'extensions', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
   assert.ok(out.verbs.includes('extensions'));
   assert.deepEqual(out.problems, []);
-  const surface = checkApiSurface(ROOT);
-  assert.equal(surface.ok, true, JSON.stringify(surface.drift));
-  assert.ok(surface.implemented.includes('extensions'));
+  const parity = checkCliParity(ROOT);
+  assert.equal(parity.ok, true, JSON.stringify(parity.findings));
+  assert.ok(parity.verbs.includes('kernel extensions'));
   const help = spawnSync(process.execPath, [path.join(ROOT, 'scripts/kernel/cli.mjs'), '--help'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.match(help.stdout + help.stderr, /extension verbs[\s\S]*extensions \[--json\]/);
 });

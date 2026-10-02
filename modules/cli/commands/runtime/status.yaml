@@ -1,0 +1,18 @@
+group: runtime
+verb: status
+owner: runtime
+summary: the runtime's version, tree root and manifest drift — a read-only summary
+impl:
+  script: scripts/cli/lib/runtime-status.mjs
+flags: []
+exit:
+  "0": status printed
+  "1": the tree has no install manifest or has drifted
+  "2": bad usage
+json: flag
+examples:
+  - starci runtime status
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed: []

@@ -1,0 +1,50 @@
+# The contract of `api kernel-proposal` (scripts/kernel/verbs/kernel-proposal.mjs): tier 2.
+group: kernel
+verb: kernel-proposal
+owner: runtime
+summary: "tier 2: a shared .claude change for the Supervisor"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - kernel-proposal
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: title
+    type: string
+  - name: evidence
+    type: string
+  - name: patch
+    type: string
+  - name: files
+    type: string
+  - name: decision
+    type: string
+  - name: list
+    type: boolean
+exit:
+  "0": filed or listed
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel kernel-proposal --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api kernel-proposal
+  - node scripts/kernel/cli.mjs kernel-proposal
+purpose: A change the Kernel needs in shared .claude (op manifest, knowledge, grammar, gate, runtime
+  code) is filed as a proposal with evidence and an optional patch; the Supervisor lands AUTO-tier
+  ones through a lane and forwards IMPORTANT ones (lessons.mjs tierOf) to the owner. The Kernel
+  never edits .claude itself; a local override keeps the workflow moving meanwhile.
+writes:
+  - events kernel-proposal
+  - the patch as a kernel artifact proposals/<id>.diff (blob + job_artifacts
+  - origin kernel)
+  - the Supervisor inbox
+refusals:
+  proposal-duplicate: the same title was proposed in the last 6 h
+kernelOnly: true

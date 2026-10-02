@@ -83,7 +83,7 @@ function driftFindings(repoRoot, targets) {
     const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(path.posix.basename(result.path)) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
     const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
-    findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx hfs sync --write"` });
+    findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx starci app sync --write"` });
   }
   return findings;
 }

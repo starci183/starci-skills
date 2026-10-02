@@ -1,0 +1,60 @@
+# The contract of `api decide` (scripts/kernel/verbs/decide.mjs): the Kernel's decision log (guardrail d,
+# owner 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
+group: kernel
+verb: decide
+owner: runtime
+summary: the Kernel decision log
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - decide
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: hypothesis
+    type: string
+  - name: action-key
+    type: string
+  - name: metric
+    type: string
+  - name: command
+    type: string
+  - name: close
+    type: string
+  - name: result
+    type: enum
+    enum:
+      - keep
+      - revert
+  - name: observed
+    type: string
+  - name: list
+    type: boolean
+exit:
+  "0": recorded
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel decide --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api decide
+  - node scripts/kernel/cli.mjs decide
+purpose: "Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline
+  snapshot of the units that passed their gates; close it next wake with keep|revert and what the
+  metric showed. A restarted Kernel reads the log (api status rca.decisions, decide --list) and
+  never repeats a failed idea. Every mutating kernel verb (graph-edit, op-override, redesign) names
+  an open decision."
+writes:
+  - events kernel-decision / kernel-decision-result
+  - logs kind decision (actor kernel)
+refusals:
+  decision-repeats-failed: the action key was already tried and reverted - pick the next untried rca
+    action or change the shape under a new key
+  decision-open: the key is still being measured - close it first
+  decision-incomplete: --hypothesis, --action-key and --metric are required
+kernelOnly: true

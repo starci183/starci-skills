@@ -1,6 +1,6 @@
 // api-lib/check-evidence.mjs — the independent checks of one attempt, on check_runs (DBTREE; H8).
 //
-// `api check` records the Kernel's (runner kernel) or the settler's (runner settler) checks of the job's latest attempt
+// `api record-checks` records the Kernel's (runner kernel) or the settler's (runner settler) checks of the job's latest attempt
 // through scripts/machine/evidence-store.mjs recordCheck: the raw exit a runtime runner observed is exit_code; a command
 // the runtime could not re-run is authority 'declared' (its value kept as declared_exit_code, exit_code NULL). The whole
 // envelope entry (advisory, peerBlocked, attribution, measured, codes, failing) rides in summary_json.entry, so the

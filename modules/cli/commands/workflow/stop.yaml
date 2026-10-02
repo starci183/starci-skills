@@ -1,0 +1,35 @@
+group: workflow
+verb: stop
+owner: runtime
+summary: stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - archive
+flags:
+  - name: repo
+    type: string
+    summary: "repository whose .starciwork ledger holds the workflow (default: the working directory)"
+  - name: workflow
+    type: string
+    required: true
+    summary: the workflow_id
+  - name: reason
+    type: string
+    required: true
+    summary: why the workflow is stopped
+  - name: by
+    type: enum
+    enum: [owner, supervisor]
+    default: owner
+exit:
+  "0": workflow archived
+  "1": refusal (unsettled reports, unknown workflow)
+  "2": bad usage
+json: flag
+examples:
+  - starci workflow stop --workflow <id> --reason "superseded by the redesign"
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed: []

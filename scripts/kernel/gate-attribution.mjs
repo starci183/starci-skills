@@ -5,7 +5,7 @@
 // workflow's commit 9caa2d5c and on that peer's uncommitted spec, and the first retried
 // backend.implement for breakage it did not cause. The rule (modules/kernel/api.yaml commands.check peerBlocked): a red
 // check names the files its failure implicates (`failing`: the failing spec and the source it
-// points at); api check attributes each file, and a red check none of whose files is this op's and
+// points at); api record-checks attributes each file, and a red check none of whose files is this op's and
 // at least one of which a peer changed is `peer`: recorded peerBlocked, counted neither passed nor
 // failed, and the settle names the peer instead of spending this op's attempt on it.
 //
@@ -29,7 +29,7 @@
 //             test files are never foreign: a change of this job can break a spec it does not own.
 //   unknown   neither: nothing ties the file to anyone since the work began
 // The check is `own` when any file is own, `peer` when none is own and one is peer, `foreign` when every file is
-// foreign (api check then records it advisory: counted neither passed nor failed), else `unknown`.
+// foreign (api record-checks then records it advisory: counted neither passed nor failed), else `unknown`.
 // A git read that fails leaves its file unknown, never peer. Ledger and git reads only.
 //
 // A failing file may live in another repository of the project binding (a backend op whose slice spans

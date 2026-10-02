@@ -1,0 +1,211 @@
+group: kernel
+verb: reconcile
+owner: runtime
+summary: kernel jobs of finished/archived workflows -> cancelled
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - reconcile
+flags:
+  - name: job
+    type: string
+  - name: drop
+    type: boolean
+  - name: reason
+    type: string
+  - name: dead-worker
+    type: boolean
+  - name: settle-failed
+    type: boolean
+  - name: no-salvage
+    type: boolean
+  - name: release-worker
+    type: boolean
+  - name: orphan-kernel-jobs
+    type: boolean
+  - name: workflow
+    type: string
+  - name: dry-run
+    type: boolean
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel reconcile --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api reconcile
+  - node scripts/kernel/cli.mjs reconcile
+salvage: "`--dead-worker` first looks for a report the dead worker wrote but never filed: an
+  op-report@1 report*.json under its owned paths modified since its dispatch, stamped for this job
+  or unstamped (scripts/kernel/report-salvage.mjs), filed through api report itself so every report
+  guard applies. A filed one returns {ok, jobId, recovery:'settle', salvaged:{file, outcome},
+  tried[], next} and a 'report-salvaged' event; the Kernel checks and settles it. --no-salvage skips
+  the search."
+hostEvent: "A worker disconnected, or gone with terminal_handle_stale, while the Kernel terminals of
+  3+ workflows of this ledger were cleared for a gone or disconnected terminal in the 20 minutes
+  before is a host-wide disconnect: settled failed-no-report with environment host-terminal-wipe
+  (hostWipe.proof host-wide-disconnect), no business attempt spent, no pool demoted, no pattern
+  count. A launch-abandoned job (no worker ever launched) is environment launch-abandoned the same
+  way, and a dirty file last written before the dispatch is debris, never the dead worker's effect
+  evidence."
+orphanKernelJobs: "`--orphan-kernel-jobs` (no --job) settles every kernel job still queued, leased,
+  running or answering whose workflow is finished or archived: status cancelled with result
+  {reason:'orphan-kernel-job', workflowPhase, archivedAt, terminal}, its leases deleted, a finished
+  workflow's kernel signal released, one 'orphan-kernel-job-reconciled' event each. The terminal it
+  names is reported, never closed (the Host controller's terminal dedupe owns stray terminals).
+  --dry-run writes nothing. Returns {ok, mode:'orphan-kernel-jobs', dryRun, reconciled:[{jobId,
+  workflowId, status, terminal, phase, archivedAt, signal, settledAs, leasesReleased,
+  signalReleased}]}. Supervisor-safe: it touches only rows of workflows that can no longer run.
+  Called by the reconciler Host controller's boot phase."
+deadWorker: "`--dead-worker` is the saga recovery of a RUNNING (or answering) job whose exact worker
+  terminal is gone: status worker liveness disconnected, or gone (a running Orca answered
+  terminal_handle_stale - every op terminal after a host shutdown), or agent-exited (the terminal is
+  back at a bare shell prompt), frontier `worker-dead`. An unreachable Orca (liveness unknown)
+  refuses worker-liveness-unproven and a live terminal refuses worker-alive; both write nothing.
+  Three routes. (1) A report is filed for the attempt: nothing is written and the answer is
+  {recovery:'settle', route:'settle', report:{dispatchId,outcome,consumed}, next} - consume-report,
+  check and settle it as usual. (2) Provably no effect: no report, no checks row, no worker-question
+  inbox row, the op manifest's route.riskHints name none of external-effects, runtime-effects,
+  live-provider, destructive-gate, and git shows not one uncommitted change nor one commit on any
+  ref since the dispatch contract's created_at under the owned paths (resolved per repository like
+  settle's landed proof; an unreadable tree is evidence, never proof). The contract row alone is
+  dispatch's delivery, not effect. The SAME job and attempt return to queued: leases deleted
+  (machine refs released best-effort), managed/orca/runtime dispatch and terminal bindings cleared,
+  a managed Dispatch stopped and released best-effort, payload.deadWorkers[] gains
+  {attempt,dispatchId,terminal,liveness, recovery,at}, result
+  {reason:'dead-worker-requeued',effectState:'none', attemptConsumed:false,retryable:true,proof} and
+  one event 'dead-worker-requeued'. It is an infrastructure retry that spends no business attempt;
+  route and dispatch it again. The same attempt is requeued at most 3 times
+  (DEAD_WORKER_REQUEUE_LIMIT); the next death is fenced with evidence infra-retries-exhausted:<n>.
+  (3) Otherwise the job is fenced effect_unknown (effectState partial on effect evidence, unknown
+  when only the budget ran out), leases and bindings kept, result
+  {reason:'dead-worker-fenced',evidence[],worker,paths} and one event 'dead-worker-fenced'. The
+  Kernel inspects the evidence (dirty:<path>, commit:<sha>, checks, worker-question:<key>,
+  risk:<hint>, owned-paths-unverifiable:<why>, op-manifest-unreadable) and settles it fail or
+  blocked, then retries as a new attempt whose contract names the partial state; a plain reconcile
+  of that job refuses dead-worker-fenced. Repeating --dead-worker on a recovered job is idempotent
+  (alreadyRecovered:true). After a requeue or a fence is written (and on a repeat), a MANAGED
+  worker's Dispatch is released once per attempt (settle's releaseManagedWorker: worker-stop first
+  when it did not settle itself, then worker-release, which alone ends the agent; live smoke E1);
+  the receipt is returned as managedWorker and recorded as the job event 'dead-worker-released'
+  {attempt, dispatchId, custody}. Nothing is typed into the terminal and no tab is closed by hand.
+  The settle route releases the same way. Returns
+  '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,eviden\
+  ce?,worker,proof?|paths?,managedWorker?}'. A worker is also dead when its liveness is `quiet`:
+  still at its idle prompt (or frozen) longer than its provider's quietMs after a delivered nudge of
+  this dispatch, with no output since (runtimes.yaml allocation.liveness.quietMs, a card's
+  liveness.quietMs); nudge refuses it worker-quiet, and its recovery releases the Dispatch. A
+  `wedged` worker (terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output) is dead
+  to its contract the same way, but its agent is still live and its turn may hold effects the owned
+  paths cannot bound, so it is not a dead-liveness state: plain --dead-worker refuses it
+  worker-wedged, nudge refuses it worker-wedged, and only --dead-worker --settle-failed accepts it -
+  releasing its Dispatch first (worker-stop, worker-release), then settling or requeueing on the
+  evidence (inc-2c1ac4ff3e48)."
+settleFailed: "`--dead-worker --settle-failed` is the recovery the watchdog runs under --repair for
+  every frontier deadWorkerJobs entry (scripts/kernel/kernel-watchdog.mjs recoverDeadWorkers), so a
+  dead worker never waits on a Kernel or a hand-written incident. Routes (1) and (2) are unchanged.
+  In place of route (3), evidence the owned paths bound (dirty:<path>, commit:<sha>, checks,
+  worker-question:<key>, infra-retries-exhausted:<n>) settles the attempt failed with result
+  {verdict:fail, reason:'failed-no-report', reportFiled:false, effectState:partial|unknown,
+  attemptConsumed:true, evidence, worker, paths}: leases deleted, pending worker questions closed,
+  events 'op-settled' {reason:failed-no-report, auto:true} and 'worker-failed-no-report', and the
+  no-report route runs (settle.nextStep, kinds.yaml no-report-retries-on-another-pool): ONE retry of
+  the same op, records, owned paths and cut ordinal enqueued as attempt+1 through the ordinary retry
+  lineage (payload.retry.retryOf, payload.retryReason; a business attempt is spent), which route
+  moves off the pools the lineage died on; past the route's limit an owner gate holds the job
+  instead and retry reads {enqueued:false, reason:route-limit, incidentId}. After the transaction
+  the managed worker is released (settle's releaseManagedWorker, custody the release receipt's
+  state); the Orca Task settled with the Dispatch. Evidence the owned paths cannot bound
+  (risk:<hint>, owned-paths-unverifiable, op-manifest-unreadable) is still fenced for the Kernel. A
+  job --dead-worker already fenced on bounded evidence is settled the same way by --settle-failed. A
+  worker gone (terminal_handle_stale) together with its workflow's Kernel terminal - the Kernel
+  seat's terminal answers gone too, or event kernel-stale-cleared for a gone terminal was recorded
+  since the attempt's dispatch - died in a host terminal wipe (an Orca restart or host reboot):
+  worker.hostWipe {cause:host-terminal-wipe,
+  errorCode,kernelTerminal,proof:kernel-terminal-gone|kernel-stale-cleared}, and the settle is the
+  environment's: result attemptConsumed:false, retryClass:environment,
+  environment:host-terminal-wipe (events carry environment), the retry is a new durable attempt that
+  spends no business retry (engine/admission.mjs RETRY_CLASS_ENVIRONMENT), routing never demotes its
+  pool (lineage cause host-terminal-wipe, not attributable), and it counts toward no pattern
+  incident. When one op of a workflow has ended failed-no-report 3 times
+  (DEAD_WORKER_PATTERN_THRESHOLD) one open incident '[worker-died-no-report-pattern] <op>: ...'
+  names the pattern for the runtime supervisor, raised once while it stays open. A repeat on a
+  settled job is idempotent (alreadyRecovered:true, retry). Returns
+  '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attemp\
+  t,effectState,evidence,liveness,leasesReleased,attemptConsumed,environment?,hostWipe?,retry:{enqu\
+  eued,jobId,attempt,businessAttempt|reason,incidentId?},nextStep,managedWorker?,pattern:{raised,co\
+  unt,threshold,incidentId?}}'."
+releaseWorker: "`--release-worker` proves, and if needed redoes, a SETTLED job's worker release:
+  settle's release of a managed worker (worker-stop when the Dispatch did not settle itself,
+  worker-release, one repeat when the first release is not ok), which alone ends the agent (live
+  smoke E1). Custody is the release receipt's own state: {state:released, proof:release-ok} when the
+  release said ok; retained (release-retained) when Orca keeps the worker; unknown (release-<state>)
+  otherwise. Idempotent: a job whose recorded custody is released writes nothing
+  (alreadyReleased:true). One event 'worker-release-reconciled'. On a RUNNING job whose report was
+  filed and consumed and whose settle an open owner-gate or peer-wait holds (status
+  frontier.heldWorkerJobs) it releases the worker without settling (settle's worker-stop when
+  needed, then worker-release), the path leases are released, and the proof is recorded as
+  payload.workerReleased {at, heldBy, custody}; the job stays running (its Orca Task settled with
+  the op's worker_done). The worker then reads liveness released, and api settle reuses the recorded
+  proof (custody released, proof released-while-held) instead of releasing again, so a later
+  --release-worker on the settled job answers alreadyReleased. One event
+  'worker-released-while-held'; a repeat writes nothing (alreadyReleased:true). Returns
+  '{ok,jobId,status,releasedWhileHeld,heldBy:{heldBecause,incident,peer?},custody,leasesReleased,ma\
+  nagedWorker?}'. Refuses release-worker-not-settled for any other unsettled job. On a settled job
+  it returns '{ok,jobId,custody,managedWorker?}'; exit 1 while custody reads retained."
+drop: "`--drop --reason <text>` retires a QUEUED job that never crossed the dispatch boundary: the
+  row settles `cancelled` with result {verdict:'dropped', reason, at} and one event 'job-dropped'
+  {op, attempt, reason, cut, waiting}. `waiting` names every queued job whose --after is this job,
+  or whose cut seam this job is (it was the seam's live head). An --after dependant reads
+  dependency-failed in status until the Kernel re-points or drops it; a dropped seam retry is no
+  seam, so the other ordinals wait on the seam's previous live job (an answered ask reads
+  `dependency`) or on the next ordinal-1 retry the Kernel enqueues. It is how a Kernel clears a cut
+  whose grants are wrong before it re-plans it. Refuses drop-not-queued, drop-needs-reason and
+  drop-dispatched (with `evidence`)."
+reads: either an effect_unknown managed launch, or a queued row whose accepted contract still points
+  at a connected+writable exact operation terminal; contracts and reports for the exact
+  {workflow_id,op_id,attempt}; Orca terminal/worker observation and cleanup receipts through
+  wrappers
+writes: "queued+live recovery re-reserves the same owned-path leases, restores status=running and
+  the exact worker identity, and appends live-worker-reconciled without spawning or re-sending
+  anything. For an effect_unknown launch, only after proof of no operation effect: deletes the job's
+  exact leases, clears stale worker/task/terminal bindings, returns the SAME job and attempt to
+  queued, records result {reason:'dispatch-reconciled',
+  effectState:'none',attemptConsumed:false,retryable:true,proof}, and appends 'dispatch-reconciled'.
+  Machine lease refs are released best-effort after the ledger transaction. An ambiguous proof
+  writes nothing and retains the fence."
+proof: no accepted contract or report exists; the exact managed worker is failed at stage
+  dispatch_input with last_failure agent_prompt_stalled; observation says exactWorker:true and the
+  process/terminal is exited; release completed, or state=retained only because
+  reason=identity_unproven (terminal bookkeeping with no process action)
+returns: "{ok:true,jobId,reconciled:true,dispatchId,status:ready,attempt,effectState:none,attemptCo\
+  nsumed:false,leasesReleased,cleanup}"
+refuses:
+  - job-unknown
+  - job-not-reconcilable: status is neither effect_unknown nor the idempotent case of a row already back at queued
+  - dispatch-identity-missing: no exact managed Dispatch id is bound
+  - accepted-contract-exists: operation authority may have landed; never infer no effect
+  - worker-report-exists: worker evidence exists; use ordinary consume/check/settle
+  - "incomplete proof (UNTYPED): cleanup reports effectState other than none — the refusal prints
+    {ok:false, jobId, reconciled:false, dispatchId, effectState, cleanup} and exits 1; status and
+    lease stay unchanged"
+  - live-worker-lease-conflict: the exact live worker exists but its owned paths cannot be re-fenced; do
+      not duplicate or continue unfenced
+  - dead-worker-not-running: --dead-worker on a job that is neither running, answering nor leased (nor
+      already recovered by it)
+  - "dispatch-in-flight (field `reason`): a leased job with no worker before its lease deadline
+    (jobs.deadline): its dispatch may still be launching; nothing written"
+  - "worker-liveness-unproven (UNTYPED exit 1): --dead-worker while the exact terminal reads unknown
+    (Orca unreachable or no handle); nothing written"
+  - "worker-alive (UNTYPED exit 1): --dead-worker while the exact terminal is live; nothing written"
+  - "worker-wedged (UNTYPED exit 1): --dead-worker without --settle-failed on a wedged worker; the
+    message names the settle-failed route, nothing written"
+  - dead-worker-raced: the job changed status between the observation and the recovery transaction; re-read status
+  - dead-worker-fenced: a plain reconcile of a job --dead-worker fenced on effect evidence; inspect and settle it
+usedBy: drive.reconcile before route; drive.status worker-dead (--dead-worker); infrastructure retry
+  reuses the same logical attempt and does not consume business route budget

@@ -284,6 +284,6 @@ export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } =
   const s = progressSettings().settleBacklog;
   const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
-    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; api status settleDecisions): api settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (api check) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
+    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; api status settleDecisions): api settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (api record-checks) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
   }
 }

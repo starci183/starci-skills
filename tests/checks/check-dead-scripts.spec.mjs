@@ -31,7 +31,7 @@ test('a script named only by a doc, a README, YAML prose, retired-paths, a contr
     'scripts/kernel/commented.mjs': '',
     'docs/why.md': 'Dry-run backfill: `node scripts/supervisor/why-backfill.mjs`.\n',
     'README.md': 'see scripts/work/migrate-ui-shapes.mjs\n',
-    'modules/kernel/api-commands/dispatch.yaml': 'reads: scripts/kernel/repair-rejected-attempts.mjs seals the rest\n',
+    'modules/cli/commands/kernel/dispatch.yaml': 'reads: scripts/kernel/repair-rejected-attempts.mjs seals the rest\n',
     'modules/kernel/retired-paths.yaml': '  - {path: scripts/kernel/commented.mjs}\n',
     'modules/kernel/contract-changes/x.yaml': 'run: node scripts/kernel/commented.mjs\n',
     'scripts/lib/other.mjs': '// node scripts/kernel/commented.mjs\n/* scripts/kernel/commented.mjs */\n * scripts/kernel/commented.mjs\n',

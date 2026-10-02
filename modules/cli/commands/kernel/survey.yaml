@@ -1,0 +1,99 @@
+group: kernel
+verb: survey
+owner: runtime
+summary: the read projection a Kernel scans each wake (jobs, inbox, signals, drift)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - survey
+flags:
+  - name: workflow
+    type: string
+    required: true
+  - name: deliveries
+    type: boolean
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel survey --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api survey
+  - node scripts/kernel/cli.mjs survey
+reads: workflows row; latest goals row (revision, goal_identity, json.opChain — the approved shape
+  plan diffs against); all jobs; inbox rows; live signals; the tail of events; open incidents; the
+  contracts rows of settled jobs and the current bytes of the inputs they recorded (staleInput and
+  sourceDrift below); modules/kernel/contract-changes/; with --deliveries, every settled job's filed
+  report and every handover ask with its answer receipt
+writes: nothing — pure projection
+returns:
+  ok: true
+  workflow: "{workflow_id, title, phase, generation, goal_identity}"
+  goal: "{revision, goal_identity, opChain[]}"
+  jobs: "[{job_id, op_id, kind, status, attempt, generation, worker_id, payload:{owned_paths,...}}] —
+    OPEN jobs only; settled statuses are filtered out"
+  inbox: "[{inbox_id, kind, key, status}]"
+  signals: "[{scope, key, token, expires_at}]"
+  events: "[{seq, kind, entity_id, created_at}] — newest last, bounded tail"
+  eventsHead: the hash-chain head over the events tail
+  incidentsOpen: "[{incident_id, kind, status, attempts, last_progress}] — open only"
+  staleInput: "[{jobId, op, attempt, cut?:{id, ordinal, total}, path, kind:work, recorded, current,
+    changed[], breaking?:[{file, owner, via:change-note|declaration, rev?, reason?, at?}],
+    followUp?, heldBy?}] — one row per product Work input (a .starciwork record of the job's
+    payload.records) of a settled job (status succeeded, or failed on a partial report) that is the
+    newest attempt of its op and cut ordinal, in a workflow that is not finished, whose change OWES
+    work. `recorded` is the digest `settle` re-baselined on the contract
+    (contracts.context_json.inputs, the bytes the job left, with the change-note rev of each file:
+    the revision it read), `current` the digest now. A changed record file is never listed when the
+    owned paths of the job itself, or of another job of the same workflow still open or settled
+    after it, cover it (its own workflow's later legs), nor when its COMMITTED revision (git HEAD)
+    is still the one the job read (an in-flight rewrite by a leased job never counts). Otherwise it
+    is judged by the record's ONE owner workflow (scripts/kernel/work-ownership.mjs ownerOf: a
+    foundation's owner, the workflow of the feature's scope record, the one scope naming it as a
+    node, the one workflow whose jobs own it, else the ledger's repo owner): a peer-owned record is
+    listed only when its OWNER marked the change breaking - a committed change note kind breaking
+    with a rev above the one read (written by the owner, not by a non-owner peer) or api
+    record-change --reach follow-up after the job read it - in `breaking`; a row whose every file is
+    such a change is `followUp: true`, owed ONE targeted follow-up leg and never held seam-first. A
+    record the job's own workflow owns is listed only when no job of another workflow wrote it (an
+    unattributed edit). Every other peer change is survey.peerDrift, never here (owner 2026-09-25).
+    A Source-law edit (knowledge/**, modules/schemas/**) NEVER appears here: see sourceDrift. A
+    contract with no recorded inputs, or no settle baseline, never appears. `heldBy` names the open
+    seam-ordinal job a higher stale slice of the same cut waits on (never on a followUp row).
+    Computed by `inputDrift()` in scripts/kernel/input-digests.mjs, each distinct path digested once
+    and HEAD read once per call"
+  peerDrift: "[{jobId, op, attempt, cut?, path, kind:work, files:[{file, owner, ownerBy, writers[],
+    readRev, currentRev, foreignWrite?,
+    breakingIgnored?:written-by-non-owner|owner-declared-advisory}]}] — ADVISORY only: a committed
+    change a peer made to a Work record the settled job read, that its owner did not declare
+    breaking. Never stale, never owed, never a redo: `owner` is the record's owner (ownerBy the rule
+    that named it), `writers` the other workflows whose jobs wrote it since, `foreignWrite` a peer
+    rewrote a record this workflow owns (review it; redo nothing), `breakingIgnored` a breaking
+    change note that binds nothing (a non-owner wrote it, or its owner declared it advisory)"
+  sourceDrift: "[{jobId, op, attempt, cut?, path, kind:source, recorded, current, admittedAt,
+    changes[], followUp[], unregistered}] — ADVISORY only: a Source-law input the settled job was
+    admitted under (recorded at dispatch) has been edited since. The job is judged by what it was
+    admitted under, so this is never owed work: `changes` are the registered contract changes after
+    its admission whose `paths` cover the edit, `followUp` those registered `reach: follow-up` for
+    this op (their owed legs are frontier.contractFollowUps), `unregistered` true when no change
+    names the edit (a supervisor finding: register it)"
+  staleInputError: present only when the projection itself failed; staleInput and sourceDrift are then []
+  deliveries: "--deliveries only: [{jobId, op, attempt, status, verdict, repository, ownedPaths,
+    reportFile, outcome, summary, files, head, branch, credentialPending, open, blocker,
+    checks[{name, command, exitCode}]}] — every settled (succeeded|failed) job except
+    handover.review, with the fields of its filed report (reportFiled:false when none was filed);
+    what a handover package is assembled from (scripts/kernel/handover.mjs deliveriesOf). survey is
+    a read projection, so an op terminal may call it"
+  credentialPending: "--deliveries only: the union of every delivery report's credentialPending"
+  handoverHistory: "--deliveries only: [{dispatchId, attempt, state:pending|answered|superseded,
+    decision:approve|feedback|question|null, answeredBy, byOwner, note, answeredAt, receiptPath}] —
+    every handover.review ask, oldest first"
+refuses:
+  - workflow-unknown: no workflows row for --workflow
+usedBy: the ticks deep read — first call of every iteration (driver-loop.yaml tick.survey); with
+  --deliveries, the handover.review op

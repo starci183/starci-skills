@@ -34,6 +34,17 @@ import { recordLaunchedTerminal } from './launched-terminals.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
+/** Put the per-user starci shim first for Orca and every agent process it launches. */
+export function addStarciShimToPath({ env = process.env, home = os.homedir(), platform = process.platform } = {}) {
+  const key = Object.keys(env).find((name) => name.toLowerCase() === 'path') ?? (platform === 'win32' ? 'Path' : 'PATH');
+  const shim = path.join(home, '.starci', 'bin');
+  const entries = String(env[key] ?? '').split(path.delimiter).filter(Boolean);
+  const comparable = (entry) => platform === 'win32' ? path.resolve(entry).toLowerCase() : path.resolve(entry);
+  const wanted = comparable(shim);
+  env[key] = [shim, ...entries.filter((entry) => comparable(entry) !== wanted)].join(path.delimiter);
+  return env[key];
+}
+
 export function loadAdapter(provider) {
   const file = path.join(skillRoot, 'modules', 'models', 'agents', `${provider}.yaml`);
   if (!fs.existsSync(file)) return { provider, error: `no adapter card modules/models/agents/${provider}.yaml` };
@@ -382,6 +393,7 @@ function sendPrompt(handle, text, adapter, io) {
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {
+  addStarciShimToPath();
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? workerRelease,
     trust: io?.trust ?? ensureLaunchTrust };

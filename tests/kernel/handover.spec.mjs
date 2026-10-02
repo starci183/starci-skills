@@ -118,7 +118,7 @@ const settleApproval=(repo,wf,{attempt,dispatchId})=>{
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  const checked=runSettler('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
+  const checked=runSettler('record-checks','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   return run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','pass','--json');
 };
