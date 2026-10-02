@@ -48,7 +48,9 @@ after(() => { for (const dir of TEMP_DIRS) { try { spawnSync('git', ['-C', dir, 
 const tmp = (t, prefix) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   TEMP_DIRS.push(dir);
-  t.after(() => { try { spawnSync('git', ['-C', dir, 'worktree', 'prune'], { windowsHide: true }); } catch { /* none */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* an open ledger handle closes after this hook */ } });
+  // This hook can run before a later hook closes its SQLite handle. Do one best-effort removal here;
+  // the file-level after() above owns the retrying removal once every handle is closed.
+  t.after(() => { try { spawnSync('git', ['-C', dir, 'worktree', 'prune'], { windowsHide: true }); } catch { /* none */ } try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* an open ledger handle closes after this hook */ } });
   return dir;
 };
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
@@ -361,8 +363,11 @@ const git = (cwd, ...args) => {
   if (r.status !== 0) throw Error(`git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
-function repoFixture(t) {
-  const root = tmp(t, 'sup-repo-');
+let REPO_BASELINE = null;
+function repoBaseline() {
+  if (REPO_BASELINE) return REPO_BASELINE;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-repo-base-'));
+  TEMP_DIRS.push(root);
   git(root, 'init', '-q', '-b', 'main');
   git(root, 'config', 'user.name', 'Spec');
   git(root, 'config', 'user.email', 'spec@example.invalid');
@@ -377,6 +382,12 @@ function repoFixture(t) {
   fs.writeFileSync(path.join(root, 'modules', 'kernel', 'rules.yaml'), 'rule: one\n');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'base');
+  REPO_BASELINE = root;
+  return root;
+}
+function repoFixture(t) {
+  const root = tmp(t, 'sup-repo-');
+  fs.cpSync(repoBaseline(), root, { recursive: true });
   return root;
 }
 /** A commit on a side branch `name` off main that writes `files` ({path: content}); returns its sha. */
