@@ -29,7 +29,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
-import { dbTypesPath, emitDbTypes } from '../emit/db-types.mjs';
+import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
 import { TEMPLATES_DIR, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
@@ -326,7 +326,7 @@ export function npmLock(root) {
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. A failed lock step removes the app and throws HFS_SCAFFOLD_LOCK_FAILED.
  */
-export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = emitDbTypes, now = () => new Date() }) {
+export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.join(into, name);
   if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; hfs scaffold app never writes into an existing directory`);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
+import { appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
 import { openHfs } from '../../packages/hfs/runtime/scripts/hfs/slots.mjs';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
@@ -134,4 +134,23 @@ test('dbTypesEmitter is the emitTypes of checkDatabase: drift and emit-failed ar
   const calls = [];
   await dbTypesEmitter({ root: path.join(dir, 'elsewhere'), run: fakeRun(calls) })({ repoRoot: dir, declaration: {} });
   assert.deepEqual(calls.map((c) => c.cwd), [dir]);
+});
+
+test('generateDbTypes: starts the app stack, emits, stops what it started; a stack already up is left running; a failed start is a typed refusal', () => {
+  const dir = appRoot({ 'supabase/config.toml': CONFIG }, 'supabase');
+  const calls = [];
+  const run = (file, args, options) => {
+    calls.push([file, args[0], options.cwd]);
+    return args[0] === 'gen' ? { status: 0, stdout: GENERATED, stderr: '' } : { status: 0, stdout: '', stderr: '' };
+  };
+  assert.equal(generateDbTypes({ root: dir, run }), GENERATED);
+  assert.deepEqual(calls.map((c) => c[1]), ['start', 'gen', 'stop']);
+  const up = [];
+  const alreadyUp = (file, args) => { up.push(args[0]); return args[0] === 'start' ? { status: 1, stdout: '', stderr: 'supabase start is already running.\n' } : { status: 0, stdout: GENERATED, stderr: '' }; };
+  assert.equal(generateDbTypes({ root: dir, run: alreadyUp }), GENERATED);
+  assert.deepEqual(up, ['start', 'gen'], 'a stack the call did not start is not stopped');
+  assert.throws(() => generateDbTypes({ root: dir, run: () => ({ status: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon\n' }) }), /HFS_EMIT_DB_TYPES_FAILED.*start.*Docker daemon/);
+  const stops = [];
+  assert.throws(() => generateDbTypes({ root: dir, run: (file, args) => { stops.push(args[0]); return args[0] === 'gen' ? { status: 1, stdout: '', stderr: 'boom\n' } : { status: 0, stdout: '', stderr: '' }; } }), /boom/);
+  assert.deepEqual(stops, ['start', 'gen', 'stop'], 'the stack is stopped even when the types failed');
 });
