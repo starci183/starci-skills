@@ -1,0 +1,31 @@
+{
+  "events": {
+    "order.expired": {
+      "payload": {
+        "expiredAt": "string",
+        "orderId": "string",
+        "personId": "string"
+      },
+      "version": 1
+    },
+    "order.paid": {
+      "payload": {
+        "orderId": "string",
+        "paidAt": "string",
+        "personId": "string",
+        "totalMinorUnits": "number"
+      },
+      "version": 1
+    },
+    "order.placed": {
+      "payload": {
+        "orderId": "string",
+        "personId": "string",
+        "totalMinorUnits": "number"
+      },
+      "version": 1
+    }
+  },
+  "schema": "starci/event-contract@1",
+  "service": "order"
+}

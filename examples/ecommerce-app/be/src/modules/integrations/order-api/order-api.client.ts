@@ -4,9 +4,8 @@ import type { HttpClient } from "@modules/platform/http"
 import { isRecord } from "@modules/platform/primitives"
 import { OrderApiError, OrderApiErrorCode } from "./errors/order-api.error"
 import { InjectOrderApiOptions } from "./order-api.decorators"
+import { ORDER_API_DOCUMENTS } from "./order-api.contracts"
 import type { OrderApiOptions } from "./order-api.options"
-
-const BUYER_STATUS_QUERY = "query BuyerStatus { buyerStatus { personId hasOrders } }"
 
 /** Whether the caller of the order service is a buyer. */
 export interface OrderApiBuyerStatus {
@@ -29,7 +28,7 @@ export class OrderApiClient {
         try {
             const answer = await callGraphql(this.http, {
                 url: `${this.options.url}/graphql`,
-                query: BUYER_STATUS_QUERY,
+                query: ORDER_API_DOCUMENTS.buyerStatus,
                 headers: { authorization: `Bearer ${sessionToken}` },
                 timeoutMs: this.options.timeoutMs,
             })
