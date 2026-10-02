@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
@@ -24,7 +25,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 export const CODE = 'RT_VERSION_RESTATED';
 export const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 /** The `version:` leaf is a declared binding when its enclosing YAML block is one of these keys. */
-export const BINDING_KEYS = Object.freeze(['canon', 'provenance', 'identity']);
+const BINDING_KEYS = Object.freeze(['canon', 'provenance', 'identity']);
 
 const EXT = /\.(?:mjs|cjs|js|ts|tsx|yaml|yml|md|json|cmd|ps1|sh|toml)$/;
 const OUT = /node_modules\/|(?:^|\/)package\.json$|(?:^|\/)package-lock\.json$|(?:^|\/)pnpm-lock\.yaml$|(?:^|\/)yarn\.lock$|CHANGELOG|packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|modules\/kernel\/contract-changes\//;
@@ -99,12 +100,4 @@ export function checkVersionPinOnce(root = skillRoot) {
   return versionPinFindings(files, pins);
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkVersionPinOnce();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log(`OK: every pinned version is spelled once, in canon-pins.yaml.`);
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkVersionPinOnce(), "OK: every pinned version is spelled once, in canon-pins.yaml."));

@@ -45,7 +45,7 @@ function product(t) {
   const work = path.join(repo, '.starciwork');
   const brandDir = path.join(work, 'brand');
   fs.mkdirSync(brandDir, { recursive: true });
-  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml'), 'utf8')).direction;
+  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.example.yaml'), 'utf8')).direction;
   fs.writeFileSync(path.join(brandDir, 'index.yaml'), stringifyYaml({ schema: 'work/brand@1', id: 'brand', kind: 'brand', state: 'todo', rev: 1,
     brand: { identity: { name: 'Nivo', family: 'starci' }, direction }, review: { reviewer: 'owner', authority: 'fixture', reviewedAt: '2026-09-27T00:00:00Z' } }));
   const dir = path.join(work, 'features', 'todo', 'ui', 'list');

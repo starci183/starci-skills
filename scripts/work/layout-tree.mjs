@@ -476,7 +476,7 @@ function keyedDigest(messages, keys) {
 }
 
 /** i18n.used: {keys, locales: [{locale, sha256}]} for parsed catalogs ({locale, messages}). */
-export function keyedI18n(catalogs, keys) {
+function keyedI18n(catalogs, keys) {
   return { keys: [...keys], locales: list(catalogs).map((c) => ({ locale: c.locale, sha256: keyedDigest(c.messages, keys) })) };
 }
 

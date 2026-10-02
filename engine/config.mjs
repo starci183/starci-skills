@@ -200,7 +200,7 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
  * accepted without the owner) and any ask kind of modules/ops/ops/provision.ask.yaml.
  */
 export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
-export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
+const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
 export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
 function validateAsks(asks){
   if(asks===null)return;

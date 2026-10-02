@@ -22,6 +22,7 @@ import { walkFiles } from '../lib/walk.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { parseCheckArgs } from '../lib/check-scan.mjs';
 
 const HELP = `Usage: node scripts/checks/check-doc-owner.mjs [--root <tree>] [--json]
 
@@ -33,7 +34,7 @@ the findings, 2 is a bad argument.`;
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DOC_OWNER_MISSING = 'RT_DOC_NO_OWNER';
-export const DOC_DIR = 'docs';
+const DOC_DIR = 'docs';
 const HEADER = /^(Owner|Task):[ \t]+(\S.*?)\s*$/;
 const ANY_HEADER = /^(Owner|Task):/m;
 const OWNER_ROOT = /^(?:knowledge|modules)\//;
@@ -59,7 +60,7 @@ export function docFiles(root = DEFAULT_ROOT) {
 }
 
 /** One document's parts: {rel, header: {kind, value} | null, headerCount, title, topics, sentences}. */
-export function readDocument(root, rel) {
+function readDocument(root, rel) {
   const lines = fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8').split('\n');
   const first = lines.find((line) => line.trim() !== '') ?? '';
   const match = HEADER.exec(first);
@@ -86,7 +87,7 @@ function textBody(lines) {
 }
 
 /** The title's topic words: lowercase alphanumeric words of three or more letters, stop words dropped. */
-export function topicWords(title) {
+function topicWords(title) {
   return new Set(String(title).toLowerCase().match(/[a-z][a-z0-9-]*/g)?.filter((w) => w.length >= 3 && !STOP_WORDS.has(w)) ?? []);
 }
 
@@ -158,19 +159,9 @@ export function docOwnerFindings(root = DEFAULT_ROOT) {
 }
 
 export function checkDocOwnerMain(argv) {
-  let root = DEFAULT_ROOT, json = false;
-  for (let i = 0; i < argv.length; i++) {
-    const key = argv[i];
-    if (key === '--help' || key === '-h') return { exitCode: 0, text: `${HELP}\n` };
-    if (key === '--json') { json = true; continue; }
-    if (key === '--root') {
-      const value = argv[++i];
-      if (value === undefined) return { exitCode: 2, text: `check-doc-owner: --root needs a value\n` };
-      root = path.resolve(value);
-      continue;
-    }
-    return { exitCode: 2, text: `check-doc-owner: unknown argument ${key}\n${HELP}\n` };
-  }
+  const parsed = parseCheckArgs(argv, { name: 'check-doc-owner', help: HELP, root: DEFAULT_ROOT });
+  if (parsed.exitCode !== undefined) return parsed;
+  const { root, json } = parsed;
   const findings = docOwnerFindings(root);
   if (json) return { exitCode: findings.length ? 1 : 0, text: `${JSON.stringify({ schema: 'starci/doc-owner@1', ok: findings.length === 0, filesScanned: docFiles(root).length, findings }, null, 2)}\n` };
   if (!findings.length) return { exitCode: 0, text: `check-doc-owner: ${docFiles(root).length} documents, every one owned, no duplicate\n` };

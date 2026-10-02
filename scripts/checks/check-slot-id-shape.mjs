@@ -26,11 +26,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 export const CODE = 'RT_SLOT_ID_SHAPE';
-export const APP_MANIFEST = 'knowledge/hfs/slots.yaml';
-export const RUNTIME_MANIFEST = 'knowledge/hfs/runtime-slots.yaml';
+const APP_MANIFEST = 'knowledge/hfs/slots.yaml';
+const RUNTIME_MANIFEST = 'knowledge/hfs/runtime-slots.yaml';
 /** The manifests a slot id may live in, in scan order. */
 export const MANIFESTS = Object.freeze([APP_MANIFEST, RUNTIME_MANIFEST]);
 
@@ -119,12 +120,4 @@ export function checkSlotIdShape(root = skillRoot) {
   return findings;
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkSlotIdShape();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log(`OK: every slot id follows the manifest's declared grammar and the suffix vocabulary holds no undeclared synonyms.`);
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkSlotIdShape(), "OK: every slot id follows the manifest's declared grammar and the suffix vocabulary holds no undeclared synonyms."));

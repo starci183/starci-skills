@@ -67,7 +67,7 @@ export function publishSet(root = runtimeRoot) {
 }
 
 /** The generated roots of the runtime manifest under `root` (ruleParams.runtime.generated), runtime-relative posix; [] when the runtime has no manifest. */
-export function generatedRoots(root = runtimeRoot) {
+function generatedRoots(root = runtimeRoot) {
   const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
   if (!fs.existsSync(file)) return [];
   return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? [])

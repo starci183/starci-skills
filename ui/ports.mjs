@@ -22,6 +22,6 @@ export const appPort = Number(statusApp.port);
 /** The port the Vite dev and preview servers bind (vite.config.ts; package.json scripts carry no flag for it). */
 export const devPort = Number(statusApp.devPort);
 /** Where start.cmd points the browser. */
-export const devUrl = `http://127.0.0.1:${devPort}`;
+const devUrl = `http://127.0.0.1:${devPort}`;
 
 if (isMain(import.meta.url)) process.stdout.write(`${devUrl}\n`);

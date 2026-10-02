@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { movedTo } from '../hfs/runtime-rules/retired.mjs';
+import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath } from '../lib/check-scan.mjs';
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
@@ -52,14 +53,11 @@ const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-
 
 class CiteInputError extends Error {}
 
-export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel === RETIRED_PATHS_FILE;
 /** A file the cite scan reads whole (prose) vs one whose comments alone are read (a string literal is data). */
 const PROSE_EXT = /\.(?:ya?ml|md)$/;
 const SOURCE_EXT = /\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
 const CITE_EXT = /\.(?:ya?ml|md|mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
-/** Scope of the widened R122 scan: never read. Contract history keeps retired names, a changelog is history by form, a benchmark finding and a .starciwork work record are records, the registry lists its own paths. */
-const SCAN_HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel.startsWith('benchmark/') || /(^|\/)CHANGELOG[^/]*\.md$/i.test(rel) || /(^|\/)\.starciwork\//.test(rel) || rel === RETIRED_PATHS_FILE;
 /** The slot manifests: a `path:`/`requires:`/`allows:`/`forbids:`/`roles:` value there declares a slot's shape (judged by the HFS engine, incl. forbidden tombstones and product-repo paths), never cites this tree. */
 const MANIFEST_SLOTS = new Set(['knowledge/hfs/slots.yaml', 'knowledge/hfs/runtime-slots.yaml']);
 /** Blank every shape value of a slot manifest: declarations, not prose cites. Line count is kept. */
@@ -72,12 +70,6 @@ const dropGeneratedBlocks = (text) => {
     if (/<!--\s*hfs:generated-end\b/.test(line)) { inside = false; return ''; }
     return inside ? '' : line;
   }).join('\n');
-};
-/** The generated copy roots of the runtime (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml), each a byte mirror of the runtime layout. */
-const generatedRoots = (root) => {
-  const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
-  if (!fs.existsSync(file)) return [];
-  return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? []).map((g) => `${String(g.root).replace(/\/$/, '')}/`);
 };
 /** A path inside a generated copy is the runtime path it mirrors (packages/hfs/runtime/scripts/x.mjs -> scripts/x.mjs). */
 const mirrored = (roots, target) => { const r = roots.find((g) => target.startsWith(g)); return r ? target.slice(r.length) : target; };
@@ -127,7 +119,7 @@ function collectScanFiles(root, scan = DEFAULT_SCAN) {
 }
 
 /** The comments of one source file re-laid on their own lines (everything else blank), so a cite keeps its real line number. */
-export function commentsAsText(file, text) {
+function commentsAsText(file, text) {
   const t = ts();
   const kind = /\.tsx$/i.test(file) ? t.ScriptKind.TSX : /\.ts$/i.test(file) ? t.ScriptKind.TS : /\.jsx$/i.test(file) ? t.ScriptKind.JSX : t.ScriptKind.JS;
   const source = t.createSourceFile(file, String(text), t.ScriptTarget.Latest, true, kind);
@@ -210,7 +202,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   const files = collectScanFiles(root, scan);
   const retired = retiredPaths(root);
   const moved = movedPaths(root);
-  const roots = generatedRoots(root);
+  const roots = generatedRootsOf(root);
   const retiredOrMoved = (target) => retired.has(target) || moved(target) || retired.has(mirrored(roots, target)) || moved(mirrored(roots, target));
   let checked = 0, historic = 0;
   for (const file of files) {
@@ -251,7 +243,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
 
 export const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';
 /** The runtime's live prose (rule R122): every tracked doc, yaml and source file of this tree outside history. */
-export const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
+const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
 
 const NOT_TRACKED_DIRS = new Set(['.git', 'node_modules', '.starciwork', 'dist']);
 
@@ -261,8 +253,8 @@ const NOT_TRACKED_DIRS = new Set(['.git', 'node_modules', '.starciwork', 'dist']
  * git ls-files; a tree that is not a Git work tree falls back to the filesystem (a spec fixture).
  */
 export function runtimeCiteScan(root = DEFAULT_ROOT) {
-  const generated = generatedRoots(root);
-  const scoped = (rel) => CITE_EXT.test(rel) && !SCAN_HISTORY(rel) && !generated.some((g) => rel.startsWith(g));
+  const generated = generatedRootsOf(root);
+  const scoped = (rel) => CITE_EXT.test(rel) && !isHistoryPath(rel) && !generated.some((g) => rel.startsWith(g));
   try {
     return gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files').split('\0').filter(Boolean).map((f) => f.replaceAll('\\', '/')).filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort();
   } catch {

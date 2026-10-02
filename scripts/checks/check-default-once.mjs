@@ -29,12 +29,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings, scopeFilter } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 
 export const CODE = 'RT_CONFIG_DEFAULT_TWICE';
-export const EXAMPLE_FILE = 'config.example.yaml';
+const EXAMPLE_FILE = 'config.example.yaml';
 export const OWNER_FILES = Object.freeze([
   'scripts/machine/home.mjs', 'engine/config.mjs', 'engine/orca-config.mjs',
   'scripts/reconciler/state.mjs', EXAMPLE_FILE,
@@ -46,7 +47,7 @@ const CODE_EXT = /\.(?:mjs|cjs|js|ts|tsx)$/;
 const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|\.stories\.|^packages\/hfs\/templates\//;
 // packages/hfs/templates are product seeds and *.stories.* are component demos: the literals they carry are the
 // product's own defaults, not the runtime config's keys restated.
-const inScope = (rel) => SCOPE.test(rel) && CODE_EXT.test(rel) && !OUT.test(rel) && !OWNER_FILES.includes(rel);
+const inScope = scopeFilter({ scope: SCOPE, ext: CODE_EXT, out: OUT, exclude: OWNER_FILES });
 
 const LANGUAGE_KEYS = ['language', 'lang', 'owner_language', 'ownerLanguage'];
 const LANG_RE = String.raw`(?:language|lang|owner_language|ownerLanguage)`;
@@ -156,12 +157,4 @@ export function checkDefaultOnce(root = skillRoot) {
   return defaultOnceFindings(files, { leaves, ownerValues: values, ownerLanguage: language });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkDefaultOnce();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log(`OK: every documented default is read through its owner.`);
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkDefaultOnce(), "OK: every documented default is read through its owner."));

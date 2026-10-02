@@ -24,7 +24,7 @@ export const BE_DECLARATION = Object.freeze({
 export const fixtureHfs = (declaration = BE_DECLARATION) => hfsFromDeclaration(appDeclaration("be", declaration), TYPED_ROOT)
 
 /** Globs of every depth a case filename may sit at, per extension (the project service refuses a `**` glob). */
-export const depthsOf = (extensions = ["ts"], maxDepth = 8) =>
+const depthsOf = (extensions = ["ts"], maxDepth = 8) =>
     Array.from({ length: maxDepth }, (_, depth) => extensions.map((ext) => `${"*/".repeat(depth)}*.${ext}`)).flat()
 
 /** The absolute filename of a fixture-relative path. */

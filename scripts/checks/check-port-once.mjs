@@ -24,14 +24,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings, scopeFilter } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 
 export const CODE = 'RT_PORT_RESTATED';
-export const RUNTIMES_FILE = 'modules/models/runtimes.yaml';
-export const UI_PORTS_FILE = 'ui/ports.mjs';
-export const SONAR_FILE = 'scripts/gates/sonar-local.mjs';
+const RUNTIMES_FILE = 'modules/models/runtimes.yaml';
+const UI_PORTS_FILE = 'ui/ports.mjs';
+const SONAR_FILE = 'scripts/gates/sonar-local.mjs';
 export const SELF_FILES = Object.freeze(['scripts/checks/check-port-once.mjs', 'tests/checks/check-port-once.spec.mjs']);
 
 const SCOPE = /^(?:scripts|engine|ui|ext|docs|knowledge|modules|examples|packages)\//;
@@ -42,7 +43,7 @@ const CODE_EXT = /\.(?:mjs|cjs|js|ts|tsx)$/;
 // the product it runs is a product declaration, not a runtime port restated.
 const RUNTIME_CODE = /^(?:scripts|engine|ui|ext)\//;
 const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|\.starcistacks\/|starcistacks-services\/|contract-changes\/|CHANGELOG/;
-const inScope = (rel) => SCOPE.test(rel) && TEXT_EXT.test(rel) && !OUT.test(rel) && !SELF_FILES.includes(rel);
+const inScope = scopeFilter({ scope: SCOPE, ext: TEXT_EXT, out: OUT, exclude: SELF_FILES });
 
 /** The port-position contexts, each capturing the port literal in group 1. */
 const CONTEXTS = [
@@ -62,7 +63,7 @@ export function portLiteralsOf(text) {
 }
 
 /** The owned ports of the runtime, as {port -> owner rel}. Derived from the owner files, never restated here. */
-export function ownedPorts(root = skillRoot) {
+function ownedPorts(root = skillRoot) {
   const owned = new Map();
   const runtimes = parseYaml(fs.readFileSync(path.join(root, RUNTIMES_FILE), 'utf8'));
   for (const key of ['port', 'devPort']) {
@@ -123,12 +124,4 @@ export function checkPortOnce(root = skillRoot) {
   return portOnceFindings(files, { owned: ownedPorts(root) });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkPortOnce();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log(`OK: every port literal of the runtime is spelled by its owner only.`);
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkPortOnce(), "OK: every port literal of the runtime is spelled by its owner only."));

@@ -30,6 +30,7 @@ import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { lineOf, runReportMain } from '../lib/check-scan.mjs';
 
 const HELP = `Usage: node scripts/checks/check-example-coupling.mjs [--root <tree>] [--json]
 
@@ -66,7 +67,6 @@ const EXAMPLE_PATH_RE = /(?:^|[^A-Za-z0-9_/-]|\.{1,2}\/)examples\/([A-Za-z0-9_-]
 /** A hyphen-joined token ending in an incident id, `inc-<hash>` with a prefix (allowed only when the prefix is not a product name). */
 const INCIDENT_TOKEN_RE = /(?<![A-Za-z0-9])([A-Za-z0-9._-]*?)-?inc-[0-9a-z]{4,}[A-Za-z0-9._-]*/gi;
 
-const lineOf = (text, offset) => { let n = 1; for (let i = 0; i < offset; i += 1) if (text.charCodeAt(i) === 10) n += 1; return n; };
 
 /** The live tracked source files of `root` under SCAN_ROOTS (git ls-files, or the filesystem of a spec fixture tree). */
 export function exampleCouplingScan(root = DEFAULT_ROOT) {
@@ -140,34 +140,21 @@ export function checkExampleCoupling(root = DEFAULT_ROOT) {
 }
 
 /** The findings (RT_EXAMPLE_COUPLING, RT_PRODUCT_NAME_IN_SOURCE, RT_HOST_PATH_IN_TEMPLATE) under `root`. */
-export function exampleCouplingFindings(root = DEFAULT_ROOT) {
+function exampleCouplingFindings(root = DEFAULT_ROOT) {
   return checkExampleCoupling(root).hits.map((h) => ({
     code: h.code, level: 'error', path: h.file, line: h.line,
     message: `${h.file}:${h.line} names ${h.token}: ${h.why}`,
   }));
 }
 
-export function checkExampleCouplingMain(argv) {
-  let root = DEFAULT_ROOT, json = false;
-  for (let i = 0; i < argv.length; i++) {
-    const key = argv[i];
-    if (key === '--help' || key === '-h') return { exitCode: 0, text: `${HELP}\n` };
-    if (key === '--json') { json = true; continue; }
-    if (key === '--root') {
-      const value = argv[++i];
-      if (value === undefined) return { exitCode: 2, text: `check-example-coupling: --root needs a value\n` };
-      root = path.resolve(value);
-      continue;
-    }
-    return { exitCode: 2, text: `check-example-coupling: unknown argument ${key}\n${HELP}\n` };
-  }
-  const report = checkExampleCoupling(root);
-  if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
-  if (report.ok) return { exitCode: 0, text: `check-example-coupling: no example or product name in ${report.filesScanned} source files\n` };
-  const lines = [`check-example-coupling: ${report.hits.length} coupling hit(s) in runtime source`];
-  for (const h of report.hits) lines.push(`  ${h.file}:${h.line}  ${h.code}  ${h.token} — ${h.why}`);
-  return { exitCode: 1, text: `${lines.join('\n')}\n` };
-}
+export const checkExampleCouplingMain = (argv) => runReportMain(argv, {
+  name: 'check-example-coupling', help: HELP, root: DEFAULT_ROOT, scan: checkExampleCoupling,
+  describe: (report) => ({
+    okText: `check-example-coupling: no example or product name in ${report.filesScanned} source files`,
+    headline: `check-example-coupling: ${report.hits.length} coupling hit(s) in runtime source`,
+    rows: report.hits.map((h) => `  ${h.file}:${h.line}  ${h.code}  ${h.token} — ${h.why}`),
+  }),
+});
 
 if (isMain(import.meta.url)) {
   const result = checkExampleCouplingMain(process.argv.slice(2));

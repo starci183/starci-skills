@@ -7,9 +7,9 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { catalogEntries } from '../lib/i18n.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const UI_CATALOG_FILE = 'ui/src/i18n/generated/catalog.ts';
+const UI_CATALOG_FILE = 'ui/src/i18n/generated/catalog.ts';
 
-export function uiCatalogSource(root = skillRoot) {
+function uiCatalogSource(root = skillRoot) {
   const entries = catalogEntries(root, { scope: 'ui' });
   const catalog = Object.fromEntries(entries.map(({ en, vi }) => [en, vi]));
   if (Object.keys(catalog).length !== entries.length) throw new Error('The UI i18n scope contains duplicate English sources');
@@ -21,7 +21,7 @@ export function uiCatalogSource(root = skillRoot) {
   ].join('\n');
 }
 
-export function generateUiCatalog(root = skillRoot) {
+function generateUiCatalog(root = skillRoot) {
   const target = path.join(root, ...UI_CATALOG_FILE.split('/'));
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, uiCatalogSource(root), 'utf8');

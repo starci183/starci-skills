@@ -1234,7 +1234,7 @@ rules:
       - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
   - id: R121
     code: "RT_GENERATED_DRIFT"
-    law: "A generated root of ruleParams.runtime.generated (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) is git-ignored output equal to what its generatedBy (scripts/hfs/sync-runtime.mjs) writes from the single source, and no git-tracked path lies under it."
+    law: "A generated root of ruleParams.runtime.generated is git-ignored output of its declared generatedBy: the repo's check regenerates every root, the runtime copies (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) are judged equal to what scripts/hfs/sync-runtime.mjs writes from the single source, and no git-tracked path lies under a generated root."
     scope: runtime
     kinds: [check, codemod]
     gates: [land, runtime]
@@ -1745,6 +1745,7 @@ rules:
   - id: R202
     code: "CI_UPLOAD_NOT_SILENT"
     law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["CI_UPLOAD_NOT_SILENT"]

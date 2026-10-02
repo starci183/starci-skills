@@ -16,7 +16,7 @@ import { loadWorkSchemaValidators } from '../../scripts/work/validate/check-work
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GRAMMAR = path.join(ROOT, 'knowledge', 'grammars');
-const EXAMPLE = path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml');
+const EXAMPLE = path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.example.yaml');
 const example = () => parseYaml(fs.readFileSync(EXAMPLE, 'utf8')).direction;
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 

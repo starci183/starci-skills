@@ -179,7 +179,7 @@ function judgeEvidence(abs, doc, repo) {
  * draws.yaml, rejected composites, baselines) is kept-never-deleted and artifact-indexed, so it stays in the owned
  * directory; it is judged only when the live record still points at it.
  */
-export function boundByRecord(record, recordDir, abs, repo) {
+function boundByRecord(record, recordDir, abs, repo) {
   const target = slash(path.resolve(abs)).toLowerCase();
   const names = (v) => typeof v === 'string' && !/\s/.test(v) && /\.(ya?ml|json|png|jpe?g|webp)$/i.test(v)
     && [recordDir, repo].some((base) => base && slash(path.resolve(base, v)).toLowerCase() === target);

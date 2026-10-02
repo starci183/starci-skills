@@ -10,12 +10,12 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
-export const SOURCE_PHRASES_FILE = 'modules/goal/source-phrases.yaml';
+const SOURCE_PHRASES_FILE = 'modules/goal/source-phrases.yaml';
 
 const cache = new Map();
 
 /** The lexicon's `phrases` map ({<group>: {<list>: string[]}}), cached per root. */
-export function sourcePhrases(root = skillRoot) {
+function sourcePhrases(root = skillRoot) {
   if (!cache.has(root)) {
     let doc = null;
     try { doc = parseYaml(fs.readFileSync(path.join(root, ...SOURCE_PHRASES_FILE.split('/')), 'utf8')); } catch { doc = null; }

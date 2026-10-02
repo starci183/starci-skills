@@ -11,7 +11,7 @@ import { loadRuleCatalog } from '../slots.mjs';
 
 export const UNKNOWN = 'RT_RULE_ID_UNKNOWN';
 export const GAP = 'RT_RULE_ID_GAP';
-export const UNCITED = 'RT_RULE_UNCITED';
+const UNCITED = 'RT_RULE_UNCITED';
 const READ = /\.(?:mjs|cjs|js|ts|tsx|md|ya?ml|json)$/;
 const SKIPPED = /(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json)$|^tests\//;
 const HISTORY = /^modules\/kernel\/contract-changes\/|(?:^|\/)CHANGELOG\.md$|^knowledge\/hfs\/rules\.yaml$/;

@@ -14,8 +14,8 @@ import { isMain } from '../lib/is-main.mjs';
 import { CATALOG_DIR, catalogFiles, placeholdersOf } from '../lib/i18n.mjs';
 import { hasSecondLanguage } from '../lib/language.mjs';
 
-export const CATALOG_SCHEMA = 'starci/i18n-catalog@1';
-export const CATALOG_SCOPES = Object.freeze(['runtime', 'ui']);
+const CATALOG_SCHEMA = 'starci/i18n-catalog@1';
+const CATALOG_SCOPES = Object.freeze(['runtime', 'ui']);
 
 /** The findings of the catalog under `root`: [{code, path, message}]. */
 export function catalogFindings(root = skillRoot) {

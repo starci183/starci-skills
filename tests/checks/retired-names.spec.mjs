@@ -5,9 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
-  RETIRED_NAME_LIVE, RETIRED_NAMES_FILE,
+  RETIRED_NAME_LIVE,
   checkRetiredNames, checkRetiredNamesMain, retiredNameFindings, retiredNameScan, retiredNameTokens,
 } from '../../scripts/checks/check-retired-names.mjs';
+import { RETIRED_PATHS_FILE } from '../../scripts/lib/check-scan.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 const CHECK = path.join(repoRoot, 'scripts/checks/check-retired-names.mjs');
@@ -27,7 +28,7 @@ const REGISTRY = [
 
 const fixtureTree = (files, registry = REGISTRY) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-retired-names-'));
-  for (const [rel, body] of Object.entries({ [RETIRED_NAMES_FILE]: registry, ...files })) {
+  for (const [rel, body] of Object.entries({ [RETIRED_PATHS_FILE]: registry, ...files })) {
     const target = path.join(root, rel);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, body);
@@ -98,7 +99,7 @@ test('history, the registry itself, the check files and a manifest refusal are n
   try {
     const report = checkRetiredNames(root);
     assert.deepEqual(report.dead, [], 'a forbidden tombstone path, a forbids value and history name the dead names legitimately');
-    assert.ok(retiredNameScan(root).includes('docs/live.md') && !retiredNameScan(root).includes(RETIRED_NAMES_FILE));
+    assert.ok(retiredNameScan(root).includes('docs/live.md') && !retiredNameScan(root).includes(RETIRED_PATHS_FILE));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

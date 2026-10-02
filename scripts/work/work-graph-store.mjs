@@ -114,7 +114,7 @@ const jobsOf = (db, workflowId) => db.prepare("SELECT job_id,op_id,status,payloa
  * succeeded jobs a contract change owes a follow-up (api status contractFollowUps): they colour their nodes as rework
  * (red), never done.
  */
-export function liveCoverage(db, row, { rework = new Set() } = {}) {
+function liveCoverage(db, row, { rework = new Set() } = {}) {
   if (!row) return { colors: {}, jobs: new Map() };
   const jobs = jobsOf(db, row.workflowId).map((j) => (j.status === 'succeeded' && rework.has(j.jobId) ? { ...j, status: 'failed', rework: true } : j));
   return { colors: colorsFromJobs(row.graph, jobs, { recorded: row.colors ?? {}, since: row.createdAt ?? 0 }), jobs: coverageOf(row.graph, jobs) };

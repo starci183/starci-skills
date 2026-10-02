@@ -12,10 +12,10 @@ import { parseYaml } from '../../engine/yaml.mjs';
 export const ALLOWLIST_FILE = 'modules/kernel/allowlist.yaml';
 
 /** The schema stamp every allowlist document carries. */
-export const ALLOWLIST_SCHEMA = 'starci/allowlist@1';
+const ALLOWLIST_SCHEMA = 'starci/allowlist@1';
 
 /** The section names of the one allowlist, in file order. */
-export const ALLOWLIST_SECTIONS = Object.freeze(['not-codes', 'json-exceptions', 'dead-script-entries', 'export-used']);
+const ALLOWLIST_SECTIONS = Object.freeze(['not-codes', 'json-exceptions', 'dead-script-entries', 'export-used']);
 
 /** The `kind` section of one already-parsed allowlist document; a malformed document or an unknown section is an error, never a silent empty list. */
 export function allowlistSection(doc, kind, at = ALLOWLIST_FILE) {

@@ -21,6 +21,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath, lineOf, runReportMain } from '../lib/check-scan.mjs';
 
 const HELP = `Usage: node scripts/checks/check-retired-names.mjs [--root <tree>] [--json]
 
@@ -29,25 +30,15 @@ moved[].from, retiredNames[].name) in a live tracked file. Exit 0 clean, 1 lists
 the live occurrences, 2 is a bad argument.`;
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const RETIRED_NAMES_FILE = 'modules/kernel/retired-paths.yaml';
 export const RETIRED_NAME_LIVE = 'RT_RETIRED_NAME_LIVE';
 /** The files of this check name the tokens they enforce. */
 const SELF_FILES = new Set(['scripts/checks/check-retired-names.mjs', 'tests/checks/retired-names.spec.mjs']);
-/** Never read: contract history, a changelog, a benchmark finding and a .starciwork record may name what was deleted. */
-const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel.startsWith('benchmark/')
-  || /(^|\/)CHANGELOG[^/]*\.md$/i.test(rel) || /(^|\/)\.starciwork\//.test(rel) || rel === RETIRED_NAMES_FILE;
 /** The slot manifests: refusal declarations there are enforcement, not use. */
 const MANIFESTS = new Set(['knowledge/hfs/slots.yaml', 'knowledge/hfs/runtime-slots.yaml']);
-/** The generated copy roots of the runtime (ruleParams.runtime.generated), each a byte mirror of the live layout. */
-const generatedRoots = (root) => {
-  const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
-  if (!fs.existsSync(file)) return [];
-  return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? []).map((g) => `${String(g.root).replace(/\/$/, '')}/`);
-};
 
 /** The dead tokens `root`'s registry declares: [{token, kind, why}]. */
 export function retiredNameTokens(root = DEFAULT_ROOT) {
-  const file = path.join(root, RETIRED_NAMES_FILE);
+  const file = path.join(root, RETIRED_PATHS_FILE);
   const doc = fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8')) ?? {}) : {};
   const tokens = [];
   for (const r of doc.retired ?? []) if (r?.path) tokens.push({ token: String(r.path), kind: 'retired path', why: r.replacedBy ? `replaced by ${r.replacedBy}` : 'retired' });
@@ -74,12 +65,10 @@ const blankRefusals = (text) => {
   return lines.map((line) => (/^\s*forbids\s*:/.test(line) ? line.replace(/:.*/, ':') : line)).join('\n');
 };
 
-const lineOf = (text, offset) => { let line = 1; for (let i = 0; i < offset; i += 1) if (text.charCodeAt(i) === 10) line += 1; return line; };
-
 /** The live tracked files of `root`: git ls-files, or the filesystem under a tree that is not a Git work tree (a spec fixture). */
 export function retiredNameScan(root = DEFAULT_ROOT) {
-  const generated = generatedRoots(root);
-  const scoped = (rel) => !HISTORY(rel) && !SELF_FILES.has(rel) && !generated.some((g) => rel.startsWith(g));
+  const generated = generatedRootsOf(root);
+  const scoped = (rel) => !isHistoryPath(rel) && !SELF_FILES.has(rel) && !generated.some((g) => rel.startsWith(g));
   try {
     return gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files').split('\0').filter(Boolean).map((f) => f.replaceAll('\\', '/')).filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort();
   } catch {
@@ -117,29 +106,14 @@ export function retiredNameFindings(root = DEFAULT_ROOT) {
   }));
 }
 
-export function checkRetiredNamesMain(argv) {
-  let root = DEFAULT_ROOT, json = false;
-  for (let i = 0; i < argv.length; i++) {
-    const key = argv[i];
-    if (key === '--help' || key === '-h') return { exitCode: 0, text: `${HELP}\n` };
-    if (key === '--json') { json = true; continue; }
-    if (key === '--root') {
-      const value = argv[++i];
-      if (value === undefined) return { exitCode: 2, text: `check-retired-names: --root needs a value\n` };
-      root = path.resolve(value);
-      continue;
-    }
-    return { exitCode: 2, text: `check-retired-names: unknown argument ${key}\n${HELP}\n` };
-  }
-  const report = checkRetiredNames(root);
-  if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
-  if (report.ok) return { exitCode: 0, text: `check-retired-names: no retired name in ${report.filesScanned} live tracked files\n` };
-  const lines = [`check-retired-names: ${report.dead.length} live occurrence(s) of a retired name`];
-  for (const entry of report.dead) {
-    lines.push(`  ${entry.file}${entry.line ? `:${entry.line}` : ''}  ${entry.token} — ${entry.kind}: ${entry.why}`);
-  }
-  return { exitCode: 1, text: `${lines.join('\n')}\n` };
-}
+export const checkRetiredNamesMain = (argv) => runReportMain(argv, {
+  name: 'check-retired-names', help: HELP, root: DEFAULT_ROOT, scan: checkRetiredNames,
+  describe: (report) => ({
+    okText: `check-retired-names: no retired name in ${report.filesScanned} live tracked files`,
+    headline: `check-retired-names: ${report.dead.length} live occurrence(s) of a retired name`,
+    rows: report.dead.map((entry) => `  ${entry.file}${entry.line ? `:${entry.line}` : ''}  ${entry.token} — ${entry.kind}: ${entry.why}`),
+  }),
+});
 
 if (isMain(import.meta.url)) {
   const result = checkRetiredNamesMain(process.argv.slice(2));

@@ -8,9 +8,9 @@
 // Pure: the registry, the tracked files and the parsed sources come in through ctx.
 import { globExpression } from '../../lib/glob.mjs';
 import { declaredNames } from './source-ast.mjs';
+import { RETIRED_PATHS_FILE } from '../../lib/check-scan.mjs';
 
 export const CODES = Object.freeze({ retired: 'RT_RETIRED_PRESENT', pinned: 'RT_PINNED_PATH_MOVED' });
-export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 
 /** The rows of moved[] as [from, to] pairs; a `from` ending in / moved a directory and everything below it. */
 const pairsOf = (moved) => (moved ?? []).filter((m) => m?.from && m?.to).map((m) => [String(m.from), String(m.to)]);

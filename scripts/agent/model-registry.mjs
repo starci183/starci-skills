@@ -7,15 +7,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readYamlFile } from '../lib/read-yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 export const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
 
-export function loadModelRegistry(modelsDir = DEFAULT_MODELS_DIR) {
-  const file = path.join(modelsDir, 'registry.yaml');
-  if (!fs.existsSync(file)) return null;
-  try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; }
-}
+export const loadModelRegistry = (modelsDir = DEFAULT_MODELS_DIR) => readYamlFile(path.join(modelsDir, 'registry.yaml'));
 
 export function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
   const file = path.join(modelsDir, 'runtimes.yaml');

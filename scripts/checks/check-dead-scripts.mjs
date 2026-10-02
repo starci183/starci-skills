@@ -21,6 +21,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings } from '../lib/check-scan.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { ALLOWLIST_FILE, allowlistSection } from '../lib/allowlist.mjs';
@@ -55,7 +56,7 @@ function executableText(rel, text) {
 }
 
 /** The declared entries: the {path, reason} maps of the dead-script-entries section of the one allowlist. */
-export function parseEntries(text) {
+function parseEntries(text) {
   const entries = new Map();
   if (!String(text ?? '').trim()) return entries;
   for (const entry of allowlistSection(parseYaml(text), 'dead-script-entries')) {
@@ -104,12 +105,4 @@ export function checkDeadScripts(root = skillRoot) {
   return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkDeadScripts();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log('OK: every runtime script has an executable reader or a declared entry.');
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkDeadScripts(), "OK: every runtime script has an executable reader or a declared entry."));

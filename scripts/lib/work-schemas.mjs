@@ -7,7 +7,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
-export const WORK_COMMON_ID = 'urn:work:common:1';
+const WORK_COMMON_ID = 'urn:work:common:1';
 
 /** Register the shared work-schema vocabulary on an Ajv instance (once per instance). `root` is the
  *  runtime root the rest of the caller reads schemas from; it defaults to this checkout. */

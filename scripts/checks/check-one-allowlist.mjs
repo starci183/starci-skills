@@ -23,10 +23,10 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { ALLOWLIST_FILE } from '../lib/allowlist.mjs';
 
 export const ALLOWLIST_SCHEMA_FILE = 'modules/schemas/allowlist.schema.yaml';
-export const CHECK_FILES = Object.freeze(['scripts/checks/check-one-allowlist.mjs', 'tests/checks/check-one-allowlist.spec.mjs', 'scripts/lib/allowlist.mjs']);
+const CHECK_FILES = Object.freeze(['scripts/checks/check-one-allowlist.mjs', 'tests/checks/check-one-allowlist.spec.mjs', 'scripts/lib/allowlist.mjs']);
 /** Append-only contract history: a change id may name the mechanism it changed; its names are records, not lists. */
 export const HISTORY_DIR = 'modules/kernel/contract-changes/';
-export const CHECKS_DIR = 'scripts/checks/';
+const CHECKS_DIR = 'scripts/checks/';
 
 /** The file-name forms of a stray allowlist, baseline or pending list, matched against the base name. */
 const LIST_NAME = [
