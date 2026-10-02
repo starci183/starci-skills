@@ -28,7 +28,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { isDir, isFile } from './work-io.mjs';
 
-export const GRAMMAR_PROPOSAL_SCHEMA = 'starci/grammar-proposal@1';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
 export const PROPOSAL_FILE_NAMES = Object.freeze(['grammar-proposal.yaml', 'grammar-proposal.yml', 'grammar-proposal.md']);

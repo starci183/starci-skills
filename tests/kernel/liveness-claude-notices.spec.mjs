@@ -64,8 +64,8 @@ test('every Claude Code 2.1.282 notice row under a live spinner reads active', (
   for (const notice of notices) assert.deepEqual(both(frame('● Reading the frontier.',SPINNER,notice)),['active','active'],notice);
   // The two-row restore failure: its second row names the preserved copy.
   assert.deepEqual(both(frame(SPINNER,
-    '  ✘ Update failed and C:\\Users\\Hi\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe could not be restored — it was preserved at:',
-    '  C:\\Users\\Hi\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe.old.1790280018689 · rename it back to claude.exe or run npm i -g @anthropic-ai/claude-code')),['active','active']);
+    '  ✘ Update failed and ~/npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe could not be restored — it was preserved at:',
+    '  ~/npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe.old.1790280018689 · rename it back to claude.exe or run npm i -g @anthropic-ai/claude-code')),['active','active']);
   // Stacked notices, as a session that has both an updater and an IDE notice draws them.
   assert.deepEqual(both(frame(SPINNER,EXE_IN_USE,'  Visual Studio Code disconnected')),['active','active']);
 });
@@ -86,8 +86,8 @@ test('a finished turn above a notice row still reads turn-idle, and prose about 
   // The four idle frames captured live that morning.
   assert.deepEqual(both(frame('  report, and no peer messages are pending. I\'m yielding until it reports or the watchdog wakes me.','✻ Baked for 33s · done 5:23 AM',EXE_IN_USE)),['turn-idle','turn-idle']);
   assert.deepEqual(both(frame('  repair op-interface.implement-2a43f63c6c is still running.','✻ Cooked for 34s · done 5:30 AM',EXE_IN_USE_TRUNCATED)),['turn-idle','turn-idle']);
-  assert.deepEqual(both(frame('  lượt, chờ report của job draw.','✻ Worked for 1m 5s · done 5:24 AM',INSTALLED)),['turn-idle','turn-idle']);
-  assert.deepEqual(both(frame('  report của hai job này.','✻ Churned for 11s · done 5:29 AM',INSTALLED)),['turn-idle','turn-idle']);
+  assert.deepEqual(both(frame('  l\u01b0\u1ee3t, ch\u1edd report c\u1ee7a job draw.','✻ Worked for 1m 5s · done 5:24 AM',INSTALLED)),['turn-idle','turn-idle']);
+  assert.deepEqual(both(frame('  report c\u1ee7a hai job n\u00e0y.','✻ Churned for 11s · done 5:29 AM',INSTALLED)),['turn-idle','turn-idle']);
   // A finished answer below the spinner ends the turn whatever notice follows it.
   assert.deepEqual(both(frame(SPINNER,'● Report filed with outcome done.',EXE_IN_USE)),['turn-idle','turn-idle']);
   // The notice's words in an answer are the answer: a bullet row, and a claude doctor mention without the " · Run" hint.

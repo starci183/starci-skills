@@ -4,7 +4,7 @@ summary: >-
   Legacy removal WP3 H05 (owner rule 2026-09-29: no backward compatibility). The allocation.housekeeping.legacyFixturePrefixes
   key and the drive-root starci-tmp fixture sweep of scripts/lib/hk-tmp.mjs are removed. Land only after the
   leftover artifacts-/gate-/consistency-/critique-/derive-/evidence-/verify-/surfaces-fixture-* directories in
-  D:/starci-tmp (52,570 on 2026-09-29) were swept by housekeeping apply: nothing sweeps them afterwards.
+  <tmp> (52,570 on 2026-09-29) were swept by housekeeping apply: nothing sweeps them afterwards.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/legacy-wp3-fixture-sweep.yaml

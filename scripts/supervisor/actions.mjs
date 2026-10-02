@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // actions.mjs — the OWED ACTIONS list: every stuck item of every running workflow, classified, with the one action
 // the [Supervisor] takes on it and an SLA clock (modules/supervisor/supervise.yaml mission; owner, 2026-09-28:
-// "supervisor phải giám sát, quản lý, gửi thư tới, điều chỉnh" - autopilot, the owner is asked only for the final
+// "the supervisor must watch, manage, send mail in, and adjust" - autopilot, the owner is asked only for the final
 // credentials step and the handover).
 //
 // It classifies nothing twice: OWED incidents and patterns come from owed.mjs through cluster.mjs, stalls/gates/waits
@@ -25,6 +25,7 @@ import { OWNER_ONLY } from './owed.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const ACTION_KIND = 'supervisor-action';
@@ -200,14 +201,15 @@ export const latestOwedActions = ({ env = process.env } = {}) => readSupervisor(
 
 /* ------------------------------------------------------------ the owner's digest */
 
-const T = {
-  en: { head: 'StarCi supervisor digest', fixed: 'Handled', open: 'Still being handled', none: 'nothing new', wf: 'Workflows', owner: 'Waiting on you (credentials / handover only)' },
-  vi: { head: 'StarCi supervisor - báo cáo định kỳ', fixed: 'Đã xử lý', open: 'Đang xử lý', none: 'không có gì mới', wf: 'Workflows', owner: 'Chờ bạn (chỉ credentials / bàn giao)' },
+// The digest's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
+const digestTexts = (language) => {
+  const tr = translator(language);
+  return { head: tr('StarCi supervisor digest'), fixed: tr('Handled'), open: tr('Still being handled'), none: tr('nothing new'), wf: tr('Workflows'), owner: tr('Waiting on you (credentials / handover only)'), unacted: tr('not yet acted on') };
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
 export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = 'en', now = Date.now() }) {
-  const t = T[language] ?? T.en;
+  const t = digestTexts(language);
   const lines = [`${t.head} ${stampMinute(now)}`];
   // Outcome first: progress per workflow, priority first, and why it is slow.
   if (progress?.length) lines.push(...progress);
@@ -219,7 +221,7 @@ export function digestText({ actions = [], owed = null, learning = [], trend = n
   for (const a of actions.slice(-12)) lines.push(`- ${a.action} ${a.item}: ${one(a.reason, 140)}`);
   const items = owed?.items ?? [];
   const open = items.filter((i) => !i.actedAt);
-  lines.push(`${t.open}: ${items.length} (${open.length} ${language === 'vi' ? 'chưa có hành động' : 'not yet acted on'})`);
+  lines.push(`${t.open}: ${items.length} (${open.length} ${t.unacted})`);
   const byClass = {};
   for (const i of items) byClass[i.class] = (byClass[i.class] ?? 0) + 1;
   if (items.length) lines.push(`  ${Object.entries(byClass).map(([c, n]) => `${c} ${n}`).join(', ')}`);

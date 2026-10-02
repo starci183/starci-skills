@@ -383,7 +383,7 @@ ui:
   assets:
     - path: assets/privacy-erasure-refused.prompt.txt
       role: prompt
-      sha256: a29af848aac14496611790c7172c0033ef2b69692074ae184f05c3271032a6d0
+      sha256: de123bb634b08d65a8a87bd328bafaf7b96d546da2e85bcdc0587cad21d6a0a2
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/privacy-erasure-refused.png
       role: direction
@@ -523,7 +523,7 @@ ui:
 assets:
   - path: assets/privacy-erasure-refused.prompt.txt
     role: prompt
-    sha256: a29af848aac14496611790c7172c0033ef2b69692074ae184f05c3271032a6d0
+    sha256: de123bb634b08d65a8a87bd328bafaf7b96d546da2e85bcdc0587cad21d6a0a2
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/privacy-erasure-refused.png
     role: direction

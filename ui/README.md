@@ -13,8 +13,8 @@ From `.claude/ui`:
 ```powershell
 npm ci
 npm run build
-$env:STARCI_MACHINE_DB = 'D:/starci-lanes/ui/ui/fixtures/seed/machine.sqlite'
-$env:STARCI_ARTIFACT_ROOT = 'D:/starci-tmp/ui-seed-artifacts'
+$env:STARCI_MACHINE_DB = '<lanes root>/ui/ui/fixtures/seed/machine.sqlite'
+$env:STARCI_ARTIFACT_ROOT = '<tmp>/ui-seed-artifacts'
 $env:STARCI_STATUS_PORT = '4556'
 node server.mjs
 ```
@@ -42,7 +42,7 @@ Workflow tabs include Units, Graph, Attempts, Decisions, Why, Timeline, Evidence
 
 The Attempt page keeps the Op's reported outcome distinct from the final verdict. Its transcript is stored redacted scrollback or a live snapshot, not a terminal-screen guess. Diff and media come from indexed blob evidence; a finished job is never reconstructed from the current checkout.
 
-Old hash routes such as `#/agents`, `#/changes`, `#/proofs` and `#/supervisor` open Overview. They expose no legacy data surface.
+An unknown hash route opens the not-found page.
 
 ## API contract
 

@@ -4,8 +4,8 @@
 // Owner, 2026-09-24: workflows that share one repository planned independently and discovered
 // their shared foundations mid-flight - the layout tree/shell, the brand, the @starci/grammar
 // version, shared modules - so one workflow's leg sat blocked on another's foundation with no
-// record of who owned it (nivo Collab held on Modules' shell rev; mia-mia brand.decide waited on
-// base-repos' Grammar install for 23h). A foundation is one row: an OWNER workflow, a state
+// record of who owned it (one product's Collab workflow held on Modules' shell rev; another's brand.decide
+// waited on its base-repos peer's Grammar install for 23h). A foundation is one row: an OWNER workflow, a state
 // (unclaimed -> claimed -> landed) and its dependents. Landing it notifies every dependent and
 // releases every typed wait on it (api incident --kind peer-wait --until-foundation <name>).
 //
@@ -18,10 +18,7 @@ import { parseJson } from '../lib/json.mjs';
 import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
 export const FOUNDATION_SCHEMA = 'starci/foundation@1';
-export const FOUNDATION_SCOPE = 'foundation';
-export const DECLARED_SCOPE = 'foundation-declared';
 export const FOUNDATION_KINDS = ['layout-tree', 'brand', 'grammar', 'module', 'contract', 'baseline', 'scaffold', 'other'];
-export const FOUNDATION_STATES = ['unclaimed', 'claimed', 'landed'];
 // The contract change that introduced foundation planning (modules/kernel/contract-changes.yaml):
 // a workflow created after it must declare before its first leg; an older one is told, not held.
 export const FOUNDATION_CHANGE_ID = 'shared-foundation-planning';

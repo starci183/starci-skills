@@ -9,15 +9,15 @@ import {owedFindings,patternFindings,ackOwed,unackOwed,readOwedAcks,ackHolds,CLA
 import {readMachine} from '../../engine/db/machine.mjs';
 
 // A retry-loop / repeat-check stays OWED until a success breaks its streak, so a lineage whose causes
-// were already fixed re-alerted every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8
-// failed, fixed by 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review
+// were already fixed re-alerted every hour: a product workflow's brand.decide attempts
+// failed, were fixed by later commits, then queued behind an owner review
 // ask. The supervisor now acks such an item (quiet until a NEWER failure on its lineage re-opens it),
 // and a lineage whose newest job waits behind an owner gate or owner ask is the owner's, not OWED.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const OWED_CLI=path.join(ROOT,'scripts','supervisor','owed.mjs');
 const MIN=60_000;
 const NOW=Date.now();
-const WF='wf-miamia-work-and-stacks-mud7kjun';
+const WF='wf-todo-app-work-and-stacks-mud7kjun';
 const OP='brand.decide';
 const id=n=>`op-brand.decide-00000000${String(n).padStart(2,'0')}`;
 const job=(n,{status,agoMin,after=null,retry=true})=>({jobId:id(n),opId:OP,attempt:n,status,createdAt:NOW-agoMin*MIN,updatedAt:NOW-(agoMin-5)*MIN,

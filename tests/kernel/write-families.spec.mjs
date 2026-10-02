@@ -1,7 +1,6 @@
 // An authoring op is enqueued only onto the Work families its manifest writes (scripts/kernel/write-families.mjs).
-// Since 2026-09-27T05:50Z business.decide went onto integration/, impl/ and src/ grants and architecture.decide
-// onto journey/ (sn-learn-content, sn-subscription, modules-agentos, collab): each worker launched only to
-// report blocked authority.
+// business.decide went onto integration/, impl/ and src/ grants and architecture.decide
+// onto journey/: each worker launched only to report blocked authority.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,14 +24,14 @@ test('business.decide and architecture.decide are guarded by their families; sou
 test('the measured misroutes are refused; the op\'s own families, evidence and the work graph pass', () => {
   const business = familyGuardOf(brief('business.decide'));
   const refused = (paths) => familyViolations(business, paths).map((v) => v.family);
-  assert.deepEqual(refused(['.starciwork/features/concepts/integration/academy-content-source']), ['integration']);
-  assert.deepEqual(refused(['.starciwork/features/commerce/impl/starci-next/entitlement', 'src/modules/domain/entitlement', '.starciwork/evidence/wf-x.business']), ['impl', null]);
+  assert.deepEqual(refused(['.starciwork/features/concepts/integration/product-content-source']), ['integration']);
+  assert.deepEqual(refused(['.starciwork/features/commerce/impl/ecommerce-app/entitlement', 'src/modules/domain/entitlement', '.starciwork/evidence/wf-x.business']), ['impl', null]);
   assert.deepEqual(refused(['.starciwork/features/shared-lifecycle/architecture/sds/contracts/contract-sh-core-controlplane']), ['architecture']);
   assert.deepEqual(refused(['.starciwork/features/commerce', '.starciwork/features/commerce/index.yaml', '.starciwork/features/commerce/fr/checkout/**',
     '.starciwork/features/commerce/journey/buy', '.starciwork/evidence/wf-x.scope/work-graph.json']), []);
   const architecture = familyGuardOf(brief('architecture.decide'));
   assert.deepEqual(familyViolations(architecture, ['.starciwork/features/collab/journey/first-open']).map((v) => v.family), ['journey']);
-  assert.deepEqual(familyViolations(architecture, ['D:/Repositories/nivo-backend/.starciwork/features/collab/sds/room', '.starciwork/features/collab/index.yaml']).map((v) => v.family), ['overview']);
+  assert.deepEqual(familyViolations(architecture, [path.join(path.dirname(OPS), 'todo-app-be', '.starciwork/features/collab/sds/room'), '.starciwork/features/collab/index.yaml']).map((v) => v.family), ['overview']);
 });
 
 test('the refusal names who writes each family', () => {

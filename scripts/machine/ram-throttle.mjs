@@ -1,5 +1,5 @@
-// ram-throttle.mjs — the RAM-aware, priority-aware dispatch throttle (owner rulings 2026-09-28: "Trần song song theo
-// RAM thật: RAM còn dưới 15% thì giảm số op chạy song song, tránh treo máy làm op chết giữa chừng", lowered the same day to "15→10, 10→2.5"; and the FE
+// ram-throttle.mjs — the RAM-aware, priority-aware dispatch throttle (owner rulings 2026-09-28: "Cap parallelism by
+// real RAM: with free RAM below 15% reduce the number of ops running in parallel, so a hung machine does not kill ops mid-run", lowered the same day to "15→10, 10→2.5"; and the FE
 // refactor workflow runs its parallel code.refactor slices first while the other workflows ramp up).
 //
 // Measured before it (supervisor bottleneck samples, 2026-09-27): free RAM sat at 10-13% of 68.6 GB for hours with
@@ -417,7 +417,7 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const ramKnown = num(host.totalRamBytes) > 0 || override?.freeRamPct != null;
   // Single writer (DESIGN §8.3): the reconciler's Resource controller alone writes the mode. This call reads the mode
   // it published (fresh within RECONCILER_MODE_FRESH_MS); a stale or missing publication is computed locally and never
-  // written (owner ruling 2026-09-28 "có lỗi xóa luôn": no dormant fallback writer).
+  // written (owner ruling 2026-09-28 "on an error, delete it outright": no dormant fallback writer).
   const published = prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
   const m = published ? { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` }
     : ramKnown ? nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)

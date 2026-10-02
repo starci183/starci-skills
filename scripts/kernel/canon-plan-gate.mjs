@@ -12,7 +12,7 @@ import { canonCutPlanOf } from './cut-seam.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 
 const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
-/** An owned path `q` (maybe repository-prefixed, e.g. nivo-fe/apps/...) covers the scan-relative path `p`. */
+/** An owned path `q` (maybe repository-prefixed, e.g. todo-app-fe/apps/...) covers the scan-relative path `p`. */
 const covers = (q, p) => { const a = norm(q), b = norm(p); return sameOrUnder(b, a) || a.endsWith(`/${b}`) || [...a.split('/').keys()].some((i) => sameOrUnder(b, a.split('/').slice(i).join('/'))); };
 
 /** A canon slice's payload: cut + params.canonFamilies, and not its wire leg. */

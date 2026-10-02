@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// gc.mjs — the Supervisor's garbage collection ("dọn rác"; owner, 2026-09-28: "sao supervisor không xóa worker, và op
-// đầy rác thế!!! phải có dọn rác chứ"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
+// gc.mjs — the Supervisor's garbage collection (owner, 2026-09-28: "why doesn't the supervisor delete the workers,
+// the ops are so full of garbage!!! there has to be a garbage collection"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
 //
-//   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp,tasks] [--json]
+//   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp] [--json]
 //                                  [--plan] [--holder <name>] [--trigger <name>]
 //
 // --plan is a dry run that writes NOTHING (no seen-state, no machine-log rows, no lessons): the reconciler's gc controller
@@ -38,12 +38,11 @@
 //             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
 //             the worktree GC (scripts/machine/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
 //             The node_modules junction is unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
-//             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
+//             `git worktree remove --force`), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
 //    through scripts/housekeeping/hk-ledger.mjs and scripts/work/purge-workflow.mjs.)
 //   tmp       %TEMP% entries with a runtime prefix past tmpMaxAgeMs (hk-tmp.mjs sweepTmp).
-//   tasks     Orca Tasks of settled jobs whose close was refused: closed again (task-update completed).
 //   leases    lease rows (product ledgers and machine.sqlite sup_leases) of a settled job, a job the ledger no longer
 //             has, or an ended workflow, older than leaseMinAgeMs (DESIGN §15.2, LEASE_LEAK). No api path deletes
 //             the lease of an already-settled job, so this collector REPORTS them (verdict refuse, reportOnly) and
@@ -69,7 +68,6 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll, activeWorkersAllRuns } from '../api/orca/worker-list.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { taskUpdate } from '../api/orca/task-update.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../machine/close-verify.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
@@ -81,18 +79,19 @@ import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
-import { SKILL_ROOT, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
+import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
 import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
-export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'tasks', 'leases', 'lanelogs']);
+export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
   leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
@@ -115,7 +114,7 @@ export function gcSettings(allocation = allocationSettings()) {
   const gc = allocation?.gc ?? {};
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
   return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
-    archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
+    archiveRoot: archiveRootOf(), housekeeping: hk,
     sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
     leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
@@ -127,16 +126,6 @@ export function gcSettings(allocation = allocationSettings()) {
 }
 
 
-
-/**
- * Whether the periodic sweep is due (owner 2026-09-28: every allocation.gc.sweepMs, default 30 minutes; the tick only
- * checks): true when no supervisor-gc event is younger than sweepMs. {due, lastAt, nextAt}.
- */
-export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAULTS.sweepMs } = {}) {
-  const lastAt = readSupervisor((m) => m.newestSupEvent(GC_EVENT_KIND)?.created_at ?? null, null, { env });
-  return { due: lastAt == null || now - lastAt >= sweepMs, lastAt, nextAt: lastAt == null ? now : lastAt + sweepMs };
-}
-
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
 /** {seen: {handle: firstSeenMs}}: the open terminals rows' opened_at (the first sighting of an idle-shell candidate). */
@@ -146,7 +135,7 @@ export function readState(env = process.env) {
 }
 
 /** The GC collector of a report item's class (gc_items.collector). */
-const collectorOf = (klass) => ({ 'idle-shell': 'shells', lane: 'lanes', evidence: 'evidence', tmp: 'tmp', task: 'tasks', lease: 'leases', 'lane-log': 'lanelogs', process: 'processes' }[klass] ?? 'agents');
+const collectorOf = (klass) => ({ 'idle-shell': 'shells', lane: 'lanes', evidence: 'evidence', tmp: 'tmp', lease: 'leases', 'lane-log': 'lanelogs', process: 'processes' }[klass] ?? 'agents');
 
 /**
  * The run's machine records: a candidate shell's first sighting (terminals.opened_at, a row created when absent),
@@ -249,9 +238,7 @@ export function ledgerView(repo) {
       purged: purged.has(w.workflow_id), kernelHandle: signals.get(w.workflow_id) ?? null }));
     const updatedAt = new Map((() => { try { return db.prepare('SELECT job_id, updated_at FROM jobs').all().map((r) => [r.job_id, r.updated_at]); } catch { return []; } })());
     const jobs = ledgerJobs(db).map((j) => ({ jobId: j.job_id, workflowId: j.workflow_id, kind: j.kind, status: j.status, updatedAt: updatedAt.get(j.job_id) ?? null,
-      handles: [...new Set([...jobTerminalHandles(j, j.payload), j.payload?.launchTerminal?.handle].filter(Boolean))],
-      task: (() => { const p = j.payload; const taskId = p?.orca?.taskId ?? p?.managed?.taskId ?? p?.hierarchy?.runtime?.taskId ?? null;
-        return taskId ? { taskId, runId: p?.orca?.runId ?? p?.managed?.runId ?? p?.hierarchy?.runtime?.runId ?? null, closed: p?.taskClosed?.ok === true } : null; })() }));
+      handles: [...new Set([...jobTerminalHandles(j, j.payload), j.payload?.launchTerminal?.handle].filter(Boolean))] }));
     return { repo: path.resolve(repo), workflows, jobs, leases: leaseRowsOf(db) };
   } finally { h.close(); }
 }
@@ -623,20 +610,22 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
 /** The one owner-digest line (Vietnamese per config.yaml language vi; English otherwise). */
 export function gcLine(counts, { language = 'vi', apply = true } = {}) {
   const bytes = (counts.freedBytes ?? 0) + (counts.ramFreedBytes ?? 0);
-  if (language === 'vi') return `Dọn rác${apply ? '' : ' (thử)'}: ${counts.agents} agent, ${counts.terminals} terminal, ${counts.worktrees} worktree, ${fmtGb(bytes)}`;
-  return `Garbage collected${apply ? '' : ' (dry run)'}: ${counts.agents} agent(s), ${counts.terminals} terminal(s), ${counts.worktrees} worktree(s), ${fmtGb(bytes)}`;
+  return translator(language)(
+    apply ? 'Garbage collected: {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}'
+      : 'Garbage collected (dry run): {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}',
+    { agents: counts.agents, terminals: counts.terminals, worktrees: counts.worktrees, bytes: fmtGb(bytes) });
 }
 
 /**
  * One GC run. `only` restricts the collectors; `deps` replaces the host seams (workers (run) -> worker-list of one Run,
- * release, activeWorkers, list, read, close, procs, ledgers, sup, git, purge, sweepTmp, taskUpdate, log, lesson, freemem). Returns the report (see the header).
+ * release, activeWorkers, list, read, close, procs, ledgers, sup, git, purge, sweepTmp, log, lesson, freemem). Returns the report (see the header).
  */
 export async function runGc({ apply = false, only = null, env = process.env, now = Date.now(), deps = {}, allocation = null, language = null, trigger = 'sweep' } = {}) {
   const started = Date.now();
   const settings = gcSettings(allocation ?? allocationSettings());
   const want = new Set(only ?? COLLECTORS);
   const report = { schema: SCHEMA, apply: apply === true, at: new Date(now).toISOString(), ok: true, items: [], errors: [],
-    counts: { agents: 0, terminals: 0, worktrees: 0, processes: 0, evidence: 0, tmp: 0, tasks: 0, leases: 0, laneLogs: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
+    counts: { agents: 0, terminals: 0, worktrees: 0, processes: 0, evidence: 0, tmp: 0, leases: 0, laneLogs: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
   // The host lock `gc` (live apply runs only: a spec's injected deps never take the host lock unless it passes deps.lock).
   const lockFn = deps.lock ?? (Object.keys(deps).some((k) => k !== 'holder') ? null : acquireGcLock);
   let lock = null;
@@ -793,18 +782,6 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     } catch (error) { report.errors.push(`tmp: ${String(error?.message ?? error).slice(0, 200)}`); }
   }
 
-  if (want.has('tasks')) {
-    const update = deps.taskUpdate ?? taskUpdate;
-    for (const l of ledgers) for (const j of l.jobs) {
-      if (LIVE_JOB.has(j.status) || !j.task || j.task.closed) continue;
-      const target = j.task.taskId;
-      if (!apply) { report.items.push({ class: 'task', action: 'close-task', target, reason: `open Task of ${j.status} job ${j.jobId}`, verdict: 'collect', ok: null }); report.counts.tasks += 1; continue; }
-      let r; try { r = update({ id: target, status: 'completed', run: j.task.runId ?? undefined }); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
-      report.items.push({ class: 'task', action: 'close-task', target, reason: `open Task of ${j.status} job ${j.jobId}`, verdict: r?.ok ? 'collect' : 'refuse', ok: r?.ok === true, ...(r?.ok ? {} : { error: String(r?.error ?? '').slice(0, 200) }) });
-      if (r?.ok) report.counts.tasks += 1; else report.counts.refused += 1;
-    }
-  }
-
   if (want.has('leases')) {
     const rows = [...(sup.leases ?? []).map((r) => ({ ...r, ledger: 'supervisor' })), ...ledgers.flatMap((l) => (l.leases ?? []).map((r) => ({ ...r, ledger: path.basename(l.repo) })))];
     for (const lk of classifyLeases({ rows, now, minAgeMs: settings.leaseMinAgeMs })) {
@@ -845,7 +822,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   rows.push({ kind: 'gc.summary', at: now, level: report.errors.length ? 'warn' : 'info', msg: report.line,
     data: { agents: report.counts.agents, terminals: report.counts.terminals, worktrees: report.counts.worktrees, freedBytes: report.counts.freedBytes,
       apply, ramFreedBytes: report.counts.ramFreedBytes, refused: report.counts.refused, errors: report.errors.length, leftovers: report.counts.leftovers,
-      evidence: report.counts.evidence, tmp: report.counts.tmp, tasks: report.counts.tasks, leases: report.counts.leases, laneLogs: report.counts.laneLogs, line: report.line } });
+      evidence: report.counts.evidence, tmp: report.counts.tmp, leases: report.counts.leases, laneLogs: report.counts.laneLogs, line: report.line } });
   try { if (deps.log) deps.log(rows, { env }); else withSupervisor((m) => m.log(rows.map((r) => ({ actor: 'gc', ...r }))), { env }); } catch { /* best effort */ }
   // The run's machine records (first sightings, closed terminals, gc_runs + gc_items of an apply run).
   report.runId = (deps.writeState ?? writeState)({ seen: seenNow, closed: closedNow, report, trigger, startedAt: now }, env);
@@ -868,7 +845,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
 /** The report as lines for a human. */
 export function describe(report) {
   const lines = [`===== GC ${report.apply ? 'APPLY' : 'DRY-RUN'} ${report.at} ${report.ok ? 'ok' : 'WITH ERRORS'} =====`, report.line,
-    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, processes ${report.counts.processes}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, tasks ${report.counts.tasks}, leases ${report.counts.leases ?? 0} (report-only), lane logs ${report.counts.laneLogs ?? 0}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
+    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, processes ${report.counts.processes}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, leases ${report.counts.leases ?? 0} (report-only), lane logs ${report.counts.laneLogs ?? 0}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
   const order = ['collect', 'refuse', 'keep'];
   for (const v of order) {
     const rows = report.items.filter((i) => i.verdict === v);

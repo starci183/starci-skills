@@ -176,9 +176,6 @@ export function judgeTestWorlds(summaries, projects = []) {
   return pass();
 }
 
-/** The ops held to a mechanism proof. */
-export const proofOps = (doc = loadOpGate()) => new Set(Object.keys(doc.opProofs ?? {}));
-
 export function judgeKnowledgeRead(digest) {
   const read = judgeKnowledgeDigest(digest);
   if (read.status === 'missing') return refused({ status: 'missing', code: 'op-read-digest-missing' }, `${read.detail}: the op decided or authored without READ (node scripts/gates/read-digest.mjs --root <app> [--touch <records>] --knowledge <knowledge files> --out read-digest.json)`);

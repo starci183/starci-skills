@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { checkArchitecture } from '../../scripts/hfs/architecture/index.mjs';
 
-// nivo-fe: npm workspaces hoisted @starci/grammar 0.4.11 to the root while a workspace whose range was ^0.5.0 resolved its own
+// Live defect: npm workspaces hoisted @starci/grammar 0.4.11 to the root while a workspace whose range was ^0.5.0 resolved its own
 // nested copy. The grammar contract read only the hoisted copy, so every correct import of that workspace resolved to a file
 // outside the "expected" export targets. Each consumer is now judged against the copy Node resolves for it. In an app the one
 // package.json at the app root is the consumer of the fe apps (they have no package.json) and resolves the hoisted copy; a
@@ -56,7 +56,7 @@ const grammarViolations = (result) => result.violations.filter((item) => /^ARCH_
 
 test('each consumer (the app package.json, a workspace package) is checked against the grammar copy it resolves, hoisted or nested', (t) => {
   const m = monorepo(t);
-  // A local `export { x }` has no module specifier; the grammar import scan crashed on it (TypeError) in nivo-fe.
+  // A local `export { x }` has no module specifier; the grammar import scan crashed on it (TypeError) live.
   m.put('apps/landing/src/app/local.ts', 'const label = "x"\nexport { label }\n');
   const result = m.check();
   assert.deepEqual(result.errors, []);

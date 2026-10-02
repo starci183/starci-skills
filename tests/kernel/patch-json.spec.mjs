@@ -27,7 +27,7 @@ const series = (t) => {
   write('src/keep.ts', 'export const a = 1;\nexport const b = 20;\nexport const c = 3;\n');
   fs.renameSync(path.join(dir, 'src/old-name.ts'), path.join(dir, 'src/new-name.ts'));
   fs.rmSync(path.join(dir, 'src/gone.ts'));
-  write('docs/ảnh chụp.png', PNG);
+  write('docs/\u1ea3nh ch\u1ee5p.png', PNG);
   write('src/secret-free.md', '-- \nnot a signature\n');
   git(dir, 'add', '-A'); git(dir, 'commit', '-q', '-m', 'feat: first change');
   write('src/keep.ts', 'export const a = 1;\nexport const b = 20;\nexport const c = 30;\nexport const d = 4;\n');
@@ -38,7 +38,7 @@ const series = (t) => {
 };
 
 test('path helpers: git quoting, diff --git splitting, base85', () => {
-  assert.equal(unquoteGitPath('"docs/\\341\\272\\243nh.png"'), 'docs/ảnh.png');
+  assert.equal(unquoteGitPath('"docs/\\341\\272\\243nh.png"'), 'docs/\u1ea3nh.png');
   assert.deepEqual(pathsOfDiffLine('diff --git a/src/a b/c.ts b/src/a b/c.ts'), ['src/a b/c.ts', 'src/a b/c.ts']);
   assert.deepEqual(pathsOfDiffLine('diff --git a/x.ts b/y.ts'), ['x.ts', 'y.ts']);
   assert.deepEqual([...decodeBase85Line('D00000')], [0, 0, 0, 0]);
@@ -62,7 +62,7 @@ test('a real format-patch series: statuses, rename, delete, binary image, merged
   const moved = byPath.get('src/new-name.ts');
   assert.deepEqual([moved.status, moved.oldPath], ['R', 'src/old-name.ts']);
   assert.equal(byPath.get('src/gone.ts').status, 'D');
-  const image = byPath.get('docs/ảnh chụp.png');
+  const image = byPath.get('docs/\u1ea3nh ch\u1ee5p.png');
   assert.ok(image, 'the quoted non-ASCII path is decoded');
   assert.deepEqual([image.status, image.binary, image.image], ['A', true, true]);
   assert.ok(image.after?.blob && !image.before, 'an added image has an after blob only');

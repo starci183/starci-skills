@@ -161,13 +161,13 @@ assertions:
     outcome: pass
     observation: npx tsc --noEmit exited 0
   - id: live
-    command: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer /'
+    command: "bash -c \"sed 's/x-session-token: /Authorization: Bearer /'
       scripts/live-proof-notify.mjs | API_URL=http://localhost:3001
       POSTGRES_CONTAINER=compose-postgres-1 REDIS_CONTAINER=compose-redis-1 NOTIFY_DB=todo bash
       -s\""
     exit: 0
     outcome: pass
-    observation: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer
+    observation: "bash -c \"sed 's/x-session-token: /Authorization: Bearer
       /' scripts/live-proof-notify.mjs | API_URL=http://localhost:3001
       POSTGRES_CONTAINER=compose-postgres-1 REDIS_CONTAINER=compose-redis-1 NOTIFY_DB=todo bash -s\"
       exited 0"

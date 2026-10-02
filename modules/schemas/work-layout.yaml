@@ -127,7 +127,7 @@ shape:
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
     - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
-      STARCIWORK_GITIGNORE, written by scripts/example/work-example.mjs for the example trees): deny the root,
+      STARCIWORK_GITIGNORE): deny the root,
       re-admit the productPaths roots, deny agent output inside them. Side folders have no .starciwork."
     - "/*"
     - "!/.gitignore !/.gitattributes !/workspace.yaml !/index.yaml"

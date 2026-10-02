@@ -12,7 +12,7 @@
 //   info/exclude (excludeFromGit). The only per-user records are the ones a host keeps nowhere else: its trust of
 //   the directory, and Codex's trusted hash of the project hook.
 //     claude → ~/.claude.json projects[<cwd>].hasTrustDialogAccepted = true, in
-//              every key form Claude writes (win32: `D:/…` and `D:\…`); in
+//              every key form Claude writes (win32: `<drive>:/…` and `<drive>:\…`); in
 //              <cwd>/.claude/settings.local.json: skipDangerousModePermissionPrompt
 //              (set only when missing), each agents/claude.yaml launchEnv key under
 //              env (DISABLE_AUTOUPDATER: Orca composes a worker's command, so its
@@ -20,7 +20,7 @@
 //     codex  → [projects."<path>"] trust_level = "trusted" in every Codex home
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
-//              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic), plus the
+//              writes (win32: a '<drive>:\lower\case' literal and a "<DRIVE>:\\exact" basic), plus the
 //              update-check and model-nudge notices; the guard hook in the project
 //              layer <cwd>/.codex/config.toml, and in each home only the hash Codex
 //              trusts it by (codex app-server hooks/list, then config/batchWrite
@@ -132,14 +132,14 @@ export function excludeFromGit(dir, file) {
 
 const upperDrive = (p) => p.replace(/^([a-z]):/, (m, d) => `${d.toUpperCase()}:`);
 
-/** Claude's project keys for `dir`: win32 writes both `D:/…` and `D:\…`. */
+/** Claude's project keys for `dir`: win32 writes both `<drive>:/…` and `<drive>:\…`. */
 export function claudeKeyForms(dir, platform = process.platform) {
   if (platform !== 'win32') return [path.posix.resolve(String(dir))];
   const abs = upperDrive(path.win32.resolve(String(dir)));
   return [...new Set([abs.replaceAll('\\', '/'), abs.replaceAll('/', '\\')])];
 }
 
-/** Codex's project keys for `dir`: win32 writes 'd:\lower' (its own form) and "D:\\Exact". */
+/** Codex's project keys for `dir`: win32 writes '<drive>:\lower' (its own form) and "<DRIVE>:\\exact". */
 export function codexKeyForms(dir, platform = process.platform) {
   if (platform !== 'win32') return [path.posix.resolve(String(dir))];
   const abs = upperDrive(path.win32.resolve(String(dir))).replaceAll('/', '\\');

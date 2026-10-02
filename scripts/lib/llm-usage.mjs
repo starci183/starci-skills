@@ -208,14 +208,6 @@ export function costOfRow(row, prices = loadPrices()) {
   return Math.round(usd * 1e6) / 1e6;
 }
 
-/** Total cost of rows: the sum when every row is priced, else null. */
-export function costOfRows(rows, prices = loadPrices()) {
-  if (!rows.length) return null;
-  let total = 0;
-  for (const r of rows) { const c = costOfRow(r, prices); if (c === null) return null; total += c; }
-  return Math.round(total * 1e6) / 1e6;
-}
-
 /** delta of `now` rows over `recorded` rows per model (each a normalized row); only positive deltas survive. */
 export function deltaRows(now, recorded) {
   const before = new Map(recorded.map((r) => [r.model, r]));

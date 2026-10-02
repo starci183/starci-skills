@@ -248,8 +248,8 @@ package's `prepare` in place, but it does not install this package's devDependen
 `packages/grammar/node_modules` is absent. Where it is present, the script would wipe and rebuild
 the shared `dist/` on every consumer install. Git dependencies are not a way in either: npm parses
 the `#…::path:packages/grammar` suffix, but pacote ignores it, so a git dependency cannot select
-this subdirectory. A linking consumer builds on purpose, as `starci-academy-fe`'s own `prepare` does
-with `npm run grammar:build`. After pulling a grammar change, run `npm run build` here. Publishing is
+this subdirectory. A linking consumer builds on purpose, e.g. through a `prepare` of its own that runs
+`npm run grammar:build`. After pulling a grammar change, run `npm run build` here. Publishing is
 unaffected: `prepack` runs `typecheck` and `test`, and `test` builds first, so a tarball always
 carries a fresh stamp.
 

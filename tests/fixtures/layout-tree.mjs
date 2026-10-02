@@ -14,7 +14,7 @@ import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 export const APP_FILES = {
   'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@/*': ['./src/*'] } } }, null, 2),
   'apps/app/src/i18n/config.ts': 'export const LOCALES = ["vi", "en"] as const\nexport const DEFAULT_LOCALE = "vi"\n',
-  'apps/app/src/messages/vi.json': JSON.stringify({ console: { nav: { photos: 'Ảnh', help: 'Trợ giúp' } } }),
+  'apps/app/src/messages/vi.json': JSON.stringify({ console: { nav: { photos: '\u1ea2nh', help: 'Tr\u1ee3 gi\u00fap' } } }),
   'apps/app/src/messages/en.json': JSON.stringify({ console: { nav: { photos: 'Photos', billing: 'Billing', help: 'Help' } } }),
   'apps/app/src/app/[locale]/layout.tsx': 'import { AppProviders } from "../providers"\nconst RootLayout = async ({ children }: { children: React.ReactNode }): Promise<Metadata> => <html><body><AppProviders>{children}</AppProviders></body></html>\nexport default RootLayout\n',
   'apps/app/src/app/providers.tsx': 'export const AppProviders = ({ children }) => children\n',

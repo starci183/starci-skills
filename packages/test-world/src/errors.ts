@@ -22,6 +22,8 @@ export const TestWorldErrorCode = {
     MigrateFailed: "TEST_WORLD_MIGRATE_FAILED",
     /** Another run holds the same namespace (same repository checkout). */
     NamespaceBusy: "TEST_WORLD_NAMESPACE_BUSY",
+    /** The state file or the spec process's slot is not what this library writes: `@starci/jest-preset` is not the paired version. */
+    PairMismatch: "TEST_WORLD_PAIR_MISMATCH",
 } as const
 
 /** One code of {@link TestWorldErrorCode}. */

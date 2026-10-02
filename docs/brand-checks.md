@@ -75,9 +75,9 @@ whose `sources[]` span two roots behaves: run the check once per root.
 **A token the app has not written yet.** An owner can rule a token into the product before the app's theme
 declares it - the value read off a reference render, the theme written later by interface.implement. Such a
 token carries `valueSource: {path, value, token?, line?, sha256?}`: the reference file relative to the same
-`--source` root (for example `starci-academy-fe/src/app/globals.css`, only ever read), the exact value it
+`--source` root (for example `examples/ecommerce-app/fe/apps/shop/src/app/globals.css`, only ever read), the exact value it
 declares, the custom property it declares it under when that is not the brand token's own name (the brand's
-`--starci-surface-tertiary` read from Academy's `--surface-tertiary`), and optionally the line and the file's
+`--starci-surface-tertiary` read from the reference's `--surface-tertiary`), and optionally the line and the file's
 sha256. The token is looked up in the declared sources as usual - never in the reference file itself, even when
 `sources[]` also lists it:
 
@@ -118,7 +118,7 @@ contrastExceptions:
   - foreground: --danger-foreground   # declared color.tokens names, exactly
     background: --danger
     ratio: 3.45                       # the WCAG ratio the owner accepted
-    reason: Academy danger red, owner answer A
+    reason: brand danger red, owner answer A
     acceptedBy: ctx_eb5a945a39ea      # the owner ask's dispatch id
     receipt: blob:<sha256>            # optional: the stored answer serve-ask returned
 ```

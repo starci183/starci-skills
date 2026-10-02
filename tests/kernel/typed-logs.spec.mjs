@@ -13,10 +13,10 @@ import { SECRET_PATTERNS } from '../../scripts/supervisor/push-mains.mjs';
 import { SECRET_PATTERNS as SHARED } from '../../scripts/lib/secret-patterns.mjs';
 import { artifactHoldOf } from '../../scripts/machine/artifact-hold.mjs';
 import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
-import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { seedWorkflow } from '../helpers/ledger-fixture.mjs'; const R = path.join(os.tmpdir(), 'repo').replace(/\\/g, '/');
 
-// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite since
-// 2026-09-27), validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
+// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite),
+// validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
 // are idempotent.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
@@ -44,7 +44,7 @@ test('storage: the logs live in the ledger (WAL), and rows are append-only', (t)
   assert.equal(logs.file, logsFileFor(repo));
   assert.equal(logs.file, ledgerFileFor(repo), 'one RDBMS per repo: the typed logs are a table of runtime.sqlite');
   assert.equal(String(logs.db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase(), 'wal');
-  const r = appendLog(logs, { workflowId: WF, jobId: 'op-a-1', actor: 'op', kind: 'step.start', msg: 'Bắt đầu', data: { name: 'build' } });
+  const r = appendLog(logs, { workflowId: WF, jobId: 'op-a-1', actor: 'op', kind: 'step.start', msg: 'B\u1eaft \u0111\u1ea7u', data: { name: 'build' } });
   assert.equal(r.ok, true);
   assert.ok(r.seq > 0);
   const ledger = track(t, openLedger({ file: ledgerFileFor(repo) }));
@@ -89,14 +89,14 @@ test('redaction reuses the push secret-scan patterns, blanks OTPs and secret-nam
   assert.equal(redactText(`pushed with ${gh} ok`), 'pushed with [redacted:github-token] ok');
   assert.equal(redactText('password: "Sup3rSecretValue99"'), 'password: "[redacted]"');
   assert.equal(redactText('password: "fixture-password-123"'), 'password: "[redacted]"', 'a log redacts even a stand-in the push scan would let through');
-  assert.equal(redactText('mã OTP: 482913'), 'mã OTP: [redacted]');
+  assert.equal(redactText('m\u00e3 OTP: 482913'), 'm\u00e3 OTP: [redacted]');
   assert.equal(redactText('otp=123456 and code'), 'otp=[redacted] and code');
   assert.equal(redactText('Authorization: Bearer abcdefghijklmnop'), 'Authorization: Bearer [redacted]');
   assert.equal(redactText('GET /cb?code=xyz123&state=1'), 'GET /cb?code=[redacted]&state=1');
   assert.deepEqual(redactData({ password: 'hunter2hunter2', accessToken: 'abc', tokenCount: 3, nested: { apiKey: 'k1' }, cmd: `git push ${gh}` }),
     { password: '[redacted]', accessToken: '[redacted]', tokenCount: 3, nested: { apiKey: '[redacted]' }, cmd: 'git push [redacted:github-token]' });
-  assert.equal(redactPath('D:/repo/.env.local'), '[redacted:env-file]');
-  assert.equal(redactPath('D:/repo/.env.example'), 'D:/repo/.env.example');
+  assert.equal(redactPath(`${R}/.env.local`), '[redacted:env-file]');
+  assert.equal(redactPath(`${R}/.env.example`), `${R}/.env.example`);
   const row = prepareLogRow({ workflowId: WF, actor: 'op', kind: 'cmd.run', msg: `login ${gh}`, data: { cmd: 'curl', exit: 0, otp: '123456' }, refs: 'a.log,.secrets/key.txt' }).row;
   assert.equal(row.msg, 'login [redacted:github-token]');
   assert.equal(row.data.otp, '[redacted]');
@@ -123,7 +123,7 @@ test('event-derived rows: dispatch, checks, settle with land, incident, drop - p
   const ev = (seq, kind, entityId, payload, entityType = 'job') => ({ seq, kind, entity_type: entityType, entity_id: entityId, workflow_id: WF, created_at: 5000 + seq, payload_json: JSON.stringify(payload) });
   const ctx = {
     ledgerKey: 'k',
-    jobOf: () => ({ op_id: 'backend.implement', attempt: 2, result_json: JSON.stringify({ landed: { head: 'a'.repeat(40), repo: 'D:/r/nivo-backend', repos: [{ paths: ['src/a.ts'] }] } }) }),
+    jobOf: () => ({ op_id: 'backend.implement', attempt: 2, result_json: JSON.stringify({ landed: { head: 'a'.repeat(40), repo: 'r/todo-app-be', repos: [{ paths: ['src/a.ts'] }] } }) }),
     checksOf: () => [{ name: 'lint', command: 'npm run lint', exitCode: 0, evidence: 'ok' }, { name: 'unit', command: 'npm test', exitCode: 1, evidence: '2 failed' }],
   };
   const [dispatch] = rowsOfEvent(ev(1, 'op-dispatched', 'op-x-1', { op: 'backend.implement', model: 'codex-agent', modelId: 'gpt', dispatch: 'ctx_1' }), ctx);
@@ -173,13 +173,13 @@ test('api log: a kernel logs a typed row without a ledger write; an op logs only
   ledger.close();
   const env = { ...process.env, ORCA_TERMINAL_HANDLE: '' };
   const api = (args, extra = {}) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { encoding: 'utf8', windowsHide: true, env: { ...env, ...extra }, timeout: 60000 });
-  const ok = api(['log', '--workflow', WF, '--kind', 'decision', '--msg', 'Chọn codex', '--data', '{"markdown":"devin **hết quota**"}']);
+  const ok = api(['log', '--workflow', WF, '--kind', 'decision', '--msg', 'Ch\u1ecdn codex', '--data', '{"markdown":"devin **h\u1ebft quota**"}']);
   assert.equal(ok.status, 0, ok.stderr);
   assert.equal(JSON.parse(ok.stdout).actor, 'kernel');
   const bad = api(['log', '--workflow', WF, '--kind', 'cmd.run', '--msg', 'x', '--data', '{"cmd":"x"}']);
   assert.notEqual(bad.status, 0);
   assert.match(bad.stderr, /log-data-invalid/);
-  const own = api(['log', '--workflow', WF, '--job', 'op-a-1', '--kind', 'file.edit', '--msg', 'Sửa a.ts', '--data', '{"path":"src/a.ts","added":3,"removed":1}'], { ORCA_TERMINAL_HANDLE: 'term_op-a' });
+  const own = api(['log', '--workflow', WF, '--job', 'op-a-1', '--kind', 'file.edit', '--msg', 'S\u1eeda a.ts', '--data', '{"path":"src/a.ts","added":3,"removed":1}'], { ORCA_TERMINAL_HANDLE: 'term_op-a' });
   assert.equal(own.status, 0, own.stderr);
   assert.equal(JSON.parse(own.stdout).actor, 'op');
   const other = api(['log', '--workflow', WF, '--job', 'op-b-1', '--kind', 'narration', '--msg', 'x', '--data', '{"markdown":"x"}'], { ORCA_TERMINAL_HANDLE: 'term_op-a' });

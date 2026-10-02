@@ -1,8 +1,8 @@
-// push-mains' scratch push (scripts/supervisor/push-mains.mjs, cluster push-hooks-test-inflight-tree
-// 2026-09-24): main is pushed from a scratch worktree of the committed main, never from the live product
+// push-mains' scratch push (scripts/supervisor/push-mains.mjs): main is pushed
+// from a scratch worktree of the committed main, never from the live product
 // checkout, whose pre-push hook (husky: `npm run lint:check && npm run test:unit`) runs against the WORKING
-// TREE. A running op worker's uncommitted edit made nivo-backend's hook red for 42 unit tests no commit
-// held, and nivo stopped pushing altogether. The fixture is a temp repository with the husky v9 layout
+// TREE. A running op worker's uncommitted edit made a product repo's hook red for 42 unit tests no commit
+// held, and pushes stopped altogether. The fixture is a temp repository with the husky v9 layout
 // every product repo has — `.husky/pre-push` tracked, the `.husky/_` shim directory installed and
 // gitignored, `core.hooksPath=.husky/_` — a fake lint that is red only where LINT_ERROR is, a real
 // node_modules (root and one workspace package) and a bare `origin`. Nothing here touches a real repo.
@@ -204,8 +204,8 @@ test('pushFromScratch: a repository it cannot prepare is unavailable, never a fa
   assertScratchRemoved(r);
 });
 
-// The stand-in for nivo-backend's `jest --selectProjects unit` over suites that read git-ignored local state
-// (cluster push-scratch-local-mounts, 2026-09-24 16:30Z): the `.gitmounts/data` clone, a top-level
+// The stand-in for a product repo's `jest --selectProjects unit` over suites that read git-ignored local state:
+// the `.gitmounts/data` clone, a top-level
 // `.env.override`, a stack runtime file inside a tracked `.starcistacks/<env>` tree. It records what it saw
 // and is red when any of them is missing — and red when a stale `dist/` build leaked into the tree it judged.
 const unitScript = (marker) => [

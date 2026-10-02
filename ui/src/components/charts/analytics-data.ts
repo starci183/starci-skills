@@ -2,6 +2,7 @@ import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import type { AttemptRow } from '../../contract';
 import type { Tone } from '../status';
+import { t } from '../../i18n/t';
 
 /** Chart-level state of an attempt. `dropped` = cancelled/dropped (shown apart from red). */
 export type AttemptState = 'pass' | 'bad' | 'run' | 'dropped';
@@ -16,11 +17,11 @@ export const attemptState = (row: AttemptRow): AttemptState => {
   return 'run';
 };
 export const stateTone: Record<AttemptState, Tone> = { pass: 'success', bad: 'failed', run: 'running', dropped: 'skipped' };
-export const stateLabel: Record<AttemptState, string> = { pass: 'Đạt', bad: 'Hỏng/chặn', run: 'Đang chạy', dropped: 'Đã bỏ' };
+export const stateLabel: Record<AttemptState, string> = { pass: t('Passed'), bad: t('Failed/blocked'), run: t('Running'), dropped: t('Dropped') };
 
 export const num = (value: number, digits = 1) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(value);
 export const minutes = (ms: number) => ms / 60_000;
-export const fmtMin = (min: number) => min < 1 ? `${num(min * 60, 0)} giây` : `${num(min)} phút`;
+export const fmtMin = (min: number) => min < 1 ? t('{n} sec', { n: num(min * 60, 0) }) : t('{n} min', { n: num(min) });
 const zone = 'Asia/Bangkok';
 export const fmtClock = (at: number) => new Intl.DateTimeFormat('vi-VN', { timeZone: zone, hour: '2-digit', minute: '2-digit' }).format(at);
 export const fmtDay = (at: number) => new Intl.DateTimeFormat('vi-VN', { timeZone: zone, day: '2-digit', month: '2-digit' }).format(at);

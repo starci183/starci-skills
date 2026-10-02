@@ -24,7 +24,7 @@ test("rotateClientSecret finds the client by clientId in the repository realm an
     const address = server.address()
     const port = typeof address === "object" && address !== null ? address.port : 0
     try {
-        const run: RunKeycloak = { host: "127.0.0.1", port: 1, directPort: port, proxy: "p", image: "i", container: "c", realm: "shop-realm", clientId: "api", adminUser: "admin", adminPassword: "pw" }
+        const run: RunKeycloak = { host: "127.0.0.1", port: 1, directPort: port, proxy: "p", image: "i", container: "c", realm: "shop-realm", clientId: "api", adminUser: "admin", adminPassword: "pw", userIds: {} }
         const admin = createKeycloakAdmin(run)
         assert.equal(await admin.rotateClientSecret("api"), "new-secret")
         await assert.rejects(admin.rotateClientSecret("ghost"), /ghost is not in the realm shop-realm/)
@@ -59,7 +59,7 @@ test("events and sessions read a person's user events and live sessions of the r
     const address = server.address()
     const port = typeof address === "object" && address !== null ? address.port : 0
     try {
-        const run: RunKeycloak = { host: "127.0.0.1", port: 1, directPort: port, proxy: "p", image: "i", container: "c", realm: "shop-realm", clientId: "api", adminUser: "admin", adminPassword: "pw" }
+        const run: RunKeycloak = { host: "127.0.0.1", port: 1, directPort: port, proxy: "p", image: "i", container: "c", realm: "shop-realm", clientId: "api", adminUser: "admin", adminPassword: "pw", userIds: {} }
         const admin = createKeycloakAdmin(run)
         assert.deepEqual(await admin.events("p-1"), [
             { type: "LOGOUT", userId: "p-1", clientId: null, sessionId: "s-1", error: null, time: 20 },

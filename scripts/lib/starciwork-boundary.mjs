@@ -2,8 +2,7 @@
 // modules/schemas/work-layout.yaml shape.productPaths). A repository's .starciwork holds product content only:
 // the explicit path list below. Every other path is agent data (reports, checks, captures, draw rounds, UAT runs,
 // logs, caches, ledgers, worktrees), which lives in runtime.sqlite rows and content-addressed blobs outside
-// every repository. STARCIWORK_GITIGNORE is the .starciwork/.gitignore content of a product repository (the
-// example trees write it through scripts/example/work-example.mjs).
+// every repository. STARCIWORK_GITIGNORE is the .starciwork/.gitignore content of a product repository.
 //
 // Paths are relative to the .starciwork root, '/'-separated.
 import fs from 'node:fs';
@@ -76,21 +75,12 @@ function walk(pattern, p, parts, i, prefix) {
   return fits(m, parts[i]) && walk(pattern, p + 1, parts, i + 1, prefix);
 }
 const matchFile = (pattern, parts) => walk(pattern, 0, parts, 0, false);
-const prefixOf = (pattern, parts) => walk(pattern, 0, parts, 0, true);
 
 /** True when the FILE at `rel` (relative to .starciwork) is product content §5.1 admits. */
 export function isProductPath(rel) {
   const parts = segs(rel);
   if (!parts.length || denied(parts)) return false;
   return PRODUCT_PATTERNS.some((p) => matchFile(p, parts));
-}
-
-/** True when the DIRECTORY at `rel` may hold product content; false means the whole tree is agent data. */
-export function mayHoldProduct(rel) {
-  const parts = segs(rel);
-  if (!parts.length) return true;
-  if (denied(parts, { dir: true })) return false;
-  return PRODUCT_PATTERNS.some((p) => prefixOf(p, parts));
 }
 
 const ROOT_CACHE_DIRS = new Set(['settle-parity', 'settle-tail', 'runtime', 'canon-seams']);

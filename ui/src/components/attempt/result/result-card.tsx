@@ -8,11 +8,12 @@ import { Card } from '../frame/card';
 import { useManifest } from './manifest';
 import { settleView } from './settle-text';
 import { WhyBlock } from '../../why/why-block';
+import { t } from '../../../i18n/t';
 
 export const concept: Concept = 'C10';
 
-const outcomeLabels: Record<string, string> = { done: 'Hoàn tất', partial: 'Một phần', failed: 'Thất bại', ask: 'Cần hỏi', blocked: 'Bị chặn' };
-const verdictLabels: Record<string, string> = { pass: 'Đạt', fail: 'Không đạt', partial: 'Một phần', blocked: 'Bị chặn', dropped: 'Đã bỏ', cancelled: 'Đã huỷ' };
+const outcomeLabels: Record<string, string> = { done: t('Done'), partial: t('Partial'), failed: t('Failed'), ask: t('Needs a question'), blocked: t('Blocked') };
+const verdictLabels: Record<string, string> = { pass: t('Pass'), fail: t('Fail'), partial: t('Partial'), blocked: t('Blocked'), dropped: t('Dropped'), cancelled: t('Cancelled') };
 
 const obj = (value: unknown): Record<string, unknown> | null => (value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null);
 
@@ -31,10 +32,10 @@ function claimsOf(attempt: AttemptDetailV3): { frs: string[]; paths: string[] } 
 
 type AssertStatus = { status: Status; label: string };
 function assertionStatus(outcome: string): AssertStatus {
-  if (/^(pass|passed|ok|true|done)$/i.test(outcome)) return { status: 'success', label: 'đạt' };
-  if (/^(fail|failed|false|blocked)$/i.test(outcome)) return { status: 'failed', label: 'không đạt' };
-  if (/^(skip|skipped|deferred)$/i.test(outcome)) return { status: 'deferred', label: 'hoãn' };
-  return { status: 'unknown', label: outcome || 'chưa rõ' };
+  if (/^(pass|passed|ok|true|done)$/i.test(outcome)) return { status: 'success', label: t('passed') };
+  if (/^(fail|failed|false|blocked)$/i.test(outcome)) return { status: 'failed', label: t('failed') };
+  if (/^(skip|skipped|deferred)$/i.test(outcome)) return { status: 'deferred', label: t('deferred') };
+  return { status: 'unknown', label: outcome || t('unknown') };
 }
 const icons: Partial<Record<Status, typeof CircleCheck>> = { success: CircleCheck, failed: CircleAlert, deferred: CircleMinus };
 const toneOf = (s: Status) => (s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'skipped');
@@ -43,14 +44,14 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
   const rows = manifest.assertions.map(a => ({ ...a, ...assertionStatus(a.outcome) }));
   const pass = rows.filter(r => r.status === 'success').length;
   const fail = rows.filter(r => r.status === 'failed').length;
-  if (!rows.length) return <p className="text-sm text-muted-foreground">Manifest không khai điều kiện kiểm nào.</p>;
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{t('The manifest declares no assertions.')}</p>;
   return <div className="min-w-0">
     <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-      <h3 className="m-0 font-medium">Danh sách điều kiện của op</h3>
-      {manifest.outcome ? <span className="text-xs text-muted-foreground">manifest kết luận: {manifest.outcome}</span> : null}
-      <span className="ml-auto text-xs text-muted-foreground">{pass}/{rows.length} đạt{fail ? ` · ${fail} không đạt` : ''}</span>
+      <h3 className="m-0 font-medium">{t('The op\'s assertion list')}</h3>
+      {manifest.outcome ? <span className="text-xs text-muted-foreground">{t('manifest concludes: {outcome}', { outcome: manifest.outcome })}</span> : null}
+      <span className="ml-auto text-xs text-muted-foreground">{t('{pass}/{total} passed', { pass, total: rows.length })}{fail ? t(' · {n} failed', { n: fail }) : ''}</span>
     </div>
-    <div className="mb-3 flex h-2 w-full gap-1 overflow-hidden rounded-full" role="img" aria-label={`${pass} đạt, ${fail} không đạt, ${rows.length - pass - fail} khác`}>
+    <div className="mb-3 flex h-2 w-full gap-1 overflow-hidden rounded-full" role="img" aria-label={t('{pass} passed, {fail} failed, {other} other', { pass, fail, other: rows.length - pass - fail })}>
       {rows.map((r, i) => <span key={`${r.id}-${i}`} data-tone={toneOf(r.status)} className="flex h-full min-w-1 flex-1"><Grow className="block size-full bg-[var(--tone)]" delay={i * 0.02} title={`${r.id}: ${r.label}`} /></span>)}
     </div>
     <ul className="divide-y rounded-lg border">
@@ -67,7 +68,7 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
   </div>;
 }
 
-/** Block 4 "Kết luận": what the op says, the manifest checklist, claims, and the kernel's verdict with the reason. */
+/** Block 4 "Conclusion": what the op says, the manifest checklist, claims, and the kernel's verdict with the reason. */
 export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
   const manifest = useManifest(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
@@ -82,32 +83,32 @@ export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
   const hasAssertions = Boolean(manifest?.assertions.length);
   const failed = manifest ? manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'failed').length : 0;
   const hasMore = hasAssertions || claims.frs.length > 0 || claims.paths.length > 0;
-  const moreSummary = [hasAssertions && manifest ? `${manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'success').length}/${manifest.assertions.length} điều kiện đạt${failed ? ` · ${failed} không đạt` : ''}` : null, claims.frs.length ? `${claims.frs.length} FR` : null].filter(Boolean).join(' · ');
-  return <Card id="attempt-result" concept="C10" title="Kết luận" hint="Op tự báo gì, kernel chốt gì, và vì sao">
+  const moreSummary = [hasAssertions && manifest ? `${manifest.assertions.filter(r => assertionStatus(r.outcome).status === 'success').length}/${manifest.assertions.length} ${t('assertions passed')}${failed ? ` · ${t('{n} failed', { n: failed })}` : ''}` : null, claims.frs.length ? `${claims.frs.length} FR` : null].filter(Boolean).join(' · ');
+  return <Card id="attempt-result" concept="C10" title={t('Outcome')} hint={t('what the op reported, what the kernel decided, and why')}>
     <div className="grid min-w-0 gap-6">
       <section className="min-w-0" data-tone={attempt.reportOutcome ? opTone : 'queued'}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <h3 className="m-0 text-sm font-medium">Op báo cáo</h3>
-          {attempt.reportOutcome ? <StatusChip status={opStatus} label={outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome} /> : <StatusChip status="queued" label="Chưa có báo cáo" />}
+          <h3 className="m-0 text-sm font-medium">{t('Op report')}</h3>
+          {attempt.reportOutcome ? <StatusChip status={opStatus} label={outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome} /> : <StatusChip status="queued" label={t('No report yet')} />}
         </div>
         {summary ? <p className="m-0 max-w-[72ch] whitespace-pre-line break-words rounded-lg border-l-4 border-[var(--tone-line)] bg-[var(--tone-bg)] px-4 py-3 text-[15px] leading-relaxed">{summary}</p>
-          : <p className="m-0 rounded-lg border p-3 text-sm text-muted-foreground">Op chưa ghi tóm tắt kết quả.</p>}
+          : <p className="m-0 rounded-lg border p-3 text-sm text-muted-foreground">{t('The op has not written a result summary.')}</p>}
       </section>
 
       <section className="min-w-0 border-t pt-6" data-tone={verdictTone}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Gavel className="size-4 text-[var(--tone)]" aria-hidden="true" />
-          <h3 className="m-0 text-sm font-medium">Kernel chốt</h3>
-          <StatusChip status={verdictStatus} label={attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : 'Chưa chốt'} />
-          {attempt.settledBy ? <span className="text-xs text-muted-foreground">bởi {attempt.settledBy}</span> : null}
+          <h3 className="m-0 text-sm font-medium">{t('Kernel verdict')}</h3>
+          <StatusChip status={verdictStatus} label={attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : t('Not settled')} />
+          {attempt.settledBy ? <span className="text-xs text-muted-foreground">{t('by {actor}', { actor: attempt.settledBy })}</span> : null}
         </div>
         {attempt.why ? <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" /> : null}
         {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
-          : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? 'Kernel không ghi thêm lý do nào ngoài kết luận.' : 'Kernel chưa chốt lần thử này.'}</p>}
+          : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? t('The kernel recorded no reason beyond the verdict.') : t('The kernel has not settled this attempt yet.')}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">
-          <span className="text-muted-foreground">Bước tiếp:</span>
-          <span className="min-w-0 break-words">{settle.nextStep ?? (attempt.verdict === 'pass' ? 'Không cần làm lại; kernel chuyển sang chặng sau.' : nextAttempt ? 'Chạy lần thử kế tiếp.' : 'Chưa có bước tiếp được ghi.')}</span>
-          {nextAttempt ? <a href={nextAttempt.href} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">Lần thử kế tiếp #{nextAttempt.id}<ArrowRight className="size-3.5" aria-hidden="true" /></a> : null}
+          <span className="text-muted-foreground">{t('Next step:')}</span>
+          <span className="min-w-0 break-words">{settle.nextStep ?? (attempt.verdict === 'pass' ? t('No rework needed; the kernel moves to the next leg.') : nextAttempt ? t('Run the next attempt.') : t('No next step recorded yet.'))}</span>
+          {nextAttempt ? <a href={nextAttempt.href} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">{t('Next attempt #{id}', { id: nextAttempt.id })}<ArrowRight className="size-3.5" aria-hidden="true" /></a> : null}
         </div>
       </section>
 
@@ -115,9 +116,9 @@ export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
         <div className="grid min-w-0 gap-6">
           {manifest ? <Assertions manifest={manifest} /> : null}
           {claims.frs.length || claims.paths.length ? <section className="min-w-0">
-            <h3 className="m-0 mb-2 text-sm font-medium">Yêu cầu (FR) mà op nhận đã làm</h3>
+            <h3 className="m-0 mb-2 text-sm font-medium">{t('Requirements (FR) the op claims it did')}</h3>
             {claims.frs.length ? <ul className="m-0 flex list-none flex-wrap gap-2 p-0">{claims.frs.map(fr => <li key={fr} className="min-w-0"><code className="inline-block max-w-full break-all rounded-md border bg-muted/40 px-2 py-1 font-mono text-xs">{fr}</code></li>)}</ul> : null}
-            {claims.paths.length ? <p className="mb-0 mt-2 break-all text-xs text-muted-foreground">Đường dẫn khai kèm: {claims.paths.join(', ')}</p> : null}
+            {claims.paths.length ? <p className="mb-0 mt-2 break-all text-xs text-muted-foreground">{t('Claimed paths: {paths}', { paths: claims.paths.join(', ') })}</p> : null}
           </section> : null}
         </div>
       </Advanced> : null}

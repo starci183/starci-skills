@@ -105,5 +105,3 @@ export function poolCapsNow({ env = process.env, now = Date.now() } = {}) {
     return capsOf(rows, { now });
   } catch { return {}; }
 }
-
-export const resetPoolCapsCache = () => cache.clear();

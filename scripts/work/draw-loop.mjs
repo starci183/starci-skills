@@ -13,7 +13,7 @@
 //   round  --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir>
 //          [--css <product global css>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>]
 //          --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui ...] [--out ...] [...]
-//          the real-component drawing (owner ruling 2026-09-27, "chốt"): the shape is a React XBase composing only
+//          the real-component drawing (owner ruling 2026-09-27, "locked"): the shape is a React XBase composing only
 //          @starci/grammar (scripts/work/draw/draw-source.mjs). The round first runs the SOURCE gate - the grammar the
 //          draw type-checks against (scripts/work/draw-grammar.mjs: the product's install, else claude-dist with the
 //          product upgrade owed), DRAW_TYPECHECK_FAILED, the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,

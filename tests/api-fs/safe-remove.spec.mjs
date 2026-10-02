@@ -9,7 +9,7 @@ import { isLinkLike, safeRemoveTree, forbiddenRoot } from '../../scripts/api/fs/
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 import { safeRemoveWorktree } from '../../scripts/machine/worktree-git.mjs';
 
-// nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): a recursive delete of a scratch tree followed node_modules
+// Live defect: a recursive delete of a scratch tree followed node_modules
 // junctions into the live repository and deleted 674 tracked files and its node_modules. Git for Windows'
 // `git worktree remove --force` follows a junction inside the worktree. The runtime deletes trees only through
 // safeRemoveTree, which never descends into a link. Every case here builds a REAL junction (a dir symlink off
@@ -28,7 +28,7 @@ function sandbox(t) {
   return { root, sentinel, intact };
 }
 
-// A scratch shaped like the one that destroyed nivo-fe: a node_modules whose workspace entries are links to the
+// A scratch shaped like the one that destroyed a live repository: a node_modules whose workspace entries are links to the
 // sentinel (the live package), a direct link at the top, plain files, and a hard link to a sentinel file.
 function linkedScratch(root, sentinel, name = 'scratch') {
   const scratch = path.join(root, name);

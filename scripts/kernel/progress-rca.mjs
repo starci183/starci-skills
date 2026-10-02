@@ -1,10 +1,9 @@
 // progress-rca.mjs — "am I progressing toward the goal? if not, why, and which single change fixes the most?"
 // computed in deterministic code, so a Kernel on a modest model only has to pick the top untried action.
 //
-// Owner, 2026-09-28: "trước đây supervisor không tư duy dc à?" then "sao workflows không tự điều phối dc mà đợi
-// supervisor" then "kernel phải brainstorm dc, xử lý lỗi dc ... làm mọi thứ để workflows tiến", refined: ops draw
-// the graph, the Kernel makes LIGHT edits (api graph-edit) and dispatches the owning op for a heavy redesign
-// (api redesign). The Kernel stays on Devin, so the thinking lives here:
+// Owner ruling 2026-09-28: the workflows move themselves forward, not the supervisor. Ops draw the graph, the Kernel
+// makes LIGHT edits (api graph-edit) and dispatches the owning op for a heavy redesign (api redesign). The Kernel
+// stays on Devin, so the thinking lives here:
 //
 //   progressOf  units that PASSED their gates (a succeeded job; never a job count, never a self-marked done), units
 //               per hour, share of legs done, running vs allowed parallelism (RAM cap, pools, priority reserve),
@@ -33,6 +32,7 @@ import { JOB_ROW } from '../machine/job-row.mjs';
 import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -509,7 +509,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
 export function whyLine(rca, { language = 'vi', limit = 5 } = {}) {
   const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit);
   if (!cls.length) return null;
-  const head = language === 'vi' ? 'Vì sao chậm' : 'Why slow';
+  const head = translator(language)('Why slow');
   return `${head}: ${cls.map((c) => `${c.cause} x${c.count}${c.open !== c.count ? ` (${c.open} open)` : ''}`).join(', ')}`;
 }
 
@@ -591,13 +591,13 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
 
 /** The Kernel notice for one stalled workflow (the Workflow controller's progress-stall DI text). Pure. */
 export function stallNotice(w, { lang = 'vi' } = {}) {
-  const p = w.progress, r = w.rca;
+  const p = w.progress, r = w.rca, tr = translator(lang);
   const top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
   return [
     `PROGRESS-STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}.`,
     r ? `${whyLine(r, { language: lang }) ?? ''}` : '',
-    p.queuedReady > 0 && p.running < p.allowedParallel ? `Chạy ngay: api dispatch-ready --workflow ${w.workflowId} (running ${p.running}/${p.allowedParallel}, ${p.queuedReady} ready).` : '',
-    top ? `Hành động #${top.rank} [${top.tier}] ${top.title}. Log: api decide --workflow ${w.workflowId} --hypothesis "..." --action-key ${top.key} --metric "units/h". Run: ${top.command}` : '',
+    p.queuedReady > 0 && p.running < p.allowedParallel ? tr('Run now: api dispatch-ready --workflow {wf} (running {running}/{allowed}, {ready} ready).', { wf: w.workflowId, running: p.running, allowed: p.allowedParallel, ready: p.queuedReady }) : '',
+    top ? tr('Action #{rank} [{tier}] {title}. Log: api decide --workflow {wf} --hypothesis "..." --action-key {key} --metric "units/h". Run: {command}', { rank: top.rank, tier: top.tier, title: top.title, wf: w.workflowId, key: top.key, command: top.command }) : '',
     'driver-loop.yaml progress: FIRST DUTY every wake.',
   ].filter(Boolean).join(' ');
 }

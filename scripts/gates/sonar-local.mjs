@@ -34,7 +34,7 @@ import {createRequire} from 'node:module';
  * through the stack-secret tool the first time (the example apps' tokens, whose declared custody is a runtime extension's
  * ext/<service>/secrets directory, are sealed there by sealExtCustody). No op ever asks the owner for a Sonar token or a GitHub
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
- * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
+ * (a container and database recreated behind custody) is re-minted with a
  * valid admin token through the same mint path, stored over the rejected member through the same
  * stack-secret tool, and recorded as a `sonar-token-reminted` Supervisor audit event (machine.sqlite sup_events).
  *
@@ -51,12 +51,11 @@ import {createRequire} from 'node:module';
  *                                            of every file of the coverage scope), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
- * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
- * op-backend.implement-792d53da0b: `--cwd starci-next` from inside starci-next read
- * D:/Repositories/starci-next/starci-next and was blocked). --isolate analyses the slice alone: the
+ * directory beside or above the current one, never to <cwd>/<name> (a `--cwd <name>` run from inside
+ * that same repository once read <cwd>/<name> and was blocked). --isolate analyses the slice alone: the
  * scanner indexes only --paths (sonar.inclusions, and the repository's test patterns under them) into
  * a throwaway project <key>-slice-<hash> scanned with the admin token, judged, then deleted. A whole
- * nivo-backend analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
+ * repository analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
  * the slice verdict reads only the slice's files, so the isolated analysis proves the same verdict.
  * Without the admin token in custody --isolate falls back to the full analysis and says so.
  *
@@ -1006,8 +1005,8 @@ export function isolationDefines(cwd,props,scope){
       }
     }
   }else if(props['sonar.tests'])tests=main;
-  // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: nivo-backend
-  // held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
+  // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: one product
+  // repository held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
   // still spent 19.7 minutes in the JS/TS sensor. The repository's own root tsconfig is the one that
   // types the slice; a declared sonar.typescript.tsconfigPath(s) wins.
   const declaredTsconfig=props['sonar.typescript.tsconfigPaths']||props['sonar.typescript.tsconfigPath'];

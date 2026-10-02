@@ -35,12 +35,12 @@ import path from 'node:path';
 import {listProcessNames} from '../api/process/process-names.mjs';
 import {isLinkLike} from '../api/fs/safe-remove.mjs';
 import {pathKey} from '../lib/path-key.mjs';
+import {archiveRoot as archiveRootOf} from '../machine/home.mjs';
 import {allocationSettings} from '../../engine/config.mjs';
 
 const DAY_MS=86400000;
 /** Defaults for the allocation.housekeeping keys; runtimes.yaml overrides them when it declares them. */
 const DEFAULT_ARCHIVE_AFTER_MS=3*DAY_MS;
-const DEFAULT_ARCHIVE_ROOT='D:/starci-archive';
 /** Directory names under the devin root whose files are session history (transcripts, summaries, local History). */
 const HISTORY_DIRS=new Set(['summaries','transcripts','history']);
 /** Extensions session history is written in; anything else in those dirs stays. */
@@ -112,7 +112,7 @@ export async function sweepDevinData({apply=false,now=Date.now(),env=process.env
   const hk=(allocation??allocationSettings())?.housekeeping??allocation??{};
   const archiveAfterMs=Number.isFinite(Number(hk.sessionArchiveAfterMs))&&Number(hk.sessionArchiveAfterMs)>0
     ?Number(hk.sessionArchiveAfterMs):DEFAULT_ARCHIVE_AFTER_MS;
-  const archiveRoot=typeof hk.archiveRoot==='string'&&hk.archiveRoot.trim()?hk.archiveRoot:DEFAULT_ARCHIVE_ROOT;
+  const archiveRoot=archiveRootOf({env});
   const root=devinRoot(env),rootKey=pathKey(root);
   const archiveDevin=path.join(archiveRoot,'devin'),archiveKey=pathKey(archiveDevin);
   const cliDir=path.join(root,'cli');

@@ -1,6 +1,7 @@
 // kernel-authority.mjs — what the Kernel may do INSIDE its own workflow without escalating, and the api-enforced
-// guardrails around it (owner 2026-09-28: "sao workflows không tự điều phối dc mà đợi supervisor", "kernel phải
-// brainstorm dc, xử lý lỗi dc ... làm mọi thứ để workflows tiến", refined: ops draw the graph, the Kernel only makes
+// guardrails around it (owner 2026-09-28: "why don't the workflows coordinate themselves instead of waiting for the
+// supervisor", "the kernel must be able to brainstorm, handle errors ... do everything so the workflows move forward",
+// refined: ops draw the graph, the Kernel only makes
 // LIGHT unit edits and dispatches the owning op for a heavy redesign). Shared by the api verbs graph-edit,
 // dispatch-ready, decide, redesign, op-override and kernel-proposal (scripts/kernel/verbs/).
 //

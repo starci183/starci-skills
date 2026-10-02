@@ -36,7 +36,7 @@ test('the husky directories are the only values a clone may set', t => {
 });
 
 test('a hooks path that points anywhere else is refused and named', t => {
-  for (const value of ['.git/no-hooks', 'D:/elsewhere/hooks', '.husky-skip', 'hooks']) {
+  for (const value of ['.git/no-hooks', path.join(os.tmpdir(), 'elsewhere', 'hooks'), '.husky-skip', 'hooks']) {
     const root = repo(t);
     git(root, 'config', '--local', 'core.hooksPath', value);
     const found = findings(root);

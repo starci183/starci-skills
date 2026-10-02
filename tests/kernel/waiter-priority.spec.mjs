@@ -103,7 +103,7 @@ test('an --until-job wait on a failed job blocks through its retry: the open ret
 test('free-text gates of another workflow naming a job id, peer requests naming its op or record, and --after count as waiters',t=>{
   const fx=fixture(t);
   const scaffold=fx.enqueue(OWNER,'interface.scaffold','.starciwork/shell');
-  fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','interface.draw','--detail',`Chờ job ${scaffold} settle + sha rồi mới vẽ lại`]);
+  fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','interface.draw','--detail',`Ch\u1edd job ${scaffold} settle + sha r\u1ed3i m\u1edbi v\u1ebd l\u1ea1i`]);
   fx.ok(['notify','--workflow',THIRD,'--to',OWNER,'--kind','request','--subject','need the new shell','--body','please land .starciwork/shell rev 18 (interface.scaffold)']);
   const dependant=fx.enqueue(OWNER,'interface.implement','src/ui',['--after',scaffold]);
   const entry=fx.read(db=>blockingJobs(db).get(scaffold));
@@ -154,5 +154,5 @@ test('the supervisor prints one BLOCKING line per job and the progress report na
   assert.deepEqual(fx.read(db=>blockingLines(db,{wanted:new Set([THIRD])})),[],'a --workflow filter keeps only its own jobs and waits');
   const row=fx.read(db=>workflowProgress(db,db.prepare('SELECT workflow_id,created_at FROM workflows WHERE workflow_id=?').get(OWNER)));
   assert.deepEqual(row.blocking.map(b=>[b.jobId,b.status]),[[awaited,'queued']]);
-  assert.match(workflowSection(row),/⛓ Đang chặn workflow khác: <b>Code backend<\/b>/);
+  assert.match(workflowSection(row),/⛓ \u0110ang ch\u1eb7n workflow kh\u00e1c: <b>Code backend<\/b>/);
 });

@@ -118,7 +118,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
   // owedToWire: a canon slice's residual findings that only its cut's canon-wire leg can land (a shared-root
   // registration, config, public entry or consumer outside its owned paths; modules/ops/ops/code.refactor.yaml
   // SCOPE_WIDENING). The brief always named it; the envelope refused it, so slices could not declare it
-  // (wf-nivo-fe-canon-mujek980 op-code.refactor-c54caae5fb overruled for 'missing the formal owedToWire').
+  // (a code.refactor slice was overruled for 'missing the formal owedToWire').
   if (value.owedToWire !== undefined && (!Array.isArray(value.owedToWire)
     || value.owedToWire.some((o) => !o || typeof o !== 'object' || Array.isArray(o) || !text(o.path) || !text(o.finding) || Object.keys(o).some((k) => !['path', 'finding', 'file', 'ruleId'].includes(k)))))
     fail('owedToWire must be an array of {path, finding, file?, ruleId?}');

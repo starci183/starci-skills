@@ -3,7 +3,7 @@ import test from "node:test"
 import { lintRule } from "./testing.mjs"
 import { BREAKPOINTS } from "./lib/vocabulary.generated.mjs"
 
-const rule = (query) => lintRule("breakpoint-scale", `@media ${query} { [data-a] { color: var(--accent); } }`, "D:/repo/apps/web/src/app/x.css")
+const rule = (query) => lintRule("breakpoint-scale", `@media ${query} { [data-a] { color: var(--accent); } }`, "apps/web/src/app/x.css")
 
 test("the scale is the grammar's own", () => {
   for (const width of ["30rem", "40rem", "48rem", "70rem"]) assert.ok(BREAKPOINTS.includes(width), width)

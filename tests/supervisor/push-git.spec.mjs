@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { planFor, failuresOf, mainState, pushGitRepo, pushGit, describeRun, selectRepos } from '../../scripts/supervisor/push-git.mjs';
 
 const RUNTIME = path.resolve('/x/runtime');
-const PRODUCT = path.resolve('/x/nivo-backend');
+const PRODUCT = path.resolve('/x/todo-app-be');
 
 /** A fake git: answers by the first git argument; `dirty` = porcelain lines, `head` may change per call. */
 const fakeGit = ({ branch = 'main', dirty = [], ahead = 2, heads = ['aaa111'] } = {}) => {
@@ -144,5 +144,5 @@ test('pushGit stops at the first repository that is not green; an explicit --rep
   assert.deepEqual(selectRepos({ repos: ['/a/b'] }), { list: [path.resolve('/a/b')], explicit: true });
   const dirty = pushGit({ deps: { ...deps, git: fakeGit({ dirty: [' M x'] }) } });
   assert.equal(dirty.ok, false);
-  assert.deepEqual(dirty.notRun, ['nivo-backend'], 'the run stopped at the first red repository');
+  assert.deepEqual(dirty.notRun, ['todo-app-be'], 'the run stopped at the first red repository');
 });

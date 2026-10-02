@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { clipLine } from './clip.mjs';
+import { translator } from './i18n.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
 import { readYamlFile } from './read-yaml.mjs';
@@ -81,9 +82,9 @@ export function workflowNames(db) {
 export const nameWithId = (name, id) => (name && name !== id ? `${name} (${id})` : String(id ?? name ?? ''));
 
 // ---------------------------------------------------------------------------------- workflow names
-const BRAND_CASE = { starci: 'StarCi', nivo: 'Nivo', agentos: 'AgentOS', miamia: 'Mia Mia' };
+const BRAND_CASE = { starci: 'StarCi', nivo: 'Nivo' };
 const REPO_ROLE_SUFFIX = /[-_](backend|be|frontend|fe|api|server|web|app)$/i;
-/** The product's display word(s) from a project or repository name: `starci-next` -> `StarCi Next`. */
+/** The product's display word(s) from a project or repository name: `todo-app-be` -> `Todo App`. */
 export function productName(raw) {
   const base = oneLine(raw).replace(REPO_ROLE_SUFFIX, '');
   if (!base) return '';
@@ -192,7 +193,7 @@ export function nodeLabel(node) {
  * `payload` is the job payload, `op` its op id, `nodes` the workflow's latest work-graph nodes, `repo`
  * the ledger owner (to read Work record titles).
  */
-export function jobWhat({ payload, op = null, nodes = null, repo = null, max = JOB_WHAT_MAX } = {}) {
+export function jobWhat({ payload, op = null, nodes = null, repo = null, max = JOB_WHAT_MAX, language = 'vi' } = {}) {
   const p = payload ?? {};
   const owned = list(p.owned_paths ?? p.ownedPaths).map((x) => (typeof x === 'string' ? x : x?.path)).filter(Boolean);
   const records = list(p.records).filter((x) => typeof x === 'string');
@@ -217,7 +218,7 @@ export function jobWhat({ payload, op = null, nodes = null, repo = null, max = J
   let what = null;
   for (const pick of candidates) { const v = oneLine(pick()); if (v) { what = v; break; } }
   const tail = cut && Number(cut.total) > 1 && Number.isInteger(Number(cut.ordinal)) ? ` ${cut.ordinal}/${cut.total}` : '';
-  if (!what) return tail ? `phần${tail}` : null;
+  if (!what) return tail ? translator(language)('part{tail}', { tail }) : null;
   return `${clipWords(what, Math.max(8, max - tail.length))}${tail}`;
 }
 
@@ -247,6 +248,6 @@ export function jobDisplayNameOf(db, job, { repo = null, workflowName = null, no
     memo.set(wf, info);
     return info;
   })();
-  const what = jobWhat({ payload, op, nodes: nodes === undefined ? wfInfo.nodes : nodes, repo: repo ?? wfInfo.repo });
+  const what = jobWhat({ payload, op, nodes: nodes === undefined ? wfInfo.nodes : nodes, repo: repo ?? wfInfo.repo, language });
   return jobDisplayName({ op, what, workflowName: workflowName ?? wfInfo.name, language });
 }

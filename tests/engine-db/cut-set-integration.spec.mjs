@@ -8,7 +8,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 
-// Incident inc-751dd1ac4492 (starci-next base-repos, backend.scaffold): which cut pass runs the whole-set
+// Live incident (a base-repos backend.scaffold run): which cut pass runs the whole-set
 // integration gate. settle used to call ordinal === total "final", but once the seam passes the other
 // ordinals run in parallel and settle in any order: ordinal total could pass while a lower sibling was still
 // running (so full-regression-final could not be green yet), and the sibling that settled LAST passed on its

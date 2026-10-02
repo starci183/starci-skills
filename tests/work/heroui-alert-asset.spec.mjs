@@ -33,8 +33,8 @@ const kinds = (list, code) => list.filter((f) => f.code === code).map((f) => f.k
 const ALERT = (attrs = '', inner = null) => `<main data-grammar-component="PageContainer">
   <aside data-grammar-component="Alert" data-tone="warning" role="status"${attrs}>
     ${inner ?? `<span data-grammar-part="alert-indicator"><svg data-grammar-component="Icon"><path d="M0 0"/></svg></span>
-    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật tra cứu</p><p data-grammar-part="alert-description">Sales Copilot thiếu một khả năng</p></div>
-    <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="secondary">Bật</button></div>`}
+    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt tra c\u1ee9u</p><p data-grammar-part="alert-description">Sales Copilot thi\u1ebfu m\u1ed9t kh\u1ea3 n\u0103ng</p></div>
+    <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="secondary">B\u1eadt</button></div>`}
   </aside></main>`;
 
 test('DRAW_ALERT_ANATOMY: the real HeroUI Alert passes; a tone fill, an IconTile, a late indicator or a hand-made action fails', () => {
@@ -52,16 +52,16 @@ test('DRAW_ALERT_ANATOMY: the real HeroUI Alert passes; a tone fill, an IconTile
   assert.equal(surfaceBackground('var(--danger)'), false);
   // An IconTile as the indicator (the r4/r5 "tile" notice).
   const tiled = ALERT('', `<span data-grammar-part="alert-indicator"><span data-grammar-component="IconTile" data-tone="warning" data-size="sm"><svg data-grammar-component="Icon"></svg></span></span>
-    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật</p></div>`);
+    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt</p></div>`);
   assert.deepEqual(kinds(dnaFindings(tiled, { dna }), DRAW_ALERT_ANATOMY), ['IconTile in an Alert']);
   const big = ALERT('', `<span data-grammar-part="alert-indicator" style="width:40px;height:40px"><svg data-grammar-component="Icon"></svg></span>
-    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật</p></div>`);
+    <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt</p></div>`);
   assert.deepEqual(kinds(dnaFindings(big, { dna }), DRAW_ALERT_ANATOMY), ['Alert indicator as a tile']);
   // The indicator sits left of the title.
-  const late = ALERT('', `<div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật</p></div>
+  const late = ALERT('', `<div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt</p></div>
     <span data-grammar-part="alert-indicator"><svg data-grammar-component="Icon"></svg></span>`);
   assert.deepEqual(kinds(dnaFindings(late, { dna }), DRAW_ALERT_ANATOMY), ['Alert indicator not left of the title']);
-  const bare = ALERT('', '<div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật</p></div>');
+  const bare = ALERT('', '<div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt</p></div>');
   assert.deepEqual(kinds(dnaFindings(bare, { dna }), DRAW_ALERT_ANATOMY), ['Alert without its indicator']);
   // Its action is the grammar Button: a hand-made control or a variant off DNA fails; a secondary never does.
   const handmade = ALERT().replace('<button data-grammar-component="Button" data-variant="secondary">', '<button data-grammar-part="alert-actions" class="btn-warning">');
@@ -88,7 +88,7 @@ test('DRAW_ALERT_ANATOMY: the real HeroUI Alert passes; a tone fill, an IconTile
 test('a status dot is the DNA Badge isDot dot (grammar 0.5.3): a hand-made dot or a haloed dot fails', () => {
   const dna = loadDna();
   assert.ok(dna.components.get('Badge').parts.has('badge-dot') && dna.components.get('Badge').parts.has('dot'), 'DNA Badge publishes its dot anatomy');
-  const badge = (dot) => `<main data-grammar-component="PageContainer"><span data-grammar-component="Badge" data-tone="success">${dot}Đang chạy</span></main>`;
+  const badge = (dot) => `<main data-grammar-component="PageContainer"><span data-grammar-component="Badge" data-tone="success">${dot}\u0110ang ch\u1ea1y</span></main>`;
   const DNA_DOT = '<svg data-grammar-part="badge-dot" class="starci-core-badge-dot" width="6" height="6" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>';
   assert.deepEqual(dnaFindings(badge(DNA_DOT), { dna }), [], 'the DNA dot passes');
   const kindsOf = (html) => dnaFindings(html, { dna }).filter((f) => f.code === DRAW_OFF_GRAMMAR_COMPONENT).map((f) => f.kind).sort();
@@ -116,7 +116,7 @@ test('DRAW_METER_TRACK: the h-2 track spans the full band; a stub, another heigh
   const dna = loadDna();
   const meter = (track = '', root = '') => `<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard">
     <div data-grammar-component="Meter" role="meter" aria-valuenow="2" aria-valuemax="3"${root}>
-      <span data-grammar-part="meter-label">Khả năng</span><span data-grammar-part="meter-output">2/3</span>
+      <span data-grammar-part="meter-label">Kh\u1ea3 n\u0103ng</span><span data-grammar-part="meter-output">2/3</span>
       <div data-grammar-part="meter-track"${track}><div data-grammar-part="meter-fill"></div></div></div></div></main>`;
   assert.deepEqual(dnaFindings(meter(), { dna }), []);
   assert.deepEqual(dnaFindings(meter(' style="height:8px;width:100%"'), { dna }), [], 'h-2 at full width');

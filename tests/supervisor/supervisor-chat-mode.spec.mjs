@@ -1,4 +1,4 @@
-// config.yaml supervisor.mode chat (the default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent"):
+// config.yaml supervisor.mode chat (the default; owner, 2026-09-25: "move the supervisor into chat so it stays persistent"):
 // the owner's desktop chat is the Supervisor again (modules/supervisor/supervise.yaml chatSeat, docs/supervisor.md).
 // The chat registers and drains channel 'main' with no Orca terminal; every other reader peeks. Nothing starts a
 // [Supervisor] kernel: start-supervisor answers chat-mode, and the supervisor

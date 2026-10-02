@@ -71,7 +71,7 @@ const isComposite = (a) => Boolean(a.composite) || a.generation?.mode === 'compo
 /**
  * The render source of a part: the `.html` beside it (`X.content.png` -> `X.content.html`, `B#s--bp--th.png` -> `.html`),
  * else - a real-component drawing (owner ruling 2026-09-27) - the rendered DOM `draw-loop finish` installs beside the
- * part (`<part>.dom.html`, next to its `<part>.draw.tsx`). The reference draw D:/starci-tmp/draw-components passed every
+ * part (`<part>.dom.html`, next to its `<part>.draw.tsx`). The reference draw <tmp>/draw-components passed every
  * loop metric and was still refused DRAW_SCORE_BELOW "no render source (.html)" here.
  */
 export function renderSourceOf(dir, rel) {

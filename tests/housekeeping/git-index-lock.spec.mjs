@@ -1,4 +1,4 @@
-// git-index-lock: a stale shared .git/index.lock (starci-next sn-subscription backend.implement a20: a 403 KB lock
+// git-index-lock: a stale shared .git/index.lock (a 403 KB lock
 // from 01:01:34, no git process alive, every commit in the checkout refused) is recovered by the runtime, only when
 // it is older than allocation.housekeeping.gitIndexLockStaleMs and no git process may be working on that repository;
 // each removal is a Supervisor audit event (machine.sqlite sup_events). The op command guard (before an op's git command) and the housekeeping area gitlocks run it.
@@ -46,13 +46,13 @@ test('runtimes.yaml declares the stale window and housekeeping runs the gitlocks
 });
 
 test('a git process holds the repo when it names it or names none; one naming only another repo does not', () => {
-  const repo = path.resolve('D:/Repositories/starci-next');
-  assert.deepEqual(reposNamed('"C:\\Program Files\\Git\\cmd\\git.exe" -C "D:\\Repositories\\starci-next" status'), ['D:\\Repositories\\starci-next']);
+  const repo = path.join(os.tmpdir(), 'ecommerce-app'), fwd = repo.replace(/\\/g, '/'), other = path.join(os.tmpdir(), 'todo-app-be').replace(/\\/g, '/');
+  assert.deepEqual(reposNamed(`"${path.parse(repo).root}Program Files\\Git\\cmd\\git.exe" -C "${repo}" status`), [repo]);
   assert.deepEqual(reposNamed('git --git-dir=/r/.git --work-tree /r log'), ['/r/.git', '/r']);
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/starci-next commit -m x'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/starci-next/src add a'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe --git-dir=D:/Repositories/starci-next/.git status'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/nivo-backend status'), repo), 'other');
+  assert.equal(processOnRepo(proc(`git.exe -C ${fwd} commit -m x`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe -C ${fwd}/src add a`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe --git-dir=${fwd}/.git status`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe -C ${other} status`), repo), 'other');
   assert.equal(processOnRepo(proc('git.exe commit -m x'), repo), 'unknown', 'its cwd may be this repo');
 });
 
@@ -83,7 +83,7 @@ test('a lock that changed during the probe stays; a dry run only reports', (t) =
 test('a stale lock with no git process on the repository is removed and recorded once', (t) => {
   const { repo, lock } = repoWithLock(t, 9);
   const recorded = [];
-  const r = indexLock({ repo, staleMs: STALE, list: () => [proc('git.exe -C D:/elsewhere status'), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
+  const r = indexLock({ repo, staleMs: STALE, list: () => [proc(`git.exe -C ${path.join(os.tmpdir(), 'elsewhere').replace(/\\/g, '/')} status`), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
   assert.equal(r.state, 'removed');
   assert.equal(fs.existsSync(lock), false);
   assert.equal(recorded.length, 1);

@@ -16,7 +16,7 @@ export type TagGroupItem = {
      */
     readonly isOff?: boolean
     /**
-     * Localized state word for an off chip ("off", "đang tắt"), appended to its accessible name as
+     * Localized state word for an off chip ("off", "paused"), appended to its accessible name as
      * visually hidden text. Omit it only when the visible `label` already says the chip is off.
      */
     readonly offLabel?: string

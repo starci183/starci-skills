@@ -64,11 +64,11 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/domain/share -t removed-loses-access-next-read exited 0
   - id: live-proof
-    command: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer /'
+    command: "bash -c \"sed 's/x-session-token: /Authorization: Bearer /'
       scripts/live-proof-share.mjs | API_URL=http://localhost:3001 bash -s\""
     exit: 0
     outcome: pass
-    observation: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer
+    observation: "bash -c \"sed 's/x-session-token: /Authorization: Bearer
       /' scripts/live-proof-share.mjs | API_URL=http://localhost:3001 bash -s\" exited 0"
 provenance:
   actor: example-evidence

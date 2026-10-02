@@ -11,11 +11,9 @@ import { ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch, bindGua
 import { commandVerdict } from '../../scripts/guards/command-guard.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
-// nivo, 2026-09-23/24: four workflows share nivo-backend main. A Collab worker ran
-// `git reset --soft HEAD~1` over the workspace-provision commit 1ed65948 (inc-40fed684fff8,
-// inc-cb721b99fdd1), a commit swept a hook-restaged foreign file (inc-5d7ce049e810), and
-// node_modules was deleted and recreated under running checks (inc-7faca0d4d632,
-// inc-3de1d5efdea6). scripts/guards/ refuses those before the worker's command runs (command-guard.mjs, a
+// Live defects: four workflows shared one backend main. A Collab worker ran
+// `git reset --soft HEAD~1` over the workspace-provision commit, a commit swept a hook-restaged foreign file, and
+// node_modules was deleted and recreated under running checks. scripts/guards/ refuses those before the worker's command runs (command-guard.mjs, a
 // PreToolUse hook) and in git itself (reference-transaction hook).
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -115,7 +113,7 @@ test('history-rewriting git is refused; append-only git passes', () => {
 
 test('discarding, staging and committing are scoped to the op owned paths', () => {
   const cwd = path.resolve(os.tmpdir(), 'repo');
-  const owned = [path.join(cwd, 'src/features/collab/tasks'), path.join(cwd, '.starciwork/features/collab/impl/nivo-backend/tasks')];
+  const owned = [path.join(cwd, 'src/features/collab/tasks'), path.join(cwd, '.starciwork/features/collab/impl/todo-app-be/tasks')];
   const ctx = { cwd, owned, top: cwd };
   assert.equal(classifyGit(['checkout', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
   assert.equal(classifyGit(['checkout', '--', 'src/features/workspace-provision/x.ts'], ctx).code, 'PATH_NOT_OWNED');
@@ -124,7 +122,7 @@ test('discarding, staging and committing are scoped to the op owned paths', () =
   assert.equal(classifyGit(['restore', '--', 'src/features/collab/tasks'], ctx).allow, true);
   assert.equal(classifyGit(['reset', '-q', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
   assert.equal(classifyGit(['reset', 'HEAD', '--', 'src/other'], ctx).code, 'PATH_NOT_OWNED');
-  assert.equal(classifyGit(['add', '--', 'src/features/collab/tasks', '.starciwork/features/collab/impl/nivo-backend/tasks/index.yaml'], ctx).allow, true);
+  assert.equal(classifyGit(['add', '--', 'src/features/collab/tasks', '.starciwork/features/collab/impl/todo-app-be/tasks/index.yaml'], ctx).allow, true);
   assert.equal(classifyGit(['add', '.'], ctx).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks', '.starcistacks/dev/stack.yaml.enc'], ctx).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks/*.ts'], ctx).allow, true);
@@ -157,23 +155,18 @@ test('npm install-family commands are installs; npm ci is the node_modules delet
 });
 
 test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-ledger-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(repo, '.starciwork'));
-  const { openLedger } = await import('../../engine/db/ledger.mjs');
-  const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
-  const ledger = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
-  try {
+  const { withLedger, seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  await withLedger(t, async ({ repoRoot: repo, ledger }) => {
     seedWorkflow(ledger, { id: 'wf-collab', jobs: [{ jobId: 'op-a', opId: 'backend.implement', status: 'running' }] });
     seedWorkflow(ledger, { id: 'wf-auth', jobs: [
       { jobId: 'op-b', opId: 'backend.implement', status: 'running' },
       { jobId: 'op-c', opId: 'backend.implement', status: 'succeeded' },
       { jobId: 'k-1', kind: 'kernel', status: 'running' }] });
-  } finally { ledger.close(); }
-  const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
-  assert.equal(peers.known, true);
-  assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);
-  assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-auth' })).jobs.map((j) => j.jobId), ['op-a']);
+    const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
+    assert.equal(peers.known, true);
+    assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);
+    assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-auth' })).jobs.map((j) => j.jobId), ['op-a']);
+  });
 });
 
 const sh = (cwd, args, env = {}) => spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
@@ -206,7 +199,7 @@ test('the reference-transaction hook keeps the shared branch append-only for eve
   assert.notEqual(amend.status, 0, 'amend is refused');
   assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
   fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'dirty\n');
-  // refs/stash stays writable at the git level: lint-staged's pre-commit backup (mia, starci-next) stores
+  // refs/stash stays writable at the git level: lint-staged's pre-commit backup stores
   // one; a sweeping stash is refused by the op shim (git-policy.mjs), not by the hook.
   const backup = sh(repo, ['stash', 'create']).stdout.trim();
   assert.equal(sh(repo, ['stash', 'store', '-q', '-m', 'lint-staged automatic backup', backup]).status, 0);
@@ -328,7 +321,7 @@ test('guardLaunch writes the job guard file the launch binds to the worker termi
 });
 
 
-// nivo inc-d1833bc89c1f: a long owned list is committed with
+// Live defect: a long owned list is committed with
 // --pathspec-from-file, which the guard refused (COMMIT_NOT_SCOPED), so the batched repair could never
 // commit. The list's entries are pathspecs: every one inside owned_paths passes, one outside refuses.
 test('a --pathspec-from-file list is scoped line by line like named pathspecs', (t) => {
@@ -342,7 +335,7 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   const nul = list('nul.txt', 'src/features/collab/chat/a.ts\0.starciwork/features/collab/ui/chat/a b.yaml\0');
   const empty = list('empty.txt', '');
   assert.deepEqual(parsePathspecList(fs.readFileSync(path.join(cwd, mine), 'utf8')).slice(0, 3),
-    ['src/features/collab/chat/a.ts', '.starciwork/features/collab/ui/chat/index.yaml', '.starciwork/features/collab/ui/chat/é x.yaml']);
+    ['src/features/collab/chat/a.ts', '.starciwork/features/collab/ui/chat/index.yaml', '.starciwork/features/collab/ui/chat/\u00e9 x.yaml']);
   // allowed: every line owned, whichever form names the list
   for (const argv of [
     ['add', `--pathspec-from-file=${mine}`], ['add', '--pathspec-from-file', mine],
@@ -372,7 +365,7 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], ctx).code, 'PATHSPEC_FILE_UNREADABLE', 'stdin the guard cannot read before the command runs');
   assert.equal(classifyGit(['commit', '-a', '-m', 'x', `--pathspec-from-file=${mine}`], ctx).code, 'COMMIT_NOT_SCOPED', '-a still refuses');
   assert.equal(classifyGit(['reset', '--soft', `--pathspec-from-file=${mine}`], ctx).code, 'HISTORY_REWRITE');
-  assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).allow, true, 'an App Router segment is a literal name (inc-21f76abb6d10)');
+  assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).allow, true, 'an App Router segment is a literal name');
   assert.equal(classifyGit(['add', 'src/app/[id]/pa?e.tsx'], ctx).code, 'PATH_NOT_OWNED', 'a real glob pathspec still reads as a glob');
   assert.equal(classifyGit(['add', '--', ':(literal)src/app/[id]/page.tsx'], ctx).allow, true, ':(literal) names exactly that path');
 });

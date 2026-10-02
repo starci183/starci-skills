@@ -1272,3 +1272,11 @@ rules:
     failureCodes: ["RT_CONTROL_CHARACTER"]
     enforcers:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
+  - id: R127
+    code: "RT_ABSOLUTE_PATH"
+    law: "No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text. A real path-parsing test vector goes to the pending list with a reason."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_ABSOLUTE_PATH"]
+    enforcers:
+      - {kind: runtime, id: absolute-path, at: scripts/hfs/runtime-rules/absolute-path.mjs}

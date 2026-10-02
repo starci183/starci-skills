@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // gate-stability.mjs — would a gate change newly fail work the live workflows already accepted?
 //
-// Owner ruling 2026-09-28 ("Đóng băng luật vẽ"): a gate or checker change of a frozen op family
+// Owner ruling 2026-09-28 ("Freeze the drawing rules"): a gate or checker change of a frozen op family
 // (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
 // decides (api contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
 // land touches the family's gatePaths or registers a change that adds checks/codes for it: the family's gates, as

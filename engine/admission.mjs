@@ -26,7 +26,7 @@ const plainPath=value=>typeof value==='string'?value:value?.path;
 
 /**
  * Canonical workspace-relative path prefix used by planning, leases and report boundaries. In a
- * multi-repository project the caller includes the repository binding prefix (for example `nivo-fe/`).
+ * multi-repository project the caller includes the repository binding prefix (for example `my-app/`).
  * A directory prefix is spelled either bare (`docs/`) or with a trailing `/**`, which normalizes to
  * the same prefix; every other glob, absolute path and parent traversal is refused because it is not
  * a concrete ownership boundary. A Next.js App Router segment (`[lang]`, `[...slug]`, `[[...opt]]`,
@@ -70,8 +70,8 @@ const leasePath=resourceKey=>String(resourceKey??'').startsWith(PATH_LEASE_PREFI
 
 /**
  * The spelling two lease paths are compared in. The same file must compare equal however a workflow
- * spelled it (nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: `apps/app/src/messages/vi.json` bare for
- * the fe repository vs `nivo-fe/apps/app/src/messages` repository-prefixed never overlapped). `canonicalOf`
+ * spelled it (a past incident had `apps/app/src/messages/vi.json` spelled bare for
+ * the fe repository while the repository-prefixed spelling of the same file never overlapped it). `canonicalOf`
  * (scripts/kernel/lease-canon.mjs) resolves a path to its app-relative form in a bound app
  * (be/<path>, fe/<path>) — for a held row through its holder job, so every spelling of one file
  * compares as one key; paths on Windows compare case-insensitively, as its file

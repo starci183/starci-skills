@@ -380,7 +380,7 @@ ui:
   assets:
     - path: assets/invite-refused.prompt.txt
       role: prompt
-      sha256: 81f800c2a28b76143dc8c1870ded6c6c5f676943bc8bd1a8a5d36c65cfe6efee
+      sha256: 3c1bbdfedeb6d109fbbaae6ed088769e0f45d870844989c0212f66fc88d1a84a
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/invite-refused.png
       role: direction
@@ -523,7 +523,7 @@ ui:
 assets:
   - path: assets/invite-refused.prompt.txt
     role: prompt
-    sha256: 81f800c2a28b76143dc8c1870ded6c6c5f676943bc8bd1a8a5d36c65cfe6efee
+    sha256: 3c1bbdfedeb6d109fbbaae6ed088769e0f45d870844989c0212f66fc88d1a84a
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/invite-refused.png
     role: direction

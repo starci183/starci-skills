@@ -337,8 +337,8 @@ export async function scanCanon(options) {
     }
     catch (error) { result = { errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error.message ?? error) }], violations: [] }; }
     // An unresolved internal import located on a file is that file's finding (the slice holding it repoints it),
-    // never the machine's unavailability (wf-nivo-fe-canon-mujek980: @/i18n/navigation residue left by a moved
-    // seam made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
+    // never the machine's unavailability (@/i18n/navigation residue left by a moved
+    // seam once made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
     const importGaps = (result.errors ?? []).filter((error) => error.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && error.path);
     const machineErrors = (result.errors ?? []).filter((error) => !importGaps.includes(error));
     for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });

@@ -30,14 +30,14 @@
 //    Get-ChildItem env:, [Environment]::GetEnvironmentVariables(), node -p process.env, python -c print(os.environ)), even
 //    filtered by grep or redacted by sed (ENV_DUMP, scripts/guards/env-dump-verdict.mjs); one named variable is read freely.
 //  - links: `ln`, `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and [IO.Directory]::Create*Link - an
-//    op never creates a link (nivo-fe inc-c8fbf76aa499).
+//    op never creates a link.
 //  - processes: a kill by image name or pattern (taskkill /IM or /FI, pkill, killall, Stop-Process -Name, wmic process
 //    where name=...), which also ends Orca and every other agent's processes of that name (a lane's taskkill of node.exe
 //    restarted Orca, 2026-10-01); a kill whose targets come from a process query (Get-CimInstance Win32_Process,
 //    Get-Process, ps | grep, pgrep, then Stop-Process, kill, .Terminate()); an agent ends only the PIDs it started
 //    (scripts/guards/process-kill-verdict.mjs).
 //  - deletes: a recursive delete (rm -r, rmdir|rd /s, del /s, robocopy /MIR|/PURGE, Remove-Item -Recurse and its
-//    aliases), which follows a junction into the live tree (inc-c8fbf76aa499); trees go through safeRemoveTree.
+//    aliases), which follows a junction into the live tree; trees go through safeRemoveTree.
 //  - workflow history: inside the workflow worktree its guard names (guard.workflowWorktree, contract change
 //    workflow-worktree), a git command that changes history or a ref, or discards tracked work (commit, merge, rebase,
 //    push, pull, cherry-pick, revert, am, reset to a revision or with a mode, checkout of a branch or a path, switch,
@@ -293,13 +293,13 @@ const linkVerdict = (program, args, word) => {
     || LINK_API.test(word) || args.some((a) => LINK_API.test(a));
   if (!refused) return null;
   return { code: 'LINK_CREATE', command: [word, ...args].join(' ').slice(0, 200),
-    reason: 'an op worker never creates a junction, symlink or hard link - a link from a scratch tree into a live repository is followed by a recursive delete (git worktree remove, rm -rf, Remove-Item) and empties the live repository (nivo-fe lost 674 files, inc-c8fbf76aa499)',
+    reason: 'an op worker never creates a junction, symlink or hard link - a link from a scratch tree into a live repository is followed by a recursive delete (git worktree remove, rm -rf, Remove-Item) and empties the live repository',
     remedy: 'work in your dispatched checkout with its own node_modules; a need for another tree or a linked dependency is reported (report blocked environment), never made' };
 };
 
-// A recursive delete follows a junction or symlink inside the tree and empties the live tree it points at (Git for
-// Windows' worktree removal deleted 674 live nivo-fe files through node_modules junctions, inc-c8fbf76aa499; the
-// 2026-09-30 incident emptied main's node_modules the same way). The runtime's safeRemoveTree removes every link as a
+// A recursive delete follows a junction or symlink inside the tree and empties the live tree it points at (a Git for
+// Windows worktree removal deleted 674 live files through node_modules junctions; a later incident emptied main's
+// node_modules the same way). The runtime's safeRemoveTree removes every link as a
 // link first. One junction is removed on its own with `cmd /c rmdir <path>` (no /s), which removes the link only.
 const REMOVE_ITEM = new Set(['remove-item', 'ri', 'rm', 'del', 'erase', 'rd', 'rmdir']);
 const POWERSHELL_RECURSE = /^-r(?:e(?:c(?:u(?:r(?:se?)?)?)?)?)?(?::(?!\$?false$).*)?$/i;
@@ -322,7 +322,7 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
   }
   if (!how) return null;
   return { code: 'RECURSIVE_DELETE', command: [program, ...args].join(' ').slice(0, 200),
-    reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live nivo-fe files, inc-c8fbf76aa499)`,
+    reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live files)`,
     remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/api/fs/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
 };
 
@@ -374,7 +374,7 @@ export function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
 
 // git reads an App Router segment ([locale], [...slug]) in a pathspec as a character class. The policy scopes it as the
 // literal path admission granted, so the command is refused only when git's glob reading reaches a path the literal
-// reading does not (a sibling like src/app/l/ another workflow owns; nivo-fe inc-21f76abb6d10): the files each reading
+// reading does not (a sibling like src/app/l/ another workflow owns): the files each reading
 // names are compared with git ls-files. The remedy is the same command with :(literal) pathspecs.
 function appRouterGlob({ args, cwd, deps }) {
   const { literalAppRouterArgv, parseGitArgv } = deps.policy;
@@ -405,7 +405,7 @@ function appRouterGlob({ args, cwd, deps }) {
     const reached = globbed && named ? [...globbed].filter((f) => !named.has(f)) : [];
     if (!reached.length) return null;
     return { code: 'APP_ROUTER_GLOB',
-      reason: `an App Router segment in a pathspec is a glob to git: it would also reach ${reached.slice(0, 5).join(', ')} (nivo-fe inc-21f76abb6d10)`,
+      reason: `an App Router segment in a pathspec is a glob to git: it would also reach ${reached.slice(0, 5).join(', ')}`,
       remedy };
   } finally { fs.rmSync(listFile, { force: true }); }
 }

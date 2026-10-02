@@ -1,4 +1,5 @@
 import type { UiState } from '../contract';
+import { t } from '../i18n/t';
 
 /** Status vocabulary produced by ui/api/pipeline.mjs and used by every surface. */
 export type Status = 'success' | 'running' | 'settling' | 'queued' | 'retry' | 'failed' | 'blocked' | 'awaiting-owner' | 'planned' | 'deferred' | 'external' | 'dropped' | 'rejected' | 'warning' | 'unknown';
@@ -11,8 +12,8 @@ export const statusTone: Record<Status, Tone> = {
 };
 
 export const statusLabels: Record<Status, string> = {
-  success: 'Đạt', running: 'Đang chạy', settling: 'Đang chốt', queued: 'Đang chờ', retry: 'Chờ thử lại',
-  failed: 'Hỏng', blocked: 'Bị chặn', 'awaiting-owner': 'Chờ thầy trả lời', planned: 'Chưa tới', deferred: 'Hoãn', external: 'Ngoài workflow', dropped: 'Đã bỏ', rejected: 'Bị từ chối khi giao', warning: 'Cảnh báo', unknown: 'Chưa rõ',
+  success: t('Passed'), running: t('Running'), settling: t('settling'), queued: t('Queued'), retry: t('Waiting to retry'),
+  failed: t('Failed'), blocked: t('Blocked'), 'awaiting-owner': t('Awaiting the owner'), planned: t('Not reached yet'), deferred: t('Deferred'), external: t('External'), dropped: t('Dropped'), rejected: t('Rejected at handoff'), warning: t('Warning'), unknown: t('Unknown'),
 };
 
 /** Statuses that are "live" (animated dot). */

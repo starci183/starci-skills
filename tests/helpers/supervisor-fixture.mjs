@@ -13,7 +13,7 @@ export const SEED_NOW = Date.parse('2026-09-28T12:00:00Z');
 export async function seedSupervisorHome(env, { now = SEED_NOW } = {}) {
   const wf = 'wf-fixture-mission';
   recordAction({ item: `gate|${wf}|inc-0123456789ab`, action: 'resolve', reason: 'the record the gate named landed; resolved --by supervisor', workflowId: wf, env, now: now + 1000 });
-  await notifyKernel({ repo: 'D:/fixture', workflowId: wf, text: 'inc-0123456789ab resolved by the supervisor: release the held job', item: `gate|${wf}|inc-0123456789ab`, env,
+  await notifyKernel({ repo: `${env.STARCI_TEST_MACHINE_FILE}.fixture-repo`, workflowId: wf, text: 'inc-0123456789ab resolved by the supervisor: release the held job', item: `gate|${wf}|inc-0123456789ab`, env,
     wake: () => ({ action: 'delivered', delivered: true }) });
   recordFeedback({ text: 'owner: a peer wait over 2 h is always escalated to the peer Kernel', via: 'telegram', env, now: now + 2000, settings: { ownerWeight: 3 } });
   await propose({ title: 'Raise the daily autonomous-landing cap to 12', evidence: '9 routine fixes queued behind the cap', options: 'A keep 8; B raise to 12', recommendation: 'B', env, now: () => now + 3000 });

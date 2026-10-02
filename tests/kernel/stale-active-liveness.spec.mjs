@@ -7,9 +7,9 @@ import {spawnSync} from 'node:child_process';
 import {ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {allocationMs} from '../../engine/config.mjs';
-import {classifyAgentScreen,staleAwareState} from '../../scripts/lib/terminal-liveness.mjs';
+import {classifyAgentScreen,staleAwareState} from '../../scripts/lib/terminal-liveness.mjs'; const DRIVE=path.parse(os.tmpdir()).root;
 
-// 2026-09-24: both starci-next Kernels printed nothing for ~3.7 hours; their screens ended with a
+// Two Kernels printed nothing for ~3.7 hours; their screens ended with a
 // finished answer at the prompt, but older spinner rows stayed in the last lines, so the watchdog
 // reported `action: active, outputAgeMs: 13365199` every tick and never woke them.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -18,14 +18,14 @@ const STALE_MS=allocationMs('liveness.activeStaleMs');
 
 // A Codex Kernel frame: the old spinner row, then the finished answer, then the prompt.
 const FINISHED_AFTER_SPINNER=[
-  '• Ran node scripts/kernel/cli.mjs status --repo D:\\Repositories\\starci-next --workflow wf-x',
+  `• Ran node scripts/kernel/cli.mjs status --repo ${DRIVE}Repositories\\ecommerce-app --workflow wf-x`,
   '  └ wf-x phase=running frontier=engaged ACTIONABLE',
   '• Working (12m 03s • esc to interrupt) · 1 background terminal running',
   '• No new report or repair is recorded. The queued ordinal-1 retry still has invalid lineage, so',
-  '  it remains fenced under incident inc-72839f63a1f5. The workflow awaits the runtime repair.',
+  '  it remains fenced under incident inc-000000000001. The workflow awaits the runtime repair.',
   '  done 11:27 PM',
   '› Ask Codex to do anything',
-  '  gpt-6-sol high · D:\\Repositories\\starci-next · Orchestrate starci-next workflow',
+  `  gpt-6-sol high · ${DRIVE}Repositories\\ecommerce-app · Orchestrate ecommerce-app workflow`,
 ].join('\n');
 // A live Codex turn: the spinner sits directly above the input row.
 const SPINNER_LAST=[
@@ -34,7 +34,7 @@ const SPINNER_LAST=[
   '  └ {"ok": true}',
   '• Working (3m 44s • esc to interrupt) · 1 background terminal running · /ps to view',
   '› Ask Codex to do anything',
-  '  gpt-6-sol high · D:\\Repositories\\starci-next · Prepare starci-next base repos',
+  `  gpt-6-sol high · ${DRIVE}Repositories\\ecommerce-app · Prepare ecommerce-app base repos`,
 ].join('\n');
 
 test('a finished answer and prompt after the last spinner row is turn-idle; the last rows decide',()=>{

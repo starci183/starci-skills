@@ -163,7 +163,7 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
   assert.equal(payload?.hierarchy?.parentNodeId,`agent:kernel:${WORKFLOW}`);
   assert.equal(payload?.hierarchy?.runtime?.dispatchId,contract.dispatch_id);
   const calls=fs.readFileSync(fx.env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv.slice(0,2).join(' '));
-  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start'])
+  for(const step of ['orchestration run-create','orchestration worker-start'])
     assert.ok(calls.includes(step),`the op hierarchy never called '${step}' — log: ${calls.join(', ')}`);
   assert.equal(calls.includes('terminal create'),false,'no op terminal is created by the runtime');
 

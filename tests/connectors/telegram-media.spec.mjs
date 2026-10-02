@@ -84,7 +84,7 @@ test('media kinds: draw and asset ops send drawings, UAT and e2e ops send videos
 test('a settled interface.draw sends its drawings as one album with a Vietnamese caption',async t=>{
   await withLedger(t,async({ledger,ledgerFile,repoRoot,machineHome})=>{
     const files=seedDraw(repoRoot);
-    seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'Đã vẽ 2 hướng giao diện giỏ hàng.',files});
+    seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'\u0110\u00e3 v\u1ebd 2 h\u01b0\u1edbng giao di\u1ec7n gi\u1ecf h\u00e0ng.',files});
     const bot=fakeBot();
     const r=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     assert.deepEqual([r.ok,r.kind,r.sent,r.failed],[true,'draw',1,0]);
@@ -99,13 +99,13 @@ test('a settled interface.draw sends its drawings as one album with a Vietnamese
     assert.equal(call.body.f0.type,'image/png');
     const caption=media[0].caption;
     assert.equal(media[1].caption,undefined,'one caption for the album');
-    assert.match(caption,/^🎨 \[StarCi\] shop-checkout đã vẽ xong giao diện shop\/cart\n/);
-    assert.match(caption,/Màn hình: 2 \(Cart, Checkout\)/);
-    assert.match(caption,/Biến thể: desktop, mobile · sáng, tối/);
-    assert.match(caption,/Trạng thái: 3/);
-    assert.match(caption,/Tóm tắt: Đã vẽ 2 hướng giao diện giỏ hàng\./);
-    assert.match(caption,/1\. cart · cart-ready · desktop · sáng\n2\. cart · cart-empty · mobile · tối/);
-    assert.match(caption,/Thầy xem kỹ khi bàn giao \(handover\), hoặc góp ý bất cứ lúc nào\.$/);
+    assert.match(caption,/^🎨 \[StarCi\] shop-checkout \u0111\u00e3 v\u1ebd xong giao di\u1ec7n shop\/cart\n/);
+    assert.match(caption,/M\u00e0n h\u00ecnh: 2 \(Cart, Checkout\)/);
+    assert.match(caption,/Bi\u1ebfn th\u1ec3: desktop, mobile · s\u00e1ng, t\u1ed1i/);
+    assert.match(caption,/Tr\u1ea1ng th\u00e1i: 3/);
+    assert.match(caption,/T\u00f3m t\u1eaft: \u0110\u00e3 v\u1ebd 2 h\u01b0\u1edbng giao di\u1ec7n gi\u1ecf h\u00e0ng\./);
+    assert.match(caption,/1\. cart · cart-ready · desktop · s\u00e1ng\n2\. cart · cart-empty · mobile · t\u1ed1i/);
+    assert.match(caption,/Th\u1ea7y xem k\u1ef9 khi b\u00e0n giao \(handover\), ho\u1eb7c g\u00f3p \u00fd b\u1ea5t c\u1ee9 l\u00fac n\u00e0o\.$/);
     assert.ok(caption.length<=1024);
     const state=JSON.stringify(mediaRows(machineHome));
     assert.equal(mediaSent('media|wf-shop-x1|job-draw-1|1',{LOCALAPPDATA:machineHome})?.delivery,'sent');
@@ -127,7 +127,7 @@ test('without a draws.yaml the drawings are the images the report names, minus w
 test('a settled UAT op sends each video with the verdict and the flow steps, whatever the verdict',async t=>{
   await withLedger(t,async({ledger,ledgerFile,repoRoot,machineHome})=>{
     const files=seedUat(repoRoot);
-    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Thanh toán thẻ test bị từ chối ở bước 2.',files});
+    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Thanh to\u00e1n th\u1ebb test b\u1ecb t\u1eeb ch\u1ed1i \u1edf b\u01b0\u1edbc 2.',files});
     const bot=fakeBot();
     const r=await sendSettleMedia({ledgerFile,repo:repoRoot,...UAT},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     assert.deepEqual([r.ok,r.kind,r.sent],[true,'uat',1]);
@@ -137,7 +137,7 @@ test('a settled UAT op sends each video with the verdict and the flow steps, wha
     assert.equal(body.video.type,'video/webm');
     assert.equal(body.supports_streaming,'true');
     assert.equal(body.caption,[
-      '🎬 [StarCi] UAT Buy one item: KHÔNG ĐẠT','Workflow: shop-checkout','Tóm tắt: Thanh toán thẻ test bị từ chối ở bước 2.','Các bước:',
+      '🎬 [StarCi] UAT Buy one item: KH\u00d4NG \u0110\u1ea0T','Workflow: shop-checkout','T\u00f3m t\u1eaft: Thanh to\u00e1n th\u1ebb test b\u1ecb t\u1eeb ch\u1ed1i \u1edf b\u01b0\u1edbc 2.','C\u00e1c b\u01b0\u1edbc:',
       '1. Open the shop and add one item to the cart.','2. Pay with the test card.','3. See the order confirmation.'].join('\n'));
   });
 });
@@ -145,7 +145,7 @@ test('a settled UAT op sends each video with the verdict and the flow steps, wha
 test('a passing UAT without a video sends its screenshots as an album; a failing one sends nothing',async t=>{
   await withLedger(t,async({ledger,ledgerFile,repoRoot,machineHome})=>{
     const files=seedUat(repoRoot,{video:false});
-    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Mua hàng thành công.',files});
+    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Mua h\u00e0ng th\u00e0nh c\u00f4ng.',files});
     const failing=fakeBot();
     const none=await sendSettleMedia({ledgerFile,repo:repoRoot,...UAT},deps(machineHome,{fetchImpl:failing.fetchImpl}));
     assert.match(none.skipped,/no UAT video/);assert.equal(failing.calls.length,0);
@@ -156,7 +156,7 @@ test('a passing UAT without a video sends its screenshots as an album; a failing
     assert.equal(call.method,'sendMediaGroup');
     const media=JSON.parse(call.body.media);
     assert.equal(media.length,2);
-    assert.match(media[0].caption,/^🎬 \[StarCi\] UAT Buy one item: ĐẠT\nWorkflow: shop-checkout\n2 ảnh chụp màn hình \(không có video\)/);
+    assert.match(media[0].caption,/^🎬 \[StarCi\] UAT Buy one item: \u0110\u1ea0T\nWorkflow: shop-checkout\n2 \u1ea3nh ch\u1ee5p m\u00e0n h\u00ecnh \(kh\u00f4ng c\u00f3 video\)/);
     assert.match(media[0].caption,/1\. Open the shop/);
   });
 });
@@ -188,27 +188,27 @@ test('oversize media: images over 10 MB are listed not sent, albums split at 10,
     for(let i=1;i<=12;i++)files.push(put(repoRoot,`${UI}/assets/screen-${String(i).padStart(2,'0')}.png`,`img-${i}`));
     const huge=sized(repoRoot,`${UI}/assets/screen-huge.png`,10*1024*1024+1);
     files.push(huge);
-    seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'Nhiều màn hình.',files});
+    seedReport(ledger,{dispatchId:'ctx_draw',op:'interface.draw',summary:'Nhi\u1ec1u m\u00e0n h\u00ecnh.',files});
     const bot=fakeBot();
     const r=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     assert.deepEqual([r.sent,r.failed],[2,0]);
     const albums=bot.of('sendMediaGroup').map(c=>JSON.parse(c.body.media));
     assert.deepEqual(albums.map(a=>a.length),[10,2]);
     assert.ok(!bot.calls.some(c=>Object.values(c.body).some(v=>v?.name==='screen-huge.png')),'the 10 MB+ image is never uploaded');
-    assert.ok(albums[0][0].caption.includes(`1 ảnh lớn hơn 10 MB không gửi qua Telegram, xem trên máy: ${huge}`));
-    assert.match(albums[1][0].caption,/^🎨 \[StarCi\] shop-checkout đã vẽ xong giao diện shop\/cart \(tiếp 2\/2\)$/);
+    assert.ok(albums[0][0].caption.includes(`1 \u1ea3nh l\u1edbn h\u01a1n 10 MB kh\u00f4ng g\u1eedi qua Telegram, xem tr\u00ean m\u00e1y: ${huge}`));
+    assert.match(albums[1][0].caption,/^🎨 \[StarCi\] shop-checkout \u0111\u00e3 v\u1ebd xong giao di\u1ec7n shop\/cart \(ti\u1ebfp 2\/2\)$/);
 
     const uatFiles=seedUat(repoRoot,{video:false});
     const big=sized(repoRoot,`${FLOW}/runs/run-1/videos/checkout.webm`,50*1024*1024+1);
-    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Video dài.',files:uatFiles});
+    seedReport(ledger,{dispatchId:'ctx_uat',op:'uat.verify',summary:'Video d\u00e0i.',files:uatFiles});
     const vbot=fakeBot();
     const v=await sendSettleMedia({ledgerFile,repo:repoRoot,...UAT,verdict:'pass'},deps(machineHome,{fetchImpl:vbot.fetchImpl}));
     assert.equal(v.sent,1);
     assert.deepEqual(vbot.calls.map(c=>c.method),['sendMessage']);
     const text=vbot.calls[0].body.text;
-    assert.match(text,/^🎬 \[StarCi\] UAT Buy one item: ĐẠT\n/);
-    assert.ok(text.includes(`Video lớn hơn 50 MB nên không gửi qua Telegram; xem trên máy: ${big}`));
-    assert.match(text,/Các bước:\n1\. Open the shop/);
+    assert.match(text,/^🎬 \[StarCi\] UAT Buy one item: \u0110\u1ea0T\n/);
+    assert.ok(text.includes(`Video l\u1edbn h\u01a1n 50 MB n\u00ean kh\u00f4ng g\u1eedi qua Telegram; xem tr\u00ean m\u00e1y: ${big}`));
+    assert.match(text,/C\u00e1c b\u01b0\u1edbc:\n1\. Open the shop/);
   });
 });
 

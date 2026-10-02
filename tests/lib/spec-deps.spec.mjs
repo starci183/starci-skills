@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { specsDependingOn, reachableFrom } from '../../scripts/lib/spec-deps.mjs';
 
 function repo(t, files) {
@@ -39,4 +40,41 @@ test('an import shown in a string or a comment is never followed, and a cycle te
     'scripts/c.mjs': 'export const c = 1;\n',
   });
   assert.deepEqual([...reachableFrom(root, 'scripts/a.mjs')].sort(), ['scripts/a.mjs', 'scripts/b.mjs']);
+});
+
+test('specs in tests/<area>/ import ../../scripts: a direct and a transitive change select them', (t) => {
+  const root = repo(t, {
+    'scripts/lib/leaf.mjs': 'export const leaf = 1;\n',
+    'scripts/kernel/mid.mjs': "import { leaf } from '../lib/leaf.mjs';\nexport const mid = leaf;\n",
+    'tests/kernel/mid.spec.mjs': "import { mid } from '../../scripts/kernel/mid.mjs';\n",
+    'tests/lib/other.spec.mjs': "import assert from 'node:assert';\n",
+  });
+  const specs = ['tests/kernel/mid.spec.mjs', 'tests/lib/other.spec.mjs'];
+  assert.deepEqual(specsDependingOn(root, ['scripts/kernel/mid.mjs'], specs), ['tests/kernel/mid.spec.mjs']);
+  assert.deepEqual(specsDependingOn(root, ['scripts/lib/leaf.mjs'], specs), ['tests/kernel/mid.spec.mjs'], 'transitive');
+});
+
+test('a runtime entry a spec starts as a process (path segments or a path string) is a dependency, with its imports', (t) => {
+  const root = repo(t, {
+    'scripts/lib/leaf.mjs': 'export const leaf = 1;\n',
+    'scripts/kernel/cli.mjs': "import { leaf } from '../lib/leaf.mjs';\nconsole.log(leaf);\n",
+    'tests/kernel/cli.spec.mjs': "const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');\n",
+    'tests/kernel/string.spec.mjs': "spawnSync(process.execPath, ['scripts/kernel/cli.mjs', 'status']);\n",
+    'tests/kernel/none.spec.mjs': "const fixture = path.join(ROOT, 'scripts', 'kernel', 'missing.mjs');\n",
+  });
+  const specs = ['tests/kernel/cli.spec.mjs', 'tests/kernel/string.spec.mjs', 'tests/kernel/none.spec.mjs'];
+  assert.deepEqual(specsDependingOn(root, ['scripts/kernel/cli.mjs'], specs), ['tests/kernel/cli.spec.mjs', 'tests/kernel/string.spec.mjs']);
+  assert.deepEqual(specsDependingOn(root, ['scripts/lib/leaf.mjs'], specs), ['tests/kernel/cli.spec.mjs', 'tests/kernel/string.spec.mjs'], 'and what the entry imports');
+});
+
+test('the CLI reads a large changed list from stdin (`-`): a tree move exceeds the Windows command line', (t) => {
+  const root = repo(t, {
+    'scripts/lib/leaf.mjs': 'export const leaf = 1;\n',
+    'tests/lib/leaf.spec.mjs': "import { leaf } from '../../scripts/lib/leaf.mjs';\n",
+  });
+  const cli = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'lib', 'spec-deps.mjs');
+  const changed = [...Array.from({ length: 3000 }, (_, i) => `scripts/moved/file-number-${i}-with-a-long-name.mjs`), 'scripts/lib/leaf.mjs'];
+  const r = spawnSync(process.execPath, [cli, root, '-'], { input: `${changed.join('\n')}\n`, encoding: 'utf8', windowsHide: true });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split(/\r?\n/), ['tests/lib/leaf.spec.mjs']);
 });

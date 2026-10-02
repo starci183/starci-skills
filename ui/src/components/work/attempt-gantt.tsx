@@ -5,6 +5,7 @@ import type { Concept } from '../concept';
 import { AgentMark, familyTint, tintStyle } from '../agent/agent-marks';
 import { agentOf } from '../agent/agent-avatar';
 import { formatDayTime, formatDuration, formatHm } from './leg/time';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C7';
 
@@ -25,7 +26,7 @@ function FadeScroller({ children }: { children: ReactNode }) {
     return () => { el.removeEventListener('scroll', update); observer.disconnect(); };
   }, []);
   return <div className="relative max-w-full rounded-lg border bg-card">
-    <div ref={box} className="max-w-full overflow-x-auto rounded-lg" tabIndex={0} aria-label="Dòng thời gian, cuộn ngang">{children}</div>
+    <div ref={box} className="max-w-full overflow-x-auto rounded-lg" tabIndex={0} aria-label={t('Timeline, scroll horizontally')}>{children}</div>
     <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-lg bg-gradient-to-r from-card to-transparent transition-opacity ${edge.left ? 'opacity-100' : 'opacity-0'}`} />
     <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-lg bg-gradient-to-l from-card to-transparent transition-opacity ${edge.right ? 'opacity-100' : 'opacity-0'}`} />
   </div>;
@@ -34,7 +35,7 @@ function FadeScroller({ children }: { children: ReactNode }) {
 /** Timeline of every attempt per leg (bar = dispatched → settled/now, colour = status). */
 export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: number }) {
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(a => a.dispatchedAt != null) })).filter(r => r.atts.length);
-  if (!rows.length) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">Chưa có lần thử nào để vẽ dòng thời gian.</p>;
+  if (!rows.length) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('No attempts to draw a timeline for yet.')}</p>;
   const all = rows.flatMap(r => r.atts);
   const endOf = (a: AttemptBrief) => a.settledAt ?? (a.open ? Math.max(now, a.dispatchedAt as number) : a.dispatchedAt as number);
   const t0 = Math.floor(Math.min(...all.map(a => a.dispatchedAt as number)) / STEP_MS) * STEP_MS;
@@ -60,18 +61,18 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
   const placed = laid.map(r => { const h = r.lanes * LANE_H + ROW_PAD * 2; const out = { ...r, y, h }; y += h; return out; });
   const height = y + 8;
   const ticks: number[] = [];
-  for (let t = t0; t <= t1; t += STEP_MS * mult) ticks.push(t);
+  for (let tick = t0; tick <= t1; tick += STEP_MS * mult) ticks.push(tick);
   const nowX = x(now);
   return <FadeScroller>
-    <svg width={width} height={height} role="img" aria-label="Dòng thời gian các lần thử theo chặng" className="block text-foreground" style={{ minWidth: width }}>
+    <svg width={width} height={height} role="img" aria-label={t('Attempt timeline by leg')} className="block text-foreground" style={{ minWidth: width }}>
       <defs>
         {(['running', 'warning', 'failed', 'success', 'queued', 'skipped'] as const).map(tone => <pattern key={tone} id={`hatch-${tone}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" style={{ fill: toneVar(tone, '-bg') }} /><line x1="0" y1="0" x2="0" y2="6" strokeWidth="3" style={{ stroke: toneVar(tone, '-line') }} />
         </pattern>)}
       </defs>
-      {ticks.map(t => <g key={t}>
-        <line x1={x(t)} x2={x(t)} y1={TOP - 6} y2={height - 6} style={{ stroke: 'var(--border)' }} strokeWidth="1" />
-        <text x={x(t)} y={14} textAnchor="middle" fontSize="10.5" style={{ fill: 'var(--muted-foreground)' }}>{formatHm(t)}</text>
+      {ticks.map(tick => <g key={tick}>
+        <line x1={x(tick)} x2={x(tick)} y1={TOP - 6} y2={height - 6} style={{ stroke: 'var(--border)' }} strokeWidth="1" />
+        <text x={x(tick)} y={14} textAnchor="middle" fontSize="10.5" style={{ fill: 'var(--muted-foreground)' }}>{formatHm(tick)}</text>
       </g>)}
       {placed.map(({ leg, bars, y: top, h }, i) => <g key={leg.op}>
         {i % 2 === 1 && <rect x={0} y={top} width={width} height={h} style={{ fill: 'var(--muted)' }} opacity="0.35" />}
@@ -81,7 +82,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
           const tone = statusTone[a.status];
           const bx = x(a.dispatchedAt as number); const bw = Math.max(6, x(endOf(a)) - bx);
           const by = top + ROW_PAD + lane * LANE_H + (LANE_H - BAR_H) / 2;
-          const tip = `#${a.id} · lần ${a.try} · ${statusLabels[a.status]}\n${a.model ?? a.agent ?? 'chưa rõ model'}\n${formatDayTime(a.dispatchedAt)} → ${open ? 'đang chạy' : formatDayTime(a.settledAt)}\n${formatDuration(endOf(a) - (a.dispatchedAt as number))}`;
+          const tip = `#${a.id} · ${t('try {n}', { n: a.try })} · ${statusLabels[a.status]}\n${a.model ?? a.agent ?? t('unknown model')}\n${formatDayTime(a.dispatchedAt)} → ${open ? t('running') : formatDayTime(a.settledAt)}\n${formatDuration(endOf(a) - (a.dispatchedAt as number))}`;
           return <a key={a.id} href={a.href}><g>
             <title>{tip}</title>
             <rect x={bx} y={by} width={bw} height={BAR_H} rx="4" strokeWidth="1.5" style={{ fill: open ? `url(#hatch-${tone})` : toneVar(tone, '-bg'), stroke: toneVar(tone) }}>
@@ -94,7 +95,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
       </g>)}
       <g>
         <line x1={nowX} x2={nowX} y1={TOP - 6} y2={height - 6} strokeWidth="1.5" style={{ stroke: 'var(--chart-muted)' }} />
-        <text x={Math.min(nowX + 4, width - 52)} y={TOP + 10} fontSize="10.5" fontWeight="600" style={{ fill: 'var(--primary)' }}>bây giờ</text>
+        <text x={Math.min(nowX + 4, width - 52)} y={TOP + 10} fontSize="10.5" fontWeight="600" style={{ fill: 'var(--primary)' }}>{t('now')}</text>
       </g>
     </svg>
   </FadeScroller>;

@@ -10,7 +10,7 @@
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
 //    runtimes.yaml allocation.landGate.waitMs). Every run is a land_runs row (full output as blobs, G9/MB-10).
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
-//    (scripts/machine/home.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
+//    (scripts/machine/home.mjs lanesRoot: STARCI_LANES_ROOT, the owner config roots.lanes, else <starciLocalRoot>/lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
 //    already landed and moves nothing. Before a waiter even joins the queue, a lock-free preflight
 //    (`git merge-tree` of each commit onto main, conflictPreflight) refuses a pick that cannot apply, so a lane

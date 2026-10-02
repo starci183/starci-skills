@@ -29,7 +29,7 @@ const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 // Managed dispatch rides the scripts/api/orca orchestration wrappers
-// (runCreate/taskCreate/workerStart/orchDispatch/workerShow/workerStop/
+// (runCreate/workerStart/workerShow/workerStop/
 // workerRelease), cli.mjs's managed-agent branch and
 // scripts/agent/quota/index.mjs probeQuota. Kernel boot deliberately does not
 // use those orchestration wrappers: every Kernel is a dedicated Orca
@@ -166,7 +166,7 @@ test('kernel pin precedence: an unavailable explicit pin fails closed instead of
 
 /* ------------------------------------------- managed dispatch lifecycle */
 
-test('managed dispatch: route persists the decision, spawn marks the job running, settle stops+releases the worker',t=>{
+test('managed dispatch: route persists the decision, spawn marks the job running, report sends worker_done, settle only releases the worker',t=>{
   const fx=fixture(t);
   const jobId='job-managed-1';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
@@ -187,8 +187,10 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // durable job, not in launcher memory.
   assert.match(job?.payload_json??'',/claude/,`the dispatch decision must be persisted on the job payload: ${job?.payload_json}`);
   const seen=fx.calls();
-  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
+  for(const step of ['orchestration run-create','orchestration worker-start','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
+  for(const gone of ['orchestration task-create','orchestration dispatch-show'])
+    assert.equal(seen.includes(gone),false,`worker-start --spec files the Task and names the terminal: no ${gone}`);
   assert.equal(seen.includes('orchestration dispatch'),false,
     'worker-start already owns Task injection; a second orchestration dispatch would double-dispatch the operation');
   const calls=fx.callArgv();
@@ -199,16 +201,16 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     'managed profiles use Orca native managed-agent admission');
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--from')+1],'fake-kernel-terminal',
     'the dedicated Kernel terminal is the explicit Orca Run/worker coordinator');
-  const taskCreateCall=calls.find(argv=>argv.slice(0,2).join(' ')==='orchestration task-create');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--run')+1],'run-fake-1');
-  assert.equal(taskCreateCall?.includes('--parent'),false,
+  // worker-start --spec files the op Task in the workflow Run, from the Kernel terminal, with no --parent.
+  assert.equal(workerStartCall?.[workerStartCall.indexOf('--run')+1],'run-fake-1');
+  assert.equal(workerStartCall?.includes('--parent'),false,
     'Orca --parent takes a task id; the kernel is a terminal, so the Task hangs under the Run and names the kernel with --from');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--from')+1],'fake-kernel-terminal');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--task-title')+1],'code.refactor #1');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--display-name')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-managed');
+  assert.equal(workerStartCall?.[workerStartCall.indexOf('--task-title')+1],'code.refactor #1');
+  assert.equal(workerStartCall?.[workerStartCall.indexOf('--display-name')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed');
+  assert.ok(workerStartCall?.includes('--spec'),'the rendered packet rides on --spec');
   const renameCall=calls.find(argv=>argv.slice(0,2).join(' ')==='terminal rename');
   assert.equal(renameCall?.[renameCall.indexOf('--terminal')+1],'fake-terminal-1');
-  assert.equal(renameCall?.[renameCall.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-managed',
+  assert.equal(renameCall?.[renameCall.indexOf('--title')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed',
     'managed worker terminals keep the semantic [Op] title instead of worker-task_<id>');
   const payload=json(job?.payload_json);
   assert.equal(payload?.hierarchy?.parentNodeId,'agent:kernel:wf-managed');
@@ -226,14 +228,20 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal('shims' in (guard??{}),false,'the guard reaches the agent through its terminal binding only');
 
   // A pass is earned from the worker's filed done claim plus an independent
-  // green Kernel check. Settle then closes the managed worker through the
-  // contract's two-step worker-stop/worker-release lifecycle.
+  // green Kernel check. api report sends the op's one worker_done (orca-deep-map
+  // REPLACE #9), so Orca settles the Task and Dispatch and settle only releases.
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
     files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
+  const sends=fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')==='orchestration send');
+  assert.equal(sends.length,1,'exactly one worker_done');
+  const flagOf=(argv,name)=>argv[argv.indexOf(`--${name}`)+1];
+  assert.deepEqual(['type','task-id','dispatch-id','from','outcome'].map(n=>flagOf(sends[0],n)),['worker_done','task-fake-1','dispatch-fake-1','fake-terminal-1','succeeded']);
+  assert.ok(sends[0].includes('--retry-request'),'a lost receipt replays, never a second worker_done');
+  assert.deepEqual([json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.outcome,json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.ok],['succeeded',true],'api report sent the worker_done and the job keeps its receipt');
   fx.env.STARCI_CALLER='runtime-settler';
   const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
     checks:[{name:'validator',command:'managed validation',exitCode:0,evidence:'green'}],
@@ -245,20 +253,33 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const settled=jobRow(fx.repo,jobId);
   assert.equal(settled?.status,'succeeded');
   const after=fx.calls();
-  assert.ok(after.includes('orchestration worker-stop'),`settle must worker-stop the dispatch — log: ${after.join(', ')}`);
+  assert.equal(after.includes('orchestration worker-stop'),false,`a Dispatch settled by worker_done is never stopped — log: ${after.join(', ')}`);
   assert.ok(after.includes('orchestration worker-release'),`settle must worker-release the dispatch — log: ${after.join(', ')}`);
-  // Stopping the worker is not closing the Task. A settled op that leaves its
-  // Task open is exactly the ticked [Op] row the owner found at the Orca
-  // sidebar root (benchmark/findings/fable.md orca-hierarchy, row 3).
-  assert.ok(after.includes('orchestration task-update'),`settle must close the operation Task — log: ${after.join(', ')}`);
-  const update=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration task-update');
-  assert.equal(update?.[update.indexOf('--id')+1],'task-fake-1');
-  assert.equal(update?.[update.indexOf('--status')+1],'completed','Orca accepts completed, never done');
-  assert.equal(update?.[update.indexOf('--run')+1],'run-fake-1');
-  assert.equal(update?.[update.indexOf('--from')+1],'fake-kernel-terminal');
-  assert.equal(json(s.stdout)?.taskClosed?.ok,true,'the settle receipt records the Task it closed');
-  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.taskClosed?.ok,true,
-    'and the job payload keeps the proof, so finish does not close it twice');
+  assert.equal(after.includes('orchestration task-update'),false,`the Task settled with worker_done: settle never issues task-update — log: ${after.join(', ')}`);
+  const worker=json(s.stdout)?.managedWorker;
+  assert.deepEqual([worker?.dispatch?.state,worker?.dispatch?.workerDone,worker?.stop],['succeeded',true,null],'the receipt keeps the Dispatch state it released');
+  assert.equal('taskClosed' in (json(s.stdout)??{}),false);
+});
+
+test('managed settle: a Dispatch with no worker_done (the op filed no report) is fenced with worker-stop, then released',t=>{
+  const fx=fixture(t);
+  const jobId='job-managed-no-worker-done';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-nodone',workflowId:'wf-nodone',kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-nodone'").run();
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nodone',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+  }finally{ledger.close();}
+  const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  const r=fx.run(API,'reconcile','--repo',fx.repo,'--job',jobId,'--dead-worker','--settle-failed','--json');
+  const calls=fx.calls();
+  assert.equal(calls.includes('orchestration send'),false,'no report, no worker_done');
+  if(calls.includes('orchestration worker-release')){
+    assert.ok(calls.indexOf('orchestration worker-stop')>=0&&calls.lastIndexOf('orchestration worker-stop')<calls.lastIndexOf('orchestration worker-release'),
+      `a Dispatch that did not settle itself is stopped before the release — log: ${calls.join(', ')} (${r.stdout||r.stderr})`);
+  }
+  assert.equal(calls.includes('orchestration task-update'),false);
 });
 
 // Two settled nivo business.decide ops kept their Claude terminals live:
@@ -297,7 +318,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.agentTerminal?.connected,false,'the ledger keeps the worker receipt');
 });
 
-test('finish closes the kernel terminal and every Task the Run still holds open',t=>{
+test('finish closes the kernel terminal and never issues task-update (the Task of an op belongs to Orca)',t=>{
   const fx=fixture(t);
   const workflowId='wf-finish-tree';
   const jobId='job-finish-tree';
@@ -319,17 +340,14 @@ test('finish closes the kernel terminal and every Task the Run still holds open'
   assert.equal(finished.status,0,finished.stderr||finished.stdout);
   const out=json(finished.stdout);
   assert.equal(out?.phase,'finished');
-  assert.deepEqual(out?.tasksClosed?.map(entry=>[entry.jobId,entry.taskId,entry.status,entry.ok]),
-    [[jobId,'task-orphan-1','completed',true]],'a finish leaves no open Task in the Run');
+  assert.equal('tasksClosed' in (out??{}),false);
   assert.equal(out?.kernelTerminal,'fake-kernel-terminal');
 
   const argv=fx.callArgv();
-  const update=argv.find(a=>a.slice(0,2).join(' ')==='orchestration task-update');
-  assert.equal(update?.[update.indexOf('--id')+1],'task-orphan-1');
-  assert.equal(update?.[update.indexOf('--from')+1],'fake-kernel-terminal','the Task is closed from the kernel that owned it');
+  assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='orchestration task-update'),false,'finish closes no Task');
   const close=argv.find(a=>a.slice(0,2).join(' ')==='terminal close');
   assert.equal(close?.[close.indexOf('--terminal')+1],'fake-kernel-terminal','the kernel terminal does not outlive the workflow');
-  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.taskClosed?.ok,true);
+  assert.equal('taskClosed' in (json(jobRow(fx.repo,jobId)?.payload_json)??{}),false);
 });
 
 test('Claude auth rejection circuits the shared-auth provider for every job and reuses the logical operation attempt',t=>{
@@ -596,8 +614,10 @@ test('kernel launch: Codex boots as a worker of its own entry Run through worker
     model:'gpt-6-sol',effort:'high',launch:'worker',modelAttested:true,
   });
   const seen=fx.calls();
-  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
+  for(const step of ['orchestration run-create','orchestration worker-start','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
+  for(const gone of ['orchestration task-create','orchestration dispatch-show'])
+    assert.equal(seen.includes(gone),false,`worker-start --spec files the Task and names the terminal: no ${gone}`);
   assert.equal(seen.includes('terminal create'),false,'the Kernel is never launched with terminal create');
   const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6-sol','high']);

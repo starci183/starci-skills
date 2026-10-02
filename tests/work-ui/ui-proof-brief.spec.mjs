@@ -145,7 +145,7 @@ test('the spacing section measures page inset, joined band side-contact, field g
   assert.doesNotMatch(scale.evidence, /input/, 'a control owns its inner padding; the closed scale judges app-owned boxes');
 });
 
-// inc-2563f2d9d779 (nivo login) and inc-c3fdb1a320ec (starci-next subscription): the page inset is PageContainer's
+// Two product pages - a login and a subscription one - showed it: the page inset is PageContainer's
 // inline padding, not the x of a card a capped measure centres (MEASURE-4 case-3) or a centred page's auto margin.
 test('page-inset reads the page box padding: a centred compact card and a centred PageContainer pass, a card in the padding fails', () => {
   const ctx = { knowledge, pageInset: 32, cardInset: 16, edgeInset: 16, separatorInset: 12, inputGap: 8, fieldGap: 16, badgeGap: 8, width: 1440, height: 900 };
@@ -158,7 +158,7 @@ test('page-inset reads the page box padding: a centred compact card and a centre
     { parent: 1, tag: 'p', x: 516, y: 216, w: 300, h: 20, own: 'Sign in' },
   ]);
   assert.deepEqual([compact.got, compact.status], [32, 'pass'], compact.evidence);
-  // starci-next: an 80rem .page centred by margin-inline:auto at x=80 with 32px padding; the card at 112 = 80 + 32.
+  // A second product page: an 80rem .page centred by margin-inline:auto at x=80 with 32px padding; the card at 112 = 80 + 32.
   const centred = insetOf([
     { tag: 'div', x: 0, y: 0, w: 1440, h: 900 },
     { parent: 0, tag: 'main', x: 80, y: 0, w: 1280, h: 900, style: { padding: [32, 32, 32, 32], margin: [0, 80, 0, 80] } },

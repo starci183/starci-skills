@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon, WrapTextIcon } from 'lucide-react';
 import type { Tone } from '../../status';
 import { CopyButton, Frame, Line, stripAnsi, Toolbar, toolbarBtn } from './common';
+import { t } from '../../../i18n/t';
 
 const ERROR_RE = /error|fail|✗|SCHEMA_VIOLATION|exception|fatal|panic/i;
 const WARN_RE = /warn|⚠|deprecated/i;
@@ -13,9 +14,9 @@ const HEIGHT = 560;
 
 export function cleanLines(text: string): string[] {
   return stripAnsi(text).split('\n').map(l => {
-    const t = l.endsWith('\r') ? l.slice(0, -1) : l;
-    const i = t.lastIndexOf('\r');
-    return i >= 0 ? t.slice(i + 1) : t;
+    const line = l.endsWith('\r') ? l.slice(0, -1) : l;
+    const i = line.lastIndexOf('\r');
+    return i >= 0 ? line.slice(i + 1) : line;
   });
 }
 
@@ -105,18 +106,18 @@ export function TextView({ text, query, className = '' }: { text: string; query:
 
   return (
     <Frame className={className}>
-      <Toolbar right={<><span>{lines.length.toLocaleString('vi-VN')} dòng</span>{windowed ? <span>(hiển thị theo cửa sổ, không xuống dòng)</span> : null}</>}>
+      <Toolbar right={<><span>{t('{n} lines', { n: lines.length.toLocaleString('vi-VN') })}</span>{windowed ? <span>{t('(windowed, no wrapping)')}</span> : null}</>}>
         <label className="flex min-w-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 focus-within:outline-2 focus-within:outline-ring">
           <SearchIcon className="size-3 shrink-0 text-muted-foreground" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm trong tệp" aria-label="Tìm trong tệp"
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search in file')} aria-label={t('Search in file')}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }}
             className="w-32 min-w-0 bg-transparent text-xs outline-none sm:w-44" />
         </label>
-        {q ? <span className="text-[11px] tabular-nums text-muted-foreground" aria-live="polite">{hits.length ? `${current + 1}/${hits.length}${capped ? '+' : ''}` : 'Không có'}</span> : null}
-        <button type="button" className={toolbarBtn} onClick={() => step(-1)} disabled={!hits.length} aria-label="Kết quả trước" title="Kết quả trước (Shift+Enter)"><ChevronUpIcon className="size-3" /></button>
-        <button type="button" className={toolbarBtn} onClick={() => step(1)} disabled={!hits.length} aria-label="Kết quả sau" title="Kết quả sau (Enter)"><ChevronDownIcon className="size-3" /></button>
-        <button type="button" className={toolbarBtn} onClick={() => setWrap(w => !w)} aria-pressed={effectiveWrap} disabled={windowed}><WrapTextIcon className="size-3" />{effectiveWrap ? 'Xuống dòng' : 'Một dòng'}</button>
-        <CopyButton value={() => lines.join('\n')} label="Chép hết" />
+        {q ? <span className="text-[11px] tabular-nums text-muted-foreground" aria-live="polite">{hits.length ? `${current + 1}/${hits.length}${capped ? '+' : ''}` : t('None')}</span> : null}
+        <button type="button" className={toolbarBtn} onClick={() => step(-1)} disabled={!hits.length} aria-label={t('Previous result')} title={t('Previous result (Shift+Enter)')}><ChevronUpIcon className="size-3" /></button>
+        <button type="button" className={toolbarBtn} onClick={() => step(1)} disabled={!hits.length} aria-label={t('Next result')} title={t('Next result (Enter)')}><ChevronDownIcon className="size-3" /></button>
+        <button type="button" className={toolbarBtn} onClick={() => setWrap(w => !w)} aria-pressed={effectiveWrap} disabled={windowed}><WrapTextIcon className="size-3" />{effectiveWrap ? t('Wrap') : t('One line')}</button>
+        <CopyButton value={() => lines.join('\n')} label={t('Copy all')} />
       </Toolbar>
       <div ref={box} onScroll={windowed ? e => setScrollTop(e.currentTarget.scrollTop) : undefined}
         className="relative overflow-auto bg-background py-1" style={windowed ? { height: HEIGHT } : { maxHeight: '70vh' }}>

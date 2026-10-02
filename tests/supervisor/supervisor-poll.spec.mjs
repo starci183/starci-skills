@@ -87,7 +87,7 @@ test('poll.mjs runs from scripts/supervisor and prints one digest per --once cyc
     assert.match(r.stdout,/===== poll /,'the cycle prints a digest header');
     assert.match(r.stdout,/supervisor-poll \[running\] kernel no-signal/,
       'a workflow with no kernel signal reads no-signal, never a host call');
-    assert.match(r.stdout,/report supervisor-poll Chỉnh sửa mã nguồn \(code\.refactor a1\) -> done/);
+    assert.match(r.stdout,/report supervisor-poll Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n \(code\.refactor a1\) -> done/);
   });
 });
 

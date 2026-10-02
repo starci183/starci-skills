@@ -3,7 +3,7 @@
 // artifacts and logs are never deleted by housekeeping or any other writer; a finished workflow is deleted as a unit,
 // only with the owner's approval, and only after its evidence is archived and the archive verified.
 //
-//   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root D:/starci-archive] [--json]
+//   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--json]
 //       dry run (the default): what would be archived and deleted, per table, and whether the workflow may be purged
 //   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
@@ -29,9 +29,9 @@ import { fileURLToPath } from 'node:url';
 import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/db/ledger.mjs';
 import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipRead } from '../api/fs/zip-read.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
-export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
 export const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
@@ -63,7 +63,7 @@ function evidenceFiles(db, repo, workflowId) {
 function purgeRow(db, workflowId) { return db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get(workflowId) ?? null; }
 
 /** Plan (and with `apply`, run) the purge of one finished workflow. */
-export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = null, approvalRef = null, archiveRoot = DEFAULT_ARCHIVE_ROOT, date = today(), now = Date.now }) {
+export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = null, approvalRef = null, archiveRoot = archiveRootOf(), date = today(), now = Date.now }) {
   const root = path.resolve(repo);
   const ledger = openLedger({ file: ledgerFileFor(root) });
   try {
@@ -130,7 +130,7 @@ function main() {
   const argv = process.argv.slice(2), a = {};
   for (let i = 0; i < argv.length; i++) { const k = argv[i]; if (!k.startsWith('--')) continue; const n = k.slice(2); if (['apply', 'json'].includes(n)) a[n] = true; else a[n] = argv[++i]; }
   if (!a.repo || !a.workflow) { console.error(USAGE); process.exit(2); }
-  const out = purgeWorkflow({ repo: a.repo, workflowId: a.workflow, apply: Boolean(a.apply), approvedBy: a['approved-by'] ?? null, approvalRef: a['approval-ref'] ?? null, archiveRoot: a['archive-root'] ?? DEFAULT_ARCHIVE_ROOT });
+  const out = purgeWorkflow({ repo: a.repo, workflowId: a.workflow, apply: Boolean(a.apply), approvedBy: a['approved-by'] ?? null, approvalRef: a['approval-ref'] ?? null, archiveRoot: a['archive-root'] ?? archiveRootOf() });
   if (a.json) console.log(JSON.stringify(out, null, 2));
   else if (out.already) console.log(`${a.workflow}: already purged; archive ${out.purge.archive_path} (sha256 ${out.purge.archive_sha256})`);
   else if (out.dryRun) console.log(`${a.workflow}: dry run - ${out.ok ? 'may be purged' : `REFUSED: ${out.blockers.join('; ')}`}; ${Object.entries(out.counts).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ')}; ${out.files} file(s) ${out.fileBytes} bytes -> ${out.archive}`);

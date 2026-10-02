@@ -44,6 +44,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
 import { clipLine } from '../lib/clip.mjs';
@@ -446,10 +447,9 @@ export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KI
 export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
   .all(METRICS_KIND, limit).reverse().map((r) => ({ at: Number(r.at), ...(fullJson(JSON.parse(r.data_json ?? 'null')) ?? {}) }));
 
-const TREND_TEXT = {
-  en: (d) => `Op health ${fmtMs(d.windowMs)}: success ${d.rate}${d.rateDelta}, median wait ${d.wait}${d.waitDelta}, stuck ${d.stuck} (${d.critical} critical)${d.stuckDelta}${d.top ? `; top failure ${d.top}` : ''}${d.vs ? ` [vs ${d.vs} ago]` : ''}`,
-  vi: (d) => `Sức khỏe op ${fmtMs(d.windowMs)}: đạt ${d.rate}${d.rateDelta}, chờ trung vị ${d.wait}${d.waitDelta}, kẹt ${d.stuck} (${d.critical} nghiêm trọng)${d.stuckDelta}${d.top ? `; lỗi nhiều nhất ${d.top}` : ''}${d.vs ? ` [so với ${d.vs} trước]` : ''}`,
-};
+const TREND_TEXT = (tr, d) => tr('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
+  { window: fmtMs(d.windowMs), rate: d.rate, rateDelta: d.rateDelta, wait: d.wait, waitDelta: d.waitDelta, stuck: d.stuck, critical: d.critical, stuckDelta: d.stuckDelta,
+    top: d.top ? tr('; top failure {top}', { top: d.top }) : '', vs: d.vs ? tr(' [vs {vs} ago]', { vs: d.vs }) : '' });
 const signed = (n, fmt) => (n == null || n === 0 ? '' : ` (${n > 0 ? '+' : '-'}${fmt(Math.abs(n))})`);
 
 /**
@@ -470,7 +470,7 @@ export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
     stuckDelta: base?.stuck ? signed(((last.stuck?.warn ?? 0) + (last.stuck?.critical ?? 0)) - ((base.stuck.warn ?? 0) + (base.stuck.critical ?? 0)), String) : '',
     top: t.topFailureClass, vs: base ? fmtMs(last.at - base.at) : null,
   };
-  return (TREND_TEXT[language] ?? TREND_TEXT.en)(d);
+  return TREND_TEXT(translator(language), d);
 }
 
 /** The trend line from machine.sqlite (home.mjs readSupervisor), or null. Never throws. */

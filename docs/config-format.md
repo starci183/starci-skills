@@ -218,3 +218,11 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
 `api plan` and `route-plan.mjs` mark deferred legs. `api run-deferred-tests --workflow <id> [--kind unit|e2e|integration]
 [--dry-run]` is "test later": it re-queues the deferred jobs on their same attempt with `payload.specsForced`, and
 they then run their whole brief even while the switch is still off.
+
+## Host roots (`roots`)
+
+`roots: {archive?, lanes?}` (config.yaml, gitignored) relocates the two host roots the runtime owns: the archive (session files, blob
+retention, ledger backups) and the lane worktrees. Each key is an absolute directory or `null`; a relative path, a non-string or an
+unknown key is refused with `Invalid config.yaml: roots...`. Resolution, in one place (`archiveRoot()` and `lanesRoot()` in
+`scripts/machine/home.mjs`): the environment variable (`STARCI_ARCHIVE_ROOT`, `STARCI_LANES_ROOT`), then the owner key, then
+`<starciLocalRoot>/archive` and `<starciLocalRoot>/lanes`. The tracked config declares no host location.

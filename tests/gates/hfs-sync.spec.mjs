@@ -63,15 +63,15 @@ describe('the template renderer', () => {
 describe('hfs.json validation', () => {
   it('accepts an app and refuses everything else, the standalone back-end and front-end kinds included', () => {
     assert.doesNotThrow(() => validateHfs(APP));
-    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Nivo Backend' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
-      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../nivo-backend' }]) {
+    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Todo App Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
+      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../todo-app-be' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
   });
   it('refuses a declaration the canons would refuse, so a pin bump never leaves eslint unable to start', () => {
     // the pre-2.0 connections shape (names only) is what broke eslint in a product repo after a pin bump
-    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: ['primary', 'agentos'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
-    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] } })));
+    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: ['primary', 'my-app'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
+    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'my-app', envPrefix: 'MY_APP_DB' }] } })));
   });
 });
 
@@ -164,7 +164,7 @@ describe('.gitignore', () => {
   it('carries the HFS never-tracked list of both sides and .starci/, inside the managed block', () => {
     const text = block();
     assert.ok(text.startsWith(`${BLOCK_BEGIN}\n`) && text.endsWith(`${BLOCK_END}\n`));
-    for (const entry of ['node_modules/', 'dist/', 'coverage/', '.scannerwork/', 'test-results/', '*.tsbuildinfo', '.turbo/', '.tools/', '.env', '.env.*', '!.env.example', 'report*.json', 'nul', '.qwen*/', '.artifacts/', '.starci/', 'schema.gql', '.next/', 'next-env.d.ts']) {
+    for (const entry of ['node_modules/', 'dist/', 'coverage/', '.scannerwork/', 'test-results/', '*.tsbuildinfo', '.turbo/', '.tools/', '.env', '.env.*', '!.env.example', 'report*.json', 'nul', '.artifacts/', '.starci/', 'schema.gql', '.next/', 'next-env.d.ts']) {
       assert.ok(text.split('\n').includes(entry), entry);
     }
   });
@@ -551,7 +551,7 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal(validateWorkspace({ ...workspace, repositories: [{ role: 'be', name: 'be', apps: [{ name: 'api' }] }] }), false, 'the schema refuses apps: on a repository (hfs.json declares the apps)');
     assert.equal((await run(['--check'], root)).code, 0, 'a fresh app is in sync by construction');
     assert.throws(() => scaffoldApp({ name: 'nivo', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_EXISTS' });
-    assert.throws(() => scaffoldApp({ name: 'Nivo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
+    assert.throws(() => scaffoldApp({ name: 'Todo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
   });
   it('a lock step npm cannot complete fails the scaffold with HFS_SCAFFOLD_LOCK_FAILED, names the step and leaves no app behind', t => {
     const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));

@@ -14,7 +14,7 @@ purpose: |
   mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
 gate:
   name: starci-new-code
-  # A project with no new-code baseline judges the whole project as new code (nivo inc-f92febebbb64); a fixed
+  # A project with no new-code baseline judges the whole project as new code; a fixed
   # window keeps "new code" the recent work on main, so the server gate is passable on a healthy main.
   newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
 newCode:
@@ -98,7 +98,7 @@ reasoning: |
   duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
   passes ordinary work.
   blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds
-  (nivo-backend 3 blocker, 137 critical), so the SLICE verdict reads only changed lines and never main's backlog;
+  (one product repository carries 3 blocker and 137 critical), so the SLICE verdict reads only changed lines and never main's backlog;
   major and lower are reported on the summary and never fail a slice.
   overall issues 0 and overall duplication 3: the server gate is also the owner's definition of done for the HFS canon:
   a repository that carries any open ESLint, stylelint or HFS finding is not green, whatever the age of the line. The

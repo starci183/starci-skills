@@ -239,16 +239,16 @@ describe("ChatWorkspace", () => {
             render(
                 <div className="grammar-common-root" data-grammar-family="core">
                     <ChatWorkspace
-                        composer={<form aria-label="Soạn tin"><input aria-label="Tin nhắn" /></form>}
-                        conversation={<p>Nội dung hội thoại</p>}
-                        conversationLabel="Tin nhắn thiết lập"
-                        header={<h1>Thiết lập</h1>}
-                        label="Thiết lập"
+                        composer={<form aria-label="Compose message"><input aria-label="Message" /></form>}
+                        conversation={<p>Conversation content</p>}
+                        conversationLabel="Settings messages"
+                        header={<h1>Settings</h1>}
+                        label="Settings"
                     />
                 </div>,
             )
 
-            const region = screen.getByRole("region", { name: "Tin nhắn thiết lập" })
+            const region = screen.getByRole("region", { name: "Settings messages" })
             const claims = (region.getAttribute("data-contract") ?? "").split(" ").filter(Boolean)
             expect(claims.filter((claim) => /^OVERFLOW-[34]$/.test(claim))).toEqual(["OVERFLOW-3"])
 

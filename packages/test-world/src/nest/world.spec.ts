@@ -10,7 +10,7 @@ import { Controller, Get, Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import type { AnyTestWorldConfig } from "../config/types"
 import { FakesHost } from "../fakes/framework/host"
-import { STATE_FILE_ENV, writeRunContext, removeRunContext } from "../jest/context"
+import { SLOT_ENV, STATE_FILE_ENV, writeRunState, removeRunState } from "../jest/context"
 import type { RunContext } from "../jest/context"
 import { World } from "./world"
 import type { WorldSpec } from "./world-types"
@@ -44,6 +44,13 @@ class WorkerApp {
         WorkerApp.seen = options.peer
         return { module: WorkerApp }
     }
+}
+
+
+/** Publishes one context as the run's only slot and binds this process to it, as the preset's world runner does per file. */
+const publishSlot = (context: RunContext): void => {
+    writeRunState(context.runId, [context])
+    process.env[SLOT_ENV] = String(context.slot)
 }
 
 const started: Array<() => Promise<void>> = []
@@ -81,7 +88,7 @@ const publish = async (): Promise<RunContext> => {
     const { controlUrl, fakes: entries } = await fakes.start()
     started.push(() => fakes.close())
     const context: RunContext = {
-        version: 1,
+        slot: 1,
         runId: "t",
         namespace: { snake: "t_000000", kebab: "t-000000", root: "/x" },
         secretSeed: "seed",
@@ -92,12 +99,12 @@ const publish = async (): Promise<RunContext> => {
         keepTables: {},
         root: "/x",
     }
-    writeRunContext(context)
+    publishSlot(context)
     return context
 }
 
 test.afterEach(async () => {
-    removeRunContext()
+    removeRunState()
     while (started.length > 0) await started.pop()?.()
 })
 
@@ -193,8 +200,8 @@ test("buckets expose the run-isolated bucket with scoped credentials, and a run 
             minio: { host: "127.0.0.1", port: 30103, directPort: 55003, proxy: "p", image: "m", container: "c", accessKey: "ak", secretKey: "sk", bucketPrefix: "t-000000-", buckets: { authoring: "t-000000-authoring" } },
         },
     }
-    removeRunContext()
-    writeRunContext(minioContext)
+    removeRunState()
+    publishSlot(minioContext)
     const world = new World(declaration([]), { apps: ["api"] } as WorldSpec, { resetRun: async () => undefined })
     await world.start()
     try {
@@ -209,8 +216,8 @@ test("buckets expose the run-isolated bucket with scoped credentials, and a run 
     } finally {
         await world.stop()
     }
-    removeRunContext()
-    writeRunContext(context)
+    removeRunState()
+    publishSlot(context)
     const plain = new World(declaration([]), { apps: ["api"] } as WorldSpec, { resetRun: async () => undefined })
     await plain.start()
     try {
@@ -372,8 +379,8 @@ test("an outage takes the run's outage lock itself: it waits for another file's 
         ...context,
         infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {} } },
     } as RunContext
-    removeRunContext()
-    writeRunContext(outageContext)
+    removeRunState()
+    publishSlot(outageContext)
     const options = { resetRun: async () => undefined, lockIntervalMs: 5 }
     const outage = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
     const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
@@ -433,8 +440,8 @@ test("one connection's database outage takes the outage lock like any outage, to
             postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" } },
         },
     } as RunContext
-    removeRunContext()
-    writeRunContext(outageContext)
+    removeRunState()
+    publishSlot(outageContext)
     const options = { resetRun: async () => undefined, lockIntervalMs: 5, pgConnect }
     const outage = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
     const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
@@ -501,8 +508,8 @@ test("a client-secret rotation takes the outage lock too and, never undone, hold
         ...context,
         infra: { toxiproxyApi: "http://127.0.0.1:1", keycloak: { host: "127.0.0.1", port, directPort: port, proxy: "kc", image: "keycloak", container: "c", realm: "t-realm", clientId: "api", adminUser: "a", adminPassword: "p" } },
     } as RunContext
-    removeRunContext()
-    writeRunContext(keycloakContext)
+    removeRunState()
+    publishSlot(keycloakContext)
     const options = { resetRun: async () => undefined, lockIntervalMs: 5 }
     const rotating = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
     const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)

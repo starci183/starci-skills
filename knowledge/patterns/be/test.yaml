@@ -209,7 +209,7 @@ rules:
     hfsRules: [R48, R47, R79]
     requirement: |-
       Every service spec covers the mandatory cases of each dependency kind its constructor holds, with the double the table names.
-      The table is built from every constructor in nivo (574 services) and starci-next (67 services). Cases that apply to every
+      The table is built from every constructor of the two product codebases it was calibrated on (574 services and 67 services). Cases that apply to every
       method: input boundaries (0, empty, max, rounding), paging and ordering, every declared Outcome, every domain throw and an
       idempotent re-run. Together these equal 100% branch coverage.
     rationale: |-

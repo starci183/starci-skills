@@ -18,15 +18,15 @@
 //
 // The push runs from a scratch worktree of committed main, never from the live working tree: a product
 // checkout is shared with running op workers, whose uncommitted edits make the repository's pre-push hook
-// (husky: nivo-backend `npm run lint && npm run test:unit`, nivo-fe turbo lint) red for reasons
-// unrelated to the commits being pushed — while one op is mid-edit nivo never pushes (cluster
-// push-hooks-test-inflight-tree, 2026-09-24 15:34Z: 42 unit failures that lived only in uncommitted edits).
+// (husky: `npm run lint && npm run test:unit`, turbo lint) red for reasons
+// unrelated to the commits being pushed — while one op is mid-edit that repo never pushes (cluster
+// push-hooks-test-inflight-tree: 42 unit failures that lived only in uncommitted edits).
 // The scratch installs its own dependencies (npm ci from the cache; never a link to the live node_modules) and gets
 // a relative core.hooksPath by DIRECTORY LINK, so hooks stay ON and judge the commit; it is removed whatever
 // happens, its links first so a forced removal can never walk into the live tree. The rest of the live
 // checkout's git-ignored LOCAL STATE the hook's tests read is mirrored the same way, discovered by
 // `git ls-files --others --ignored --exclude-standard --directory`, never a hard-coded list (cluster
-// push-scratch-local-mounts, 2026-09-24 16:30Z: nivo-backend's hook was red on a clean scratch of main for
+// push-scratch-local-mounts: a product repo's hook was red on a clean scratch of main for
 // the `.gitmounts/data` clone, `.env.override` and `.starcistacks/<env>/runtime/files/*` it lacked): each
 // entry is linked at its shallowest path the scratch does not hold — a directory by junction/symlink, a file
 // by hard link — build and tool output excluded (LOCAL_STATE_EXCLUDED). A secret file is linked in place or
@@ -46,7 +46,6 @@ import { markRemoved } from '../machine/worktree-registry.mjs';
 import { getBlob, putBlob } from '../../engine/db/blob.mjs';
 import { redactText } from '../lib/redact.mjs';
 import {sha256} from '../../engine/digest.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from '../machine/home.mjs';
@@ -117,7 +116,7 @@ export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<
 export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
 
 /** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
- *  (nivo-backend 2026-09-27: 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
+ *  (one push was 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
 export function forEachFileLine(file, onLine, { chunkBytes = 8 * 1024 * 1024 } = {}) {
   const fd = fs.openSync(file, 'r');
   try {
@@ -152,34 +151,6 @@ export function scanRange({ cwd, from, to }) {
   } finally { safeRemoveTree(dir, { hold: artifactHoldReason }); }
 }
 
-const SCAN_ALLOW_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'push-scan-allow.yaml');
-
-/** The owner-approved exemptions (modules/supervisor/push-scan-allow.yaml): each names one repository (by
- *  checkout folder name), one file and one pattern. A forbidden-file finding (line null) is never exempt. */
-export function scanAllowEntries(file = SCAN_ALLOW_FILE) {
-  try {
-    const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-    return (Array.isArray(doc?.entries) ? doc.entries : []).filter((e) => e?.repo && e?.file && e?.pattern && e?.approvedBy === 'owner');
-  } catch { return []; }
-}
-
-/** Whether an entry pinned to a historical range (`until: <sha>`, the last commit of the range that carries the
- *  literal) still applies: only while that commit exists and origin/main does not hold it yet. Once the range is
- *  pushed the entry is spent, so a later literal in the same file refuses the push again. Unpinned entries apply. */
-export function scanAllowLive(repo, entry, { run = git } = {}) {
-  if (!entry.until) return true;
-  const r = run(['merge-base', '--is-ancestor', String(entry.until), 'refs/remotes/origin/main'], { cwd: repo });
-  return r.status === 1;
-}
-
-/** Split findings into those still refusing the push and those an owner exemption covers. */
-export function applyScanAllow(repo, findings = [], entries = scanAllowEntries(), { run = git } = {}) {
-  const name = path.basename(path.resolve(String(repo)));
-  const live = entries.filter((e) => e.repo === name && scanAllowLive(repo, e, { run }));
-  const exempt = (f) => f.line !== null && live.some((e) => e.pattern === f.pattern && e.file === slash(String(f.file ?? '')));
-  return { findings: findings.filter((f) => !exempt(f)), exempted: findings.filter(exempt) };
-}
-
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
 export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null, prior = null, now = Date.now() } = {}) {
   const out = { repo, pushed: false };
@@ -207,9 +178,8 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     }
     if (!ahead) return { ...out, skipped: 'up to date' };
     const raw = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
-    const allowed = raw.error ? { findings: raw.findings, exempted: [] } : applyScanAllow(repo, raw.findings, scanAllowEntries(), { run });
-    const scan = { ...raw, findings: allowed.findings, ok: !raw.error && allowed.findings.length === 0 };
-    out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings, ...(allowed.exempted.length ? { exempted: allowed.exempted } : {}) };
+    const scan = { ...raw, ok: !raw.error && raw.findings.length === 0 };
+    out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings };
     if (!scan.ok) {
       const hint = scan.error ? null : scanHint(scan.findings);
       const signature = scan.error ? 'secret-scan:failed' : `secret-scan:${[...new Set(scan.findings.map((f) => f.pattern))].sort().join('+')}`;
@@ -240,7 +210,7 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
 const headOf = (repo, run) => run(['rev-parse', '--short', 'main'], { cwd: repo }).stdout;
 const fullHeadOf = (repo, run) => run(['rev-parse', 'main'], { cwd: repo }).stdout || null;
 
-/** MB-03: a push (with its pre-push hook: nivo-backend's Jest alone takes ~4 min) may run this long; a timeout is its own reason. */
+/** MB-03: a push (with its pre-push hook: one repo's Jest alone takes ~4 min) may run this long; a timeout is its own reason. */
 export const PUSH_TIMEOUT_MS = 600_000;
 /** MB-03: a refusal identical to the previous one (same head, same signature) is not re-run before base x 2^(n-1), capped. */
 export const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
@@ -390,7 +360,7 @@ const linkLocalState = (repo, worktree, { rel, dir }) => {
 
 /** Where a repository's scratch goes: the system temp dir when it shares the checkout's volume, else
  *  `.starci-tmp` at that volume's root — a hard link cannot cross volumes. Never under the git dir: jest's
- *  haste map ignores every path with a `.git` segment and finds no tests there (nivo-backend, 2026-09-24). */
+ *  haste map ignores every path with a `.git` segment and finds no tests there. */
 const scratchBaseOf = (repo) => {
   const tmp = os.tmpdir();
   const volume = (p) => path.parse(path.resolve(p)).root.toLowerCase();
@@ -420,7 +390,7 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   const cleanup = () => {
     for (const link of links.splice(0).reverse()) unlinkLink(link);
     // safeRemoveWorktree: every link left (recorded or not) removed as a link, found without following one; zero links
-    // asserted; only then `git worktree remove`; the main checkout asserted untouched (nivo-fe inc-c8fbf76aa499).
+    // asserted; only then `git worktree remove`; the main checkout asserted untouched.
     try { safeRemoveWorktree(worktree, { repo, git: run }); } catch { /* best effort */ }
     try { safeRemoveTree(base, { hold: artifactHoldReason }); } catch { /* best effort */ }
     if (!fs.existsSync(worktree)) markRemoved(worktree);

@@ -229,7 +229,7 @@ test('brand.decide takes the owner ruling and the reference sources it names fro
     assert.equal(brief.params?.[name]?.setBy, 'kernel');
     assert.equal(brief.params?.[name]?.type, 'string');
   }
-  const ruled = resolveOpParams(brief, { flag: { ownerRulings: 'Core grammar; identity as the Academy dashboard', referenceSources: 'D:/x/globals.css' }, enforceRequired: true });
+  const ruled = resolveOpParams(brief, { flag: { ownerRulings: 'Core grammar; identity as the Academy dashboard', referenceSources: 'x/globals.css' }, enforceRequired: true });
   assert.equal(ruled.ok, true, ruled.detail);
   assert.equal(ruled.params.ownerRulings, 'Core grammar; identity as the Academy dashboard');
   assert.equal(resolveOpParams(brief, { enforceRequired: true }).ok, true, 'a brand op with no ruling to pass still enqueues');

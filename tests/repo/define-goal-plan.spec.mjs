@@ -67,11 +67,11 @@ test('define-goal passes the owner Work root, so a settled brand record drops br
 
 test('an unmatched prompt prints the chain as underivable instead of a guessed leg list', t => {
   const source = projectSource(t);
-  const r = plan(source, 'xin chào, hôm nay thế nào');
+  const r = plan(source, 'xin ch\u00e0o, h\u00f4m nay th\u1ebf n\u00e0o');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /OP CHAIN[^\n]*\n {2}underivable \(kernel will derive at boot\)\n {2}reason: needs-owner — /);
   assert.doesNotMatch(r.stdout, /^\s+1\. /m, 'no numbered leg is printed');
-  const json = plan(source, 'xin chào, hôm nay thế nào', '--json');
+  const json = plan(source, 'xin ch\u00e0o, h\u00f4m nay th\u1ebf n\u00e0o', '--json');
   assert.equal(json.status, 0, json.stderr);
   const out = JSON.parse(json.stdout);
   assert.equal(out.opChain, null);

@@ -286,7 +286,7 @@ test('contrast-aa holds a HeroUI status soft pair and its bare glyph at 3:1, not
   assert.equal(checkContrastAa({brand:raised}).outcome,'fail','softMinContrast is the brand own policy');
 });
 
-// starci-next inc-4e3944371445: the owner accepted three Academy tones below AA (ask ctx_eb5a945a39ea), and
+// The owner accepted three product tones below AA through an ask, and
 // contrast-aa had only the global floor, so the record had to drop minContrast to the lowest accepted pair.
 const ASK='ctx_eb5a945a39ea';
 const LIGHT_DANGER='#e5533d';
@@ -302,18 +302,18 @@ function exceptionBrand(exceptions){
   return brand;
 }
 const dangerException=(fields={})=>({foreground:'--starci-core-danger-foreground',background:'--starci-core-danger',
-  ratio:measure(LIGHT_DANGER,'#ffffff'),reason:'The Academy danger red, accepted by the owner.',acceptedBy:ASK,...fields});
+  ratio:measure(LIGHT_DANGER,'#ffffff'),reason:'The brand danger red, accepted by the owner.',acceptedBy:ASK,...fields});
 const mutedException=(fields={})=>({foreground:'--starci-core-muted',background:'--starci-core-surface',
-  ratio:measure(MUTED,'#ffffff'),reason:'The Academy grey, accepted by the owner.',acceptedBy:ASK,...fields});
+  ratio:measure(MUTED,'#ffffff'),reason:'The brand grey, accepted by the owner.',acceptedBy:ASK,...fields});
 // The project ledgers answer() opens live under the test projects root; removed with the spec.
 test.after(()=>fs.rmSync(projectsRootFor(),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
 /** What serve-ask stores when the ask is answered: a blob + decisions row in the project ledger (ask-receipts.mjs), cited blob:<sha256>. */
-function answer(work,{dispatchId=ASK,answeredBy='owner',at=1790274475561,workflow='wf-sn-foundation'}={}){
+function answer(work,{dispatchId=ASK,answeredBy='owner',at=1790274475561,workflow='wf-ecommerce-foundation'}={}){
   const ledger=openLedger({file:ledgerFileFor(path.dirname(work))});
   try{
     ledger.ensureWorkflow({workflowId:workflow});
     return writeAskReceipt(ledger,{workflowId:workflow,dispatchId,at,receipt:{schema:OWNER_ANSWER_SCHEMA,workflowId:workflow,dispatchId,opId:'brand.decide',
-      option:'A. Academy values, accept the sub-AA contrast',optionIndex:0,answeredBy,at:new Date(at).toISOString()}}).receiptRef;
+      option:'A. Brand values, accept the sub-AA contrast',optionIndex:0,answeredBy,at:new Date(at).toISOString()}}).receiptRef;
   }finally{ledger.close();}
 }
 const contrastOf=(work,brand)=>checkContrastAa({brand,brandDir:path.join(work,'brand')});

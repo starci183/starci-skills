@@ -99,11 +99,11 @@ test('an unanswered git is no change; a baseline read while git was down is take
 test('runtimeHead reads `git rev-parse HEAD` in <root> and refuses anything but a commit id', () => {
   const calls = [];
   const git = (args, opts) => { calls.push([opts.cwd, ...args]); return { status: 0, stdout: `${SHA_A}\n` }; };
-  assert.equal(runtimeHead({ root: 'D:/rt', git }), SHA_A);
-  assert.deepEqual(calls[0], ['D:/rt', 'rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
-  assert.equal(runtimeHead({ root: 'D:/rt', git: () => ({ status: 128, stdout: '' }) }), null);
-  assert.equal(runtimeHead({ root: 'D:/rt', git: () => ({ status: 0, stdout: 'fatal: not a git repository' }) }), null);
-  assert.equal(runtimeHead({ root: 'D:/rt', git: () => { throw new Error('ENOENT'); } }), null);
+  assert.equal(runtimeHead({ root: 'rt', git }), SHA_A);
+  assert.deepEqual(calls[0], ['rt', 'rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
+  assert.equal(runtimeHead({ root: 'rt', git: () => ({ status: 128, stdout: '' }) }), null);
+  assert.equal(runtimeHead({ root: 'rt', git: () => ({ status: 0, stdout: 'fatal: not a git repository' }) }), null);
+  assert.equal(runtimeHead({ root: 'rt', git: () => { throw new Error('ENOENT'); } }), null);
   assert.deepEqual(moduleStamps(['x', 'y'], { stat: (f) => { if (f === 'y') throw new Error('gone'); return { mtimeMs: 7 }; } }), { x: 7, y: null });
 });
 
@@ -112,7 +112,7 @@ test('reexecSelf spawns the same argv, returns once the replacement holds the lo
   const spawned = [], logged = [];
   let reads = 0;
   const r = await reexecSelf({
-    script: '/rt/scripts/kernel/kernel-watchdog.mjs', args: ['--repo', 'D:/p', '--workflow', 'wf-1', '--repair'], actor: 'watchdog',
+    script: '/rt/scripts/kernel/kernel-watchdog.mjs', args: ['--repo', 'wt-p', '--workflow', 'wf-1', '--repair'], actor: 'watchdog',
     lockName: 'kernel-watchdog-wf-1', env: { KEEP: '1' }, cwd: '/rt', now: f.now, selfPid: 4242,
     sleep: async (ms) => { f.clock.t += ms; },
     spawnChild: (spec) => { spawned.push(spec); return { pid: 5151, exited: () => false }; },
@@ -123,7 +123,7 @@ test('reexecSelf spawns the same argv, returns once the replacement holds the lo
   assert.deepEqual(r, { ok: true, pid: 5151 });
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0].script, '/rt/scripts/kernel/kernel-watchdog.mjs');
-  assert.deepEqual(spawned[0].args, ['--repo', 'D:/p', '--workflow', 'wf-1', '--repair'], 'the same argv, never --once');
+  assert.deepEqual(spawned[0].args, ['--repo', 'wt-p', '--workflow', 'wf-1', '--repair'], 'the same argv, never --once');
   assert.equal(spawned[0].logFile, undefined, 'no text log: the loop logs to machine_logs itself');
   assert.equal(spawned[0].env.KEEP, '1');
   assert.equal(spawned[0].env[RELOAD_ENV.handoverFrom], '4242');

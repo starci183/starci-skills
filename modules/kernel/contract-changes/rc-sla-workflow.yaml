@@ -1,7 +1,7 @@
 id: rc-sla-workflow
 effectiveAt: '2026-09-28T18:00:00+07:00'
 summary: >-
-  Reconciler lane F (D:/starci-tmp/reconciler-design/LANES.md "Lane F", DESIGN.md §8.2, §8.8, §9.2, §17.1, Appendix A),
+  Reconciler lane F (<tmp>/reconciler-design/LANES.md "Lane F", DESIGN.md §8.2, §8.8, §9.2, §17.1, Appendix A),
   landed in SHADOW (config.yaml reconciler.controllers.workflow.mode, lane rc-engine; nothing acts until it is set
   active). The SLA / Invariant layer scripts/reconciler/sla.mjs slaPass(ctx), the engine's built-in pass every
   modules/reconciler/sla.yaml passMs: a reconciler.sqlite sla_clocks row past its sla_ms is ONE

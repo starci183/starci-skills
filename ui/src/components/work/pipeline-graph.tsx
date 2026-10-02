@@ -9,6 +9,7 @@ import { AttemptDotsSvg } from './pipeline/attempt-dots';
 import { AgentStack } from '../agent/agent-avatar';
 import { legAgents, legGoal, legName } from './pipeline/node/op-identity';
 import { NODE_H, buildColumns, layoutPipeline, legTries } from './pipeline/layout';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C4';
 
@@ -25,11 +26,11 @@ const dashed = (status: Status) => statusTone[status] === 'skipped';
 
 /** Second line under the status: tries, or units, or the reason a leg is not running. */
 export function legSummary(leg: LegRow): string {
-  if (leg.status === 'deferred') return leg.deferred ?? 'Hoãn theo cấu hình';
-  if (leg.status === 'external') return leg.deferred ?? 'Do bên ngoài xử lý';
-  if (leg.units.length > 1) return `${leg.units.length} unit · ${leg.units.filter(unit => unit.state === 'done').length} đạt`;
-  if (leg.units.length === 1 || leg.attempts.length) { const { tries, budget } = legTries(leg); return `lần ${tries}/${budget}`; }
-  return leg.status === 'planned' ? 'chưa giao' : 'chưa có lần thử';
+  if (leg.status === 'deferred') return leg.deferred ?? t('Deferred by configuration');
+  if (leg.status === 'external') return leg.deferred ?? t('Handled externally');
+  if (leg.units.length > 1) return t('{units} units · {done} passed', { units: leg.units.length, done: leg.units.filter(unit => unit.state === 'done').length });
+  if (leg.units.length === 1 || leg.attempts.length) { const { tries, budget } = legTries(leg); return t('try {tries}/{budget}', { tries, budget }); }
+  return leg.status === 'planned' ? t('not dispatched') : t('no attempts yet');
 }
 
 function useNarrow(max = 760) {
@@ -51,7 +52,7 @@ const activate = (leg: LegRow, onSelect: (leg: LegRow) => void) => (event: Keybo
 /** S3: the whole planned op chain as a pipeline (columns = levels, stacked = parallel). */
 export function PipelineGraph({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const narrow = useNarrow();
-  if (!pipeline.legs.length) return <p className="text-sm text-muted-foreground">Workflow này chưa có chuỗi op được lên kế hoạch.</p>;
+  if (!pipeline.legs.length) return <p className="text-sm text-muted-foreground">{t('This workflow has no planned op chain yet.')}</p>;
   return narrow ? <PipelineList pipeline={pipeline} selected={selected} onSelect={onSelect} /> : <PipelineSvg pipeline={pipeline} selected={selected} onSelect={onSelect} />;
 }
 
@@ -73,7 +74,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
   const scrolls = width > measured;
   return <div className="relative" data-pipeline-graph data-scrolls={scrolls}>
     <div ref={holder} className="overflow-x-auto">
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`Chuỗi ${pipeline.legs.length} chặng, ${columns.length} cột`} className="block max-w-none">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t('A chain of {legs} legs in {cols} columns', { legs: pipeline.legs.length, cols: columns.length })} className="block max-w-none">
       <defs>
         {(['plain', 'current', 'done'] as const).map(kind => <marker key={kind} id={`pg-arrow-${kind}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" fill={edgeStroke(kind)} /></marker>)}
@@ -85,7 +86,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
         const tone = statusTone[leg.status], isSel = selected === leg.op;
         const name = legName(leg), goal = legGoal(leg), agents = legAgents(leg);
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
-          aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
+          aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? t(', the current leg') : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
           <motion.g initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE, delay: 0.04 * (placed.get(leg.op)?.col ?? 0) }}>
           <title>{`${name} (${leg.op}) · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}${goal ? `
@@ -111,7 +112,7 @@ ${goal}` : ''}`}</title>
 function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const columns = buildColumns(pipeline.legs);
   return <div data-pipeline-list><Stagger as="ol" className="flex flex-col gap-4">{columns.map(col => <StaggerItem as="li" key={col.level}>
-    <p className="mb-2 text-xs font-semibold text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case"> · song song</span>}</p>
+    <p className="mb-2 text-xs font-semibold text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case"> · {t('parallel')}</span>}</p>
     <ul className="flex flex-col gap-2">{col.legs.map(leg => <li key={leg.op}>
       <button type="button" data-tone={statusTone[leg.status]} data-leg={leg.op} aria-pressed={selected === leg.op} onClick={() => onSelect(leg)}
         className={`flex w-full min-w-0 flex-col gap-2 rounded-lg border bg-card px-4 py-3 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-1 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-ring' : 'border-border'}`}>

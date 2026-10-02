@@ -3,6 +3,7 @@ export const concept: Concept = 'C8';
 import { useState, type ReactNode } from 'react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Tone } from '../../status';
+import { t } from '../../../i18n/t';
 
 export const toolbarBtn = 'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40';
 
@@ -18,14 +19,14 @@ export async function copyText(value: string): Promise<boolean> {
   } catch { return false; }
 }
 
-export function CopyButton({ value, label = 'Sao chép', title, className = toolbarBtn, icon, labelClassName }: { value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string }) {
+export function CopyButton({ value, label = t('Copy text'), title, className = toolbarBtn, icon, labelClassName }: { value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button type="button" className={className} title={title ?? label} aria-label={title ?? label} onClick={async () => {
       if (await copyText(typeof value === 'function' ? value() : value)) { setDone(true); setTimeout(() => setDone(false), 1200); }
     }}>
       {done ? <CheckIcon className="size-3" /> : (icon ?? <CopyIcon className="size-3" />)}
-      <span className={labelClassName}>{done ? 'Đã chép' : label}</span>
+      <span className={labelClassName}>{done ? t('Copied') : label}</span>
     </button>
   );
 }

@@ -49,7 +49,7 @@ test("HYGIENE-1: timers and frames", () => {
       { filename: FILE, code: withReact("useEffect(() => { const id = setTimeout(a, 1); function teardown() { clearTimeout(id) } return () => { teardown() } }, [])\ndeclare const a: () => void") },
       // a debounce started from a listener the effect registers: the handle lives in the effect and the cleanup clears it
       { filename: FILE, code: withReact("useEffect(() => { let t: number | undefined; const onResize = () => { clearTimeout(t); t = window.setTimeout(measure, 100) }; window.addEventListener(\"resize\", onResize); return () => { window.removeEventListener(\"resize\", onResize); clearTimeout(t) } }, [])\ndeclare const measure: () => void") },
-      // useSyncExternalStore: the nivo-fe useNow shape, subscribe passed by name, the handle a module-level let
+      // useSyncExternalStore: a shared useNow shape, subscribe passed by name, the handle a module-level let
       {
         filename: HOOK,
         code: withReact("const listeners = new Set<() => void>()\nlet timer: ReturnType<typeof setInterval> | undefined\nconst tick = () => { for (const l of listeners) l() }\nconst subscribe = (listener: () => void): (() => void) => { listeners.add(listener); if (timer === undefined) timer = setInterval(tick, 60000); return () => { listeners.delete(listener); if (listeners.size === 0 && timer !== undefined) { clearInterval(timer); timer = undefined } } }\nexport const useNow = () => useSyncExternalStore(subscribe, () => 1, () => null)"),
@@ -244,13 +244,13 @@ test("HYGIENE-4: no console in product source", () => {
       { filename: at("apps/web/scripts/build.mjs"), code: "console.log('building')" },
       // a folder named src that no product slot owns is not product source
       { filename: at("tools/src/build.ts"), code: "console.log('building')" },
-      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: "logger.info('x')" },
+      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: "logger.info('x')" },
     ],
     invalid: [
       { filename: PLAIN_FILE, code: "console.log('x')", errors: [{ messageId: "console" }] },
       { filename: PLAIN_FILE, code: "console.error(error)", errors: [{ messageId: "console" }] },
       { filename: at("apps/web/src/modules/api/client.ts"), code: "console.warn('slow')", errors: [{ messageId: "console" }] },
-      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: "console.log('x')", errors: [{ messageId: "console" }] },
+      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: "console.log('x')", errors: [{ messageId: "console" }] },
     ],
   })
 })

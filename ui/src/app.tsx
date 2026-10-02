@@ -7,6 +7,7 @@ import { SearchBox } from './components/search-box';
 import { FeedbackState, PageSkeleton } from './components/feedback-state';
 import { useApiQuery, useLiveStatus, useQueryHealth } from './api/query';
 import { formatAbsolute, navLabels } from './i18n/vi';
+import { t } from './i18n/t';
 import { navKind, useRoute, type Route } from './router';
 import { applyPreferences, initialTheme, type Theme } from './preferences';
 import type { ContractInfo } from './contract';
@@ -40,23 +41,23 @@ function routePage(route: Route): string | null {
 
 function routeTitle(route: Route): string {
   switch (route.kind) {
-    case 'overview': return 'Tổng quan';
+    case 'overview': return t('Overview');
     case 'workflow': return `Workflow ${route.wf}`;
     case 'attempt': return `Attempt ${route.attemptId}`;
-    case 'decisions': return 'Quyết định';
-    case 'system': return 'Hệ thống';
-    case 'logs': return 'Nhật ký';
-    case 'analytics': return 'Phân tích';
-    case 'kit': return 'Bộ thành phần';
-    case 'not-found': return 'Không tìm thấy trang';
+    case 'decisions': return t('Decisions');
+    case 'system': return t('System');
+    case 'logs': return t('Logs');
+    case 'analytics': return t('Analytics');
+    case 'kit': return t('Component kit');
+    case 'not-found': return t('Page not found');
   }
 }
 
 function PageSlot({ route }: { route: Route }) {
   const path = routePage(route);
-  if (path == null) return <FeedbackState><strong>Không tìm thấy trang</strong> · Kiểm tra lại đường dẫn. <a href="#/" className="underline">Về Tổng quan</a></FeedbackState>;
+  if (path == null) return <FeedbackState><strong>{t('Page not found')}</strong> · {t('Check the URL.')} <a href="#/" className="underline">{t('Back to Overview')}</a></FeedbackState>;
   const Page = pages[path];
-  if (!Page) return <FeedbackState><strong>Trang đang được chuẩn bị</strong> · Chưa có giao diện cho trang này trong bản build hiện tại.</FeedbackState>;
+  if (!Page) return <FeedbackState><strong>{t('Page is being prepared')}</strong> · {t('This page has no UI in the current build.')}</FeedbackState>;
   return <Suspense fallback={<PageSkeleton />}><Enter key={path}><Page /></Enter></Suspense>;
 }
 
@@ -82,9 +83,9 @@ function useAgeSeconds(at: number | null): number | null {
 }
 
 function formatAge(seconds: number): string {
-  if (seconds < 90) return `${seconds} giây trước`;
-  if (seconds < 5400) return `${Math.round(seconds / 60)} phút trước`;
-  return `${Math.round(seconds / 3600)} giờ trước`;
+  if (seconds < 90) return t('{n} seconds ago', { n: seconds });
+  if (seconds < 5400) return t('{n} minutes ago', { n: Math.round(seconds / 60) });
+  return t('{n} hours ago', { n: Math.round(seconds / 3600) });
 }
 
 export default function App() {
@@ -99,45 +100,45 @@ export default function App() {
     const title = `${routeTitle(route)} · StarCi`;
     document.title = title;
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
-    document.querySelector('meta[property="og:description"]')?.setAttribute('content', 'StarCi · Trung tâm theo dõi workflow và vận hành.');
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', t('StarCi · Workflow monitoring and operations hub.'));
   }, [route]);
 
   const observedAt = health.latestAt ?? contract.meta?.at ?? null;
   const age = useAgeSeconds(health.latestAt);
   const isStale = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
-  const provenance = [health.sources.length ? `Nguồn: ${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` : 'Chưa có nguồn', health.stale.length ? `Chậm: ${health.stale.join(', ')}` : '', health.errorCount ? `${health.errorCount} nguồn lỗi` : ''].filter(Boolean).join(' · ');
+  const provenance = [health.sources.length ? t('Sources: {list}', { list: `${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` }) : t('No sources'), health.stale.length ? t('Stale: {list}', { list: health.stale.join(', ') }) : '', health.errorCount ? t('{n} failing sources', { n: health.errorCount }) : ''].filter(Boolean).join(' · ');
   return <div className="app-shell">
-    <aside className="shell-sidebar" aria-label="Điều hướng chính">
-      <a className="shell-brand" href="#/" aria-label="StarCi · Tổng quan">
-        <span className="shell-brand-mark"><img src="/logos/starci-next-blue.png" alt="" aria-hidden="true" /></span>
+    <aside className="shell-sidebar" aria-label={t('Main navigation')}>
+      <a className="shell-brand" href="#/" aria-label={t('StarCi · Overview')}>
+        <span className="shell-brand-mark"><img src="/logos/starci-blue.png" alt="" aria-hidden="true" /></span>
         <span><strong>StarCi</strong><small>AI Operations Center</small></span>
       </a>
-      <nav className="shell-nav" aria-label="Trang">
+      <nav className="shell-nav" aria-label={t('Pages')}>
         {navigation.map(({ kind, href, label, icon: Icon }) => <a className="shell-nav-link" key={kind} href={href} aria-current={selected === kind ? 'page' : undefined}>
           <Icon aria-hidden="true" />{label}
         </a>)}
       </nav>
       <div className="shell-sidebar-footer">
-        <div className="flex items-center gap-2"><BookOpen size={14} aria-hidden="true" /><span>Giao diện chỉ đọc</span></div>
-        <div className="mt-2">{contract.data ? `${contract.data.projects.length} dự án từ nguồn` : contract.error ? 'Chưa đọc được hợp đồng API' : 'Đang đọc hợp đồng API…'}</div>
+        <div className="flex items-center gap-2"><BookOpen size={14} aria-hidden="true" /><span>{t('Read-only UI')}</span></div>
+        <div className="mt-2">{contract.data ? t('{n} projects from sources', { n: contract.data.projects.length }) : contract.error ? t('Could not read the API contract') : t('Reading the API contract…')}</div>
       </div>
     </aside>
 
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
-          <span className="shell-live" role="status" data-status={live} title={`${isStale ? 'Một nguồn dữ liệu đang chậm hoặc lỗi. ' : ''}${live === 'live' ? 'Đang nhận cập nhật trực tiếp (SSE)' : live === 'hidden' ? 'Tab đang ẩn nên tạm dừng cập nhật' : 'Đang thăm dò định kỳ'} · ${provenance}`}>
+          <span className="shell-live" role="status" data-status={live} title={`${isStale ? `${t('A data source is stale or failing')} ` : ''}${live === 'live' ? t('Receiving live updates (SSE)') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')} · ${provenance}`}>
             <span className="shell-live-dot" aria-hidden="true" />
-            <span>{live === 'live' ? 'Trực tiếp' : live === 'hidden' ? 'Tạm dừng' : 'Đang thăm dò'}</span>
+            <span>{live === 'live' ? t('Live') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
             {age != null && live !== 'hidden' ? <span className="shell-live-age">· {formatAge(age)}</span> : null}
           </span>
           <span className="shell-header-separator" aria-hidden="true" />
-          <span className="shell-last-updated" title={provenance}>{observedAt == null ? 'Chưa có dữ liệu' : `Nguồn: ${formatAbsolute(observedAt)}`}</span>
+          <span className="shell-last-updated" title={provenance}>{observedAt == null ? t('No data yet') : t('Source: {at}', { at: formatAbsolute(observedAt) })}</span>
         </div>
         <div className="shell-header-right">
           <SearchBox />
-          <Badge variant="outline" className="shell-readonly">Công khai · chỉ đọc</Badge>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển sang sáng' : 'Chuyển sang tối'} title={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}>
+          <Badge variant="outline" className="shell-readonly">{t('Public · read-only')}</Badge>
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')} title={theme === 'dark' ? t('Light theme') : t('Dark theme')}>
             {theme === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
           </Button>
         </div>
@@ -145,7 +146,7 @@ export default function App() {
       <main className="shell-main" id="main-content"><PageSlot route={route} /></main>
     </div>
 
-    <nav className="shell-bottom-nav" aria-label="Điều hướng điện thoại">
+    <nav className="shell-bottom-nav" aria-label={t('Mobile navigation')}>
       {navigation.map(({ kind, href, label, icon: Icon }) => <a key={kind} href={href} aria-current={selected === kind ? 'page' : undefined}>
         <Icon aria-hidden="true" />{label}
       </a>)}

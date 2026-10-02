@@ -1,7 +1,6 @@
 // A deferred settle that waits on a later leg and a draw retry
-// ordered --after the attempt it retries held one another forever (nivo
-// wf-nivo-workspace-provision-mujek7cb, inc-a158db5dc9b7 / inc-47e909b2f28c); a 993-path
-// packet never launched (ENAMETOOLONG at task-create, inc-826e077777de).
+// ordered --after the attempt it retries held one another forever; a 993-path
+// packet never launched (ENAMETOOLONG at task-create).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -38,7 +37,7 @@ test('taskSpecOf: a packet over the argv budget is written verbatim to the job d
   assert.deepEqual(taskSpecOf({prompt:small,file:path.join(dir,'p.md'),op:'x',jobId:'j'}),{spec:small,spilled:false});
   assert.equal(fs.existsSync(path.join(dir,'p.md')),false,'a packet that fits writes nothing');
 
-  const owned=Array.from({length:993},(_,i)=>`.starciwork/features/workspace-provision/impl/nivo-backend/n${i}/report.json`);
+  const owned=Array.from({length:993},(_,i)=>`.starciwork/features/workspace-provision/impl/todo-app-be/n${i}/report.json`);
   const big=`[Op] business.decide\nowned_paths: ${owned.join(', ')}\n  cut: ...`;
   assert.ok(big.length>TASK_SPEC_MAX_CHARS);
   const file=packetFileOf(path.join(dir,'jobs','op-business.decide-cc63d20d87'),2);

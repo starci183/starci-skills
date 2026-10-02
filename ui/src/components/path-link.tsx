@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { File, Folder } from 'lucide-react';
 import type { Concept } from './concept';
+import { t } from '../i18n/t';
 
 export const concept: Concept = 'frame';
 
@@ -19,9 +20,9 @@ export function PathLink({ path, kind = 'dir', label }: { path: string | null | 
     void navigator.clipboard?.writeText(path).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
   };
   return <span className="path-link">
-    <a className="path-main" href={`vscode://file/${toUrlPath(path)}`} title="Mở trong VS Code trên máy chủ"><Icon className="size-3.5 shrink-0" aria-hidden="true" />{label ?? path}</a>
-    <a className="path-action" href={`cursor://file/${toUrlPath(path)}`} title="Mở trong Cursor">Cursor</a>
-    {kind === 'file' ? <a className="path-action" href={`vscode://file/${toUrlPath(parentOf(path))}`} title="Mở thư mục chứa tệp">thư mục</a> : null}
-    <button type="button" className="path-action" onClick={copy} title="Chép đường dẫn">{copied ? 'Đã chép' : 'Chép'}</button>
+    <a className="path-main" href={`vscode://file/${toUrlPath(path)}`} title={t('Open in VS Code on the host')}><Icon className="size-3.5 shrink-0" aria-hidden="true" />{label ?? path}</a>
+    <a className="path-action" href={`cursor://file/${toUrlPath(path)}`} title={t('Open in Cursor')}>Cursor</a>
+    {kind === 'file' ? <a className="path-action" href={`vscode://file/${toUrlPath(parentOf(path))}`} title={t('Open the containing folder')}>{t('folder')}</a> : null}
+    <button type="button" className="path-action" onClick={copy} title={t('Copy path')}>{copied ? t('Copied') : t('Copy')}</button>
   </span>;
 }

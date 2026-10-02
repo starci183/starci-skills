@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
@@ -86,7 +86,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
     ledgerHealth: {
       ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs']),
       backupHour: Number(h?.ledgerHealth?.backupHour ?? 3),
-      backupDir: String(h?.ledgerHealth?.backupDir ?? 'D:/starci-archive/ledger-backups'),
+      backupDir: String(h?.ledgerHealth?.backupDir ?? path.join(archiveRootOf(), 'ledger-backups')),
     },
   };
 }
@@ -260,7 +260,6 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
 
 /* ------------------------------------------------------------ the state machine (DESIGN 9.7) */
 
-export const SERVICE_STATES = Object.freeze(['declared', 'starting', 'healthy', 'degraded', 'failed', 'backoff', 'quarantined', 'unmanaged']);
 export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff', 'quarantined']);
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
@@ -401,13 +400,6 @@ export function openServiceStore({ env = process.env } = {}) {
   if (shared) return shared;
   shared = machineStore(openMachine({ env }));
   return shared;
-}
-
-/** A checker's published availability for the job controller: 'available' | 'unavailable' | 'unknown'. */
-export function checkerAvailability(name, { store = openServiceStore() } = {}) {
-  const rec = store.get(`checker:${name}`);
-  if (!rec || rec.state === 'declared') return 'unknown';
-  return rec.state === 'healthy' ? 'available' : 'unavailable';
 }
 
 /* ------------------------------------------------------------ actuators (the CLI; active mode only) */

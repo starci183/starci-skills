@@ -9,9 +9,9 @@ import type { InfraName } from "../config/types"
 
 /** The isolation identity of one repository checkout. Everything a repository owns in the shared stack is named from it. */
 export interface Namespace {
-    /** `<package-name-slug>_<6 hex of the checkout root hash>` in snake case, e.g. `nivo_backend_a1b2c3`; safe as a Postgres identifier prefix. */
+    /** `<package-name-slug>_<6 hex of the checkout root hash>` in snake case, e.g. `todo_app_be_a1b2c3`; safe as a Postgres identifier prefix. */
     readonly snake: string
-    /** The same in kebab case (`nivo-backend-a1b2c3`); safe for realm, bucket, namespace and container names. */
+    /** The same in kebab case (`todo-app-be-a1b2c3`); safe for realm, bucket, namespace and container names. */
     readonly kebab: string
     /** The absolute repository root. */
     readonly root: string
@@ -123,6 +123,11 @@ export interface RunKeycloak extends ProxiedEndpoint {
     readonly adminPassword: string
     /** The secret the realm import gave each confidential client, by clientId (absent for a run provisioned before 1.0.5). */
     readonly clientSecrets?: Readonly<Record<string, string>>
+    /**
+     * Each user id the realm file pins, to the id this namespace's realm stores it under (Keycloak ids are unique per server,
+     * so every slot's realm gets its own); the seeds of the slot are applied with the same rewrite.
+     */
+    readonly userIds: Readonly<Record<string, string>>
 }
 
 /** The cluster of a run. */

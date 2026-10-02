@@ -1,85 +1,87 @@
 /**
- * The Vietnamese "why" of each rule of this canon, in the same shape as `@starci/eslint-canon-fe`'s `lib/why.mjs`.
+ * The "why" of each rule of this canon, in the same shape as `@starci/eslint-canon-fe`'s `lib/why.mjs`.
  *
  * A stylelint message is written for the developer at the terminal, in English. The agent that reads a failed land
- * gate needs the catalogue's sentence instead: the finding code (a key of `modules/kernel/failure-codes.yaml`), a
- * Vietnamese headline with `<file>` / `<what>` placeholders the reader fills from the stylelint location, and one
- * sentence "what do I do now". Every rule has an entry; the twin test refuses a rule with none and an entry for a
- * rule that does not exist.
+ * gate needs the catalogue's sentence instead: the finding code (a key of `modules/kernel/failure-codes.yaml`), an
+ * English headline (`en`) with `<file>` / `<what>` placeholders the reader fills from the stylelint location, and one
+ * sentence "what do I do now" (`fix`). The owner reads both in Vietnamese through the declared message catalog: the
+ * `en` and `fix` strings are the keys of `modules/i18n/messages/v4.yaml` (`translator('vi')(entry.en)` hands back the
+ * Vietnamese of the same sentence). Every rule has an entry; the twin test refuses a rule with none and an entry for
+ * a rule that does not exist.
  */
 
-/** @typedef {{ code: string, vi: string, fixVi: string }} Why */
+/** @typedef {{ code: string, en: string, fix: string }} Why */
 
 /** @type {Record<string, Why>} */
 export const why = {
   "token-only": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "CSS ở `<file>` dùng `<what>` không phải token của grammar. Màu, khoảng cách, bo góc và chữ chỉ đến từ token grammar; một tên biến riêng là một hệ thiết kế thứ hai.",
-    fixVi: "Thay bằng `var(--...)` của grammar (`--grammar-*`, token của family, token ngữ nghĩa) hoặc từ khóa trung tính.",
+    en: "CSS in `<file>` uses `<what>`, which is not a grammar token. Colour, spacing, radius and type come only from grammar tokens; a private variable name is a second design system.",
+    fix: "Replace it with a grammar `var(--...)` (`--grammar-*`, a family token, a semantic token) or a neutral keyword.",
   },
   "raw-brand-value": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "CSS ở `<file>` viết giá trị màu/độ dài thô (`<what>`: hex, rgb, hsl, oklch hoặc px). Giá trị thô chỉ được nằm trong `modules/brand/brand.css`, có cả giá trị sáng và tối.",
-    fixVi: "Dùng token grammar; nếu là màu thương hiệu thì khai ở `modules/brand/brand.css` cho cả sáng và tối.",
+    en: "CSS in `<file>` writes a raw colour/length value (`<what>`: hex, rgb, hsl, oklch or px). Raw values may live only in `modules/brand/brand.css`, with both a light and a dark value.",
+    fix: "Use a grammar token; for a brand colour declare it in `modules/brand/brand.css` for both light and dark.",
   },
   "no-apply-raw": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`@apply <what>` ở `<file>` áp một giá trị tùy ý hoặc giá trị thô. Giá trị tùy ý là giá trị thô đổi tên, lách qua thang của grammar.",
-    fixVi: "Dùng utility có trong thang, hoặc tham chiếu token dạng `[var(--...)]`.",
+    en: "`@apply <what>` in `<file>` applies an arbitrary value or a raw value. An arbitrary value is a raw value renamed, slipping past the grammar scale.",
+    fix: "Use a utility from the scale, or a token reference of the form `[var(--...)]`.",
   },
   "no-important": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`!important` ở `<file>` (`<what>`). Nó thắng cuộc tranh độ ưu tiên bằng cách làm lần sau không thể thắng, và làm bản ghi đè của grammar sống sót qua đợt đổi thương hiệu.",
-    fixVi: "Bỏ `!important`; sửa thứ tự cascade (layer của grammar đã quyết ai thắng).",
+    en: "`!important` in `<file>` (`<what>`). It wins the priority fight by making the next one unwinnable, and lets a grammar override survive a rebrand.",
+    fix: "Drop `!important`; fix the cascade order (grammar's layers already decide who wins).",
   },
   "globals-shape": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`globals.css` (`<file>`) chứa `<what>`. File CSS toàn cục chỉ có `@import`, `@source` và khối khai token.",
-    fixVi: "Chuyển phần tạo kiểu vào utility của grammar; trong `globals.css` chỉ giữ `@import`/`@source` và token là bí danh `var(--...)`.",
+    en: "`globals.css` (`<file>`) contains `<what>`. The global stylesheet holds only `@import`, `@source` and token declaration blocks.",
+    fix: "Move the styling into grammar utilities; inside `globals.css` keep only `@import`/`@source` and tokens that alias `var(--...)`.",
   },
   "no-token-redefinition": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`<file>` khai lại token của grammar (`<what>`). Token của grammar chỉ được đặt giá trị ở `modules/brand/brand.css`; CSS module hay `globals.css` khai lại làm component khác family và không đổi thương hiệu được.",
-    fixVi: "Xóa khai báo; nếu cần đổi giá trị thì đổi ở `modules/brand/brand.css`, cho cả sáng và tối.",
+    en: "`<file>` redeclares a grammar token (`<what>`). A grammar token may be assigned only in `modules/brand/brand.css`; a CSS module or `globals.css` redeclaring one makes a component leave the family and unrebrandable.",
+    fix: "Delete the declaration; to change the value, change it in `modules/brand/brand.css`, for both light and dark.",
   },
   "brand-layer-shape": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`brand.css` (`<file>`) sai hình dạng (`<what>`). Lớp thương hiệu chỉ khai token của grammar, trong một khối sáng và một khối tối, mỗi token có đủ hai giá trị.",
-    fixVi: "Chỉ giữ khai báo token trong `:root` và `.dark` (hoặc `@media (prefers-color-scheme: dark)`); thêm giá trị còn thiếu cho chế độ kia.",
+    en: "`brand.css` (`<file>`) has the wrong shape (`<what>`). The brand layer declares only grammar tokens, in one light block and one dark block, each token carrying both values.",
+    fix: "Keep only token declarations in `:root` and `.dark` (or `@media (prefers-color-scheme: dark)`); add the value the other mode is missing.",
   },
   "status-contrast": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`brand.css` (`<file>`) có màu trạng thái không đạt chuẩn cặp mềm HeroUI (`<what>`). Mỗi tông trạng thái (success, warning, danger, info) có `--<tông>-soft` (nền nhạt) và `--<tông>-soft-foreground` (màu chữ, icon, chấm) ở cả sáng và tối; chữ mềm trên nền nhạt và trên nền trang phải đạt ≥ 3:1, chữ thân `--foreground` trên `--background` ≥ 4.5:1, và tông đặc không được dùng làm màu chữ khi dưới 4.5:1.",
-    fixVi: "Khai đủ cặp mềm cho cả sáng và tối (khối chung `:root, .light, .dark` tính cho cả hai); trộn `--<tông>-soft-foreground` về phía `--foreground` cho tới khi đạt ngưỡng; giá trị không phân giải được thì sửa thành màu đọc được (hex, rgb, hsl, oklab, oklch, color-mix).",
+    en: "`brand.css` (`<file>`) has a status colour failing the HeroUI soft-pair standard (`<what>`). Each status tone (success, warning, danger, info) has `--<tone>-soft` (light background) and `--<tone>-soft-foreground` (text, icon, dot colour) in both light and dark; soft text on a light surface and on the page must reach at least 3:1, body `--foreground` on `--background` at least 4.5:1, and a solid tone may not be a text colour when under 4.5:1.",
+    fix: "Declare the full soft pair for both light and dark (the shared block `:root, .light, .dark` counts for both); blend `--<tone>-soft-foreground` toward `--foreground` until the threshold is met; a value that cannot be resolved is rewritten as a readable colour (hex, rgb, hsl, oklab, oklch, color-mix).",
   },
   "no-inline-lint-config": {
     code: "HFS_INLINE_SUPPRESSION",
-    vi: "Có chú thích tắt luật ở `<file>:<line>`. HFS không cho tắt tại chỗ — sửa code, hoặc đề xuất đổi luật.",
-    fixVi: "Xóa `stylelint-disable` và sửa nguyên nhân.",
+    en: "A comment disabling a rule sits at `<file>:<line>`. HFS does not allow in-place suppression - fix the code, or propose a rule change.",
+    fix: "Remove `stylelint-disable` and fix the cause.",
   },
   "no-css-module": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`<file>` là CSS module. HFS cấm `*.module.css`: một stylesheet riêng cho từng component là nơi hệ thiết kế thứ hai bắt đầu.",
-    fixVi: "Xóa file; tạo kiểu bằng component và token của grammar, phần grammar còn thiếu thì bổ sung vào grammar.",
+    en: "`<file>` is a CSS module. HFS forbids `*.module.css`: a private stylesheet per component is where a second design system begins.",
+    fix: "Delete the file; style with grammar components and tokens, and extend grammar where it falls short.",
   },
   "no-class-selector": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "CSS ở `<file>` có selector class (`<what>`). CSS của app không định nghĩa component; kiểu đi qua component và token của grammar.",
-    fixVi: "Xóa rule; dùng component grammar hoặc token thay cho class riêng.",
+    en: "CSS in `<file>` has a class selector (`<what>`). App CSS does not define components; styling flows through grammar components and tokens.",
+    fix: "Remove the rule; use a grammar component or token instead of a private class.",
   },
   "breakpoint-scale": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`@media` ở `<file>` dùng breakpoint `<what>` ngoài thang của grammar, nên bố cục đổi ở độ rộng khác các component khác.",
-    fixVi: "Dùng một breakpoint của thang grammar (30rem, 40rem, 48rem, 70rem), hoặc px tương đương ở 16px/rem.",
+    en: "A `@media` in `<file>` uses breakpoint `<what>` outside the grammar scale, so the layout changes at a width different from the other components.",
+    fix: "Use a breakpoint of the grammar scale (30rem, 40rem, 48rem, 70rem), or the px equivalent at 16px/rem.",
   },
   "source-resolves": {
     code: "FE_STYLE_SOURCE_UNRESOLVED",
-    vi: "`@source` ở `<file>` trỏ tới đường dẫn không tồn tại (`<what>`). Tailwind không quét file nào và lặng lẽ làm mất các utility mà component dùng.",
-    fixVi: "Sửa đường dẫn `@source` để trỏ tới thư mục có thật, tính từ chính file CSS.",
+    en: "`@source` in `<file>` points at a path that does not exist (`<what>`). Tailwind scans no file and silently drops the utilities the components use.",
+    fix: "Fix the `@source` path so it points at a real directory, resolved from the CSS file itself.",
   },
   "globals-import-order": {
     code: "FE_STYLE_TOKEN_ONLY",
-    vi: "`globals.css` (`<file>`) import sai thứ tự hoặc import ngoài danh sách chuẩn (`<what>`). Thứ tự chuẩn: tailwindcss, @heroui/styles/css, stylesheet family của grammar, modules/brand/brand.css, rồi `@source`.",
-    fixVi: "Sắp lại `@import` theo thứ tự chuẩn và bỏ import ngoài danh sách; `@source` đặt sau cùng.",
+    en: "`globals.css` (`<file>`) imports in the wrong order or imports outside the standard list (`<what>`). The standard order: tailwindcss, @heroui/styles/css, the grammar family stylesheet, modules/brand/brand.css, then `@source`.",
+    fix: "Reorder `@import` to the standard order and drop imports outside the list; `@source` comes last.",
   },
 }

@@ -159,7 +159,7 @@ test('a red judgment is a failed runtime check whose why speaks Vietnamese; a la
   const why=buildWhy({attempt:{attempt_id:attemptId,workflow_id:'wf-sonar',op_id:'backend.implement',try_no:1,verdict:'fail',report_outcome:'done',end_state:'settled',settled_at:1,reported_at:1},
     checks:[facts],report:{report_id:1,report_json:json({outcome:'done',summary:'xong'})},settle:{claimOverruled:true},unit:null,catalog});
   assert.ok(why.codes.includes('sonar-gate-red'));
-  assert.match(`${why.headline} ${why.cause}`,/Cổng chất lượng Sonar đỏ/);
+  assert.match(`${why.headline} ${why.cause}`,/C\u1ed5ng ch\u1ea5t l\u01b0\u1ee3ng Sonar \u0111\u1ecf/);
   const green=record(ledger,attemptId,scan(),2000);
   assert.equal(green.green,true);
   assert.equal(independentChecksOf(ledger.db,{attemptId}).checks[0].exitCode,0,'the latest run decides');

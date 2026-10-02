@@ -1,5 +1,5 @@
 // The machine resolves workspaces the way npm does: a `*` segment admits the directories that hold a package.json and skips an
-// empty folder (nivo-fe `apps/landing-draft`, untracked and empty, made the machine analyse ZERO files); a literal path must resolve.
+// empty folder (an untracked, empty `apps/landing-draft` made the machine analyse ZERO files); a literal path must resolve.
 // In an app the one package.json at the app root lists the workspaces, and only the fe side's packages are workspaces
 // (`fe/packages/*`); the side folder the machine judges reads them relative to itself (`packages/<name>`).
 import assert from 'node:assert/strict';
@@ -39,7 +39,7 @@ test('a literal workspace path that does not hold a package.json is still refuse
   assert.throws(() => loadArchitectureConfig(root), /workspace packages\/draft-ui must resolve to a regular package.json/);
 });
 
-test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (nivo-fe packages/nivo-ui)', (t) => {
+test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (todo-app-fe packages/app-ui)', (t) => {
   const root = tree(t, ['fe/packages/*'], (r) => {
     for (const [rel, text] of [
       ['packages/web-ui/src/hooks/useToggle.ts', 'export const useToggle = () => null\n'],

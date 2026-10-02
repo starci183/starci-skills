@@ -1,14 +1,14 @@
 // A worker death in a host-wide terminal wipe is the environment's, even when it is the first death the
 // sweep reconciles (scripts/kernel/host-event.mjs hostEventAround, scripts/kernel/lineage-route.mjs).
 //
-// Live defect (nivo wf-nivo-fe-canon-mujek980, 2026-09-28, host free RAM 8-9%, ram-throttle heavy-paused):
-// at 04:19Z Orca dropped every terminal at once. The first dead worker reconciled, devin code.refactor
-// op-code.refactor-b7f1b77a67 (gone terminal_handle_stale, a dirty tree), settled failed-no-report at
-// 04:19:33 - before its three sibling workers (dead-worker-requeued 04:19:39-46, all terminal_handle_stale),
-// the module-studio Kernel (cleared terminal_handle_stale 04:19:39) and the collab and fe-canon Kernels
-// (cleared 'terminal disconnected' 04:34:56 / 04:35:31) reached the ledger. hostWideDisconnectOf saw no
+// Live defect (host free RAM 8-9%, ram-throttle heavy-paused):
+// Orca dropped every terminal at once. The first dead worker reconciled, a devin code.refactor
+// (gone terminal_handle_stale, a dirty tree), settled failed-no-report
+// before its three sibling workers (dead-worker-requeued, all terminal_handle_stale),
+// the module-studio Kernel (cleared terminal_handle_stale) and the collab and fe-canon Kernels
+// (cleared 'terminal disconnected') reached the ledger. hostWideDisconnectOf saw no
 // proof, the attempt spent a business retry and its retry was routed off devin for a death that said
-// nothing of devin. A wedged worker (op-code.refactor-f166bfbaa3, 02:15Z: its own turn stuck on a
+// nothing of devin. A wedged worker (its own turn stuck on a
 // no-output command, terminal alive) stays the worker's failure.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ import { attemptCauseOf } from '../../scripts/kernel/lineage-route.mjs';
 
 const MIN = 60_000, SEC = 1000;
 const SETTLE = Date.parse('2026-09-28T04:19:33Z');
-const FE = 'wf-nivo-fe-canon-mujek980';
+const FE = 'wf-app-fe-canon-x';
 const STALE = 'terminal_handle_stale';
 
 const ledger = (t) => {
@@ -39,14 +39,14 @@ const settledNoReport = (worker, at = SETTLE) => ({
   payload_json: JSON.stringify({ model: 'devin-agent' }),
   result_json: JSON.stringify({ verdict: 'fail', reason: 'failed-no-report', effectState: 'partial', attemptConsumed: true, worker, at }),
 });
-// The 2026-09-28 04:19Z wipe as the nivo ledger recorded it; the dying worker's own row carries no error code.
+// The wipe as the ledger recorded it; the dying worker's own row carries no error code.
 const seedWipe = (db) => {
   event(db, FE, 'worker-failed-no-report', { liveness: 'gone', terminal: 'term_c757' }, SETTLE, 'op-code.refactor-b7f1b77a67');
-  kernelCleared(db, 'wf-nivo-module-studio-mujek86a', SETTLE + 6 * SEC, STALE);
+  kernelCleared(db, 'wf-app-module-studio-x', SETTLE + 6 * SEC, STALE);
   workerRequeued(db, FE, SETTLE + 6 * SEC, { terminal: 'term_50fb', liveness: 'gone', errorCode: STALE });
   workerRequeued(db, FE, SETTLE + 9 * SEC, { terminal: 'term_e6bc', liveness: 'gone', errorCode: STALE });
   workerRequeued(db, FE, SETTLE + 13 * SEC, { terminal: 'term_f46b', liveness: 'gone', errorCode: STALE });
-  kernelCleared(db, 'wf-nivo-collab-group-chat-mujek7ue', Date.parse('2026-09-28T04:34:56Z'), 'terminal disconnected');
+  kernelCleared(db, 'wf-app-collab-group-chat-x', Date.parse('2026-09-28T04:34:56Z'), 'terminal disconnected');
   kernelCleared(db, FE, Date.parse('2026-09-28T04:35:31Z'), 'terminal disconnected');
 };
 
@@ -56,7 +56,7 @@ test('the first worker reconciled in a host wipe reads as the environment once t
   const worker = { terminal: 'term_c757', liveness: 'gone', errorCode: STALE };
   assert.equal(hostWideDisconnectOf(db, SETTLE, { repos: [] }), null, 'at its settle no other death was in the ledger (the live miss)');
   assert.deepEqual(hostEventAround(db, SETTLE, { repos: [] })?.sort(),
-    ['wf-nivo-collab-group-chat-mujek7ue', FE, 'wf-nivo-module-studio-mujek86a'].sort());
+    ['wf-app-collab-group-chat-x', FE, 'wf-app-module-studio-x'].sort());
   const cause = attemptCauseOf(db, settledNoReport(worker));
   assert.equal(cause.attributable, false, cause.detail);
   assert.equal(cause.cause, 'host-terminal-wipe-hindsight');
@@ -67,10 +67,10 @@ test('dead worker terminals are host evidence at settle time, one count per work
   const at = Date.parse('2026-09-28T04:20:00Z');
   workerRequeued(db, FE, at - 3 * MIN, { liveness: 'gone', errorCode: STALE });
   workerRequeued(db, FE, at - 2 * MIN, { liveness: 'gone', errorCode: STALE });
-  kernelCleared(db, 'wf-nivo-module-studio-mujek86a', at - 2 * MIN, STALE);
+  kernelCleared(db, 'wf-app-module-studio-x', at - 2 * MIN, STALE);
   assert.equal(hostWideDisconnectOf(db, at, { repos: [] }), null, 'four terminals of two workflows are not yet host-wide');
-  event(db, 'wf-nivo-app-auth-mujek72s', 'worker-failed-no-report', { liveness: 'disconnected' }, at - MIN, 'op-x');
-  assert.deepEqual(hostWideDisconnectOf(db, at, { repos: [] })?.sort(), [FE, 'wf-nivo-app-auth-mujek72s', 'wf-nivo-module-studio-mujek86a'].sort());
+  event(db, 'wf-app-auth-x', 'worker-failed-no-report', { liveness: 'disconnected' }, at - MIN, 'op-x');
+  assert.deepEqual(hostWideDisconnectOf(db, at, { repos: [] })?.sort(), [FE, 'wf-app-auth-x', 'wf-app-module-studio-x'].sort());
 });
 
 test('deaths no single window around the settle holds stay the pool\'s', (t) => {

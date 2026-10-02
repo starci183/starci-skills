@@ -16,8 +16,11 @@ const HANDLES_KEY = Symbol.for("@starci/test-world/setup-handles")
 /** The handles of the running setup, or null. */
 export const setupHandles = (): SetupHandles | null => ((globalThis as Record<symbol, unknown>)[HANDLES_KEY] as SetupHandles | undefined) ?? null
 
-/** The globalSetup. `projectConfig.rootDir` is the be side (the declaration lives under it); declared paths resolve from its app root (appRootOf). */
-export default async function globalSetup(_globalConfig?: unknown, projectConfig?: { readonly rootDir?: string }): Promise<void> {
+/**
+ * The globalSetup. `projectConfig.rootDir` is the be side (the declaration lives under it); declared paths resolve from its app
+ * root (appRootOf). `globalConfig.maxWorkers` sizes the run's data slots (one per jest worker, capped by the declaration's `workers`).
+ */
+export default async function globalSetup(globalConfig?: { readonly maxWorkers?: number }, projectConfig?: { readonly rootDir?: string }): Promise<void> {
     const root = projectConfig?.rootDir ?? process.cwd()
     registerTsPaths(root)
     const file = join(root, "src", "tests", "world", "test-world.config.ts")
@@ -31,5 +34,5 @@ export default async function globalSetup(_globalConfig?: unknown, projectConfig
     if (declaration === null) {
         throw worldError(TestWorldErrorCode.ConfigInvalid, `${file} did not call defineTestWorld(...) from @starci/test-world`)
     }
-    ;(globalThis as Record<symbol, unknown>)[HANDLES_KEY] = await setupWorld(declaration, root)
+    ;(globalThis as Record<symbol, unknown>)[HANDLES_KEY] = await setupWorld(declaration, root, globalConfig?.maxWorkers)
 }

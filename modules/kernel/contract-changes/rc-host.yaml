@@ -16,7 +16,7 @@ summary: >-
   --once. host:processes stops runaway guard-shim chains and orphan watchdog/start-workflow/serve-ask loops of an
   unlisted repo older than 30 min (ORPHAN_PROCESS), runs the footprint scan every 10 min and clocks
   TERMINAL_COUNT_DRIFT. ledger-health.mjs runs PRAGMA quick_check hourly (LEDGER_CORRUPT + DI) and a nightly VACUUM
-  INTO backup to D:/starci-archive/ledger-backups, keeping 7; restore stays manual and owner-approved. Lands in
+  INTO backup to <archive root>/ledger-backups, keeping 7; restore stays manual and owner-approved. Lands in
   shadow: nothing acts until config.yaml reconciler.controllers.host.mode is active.
 reach: new-legs
 paths:

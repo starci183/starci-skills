@@ -88,11 +88,6 @@ export function releaseOrcaSlot(pending, { env = process.env } = {}) {
   try { return withRegistry((m) => m.dropWorktree(pending), env); } catch { return false; }
 }
 
-/** The live registry row Orca knows by `orcaId`, or null. */
-export function orcaRowOf(orcaId, { env = process.env } = {}) {
-  try { return withRegistry((m) => m.db.prepare('SELECT * FROM worktrees WHERE orca_id=? AND removed_at IS NULL').get(orcaId) ?? null, env); } catch { return null; }
-}
-
 /* ------------------------------------------------------------ gc judgement */
 
 /**

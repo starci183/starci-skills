@@ -131,7 +131,7 @@ test('the unit project matches *.spec.ts only and never a file of src/tests/{wor
   const ignored = (file) => unit.testPathIgnorePatterns.some((pattern) => new RegExp(pattern).test(file));
   for (const folder of ['world', 'integration', 'e2e', 'contract']) {
     assert.equal(ignored(`/r/src/tests/${folder}/a/x.spec.ts`), true, folder);
-    assert.equal(ignored(`C:\\r\\src\\tests\\${folder}\\a\\x.spec.ts`), true, folder);
+    assert.equal(ignored(`${path.parse(withWorld).root}r\\src\\tests\\${folder}\\a\\x.spec.ts`), true, folder);
   }
   assert.equal(ignored('/r/src/features/x/y.spec.ts'), false);
   assert.equal(ignored('/r/src/tests/fixtures/database.spec.ts'), false);
@@ -541,23 +541,29 @@ const globalRef = global
 exports.TypeMetadataStorage = globalRef.GqlTypeMetadataStorage || (globalRef.GqlTypeMetadataStorage = new TypeMetadataStorageHost())
 exports.ObjectType = (name) => (target) => { exports.TypeMetadataStorage.add(name, target); return target }
 `;
-// Each file logs `start <label> <pid>` and, a little later, `end <label> <pid>` to timeline.log at the repository root, so a
-// spec can see whether two files ever ran at the same time and in which process.
+// Each file logs `start <label> <slot> <pid>` and, a little later, `end <label> <slot> <pid>` to timeline.log at the repository
+// root, so a spec can see which files ran at the same time, in which process and on which data slot.
 const E2E_SPEC = (label) => `const { ObjectType } = require("fake-graphql")
 const fs = require("fs")
-const log = (event) => fs.appendFileSync(require("path").join(process.cwd(), "timeline.log"), event + " ${label} " + process.pid + String.fromCharCode(10))
+const log = (event) => fs.appendFileSync(require("path").join(process.cwd(), "timeline.log"), event + " ${label} " + process.env.STARCI_TEST_WORLD_SLOT + " " + process.pid + String.fromCharCode(10))
 class Person {}
 ObjectType("Person")(Person)
 test("${label} boots with its own Person type", async () => {
   log("start")
-  await new Promise((resolve) => setTimeout(resolve, 400))
+  await new Promise((resolve) => setTimeout(resolve, 1500))
   expect(require("fake-graphql").TypeMetadataStorage.types.get("Person")).toBe(Person)
   log("end")
 })
 `;
 
-/** A repository with the preset's jest config, a world that loads the registry in the main process, and two e2e files. */
-function isolationRepo({ stockRunner }) {
+/** The state file @starci/test-world 1.1.x publishes (protocol 2), with `slots` data slots. */
+const worldState = (slots) => ({ version: 2, library: '@starci/test-world@1.1.0', runId: 'r', slots: Array.from({ length: slots }, (_, index) => ({ slot: index + 1 })) });
+
+/**
+ * A repository with the preset's jest config, a world that loads the registry in the main process and publishes `state` as
+ * its state file (as the test world's globalSetup does), and three e2e files.
+ */
+function isolationRepo({ stockRunner, state = worldState(2) }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-isolation-'));
   const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), text); };
   put('package.json', JSON.stringify({ name: 'isolation-fixture', private: true }));
@@ -572,7 +578,13 @@ for (const project of config.projects) {
 }
 module.exports = config
 `);
-  put('src/tests/world/global-setup.ts', 'module.exports = async () => { require("fake-graphql") }\n');
+  put('src/tests/world/global-setup.ts', `module.exports = async () => {
+  require("fake-graphql")
+  const file = require("path").join(process.cwd(), "world-state.json")
+  require("fs").writeFileSync(file, ${JSON.stringify(JSON.stringify(state))})
+  process.env.STARCI_TEST_WORLD_STATE = file
+}
+`);
   put('src/tests/world/global-teardown.ts', 'module.exports = async () => {}\n');
   put('apps/.keep', ''); // the preset's roots are src/ and apps/
   put('src/tests/e2e/people/first.e2e-spec.ts', E2E_SPEC('the first file'));
@@ -581,8 +593,8 @@ module.exports = config
   return root;
 }
 
-/** Runs the repository's jest (the preset's peer) on the e2e project and answers its JSON report. */
-function runE2e(root, extra) {
+/** Runs the repository's jest (the preset's peer) on the e2e project and answers its exit status and output. */
+function spawnE2e(root, extra) {
   const jestPackage = require.resolve('jest/package.json');
   const jestBin = path.join(path.dirname(jestPackage), 'bin', 'jest.js');
   const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), ...extra], {
@@ -592,12 +604,40 @@ function runE2e(root, extra) {
     env: { ...process.env, NODE_PATH: path.dirname(path.dirname(jestPackage)) },
     timeout: 240_000,
   });
-  const output = `${result.stdout}\n${result.stderr}${result.error ? `\n${result.error.message}` : ''}`;
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}${result.error ? `\n${result.error.message}` : ''}` };
+}
+
+/** Runs the repository's jest on the e2e project and answers its JSON report. */
+function runE2e(root, extra) {
+  fs.rmSync(path.join(root, 'report.json'), { force: true });
+  const { status, output } = spawnE2e(root, extra);
   assert.equal(fs.existsSync(path.join(root, 'report.json')), true, `jest wrote no report:\n${output}`);
-  return { status: result.status, report: JSON.parse(fs.readFileSync(path.join(root, 'report.json'), 'utf8')), output };
+  return { status, report: JSON.parse(fs.readFileSync(path.join(root, 'report.json'), 'utf8')), output };
 }
 
 const resultsOf = (report) => Object.fromEntries(report.testResults.map((file) => [path.basename(file.name), { status: file.status, message: file.message }]));
+
+/** The timeline the files logged: `{ event, label, slot, pid }` in the order they happened. */
+function timelineOf(root) {
+  return fs.readFileSync(path.join(root, 'timeline.log'), 'utf8').trim().split(/\r?\n/).map((line) => {
+    const words = line.split(' ');
+    return { event: words[0], label: words.slice(1, -2).join(' '), slot: words.at(-2), pid: words.at(-1) };
+  });
+}
+
+/** The largest number of files that ran at the same time, and every set of labels that overlapped with their slots. */
+function concurrencyOf(events) {
+  const running = new Map();
+  let widest = 0;
+  for (const entry of events) {
+    if (entry.event === 'start') {
+      for (const other of running.values()) assert.notEqual(other.slot, entry.slot, `${entry.label} started on slot ${entry.slot} while ${other.label} held it`);
+      running.set(entry.label, entry);
+      widest = Math.max(widest, running.size);
+    } else running.delete(entry.label);
+  }
+  return widest;
+}
 
 test('e2e isolation: in one preset run, three e2e files that each register a GraphQL type named Person all pass, even with --runInBand', () => {
   const root = isolationRepo({ stockRunner: false });
@@ -629,26 +669,50 @@ test('e2e isolation is the runner: on the stock in-band runner the same files co
   }
 });
 
-test('the world runner runs one file at a time, each in its own process, even when --maxWorkers allows more', () => {
-  const root = isolationRepo({ stockRunner: false });
+test('the world runner runs up to min(--maxWorkers, slots) files at once, each in its own process, never two on one slot', () => {
+  const root = isolationRepo({ stockRunner: false, state: worldState(2) });
   try {
-    for (const extra of [['--maxWorkers=3'], []]) {
+    for (const [extra, width] of [[['--maxWorkers=3'], 2], [['--maxWorkers=2'], 2], [['--maxWorkers=1'], 1], [['--runInBand'], 1]]) {
       fs.rmSync(path.join(root, 'timeline.log'), { force: true });
       const { status, output } = runE2e(root, extra);
       assert.equal(status, 0, output);
-      const events = fs.readFileSync(path.join(root, 'timeline.log'), 'utf8').trim().split(/\r?\n/).map((line) => {
-        const [event, ...rest] = line.split(' ');
-        return { event, label: rest.slice(0, -1).join(' '), pid: rest.at(-1) };
-      });
+      const events = timelineOf(root);
       assert.equal(events.length, 6, output);
-      // strictly start, end, start, end, ...: no file starts before the one before it ended
-      for (const [index, entry] of events.entries()) {
-        assert.equal(entry.event, index % 2 === 0 ? 'start' : 'end', `${extra.join(' ') || 'default'}: ${events.map((e) => `${e.event} ${e.label}`).join(', ')}`);
-        if (index % 2 === 1) assert.equal(entry.label, events[index - 1].label);
-      }
+      assert.equal(concurrencyOf(events), width, `${extra.join(' ')}: ${events.map((e) => `${e.event} ${e.label}@${e.slot}`).join(', ')}`);
+      for (const entry of events) assert.ok(['1', '2'].slice(0, width).includes(entry.slot), `${entry.label} ran on slot ${entry.slot}`);
       assert.equal(new Set(events.map((entry) => entry.pid)).size, 3, 'each file ran in a process of its own');
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the world runner widens with the slots the world provisioned: three slots run three files at once', () => {
+  const root = isolationRepo({ stockRunner: false, state: worldState(3) });
+  try {
+    const { status, output } = runE2e(root, ['--maxWorkers=3']);
+    assert.equal(status, 0, output);
+    const events = timelineOf(root);
+    assert.equal(concurrencyOf(events), 3, events.map((e) => `${e.event} ${e.label}@${e.slot}`).join(', '));
+    assert.deepEqual([...new Set(events.map((entry) => entry.slot))].sort(), ['1', '2', '3']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a state file of another test-world protocol is a typed pair mismatch naming both versions, never a fallback mode', () => {
+  for (const state of [{ version: 1, runId: 'r' }, { version: 3, library: '@starci/test-world@9.0.0', runId: 'r', slots: [{ slot: 1 }] }]) {
+    const root = isolationRepo({ stockRunner: false, state });
+    try {
+      const { status, output } = spawnE2e(root, ['--maxWorkers=2']);
+      assert.notEqual(status, 0, output);
+      assert.match(output, /JEST_PRESET_WORLD_PAIR_MISMATCH/);
+      assert.match(output, new RegExp(`@starci/jest-preset@${require('./package.json').version.replace(/\./g, '\\.')}`));
+      assert.match(output, state.library === undefined ? /@starci\/test-world before 1\.1\.0/ : /@starci\/test-world@9\.0\.0/);
+      assert.match(output, /canon-pins/);
+      assert.equal(fs.existsSync(path.join(root, 'timeline.log')), false, 'no file ran');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   }
 });

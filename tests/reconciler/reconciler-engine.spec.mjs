@@ -89,10 +89,10 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   t.after(() => st.close());
   const spawned = [], rows = [];
   const spawnChild = async (cmd, args, opts) => { spawned.push({ cmd, args, env: opts.env }); return { ok: true, code: 0, value: { ok: true } }; };
-  const ledgers = [{ ledgerId: 'nivo', repo: 'D:/Repositories/nivo-backend', file: 'none' }];
+  const ledgers = [{ ledgerId: 'todo-app-be', repo: 'todo-app-be', file: 'none' }];
   const shared = { statusCache: new Map(), wouldSeen: new Map() };
-  const shadow = createCtx({ controller: 'job', mode: 'shadow', key: 'job:nivo:j1', state: st.db, epoch: 3, ledgers, spawnChild, writeLog: (r) => rows.push(r), shared });
-  const r = await shadow.api('nivo', 'settle', ['--job', 'j1', '--verdict', 'pass']);
+  const shadow = createCtx({ controller: 'job', mode: 'shadow', key: 'job:todo-app-be:j1', state: st.db, epoch: 3, ledgers, spawnChild, writeLog: (r) => rows.push(r), shared });
+  const r = await shadow.api('todo-app-be', 'settle', ['--job', 'j1', '--verdict', 'pass']);
   assert.deepEqual(r, { ok: true, shadow: true });
   assert.equal(spawned.length, 0, 'shadow spawns no child');
   assert.equal(rows.length, 1);
@@ -100,7 +100,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.deepEqual(validateLogData('reconciler.would', rows[0].data), [], 'the row fits its typed-log kind');
   assert.equal(rows[0].data.controller, 'job');
   assert.match(rows[0].data.argv, /--job j1 --verdict pass --json/);
-  await shadow.api('nivo', 'settle', ['--job', 'j1', '--verdict', 'pass']);
+  await shadow.api('todo-app-be', 'settle', ['--job', 'j1', '--verdict', 'pass']);
   assert.equal(rows.length, 1, 'the same would-call is recorded once per window');
   const ran = await shadow.run('node', ['scripts/supervisor/gc.mjs', '--apply']);
   assert.equal(ran.shadow, true);
@@ -110,18 +110,18 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(shadow.owns('job.settle'), false);
 
   let current = true;
-  const active = createCtx({ controller: 'job', mode: 'active', key: 'job:nivo:j1', state: st.db, epoch: 3, ledgers, spawnChild, writeLog: (r2) => rows.push(r2), shared,
+  const active = createCtx({ controller: 'job', mode: 'active', key: 'job:todo-app-be:j1', state: st.db, epoch: 3, ledgers, spawnChild, writeLog: (r2) => rows.push(r2), shared,
     isCurrentEpoch: () => current, modes: { job: 'active' } });
-  const done = await active.api('nivo', 'settle', ['--job', 'j1']);
+  const done = await active.api('todo-app-be', 'settle', ['--job', 'j1']);
   assert.equal(done.ok, true);
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0].env.STARCI_ACTOR, 'reconciler/job');
   assert.equal(spawned[0].env.STARCI_RECONCILER_EPOCH, '3');
-  assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'D:/Repositories/nivo-backend']);
+  assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'todo-app-be']);
   const journal = st.db.db.prepare('SELECT state, epoch, verb FROM engine_actions ORDER BY started_at').all();
   assert.deepEqual(journal.map((a) => [a.state, a.epoch, a.verb]), [['done', 3, 'api settle']]);
   current = false;
-  const fenced = await active.api('nivo', 'settle', ['--job', 'j2']);
+  const fenced = await active.api('todo-app-be', 'settle', ['--job', 'j2']);
   assert.equal(fenced.fenced, true, 'a lost epoch runs nothing');
   assert.equal(spawned.length, 1);
   assert.equal(st.db.db.prepare("SELECT COUNT(*) AS n FROM engine_actions WHERE state='fenced'").get().n, 1, 'the fenced action is journaled as fenced');
@@ -133,13 +133,13 @@ test('ctx.clock / ctx.clear keep one open episode per (entity, state); re-enteri
   t.after(() => st.close());
   let clock = 1000;
   const ctx = createCtx({ controller: 'job', state: st.m, now: () => clock, writeLog: () => {} });
-  ctx.clock('job:j1', 'reported', 180000, { ledgerId: 'nivo' });
+  ctx.clock('job:j1', 'reported', 180000, { ledgerId: 'todo-app-be' });
   clock = 5000;
   ctx.clock('job:j1', 'reported', 180000);
   let rows = st.m.openSla();
   assert.equal(rows.length, 1);
   assert.equal(rows[0].entered_at, 1000, 'a clock already running keeps its start');
-  assert.equal(rows[0].ledger_id, 'nivo');
+  assert.equal(rows[0].ledger_id, 'todo-app-be');
   assert.equal(ctx.clear('job:j1', 'reported'), true);
   clock = 9000;
   ctx.clock('job:j1', 'reported', 180000);
@@ -156,8 +156,8 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
   const led = eventsLedger(st.dir);
   st.own(led);
   led.append('op-reported', 'op-old'); // before the engine: never replayed
-  const ledger = { ledgerId: 'nivo', repo: st.dir, file: led.file };
-  st.m.registerLedger({ ledgerId: led.ledgerId, name: 'nivo', repoRoot: st.dir, file: led.file }); // its cursor is engine_cursors[ledger_id]
+  const ledger = { ledgerId: 'todo-app-be', repo: st.dir, file: led.file };
+  st.m.registerLedger({ ledgerId: led.ledgerId, name: 'todo-app-be', repoRoot: st.dir, file: led.file }); // its cursor is engine_cursors[ledger_id]
   const first = pollLedger(st.db, ledger, { reader: fixtureReader });
   assert.equal(first.first, true);
   assert.equal(first.events.length, 0, 'no replay');
@@ -171,7 +171,7 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
     { name: 'fleet', routes: { 'land-*': () => 'fleet:land', 'op-reported': () => { throw Error('bad route'); } } },
   ];
   const routed = p.events.flatMap((ev) => routeEvent(ev, controllers));
-  assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:nivo:op-1'], ['fleet', 'fleet:land']]);
+  assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:todo-app-be:op-1'], ['fleet', 'fleet:land']]);
   assert.equal(pollLedger(st.db, ledger, { reader: fixtureReader }).events.length, 0, 'the cursor moved');
   assert.equal(st.m.cursorOf(led.ledgerId), 4, 'the cursor is keyed by the ledger id');
 
@@ -182,8 +182,8 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
     led.append('op-reported', 'op-9');
     e.pollSources();
     const q = st.m.db.prepare('SELECT controller, key, reason FROM engine_queue').all();
-    assert.deepEqual(q.map((r) => [r.controller, r.key]), [['job', 'job:nivo:op-9']]);
-    assert.match(q[0].reason, /^event:op-reported:nivo:\d+$/);
+    assert.deepEqual(q.map((r) => [r.controller, r.key]), [['job', 'job:todo-app-be:op-9']]);
+    assert.match(q[0].reason, /^event:op-reported:todo-app-be:\d+$/);
   });
 });
 
@@ -308,7 +308,7 @@ test('events carry their parsed payload; ctx.log keeps the known kinds and files
   t.after(() => st.close());
   const led = eventsLedger(st.dir);
   st.own(led);
-  const ledger = { ledgerId: 'nivo', repo: st.dir, file: led.file };
+  const ledger = { ledgerId: 'todo-app-be', repo: st.dir, file: led.file };
   pollLedger(st.db, ledger, { reader: fixtureReader });
   led.append('worker-released-on-report', 'op-7');
   const [ev] = pollLedger(st.db, ledger, { reader: fixtureReader }).events;
@@ -331,7 +331,7 @@ test('a failed action is classified by exit and JSON ok, never by stderr; result
   const answers = [
     { ok: true, code: 0, value: { ok: true }, stderr: warn },
     { ok: false, code: 1, value: null, stderr: `${warn}file:///x/api.mjs:1\r\n  x\r\n  ^\r\n\r\nReferenceError: staleInputProjection is not defined\r\n    at file:///x` },
-    { ok: false, code: 1, value: [{ repo: 'D:/Repositories/nivo-backend', pushed: false, scan: { ok: false, findings: [1, 2] } }], stderr: '' },
+    { ok: false, code: 1, value: [{ repo: 'todo-app-be', pushed: false, scan: { ok: false, findings: [1, 2] } }], stderr: '' },
   ];
   let envSeen = null;
   const ctx = createCtx({ controller: 'host', mode: 'active', state: st.db, ledgers: [], writeLog: () => {},
@@ -341,7 +341,7 @@ test('a failed action is classified by exit and JSON ok, never by stderr; result
   const rows = st.m.db.prepare('SELECT state, result_json, result_sha, stderr_sha FROM engine_actions ORDER BY rowid').all();
   assert.deepEqual(rows.map((r) => r.state), ['done', 'failed', 'failed'], 'a warning on stderr is no failure');
   const errs = rows.map((r) => JSON.parse(r.result_json).error ?? null);
-  assert.deepEqual(errs, [null, 'ReferenceError: staleInputProjection is not defined', 'nivo-backend: push scan: 2 finding(s)']);
+  assert.deepEqual(errs, [null, 'ReferenceError: staleInputProjection is not defined', 'todo-app-be: push scan: 2 finding(s)']);
   assert.ok(rows.every((r) => r.result_sha), 'the full result is a blob (MB-03)');
   assert.ok(rows[1].stderr_sha, 'the full stderr is a blob');
 });

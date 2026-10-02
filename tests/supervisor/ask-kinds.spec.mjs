@@ -13,12 +13,13 @@ import { askKeyOf, notifyAsk } from '../../scripts/connectors/telegram.mjs';
 import { bridgeAskRepos, bridgeText, createBridge } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { collectProgress, progressMessages } from '../../scripts/supervisor/progress-report.mjs';
 import { stallFindings } from '../../scripts/supervisor/stall.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
-// Owner, 2026-09-25: "có 2 loại asks: ask for creds: không block tuyến chính, chỉ uat; ask for approval:
-// hỏi gấp. không gộp 2 cái vào 1". A credential ask holds only the live proof and is never pushed; an
+// Owner, 2026-09-25: "there are 2 ask kinds: ask for creds does not block the main line, uat only; ask
+// for approval asks urgently. never merge the two into one". A credential ask holds only the live proof and is never pushed; an
 // approval ask is pushed at once; the two never share a list or a message.
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -29,20 +30,20 @@ const EXAMPLE = parseYaml(fs.readFileSync(path.join(ROOT, 'config.example.yaml')
 const json = (v) => JSON.stringify(v ?? null);
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 
-const VNPAY = { text: 'Để bật thanh toán VNPAY sandbox, nhập Hash Secret vào ô vnpay-hash-secret.key và mã người bán vào VNPAY_TMN_CODE.', options: [] };
-const PRICING = { text: 'Chốt giá gói Pro?', options: ['99.000đ/tháng', '199.000đ/tháng'] };
-const HANDOVER = { text: 'Duyệt bàn giao? Stack dùng postgres-password.key, redis-password.key và KEYCLOAK_ADMIN_PASSWORD.', options: ['Duyệt', 'Góp ý'] };
+const VNPAY = { text: '\u0110\u1ec3 b\u1eadt thanh to\u00e1n VNPAY sandbox, nh\u1eadp Hash Secret v\u00e0o \u00f4 vnpay-hash-secret.key v\u00e0 m\u00e3 ng\u01b0\u1eddi b\u00e1n v\u00e0o VNPAY_TMN_CODE.', options: [] };
+const PRICING = { text: 'Ch\u1ed1t gi\u00e1 g\u00f3i Pro?', options: ['99.000\u0111/th\u00e1ng', '199.000\u0111/th\u00e1ng'] };
+const HANDOVER = { text: 'Duy\u1ec7t b\u00e0n giao? Stack d\u00f9ng postgres-password.key, redis-password.key v\u00e0 KEYCLOAK_ADMIN_PASSWORD.', options: ['Duy\u1ec7t', 'G\u00f3p \u00fd'] };
 
 test('askClassOf: handover, draw review, options and declared decision kinds are approval; secret fields with no options or a credential kind are credential', () => {
   assert.equal(askClassOf({ opId: 'provision.ask', question: VNPAY }), 'credential', 'the VNPAY ask: custody file and env var, no options');
   assert.equal(askClassOf({ opId: 'handover.review', question: { ...HANDOVER, options: [] } }), 'approval', 'a handover naming custody files is still an approval');
-  assert.equal(askClassOf({ opId: 'interface.draw', question: { kind: 'draw-review', text: 'Nhận bản vẽ? STRIPE_SECRET_KEY' } }), 'approval');
+  assert.equal(askClassOf({ opId: 'interface.draw', question: { kind: 'draw-review', text: 'Nh\u1eadn b\u1ea3n v\u1ebd? STRIPE_SECRET_KEY' } }), 'approval');
   assert.equal(askClassOf({ opId: 'business.decide', question: PRICING }), 'approval');
-  assert.equal(askClassOf({ opId: 'business.decide', question: { text: 'Dùng REDIS_URL cũ hay tạo mới?', options: ['Cũ', 'Mới'] } }), 'approval', 'options make it a decision');
-  assert.equal(askClassOf({ opId: 'provision.ask', question: { kind: 'credential', text: 'Mã MoMo', options: ['Có', 'Chưa có'] } }), 'credential', 'a declared credential kind wins');
+  assert.equal(askClassOf({ opId: 'business.decide', question: { text: 'D\u00f9ng REDIS_URL c\u0169 hay t\u1ea1o m\u1edbi?', options: ['C\u0169', 'M\u1edbi'] } }), 'approval', 'options make it a decision');
+  assert.equal(askClassOf({ opId: 'provision.ask', question: { kind: 'credential', text: 'M\u00e3 MoMo', options: ['C\u00f3', 'Ch\u01b0a c\u00f3'] } }), 'credential', 'a declared credential kind wins');
   for (const kind of ['account', 'access', 'consent']) assert.equal(askClassOf({ question: { kind, text: 'x' } }), 'credential', kind);
   assert.equal(askClassOf({ opId: 'provision.ask', question: { kind: 'business-decision', text: 'MOMO_PARTNER_CODE?' } }), 'approval', 'a declared decision kind is an approval');
-  assert.equal(askClassOf({ opId: 'provision.ask', question: { text: 'Tên miền nào?', options: [] } }), 'approval', 'nothing secret: an approval');
+  assert.equal(askClassOf({ opId: 'provision.ask', question: { text: 'T\u00ean mi\u1ec1n n\u00e0o?', options: [] } }), 'approval', 'nothing secret: an approval');
   assert.equal(askClassOf({ question: { text: 'x', picks: [{ id: 'p', choices: ['A', 'B'] }] } }), 'approval');
   assert.equal(askClassOf({}), 'approval', 'an ask with no question is never hidden');
   assert.deepEqual(['integration.verify', 'e2e.verify', 'uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify'].map(isLiveProofOp), [true, true, true, true, true]);
@@ -82,7 +83,7 @@ test('parkAsk pushes an approval ask at once and only lists a credential ask (as
     const approval = await parkAsk({ ledger, ledgerFile, repo: repoRoot, workflowId: 'wf-pay', report: report('ctx_price'), notify, close: async () => null });
     assert.deepEqual([approval.notified, approval.askClass], [true, 'approval']);
     assert.equal(bot.sends().length, 1, 'an approval ask is pushed at once');
-    assert.match(bot.sends()[0].body.text, /Chốt giá gói Pro\?/);
+    assert.ok(bot.sends()[0].body.text.includes(PRICING.text));
     const notified = ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id='wf-pay' AND kind='ask-notified' ORDER BY seq").all().map((r) => JSON.parse(r.payload_json));
     assert.deepEqual(notified.map((p) => [p.dispatchId, p.via, p.askClass, p.messageId]),
       [['ctx_vnpay', 'creds', 'credential', null], ['ctx_price', 'telegram', 'approval', approval.telegram.messageId]]);
@@ -166,29 +167,30 @@ const bridgeFor = (t, bot, env, extra) => createBridge({
   settings: () => ({ ready: true, token: TOKEN, chatId: String(OWNER), language: 'vi' }), ...extra,
 });
 const vi = bridgeText('vi');
+const trv = translator('vi');
 const WF = 'wf-ask';
 
 test('/asks lists approval asks only, including one from a supervisor.repos repo outside the connector list; credential asks are one hint line', async (t) => {
   const bot = await botServer(t);
   await withLedger(t, async ({ ledger, repoRoot, machineHome }) => {
     seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_vnpay', question: VNPAY });
-    seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_momo', question: { text: 'Nhập momo-secret-key.key và MOMO_PARTNER_CODE', options: [] } });
-    // The mia handover lives in a product repo the connectors never listed: config supervisor.repos names it.
-    const mia = path.join(tmp(t, 'starci-askkinds-mia-'), 'mia-mia-backend');
-    fs.mkdirSync(path.join(mia, '.starciwork'), { recursive: true });
-    const miaLedger = openLedger({ file: ledgerFileFor(mia) });
-    try { seedAsk(miaLedger, { workflowId: 'wf-miamia-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { miaLedger.close(); }
+    seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_momo', question: { text: 'Nh\u1eadp momo-secret-key.key v\u00e0 MOMO_PARTNER_CODE', options: [] } });
+    // The second handover lives in a product repo the connectors never listed: config supervisor.repos names it.
+    const other = path.join(tmp(t, 'starci-askkinds-other-'), 'todo-app-be');
+    fs.mkdirSync(path.join(other, '.starciwork'), { recursive: true });
+    const otherLedger = openLedger({ file: ledgerFileFor(other) });
+    try { seedAsk(otherLedger, { workflowId: 'wf-todo-app-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { otherLedger.close(); }
     const env = { LOCALAPPDATA: machineHome };
-    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, secretsFile: null, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [mia] } };
+    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, secretsFile: null, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [other] } };
     const repos = bridgeAskRepos({ env, config });
-    assert.ok(repos.includes(repoRoot) && repos.includes(mia), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
+    assert.ok(repos.includes(repoRoot) && repos.includes(other), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
     const bridge = bridgeFor(t, bot, env, { repos: () => bridgeAskRepos({ env, config }) });
     await bridge.handleUpdate(message('/asks'));
     const [head, ...listed] = bot.of('sendMessage');
     assert.equal(head.text, `${vi.asksHead(1)}\n${vi.credsHint(2)}`, 'one approval ask, and the credential asks only as a count');
     assert.equal(listed.length, 1);
-    assert.match(listed[0].text, /Duyệt bàn giao\?/);
-    assert.equal(listed[0].reply_markup.inline_keyboard[0][0].callback_data, `ask:${askKeyOf('wf-miamia-work-and-stacks', 'ctx_handover')}`);
+    assert.match(listed[0].text, /Duy\u1ec7t b\u00e0n giao\?/);
+    assert.equal(listed[0].reply_markup.inline_keyboard[0][0].callback_data, `ask:${askKeyOf('wf-todo-app-work-and-stacks', 'ctx_handover')}`);
     assert.ok(!bot.of('sendMessage').some((m) => /VNPAY|MoMo|momo/.test(m.text)), 'no credential ask is listed by /asks');
     assert.match(vi.help, /\/creds/);
     assert.match(bridgeText('en').help, /\/creds/);
@@ -199,7 +201,7 @@ test('/creds batches every credential ask into ONE message with one button each;
   const bot = await botServer(t);
   await withLedger(t, async ({ ledger, repoRoot, machineHome }) => {
     seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_vnpay', question: VNPAY });
-    seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_momo', question: { text: 'Nhập momo-secret-key.key và MOMO_PARTNER_CODE', options: [] } });
+    seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_momo', question: { text: 'Nh\u1eadp momo-secret-key.key v\u00e0 MOMO_PARTNER_CODE', options: [] } });
     seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_price', opId: 'business.decide', question: PRICING });
     const url = 'http://127.0.0.1:6970/a-00112233445566778899';
     const spawnServe = ({ dispatchId }) => {
@@ -213,7 +215,7 @@ test('/creds batches every credential ask into ONE message with one button each;
     assert.equal(sent.length, 1, 'one message for every credential ask');
     assert.match(sent[0].text, new RegExp(`^${vi.credsHead(2).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
     assert.match(sent[0].text, /VNPAY/); assert.match(sent[0].text, /momo-secret-key\.key/);
-    assert.doesNotMatch(sent[0].text, /Chốt giá gói Pro/, 'an approval ask is never in the credential list');
+    assert.ok(!sent[0].text.includes(PRICING.text.split('?')[0]), 'an approval ask is never in the credential list');
     const buttons = sent[0].reply_markup.inline_keyboard.map((row) => row[0].callback_data);
     assert.deepEqual(buttons.sort(), ['ctx_vnpay', 'ctx_momo'].map((d) => `cred:${askKeyOf(WF, d)}`).sort());
     await bridge.handleUpdate(callback(`cred:${askKeyOf(WF, 'ctx_vnpay')}`, 600));
@@ -247,8 +249,8 @@ test('/status lists approval asks and counts credential asks in one /creds line'
   seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_vnpay', question: VNPAY });
   seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_price', opId: 'business.decide', question: PRICING });
   const text = progressMessages(collectProgress([repoRoot], { config: {} })).join('\n');
-  assert.match(text, /❓ 1 câu hỏi đang chờ thầy trả lời/);
-  assert.match(text, /🔑 1 yêu cầu credential đang chờ, không chặn việc chính: \/creds/);
-  assert.match(text, /Chốt giá gói Pro/);
+  assert.ok(text.includes(trv('❓ {count} question(s) waiting on you (/asks sends each with a link button)', { count: 1 })));
+  assert.ok(text.includes(trv('🔑 {count} credential request(s) waiting, not blocking the main work: /creds', { count: 1 })));
+  assert.ok(text.includes(PRICING.text));
   assert.doesNotMatch(text, /VNPAY/, 'a credential ask is never listed in the report');
 }));

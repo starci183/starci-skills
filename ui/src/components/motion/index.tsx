@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig, animate, motion, useInView, useReducedMotion } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
 import type { Concept } from '../concept';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'frame';
 
@@ -40,10 +41,10 @@ export function Lift({ children, className, onClick }: { children: ReactNode; cl
 }
 
 /**
- * "Nâng cao": secondary/technical details, collapsed by default. Nothing is removed, only demoted.
+ * "Advanced": secondary/technical details, collapsed by default. Nothing is removed, only demoted.
  * `summary` is a one-line hint of what is inside; height animates open/closed.
  */
-export function Advanced({ children, summary, title = 'Nâng cao', defaultOpen = false, className = '', variant = 'inline' }: {
+export function Advanced({ children, summary, title = t('Advanced'), defaultOpen = false, className = '', variant = 'inline' }: {
   children: ReactNode; summary?: ReactNode; title?: ReactNode; defaultOpen?: boolean; className?: string; variant?: 'inline' | 'card';
 }) {
   const [open, setOpen] = useState(defaultOpen);

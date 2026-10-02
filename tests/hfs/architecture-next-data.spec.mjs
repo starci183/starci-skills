@@ -38,7 +38,7 @@ function lifecycleContract(overrides = {}) {
 }
 
 function fixture(t, { source, contract = lifecycleContract(), extra = {}, version = '2.3.8' } = {}) {
-  const root = tempSide(t, 'starci-next-data-', 'fe');
+  const root = tempSide(t, 'starci-app-data-', 'fe');
   const manifest = {
     private: true,
     dependencies: { swr: `^${version}` },
@@ -235,7 +235,7 @@ test('tracks value identity on every active path and rejects mutable or overwrit
 test('rejects source declarations below a symbolic-link or junction ancestor', t => {
   const root = fixture(t);
   const original = path.join(root, 'src', 'features', 'course');
-  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-data-external-'));
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-app-data-external-'));
   t.after(() => fs.rmSync(external, { recursive: true, force: true }));
   fs.cpSync(original, external, { recursive: true });
   fs.rmSync(original, { recursive: true, force: true });

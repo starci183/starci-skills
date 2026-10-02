@@ -126,9 +126,9 @@ async function orcaDeps() {
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 
 /**
- * What the seat's worker proves: {live, dead, hostUnavailable, legacy, reason, terminal, dispatch}. Liveness is
- * worker-show on the seat's Dispatch. A seat with a terminal and no Dispatch was launched by terminal create before
- * every launch went through worker-start: dead (legacy), retired by the next launch.
+ * What the seat's worker proves: {live, dead, hostUnavailable, reason, terminal, dispatch}. Liveness is
+ * worker-show on the seat's Dispatch. A seat with a terminal and no Dispatch is not a worker-start worker: dead,
+ * replaced by the next launch.
  */
 export function seatHealth(seat, deps) {
   if (!seat) return { live: false, dead: true, reason: 'no seat', terminal: null };
@@ -137,7 +137,7 @@ export function seatHealth(seat, deps) {
   const dispatch = seat.value?.dispatch ?? null;
   if (!dispatch) {
     if (!terminal) return { live: false, dead: true, reason: seat.expired ? 'startup reservation expired' : 'seat has no worker', terminal: null };
-    return { live: false, dead: true, legacy: true, reason: 'terminal-launched seat: every Supervisor is now a worker-start worker', terminal };
+    return { live: false, dead: true, reason: 'seat has no worker', terminal };
   }
   let shown;
   try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
@@ -240,7 +240,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     const at = now();
     const attempt = (seat?.value?.attempt ?? 0) + 1;
     const previous = seat?.value?.terminal || seat?.value?.dispatch
-      ? { terminal: seat.value.terminal ?? null, dispatch: seat.value.dispatch ?? null, reason: health.reason, ...(health.legacy ? { legacy: true } : {}) } : null;
+      ? { terminal: seat.value.terminal ?? null, dispatch: seat.value.dispatch ?? null, reason: health.reason } : null;
 
     // Reserve the seat: a concurrent launcher that got past the lock (a stale lock) still meets this row.
     const reserved = m.transaction(() => {
@@ -251,7 +251,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     });
     if (!reserved) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
 
-    // The previous seat: its Dispatch is fenced and released; a terminal-launched seat's terminal is closed.
+    // The previous seat: its Dispatch is fenced and released; a seat with only a terminal has that terminal closed.
     const closedPrevious = [];
     if (previous?.dispatch) closedPrevious.push({ dispatch: previous.dispatch, stop: bestEffort(() => d.stop(previous.dispatch)), release: bestEffort(() => d.release(previous.dispatch)) });
     else if (previous?.terminal) closedPrevious.push({ handle: previous.terminal, ...(bestEffort(() => d.close(previous.terminal)) ?? {}) });
@@ -264,7 +264,8 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     });
     const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
       specFile: path.join(starciLocalRoot(), 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
-      entry, priorRunId: seat?.value?.runId ?? null });
+      entry, priorRunId: seat?.value?.runId ?? null,
+      request: { seat: SUPERVISOR_ID, attempt, token } });
     if (!spawned?.ok) {
       m.transaction(() => {
         clearSeat(m, { token });

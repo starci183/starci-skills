@@ -65,7 +65,7 @@ const ORNAMENT = /[✅❌✔✖✗✘⭐⬆⬇➡⬅]/
 const FIXTURE_SLOTS = new Set(["be.tests.fixtures.i18n"])
 
 /** The Vietnamese language's own name, which is a label rather than prose. */
-const ENDONYM = /Tiếng Việt/
+const ENDONYM = /Ti\u1ebfng Vi\u1ec7t/
 
 /** Declarations whose surface other files depend on. */
 const DOCUMENTED_KINDS = new Set([

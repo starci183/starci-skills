@@ -85,7 +85,7 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const E = () => <p>Nothing to show yet</p>", errors: [{ messageId: "text" }] },
       { filename: BLOCK, code: "const E = () => <button>Save</button>", errors: [{ messageId: "text" }] },
       { filename: BLOCK, code: "const E = () => <p>{\"Loading\"}</p>", errors: [{ messageId: "text" }] },
-      { filename: BLOCK, code: "const E = () => <p>Tiếp tục học</p>", errors: [{ messageId: "text" }] },
+      { filename: BLOCK, code: "const E = () => <p>Ti\u1ebfp t\u1ee5c h\u1ecdc</p>", errors: [{ messageId: "text" }] },
       {
         filename: LEAF,
         code: "const E = () => <input placeholder=\"Search courses\" />",

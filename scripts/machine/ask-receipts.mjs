@@ -13,7 +13,6 @@ import { recordDecision } from '../../engine/db/ledger.mjs';
 import { artifactRoot, blobPath } from '../../engine/db/blob.mjs';
 import { stageBlob, putArtifact } from './evidence-store.mjs';
 
-export const ASK_ANSWER_SCHEMA = 'starci/ask-answer@1';
 export const RECEIPT_PREFIX = 'asks/';
 export const receiptNameOf = (dispatchId, at) => `${RECEIPT_PREFIX}${dispatchId}/answer-${at}.json`;
 const BLOB_REF = /^blob:([a-f0-9]{64})$/;

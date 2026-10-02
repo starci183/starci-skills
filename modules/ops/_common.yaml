@@ -15,6 +15,14 @@ sections:
       - "owner_language: everything a person reads as a log - terminal narration and progress lines,
         orchestration message subjects and bodies (worker_done, status, ask), report summary and
         notes, incident details, owner asks and the handover package."
+  - title: Evidence is portable - no host path in anything you file
+    blocks:
+      - "Every evidence file, draw prompt (.prompt.txt), visual review (visual-review.md), assets JSON and recorded command
+        you file under .starciwork is written with repo-relative paths. A path outside the repository is written as a
+        placeholder: <worktree>, <runtime>, <tmp> or <home>; a command is recorded as the command line you wrote
+        (bash -c ..., never the host path of its shell). api settle refuses a pass (EVIDENCE_HOST_PATH) while any of
+        those files holds a drive path, a user-profile path or an expanded AppData path, and names the file and line; rewrite
+        the file and settle again. scripts/lib/host-path.mjs normalizeHostPaths does the rewrite."
   - title: Product UI copy follows the shell record's productLocale (default - the brand record's voice.locales default), not owner_language
     blocks:
       - "Product UI copy - every label, heading, button, message, empty state and sample datum a product
@@ -111,7 +119,10 @@ sections:
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a
-        reply - nothing answers those channels and nothing records what they say."
+        reply - nothing answers those channels and nothing records what they say. An operation never
+        sends worker_done itself: api report, from the operation's own pane, sends exactly one after the
+        report row committed (succeeded for done/partial, failed for failed/blocked, none for ask), so
+        Orca settles the operation's Task and Dispatch and settle only releases the worker."
       - Every selected workflow finishes through the kernel's gate/finish contract
         (modules/kernel/api.yaml `finish`), and that gate requires the owner's approval of the
         workflow's handover (modules/ops/ops/handover.review.yaml), the last leg of every chain. Missing .starciwork routes to
@@ -344,7 +355,7 @@ sections:
         ledger — goals/jobs/inbox/reports/contracts/checks ROWS transacted through `api` verbs.
         An operation never opens, queries or copies that file: it reads its contract with `api
         op-contract` and files `api report` for its own job, and the api refuses every kernel verb
-        from an op terminal (modules/kernel/api.yaml conventions.callerBoundary, inc-360891316369).
+        from an op terminal (modules/kernel/api.yaml conventions.callerBoundary).
         Messages between workflows (`api peers`, `notify`, `inbox`) are kernel verbs too: work
         that belongs to another workflow is named in the op's report, and the kernel routes it.
         An operation's produced
@@ -416,7 +427,7 @@ sections:
         (checkpointOp), so a commit of your own is never your delivery; inspect your diff, run the
         applicable checks and report the changed paths and the tree you tested. History is never yours
         to move (main of a product repo, which peer workflows land on, included): never `git reset`, rebase, amend, drop or
-        force it - a Collab op ran `git reset HEAD~1` on nivo-backend main and silently removed its
+        force it - a Collab op ran `git reset HEAD~1` on a product repository's main and silently removed its
         own filed-report commit while three peer workflows were committing there. In a product workflow you work in the workflow's one worktree on wf-<workflowId>,
         never on main: the runtime commits each green op's checkpoint there, preserves a failed or blocked op's work to
         preserved/<workflowId>/<op> and resets the tree to the last checkpoint, and only the workflow's finish moves main;
@@ -430,9 +441,9 @@ sections:
         so on stderr; while it says a git process may still hold it, retry the git command shortly,
         and report blocked environment only if it persists. Never create a git worktree, a junction, a symlink or a hard link, anywhere:
         work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A worker's private
-        worktree beside nivo-fe with node_modules junctions into the live checkout was removed with
-        `git worktree remove --force`, which followed the junctions and deleted 674 live files
-        (inc-c8fbf76aa499); a need for another revision, a clean build tree or a linked dependency is
+        worktree beside a product front end with node_modules junctions into the live checkout was removed with
+        `git worktree remove --force`, which followed the junctions and deleted 674 live files;
+        a need for another revision, a clean build tree or a linked dependency is
         reported (blocked environment), never made. Never kill processes by image name or pattern
         (`taskkill /IM` or `/FI`, `pkill`, `killall`, `Stop-Process -Name`, `wmic process where name=...`): the
         machine is shared with Orca and every other agent, and a lane's `taskkill` of node.exe restarted Orca
@@ -541,8 +552,8 @@ sections:
         declaration names, which resolves or mints the project and its token from the source stack
         custody. No op asks the owner for a SONAR_TOKEN, a Sonar host or
         a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
-      - "Open items are unfinished work, never notes about the environment or another leg
-        (inc-00026c808d40). `partial` is a retry: the kernel settles it fail and dispatches this op
+      - "Open items are unfinished work, never notes about the environment or another leg.
+        `partial` is a retry: the kernel settles it fail and dispatches this op
         again, so `open[]` names only work inside this op's own grant that another attempt of this
         op can finish. These are never open items and never turn `done` into `partial` once every
         check this op's brief requires ran green; they are recorded as checks with their evidence

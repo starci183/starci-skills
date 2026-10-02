@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-// Owner ruling 2026-09-23: "ghi code tiếng anh còn log là tiếng theo config.yaml",
+// Owner ruling 2026-09-23: "write code in English, logs in the config.yaml language",
 // for ops and kernels alike. Kernels narrated in English while config.yaml said vi.
 const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 

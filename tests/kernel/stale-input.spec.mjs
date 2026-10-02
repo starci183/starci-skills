@@ -214,7 +214,7 @@ test('Work: the job\'s own writes and its workflow\'s later legs are progress, n
     ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-draw'").run(JSON.stringify({opId:'interface.draw',owned_paths:['src/elsewhere/']}));
     ledger.db.prepare("UPDATE jobs SET status='cancelled',updated_at=0 WHERE job_id='job-audit'").run();
   });
-  // starci-next inc-1c7f7dad53e0: the record's one owner is wf-peer (its job owns it); its change is
+  // The record's one owner is wf-peer (its job owns it); its change is
   // judged against the revision the draw read and is advisory until wf-peer declares it breaking.
   const drift=status(fx);
   assert.deepEqual(drift.staleInput,[],'a peer workflow owning the record rewrote it: never staleInput, never a redo');
@@ -255,13 +255,13 @@ test('a finished workflow reports no stale input',t=>{
   assert.deepEqual(survey(fx).staleInput,[]);
 });
 
-/* ------------------------------ the churn the live ledgers hit on 2026-09-24 */
+/* ------------------------------ the churn the live ledgers hit */
 
-// nivo inc-fd7bd0b0ecff / inc-89de324ac72a / inc-f18e11d1f44d: knowledge/application-stacks.yaml
-// (16:52) and knowledge/repository-baseline.yaml (16:38, 16:52, 17:09) were edited under dozens of
+// knowledge/application-stacks.yaml
+// and knowledge/repository-baseline.yaml were edited under dozens of
 // settled legs of four workflows; `api status` listed every one in staleInput, the Kernels redid the
-// seams, and each further edit re-staled the redo. mia inc-914266179f5c: the same through a cut set
-// (base-repos 8 slices, seam first). The fix: Source edits are judged against admission.
+// seams, and each further edit re-staled the redo. The same happened through a cut set
+// (8 slices, seam first). The fix: Source edits are judged against admission.
 const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/repository-baseline.yaml';
 const T_ADMIT=Date.parse('2026-09-24T16:00:00+07:00');
 const churnRegistry=(t,{followUp=false}={})=>{
@@ -276,7 +276,7 @@ const churnRegistry=(t,{followUp=false}={})=>{
   return file;
 };
 
-test('nivo churn: repeated knowledge edits under many settled legs stale none of them; each is advisory drift naming its registered change',t=>{
+test('churn: repeated knowledge edits under many settled legs stale none of them; each is advisory drift naming its registered change',t=>{
   const fx=fixture(t,{registry:churnRegistry(t)});
   fx.write(STACKS,'stacks: v1\n');fx.write(BASELINE,'baseline: v1\n');fx.write('knowledge/unrelated.yaml','x: 1\n');
   const legs=[['interface.draw',8],['backend.implement',5]];

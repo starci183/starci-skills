@@ -6,8 +6,7 @@ import { reconcileWorkflow, keyOf } from '../../scripts/reconciler/controllers/w
 import { stallFindings } from '../../scripts/supervisor/stall.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 
-// False progress-stall escalations on 'status unreadable' (job fix-workflow-stall-unreadable-e35c78; sdi-94355e8e
-// module-studio, sdi-76a8404d workspace-provision, sdi-2f13ab61 collab): "STALLED <wf> idle 61m: frontier unreadable
+// False progress-stall escalations on 'status unreadable': "STALLED <wf> idle 61m: frontier unreadable
 // (status unreadable); last progress op-dispatched ...". A read of api status minutes later answered in 3-5 s with the
 // frontier engaged and an interface.draw op RUNNING since that op-dispatched. An unreadable status is no evidence of a
 // stall: the controller holds the last readable status and retries, and only statusUnreadablePasses consecutive misses
@@ -16,7 +15,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-module-studio-mudqjp5g';
-const LEDGER = 'nivo-backend';
+const LEDGER = 'todo-app-be';
 const DRAW = 'op-interface.draw-94355e8e00';
 const ERROR = 'status unreadable';
 

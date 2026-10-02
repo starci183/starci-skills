@@ -28,7 +28,7 @@ const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding
 const runSettler=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
   env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',STARCI_CALLER:'runtime-settler'}});
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const open=r.stdout.indexOf('{'),close=r.stdout.indexOf('\n}');return open<0||close<0?null:JSON.parse(r.stdout.slice(open,close+2));}};
-const OPTIONS=['Duyệt - workflow hoàn tất','Góp ý / báo lỗi - mô tả trong ghi chú','Đặt câu hỏi - ghi trong ghi chú'];
+const OPTIONS=['Duy\u1ec7t - workflow ho\u00e0n t\u1ea5t','G\u00f3p \u00fd / b\u00e1o l\u1ed7i - m\u00f4 t\u1ea3 trong ghi ch\u00fa','\u0110\u1eb7t c\u00e2u h\u1ecfi - ghi trong ghi ch\u00fa'];
 
 const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handover-'));
@@ -96,7 +96,7 @@ const status=(repo,wf)=>{const r=run('status','--repo',repo,'--workflow',wf,'--j
 const handOver=(repo,wf,{attempt,dispatchId})=>{
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',
-    writeReport(scratch,`ask-${attempt}.json`,{outcome:'ask',question:{text:'Bàn giao: ứng dụng đã xong.',options:OPTIONS}}),'--json');
+    writeReport(scratch,`ask-${attempt}.json`,{outcome:'ask',question:{text:'B\u00e0n giao: \u1ee9ng d\u1ee5ng \u0111\u00e3 xong.',options:OPTIONS}}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
   const settled=run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','blocked','--json');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
@@ -152,7 +152,7 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
 test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',t=>{
   assert.equal(handoverAskProblem({text:'x',options:OPTIONS}),null);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS.slice(0,2)}),/exactly 3 options/);
-  assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Khác']}),/exactly 3 options/);
+  assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Kh\u00e1c']}),/exactly 3 options/);
   assert.match(handoverAskProblem({text:'x',options:[OPTIONS[0],OPTIONS[0],OPTIONS[2]]}),/distinct/);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS,picks:[{id:'p',choices:['a','b']}]}),/no picks/);
   assert.equal(decisionOf({optionIndex:0},{options:OPTIONS}),'approve');
@@ -162,12 +162,12 @@ test('a handover ask carries exactly the three options approve, feedback, questi
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:'job-ho-1',op:HANDOVER_OP,unitKey:'ho',dispatchId:'ho-d1'}));
-  const two=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS.slice(0,2)}}),'--json');
+  const two=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS.slice(0,2)}}),'--json');
   assert.notEqual(two.status,0,'a two-option handover ask is refused');
   assert.match(two.stderr,/report-invalid/);
   assert.match(two.stderr,/exactly 3 options/);
   assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM reports WHERE workflow_id=?').get(wf).n),0,'nothing is filed');
-  const three=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'three.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS}}),'--json');
+  const three=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'three.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS}}),'--json');
   assert.equal(three.status,0,three.stderr||three.stdout);
   assert.deepEqual(read(repo,db=>JSON.parse(db.prepare('SELECT report_json FROM reports WHERE workflow_id=?').get(wf).report_json)).question.options,OPTIONS);
 });
@@ -263,9 +263,9 @@ test('feedback and question answers are the Kernel\'s move, and a passed fix mak
   const repo=fixture(t),wf='wf-handover-feedback';
   seedWorkflow(repo,wf);
   handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
-  answer(repo,wf,{dispatchId:'ho-d1',optionIndex:1,note:'Nút lưu không hoạt động'});
+  answer(repo,wf,{dispatchId:'ho-d1',optionIndex:1,note:'N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng'});
   let s=status(repo,wf);
-  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.note],['handover-answered',true,'feedback','Nút lưu không hoạt động']);
+  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.note],['handover-answered',true,'feedback','N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng']);
   assert.match(s.frontier.reason,/handover-feedback-repairs-the-build/);
   assert.match(settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'}).stderr,/not approve/,'feedback is no approval');
   retire(repo,wf,'job-ho-2');
@@ -276,12 +276,12 @@ test('feedback and question answers are the Kernel\'s move, and a passed fix mak
   s=status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.state],['handover-due','due'],'the fix passed: hand over again');
   const deliveries=json(run('survey','--repo',repo,'--workflow',wf,'--deliveries','--json'));
-  assert.deepEqual(deliveries.handoverHistory.map(h=>[h.dispatchId,h.decision,h.note]),[['ho-d1','feedback','Nút lưu không hoạt động']],
+  assert.deepEqual(deliveries.handoverHistory.map(h=>[h.dispatchId,h.decision,h.note]),[['ho-d1','feedback','N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng']],
     'the next handover and the fix op read the note through survey --deliveries');
   assert.deepEqual(deliveries.deliveries.map(d=>d.jobId),['job-docs','job-fix']);
 
   handOver(repo,wf,{attempt:4,dispatchId:'ho-d4'});
-  answer(repo,wf,{dispatchId:'ho-d4',optionIndex:2,note:'Làm sao đăng nhập?'});
+  answer(repo,wf,{dispatchId:'ho-d4',optionIndex:2,note:'L\u00e0m sao \u0111\u0103ng nh\u1eadp?'});
   s=status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.ask.decision],['handover-answered','question']);
   assert.match(s.frontier.reason,/answers it in the package/);
@@ -289,7 +289,7 @@ test('feedback and question answers are the Kernel\'s move, and a passed fix mak
 
 test('the planner appends handover.review as the final leg of every chain',()=>{
   const plan=(...args)=>{const r=spawnSync(process.execPath,[PLAN,'--simulate','--json',...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});return JSON.parse(r.stdout);};
-  for(const text of ['viết SDS, khai báo .starcistacks','build the enrolment screen','scaffold a backend and a frontend']){
+  for(const text of ['vi\u1ebft SDS, khai b\u00e1o .starcistacks','build the enrolment screen','scaffold a backend and a frontend']){
     const p=plan('--text',text);
     assert.equal(p.status,'ok',text);
     const last=p.legs.at(-1);

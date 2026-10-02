@@ -1,8 +1,7 @@
 // goal-text.mjs — a goal text that carries an unrendered value is refused before it becomes a goal.
 //
-// 2026-09-27 05:53 the eight restarted workflows (nivo app-auth, workspace-provision, modules-agentos,
-// collab-group-chat, module-studio; starci-next foundation, learn-content, subscription) were defined as
-// "Khởi động lại trên runtime mới ... Goal gốc:\n\nnull": the predecessor's goal was interpolated as the
+// 2026-09-27 05:53 the eight restarted workflows were defined as
+// "Restart on the new runtime ... Original goal:\n\nnull": the predecessor's goal was interpolated as the
 // literal `null`. route-plan could not form S* (opChain null, underivable needs-owner), so every Kernel
 // improvised its legs - business.decide dispatched onto integration, impl and SDS nodes it may not write
 // (authority blockers), scope.define asking the owner what the goal was - and those were most of the

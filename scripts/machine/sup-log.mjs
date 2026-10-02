@@ -1,4 +1,4 @@
-// sup-log.mjs — the Supervisor's typed log rows: "log gốc của machine" (owner, 2026-09-28). Every observation,
+// sup-log.mjs — the Supervisor's typed log rows: "the machine's root log" (owner, 2026-09-28). Every observation,
 // decision, action, message and experiment of the Supervisor is one row of machine.sqlite `machine_logs`
 // (engine/db/machine.mjs log), actor `supervisor`. Kinds: supervisor.action (an owed-action act: item, action, reason,
 // class), decision, narration, cmd.run, check.result, warning, error. The product workflow / job / repo / commit a row

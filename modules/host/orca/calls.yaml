@@ -38,11 +38,20 @@ liveSchema:
   enforcedBy: scripts/api/orca/lib.mjs orcaCall; scripts/checks/check-providers.mjs --live compares every entry at once.
 idempotency:
   flag: retry-request
+  modes: [none, reissue, request]
   rule: |-
-    A mutation whose process timed out or returned non-JSON is re-issued once with the same
-    arguments plus --retry-request <deterministic id>; Orca returns the original result when it
-    exists. If the replay is still unknown, the runner returns outcome unknown and the caller
-    reconciles by reading worker-show for the deterministic display name.
+    Every mutation declares `replay`, and scripts/api/orca/lib.mjs orcaCall enforces it. A receipt is lost when the
+    process timed out or Orca answered without JSON.
+    - none: never re-issued by the runner. The caller reconciles from a read (a duplicate reply is a second message).
+    - reissue: naturally idempotent on its target (worker-stop, worker-release, task-update). A lost receipt is
+      recovered by issuing the same call once more. No request id is sent, so a later deliberate repeat (the
+      settle-dispatch recovery) is a fresh effect, never a recorded replay.
+    - request: not idempotent (a second Run, a second rebind, a second worker). The FIRST issue already carries
+      --retry-request <id>. The id is a UUIDv5 (RFC 9562, the fixed ORCA_REQUEST_NAMESPACE of scripts/api/orca/lib.mjs) of the verb and the caller's ledger identity, because Orca 1.4.209 accepts only a UUID here; it is derived from
+      ledger identity only, so a restarted process derives the same id. After a lost receipt the runner reads
+      `request-show`: completed or pending is replayed once under the same id (Orca answers the recorded outcome,
+      result.mutation.replayed), and absent or unreadable is outcome unknown (reason request-absent or
+      request-show-unreadable), never a blind second issue.
 calls:
   account-list:
     command: account list
@@ -64,24 +73,12 @@ calls:
   run-create:
     command: orchestration run-create
     kind: mutation
-    flags: [objective, from]
+    replay: request
+    flags: [objective, from, retry-request]
     required: [objective]
     receipt: [result.run.id]
     creates: run
-  task-create:
-    command: orchestration task-create
-    kind: mutation
-    flags: [spec, task-title, display-name, deps, run, from]
-    required: [spec, run]
-    receipt: [result.task.id, result.task.display_name]
-    creates: task
-    values: {deps: task-id-list, run: run-id, from: terminal-handle}
-    note: >-
-      THE NESTED RUN RULE (smoke 2026-10-01 on Orca 1.4.209, Orca's own SUB-DISPATCH preamble): an agent that starts
-      agents binds its OWN Run (run-create --from <its terminal>, which makes it that Run's coordinator), files each
-      Task there and starts it with worker-start --task --run --from <its terminal>. There is no --parent: Orca takes a
-      parent only from the same Run (runtime_error "Parent task ... must belong to run"), and a Task in the Run the
-      agent is a worker of is refused consumer_fenced. Orca nests the Run under the agent's Dispatch (worker-show depth).
+    note: Request identity is the workflow, the coordinator terminal and the Run it replaces (api.mjs ensureWorkflowRun), or the launch the caller names (agent/lib.mjs startAgent request).
   run-show:
     command: orchestration run-show
     kind: read
@@ -89,20 +86,21 @@ calls:
     required: [id]
     receipt: [result.run.id, result.run.coordinator_handle]
     note: >-
-      The Run's coordinator_handle is the terminal Orca accepts task-create/task-update from. After a
+      The Run's coordinator_handle is the terminal Orca accepts worker-start --spec and task-update from. After a
       Kernel restart it still names the replaced terminal; scripts/kernel/orca-runs.mjs reads it and
       re-binds the Run before the next Task (run_not_found: create a new Run).
   run-use:
     command: orchestration run-use
     kind: mutation
-    flags: [id, from]
+    replay: request
+    flags: [id, from, retry-request]
     required: [id, from]
     receipt: [result.run.id]
     note: >-
       Binds the Run to the --from terminal as its coordinator. Issued only when run-show proves the
       coordinator is not the workflow's current Kernel terminal (one re-bind per Kernel replacement:
-      a repeated run-use invalidates live Dispatches). Callers: api dispatch (ensureWorkflowRun) and
-      api reconcile --orca-tasks.
+      a repeated run-use invalidates live Dispatches, so it is replay: request with the identity {run, from}).
+      Caller: api dispatch (ensureWorkflowRun).
   run-list:
     command: orchestration run-list
     kind: read
@@ -118,29 +116,33 @@ calls:
   task-update:
     command: orchestration task-update
     kind: mutation
+    replay: reissue
     flags: [id, status, result, run, from]
     required: [id, status]
     allowedValues:
       status: [pending, ready, dispatched, completed, failed, blocked]
     receipt: [result.task.id]
     note: >-
-      How an operation Task is closed. scripts/kernel/cli.mjs settles a job by writing the verdict, closing the
-      worker and then marking its Task done; api finish marks whatever Task the Run still holds open. A Task
-      left open is what kept settled operations visible at the Orca sidebar root.
+      Never issued for an operation Task: the op's own worker_done (after api report) settles its Task and
+      Dispatch, and Orca refuses a task-update after that (orca-deep-map smoke E3). Issued only by
+      scripts/kernel/launch-smoke.mjs for a smoke worker that never reported, and by the draw critic.
   worker-start:
     command: orchestration worker-start
     kind: mutation
     timeoutMs: 150000
-    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
+    replay: request
+    flags: [spec, task-title, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, timeout-ms, run, from, retry-request]
     # The one agent launch (contract-changes/launch-through-worker-start.yaml): Orca launches the agent itself; the
-    # runtime never adopts a terminal (--terminal is not a declared flag, so orcaCall refuses it).
-    required: [task, worktree, agent, run]
+    # runtime never adopts a terminal (--terminal is not a declared flag, so orcaCall refuses it). --spec creates the
+    # worker's Task in the same call (contract-changes/worker-start-spec.yaml): there is no task-create, so a start
+    # that fails leaves no orphan Task. --task and --retry-of are not declared (--retry-of needs --task).
+    required: [spec, worktree, agent, run]
     forbidden: [on]
     forbiddenValues:
       on: [windows, macos, linux]
-    receipt: [result.dispatchId]
+    receipt: [result.dispatchId, result.taskId]
     creates: dispatch
-    note: "--from is resolved by Orca from the calling terminal when omitted; the runtime always passes the exact coordinator handle (the entry terminal for the Kernel, the Kernel terminal for an op). Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. For a fresh worker in an existing worktree, creation labels do not set the terminal title: after dispatch-show resolves the exact assignee, use terminal-rename to apply the semantic [Op] title."
+    note: "--from is resolved by Orca from the calling terminal when omitted; the runtime always passes the exact coordinator handle (the entry terminal for the Kernel, the Kernel terminal for an op). Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. The Task Orca created from --spec is result.taskId. The worker's terminal is result.worker.agentTerminalHandle, else the attestation worker-show's result.dispatch.assigneeHandle (there is no dispatch-show). For a fresh worker in an existing worktree, creation labels do not set the terminal title: terminal-rename applies the semantic [Op] title. Request identity: the job and its lease token (api dispatch), or the launch the caller names (startAgent)."
     classify:
       - when: {exitCode: 0, path: result.state, in: [ready]}
         outcome: ok
@@ -178,9 +180,18 @@ calls:
         effectState: unknown
         reason: worker-start exited non-zero without a classifiable receipt
     recovery:
-      failed: worker-start-retry-of
+      failed: worker-start-new
       partial: settle-dispatch
       unknown: reconcile-then-stop
+  request-show:
+    command: orchestration request-show
+    kind: read
+    flags: [request]
+    required: [request]
+    receipt: [result.state]
+    allowedValues:
+      state: [completed, pending, absent]
+    note: Read-only. scripts/api/orca/lib.mjs orcaCall asks it after a replay request mutation lost its receipt; absent is not proof that nothing happened.
   worker-show:
     command: orchestration worker-show
     kind: read
@@ -203,6 +214,7 @@ calls:
   worker-stop:
     command: orchestration worker-stop
     kind: mutation
+    replay: reissue
     timeoutMs: 60000
     flags: [dispatch]
     required: [dispatch]
@@ -229,6 +241,7 @@ calls:
   worker-release:
     command: orchestration worker-release
     kind: mutation
+    replay: reissue
     timeoutMs: 60000
     flags: [dispatch]
     required: [dispatch]
@@ -285,10 +298,16 @@ calls:
   send:
     command: orchestration send
     kind: mutation
-    flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase, dispatch-capability]
+    replay: request
+    flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase, dispatch-capability, retry-request]
     required: [subject]
     receipt: [result]
-    note: scripts/api/orca/ has no wrapper for it, so StarCi does not issue it; an op reports through `api report`.
+    note: >-
+      Only an op's worker_done (scripts/api/orca/send.mjs send): `api report`, running in the op's
+      own pane, sends exactly one `--type worker_done --outcome succeeded|failed --task-id --dispatch-id --from
+      <assignee> --report-path` after the report row committed and before the settler starts (an ask sends none).
+      Orca settles the Task and Dispatch on it, so settle only releases the worker. replay: request with the
+      identity {dispatch, type}: a lost receipt replays the recorded send, never a second worker_done.
   repo-add:
     command: repo add
     kind: mutation
@@ -456,12 +475,6 @@ calls:
       (the flags absent from agent-context, or incompatible_runtime): terminal-send.mjs sends through
       terminal-send instead. An ambiguous failure names orchestrationRequestId: the exact command is re-issued
       once with --retry-request <id>.
-  dispatch-show:
-    command: orchestration dispatch-show
-    kind: read
-    flags: [task, preamble, from]
-    required: [task]
-    receipt: [result.dispatch.id, result.dispatch.assignee_handle]
   terminal-close:
     command: terminal close
     kind: mutation
@@ -484,6 +497,6 @@ forbiddenCalls:
   - orchestration reset
   - terminal stop
 recoveries:
-  worker-start-retry-of: Start a replacement attempt with --retry-of <dispatch> after the failed Dispatch is proven settled; placement and agent are repeated explicitly.
-  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released, or when the worker process is proven gone and only an identity_unproven terminal remains. When stop stays unknown after bounded reconciliation, the exact residual agent terminal created by the fenced attempt is closed with terminal-close, then worker-stop and worker-release are repeated.
+  worker-start-new: Start a replacement attempt (a new --spec start, so a new Task) after the failed Dispatch is proven settled; placement and agent are repeated explicitly, and the request identity changes with the new lease.
+  settle-dispatch: worker-release the exact Dispatch, preceded by worker-stop only when worker-show reads it not settled by the op's own worker_done (no worker_done, outcome_unknown, or unreadable); effectState becomes none only when release reports released or already_released, or when the worker process is proven gone and only an identity_unproven terminal remains. When stop stays unknown after bounded reconciliation, the exact residual agent terminal created by the fenced attempt is closed with terminal-close, then worker-stop and worker-release are repeated.
   reconcile-then-stop: Read worker-show; ready keeps the attempt, failed or stopped allows retry-of, outcome_unknown requires worker-stop and a second read before the attempt may be called settled.

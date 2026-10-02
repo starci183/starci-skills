@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { testSecret, testSecretPaths, isSopsEnvelope, setCommand, sopsFormatFor } from '../../scripts/lib/test-secrets.mjs';
-import { scanDiff, diffScanner, scanHint, applyScanAllow, TEST_SECRET_HINT } from '../../scripts/supervisor/push-mains.mjs';
+import { scanDiff, diffScanner, scanHint, TEST_SECRET_HINT } from '../../scripts/supervisor/push-mains.mjs';
 
 const sandbox = (t) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-secrets-'));
@@ -104,12 +104,3 @@ test('a .enc passes only as a sops envelope, judged on the whole file when the s
 });
 
 const scanDiffWith = (diff, encText) => { const s = diffScanner([], { encText }); for (const l of diff.split('\n')) s.line(l); return s.findings; };
-
-test('an allow entry pinned to a committed range is spent once origin/main holds it', () => {
-  const entries = [{ repo: 'nivo-backend', file: 'evidence/capture.mjs', pattern: 'assigned-secret', approvedBy: 'owner', until: 'abc123' }];
-  const findings = [{ file: 'evidence/capture.mjs', line: 67, pattern: 'assigned-secret' }];
-  const ancestor = (status) => () => ({ ok: status === 0, status, stdout: '', stderr: '' });
-  assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries, { run: ancestor(1) }).exempted.length, 1, 'not pushed yet: exempt');
-  assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries, { run: ancestor(0) }).findings.length, 1, 'range pushed: spent');
-  assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries, { run: ancestor(128) }).findings.length, 1, 'unknown commit: not exempt');
-});

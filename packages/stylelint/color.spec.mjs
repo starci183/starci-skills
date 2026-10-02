@@ -55,7 +55,7 @@ test("a value that is not a colour this module reads is null, never a guess", ()
   }
 })
 
-test("WCAG 2 contrast: the extremes, a mid grey and the darkened solid success of nivo-fe", () => {
+test("WCAG 2 contrast: the extremes, a mid grey and the darkened solid success of a product front end", () => {
   assert.equal(contrast(parseColor("#000"), parseColor("#fff")).toFixed(2), "21.00")
   assert.equal(contrast(parseColor("#fff"), parseColor("#fff")).toFixed(2), "1.00")
   assert.equal(contrast(parseColor("#777"), parseColor("#fff")).toFixed(2), "4.48")

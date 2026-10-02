@@ -392,7 +392,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
       specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
-      onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
+      request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
       start: deps.start ?? null });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: stagingRecord(staging),
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,
@@ -468,8 +468,8 @@ export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.no
   const handle = job?.worker_id;
   if (!handle || handle === 'supervisor' || job.payload.self) return null;
   if (job.payload.terminalClosed?.ok === true) return null;
-  // A worker-start worker is fenced and released by its Dispatch (release archives its output); only a
-  // terminal-launched [Worker] from before every launch went through worker-start is closed by its terminal.
+  // A worker-start worker is fenced and released by its Dispatch (release archives its output); a job
+  // recorded without a Dispatch has only its terminal to close.
   const dispatch = job.payload.dispatch ?? null;
   let r;
   try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }

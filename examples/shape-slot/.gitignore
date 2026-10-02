@@ -25,7 +25,6 @@ lf.json
 lt.json
 %*%
 nul
-.qwen*/
 .artifacts/
 .tmp-*
 # Worktrees live under D:/starci-lanes, never inside the repository.

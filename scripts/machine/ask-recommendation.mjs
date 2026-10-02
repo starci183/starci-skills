@@ -6,7 +6,7 @@
 // question.options, validated by report-envelope.mjs) with
 // `question.recommendedReason`. An ask filed before that field existed names
 // its recommendation in the option text; exactly one option carrying
-// "(khuyến nghị)", "(recommended)" or "(đề xuất)" counts, zero or several
+// "(recommended)" or its Vietnamese glosses (RECOMMENDATION_MARK) counts, zero or several
 // mean none.
 //
 // The exclusion classes (config.yaml asks.excludes):
@@ -29,9 +29,6 @@ export const AUTO_ACCEPTED_BY = 'auto-recommended';
 export const AUTO_ACCEPT_CONFIG_KEY = 'asks.autoAcceptRecommended';
 /** The review of drawn parts (scripts/work/draw-review.mjs DRAW_REVIEW_KIND): auto-accepted unless the owner asked for it. */
 export const DRAW_REVIEW_ASK_KIND = 'draw-review';
-/** The accept option of a draw-review ask (draw-review.mjs DRAW_REVIEW_DECISIONS[0]): its implicit recommendation. */
-export const DRAW_REVIEW_ACCEPT_INDEX = 0;
-export const DRAW_REVIEW_ACCEPT_REASON = 'the owner did not ask to review this drawing (owner ruling 2026-09-26: an unrequested drawing is accepted without the owner)';
 export const CREDENTIAL_ASK_KINDS = Object.freeze(['credential', 'account', 'access', 'consent']);
 
 const RECOMMENDATION_MARK = /\((?:khuyến nghị|recommended|đề xuất)\)/iu;
@@ -97,7 +94,7 @@ export function autoAcceptDecision({ question, opId, secretFields, policy, owner
   if (excluded) return { accept: false, why: `excluded:${excluded}` };
   // Owner ruling 2026-09-27: a drawing is the owner's to accept - a draw-review ask is never answered automatically.
   // Also an ask that carries a draw review (question.review) or that interface.draw filed without the kind
-  // marker: an owner review is never answered by its recommendation (starci-next op-interface.draw-7bcf258e67).
+  // marker: an owner review is never answered by its recommendation.
   if (askKindOf(question) === DRAW_REVIEW_ASK_KIND || (question?.review && typeof question.review === 'object') || opId === 'interface.draw') {
     if (ownerRequest) return { accept: false, why: 'owner-requested', detail: ownerRequest };
     return { accept: false, why: 'owner-only', detail: 'every drawing goes to the owner (draw-content-owner-gate): a draw-review ask is never answered automatically' };

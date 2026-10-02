@@ -87,12 +87,12 @@ Reviewed 2026-09-16:
 - [Next server and client components](https://nextjs.org/docs/app/getting-started/server-and-client-components) supports server route/layout adapters and explicit client boundaries.
 - [TypeScript module resolution](https://www.typescriptlang.org/docs/handbook/modules/reference.html) is why aliases, package exports, relative paths, and resolution mode must come from the checked project.
 
-Local reference evidence is pinned, and includes debt rather than being copied as law:
+Local reference evidence is the checked-in examples of this repository; it is evidence, not law:
 
-- `starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5`: `apps/core/src/main.ts` and `app.module.ts` show the valid bootstrap/composition exception. Playground apps with `*.service.ts` under `apps/*/src` are debt under the portable rule. `src/modules/bussiness/{weekly-challenge,daily-quest,streak,kpi-reward,flashcard}` import `@features/api/**`, concrete upward dependencies that the reference does not legitimize.
-- The same backend root module performs broad registration. It is evidence for app composition, not evidence that named database/provider/tenant instances may be collapsed into one global singleton. Provider identity remains a DI/boot-test obligation.
-- `starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8`: redirect-only routes under `[lang]/page.tsx` and `courses/[displayId]/learn/flashcards/page.tsx` are valid zero-visual-owner adapters. `subscriptions/page.tsx` rendering `ShellNav` beside `ProSubscriptionPage` is reference debt. `StarCiAiFab/component.tsx` owns DOM refs, resize handling, drag, and reduced-motion behavior without transport/product-world ownership; forcing a forwarding Base twin would add ceremony without a responsibility boundary.
-- That frontend is one app with `file:packages/grammar` and `file:packages/heroicons`; `nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844` is npm workspaces with `apps/{app,expert,landing}` and `packages/ui`. Both topologies must obey the same ownership and public-export rules.
+- `examples/todo-app/be`: `apps/todo/src/main.ts` and `app.module.ts` show the valid bootstrap/composition exception, and no `*.service.ts` lives under `apps/*/src`.
+- That backend root module performs broad registration. It is evidence for app composition, not evidence that named database/provider/tenant instances may be collapsed into one global singleton. Provider identity remains a DI/boot-test obligation.
+- `examples/ecommerce-app/fe`: the shop's `app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid zero-visual-owner adapter. `examples/todo-app/fe`: `components/branches/TaskRow/index.tsx` owns a confirmation state and a DOM ref for focus return without transport/product-world ownership; forcing a forwarding twin would add ceremony without a responsibility boundary.
+- `examples/todo-app/fe` is one app consuming the published `@starci/grammar` package; `examples/ecommerce-app/fe` is npm workspaces with `apps/{landing,shop}` and `packages/*`. Both topologies must obey the same ownership and public-export rules.
 
 ## HFS machine
 

@@ -65,7 +65,7 @@ const expectedId = segments => {
  * in step). The place rule derives an id from any depth, so without this a record can sit where its id
  * matches its place yet its own schema refuses the id: impl/index.yaml derives impl.<feature> and
  * impl/<repository>/index.yaml derives impl.<feature>.<repository>, both below
- * impl.<feature>.<repository>.<name> (starci-next inc-f2cfd86685a3).
+ * impl.<feature>.<repository>.<name>.
  */
 export const MIN_ID_SEGMENTS = Object.freeze({ impl: 3, ac: 3 });
 export const DEFAULT_MIN_ID_SEGMENTS = 2;
@@ -646,8 +646,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
 
     // ---- concept 10b: a ui record draws shapes, never a slot's data status (scripts/work/ui/ui-shapes.mjs) ----
-    // A record not yet on ui.shapes is warned until scripts/work/migrate-ui-shapes.mjs rewrites it.
-    for (const finding of uiShapeFindings(data)) (Array.isArray(data.ui?.shapes) ? problems : warnings).push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
+    for (const finding of uiShapeFindings(data)) problems.push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
 
     // ---- concept 11: a generation-carrying asset is ui-owned direction, never an implementation capture ----
     if (Array.isArray(data.assets)) {

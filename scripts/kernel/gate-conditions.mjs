@@ -23,8 +23,8 @@
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it
 //                                              landed there at its finish (workflow-landed: a workflow lands
 //                                              into main once, at api finish, workflow-checkpoint.mjs) (a
-//                                              cross-workflow hold on a restructure, e.g. nivo FE legs held until
-//                                              wf-nivo-fe-canon lands into nivo-fe)
+//                                              cross-workflow hold on a restructure, e.g. a product's frontend
+//                                              legs held until its canon workflow lands into the frontend repo)
 //
 // Owner-only conditions (an ask answered, a consent given) have no typed form: the owner drives them.
 
@@ -156,7 +156,7 @@ export function parseCondition(type, raw) {
   }
   if (type === 'landed') {
     const at = spec.lastIndexOf('@');
-    if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like nivo-fe, or its path)`);
+    if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like my-app, or its path)`);
     return { type, workflowId: spec.slice(0, at).trim(), repository: spec.slice(at + 1).trim() };
   }
   throw invalid(`unknown condition type ${type}`);
@@ -220,8 +220,8 @@ const git = (repo, args) => {
  * entry's `change.rev` (every work record: ui-screen, contract, feature, ...). A nested object's `rev`
  * is a BINDING to another record, never this record's revision - ui-screen `brand.rev` / `shell.rev` /
  * `shell.layouts[].rev`, layout-tree `nodes[].rev`, contract `blockedBy[].rev` / `conflictsWith[].rev`
- * - so nothing below the top level is read except `change` (starci-next wf-sn-subscription
- * inc-13eb86851909: app-layout at change rev 6 never met `>=6`, its evidence read rev=-).
+ * - so nothing below the top level is read except `change` (an app-layout record at
+ * change rev 6 never met `>=6`, its evidence read rev=-).
  * Returns {rev, source} with rev null when the record states no revision of its own.
  */
 const positiveRev = (value) => {
@@ -340,8 +340,8 @@ const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
  * blocker text names plus `ownerJobs` (routing adds the open jobs of `to` owning a file the introducing
  * commit changed); each is taken at its lineage head, and a head that had already succeeded before the
  * blocker was raised (`since`) is the introducer, not the repair. With no such job the release is the
- * introducer's reply (the follow-up asks it to notify the reporter). nivo academy-debt inc-9474fe9ff445
- * was routed to module-studio, named its queued owner op-backend.implement-853af99286, and still sat
+ * introducer's reply (the follow-up asks it to notify the reporter). One blocker
+ * was routed to its peer workflow, named that peer's queued owner job, and still sat
  * untyped on the supervisor as OWED.
  */
 export function sharedBlockerUntil(db, { to, text = '', since = 0, ownerJobs = [] }) {

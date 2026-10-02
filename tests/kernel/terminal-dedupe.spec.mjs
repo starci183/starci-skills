@@ -93,7 +93,7 @@ test('classifyStrayTerminal: markers in titles or frame, never the owner\'s unma
   assert.equal(classifyStrayTerminal({titles:['Codex'],screen:CLAUDE_IDLE('● settled op-interface.draw-edd3451af8')}).action,'close');
   assert.equal(classifyStrayTerminal({titles:['✳ Refactor notes'],screen:idle}).action,'keep');
   assert.equal(classifyStrayTerminal({titles:['[Kernel] wf-a'],screen:null}).reason,'unreadable');
-  assert.equal(classifyStrayTerminal({titles:['anything'],screen:'PS C:\\Users\\Hi> '}).reason,'bare-shell');
+  assert.equal(classifyStrayTerminal({titles:['anything'],screen:`PS ${os.tmpdir()}> `}).reason,'bare-shell');
 });
 
 test('tab titles come from the visual layouts, by tab id',()=>{

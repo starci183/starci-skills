@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hostLaunchEnv } from '../../scripts/api/orca/lib.mjs';
-
+const DRIVE = `${process.cwd().split(/[\\/]/)[0]}\\`;
 const sourceEnv = () => ({
-  PATH: 'C:\\Windows;C:\\Tools',
-  USERPROFILE: 'C:\\Users\\Operator',
+  PATH: `${DRIVE}Windows;${DRIVE}Tools`,
+  USERPROFILE: `${DRIVE}Users\\Operator`,
   STARCI_KEEP: 'present',
   CLAUDECODE: '1',
   CLAUDE_CODE_DISABLE_TERMINAL_TITLE: '1',

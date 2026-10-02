@@ -25,7 +25,6 @@ import {isFile} from '../../lib/fs-kind.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
-export const DRAW_LAYER_CODES = Object.freeze([DRAW_NESTED_VARIANT, DRAW_MEASURE_UNCAPPED]);
 
 /** W-3xl of the Width scale (measure.yaml guidance width-scale): no form region renders wider. */
 export const FORM_MEASURE_CAP_PX = 768;

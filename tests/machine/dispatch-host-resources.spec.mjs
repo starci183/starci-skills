@@ -79,7 +79,7 @@ const leading=stdout=>{
   const open=stdout.indexOf('{'),close=stdout.indexOf('\n}');
   return JSON.parse(close<0?stdout.slice(open):stdout.slice(open,close+2));
 };
-const LOW_DISK=JSON.stringify({drives:[{drive:'C:',path:'C:\\Temp',freeDiskGb:0.5}],totalRamBytes:64e9,freeRamBytes:60e9});
+const DRIVE=(root=>root.replace(/[\\/]+$/,'')||root)(path.parse(os.tmpdir()).root),LOW_DISK=JSON.stringify({drives:[{drive:DRIVE,path:`${DRIVE}\\Temp`,freeDiskGb:0.5}],totalRamBytes:64e9,freeRamBytes:60e9});
 const LOW_RAM=JSON.stringify({freeDiskGb:500,freeRamPct:3});
 const ROOMY=JSON.stringify({freeDiskGb:500,totalRamBytes:64e9,freeRamBytes:60e9});
 
@@ -98,10 +98,10 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
     assert.equal(body.host.ok,false);
     assert.equal(body.host.lowDisk,true);
     assert.equal(body.host.lowRam,false);
-    assert.equal(body.host.drive,'C:');
+    assert.equal(body.host.drive,DRIVE);
     assert.equal(body.host.freeDiskGb,0.5);
     assert.deepEqual(body.host.thresholds,{minFreeDiskGb:20,minFreeRamPct:10});
-    assert.match(body.detail,/drive C: has 0\.5 GB free/);
+    assert.match(body.detail,new RegExp(`drive ${DRIVE} has 0\\.5 GB free`));
     assert.match(body.detail,/do not re-dispatch it by hand/);
   }
   assert.deepEqual(events(),[],'no dispatch-rejected or op-dispatched event for the waiting job');

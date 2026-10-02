@@ -84,7 +84,7 @@ test('archive stops a running workflow: asks retired, open jobs dropped, Kernel 
   assert.equal(running.terminalClosed?.handle,OP_TERM,'the dropped worker terminal is released and recorded');
   const argv=calls();
   assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='terminal close'&&a.includes(OP_TERM)),'the worker terminal is closed');
-  assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='orchestration task-update'&&a.includes('task-running')),'the open Task is closed');
+  assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='orchestration task-update'),false,'archive closes no Task: the Task of an op belongs to Orca');
   const closes=argv.filter(a=>a.slice(0,2).join(' ')==='terminal close');
   assert.ok(closes.at(-1).includes(KERNEL_TERM),'the Kernel terminal is closed, and closed last');
   assert.equal(body.kernelTerminalCloseRequested,true);

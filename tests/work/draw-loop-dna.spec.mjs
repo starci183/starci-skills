@@ -44,21 +44,21 @@ const WHITE = [255, 255, 255, 255], RED = [227, 0, 31, 255], INK = [4, 13, 28, 2
 /** A DNA-only drawing: an Alert with tone and actions, one Meter with its value, Buttons, a Badge. */
 const GOOD = `<!doctype html><html><head><style>:root{--brand-red:#e3001f;--accent:var(--brand-red)}</style></head><body>
 <main data-grammar-component="PageContainer">
-  <h1 data-grammar-component="Heading">Mô-đun đã cài</h1>
+  <h1 data-grammar-component="Heading">M\u00f4-\u0111un \u0111\u00e3 c\u00e0i</h1>
   <div data-grammar-component="PageContainer">
     <aside data-grammar-component="Alert" data-tone="warning" role="status">
       <span data-grammar-part="alert-indicator"><svg data-grammar-component="Icon"><path d="M0 0"/></svg></span>
-      <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật <strong>tra cứu</strong></p></div>
-      <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="secondary">Bật</button></div>
+      <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">C\u1ea7n b\u1eadt <strong>tra c\u1ee9u</strong></p></div>
+      <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="secondary">B\u1eadt</button></div>
     </aside>
   </div>
   <article data-grammar-component="SurfaceCard">
     <div data-grammar-component="Meter" role="meter" aria-valuenow="2" aria-valuemax="3">
-      <span data-grammar-part="meter-label">Khả năng</span><span data-grammar-part="meter-output">2/3</span>
+      <span data-grammar-part="meter-label">Kh\u1ea3 n\u0103ng</span><span data-grammar-part="meter-output">2/3</span>
       <div data-grammar-part="meter-track"><div data-grammar-part="meter-fill"></div></div>
     </div>
-    <span data-grammar-component="Badge" data-tone="success">Đang chạy</span>
-    <button data-grammar-component="Button" data-variant="outline">Mở</button>
+    <span data-grammar-component="Badge" data-tone="success">\u0110ang ch\u1ea1y</span>
+    <button data-grammar-component="Button" data-variant="outline">M\u1edf</button>
   </article>
 </main></body></html>`;
 
@@ -88,12 +88,12 @@ test('notices are Alert with a tone; a white card with an outcome IconTile posin
   assert.deepEqual(codes(dnaFindings(untoned, { dna })), [DRAW_NOTICE_NOT_ALERT]);
   const posing = `<main data-grammar-component="PageContainer"><article data-grammar-component="SurfaceCard">
     <span data-grammar-component="IconTile" data-tone="warning"><svg data-grammar-component="Icon"></svg></span>
-    <p data-grammar-component="Text">Sales Copilot thiếu một khả năng</p>
-    <button data-grammar-component="Button">Bật</button></article></main>`;
+    <p data-grammar-component="Text">Sales Copilot thi\u1ebfu m\u1ed9t kh\u1ea3 n\u0103ng</p>
+    <button data-grammar-component="Button">B\u1eadt</button></article></main>`;
   const f = dnaFindings(posing, { dna });
   assert.deepEqual(codes(f), [DRAW_NOTICE_NOT_ALERT]);
   assert.match(f[0].detail, /warning-toned IconTile beside an action/);
-  const box = '<main data-grammar-component="PageContainer"><div class="callout" data-grammar-component="SurfaceCopyGroup" role="alert"><p data-grammar-component="Text">Lỗi</p></div></main>';
+  const box = '<main data-grammar-component="PageContainer"><div class="callout" data-grammar-component="SurfaceCopyGroup" role="alert"><p data-grammar-component="Text">L\u1ed7i</p></div></main>';
   assert.deepEqual(codes(dnaFindings(box, { dna })), [DRAW_NOTICE_NOT_ALERT]);
   // A neutral entity card with an identity tile and actions is not a notice.
   assert.deepEqual(dnaFindings(posing.replace('data-tone="warning"', 'data-tone="neutral"'), { dna }), []);
@@ -101,7 +101,7 @@ test('notices are Alert with a tone; a white card with an outcome IconTile posin
 
 test('ratios are one Meter: hand-made bars, Progress ratios, hand-segmented Meters and Meters without a value fail', () => {
   const dna = loadDna();
-  const bar = '<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard"><p data-grammar-component="Text">Khả năng 2/3</p><div class="cap-bar" data-grammar-proposal="X"><div class="cap-fill" data-grammar-proposal="X"></div></div></div></main>';
+  const bar = '<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard"><p data-grammar-component="Text">Kh\u1ea3 n\u0103ng 2/3</p><div class="cap-bar" data-grammar-proposal="X"><div class="cap-fill" data-grammar-proposal="X"></div></div></div></main>';
   assert.ok(dnaFindings(bar, { dna, proposals: new Set(['X']) }).some((f) => f.code === DRAW_RATIO_NOT_METER && f.kind === 'hand-made bar'));
   const progress = '<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard"><span data-grammar-component="Text">3/3</span><div data-grammar-component="Progress" role="progressbar"></div></div></main>';
   assert.ok(dnaFindings(progress, { dna }).some((f) => f.kind === 'ratio as Progress'));
@@ -209,7 +209,7 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC, critic: allocationSettings().drawLoop.critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  const spec = orca.calls.find((c) => c[0] === 'task-create')[1].spec;
+  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);

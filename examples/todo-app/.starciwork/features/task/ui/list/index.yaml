@@ -337,7 +337,7 @@ ui:
   assets:
     - path: assets/list-many-tasks.prompt.txt
       role: prompt
-      sha256: 3eb1cb932e4297b9bf93392fb08951eeab8dbb3e1fadf0dd4120473a191ef99c
+      sha256: ef4e1e7d23c9cf97917d51ff6da3c32daab089ad5bdb5d4f7a8037660ad1fba5
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/list-many-tasks.png
       role: direction
@@ -371,7 +371,7 @@ ui:
         modelDisclosure: Tool response did not expose a model field; no model claimed.
     - path: assets/list-many-tasks.full-screen-initial.prompt.txt
       role: prompt
-      sha256: 287a8197b8393820efae1772f3168a87a740f241446444fa035bb55d28ff52db
+      sha256: b31d835d10f3d879e675b2c5066921c21840fe4fc12393f1bab243a8edee282b
       provenance: Exact first full-screen generation prompt; retained with the input to the final focused edit.
     - path: assets/list-many-tasks.full-screen-initial.png
       role: iteration-input
@@ -517,7 +517,7 @@ ui:
 assets:
   - path: assets/list-many-tasks.prompt.txt
     role: prompt
-    sha256: 3eb1cb932e4297b9bf93392fb08951eeab8dbb3e1fadf0dd4120473a191ef99c
+    sha256: ef4e1e7d23c9cf97917d51ff6da3c32daab089ad5bdb5d4f7a8037660ad1fba5
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/list-many-tasks.png
     role: direction
@@ -551,7 +551,7 @@ assets:
       modelDisclosure: Tool response did not expose a model field; no model claimed.
   - path: assets/list-many-tasks.full-screen-initial.prompt.txt
     role: prompt
-    sha256: 287a8197b8393820efae1772f3168a87a740f241446444fa035bb55d28ff52db
+    sha256: b31d835d10f3d879e675b2c5066921c21840fe4fc12393f1bab243a8edee282b
     provenance: Exact first full-screen generation prompt; retained with the input to the final focused edit.
   - path: assets/list-many-tasks.full-screen-initial.png
     role: iteration-input

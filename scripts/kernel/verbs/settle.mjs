@@ -20,7 +20,7 @@ import { OP_REV_DRIFT, opRevDrift, shortRev } from '../runtime-rev.mjs';
 import { HANDOVER_APPROVED, HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { SEAM_RECONCILED_EVENT } from '../cut-seam.mjs';
-import { PROOF_MEDIA_MISSING } from '../job-artifacts.mjs';
+import { EVIDENCE_HOST_PATH } from '../job-artifacts.mjs';
 import { isMeasurementLeg, measurementSplit } from '../verify-failure.mjs';
 import { citeRecords } from '../../work/validate/work-citations.mjs';
 import { captureWorker, finalizeAttemptTranscript } from '../transcripts.mjs';
@@ -62,7 +62,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -83,8 +83,8 @@ export default {
 
   const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
   if (media) {
-    emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
-      `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} â€” missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
+    emit({ ok: false, jobId, op: media.op, reason: media.code, code: media.code, missing: media.missing, detail: media.detail },
+      `settle REFUSED for ${jobId} (${media.op}): ${media.code} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. ${media.code === EVIDENCE_HOST_PATH ? 'Rewrite the named evidence with repo-relative paths or <worktree>, <runtime>, <tmp>, <home>, then settle again' : `Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`}`, args.json);
     process.exit(1);
   }
 
@@ -130,7 +130,7 @@ export default {
   if (drawn) {
     const codes = [...new Set(drawn.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
-      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted â€” ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/work/draw/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
+      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/work/draw/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
     process.exit(1);
   }
 
@@ -138,7 +138,7 @@ export default {
   if (measured) {
     const codes = [...new Set(measured.findings.flatMap((f) => [f.code, ...(f.codes ?? [])]))];
     emit({ ok: false, jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
-      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed â€” ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (node scripts/work/draw-loop.mjs verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
+      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed — ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (node scripts/work/draw-loop.mjs verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
     process.exit(1);
   }
 
@@ -262,7 +262,7 @@ export default {
           const why = closesSet
             ? `this pass closes cut set ${cutSet.id} (every other ordinal of ${cutSet.total} settled succeeded), so the unchanged full gates run over the whole set and record ${CUT_SET_CLOSING_CHECK}`
             : `ordinal(s) ${cutSet.open.join(',')} of cut set ${cutSet.id} are still open, so this slice records its scoped checks and the set's last pass records ${CUT_SET_CLOSING_CHECK}`;
-          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} â€” ${why}`), {
+          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} — ${why}`), {
             code: 'cut-checks-missing', cut: payload.cut, missing,
           });
         }
@@ -381,10 +381,10 @@ export default {
     }
   });
 
-  // The settled op's Orca terminal is released with its leases â€” worker_id is
+  // The settled op's Orca terminal is released with its leases — worker_id is
   // the handle. Runs after the settled state is written; a close failure
   // never un-settles.
-  // Managed jobs hold a Dispatch id in worker_id, not a terminal handle â€” they
+  // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
   const settledPayload = jobPayloadOf(job);
   const managed = settledPayload?.managed ?? null;
@@ -431,7 +431,7 @@ export default {
     } catch { /* the terminal proof stands; the tick GC reaps a lingering tree */ }
   }
 
-  // Managed settle â€” calls.yaml settle-dispatch: releaseManagedWorker below.
+  // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
   const managedWorker = !managed?.dispatchId ? null
     : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
@@ -446,18 +446,12 @@ export default {
   for (const handle of [managed ? managed.agentTerminalHandle : job.worker_id].filter(Boolean)) {
     try { if (unbindGuardTerminal({ skillRoot, handle })) guardUnbound.push(handle); } catch { /* pruned by age later */ }
   }
-  // The op's Orca Task is closed with its worker. Settling only the worker
-  // left every finished operation as an open Task in the workflow Run, which
-  // is what the owner saw as ticked [Op] rows sitting at the sidebar root
-  // (benchmark/findings/fable.md orca-hierarchy, row 3). A close failure never un-settles the
-  // job; the ledger row is already the record.
-  const taskClosed = closeOperationTask(db, job, settledPayload);
-
-  // The worker receipt is kept with the Task proof: settle's stdout is the
-  // only other place it lived, and an orphaned op terminal left no trace.
-  if (taskClosed || managedWorker || terminalClosed) {
+  // The worker receipt is kept on the job (with the Dispatch state releaseManagedWorker read): settle's
+  // stdout is the only other place it lived, and an orphaned op terminal left no trace. The op's Orca Task
+  // is not closed here: the op's worker_done settled it with the Dispatch (orca-deep-map REPLACE #9).
+  if (managedWorker || terminalClosed) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    ledger.transaction(() => updateJob(db, { jobId, payload: { ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) } }));
+    ledger.transaction(() => updateJob(db, { jobId, payload: { ...stored, ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) } }));
   }
 
   // LIGHT SETTLE, HEAVY WORK ASYNC (owner ruling settle-runtime-service): everything above is the settle's
@@ -490,13 +484,13 @@ export default {
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} dispatch=${managedWorker.dispatch?.state ?? '?'} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 
   },
 };

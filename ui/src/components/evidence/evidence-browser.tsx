@@ -6,21 +6,22 @@ import { FileTypeBadge, StatusChip } from '../status-chip';
 import { statusFromCheck, statusFromUi } from '../status';
 import { EvidenceViewer } from './evidence-viewer';
 import { encodingLabels, formatBytes, isPlainEncoding } from './format';
+import { t } from '../../i18n/t';
 
 export { useBlobText } from './use-blob-text';
 export const concept: Concept = 'C8';
 
 const GROUPS: { id: EvidenceGroup; title: string; hint: string; tip?: string }[] = [
-  { id: 'evidence', title: 'Bằng chứng op nộp (`evidence/`)', hint: 'Tệp op tự viết ra để chứng minh kết quả.', tip: 'evidence/ là thư mục bằng chứng của op; lần thử cũ ghi là E/' },
-  { id: 'op-run', title: 'Kết quả lệnh op tự chạy', hint: 'Output của các lệnh op chạy trong lúc làm việc.' },
-  { id: 'check', title: 'Output của check', hint: 'Stdout/stderr của từng check, nhóm theo tên check.' },
-  { id: 'media', title: 'Ảnh & video', hint: 'Ảnh chụp màn hình và video ghi lại.' },
-  { id: 'diff', title: 'Diff', hint: 'Thay đổi mã nguồn của lần thử.' },
-  { id: 'log', title: 'Nhật ký', hint: 'Log của terminal và tiến trình.' },
-  { id: 'other', title: 'Khác', hint: 'Tệp không thuộc nhóm nào ở trên.' },
+  { id: 'evidence', title: t('Evidence submitted by the op (`evidence/`)'), hint: t('Files the op wrote itself to prove its result.'), tip: t('evidence/ is the op evidence folder; older attempts recorded it as E/') },
+  { id: 'op-run', title: t('Results of commands the op ran'), hint: t('Output of the commands the op ran while working.') },
+  { id: 'check', title: t('Check output'), hint: t('Stdout/stderr of each check, grouped by check name.') },
+  { id: 'media', title: t('Images & video'), hint: t('Screenshots and recorded video.') },
+  { id: 'diff', title: t('Diff'), hint: t('Source changes made by the attempt.') },
+  { id: 'log', title: t('Logs'), hint: t('Terminal and process logs.') },
+  { id: 'other', title: t('Other'), hint: t('Files that belong to none of the groups above.') },
 ];
 
-const UNKNOWN_CHECK = '(không rõ check)';
+const UNKNOWN_CHECK = t('(unknown check)');
 const checkFailed = (file: EvidenceFile) => file.check?.ui === 'bad' || file.check?.status === 'fail' || file.check?.status === 'error';
 
 /** Default = first failing check output, else first evidence file, else the first file. */
@@ -60,7 +61,7 @@ function Row({ file, active, onPick, also }: { file: EvidenceFile; active: boole
     className={`flex w-full min-w-0 flex-col gap-1 rounded-md border px-2 py-2 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
     <span className="flex min-w-0 items-center gap-2">
       <FileTypeBadge kind={file.kind} />
-      {isKey(file) ? <Star className="size-3 shrink-0 fill-current text-[var(--status-retry,currentColor)]" aria-label="Tệp chính" /> : null}
+      {isKey(file) ? <Star className="size-3 shrink-0 fill-current text-[var(--status-retry,currentColor)]" aria-label={t('Key file')} /> : null}
       <span className="min-w-0 flex-1 truncate font-medium" title={file.label ?? file.base}>{file.label ?? file.base}</span>
     </span>
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -68,7 +69,7 @@ function Row({ file, active, onPick, also }: { file: EvidenceFile; active: boole
       {!isPlainEncoding(file.encoding) ? <span className="shrink-0 rounded border border-border bg-muted px-1 text-[10.5px]">{encodingLabels[file.encoding as string] ?? file.encoding}</span> : null}
     </span>
     <span className="truncate font-mono text-[11px] text-muted-foreground" title={file.name}>{file.name}</span>
-    {also?.length ? <span className="truncate text-[11px] text-muted-foreground" title={also.map(fileName).join(', ')}>cũng là: {also.map(fileName).join(', ')}</span> : null}
+    {also?.length ? <span className="truncate text-[11px] text-muted-foreground" title={also.map(fileName).join(', ')}>{t('also: {names}', { names: also.map(fileName).join(', ') })}</span> : null}
   </button>;
 }
 
@@ -110,10 +111,10 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
     else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom;
   }, [current?.artifactId]);
 
-  if (files.length === 0) return <div className="rounded-lg border p-4 text-sm text-muted-foreground">Lần thử này chưa có tệp bằng chứng nào.</div>;
+  if (files.length === 0) return <div className="rounded-lg border p-4 text-sm text-muted-foreground">{t('This attempt has no evidence files yet.')}</div>;
 
   return <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" onKeyDown={onKeyDown}>
-    <div ref={listRef} role="listbox" aria-label="Tệp bằng chứng" tabIndex={0} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
+    <div ref={listRef} role="listbox" aria-label={t('Evidence files')} tabIndex={0} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
       {GROUPS.map(group => {
         const inGroup = keyFirst(org.visible.filter(f => f.group === group.id));
         if (inGroup.length === 0) return null;
@@ -139,8 +140,8 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
             : <div className="space-y-1">{inGroup.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>}
         </section>;
       })}
-      {org.empty.length ? <section aria-label="Tệp rỗng">
-        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{org.empty.length} tệp rỗng {showEmpty ? '· ẩn' : '· xem'}</button>
+      {org.empty.length ? <section aria-label={t('Empty files')}>
+        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{showEmpty ? t('{n} empty files · hide', { n: org.empty.length }) : t('{n} empty files · view', { n: org.empty.length })}</button>
         {showEmpty ? <div className="mt-1 space-y-1">{org.empty.map(f => <Row key={f.artifactId} file={f} active={f.artifactId === current?.artifactId} onPick={() => onSelect(f.artifactId)} />)}</div> : null}
       </section> : null}
     </div>

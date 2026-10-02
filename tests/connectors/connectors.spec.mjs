@@ -155,7 +155,7 @@ test('the gateway proxies a served nonce (page, asset, POST, redirect) and forwa
 
   const cred=await request(gw,{path:`/${CRED}`});
   assert.equal(cred.status,403,'a credential ask stays off the public link by default');
-  assert.match(cred.body,/thông tin bí mật/,'the refusal speaks config language');
+  assert.match(cred.body,/th\u00f4ng tin b\u00ed m\u1eadt/,'the refusal speaks config language');
   assert.equal(form.seen.length,before,'the refused credential form was never contacted');
   expose=true;
   assert.equal((await request(gw,{path:`/${CRED}`})).status,200,'exposeCredentialAsks opts the credential form in');
@@ -213,8 +213,8 @@ test('the quick tunnel URL and the connection registration parse from cloudflare
 });
 
 test('cloudflared always runs on a generated config; a named token rides the child env, never argv',()=>{
-  const configFile='C:/state/connectors/cloudflared.yml';
-  const named={mode:'named',auth:'credentials-file',tunnel:'21e1ba7c-9bef-4154-b59a-0151f4efd9db',credentialsFile:'C:\\Users\\o\\.cloudflared\\21e1.json',hostname:'response.example.org'};
+  const configFile='state/connectors/cloudflared.yml';
+  const named={mode:'named',auth:'credentials-file',tunnel:'21e1ba7c-9bef-4154-b59a-0151f4efd9db',credentialsFile:path.win32.join(path.parse(os.tmpdir()).root,'Users','o','.cloudflared','21e1.json'),hostname:'response.example.org'};
   const plan=cloudflaredPlan(named,{port:7070,configFile,env:{}});
   assert.deepEqual(plan.args,['tunnel','--config',configFile,'--no-autoupdate','run','21e1ba7c-9bef-4154-b59a-0151f4efd9db']);
   const text=cloudflaredConfigText(named,7070),doc=parseYaml(text);
@@ -265,7 +265,7 @@ const fakeBot=({status=200,json={ok:true,result:{message_id:1}},sequence=null}={
   return {calls,fetchImpl,sends:()=>calls.filter(c=>c.method==='sendMessage')};
 };
 const telegramConfig=(extra={})=>withConnectors({secretsFile:null,cloudflare:{mode:'named',hostname:'response.example.org'},telegram:{enabled:true,chatId:'4242',...extra}});
-const DECISION={text:'Chốt giá gói Pro?',options:['99.000đ/tháng','Để sau']};
+const DECISION={text:'Ch\u1ed1t gi\u00e1 g\u00f3i Pro?',options:['99.000\u0111/th\u00e1ng','\u0110\u1ec3 sau']};
 const deps=(machineHome,extra={})=>({config:telegramConfig(),env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra});
 
 // Owner, 2026-09-24: the question goes to Telegram with a "Generate URL" button; the form is served
@@ -276,17 +276,17 @@ const seedAsk=(ledger,{workflowId,dispatchId,question,title=null})=>{
 
 test('a parked ask is told once: workflow, question, numbered options and a Generate URL button, no link, in config language',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
-    seedAsk(ledger,{workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price',title:'miamia-pricing',question:DECISION});
+    seedAsk(ledger,{workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price',title:'my-app-pricing',question:DECISION});
     const bot=fakeBot(),warnings=[];
     const logs=[];const saved={log:console.log,error:console.error,warn:console.warn};
     console.log=console.error=console.warn=(...a)=>logs.push(a.join(' '));
     let first,second;
     try{
-      first=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
-      second=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      first=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      second=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
     }finally{Object.assign(console,saved);}
     assert.equal(first.sent,1);assert.equal(first.ok,true);
-    assert.equal(first.key,askKeyOf('wf-miamia-pricing-x1','ctx_price'));
+    assert.equal(first.key,askKeyOf('wf-my-app-pricing-x1','ctx_price'));
     assert.equal(second.skipped,'already notified','an ask whose notice is in the chat is not sent again');
     assert.equal(second.messageId,first.messageId);
     assert.equal(bot.calls.length,1);
@@ -295,30 +295,30 @@ test('a parked ask is told once: workflow, question, numbered options and a Gene
     assert.equal(call.body.chat_id,'4242');
     assert.equal(call.body.link_preview_options?.is_disabled,true);
     const text=call.body.text;
-    assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: miamia-pricing \(wf-miamia-pricing-x1\)\nViệc: Xin thông tin · miamia-pricing\n\nCâu hỏi:\nChốt giá gói Pro\?/);
-    assert.match(text,/Lựa chọn:\n1\. 99\.000đ\/tháng\n2\. Để sau/);
-    assert.match(text,/Form trả lời chưa mở\. Khi thầy muốn trả lời, bấm "Tạo link trả lời"/);
+    assert.match(text,/^\[StarCi\] C\u00f3 c\u00e2u h\u1ecfi c\u1ea7n th\u1ea7y tr\u1ea3 l\u1eddi\nWorkflow: my-app-pricing \(wf-my-app-pricing-x1\)\nVi\u1ec7c: Xin th\u00f4ng tin · my-app-pricing\n\nC\u00e2u h\u1ecfi:\nCh\u1ed1t gi\u00e1 g\u00f3i Pro\?/);
+    assert.match(text,/L\u1ef1a ch\u1ecdn:\n1\. 99\.000\u0111\/th\u00e1ng\n2\. \u0110\u1ec3 sau/);
+    assert.match(text,/Form tr\u1ea3 l\u1eddi ch\u01b0a m\u1edf\. Khi th\u1ea7y mu\u1ed1n tr\u1ea3 l\u1eddi, b\u1ea5m "T\u1ea1o link tr\u1ea3 l\u1eddi"/);
     assert.ok(!/https?:\/\//.test(text),'no form is served yet, so no link of any kind');
-    assert.deepEqual(call.body.reply_markup,{inline_keyboard:[[{text:'Tạo link trả lời',callback_data:`ask:${first.key}`}]]},'one button, labelled in config language');
+    assert.deepEqual(call.body.reply_markup,{inline_keyboard:[[{text:textFor('vi').generate,callback_data:`ask:${first.key}`}]]},'one button, labelled in config language');
     assert.ok(Buffer.byteLength(call.body.reply_markup.inline_keyboard[0][0].callback_data)<=64,'callback_data fits Telegram\'s 64 bytes');
     assert.equal(textFor('en').generate,'Generate URL');
     const store=readSentStore({LOCALAPPDATA:machineHome});
-    assert.deepEqual(store.asks['wf-miamia-pricing-x1|ctx_price'].messageIds,[first.messageId]);
-    assert.equal(store.asks['wf-miamia-pricing-x1|ctx_price'].repo,repoRoot,'the store knows where the ask lives, for the button');
-    assert.equal(store.keys[first.key],'wf-miamia-pricing-x1|ctx_price');
+    assert.deepEqual(store.asks['wf-my-app-pricing-x1|ctx_price'].messageIds,[first.messageId]);
+    assert.equal(store.asks['wf-my-app-pricing-x1|ctx_price'].repo,repoRoot,'the store knows where the ask lives, for the button');
+    assert.equal(store.keys[first.key],'wf-my-app-pricing-x1|ctx_price');
     assert.deepEqual(warnings,[]);
     const out=JSON.stringify([first,second])+logs.join('\n')+JSON.stringify(store);
     assert.ok(!out.includes(TOKEN)&&!out.includes('AAFakeToken'),'the token never reaches output, logs or state');
     // A closed ask is never told.
-    ledger.appendEvent({workflowId:'wf-miamia-pricing-x1',entityType:'report',entityId:'ctx_price',kind:'ask-answered',payload:{dispatchId:'ctx_price'}});
-    assert.equal((await notifyAsk({ledgerFile,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(path.join(machineHome,'fresh'),{fetchImpl:bot.fetchImpl}))).skipped,'already answered');
+    ledger.appendEvent({workflowId:'wf-my-app-pricing-x1',entityType:'report',entityId:'ctx_price',kind:'ask-answered',payload:{dispatchId:'ctx_price'}});
+    assert.equal((await notifyAsk({ledgerFile,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(path.join(machineHome,'fresh'),{fetchImpl:bot.fetchImpl}))).skipped,'already answered');
   });
 });
 
 test('parkAsk records ask-notified with the ask fields when the owner is told, ask-notify-failed when the send fails, nothing when Telegram is off',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
-    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_old',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
-    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_new',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_old',question:{text:'C\u1ed5ng thanh to\u00e1n? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_new',question:{text:'C\u1ed5ng thanh to\u00e1n? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
     const rows=()=>ledger.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id='wf-park' AND kind IN ('ask-notified','ask-notify-failed','ask-superseded','ask-message-closed') ORDER BY seq").all().map(r=>[r.kind,JSON.parse(r.payload_json)]);
     const report=id=>ledger.db.prepare("SELECT r.*,a.op_id,a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id='wf-park' AND r.dispatch_id=?").get(id);
     const bot=fakeBot();
@@ -395,12 +395,12 @@ test('Bot API calls retry 429 and 5xx politely, fail fast on 4xx, and scrub the 
 
 test('discover-chat lists chat ids, types and names only',async()=>{
   const bot=fakeBot({sequence:[{status:200,json:{ok:true,result:[
-    {update_id:1,message:{message_id:1,text:'/start secret words',chat:{id:5550001,type:'private',first_name:'Thầy',last_name:'Ci',username:'owner'}}},
-    {update_id:2,message:{message_id:2,text:'again',chat:{id:5550001,type:'private',first_name:'Thầy'}}},
+    {update_id:1,message:{message_id:1,text:'/start secret words',chat:{id:5550001,type:'private',first_name:'Th\u1ea7y',last_name:'Ci',username:'owner'}}},
+    {update_id:2,message:{message_id:2,text:'again',chat:{id:5550001,type:'private',first_name:'Th\u1ea7y'}}},
     {update_id:3,my_chat_member:{chat:{id:-1009,type:'supergroup',title:'StarCi owners'}}},
   ]}}]});
   const r=await discoverChats({token:TOKEN,apiBase:'http://bot.invalid',fetchImpl:bot.fetchImpl});
-  assert.deepEqual(r,{ok:true,chats:[{id:5550001,type:'private',name:'Thầy Ci',username:'owner'},{id:-1009,type:'supergroup',name:'StarCi owners',username:null}]});
+  assert.deepEqual(r,{ok:true,chats:[{id:5550001,type:'private',name:'Th\u1ea7y Ci',username:'owner'},{id:-1009,type:'supergroup',name:'StarCi owners',username:null}]});
   assert.ok(!JSON.stringify(r).includes('secret words'),'message text is never printed');
   assert.equal(bot.calls[0].method,'getUpdates');
 });
@@ -417,10 +417,10 @@ test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the
   assert.match(read('scripts/kernel/verbs/serve-ask.mjs'),/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
 });
 
-// Owner, 2026-09-24: "trả lời xong xóa" — an answered or retired ask leaves the chat.
+// Owner, 2026-09-24: "answered means deleted" — an answered or retired ask leaves the chat.
 test('an answered or retired ask deletes every message that shows it; one Telegram will not delete is edited instead',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
-    seedAsk(ledger,{workflowId:'wf-close',dispatchId:'ctx_close',question:{text:'Cổng thanh toán nào?',options:['VNPay','MoMo']}});
+    seedAsk(ledger,{workflowId:'wf-close',dispatchId:'ctx_close',question:{text:'C\u1ed5ng thanh to\u00e1n n\u00e0o?',options:['VNPay','MoMo']}});
     const bot=fakeBot();
     const told=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-close',dispatchId:'ctx_close'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     await recordAskMessage({workflowId:'wf-close',dispatchId:'ctx_close',messageId:555,url:'http://127.0.0.1:6975/a-0123456789abcdef01'},{env:{LOCALAPPDATA:machineHome}});
@@ -434,7 +434,7 @@ test('an answered or retired ask deletes every message that shows it; one Telegr
     assert.equal(never.skipped,'no message sent for this ask');
 
     // Older than 48 h: Telegram refuses the delete, so the message is edited to say so, with no link or button.
-    seedAsk(ledger,{workflowId:'wf-old',dispatchId:'ctx_old',question:{text:'Tên miền?',options:['a','b']}});
+    seedAsk(ledger,{workflowId:'wf-old',dispatchId:'ctx_old',question:{text:'T\u00ean mi\u1ec1n?',options:['a','b']}});
     const stale=fakeBot();
     const refuse=async(url,init)=>url.endsWith('/deleteMessage')
       ?{ok:false,status:400,json:async()=>({ok:false,description:"Bad Request: message can't be deleted for everyone"})}:stale.fetchImpl(url,init);
@@ -442,8 +442,8 @@ test('an answered or retired ask deletes every message that shows it; one Telegr
     const retired=await markAskClosed({ledgerFile,workflowId:'wf-old',dispatchId:'ctx_old',reason:'retired'},deps(machineHome,{fetchImpl:refuse}));
     assert.deepEqual([retired.deleted,retired.edited],[[],[oldTold.messageId]]);
     const edit=stale.calls.find(c=>c.method==='editMessageText');
-    assert.match(edit.body.text,/^\[StarCi\] Câu hỏi này không cần trả lời nữa \(lúc /);
-    assert.match(edit.body.text,/Tên miền\?/);
+    assert.ok(edit.body.text.startsWith(`${textFor('vi').retired} (${textFor('vi').at} `));
+    assert.match(edit.body.text,/T\u00ean mi\u1ec1n\?/);
     assert.equal(edit.body.reply_markup,undefined,'the edit drops the button');
   });
 });

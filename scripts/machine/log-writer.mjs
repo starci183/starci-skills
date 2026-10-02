@@ -114,7 +114,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
         if (d.act === 'drop') {
           out.dropped += 1; out.seqs.push(null);
           if (d.truncate) appendLog(db, { at: d.truncate.now, workflowId: d.truncate.row.workflowId, jobId: d.truncate.row.jobId, attemptId: d.truncate.row.attemptId ?? null,
-            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `Nhật ký job đã chạm trần ${d.truncate.perJobCap} dòng; các dòng sau bị bỏ`, data: { cap: d.truncate.perJobCap }, refs: [] });
+            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `the job log hit its ${d.truncate.perJobCap}-line cap; later lines are dropped`, data: { cap: d.truncate.perJobCap }, refs: [] });
           continue;
         }
         const { row } = d;

@@ -211,7 +211,7 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
     if (error?.code !== 'EXDEV') throw error;
     // A cross-device move copies first; the source goes only after the copy is verified to hold the same top-level
     // entries (moves, never deletes), and removal goes through safeRemoveTree — the one runtime tree delete, which
-    // unlinks links and never descends into one (nivo-fe inc-c8fbf76aa499).
+    // unlinks links and never descends into one.
     fs.cpSync(from, to, { recursive: true });
     const wanted = fs.readdirSync(from).sort();
     const copied = fs.readdirSync(to).sort();

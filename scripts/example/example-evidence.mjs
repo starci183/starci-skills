@@ -1,9 +1,12 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
+import {skillRoot} from '../../engine/runtime-root.mjs';
+import {normalizeHostPaths} from '../lib/host-path.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from '../work/record-ownership.mjs';
 
 /**
@@ -98,7 +101,9 @@ function runAssertion({id, command}, cwd) {
     exit = typeof error?.status === 'number' ? error.status : 1;
   }
   const outcome = exit === 0 ? 'pass' : 'fail';
-  return {id, command, exit, outcome, observation: `${command} exited ${exit}`};
+  // The record is portable: the command is written with repo-relative paths and without the host location of its shell (scripts/lib/host-path.mjs).
+  const recorded = normalizeHostPaths(command, {repo: cwd, runtime: skillRoot, tmp: os.tmpdir(), home: os.homedir()});
+  return {id, command: recorded, exit, outcome, observation: `${recorded} exited ${exit}`};
 }
 
 export function generateEvidence({workRoot, recordId, cwd, assertions, now = () => new Date()}) {

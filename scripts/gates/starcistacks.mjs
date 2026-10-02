@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// check-starcistacks.mjs - the .starcistacks services contract (owner ruling 2026-09-24: "stacks làm rõ
-// sonar ... update .claude và enforce định dạng .starcistacks").
+// check-starcistacks.mjs - the .starcistacks services contract (owner ruling 2026-09-24: "the stacks make sonar
+// clear ... update .claude and enforce the .starcistacks format").
 //
 // Every product states the delivery and quality services its code and CI use - Sonar, a
 // container registry, analytics, error tracking - in the `services` block of its stack declaration
@@ -417,7 +417,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
       if (open.length) add('refuse', 'STACKS_GITIGNORE_VALUE_OPEN', '.gitignore',
         `the ignore rules leave plaintext value files under ${root}/${env.name}/infra trackable (${open.join(', ')}); deny them after the infra re-includes and re-include *.enc last (modules/schemas/stacks-layout.yaml custody.gitignoreRules)`);
       // The environment runbook is part of the layout contract (stacks-layout.yaml shape.runbook);
-      // rules that hide it strand it on one machine (mia-mia-backend inc-5b22edbb4e62).
+      // rules that hide it strand it on one machine.
       const runbook = `${root}/${env.name}/README.md`;
       if (git(repo, ['check-ignore', '-q', '--no-index', '--', runbook])?.status === 0)
         add('suspect', 'STACKS_RUNBOOK_IGNORED', runbook, `the ignore rules hide the ${env.name} runbook; re-include it (!${runbook}) so every machine reads it`);

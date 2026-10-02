@@ -35,14 +35,12 @@ import {
 } from './brand/brand.mjs';
 import { flag, sha256File, slash, writeRecordFile } from './work-io.mjs';
 import { sha256 } from '../../engine/digest.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const OWNER = 'owner';
 /** Autopilot's provisional accept (scripts/kernel/autopilot.mjs AUTOPILOT_BY). */
 const AUTOPILOT_BY = 'autopilot';
-const OPTIONS = {
-  en: ['Accept this archetype of the direction', 'Revise - say in the note what to change'],
-  vi: ['Chấp nhận hướng thiết kế cho loại trang này', 'Sửa lại - ghi chú rõ cần đổi gì'],
-};
+const OPTIONS = ['Accept this archetype of the direction', 'Revise - say in the note what to change'];
 
 /** The brand record with its direction, and the repository root receipt paths are relative to. */
 function loadDirection(work) {
@@ -89,24 +87,21 @@ export function directionReviewQuestion(work, { archetype, lang = 'en' } = {}) {
   const entry = archetypesOf(direction)[archetype];
   if (!entry) throw new Error(`brand.direction declares no ${archetype} archetype - brand.decide writes it (directionArchetype ${archetype}) before the owner is asked`);
   const golden = reviewedGolden(loaded, archetype);
-  const vi = lang === 'vi';
+  const tr = translator(lang);
   const digests = golden.map((g) => `${g.breakpoint ?? path.basename(g.png)} ${g.sha256.slice(0, 8)}`).join(', ');
   // An open ruling the owner has already stated a choice for says so, so the ask records it (still not applied).
   const pending = (Array.isArray(direction.pendingRulings) ? direction.pendingRulings : []).filter((r) => r?.status !== 'ruled')
-    .map((r) => (r.ownerStated ? `${r.question} (${vi ? 'chủ dự án đã nêu' : 'owner stated'}: ${r.ownerStated})` : r.question));
-  const pendingLine = !pending.length ? '' : vi ? ` Câu hỏi còn mở (chưa áp dụng): ${pending.join(' | ')}.` : ` Open owner questions (not applied): ${pending.join(' | ')}.`;
+    .map((r) => (r.ownerStated ? `${r.question} (${tr('owner stated')}: ${r.ownerStated})` : r.question));
+  const pendingLine = !pending.length ? '' : tr(' Open owner questions (not applied): {list}.', { list: pending.join(' | ') });
   // Rulings learned from the owner's draw feedback (draw-feedback.mjs) stay proposed until this acceptance.
   const learned = learnedOf(direction).filter((l) => l.status !== 'accepted');
-  const learnedLine = !learned.length ? '' : vi
-    ? ` Quy tắc rút ra từ góp ý vẽ của chủ dự án (sẽ được chấp nhận cùng): ${learned.map((l) => `[${l.id}] ${l.text}`).join(' | ')}.`
-    : ` Rulings learned from your draw feedback (accepted with this answer): ${learned.map((l) => `[${l.id}] ${l.text}`).join(' | ')}.`;
-  const text = vi
-    ? `Xin chủ dự án duyệt hướng thiết kế (brand.direction rev ${direction.rev}) cho loại trang "${archetype}": thứ tự vùng, lưới, điểm nhấn, vị trí hành động chính và các ảnh tham chiếu. Chấp nhận, hoặc yêu cầu sửa và ghi rõ cần đổi gì.${pendingLine}${learnedLine} [${digests}]`
-    : `Please review the design direction (brand.direction rev ${direction.rev}) for the "${archetype}" page archetype: region order, grids, emphasis, primary-action placement and the reference renders. Accept it, or ask for a revision and say in the note what to change.${pendingLine}${learnedLine} [${digests}]`;
+  const learnedLine = !learned.length ? '' : tr(' Rulings learned from your draw feedback (accepted with this answer): {list}.', { list: learned.map((l) => `[${l.id}] ${l.text}`).join(' | ') });
+  const text = tr('Please review the design direction (brand.direction rev {rev}) for the "{archetype}" page archetype: region order, grids, emphasis, primary-action placement and the reference renders. Accept it, or ask for a revision and say in the note what to change.{pendingLine}{learnedLine} [{digests}]',
+    { rev: direction.rev, archetype, pendingLine, learnedLine, digests });
   return {
     kind: DIRECTION_REVIEW_KIND,
     text,
-    options: [...(OPTIONS[lang] ?? OPTIONS.en)],
+    options: OPTIONS.map((o) => tr(o)),
     refs: ['brand'],
     assets: golden.map((g) => ({ path: slash(path.relative(repoRoot, path.resolve(loaded.dir, g.png))), label: `${archetype}${g.breakpoint ? ` - ${g.breakpoint}` : ''}` })),
     review: { schema: DIRECTION_REVIEW_SCHEMA, record: 'brand', recordPath: slash(path.relative(repoRoot, loaded.file)), directionRev: direction.rev, archetype, golden,

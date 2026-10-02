@@ -24,9 +24,9 @@ describe("RankArtwork", () => {
     })
 
     it("exposes an accessible image only when a label is supplied", () => {
-        const markup = renderToStaticMarkup(<RankArtwork className="size-6" kind="second" label="Hạng 2" />)
+        const markup = renderToStaticMarkup(<RankArtwork className="size-6" kind="second" label="Rank 2" />)
 
-        expect(markup).toContain("aria-label=\"Hạng 2\"")
+        expect(markup).toContain("aria-label=\"Rank 2\"")
         expect(markup).toContain("role=\"img\"")
         expect(markup).not.toContain("aria-hidden")
         expect(markup).toContain("size-6")

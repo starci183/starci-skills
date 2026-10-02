@@ -21,7 +21,6 @@ import {posixPath,slash} from '../lib/path-key.mjs';
 export const VERIFY_PROOF='starci/verify-proof@1';
 /** The proof of a sealed candidate: planned only from a verifier-owned oracle manifest. */
 export const CANDIDATE_PROOF='starci/verify-proof@1';
-export const PROOF_VERDICTS=['pass','fail','inconclusive','unavailable'];
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
 /** A spec/test file in any of the suites this runtime drives (unit, e2e). */
@@ -105,7 +104,7 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
   const scratch=path.join(parent,'base');
   const cleanup=()=>{
     // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch
-    // (a dependency link) would be followed into its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree never
+    // (a dependency link) would be followed into its target. safeRemoveTree never
     // descends into a link; prune drops the registration.
     try{safeRemoveWorktree(scratch,{repo:worktree,git:args=>run(args)});}catch{/* the temporary worktree is best-effort */}
     try{safeRemoveTree(parent, { hold: artifactHoldReason });}catch{/* nothing to keep */}

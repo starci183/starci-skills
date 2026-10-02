@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseJson } from '../lib/json.mjs';
 import { latestContractOf } from '../machine/contract-version.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 
@@ -39,8 +40,6 @@ export const SESSION_LEAD_MS = 30 * 60 * 1000;
 // Only the head of a session file is scanned for the job id: the dispatch
 // preamble is the worker's first user message.
 const SESSION_GREP_BYTES = 256 * 1024;
-// allocation.housekeeping.archiveRoot's declared default (runtimes.yaml).
-export const DEFAULT_SESSION_ARCHIVE_ROOT = 'D:/starci-archive';
 
 // The agent provider of a job payload — the same read cli.mjs agentOfJob
 // makes, kept local so the module is usable without the api's bindings.
@@ -233,7 +232,7 @@ export async function releaseSettledSession({ db, job, payload, repo, env = proc
     if (f?.matched && typeof f.file === 'string') { try { if (fs.existsSync(f.file)) attributed.add(f.file); } catch { /* gone */ } }
   const files = [...attributed];
   if (!files.length) return skip(identity.files.length ? 'unattributed-session' : 'no-session-file', { cwds: identity.cwds, candidates: identity.files.length });
-  const root = env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRoot ?? DEFAULT_SESSION_ARCHIVE_ROOT;
+  const root = env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRoot ?? archiveRootOf({ env });
   const run = archive ?? await sessionArchiver(env);
   if (!run) return skip('archiver-unavailable', { files, archiveRoot: root });
   try { beforeArchive?.({ agent, files }); } catch { /* a usage read never blocks the release */ }

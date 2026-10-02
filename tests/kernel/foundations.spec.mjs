@@ -8,9 +8,9 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName} from '../../scripts/kernel/foundations.mjs';
 
-// Owner, 2026-09-24: workflows sharing one repository planned independently and found their shared
-// foundations mid-flight (nivo Collab held on Modules' layout tree rev behind an owner-gate that was
-// really a peer dependency, inc-28187662c4fe; mia-mia brand.decide waited on base-repos' Grammar and
+// Owner ruling: workflows sharing one repository planned independently and found their shared
+// foundations mid-flight (one workflow held on another's layout tree rev behind an owner-gate that was
+// really a peer dependency; another's brand.decide waited on base-repos' Grammar and
 // FE app/ for a day). The ledger now keeps a registry of shared foundations - one OWNER workflow, a
 // state, its dependents; a dependent waits with a typed peer-wait --until-foundation, and the owner's
 // landing notifies every dependent and releases those waits. A workflow created after the change
@@ -19,7 +19,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
-const MOD='wf-nivo-modules',COLLAB='wf-nivo-collab',AUTH='wf-nivo-auth',OLD='wf-nivo-old';
+const MOD='wf-app-modules',COLLAB='wf-app-collab',AUTH='wf-app-auth',OLD='wf-app-old';
 
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-foundations-'));
@@ -181,7 +181,7 @@ test('a new workflow with running peers declares its foundations before its firs
 test('an open wait raised before the registry is typed onto a foundation with --attach and released by the landing',t=>{
   const fx=fixture(t);
   fx.foundation(MOD,'--claim','workspace-provision-module','--kind','module');
-  // nivo AUTH inc-9f2e1e7ff1f6: a free-text peer-wait on the peer that owns the module; Collab inc-28187662c4fe:
+  // AUTH: a free-text peer-wait on the peer that owns the module; COLLAB:
   // an owner-gate that was really a peer dependency.
   const plain=fx.ok(['incident','--workflow',AUTH,'--kind','peer-wait','--peer',MOD,'--op','docs.author','--detail','app does not boot until WorkspaceProvisionModule exports its admission token']);
   const gate=fx.ok(['incident','--workflow',COLLAB,'--kind','owner-gate','--op','docs.author','--detail','Peer dependency: the provision module']);
@@ -193,7 +193,7 @@ test('an open wait raised before the registry is typed onto a foundation with --
   assert.deepEqual(fx.ok(['foundations']).foundations[0].dependents.map(d=>d.workflowId).sort(),[AUTH,COLLAB].sort(),'typing a wait on it declares the dependency');
   const status=fx.ok(['status','--workflow',AUTH]).frontier;
   assert.equal(status.gateConditions?.[0]?.conditions?.[0]?.met,false);
-  const land=fx.foundation(MOD,'--land','workspace-provision-module','--proof','commit 1a2b3c: WORKSPACE_PROVISIONING_ADMISSION exported; nivo lane boots');
+  const land=fx.foundation(MOD,'--land','workspace-provision-module','--proof','commit 1a2b3c: WORKSPACE_PROVISIONING_ADMISSION exported; app lane boots');
   assert.deepEqual(land.released.map(r=>r.incidentId).sort(),[plain.incidentId,gate.incidentId].sort());
   assert.deepEqual(land.notified.map(m=>m.to).sort(),[AUTH,COLLAB].sort());
   fx.read(db=>{for(const inc of [plain.incidentId,gate.incidentId])assert.equal(db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(inc).status,'resolved');});

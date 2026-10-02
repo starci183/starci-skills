@@ -80,10 +80,10 @@ assertions:
     observation: npx jest src/modules/domain/task/list-tasks.handler.spec.ts -t
       "ac.task.list.owned.excludes-others" exited 0
   - id: br.task.list.owned.live-proof
-    command: C:\PROGRA~1\Git\bin\bash.exe -c "API_URL=http://localhost:3001 scripts/live-proof.mjs"
+    command: bash -c "API_URL=http://localhost:3001 scripts/live-proof.mjs"
     exit: 0
     outcome: pass
-    observation: C:\PROGRA~1\Git\bin\bash.exe -c "API_URL=http://localhost:3001 scripts/live-proof.mjs" exited 0
+    observation: bash -c "API_URL=http://localhost:3001 scripts/live-proof.mjs" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

@@ -359,7 +359,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: app.agent-output
     profiles: [app]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none
@@ -373,7 +373,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository) for a lane; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, never tracked, and removed by the runtime's host-side controller once the workflow's finish marked it release-pending"
+    goesTo: "<lanes root>/<project>/<lane>/ (outside every repository) for a lane; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, never tracked, and removed by the runtime's host-side controller once the workflow's finish marked it release-pending"
   - id: app.plaintext-env
     profiles: [app]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
@@ -528,7 +528,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: repo.agent-output
     profiles: [be, fe]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none
@@ -542,7 +542,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+    goesTo: "<lanes root>/<project>/<lane>/ (outside every repository)"
   - id: repo.plaintext-env
     profiles: [be, fe]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"

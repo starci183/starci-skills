@@ -43,7 +43,7 @@ function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } =
   const ctx = fakeCtx({
     mode, calls,
     now: () => t, advance: (ms) => { t += ms; },
-    ledgers: ledgers ?? [{ ledgerId: 'nivo-backend', repo: fixtureRepo('nivo-backend'), file: fixtureLedger('nivo-backend') }],
+    ledgers: ledgers ?? [{ ledgerId: 'todo-app-be', repo: fixtureRepo('todo-app-be'), file: fixtureLedger('todo-app-be') }],
     read: (id, fn) => fn(dbs[id]),
     run: async (cmd, args, o) => { calls.run.push({ cmd, args, o }); return mode === 'shadow' ? { ok: true, shadow: true } : (runAnswer?.(cmd, args) ?? { ok: true, stdout: '{}' }); },
     api: async (id, verb, argv) => { calls.api.push({ id, verb, argv }); return { ok: true, shadow: mode === 'shadow' }; },
@@ -74,7 +74,7 @@ function controller(over = {}) {
   });
 }
 const booted = (c) => { c._state.bootPending = false; return c; };
-const SEAT = 'seat:kernel:nivo-backend:wf-nivo-fe-canon';
+const SEAT = 'seat:kernel:todo-app-be:wf-todo-app-fe-canon';
 const repairRuns = (ctx) => ctx.calls.run.filter((r) => r.args[0] === 'scripts/kernel/kernel-watchdog.mjs');
 
 test('pure helpers: seat states, goal problems, child output', () => {
@@ -84,7 +84,7 @@ test('pure helpers: seat states, goal problems, child output', () => {
   assert.equal(seatStateOf('interactive-gate'), 'gated');
   assert.equal(seatStateOf('active'), 'live');
   assert.equal(goalProblem(null, goalTextRefusal), 'goal-text-missing');
-  assert.equal(goalProblem('Khởi động lại\nGoal gốc:\n\nnull', goalTextRefusal), 'goal-text-unresolved');
+  assert.equal(goalProblem('Kh\u1edfi \u0111\u1ed9ng l\u1ea1i\nGoal g\u1ed1c:\n\nnull', goalTextRefusal), 'goal-text-unresolved');
   assert.equal(goalProblem(GOAL, goalTextRefusal), null);
   assert.equal(outputOf({ ok: true, shadow: true }), null);
   assert.deepEqual(outputOf({ stdout: 'noise\n{"action":"restarted"}\n' }), { action: 'restarted' });
@@ -92,7 +92,7 @@ test('pure helpers: seat states, goal problems, child output', () => {
 });
 
 test('shadow: probe action=restart-needed -> the --repair replace is recorded, never run', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
   const c = booted(controller({ store: () => store, probeSeat: async () => ({ ok: true, action: 'restart-needed' }) }));
   const ctx = hostCtx({ dbs });
@@ -101,14 +101,14 @@ test('shadow: probe action=restart-needed -> the --repair replace is recorded, n
   assert.equal(r.replaced, true);
   const runs = repairRuns(ctx);
   assert.equal(runs.length, 1);
-  assert.deepEqual(runs[0].args, ['scripts/kernel/kernel-watchdog.mjs', '--repo', fixtureRepo('nivo-backend'), '--workflow', 'wf-nivo-fe-canon', '--once', '--repair', '--json']);
+  assert.deepEqual(runs[0].args, ['scripts/kernel/kernel-watchdog.mjs', '--repo', fixtureRepo('todo-app-be'), '--workflow', 'wf-todo-app-fe-canon', '--once', '--repair', '--json']);
   assert.equal(store.get(SEAT).restarts.length, 1);
   assert.equal(store.get(SEAT).state, 'suspect');
   assert.ok(ctx.calls.clock.some((c) => c.entity === SEAT && c.code === 'SEAT_VACANT'));
 });
 
 test('shadow: a live Kernel records no repair at all', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   const c = booted(controller({ probeSeat: async () => ({ ok: true, action: 'active' }) }));
   const ctx = hostCtx({ dbs });
   const r = await c.reconcile(SEAT, ctx);
@@ -117,7 +117,7 @@ test('shadow: a live Kernel records no repair at all', async () => {
 });
 
 test('active: watchdog --once --repair runs through ctx.run and its action=restarted counts a replacement; the 4th in an hour quarantines', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
   const c = booted(controller({ store: () => store, probeSeat: async () => assert.fail('active mode does not probe first') }));
   const ctx = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"restarted"}' }) });
@@ -136,7 +136,7 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
 });
 
 test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: 'Khởi động lại trên runtime mới\nGoal gốc:\n\nnull' }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: 'Kh\u1edfi \u0111\u1ed9ng l\u1ea1i tr\u00ean runtime m\u1edbi\nGoal g\u1ed1c:\n\nnull' }] }) };
   let probed = 0;
   const c = booted(controller({ probeSeat: async () => { probed += 1; return { action: 'restart-needed' }; } }));
   for (const mode of ['shadow', 'active']) {
@@ -150,25 +150,25 @@ test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async 
     assert.equal(ctx.calls.decisions[0].decider, 'supervisor');
   }
   assert.equal(probed, 0);
-  const missing = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon' }] }) };
+  const missing = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon' }] }) };
   const ctx = hostCtx({ dbs: missing });
   assert.equal((await booted(controller()).reconcile(SEAT, ctx)).refused, 'goal-text-missing', 'no goal row at all is refused too');
 });
 
 test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; a listed repo -> never', async () => {
-  const old = T0 - 45 * 60_000;
+  const old = T0 - 45 * 60_000; const DRIVE = path.parse(os.tmpdir()).root; const D = DRIVE.replace(/\\/g, '/'); const KNOWN = `${D}Repositories/todo-app-be`;
   const procs = [
-    { pid: 101, created: old, cmd: '"C:\\Program Files\\nodejs\\node.exe" D:\\Repositories\\starci-academy-backend\\.claude\\scripts\\kernel\\watchdog.mjs --repo C:\\Users\\Hi\\AppData\\Local\\Temp\\starci-host-outage-Ab12\\repo --workflow wf-test-outage --repair' },
-    { pid: 102, created: old, cmd: 'node D:\\Repositories\\starci-academy-backend\\.claude\\scripts\\kernel\\watchdog.mjs --repo D:\\Repositories\\nivo-backend --workflow wf-nivo-fe-canon --repair' },
-    { pid: 103, created: old, cmd: 'node D:/Repositories/starci-academy-backend/.claude/scripts/supervisor/supervisor-watchdog.mjs' },
-    { pid: 104, created: T0 - 5 * 60_000, cmd: 'node scripts/kernel/ask-server.mjs --repo C:/Users/Hi/AppData/Local/Temp/starci-x/repo --workflow wf-y' },
-    { pid: 105, created: old, cmd: 'node scripts/kernel/start-workflow.mjs --repo "C:/Users/Hi/AppData/Local/Temp/starci-host-outage-Zz/repo" --workflow wf-z' },
-    { pid: 106, created: old, cmd: 'node D:/tools/other-watchdog.mjs.bak --repo C:/Temp/x' },
+    { pid: 101, created: old, cmd: `"${DRIVE}Program Files\\nodejs\\node.exe" ${DRIVE}Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo ${DRIVE}Temp\\starci-host-outage-Ab12\\repo --workflow wf-test-outage --repair` },
+    { pid: 102, created: old, cmd: `node ${DRIVE}Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo ${DRIVE}Repositories\\todo-app-be --workflow wf-todo-app-fe-canon --repair` },
+    { pid: 103, created: old, cmd: `node ${D}Repositories/ecommerce-app/.claude/scripts/supervisor/supervisor-watchdog.mjs` },
+    { pid: 104, created: T0 - 5 * 60_000, cmd: `node scripts/kernel/ask-server.mjs --repo ${D}Temp/starci-x/repo --workflow wf-y` },
+    { pid: 105, created: old, cmd: `node scripts/kernel/start-workflow.mjs --repo "${D}Temp/starci-host-outage-Zz/repo" --workflow wf-z` },
+    { pid: 106, created: old, cmd: `node ${D}tools/other-watchdog.mjs.bak --repo ${D}Temp/x` },
   ];
-  const pure = findOrphans(procs, { knownRepos: ['D:/Repositories/nivo-backend'], runningWorkflows: new Set(['wf-nivo-fe-canon']), now: T0, minAgeMs: S.processes.orphanMinAgeMs });
+  const pure = findOrphans(procs, { knownRepos: [KNOWN], runningWorkflows: new Set(['wf-todo-app-fe-canon']), now: T0, minAgeMs: S.processes.orphanMinAgeMs });
   assert.deepEqual(pure.map((o) => o.pid), [101, 105], 'the listed repo, the repo-less Supervisor watchdog and a young loop are never orphans');
 
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   const c = controller({ listProcesses: async () => procs });
   const ctx = hostCtx({ dbs });
   const r = await c.reconcile('host:processes', ctx);
@@ -188,7 +188,7 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
 });
 
 test('process counts over threshold are logged and nothing is stopped for them; the terminal count drift is a clock', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }], jobs: [{ id: 'j1', status: 'running', worker: 't1' }, { id: 'j2', status: 'settled', worker: 't2' }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }], jobs: [{ id: 'j1', status: 'running', worker: 't1' }, { id: 'j2', status: 'settled', worker: 't2' }] }) };
   // Orca's active workers over every Run (the Supervisor seat, the Kernel, one op): the count the drift is measured against.
   const active = [{ dispatchId: 'ctx_sup', terminalState: 'active' }, { dispatchId: 'ctx_k', terminalState: 'active' }, { dispatchId: 'ctx_op', terminalState: 'active' }];
   const c = controller({ listProcesses: async () => [{ pid: 1 }], hostVerdict: async () => ({ alert: true, counts: { node: 400, git: 5, all: 900 }, topParents: [] }), orcaTerminals: async () => 9, activeWorkers: async () => active });
@@ -207,12 +207,12 @@ test('process counts over threshold are logged and nothing is stopped for them; 
 });
 
 test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), reconcile per ledger, then seats', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }] }) };
   let orcaUp = false;
   const c = controller({ registry: () => noopRegistry((n) => (n === 'orca' ? orcaUp : true)), probeSeat: async () => ({ action: 'active' }) });
   const ctx = hostCtx({ dbs });
   assert.deepEqual((await c.list(ctx)).slice(0, 2), ['host:boot', 'service:orca']);
-  assert.deepEqual(await c.reconcile('seat:kernel:nivo-backend:wf-a', ctx), { ok: true, deferred: 'boot' }, 'no seat before the boot dedupe');
+  assert.deepEqual(await c.reconcile('seat:kernel:todo-app-be:wf-a', ctx), { ok: true, deferred: 'boot' }, 'no seat before the boot dedupe');
   const down = await c.reconcile('host:boot', ctx);
   assert.equal(down.waiting, 'orca');
   assert.equal(c._state.bootPending, true);
@@ -221,8 +221,8 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
   const up = await c.reconcile('host:boot', ctx);
   assert.equal(up.ok, true);
   assert.deepEqual(up.steps.map((s) => s.step), ['orca', 'harness-ui', 'harness-tunnel', 'ask-gateway', 'ask-tunnel', 'telegram-bridge', 'dedupe',
-    'reconcile --orphan-kernel-jobs', 'reconcile --orca-tasks', 'seat', 'seat:supervisor']);
-  assert.deepEqual(ctx.calls.api.map((a) => `${a.id} ${a.verb} ${a.argv.join(' ')}`), ['nivo-backend reconcile --orphan-kernel-jobs', 'nivo-backend reconcile --orca-tasks']);
+    'reconcile --orphan-kernel-jobs', 'seat', 'seat:supervisor']);
+  assert.deepEqual(ctx.calls.api.map((a) => `${a.id} ${a.verb} ${a.argv.join(' ')}`), ['todo-app-be reconcile --orphan-kernel-jobs']);
   assert.equal(c._state.bootPending, false);
   assert.ok(!(await c.list(ctx)).includes('host:boot'));
 });
@@ -230,7 +230,7 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
 test('Orca failed -> healthy asks for the boot order again', async () => {
   let orcaUp = false;
   const c = booted(controller({ registry: () => noopRegistry((n) => (n === 'orca' ? orcaUp : true)) }));
-  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   await c.reconcile('service:orca', ctx);
   assert.equal(c._state.bootPending, false);
   orcaUp = true; ctx.advance(60_000);
@@ -242,7 +242,7 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
   const store = memoryStore();
   const reg = () => noopRegistry((n) => n !== 'telegram-bridge').map((e) => ({ ...e, startTimeoutMs: 1 }));
   const c = booted(controller({ store: () => store, registry: reg }));
-  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   for (let i = 0; i < 20; i += 1) { await c.reconcile('service:telegram-bridge', ctx); ctx.advance(60_000); }
   const starts = ctx.calls.run.filter((r) => r.args.join(' ') === 'scripts/reconciler/services.mjs --start telegram-bridge --json');
   assert.equal(starts.length, 5);
@@ -256,33 +256,33 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
 });
 
 test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightly backup is recorded once a day', async () => {
-  const ledgers = [{ ledgerId: 'nivo-backend', repo: fixtureRepo('r'), file: fixtureLedger('r') }];
+  const ledgers = [{ ledgerId: 'todo-app-be', repo: fixtureRepo('r'), file: fixtureLedger('r') }];
   let ok = false;
   const c = controller({ quickCheck: () => (ok ? { ok: true, result: ['ok'] } : { ok: false, result: ['*** in database main ***', 'page 7: btree'] }), backupDue: () => true });
-  const ctx = hostCtx({ ledgers, dbs: { 'nivo-backend': ledgerDb() } });
-  await c.reconcile('ledger:nivo-backend', ctx);
+  const ctx = hostCtx({ ledgers, dbs: { 'todo-app-be': ledgerDb() } });
+  await c.reconcile('ledger:todo-app-be', ctx);
   assert.ok(ctx.calls.clock.some((x) => x.code === 'LEDGER_CORRUPT' && x.severity === 'critical'));
   assert.equal(ctx.calls.decisions.length, 1);
   assert.equal(ctx.calls.run.length, 0, 'no backup of a corrupt ledger');
   ctx.advance(S.ledgerHealth.quickCheckEveryMs);
-  await c.reconcile('ledger:nivo-backend', ctx);
+  await c.reconcile('ledger:todo-app-be', ctx);
   assert.equal(ctx.calls.decisions.length, 1, 'still corrupt: no second DI');
   ok = true; ctx.advance(S.ledgerHealth.quickCheckEveryMs);
-  await c.reconcile('ledger:nivo-backend', ctx);
-  assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:nivo-backend' && x.state === 'LEDGER_CORRUPT'));
+  await c.reconcile('ledger:todo-app-be', ctx);
+  assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:todo-app-be' && x.state === 'LEDGER_CORRUPT'));
   const backups = ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs');
   assert.equal(backups.length, 1);
-  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'nivo-backend', '--file', fixtureLedger('r'), '--json']);
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'todo-app-be', '--file', fixtureLedger('r'), '--json']);
   ctx.advance(60_000);
-  await c.reconcile('ledger:nivo-backend', ctx);
+  await c.reconcile('ledger:todo-app-be', ctx);
   assert.equal(ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs').length, 1, 'once a day');
 });
 
 test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs nothing', async () => {
-  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   await booted(controller()).reconcile('seat:supervisor', ctx);
   assert.deepEqual(ctx.calls.run.map((r) => r.args), [['scripts/supervisor/supervisor-watchdog.mjs', '--once', '--json']]);
-  const chat = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const chat = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   assert.equal((await booted(controller({ supervisorMode: async () => 'chat' })).reconcile('seat:supervisor', chat)).skipped, 'chat-mode');
   assert.equal(chat.calls.run.length, 0);
 });
@@ -332,7 +332,7 @@ test('turnStep: over budget -> interrupt once; the same turn grace later -> repl
 });
 
 test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake pass, KERNEL_TURN_OVERDUE; still the same turn 5 min later -> replaced', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
   let minutes = 25, replaced = false;
   const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_k', agent: 'devin' }) }));
@@ -344,7 +344,7 @@ test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake
   const r1 = await c.reconcile(SEAT, ctx);
   assert.equal(r1.turn.act, 'interrupt');
   const argsOf = () => ctx.calls.run.map((x) => x.args.join(' '));
-  assert.ok(argsOf().includes(`scripts/reconciler/services.mjs --turn-interrupt --terminal term_k --agent devin --repo ${fixtureRepo('nivo-backend')} --workflow wf-nivo-fe-canon --json`));
+  assert.ok(argsOf().includes(`scripts/reconciler/services.mjs --turn-interrupt --terminal term_k --agent devin --repo ${fixtureRepo('todo-app-be')} --workflow wf-todo-app-fe-canon --json`));
   assert.equal(argsOf().filter((a) => a.startsWith('scripts/kernel/kernel-watchdog.mjs')).length, 2, 'the seat pass, then the re-wake pass');
   const overdue = ctx.calls.clock.find((x) => x.state === 'KERNEL_TURN_OVERDUE');
   assert.equal(overdue.entity, SEAT);
@@ -361,7 +361,7 @@ test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake
 });
 
 test('an interrupt that ends the turn clears KERNEL_TURN_OVERDUE and replaces nothing', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   let obs = { ok: true, busy: true, state: 'active', minutes: 21, terminal: 'term_k', agent: 'claude' };
   const c = booted(controller({ probeTurn: async () => obs }));
   const ctx = hostCtx({ dbs, mode: 'active' });
@@ -373,7 +373,7 @@ test('an interrupt that ends the turn clears KERNEL_TURN_OVERDUE and replaces no
 });
 
 test('shadow: an overdue turn records the interrupt, runs nothing, and a 19-minute turn is left alone', async () => {
-  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
   let minutes = 19;
   const c = booted(controller({ probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_k', agent: 'devin' }) }));
   const ctx = hostCtx({ dbs });
@@ -387,7 +387,7 @@ test('shadow: an overdue turn records the interrupt, runs nothing, and a 19-minu
 test('the Supervisor seat has its own 30-minute budget and interrupts with --supervisor', async () => {
   let minutes = 25;
   const c = booted(controller({ probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_s', agent: 'claude' }) }));
-  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() }, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"busy","terminal":"term_s"}' }) });
+  const ctx = hostCtx({ dbs: { 'todo-app-be': ledgerDb() }, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"busy","terminal":"term_s"}' }) });
   assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, null);
   ctx.advance(6 * 60_000); minutes = 31;
   assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, 'interrupt');
@@ -409,7 +409,7 @@ test('a service whose port still answers is never restarted, and a degraded pass
   let answers = true;
   const reg = () => noopRegistry((n) => n !== 'harness-ui').map((e) => (e.name === 'harness-ui' ? { ...e, answers: async () => answers } : e));
   const c = booted(controller({ store: () => store, registry: reg }));
-  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   await c.reconcile('service:harness-ui', ctx);
   for (let i = 0; i < 12; i += 1) { ctx.advance(60_000); await c.reconcile('service:harness-ui', ctx); }
   assert.equal(ctx.calls.run.filter((r) => r.args.includes('harness-ui')).length, 0, 'answering: never restarted');
@@ -417,7 +417,7 @@ test('a service whose port still answers is never restarted, and a degraded pass
   assert.ok(ctx.calls.log.some((l) => l.kind === 'reconciler.host.service-slow'));
   const flap = memoryStore();
   const c2 = booted(controller({ store: () => flap, registry: () => noopRegistry((n) => n !== 'orca') }));
-  const ctx2 = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx2 = hostCtx({ dbs: { 'todo-app-be': ledgerDb() } });
   flap.put({ name: 'orca', state: 'healthy', since: T0, restarts: [], failStreak: 0 });
   await c2.reconcile('service:orca', ctx2);
   assert.equal(flap.get('orca').state, 'degraded');

@@ -20,7 +20,7 @@ change:
   kind: clarifying
   at: 2026-09-18T17:30:00.000Z
   reason: "No content moved. The sequence block named PATCH /tasks/:id - the pre-GraphQL REST door that
-    ex-nivo-shape replaced; the steps now name the actual GraphQL operations the transport exposes.
+    the GraphQL reshape replaced; the steps now name the actual GraphQL operations the transport exposes.
     State also advances todo -> done: both interfaces are true of the boot wiring (TaskService.complete/
     reopen route every call through CompletionAuthorityRegistry.current(), which share.module.ts's
     ShareCompletionAuthoritySetup registers with the real ShareCompletionAuthority delegating to

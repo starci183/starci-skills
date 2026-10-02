@@ -11,11 +11,12 @@ import type { Concept } from '../../concept';
 import { Advanced, Swap } from '../../motion';
 import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
 import { WhyBlock } from '../../why/why-block';
+import { t } from '../../../i18n/t';
 
 export const concept: Concept = 'C6';
 
-const verdictWords: Record<string, string> = { pass: 'đạt', fail: 'hỏng', partial: 'một phần', blocked: 'bị chặn', dropped: 'đã bỏ', cancelled: 'đã huỷ' };
-const outcomeWords: Record<string, string> = { done: 'xong', partial: 'một phần', failed: 'hỏng', ask: 'cần hỏi', blocked: 'bị chặn' };
+const verdictWords: Record<string, string> = { pass: t('passed'), fail: t('failed'), partial: t('partial'), blocked: t('blocked'), dropped: t('dropped'), cancelled: t('cancelled') };
+const outcomeWords: Record<string, string> = { done: t('done'), partial: t('partial'), failed: t('failed'), ask: t('needs a question'), blocked: t('blocked') };
 
 function Crumb({ href, children }: { href: string; children: React.ReactNode }) {
   return <a className="hover:text-foreground hover:underline" href={href}>{children}</a>;
@@ -27,14 +28,14 @@ function SiblingLink({ target, label, dir }: { target: Ref; label: string; dir: 
   </a>;
 }
 
-/** Breadcrumb, title "op · lần n/5", job id, the two separate status chips and previous/next attempt links. */
+/** Breadcrumb, title "op · try n/5", job id, the two separate status chips and previous/next attempt links. */
 export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; project: string }) {
   const open = isOpen(attempt);
   const outcome = statusFromOutcome(attempt.reportOutcome);
   const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.ui);
   const previous = attempt.retry.retryOf ?? attempt.retry.resumeOf;
-  const outcomeLabel = attempt.reportOutcome ? `Op tự báo: ${outcomeWords[attempt.reportOutcome] ?? attempt.reportOutcome}` : attempt.reportedAt ? 'Op tự báo: chưa rõ' : 'Op tự báo: chưa báo cáo';
-  const verdictLabel = verdict === 'awaiting-owner' ? 'Kernel chốt: chờ thầy trả lời' : attempt.verdict ? `Kernel chốt: ${verdictWords[attempt.verdict] ?? attempt.verdict}` : open && attempt.reportedAt ? 'Kernel chốt: đang chốt' : 'Kernel chưa chốt';
+  const outcomeLabel = attempt.reportOutcome ? t('Op self-reported: {outcome}', { outcome: outcomeWords[attempt.reportOutcome] ?? attempt.reportOutcome }) : attempt.reportedAt ? t('Op self-reported: unclear') : t('Op self-reported: not reported');
+  const verdictLabel = verdict === 'awaiting-owner' ? t('Kernel verdict: awaiting the owner') : attempt.verdict ? t('Kernel verdict: {verdict}', { verdict: verdictWords[attempt.verdict] ?? attempt.verdict }) : open && attempt.reportedAt ? t('Kernel verdict: settling') : t('Kernel has not settled');
   const tone: Tone = statusTone[verdict === 'unknown' ? outcome : verdict];
   const enc = encodeURIComponent;
   const agent = agentOf(attempt);
@@ -44,21 +45,21 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
   const duration = attempt.dispatchedAt && end ? end - attempt.dispatchedAt : null;
   const total = attempt.usage?.total;
   const tokens = attempt.tokensIn != null || attempt.tokensOut != null ? (attempt.tokensIn ?? 0) + (attempt.tokensOut ?? 0) : total ? total.input + total.output : null;
-  const tokenText = tokens != null ? `${compactVi(tokens)} token` : attempt.usageSource === 'unavailable' ? `token không đo được${attempt.usageReason ? ` · ${attempt.usageReason}` : ''}` : 'token chưa ghi nhận';
+  const tokenText = tokens != null ? `${compactVi(tokens)} token` : attempt.usageSource === 'unavailable' ? t('tokens not measurable{reason}', { reason: attempt.usageReason ? ` · ${attempt.usageReason}` : '' }) : t('tokens not recorded');
   return <header className="flex min-w-0 flex-col gap-4" data-tone={tone}>
-    <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-      <Crumb href="#/">Tổng quan</Crumb><span aria-hidden="true">/</span>
+    <nav aria-label={t('Breadcrumb')} className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+      <Crumb href="#/">{t('Overview')}</Crumb><span aria-hidden="true">/</span>
       <Crumb href={`#/w/${enc(project)}/${enc(attempt.wf)}?tab=attempts`}>{attempt.wf}</Crumb><span aria-hidden="true">/</span>
-      <span>{name}</span><span aria-hidden="true">/</span><span className="text-foreground">lần thử #{attempt.id}</span>
+      <span>{name}</span><span aria-hidden="true">/</span><span className="text-foreground">{t('attempt #{id}', { id: attempt.id })}</span>
     </nav>
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 items-start gap-3">
         <AgentAvatar agent={agent} size={52} live={open && !attempt.reportedAt} />
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{name} <span className="whitespace-nowrap text-lg font-normal text-muted-foreground sm:text-xl">· lần {attempt.attempt}/{attempt.tryBudget ?? 5}</span></h1>
+          <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{name} <span className="whitespace-nowrap text-lg font-normal text-muted-foreground sm:text-xl">· {t('try {n}/{total}', { n: attempt.attempt, total: attempt.tryBudget ?? 5 })}</span></h1>
           <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong></span>
-            <span>Thời gian: <strong className="font-medium text-foreground">{formatSpan(duration)}</strong></span>
+            <span>{t('Duration:')} <strong className="font-medium text-foreground">{formatSpan(duration)}</strong></span>
           </p>
         </div>
       </div>
@@ -69,16 +70,16 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
     </div>
     {attempt.why ? <WhyBlock why={attempt.why} compact className="max-w-[80ch]" /> : null}
     {previous || attempt.retry.next ? <div className="flex flex-wrap items-center gap-2">
-      {previous ? <SiblingLink target={previous} label={attempt.retry.resumeOf && !attempt.retry.retryOf ? 'Tiếp nối từ' : 'Lần trước'} dir="prev" /> : null}
-      {attempt.retry.next ? <SiblingLink target={attempt.retry.next} label="Lần sau" dir="next" /> : null}
+      {previous ? <SiblingLink target={previous} label={attempt.retry.resumeOf && !attempt.retry.retryOf ? t('Resumed from') : t('Previous')} dir="prev" /> : null}
+      {attempt.retry.next ? <SiblingLink target={attempt.retry.next} label={t('Next')} dir="next" /> : null}
     </div> : null}
     <Advanced summary={`${attempt.job} · ${tokenText}`}>
       <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
-        <p className="m-0 break-all font-mono">{attempt.op} · {attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
+        <p className="m-0 break-all font-mono">{attempt.op} · {attempt.job} · attempt {attempt.id} · {t('dispatch #{id}', { id: attempt.dispatchSeq })}</p>
         <p className="m-0 flex flex-wrap gap-x-4 gap-y-1">
           <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong>{[attempt.pool, attempt.effort ? `effort ${attempt.effort}` : null].filter(Boolean).map(part => <span key={part}> · {part}</span>)}</span>
-          <span>{tokens != null ? <>Token: <strong className="font-medium text-foreground">{compactVi(tokens)}</strong></> : 'token: chưa ghi nhận'}</span>
-          {attempt.retry.class ? <span>Lý do thử lại: {attempt.retry.class}</span> : null}
+          <span>{tokens != null ? <>Token: <strong className="font-medium text-foreground">{compactVi(tokens)}</strong></> : t('tokens: not recorded')}</span>
+          {attempt.retry.class ? <span>{t('Retry reason:')} {attempt.retry.class}</span> : null}
         </p>
       </div>
     </Advanced>

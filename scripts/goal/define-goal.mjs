@@ -84,7 +84,7 @@ const ownerDefinition = !definedBy && !reviseWorkflowId && arg('reason') != null
 const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--reason <owner chat ref>] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
-// A goal text carrying an unrendered value ("Goal gốc: null") is never an owner's words (scripts/goal/goal-text.mjs).
+// A goal text carrying an unrendered value ("original goal: null") is never an owner's words (scripts/goal/goal-text.mjs).
 { const refusal = goalTextRefusal(text); if (refusal) { console.error(refusal); process.exit(2); } }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
 

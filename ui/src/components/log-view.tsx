@@ -12,6 +12,7 @@ import { formatAbsolute } from '../i18n/vi';
 import type { LogRow, TimelineItem } from '../contract';
 import { AgentAvatar } from './agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from './agent/use-running-agents';
+import { t } from '../i18n/t';
 
 export const concept: Concept = 'C17';
 
@@ -19,7 +20,7 @@ const timeFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', 
 const shortWf = (wf: string) => wf.replace(/^wf-/, '');
 
 function RefLinks({ refs }: { refs: LogRow['refs'] }) {
-  if (!refs.length) return <span className="text-muted-foreground">Chưa có liên kết.</span>;
+  if (!refs.length) return <span className="text-muted-foreground">{t('No links yet.')}</span>;
   return <div className="flex flex-wrap gap-3">{refs.map((ref) => <a key={`${ref.kind}:${ref.project ?? ''}:${ref.id}`} href={ref.href} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><Link2 size={12} aria-hidden="true" />{ref.kind} · {ref.id}</a>)}</div>;
 }
 
@@ -42,7 +43,7 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
         <ChevronRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 md:hidden" aria-hidden="true" />
       </span>
       <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block" onClick={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }}>
-        {wfRef ? <a href={wfRef.href} className={linkClass}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? 'máy' : row.db}
+        {wfRef ? <a href={wfRef.href} className={linkClass}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? t('machine') : row.db}
         {attemptRef && <> · <a href={attemptRef.href} className={linkClass}>#{attemptRef.id}</a></>}
       </span>
     </summary>
@@ -52,39 +53,39 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
         <Badge variant="outline" className="min-w-0 max-w-full truncate font-mono text-[11px]">{row.actor}</Badge>
         <Icon className="size-3.5 shrink-0" aria-hidden="true" /><span className="min-w-0 truncate" title={row.kind}>{row.kind}</span>
       </div>
-      <div><h3 className="mb-2 font-medium">Tham chiếu</h3><RefLinks refs={row.refs} /></div>
-      <Advanced summary="Nguồn, workflow, job, trace và dữ liệu thô">
+      <div><h3 className="mb-2 font-medium">{t('References')}</h3><RefLinks refs={row.refs} /></div>
+      <Advanced summary={t('Source, workflow, job, trace and raw data')}>
         <div className="flex flex-col gap-3">
           <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <div><dt className="text-muted-foreground">Thời điểm</dt><dd>{formatAbsolute(row.at)}</dd></div>
-            <div><dt className="text-muted-foreground">Mức · Actor</dt><dd>{levelLabels[row.level]} · {row.actor}{row.controller ? ` · ${row.controller}` : ''}</dd></div>
-            <div><dt className="text-muted-foreground">Loại</dt><dd className="font-mono">{row.kind}</dd></div>
-            <div><dt className="text-muted-foreground">Nguồn</dt><dd>{row.db === 'machine' ? 'Máy' : `Dự án ${row.db}`}</dd></div>
+            <div><dt className="text-muted-foreground">{t('At')}</dt><dd>{formatAbsolute(row.at)}</dd></div>
+            <div><dt className="text-muted-foreground">{t('Level · actor')}</dt><dd>{levelLabels[row.level]} · {row.actor}{row.controller ? ` · ${row.controller}` : ''}</dd></div>
+            <div><dt className="text-muted-foreground">{t('Kind')}</dt><dd className="font-mono">{row.kind}</dd></div>
+            <div><dt className="text-muted-foreground">{t('Source')}</dt><dd>{row.db === 'machine' ? t('Machine') : t('Project {db}', { db: row.db })}</dd></div>
             <div><dt className="text-muted-foreground">Workflow</dt><dd className="break-all font-mono">{row.wf ?? '—'}</dd></div>
             <div><dt className="text-muted-foreground">Job</dt><dd className="break-all font-mono">{row.job ?? '—'}</dd></div>
             {row.traceId && <div><dt className="text-muted-foreground">Trace</dt><dd className="break-all font-mono">{row.traceId}</dd></div>}
             {row.spanId && <div><dt className="text-muted-foreground">Span</dt><dd className="break-all font-mono">{row.spanId}</dd></div>}
           </dl>
-          {row.data != null && <div><h3 className="mb-2 font-medium">Dữ liệu</h3><JsonTree value={row.data} /></div>}
+          {row.data != null && <div><h3 className="mb-2 font-medium">{t('Data')}</h3><JsonTree value={row.data} /></div>}
         </div>
       </Advanced>
     </div>
   </details>;
 }
 
-export function LogView({ rows, empty = 'Không có dòng nhật ký phù hợp.', freshKeys, regionRef, onRegionScroll }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }) {
+export function LogView({ rows, empty = t('No matching log rows.'), freshKeys, regionRef, onRegionScroll }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }) {
   const [staggered] = useState(() => new Set(rows.slice(0, 12).map((row) => row.key)));
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
-  return <ConceptBlock concept="C17" aria-label="Dòng nhật ký">
-    <Card size="sm" className="overflow-hidden py-0"><div ref={regionRef} onScroll={(event) => onRegionScroll?.(event.currentTarget.scrollTop)} className="max-h-[calc(100dvh-260px)] min-h-64 overflow-y-auto overscroll-contain" data-log-region><div className="sticky top-0 z-10 hidden h-11 items-center border-b bg-muted md:grid md:grid-cols-[4.75rem_3.5rem_minmax(0,1fr)_10.5rem] md:gap-x-4 px-4 text-xs font-semibold text-muted-foreground" aria-hidden="true"><span>Giờ</span><span>Mức</span><span>Nội dung</span><span>Workflow · lần thử</span></div>
+  return <ConceptBlock concept="C17" aria-label={t('Log rows')}>
+    <Card size="sm" className="overflow-hidden py-0"><div ref={regionRef} onScroll={(event) => onRegionScroll?.(event.currentTarget.scrollTop)} className="max-h-[calc(100dvh-260px)] min-h-64 overflow-y-auto overscroll-contain" data-log-region><div className="sticky top-0 z-10 hidden h-11 items-center border-b bg-muted md:grid md:grid-cols-[4.75rem_3.5rem_minmax(0,1fr)_10.5rem] md:gap-x-4 px-4 text-xs font-semibold text-muted-foreground" aria-hidden="true"><span>{t('Time')}</span><span>{t('Level')}</span><span>{t('Content')}</span><span>{t('Workflow · attempt')}</span></div>
       <Stagger>{rows.map((row) => staggered.has(row.key) ? <StaggerItem key={row.key}><LogRowItem row={row} fresh={freshKeys?.has(row.key)} /></StaggerItem> : <LogRowItem key={row.key} row={row} fresh={freshKeys?.has(row.key)} />)}</Stagger>
     </div></Card>
   </ConceptBlock>;
 }
 
-export function TimelineView({ rows, empty = 'Chưa có diễn biến phù hợp.' }: { rows: TimelineItem[]; empty?: string }) {
+export function TimelineView({ rows, empty = t('No matching timeline entries yet.') }: { rows: TimelineItem[]; empty?: string }) {
   if (!rows.length) return <FeedbackState>{empty}</FeedbackState>;
-  return <ConceptBlock concept="C17" className="flex flex-col gap-2" aria-label="Diễn biến">
+  return <ConceptBlock concept="C17" className="flex flex-col gap-2" aria-label={t('Timeline')}>
     {rows.map((row, index) => <Card key={`${row.at}:${row.kind}:${index}`} size="sm"><CardContent className="flex items-start gap-3"><StateChip state={row.ui} compact /><div className="min-w-0 flex-1"><div className="text-sm font-medium">{row.title}</div><div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{formatAbsolute(row.at)}</span><span>· {row.source}</span><span>· {row.kind}</span></div></div>{row.ref && <a href={row.ref.href} className="shrink-0 text-xs text-primary hover:underline">{row.ref.id}</a>}</CardContent></Card>)}
   </ConceptBlock>;
 }

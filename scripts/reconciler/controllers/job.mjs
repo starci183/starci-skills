@@ -267,7 +267,6 @@ export const isArchivedRefusal = (r) => ARCHIVED_REFUSAL.test(`${r?.error ?? ''}
 ${r?.stderr ?? ''}
 ${r?.stdout ?? ''}
 ${JSON.stringify(r?.value ?? null)}`);
-export const _terminalRuns = terminalRuns;
 
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));

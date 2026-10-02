@@ -180,12 +180,33 @@ retired:
   - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
   - {path: scripts/checks/check-db-openers.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'superseded by RT_EXTERNAL_OWNER (node:sqlite only in engine/db), scripts/hfs/runtime-rules/external-owner.mjs'}
   - {path: tests/check-db-openers.spec.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'the spec of scripts/checks/check-db-openers.mjs, superseded by RT_EXTERNAL_OWNER (tests/runtime-hfs-rules.spec.mjs)'}
+  - {path: scripts/api/orca/task-create.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'scripts/api/orca/worker-start.mjs: worker-start --spec files the Task in the same call (contract change worker-start-spec)'}
+  - {path: scripts/api/orca/dispatch-show.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'the worker-start receipt (result.worker.agentTerminalHandle), else worker-show result.dispatch.assigneeHandle (contract change worker-start-spec)'}
+  - {path: scripts/api/orca/task-list.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'nothing: the Task is settled by the op worker_done (scripts/api/orca/send.mjs); no runtime code lists Tasks (deep map REPLACE #9)'}
+  - {path: tests/orca-tasks-reconcile.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'tests/managed-dispatch.spec.mjs (settle releases after worker_done; api reconcile --orca-tasks is gone)'}
+  - {path: scripts/api/orca/request-show.mjs, retiredAt: 2026-10-02, removedIn: c1-batch7, replacedBy: 'scripts/api/orca/lib.mjs requestStateOf (orcaCall asks request-show itself after a lost receipt; the standalone wrapper had no reader)'}
   - {path: engine/db/migrations/machine/0002-worktrees-no-workflow-kind.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/machine/0003-worktrees-workflow-orca.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/machine/0004-terminals-shells-only.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/runtime/0003-usage-unavailable.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/runtime/0004-attempt-why.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/runtime/0005-ended-workflow-views.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: scripts/supervisor/why-backfill.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: the why is computed on read (scripts/kernel/why.mjs); there is no backfill'}
+  - {path: scripts/work/migrate-ui-shapes.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: records are written on ui.shapes from the start; there is no migration'}
+  - {path: scripts/kernel/migrate-plan-edges.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'route-plan: a plan without edges is routed again'}
+  - {path: tests/kernel/migrate-plan-edges.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'the spec of scripts/kernel/migrate-plan-edges.mjs, retired with it'}
+  - {path: scripts/kernel/repair-rejected-attempts.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a refused launch ends its attempt in the refusal transaction; no older runtime leaves one open'}
+  - {path: tests/kernel/rejected-attempt-repair.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'the spec of scripts/kernel/repair-rejected-attempts.mjs, retired with it'}
+  - {path: packages/grammar/academy-shot.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off screenshot script of an abandoned product repository'}
+  - {path: docs/design-pattern-source-review-20260916.md, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'docs/design-pattern-catalog.md owns the pattern list; the dated research note is gone'}
+  - {path: scripts/checks/host-boundary.allow, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: scripts/checks/check-host-boundary.mjs has no exemption list'}
+  - {path: ui/public/logos/qwen.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: Qwen is not a provider'}
+  - {path: ui/public/logos/starci-next-blue.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'ui/public/logos/starci-blue.png'}
+  - {path: modules/supervisor/push-scan-allow.yaml, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: scripts/supervisor/push-mains.mjs has no scan exemption; test credentials are generated per run or kept as .starcistacks sops twins'}
+  - {path: scripts/example/work-example.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
+  - {path: scripts/housekeeping/ledger-throughput.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off load test with no reader'}
+  - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
+  - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
@@ -539,7 +560,6 @@ moved:
   - {from: tests/kernel-group.spec.mjs, to: tests/kernel/kernel-group.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-guard.spec.mjs, to: tests/guards/kernel-guard.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-observe.spec.mjs, to: tests/engine-db/kernel-observe.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/kernel-replace-close.spec.mjs, to: tests/engine-db/kernel-replace-close.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-runtime-rev.spec.mjs, to: tests/kernel/kernel-runtime-rev.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-stale-terminal.spec.mjs, to: tests/reconciler/kernel-stale-terminal.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-wake-delivery-proof.spec.mjs, to: tests/kernel/kernel-wake-delivery-proof.spec.mjs, movedIn: C7, quiesced: false}
@@ -598,12 +618,11 @@ moved:
   - {from: tests/op-work-paths.spec.mjs, to: tests/engine/op-work-paths.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/op-worktree-link-guard.spec.mjs, to: tests/guards/op-worktree-link-guard.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/open-items-contract.spec.mjs, to: tests/kernel/open-items-contract.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/orca-call-contract.spec.mjs, to: tests/repo/orca-call-contract.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: tests/orca-call-contract.spec.mjs, to: tests/api-orca/orca-call-contract.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-host-outage.spec.mjs, to: tests/api-orca/orca-host-outage.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-launch-env.spec.mjs, to: tests/api-orca/orca-launch-env.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-orphans.spec.mjs, to: tests/lib/orca-orphans.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-run-rebind.spec.mjs, to: tests/kernel/orca-run-rebind.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/orca-tasks-reconcile.spec.mjs, to: tests/engine-db/orca-tasks-reconcile.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-worktree-rm-live.spec.mjs, to: tests/api-orca/orca-worktree-rm-live.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orchestration-check-drain.spec.mjs, to: tests/kernel-verbs-shared/orchestration-check-drain.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orchestration-question-bridge.spec.mjs, to: tests/engine-db/orchestration-question-bridge.spec.mjs, movedIn: C7, quiesced: false}
@@ -936,7 +955,11 @@ moved:
   - {from: scripts/example/example-render-proof.mjs, to: scripts/work/render-proof.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/kernel/status/view.mjs, to: scripts/kernel/verbs/shared/status-view.mjs, movedIn: C6, quiesced: false}
   - {from: tests/env-dump-guard.spec.mjs, to: tests/guards/env-dump-guard.spec.mjs, movedIn: C7, quiesced: false}
-# Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
-# staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
-# deletes the symbol.
-retiredSymbols: []
+# Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
+retiredSymbols:
+  - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}
+  - {symbol: closeOperationTask, replacedBy: 'the op worker_done (api report -> scripts/api/orca/send.mjs send) settles its Task and Dispatch (REPLACE #9)'}
+  - {symbol: TASK_CLOSED_STATUS, replacedBy: 'the op worker_done settles the Task (REPLACE #9)'}
+  - {symbol: staleTasks, replacedBy: 'nothing: no Task is left open by hand any more (REPLACE #9)'}
+  - {symbol: CLOSED_TASK_STATUSES, replacedBy: 'nothing: no Task is left open by hand any more (REPLACE #9)'}
+  - {symbol: operationTaskOf, replacedBy: 'operationDispatchOf of scripts/kernel/verbs/shared/rows.mjs (REPLACE #9)'}

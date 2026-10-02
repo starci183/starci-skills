@@ -376,7 +376,7 @@ const isPlannedToken=token=>token?.valueSource!==undefined&&token?.valueSource!=
 /**
  * A token the app has not written yet may name the external render it was read from:
  * `valueSource: {path, value, token?, line?, sha256?}`. `path` is relative to the same --source root as
- * `sources[]` (for example `starci-academy-fe/src/app/globals.css`) and is only ever read; `token` is the
+ * `sources[]` (for example `ecommerce-app-fe/src/app/globals.css`) and is only ever read; `token` is the
  * name the reference declares (default: the brand token's own name); `value` is the exact value it declares
  * there. The reference passes when that declaration exists in the default (light) scope with exactly that
  * text, its colour is the brand value, and a declared sha256 still names the file's bytes.

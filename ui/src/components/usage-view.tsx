@@ -2,10 +2,11 @@ import type { ReactNode } from 'react';
 import type { Usage } from '../contract';
 import type { Concept } from './concept';
 import { InfoChip } from './infra/rows';
+import { t } from '../i18n/t';
 
 export const concept: Concept = 'C16';
 
-const NOT_RECORDED = 'Bảng llm_usage chưa có dòng nào cho mục này: runtime chưa ghi token.';
+const NOT_RECORDED = t('The llm_usage table has no rows for this section yet: the runtime has not recorded tokens.');
 
 /** Row shape shared by every grouped usage table (the server adds the v3 fields; the v2 ones stay). */
 export type UsageRow = { input: number | null; output: number | null; cacheRead: number | null; cacheWrite: number | null; reasoning: number | null;
@@ -18,24 +19,24 @@ export type UsageV3 = Omit<Usage, 'total'> & {
 };
 
 const vi = (value: number, digits = 1) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(value);
-/** Vietnamese compact numbers: 1 234 567 -> "1,2 tr", 34 500 -> "34,5 N", 2,1 tỷ. */
+/** Compact vi-VN numbers: 1 234 567 -> "1,2M", 34 500 -> "34,5k" (Vietnamese suffixes via the i18n catalog). */
 export function compactVi(value: number | null | undefined): string {
   if (value == null) return '—';
   const abs = Math.abs(value);
-  if (abs >= 1e9) return `${vi(value / 1e9)} tỷ`;
-  if (abs >= 1e6) return `${vi(value / 1e6)} tr`;
-  if (abs >= 1e3) return `${vi(value / 1e3)} N`;
+  if (abs >= 1e9) return t('{n}B', { n: vi(value / 1e9) });
+  if (abs >= 1e6) return t('{n}M', { n: vi(value / 1e6) });
+  if (abs >= 1e3) return t('{n}k', { n: vi(value / 1e3) });
   return vi(value, 0);
 }
-export const costVi = (value: number | null | undefined): string => value == null ? 'chưa báo' : `$${new Intl.NumberFormat('vi-VN', { minimumFractionDigits: value < 100 ? 2 : 0, maximumFractionDigits: value < 100 ? 2 : 0 }).format(value)}`;
-export const sourceLabel = (source: string): string => source === 'cli-transcript' ? 'từ transcript CLI' : source === 'provider-report' ? 'nhà cung cấp báo' : source;
+export const costVi = (value: number | null | undefined): string => value == null ? t('not reported') : `$${new Intl.NumberFormat('vi-VN', { minimumFractionDigits: value < 100 ? 2 : 0, maximumFractionDigits: value < 100 ? 2 : 0 }).format(value)}`;
+export const sourceLabel = (source: string): string => source === 'cli-transcript' ? t('from the CLI transcript') : source === 'provider-report' ? t('reported by the provider') : source;
 
 /** Stacked bar of input / output / cache tokens with a legend; segments use status tones, not literal colours. */
 export function TokenBar({ input, output, cache }: { input: number; output: number; cache: number }) {
   const total = input + output + cache;
   if (!total) return null;
   const parts: { key: string; label: string; value: number; tone: 'running' | 'success' | 'queued' }[] = [
-    { key: 'in', label: 'vào', value: input, tone: 'running' }, { key: 'out', label: 'ra', value: output, tone: 'success' }, { key: 'cache', label: 'cache', value: cache, tone: 'queued' },
+    { key: 'in', label: t('in'), value: input, tone: 'running' }, { key: 'out', label: t('out'), value: output, tone: 'success' }, { key: 'cache', label: 'cache', value: cache, tone: 'queued' },
   ];
   return <div>
     <div className="flex h-3 w-full gap-px overflow-hidden rounded-full bg-muted" role="img" aria-label={parts.map(p => `${p.label} ${compactVi(p.value)}`).join(', ')}>
@@ -49,46 +50,46 @@ export function TokenBar({ input, output, cache }: { input: number; output: numb
 
 function Sources({ sources }: { sources?: string[] }) {
   if (!sources?.length) return null;
-  return <span className="inline-flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">Nguồn số liệu: {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
+  return <span className="inline-flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t('Data sources:')} {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
 }
 
 const th = 'border-b border-border px-2 py-1 font-medium';
 const td = 'px-2 py-1 font-mono tabular-nums';
-const tools = (row: UsageRow) => `${compactVi(row.toolCalls)}${row.toolErrors ? ` / ${row.toolErrors} lỗi` : ''}`;
+const tools = (row: UsageRow) => `${compactVi(row.toolCalls)}${row.toolErrors ? t(' / {n} errors', { n: row.toolErrors }) : ''}`;
 const cacheOf = (row: UsageRow) => (row.cacheRead ?? 0) + (row.cacheWrite ?? 0);
 
 function UsageTable({ title, first, rows, label }: { title: string; first: string; rows: (UsageRow & { extra?: string })[]; label: (row: never, index: number) => ReactNode }) {
   return <div className="overflow-x-auto">
     <p className="m-0 mb-2 text-[11px] font-medium text-muted-foreground">{title}</p>
     <table className="w-full min-w-[520px] border-collapse text-xs">
-      <thead><tr className="text-left text-muted-foreground">{[first, 'Vào', 'Ra', 'Cache', 'Suy luận', 'Chi phí', 'Lượt', 'Công cụ'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+      <thead><tr className="text-left text-muted-foreground">{[first, t('In'), t('Out'), t('Cache'), t('Reasoning'), t('Cost'), t('Turns'), t('Tools')].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
       <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border last:border-b-0">
         <td className="px-2 py-1 font-mono [overflow-wrap:anywhere]">{label(row as never, index)}</td>
-        <td className={td}>{compactVi(row.input)}</td><td className={td}>{compactVi(row.output)}</td><td className={td} title={`đọc ${vi(row.cacheRead ?? 0, 0)} · ghi ${vi(row.cacheWrite ?? 0, 0)}`}>{compactVi(cacheOf(row))}</td>
+        <td className={td}>{compactVi(row.input)}</td><td className={td}>{compactVi(row.output)}</td><td className={td} title={t('read {read} · write {write}', { read: vi(row.cacheRead ?? 0, 0), write: vi(row.cacheWrite ?? 0, 0) })}>{compactVi(cacheOf(row))}</td>
         <td className={td}>{compactVi(row.reasoning)}</td><td className={td}>{costVi(row.costUsd)}</td><td className={td}>{compactVi(row.turns)}</td><td className={td}>{tools(row)}</td>
       </tr>)}</tbody>
     </table>
   </div>;
 }
 
-/** Token / cost usage block; shows "chưa ghi nhận" honestly when llm_usage is empty. */
+/** Token / cost usage block; shows "not recorded" honestly when llm_usage is empty. */
 export function UsageView({ usage: raw, compact = false }: { usage: Usage; compact?: boolean }) {
   const usage = raw as UsageV3;
   const total = usage.recorded ? usage.total : null;
   if (!usage.recorded || !total) {
     return compact
-      ? <span className="inline-flex flex-wrap items-center gap-2 text-xs"><InfoChip tone="warning">chưa ghi nhận</InfoChip><span className="text-muted-foreground">{NOT_RECORDED}</span></span>
-      : <div className="flex flex-col gap-2 text-[13px]"><span><InfoChip tone="warning">chưa ghi nhận</InfoChip></span><p className="m-0 text-muted-foreground">{NOT_RECORDED}</p></div>;
+      ? <span className="inline-flex flex-wrap items-center gap-2 text-xs"><InfoChip tone="warning">{t('not recorded')}</InfoChip><span className="text-muted-foreground">{NOT_RECORDED}</span></span>
+      : <div className="flex flex-col gap-2 text-[13px]"><span><InfoChip tone="warning">{t('not recorded')}</InfoChip></span><p className="m-0 text-muted-foreground">{NOT_RECORDED}</p></div>;
   }
   const toolErrors = total.toolErrors ?? usage.byModel.reduce((sum, row) => sum + (row.toolErrors ?? 0), 0);
   if (compact) {
-    return <span className="text-xs text-muted-foreground">vào {compactVi(total.input)} · ra {compactVi(total.output)} · {costVi(total.costUsd)} · {total.turns} lượt</span>;
+    return <span className="text-xs text-muted-foreground">{t('in {input} · out {output} · {cost} · {turns} turns', { input: compactVi(total.input), output: compactVi(total.output), cost: costVi(total.costUsd), turns: total.turns })}</span>;
   }
   const cells: [string, string, string?][] = [
-    ['Token vào', compactVi(total.input), vi(total.input, 0)], ['Token ra', compactVi(total.output), vi(total.output, 0)],
-    ['Cache đọc', compactVi(total.cacheRead), vi(total.cacheRead, 0)], ['Cache ghi', compactVi(total.cacheWrite), vi(total.cacheWrite, 0)],
-    ['Suy luận', compactVi(total.reasoning), vi(total.reasoning, 0)], ['Chi phí (USD)', costVi(total.costUsd)],
-    ['Lượt', compactVi(total.turns)], ['Gọi công cụ', `${compactVi(total.toolCalls)}${toolErrors ? ` · ${toolErrors} lỗi` : ''}`],
+    [t('Input tokens'), compactVi(total.input), vi(total.input, 0)], [t('Output tokens'), compactVi(total.output), vi(total.output, 0)],
+    [t('Cache read'), compactVi(total.cacheRead), vi(total.cacheRead, 0)], [t('Cache write'), compactVi(total.cacheWrite), vi(total.cacheWrite, 0)],
+    [t('Reasoning'), compactVi(total.reasoning), vi(total.reasoning, 0)], [t('Cost (USD)'), costVi(total.costUsd)],
+    [t('Turns'), compactVi(total.turns)], [t('Tool calls'), `${compactVi(total.toolCalls)}${toolErrors ? t(' · {n} errors', { n: toolErrors }) : ''}`],
   ];
   const byOp = usage.byOp ?? [];
   const rows = usage.rows ?? [];
@@ -100,11 +101,11 @@ export function UsageView({ usage: raw, compact = false }: { usage: Usage; compa
       </div>)}
     </dl>
     <Sources sources={usage.sources} />
-    {usage.byModel.length ? <UsageTable title="Theo model" first="Model" rows={usage.byModel}
-      label={((row: (typeof usage.byModel)[number] & { provider?: string }) => <>{row.model}<span className="ml-1 text-muted-foreground">{row.subject_type === 'kernel-turn' ? 'lượt Kernel' : 'lần thử'}{row.provider && row.provider !== row.model ? ` · ${row.provider}` : ''}</span></>) as never} /> : null}
-    {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title="Theo op (chặng)" first="Op" rows={byOp}
-      label={((row: (typeof byOp)[number]) => row.op === 'kernel' ? 'Kernel (lượt điều phối)' : row.op) as never} /> : null}
-    {rows.length > 1 ? <UsageTable title="Theo lượt ghi" first="Bản ghi" rows={rows}
+    {usage.byModel.length ? <UsageTable title={t('By model')} first="Model" rows={usage.byModel}
+      label={((row: (typeof usage.byModel)[number] & { provider?: string }) => <>{row.model}<span className="ml-1 text-muted-foreground">{row.subject_type === 'kernel-turn' ? t('Kernel turn') : t('attempt')}{row.provider && row.provider !== row.model ? ` · ${row.provider}` : ''}</span></>) as never} /> : null}
+    {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp}
+      label={((row: (typeof byOp)[number]) => row.op === 'kernel' ? t('Kernel (coordinator turns)') : row.op) as never} /> : null}
+    {rows.length > 1 ? <UsageTable title={t('By record')} first={t('Record')} rows={rows}
       label={((row: (typeof rows)[number]) => <>{row.responseModel ?? row.requestModel ?? row.provider}<span className="ml-1 text-muted-foreground">{sourceLabel(row.source)}</span></>) as never} /> : null}
   </div>;
 }

@@ -18,7 +18,7 @@ const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
 })
 
-const FILE = "D:/repo/src/components/leaves/StatusText/index.tsx"
+const FILE = "src/components/leaves/StatusText/index.tsx"
 const solid = { messageId: "solid" }
 
 test("the rule is exported under its published name", () => {

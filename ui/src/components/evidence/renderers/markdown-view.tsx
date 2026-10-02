@@ -2,6 +2,7 @@ import type { Concept } from '../../concept';
 export const concept: Concept = 'C8';
 import type { ReactNode } from 'react';
 import { CopyButton, Frame } from './common';
+import { t } from '../../../i18n/t';
 
 const INLINE_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*|__[^_\n]+__)|(\*[^*\s][^*\n]*\*|\b_[^_\n]+_\b)|(\[[^\]\n]+\]\([^)\s]+\))|(https?:\/\/[^\s<>)]+)/g;
 
@@ -41,7 +42,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
     <div className="overflow-hidden rounded-lg border bg-muted/40">
       <div className="flex items-center justify-between border-b bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
         <span className="font-mono">{lang || 'code'}</span>
-        <CopyButton value={code} label="Chép" />
+        <CopyButton value={code} label={t('Copy')} />
       </div>
       <pre className="overflow-x-auto p-3 font-mono text-xs leading-5"><code>{code}</code></pre>
     </div>
@@ -127,7 +128,7 @@ export function MarkdownView({ text }: { text: string }) {
   const src = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
   return (
     <Frame>
-      <div className="flex justify-end border-b bg-muted/40 px-2 py-2"><CopyButton value={text} label="Chép nguồn" /></div>
+      <div className="flex justify-end border-b bg-muted/40 px-2 py-2"><CopyButton value={text} label={t('Copy source')} /></div>
       <div className="max-h-[75vh] space-y-2 overflow-auto bg-background p-4 text-sm">{blocks(src, '')}</div>
     </Frame>
   );

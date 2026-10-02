@@ -70,7 +70,7 @@ test('navigation labels come from the route tree plus the catalogs, and every mi
     ['billing', '/billing', null, 'console.nav.billing'],
     ['help', null, null, 'console.nav.help'],
   ]);
-  assert.deepEqual(nav.items[0].labels, { en: 'Photos', vi: 'Ảnh' });
+  assert.deepEqual(nav.items[0].labels, { en: 'Photos', vi: '\u1ea2nh' });
   assert.deepEqual(nav.items[1].labels, { en: 'Billing' }, 'a label is never typed in for a catalog that lacks it');
   assert.deepEqual(nav.findings.map((f) => f.code).sort(), ['NAV_LABEL_MISSING', 'NAV_ROUTE_MISSING', 'NAV_ROUTE_NULL', 'ROUTE_NOT_IN_NAV']);
   assert.match(nav.findings.find((f) => f.code === 'ROUTE_NOT_IN_NAV').detail, /^\/reports /);
@@ -101,7 +101,7 @@ test('a scanned record compiles, and a re-scan keeps decisions but re-opens a la
   assert.equal(validateTree(moved.record), true, JSON.stringify(validateTree.errors));
 });
 
-test('a fresh app with no message catalogs scans to a record that compiles without i18n (starci-next inc-21d50d640e22)', (t) => {
+test('a fresh app with no message catalogs scans to a record that compiles without i18n', (t) => {
   const files = {
     'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: {} }),
     'apps/app/src/app/layout.tsx': 'export default function RootLayout({ children }) { return <html><body>{children}</body></html> }\n',

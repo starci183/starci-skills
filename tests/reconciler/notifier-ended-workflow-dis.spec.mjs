@@ -1,7 +1,7 @@
 // notifier-ended-workflow-dis.spec.mjs — the owner digest's ownerWaits never lists an owner Decision Item of an
 // ended workflow (cluster notifier-ended-workflow-dis, follow-up of decisions-archived-workflow 38071f3a2).
-// Evidence 2026-09-30 nivo-backend: di-876124d7 (decider 'owner', still live) sits on wf-nivo-module-studio,
-// archived 2026-09-29; the raw `decision_items` read in notifier.mjs digestInputs kept pushing it to Telegram.
+// A live owner DI (decider 'owner') sat on an archived workflow; the raw `decision_items` read in
+// notifier.mjs digestInputs kept pushing it to Telegram.
 //   1. An owner DI left open on an archived|finished workflow yields no ownerWaits line.
 //   2. An owner DI on a running workflow still does (and a kernel-decider DI never did).
 import test from 'node:test';

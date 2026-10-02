@@ -9,6 +9,7 @@ import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../agent/quota/index.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -32,11 +33,11 @@ export function supervisorSnapshot(m, { now = Date.now() } = {}) {
   return { seat: seatOf(m, now), enabled: enabledOf(m), ticks, board: workerBoard(m, { now }), pushes: [...pushes.values()], lands };
 }
 
-const TEXT = {
-  en: { head: 'Supervisor', chat: 'in the owner chat', off: 'disabled', none: 'no seat', owed: 'OWED', trend: 'trend', noTick: 'no tick yet', workers: 'Workers', idle: 'none active',
-    queue: 'Land queue', empty: 'empty', landing: 'landing now', pushes: 'Last pushes', lastLand: 'Last land', tick: 'last tick', quota: 'Quota', used: 'used' },
-  vi: { head: 'Supervisor', chat: 'trong chat của owner', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick này', workers: 'Worker', idle: 'không có worker nào chạy',
-    queue: 'Hàng chờ land', empty: 'trống', landing: 'đang land', pushes: 'Lần push gần nhất', lastLand: 'Land gần nhất', tick: 'tick gần nhất', quota: 'Hạn mức', used: 'đã dùng' },
+// The block's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
+const blockTexts = (language) => {
+  const tr = translator(language);
+  return { head: tr('Supervisor'), chat: tr('in the owner chat'), off: tr('disabled'), none: tr('no seat'), owed: tr('OWED'), trend: tr('trend'), noTick: tr('no tick yet'), workers: tr('Workers'), idle: tr('none active'),
+    queue: tr('Land queue'), empty: tr('empty'), landing: tr('landing now'), pushes: tr('Last pushes'), lastLand: tr('Last land'), tick: tr('last tick'), quota: tr('Quota'), used: tr('used') };
 };
 
 /**
@@ -46,7 +47,7 @@ const TEXT = {
  * rendered when no provider reports a figure.
  */
 export function renderQuotaLine(quota, { language = 'en' } = {}) {
-  const t = TEXT[language] ?? TEXT.en;
+  const t = blockTexts(language);
   const parts = [];
   for (const [name, q] of Object.entries(quota ?? {})) {
     if (typeof q?.usedPercent !== 'number' || !Number.isFinite(q.usedPercent)) continue;
@@ -62,7 +63,7 @@ export function renderQuotaLine(quota, { language = 'en' } = {}) {
 /** The block as Telegram HTML, or null. `quota` is a probeAll() result map (null/absent hides the line). */
 export function renderSupervisorBlock(snap, { language = 'en', land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
   if (!snap) return null;
-  const t = TEXT[language] ?? TEXT.en;
+  const t = blockTexts(language);
   const lines = [];
   const seat = snap.seat?.value?.terminal ? `${esc(snap.seat.value.agent ?? '')} ${esc(snap.seat.value.terminal.slice(0, 13))}…` : t.none;
   // chat mode (config.yaml supervisor.mode): the owner's chat is the Supervisor; there is no seat to show.

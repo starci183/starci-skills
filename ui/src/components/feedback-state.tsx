@@ -2,6 +2,7 @@ import { CircleAlert, CircleHelp, RotateCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from './ui/button';
 import type { Concept } from './concept';
+import { t } from '../i18n/t';
 
 export const concept: Concept = 'frame';
 
@@ -11,12 +12,12 @@ export function FeedbackState({ children, error = false, onRetry }: { children: 
   return <div className="feedback-state" data-feedback={error ? 'error' : 'empty'} role={error ? 'alert' : 'status'}>
     <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
     <span>{children}</span>
-    {onRetry && <Button variant="outline" size="sm" onClick={onRetry}><RotateCw size={14} strokeWidth={1.75} aria-hidden="true" /> Thử lại</Button>}
+    {onRetry && <Button variant="outline" size="sm" onClick={onRetry}><RotateCw size={14} strokeWidth={1.75} aria-hidden="true" /> {t('Retry')}</Button>}
   </div>;
 }
 
 /** Static geometry matching a page heading and its first data region. */
-export function PageSkeleton({ label = 'Đang tải trang…' }: { label?: string }) {
+export function PageSkeleton({ label = t('Loading page…') }: { label?: string }) {
   return <div className="page-skeleton" role="status" aria-label={label}>
     <span className="sr-only">{label}</span>
     <div className="skeleton-line skeleton-title" /><div className="skeleton-line skeleton-subtitle" />

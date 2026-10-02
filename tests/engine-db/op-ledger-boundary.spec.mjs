@@ -8,7 +8,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
-// Incident inc-360891316369 (starci-next base-repos, backend.scaffold seam attempt 11): an op worker ran
+// Live incident (a base-repos backend.scaffold seam attempt): an op worker ran
 // node:sqlite against .starciwork/runtime.sqlite to inspect jobs. The contract forbade it; the owner wants
 // it enforced. The op launch carries no ledger path and a role marker (STARCI_ROLE=op, STARCI_OP_JOB), Orca's
 // ORCA_TERMINAL_HANDLE identifies a managed worker whose env StarCi cannot set, and api refuses every kernel

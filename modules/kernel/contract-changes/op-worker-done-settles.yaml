@@ -1,0 +1,36 @@
+id: op-worker-done-settles
+effectiveAt: '2026-10-01T23:30:00+07:00'
+summary: >-
+  AN OP SETTLES ITS OWN ORCA TASK AND DISPATCH (lane C0 SETTLED, Orca deep map REPLACE #9, W4 + D2; GUARDED BY SMOKE
+  E3). `api report`, which runs in the op's own pane, sends exactly one `orchestration send --type worker_done
+  --outcome succeeded|failed --task-id --dispatch-id --from <assignee> --report-path` through the new
+  scripts/api/orca/send.mjs after the report row committed and before the settler starts (done/partial ->
+  succeeded, failed/blocked -> failed, ask -> none; a refile is a replay and sends nothing). calls.yaml `send` is
+  replay: request with the identity {dispatch, type}. The receipt is payload.workerDone and one 'worker-done-sent'
+  event; a failed send is worker-done-unsent, never fatal. The op prompt and modules/ops/_common.yaml tell the op never
+  to send worker_done itself. Settle, the failed-no-report settle and `reconcile --release-worker` only release:
+  worker-show reads the Dispatch first (managedWorker.dispatch {state, workerDone} on the receipt, the audit the closed
+  Task used to carry), and worker-stop runs only for a Dispatch that did not settle itself. The runtime never issues
+  task-update for an op Task: closeOperationTask, TASK_CLOSED_STATUS, payload.taskClosed, finish/archive
+  closeHeldTasks (tasksClosed), operationTaskOf, orca-runs staleTasks / CLOSED_TASK_STATUSES / isStarciTask /
+  STALE_TASK_MIN_AGE_MS (runtimes.yaml orcaRuns), `api reconcile --orca-tasks` (and the reconciler boot step), and the
+  supervisor GC "tasks" collector are deleted. check-orca-tree TASK_OUTSIDE_RUN counts live jobs only. New failure code
+  worker-done-unsent.
+paths:
+  - modules/kernel/contract-changes/op-worker-done-settles.yaml
+  - modules/host/orca/calls.yaml
+  - scripts/api/orca/send.mjs
+  - scripts/kernel/api-verbs/report.mjs
+  - scripts/kernel/api-verbs/settle.mjs
+  - scripts/kernel/api-verbs/reconcile.mjs
+  - scripts/kernel/api-verbs/finish.mjs
+  - scripts/kernel/api-verbs/archive.mjs
+  - scripts/kernel/api-lib/workflow-end.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/orca-runs.mjs
+  - scripts/kernel/op-prompt.mjs
+  - modules/ops/_common.yaml
+  - scripts/supervisor/gc.mjs
+  - scripts/reconciler/controllers/host.mjs
+  - scripts/checks/check-orca-tree.mjs
+reach: new-legs

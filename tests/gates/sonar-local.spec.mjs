@@ -244,11 +244,11 @@ test('ensure-project creates a missing project with the admin token and is idemp
   const root=temporary(t,'ensure');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
-  const first=await sonarLocalMain(['ensure-project','--key','starci-next','--name','StarCi Next'],{config:configFor(host,custody)});
+  const first=await sonarLocalMain(['ensure-project','--key','ecommerce-app','--name','Ecommerce App'],{config:configFor(host,custody)});
   assert.equal(first.exitCode,0);
   assert.equal(first.report.created,true);
-  assert.equal(state.projects.get('starci-next'),'StarCi Next');
-  const again=await sonarLocalMain(['ensure-project','--key','starci-next'],{config:configFor(host,custody)});
+  assert.equal(state.projects.get('ecommerce-app'),'Ecommerce App');
+  const again=await sonarLocalMain(['ensure-project','--key','ecommerce-app'],{config:configFor(host,custody)});
   assert.equal(again.report.created,false);
   assert.equal(state.requests.filter(r=>r.path==='/api/projects/create').length,1);
   assert.ok(state.requests.filter(r=>r.path.startsWith('/api/projects')).every(r=>r.auth===ADMIN),'project calls use the admin token');
@@ -264,15 +264,15 @@ test('ensure-project --with-token mints a project analysis token into custody th
   const root=temporary(t,'mint');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
-  const {exitCode,report}=await sonarLocalMain(['ensure-project','--key','starci-next-fe','--with-token'],{config:configFor(host,custody)});
+  const {exitCode,report}=await sonarLocalMain(['ensure-project','--key','ecommerce-app-fe','--with-token'],{config:configFor(host,custody)});
   assert.equal(exitCode,0);
   assert.equal(report.tokenCustody.via,'minted');
   const generate=state.requests.find(r=>r.path==='/api/user_tokens/generate');
-  assert.deepEqual([generate.form.type,generate.form.projectKey],['PROJECT_ANALYSIS_TOKEN','starci-next-fe']);
-  const enc=path.join(custody.stack,`${projectTokenRef('starci-next-fe')}.enc`);
+  assert.deepEqual([generate.form.type,generate.form.projectKey],['PROJECT_ANALYSIS_TOKEN','ecommerce-app-fe']);
+  const enc=path.join(custody.stack,`${projectTokenRef('ecommerce-app-fe')}.enc`);
   assert.equal(fs.readFileSync(enc,'utf8'),`ENC:${MINTED}`);
   assertNoSecret(report,'ensure report');
-  const reuse=await sonarLocalMain(['ensure-project','--key','starci-next-fe','--with-token'],{config:configFor(host,custody)});
+  const reuse=await sonarLocalMain(['ensure-project','--key','ecommerce-app-fe','--with-token'],{config:configFor(host,custody)});
   assert.equal(reuse.report.tokenCustody.via,'sops','the stored member is decrypted, not minted again');
   assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,1);
 });
@@ -327,25 +327,25 @@ test('a stored project token the server rejects is re-minted over the same custo
   const custody=fakeCustody(root);
   const events=[];
   const config=configFor(host,custody,{record:e=>events.push(e)});
-  const first=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  const first=await sonarLocalMain(['ensure-project','--key','ecommerce-app','--with-token'],{config});
   assert.equal(first.report.tokenCustody.via,'minted');
   assert.equal(events.length,0,'a first mint is not a re-mint');
   // Recreated server: every stored analysis token is gone.
   state.tokens.delete(MINTED);
   state.tokens.delete(ANALYSIS);
   state.mintValues.push(REMINTED);
-  const second=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  const second=await sonarLocalMain(['ensure-project','--key','ecommerce-app','--with-token'],{config});
   assert.equal(second.exitCode,0,JSON.stringify(second.report));
-  assert.deepEqual([second.report.tokenCustody.via,second.report.tokenCustody.reminted,second.report.tokenCustody.name],['minted',true,projectTokenRef('starci-next')]);
+  assert.deepEqual([second.report.tokenCustody.via,second.report.tokenCustody.reminted,second.report.tokenCustody.name],['minted',true,projectTokenRef('ecommerce-app')]);
   const generates=state.requests.filter(r=>r.path==='/api/user_tokens/generate');
   assert.equal(generates.length,2);
-  assert.deepEqual([generates[1].form.type,generates[1].form.projectKey],['PROJECT_ANALYSIS_TOKEN','starci-next']);
-  assert.equal(fs.readFileSync(path.join(custody.stack,`${projectTokenRef('starci-next')}.enc`),'utf8'),`ENC:${REMINTED}`);
+  assert.deepEqual([generates[1].form.type,generates[1].form.projectKey],['PROJECT_ANALYSIS_TOKEN','ecommerce-app']);
+  assert.equal(fs.readFileSync(path.join(custody.stack,`${projectTokenRef('ecommerce-app')}.enc`),'utf8'),`ENC:${REMINTED}`);
   assert.equal(events.length,1);
-  assert.deepEqual([events[0].kind,events[0].payload.role,events[0].payload.projectKey],['sonar-token-reminted','project','starci-next']);
+  assert.deepEqual([events[0].kind,events[0].payload.role,events[0].payload.projectKey],['sonar-token-reminted','project','ecommerce-app']);
   assertNoSecret(second.report,'ensure report');
   assertNoSecret(events,'remint event');
-  const third=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  const third=await sonarLocalMain(['ensure-project','--key','ecommerce-app','--with-token'],{config});
   assert.equal(third.report.tokenCustody.via,'sops');
   assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,2);
 });
@@ -603,7 +603,7 @@ test('a slice holding spec (UTS) and source (FIL) files is judged: issues are as
     hotspots:[{path:'src/app.spec.js',line:3}],
     sources:knownSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/app.spec.js':4}})});
   const custody=fakeCustody(root);
-  // inc-0fee2b8fb296: this slice's scan succeeded, then one mixed-qualifier issues query blocked it.
+  // Live defect: this slice's scan succeeded, then one mixed-qualifier issues query blocked it.
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root,{specFile:true}),'--wait'],{config:configFor(host,custody)});
   assert.equal(exitCode,1,JSON.stringify(report));
   assert.equal(report.outcome,'fail','the mixed slice reaches a verdict instead of a blocked exit 2');
@@ -819,7 +819,7 @@ test('a re-mint in a spec run without a recorder never writes machine.sqlite', a
   assert.deepEqual(fs.readdirSync(home),[],'machine.sqlite was never opened');
 });
 
-// nivo-backend: a whole analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice.
+// Live defect: a whole analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice.
 test('--isolate analyses only the slice in a throwaway project scanned with the admin token, then deletes it', async t => {
   const root=temporary(t,'isolate');
   const {host,state}=await fakeSonar(t);
@@ -864,13 +864,13 @@ test('isolation defines: directories as dir/**, test patterns under each scope d
 
 test('--cwd takes a bare repository name as the directory beside or above the current one', t => {
   const root=temporary(t,'cwd');
-  const repo=path.join(root,'starci-next');
+  const repo=path.join(root,'ecommerce-app');
   write(repo,'package.json','{}');
-  write(root,'starci-next-fe/package.json','{}');
-  assert.equal(resolveScanCwd('starci-next',repo),repo,'from inside the repository itself');
-  assert.equal(resolveScanCwd('starci-next',path.join(repo,'src','deep')),repo);
-  assert.equal(resolveScanCwd('starci-next-fe',repo),path.join(root,'starci-next-fe'),'a sibling repository');
-  assert.equal(resolveScanCwd(repo,'C:/elsewhere'),repo,'an absolute root as given');
+  write(root,'ecommerce-app-fe/package.json','{}');
+  assert.equal(resolveScanCwd('ecommerce-app',repo),repo,'from inside the repository itself');
+  assert.equal(resolveScanCwd('ecommerce-app',path.join(repo,'src','deep')),repo);
+  assert.equal(resolveScanCwd('ecommerce-app-fe',repo),path.join(root,'ecommerce-app-fe'),'a sibling repository');
+  assert.equal(resolveScanCwd(repo,path.join(os.tmpdir(),'elsewhere')),repo,'an absolute root as given');
   assert.equal(resolveScanCwd('missing-repo',repo),path.join(repo,'missing-repo'),'nothing found: the value as a path');
 });
 
@@ -1041,10 +1041,10 @@ test('an example app inside the runtime checkout resolves its host custody insid
   const root=path.resolve(import.meta.dirname,'..', '..');
   const file=path.join(root,'examples','todo-app','.starcistacks','application-stacks.yaml');
   const declared=readSonarDeclaration(file);
-  // {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/...} names the runtime host: the file is this tree's ext/.
+  // The admin credential's custody entry names the runtime host: the file is this tree's ext/.
   assert.equal(declared.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
   assert.equal(declared.stackDir,path.join(root,'ext','sonar'));
-  assert.ok(!declared.admin.includes(`${path.sep}examples${path.sep}starci-academy-backend`),'never under the app folder');
+  assert.ok(!declared.admin.includes(`${path.sep}examples${path.sep}ecommerce-app`),'never under the app folder');
   const cfg=resolveConfig({cwd:path.join(root,'examples','todo-app')},{});
   assert.equal(cfg.adminToken,declared.admin);
   assert.ok(fs.existsSync(`${declared.admin}.enc`),'the encrypted member the declaration names exists at the resolved path');
@@ -1054,7 +1054,7 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
   const root=path.resolve(import.meta.dirname,'..', '..');
   const host=runtimeHostRoot({});
   assert.notEqual(path.basename(host).toLowerCase(),'.claude');
-  assert.equal(runtimeHostRoot({STARCI_SOURCE_ROOT:'D:/elsewhere/host'}),path.resolve('D:/elsewhere/host'));
+  assert.equal(runtimeHostRoot({STARCI_SOURCE_ROOT:path.join(os.tmpdir(),'elsewhere','host')}),path.resolve(path.join(os.tmpdir(),'elsewhere','host')));
   const before=process.env.STARCI_SOURCE_ROOT;
   const fake=temporary(t,'host');
   process.env.STARCI_SOURCE_ROOT=fake;

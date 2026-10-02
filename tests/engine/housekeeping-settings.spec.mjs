@@ -7,10 +7,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { archiveRoot, lanesRoot } from '../../scripts/machine/home.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RUNTIMES = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/models/runtimes.yaml'), 'utf8'));
@@ -34,8 +36,12 @@ test('allocation.housekeeping declares every retention window, prefix list and r
     assert.equal(HK[key], want, `housekeeping.${key}`);
     assert.ok(Number.isInteger(HK[key]) && HK[key] > 0, `housekeeping.${key} is a positive integer of ms`);
   }
-  assert.equal(HK.archiveRoot, 'D:/starci-archive');
-  assert.equal(HK.lanesRoot, 'D:/starci-lanes');
+  // The roots are not declared in the tracked file: no host location lives there; they default under the host state root.
+  const stateRoot = path.join(os.tmpdir(), 'state-root');
+  assert.equal(HK.archiveRoot, undefined);
+  assert.equal(HK.lanesRoot, undefined);
+  assert.equal(archiveRoot({ env: { STARCI_LOCAL_ROOT: stateRoot }, config: {} }), path.join(stateRoot, 'archive'));
+  assert.equal(lanesRoot({ env: { STARCI_LOCAL_ROOT: stateRoot }, config: {} }), path.join(stateRoot, 'lanes'));
   assert.ok(Array.isArray(HK.tmpPrefixes) && HK.tmpPrefixes.length >= 10, 'tmpPrefixes is a declared list');
   for (const prefix of HK.tmpPrefixes) {
     assert.equal(typeof prefix, 'string', 'every tmpPrefixes entry is a string');
@@ -57,8 +63,8 @@ test('allocation.resources declares the disk and RAM floors the admission guard 
 test('engine/config.mjs allocationSettings exposes both blocks to the scripts that read them', () => {
   const allocation = allocationSettings();
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
-    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'gcLaneGraceMs', 'gcMinAgeMs', 'gitIndexLockStaleMs',
-      'laneGraceMs', 'lanesRoot', 'logMaxAgeMs', 'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
+    ['archiveMaxAgeMs', 'claudeTranscriptArchiveAfterMs', 'gcLaneGraceMs', 'gcMinAgeMs', 'gitIndexLockStaleMs',
+      'laneGraceMs', 'logMaxAgeMs', 'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
   assert.equal(allocation.resources.minFreeDiskGb, 20);
   assert.equal(allocation.resources.minFreeRamPct, 10);
   // The RAM-aware throttle's thresholds and per-op RAM table (scripts/machine/ram-throttle.mjs) live beside the floors.

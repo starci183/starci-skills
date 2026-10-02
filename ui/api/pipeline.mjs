@@ -113,17 +113,3 @@ export function pipelineOf(db, project, wf) {
       edges: (g.edges ?? []).map(e => ({ from: e.from, to: e.to, kind: e.kind ?? null, reason: e.reason ?? null })) } : null,
   };
 }
-
-/** Token / cost usage for a workflow or attempt from llm_usage (empty until the runtime records it). */
-export function usageOf(db, { wf = null, attempt = null } = {}) {
-  const where = attempt != null ? 'attempt_id=?' : 'workflow_id=?';
-  const arg = attempt != null ? attempt : wf;
-  const rows = many(db, `SELECT coalesce(response_model,request_model,provider) AS model,subject_type,
-    sum(input_tokens) AS input,sum(output_tokens) AS output,sum(cache_read_tokens) AS cacheRead,sum(cache_write_tokens) AS cacheWrite,
-    sum(reasoning_tokens) AS reasoning,sum(cost_usd) AS costUsd,sum(turns) AS turns,sum(tool_calls) AS toolCalls,sum(tool_errors) AS toolErrors,count(*) AS n
-    FROM llm_usage WHERE ${where} GROUP BY 1,2`, arg);
-  const total = key => rows.reduce((sum, r) => sum + (r[key] ?? 0), 0);
-  return { recorded: rows.length > 0, byModel: rows,
-    total: rows.length ? { input: total('input'), output: total('output'), cacheRead: total('cacheRead'), cacheWrite: total('cacheWrite'),
-      reasoning: total('reasoning'), costUsd: rows.some(r => r.costUsd != null) ? total('costUsd') : null, turns: total('turns'), toolCalls: total('toolCalls') } : null };
-}

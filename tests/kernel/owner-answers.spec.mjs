@@ -7,10 +7,10 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,markReportConsumed,recordJobResult,appendEvent} from '../../engine/db/ledger.mjs';
 import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/machine/owner-answers.mjs';
 
-// starci-next wf-starci-next-work-and-stacks-mud4qamv: ordinal 1 of business.decide asked the owner
-// (ctx_3074731253e3), config.yaml asks.autoAcceptRecommended answered it (answeredBy auto-recommended),
-// and the owner-answer retry (attempt 12, op-business.decide-7f71843aaa) filed the SAME question again
-// (ctx_cc73a111de44): its packet carried no record of the answered ask. Dispatch now binds the answers of
+// Ordinal 1 of business.decide asked the owner,
+// config.yaml asks.autoAcceptRecommended answered it (answeredBy auto-recommended),
+// and the owner-answer retry (attempt 12) filed the SAME question again:
+// its packet carried no record of the answered ask. Dispatch now binds the answers of
 // the job's retry lineage into packet context.owner_answers and the op prompt, and api report refuses an
 // ask that repeats one (modules/kernel/api.yaml dispatch.ownerAnswers, report refuses ask-already-answered).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');

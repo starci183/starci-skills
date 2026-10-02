@@ -14,13 +14,13 @@ nudge:
     nothing is typed). A worker whose liveness is `staged-input` (its
     paste never left the input row) gets ONE Enter-only send and no wake
     text, action submit-staged-input: typing a wake on top of the paste
-    would bury it (inc-06aeecf432f1). A worker at a host dialog its agent
+    would bury it. A worker at a host dialog its agent
     card allowlists (liveness interactive-gate with worker.gateAutoAnswer;
     modules/models/agents/<agent>.yaml gateAutoAnswer.gates, e.g. a loop-detection
     menu) gets the
     card's option picked with arrow keys and Enter, no wake text, action
     answer-gate {gate,select,answered,cleared,keystroke,answers,limit}, and one
-    op-worker-gate-answered event (starci-next inc-af01e1cedbf4). Answered
+    op-worker-gate-answered event. Answered
     the gate's maxPerAttempt times on the same attempt, the dialog is a loop:
     the worker reads liveness gate-loop, listed in frontier.wedgedJobs, and
     nudge refuses it `worker-gate-loop` (one op-worker-gate-loop event,
@@ -31,12 +31,12 @@ nudge:
     verbatim piece of the dispatched contract, or this same wake left
     staged) is foreign input, and the nudge refuses `foreign-input` typing
     nothing - the wake never appends to words this job did not write
-    (Supervisor ruling, inc-f1d014518dc3).
+    (Supervisor ruling).
     The input box's draft counts as its input row. Orca lifts the text of an
     agent's input box out of the frame and answers it as `draft`
     (scripts/api/orca/terminal-read.mjs); read without it, a send whose Enter
-    was dropped sat invisible and each later send was appended to it (nivo
-    collab Kernel, 2026-09-25). Liveness reads the draft in the input row
+    was dropped sat invisible and each later send was appended to it.
+    Liveness reads the draft in the input row
     (the contract left there is staged-input); a draft the runtime did not
     type gets one Ctrl+U probe (scripts/kernel/clear-draft.mjs probeDraft):
     text that changes is real - the part cut from a one-row draft is typed
@@ -47,8 +47,8 @@ nudge:
     not empty refuses `draft-stuck`. Orca blanks the input row of every
     screen read that carries a draft, so the screen cannot tell a real draft
     from a stale one; a draft the FIRST Ctrl+U leaves unchanged is stale on
-    Orca's side (sn-foundation Kernel term_da5f72b3, 2026-09-25: 'check
-    status' no key cleared while the box was empty) and is never refused:
+    Orca's side (a Kernel's 'check
+    status' draft once cleared no key while the box was empty) and is never refused:
     the wake is typed as into an empty box, the result and op-worker-nudged
     carry draftNote 'draft-stale' and staleDraft, and the delivery proof
     after the send stays the backstop.
@@ -58,10 +58,10 @@ nudge:
     as Claude's "Press up to edit queued messages" (queued) proves it, so
     agent_prompt_stalled / agent_prompt_blocked with the wake on screen is a
     nudge (op-worker-nudged carries delivery and sendErrorCode), never
-    terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f)
+    terminal-send-failed.
     A frame that stays turn-idle with no wake text, no queued marker and no
     staged input is a dropped send whatever the receipt said (a Codex Kernel
-    took ok:true text+Enter sends that never reached its screen, 2026-09-24):
+    took ok:true text+Enter sends that never reached its screen):
     the wake is retried once split - the text with enter:false, proven staged
     in the input row, then Enter-only, proven again - and the result and
     event carry splitRetried:true with splitOutcome delivered-after-split, or
@@ -77,9 +77,9 @@ nudge:
     shell prompt, a new shell error, or a bare prompt) is never delivered:
     reason 'agent-exited', delivery agent-exited, evidence
     shell-echo|shell-error|shell-prompt, typed:true, no retry, and one
-    event 'op-worker-wake-to-shell' instead of op-worker-nudged (nivo
-    term_8f9e0611, 2026-09-24 03:56: PowerShell ran a nudge and its echo
-    read as delivered). Recover the job with reconcile --dead-worker.
+    event 'op-worker-wake-to-shell' instead of op-worker-nudged (PowerShell
+    once ran a nudge and its echo read as delivered). Recover the job with
+    reconcile --dead-worker.
   refuses:
     - 'agent-exited (field `reason`, exit 1): the worker''s agent exited - before the send (nothing typed) or under it (typed:true, a shell received the text); run api reconcile --job <id> --dead-worker'
     - job-unknown: 'no jobs row for --job'

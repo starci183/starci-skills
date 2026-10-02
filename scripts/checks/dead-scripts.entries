@@ -1,0 +1,17 @@
+# dead-scripts.entries - the runtime CLIs that no code imports (owner or agent tools), declared once with why they have no code reader.
+# scripts/checks/check-dead-scripts.mjs reads it: an undeclared script with no executable reader is RT_DEAD_SCRIPT, and an entry whose
+# script is gone or that code now reads is RT_DEAD_ENTRY, so this list only shrinks. Format: <script path><TAB><reason>.
+# Keep this list honest: delete a script that nothing reads rather than declaring it.
+scripts/api/orca/project-setup-delete.mjs	typed call of modules/host/orca/calls.yaml with no code importer; KEEP by owner ruling
+scripts/checks/check-entry.mjs	CLI that CONTEXT.md tells an agent to run when an entry path errors (installed-entry sanity); kept because a live instruction names it
+scripts/checks/check-example-architecture.mjs	CLI run by the owner (RED14: the examples meet their own standard); a spec reads it
+scripts/checks/check-example-derived.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
+scripts/example/example-evidence.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); specs read it
+scripts/example/example-verify.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
+scripts/gates/hfs-sync.mjs	gate CLI that a product repository runs (docs/application-stacks.md); specs read it
+scripts/gates/repo-presentation.mjs	gate CLI that a product repository runs (docs/repo-presentation.md); no spec
+scripts/kernel/launch-smoke.mjs	release smoke run by the owner (docs/releasing.md); specs read it
+scripts/route/route-op.mjs	routing CLI named by the op prompts (docs/ops.md); no spec
+scripts/uat/assisted-runner.mjs	UAT runner CLI named by the op prompts; specs read it
+scripts/work/validate/check-evidence-binding.mjs	validator CLI (docs/verify-proof.md); a spec reads it
+scripts/work/validate/work-change.mjs	validator CLI of work records (docs); a spec reads it

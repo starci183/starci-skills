@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// draw-source.mjs — owner ruling 2026-09-27 ("chốt"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS. The
+// draw-source.mjs — owner ruling 2026-09-27 ("locked"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS. The
 // drawer writes each shape as a React `XBase` in `<XBase>.draw.tsx` (the shape-slot pattern of examples/shape-slot:
 // the XBase takes {state, props, on} of atoms) composing ONLY @starci/grammar components with their real props and
 // variants, plus fixture JSON per state (and optionally per viewport); scripts/work/draw-render.mjs --component
@@ -52,8 +52,6 @@ export const DRAW_RAW_STYLED_HTML = 'DRAW_RAW_STYLED_HTML';
 export const DRAW_IMPORT_OFF_GRAMMAR = 'DRAW_IMPORT_OFF_GRAMMAR';
 export const DRAW_LAYOUT_VALUE_UNJUSTIFIED = 'DRAW_LAYOUT_VALUE_UNJUSTIFIED';
 export const DRAW_BASE_SIGNATURE = 'DRAW_BASE_SIGNATURE';
-export const DRAW_SOURCE_CODES = Object.freeze([DRAW_TYPECHECK_FAILED, DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML, DRAW_IMPORT_OFF_GRAMMAR,
-  DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE]);
 
 export const DRAW_SOURCE_SUFFIX = '.draw.tsx';
 export const GRAMMAR_PACKAGE = '@starci/grammar';

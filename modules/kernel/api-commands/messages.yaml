@@ -23,8 +23,8 @@ messages:
   why: >-
     Orca tells the Kernel terminal "You have N orchestration messages. Run orca orchestration check ..."
     for every message type, but the Kernel may not call Orca and `questions` bridges only `question`
-    rows, so the notice pointed at messages no authorized verb could read (starci-next
-    inc-81559e3a064b, mia inc-c55b52879387). `handle` says where each type is acted on: a question or
+    rows, so the notice pointed at messages no authorized verb could read.
+    `handle` says where each type is acted on: a question or
     an escalation through api reply, worker_done and status are information (the report and settle come
     through the ledger).
   usedBy: 'the Kernel, whenever its terminal shows the orchestration-message notice (modules/kernel/driver-loop.yaml)'

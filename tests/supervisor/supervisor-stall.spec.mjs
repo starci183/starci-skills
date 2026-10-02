@@ -8,7 +8,7 @@ import {stallFindings,judgeGate,ownerGates,namedPaths,kernelTurnState,GATE_GRACE
 import { readInbox } from '../../scripts/machine/sup-messages.mjs';
 import {wakeKernel} from '../../scripts/kernel/wake-delivery.mjs';
 
-// Incident 2026-09-24: nivo Collab sat idle ~2 h behind owner-gate inc-48bc556d89a6 ("resolve when
+// A nivo Collab workflow sat idle ~2 h behind an owner-gate ("resolve when
 // the shell record .starciwork/shell/index.yaml exists (peer heads-up)") after the record had landed
 // and the peer's ask had closed. Kernel and watchdog were alive; the supervisor digest checked
 // liveness only. scripts/supervisor/stall.mjs classifies progress; stall-alert.mjs routes each finding
@@ -129,7 +129,7 @@ test('a justified gate is reported as GATE, never alerted; a young gate is not j
   assert.equal(young.young,true);
 
   // A supervisor hold that waits for a record nobody wrote yet is justified with no ask at all.
-  const hold=judgeGate({db:ledger.db,workflowId:'wf-miamia-base-repos-mud7kk5c',gate:{...g,text:'Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled.'},repo:repoRoot,now:NOW});
+  const hold=judgeGate({db:ledger.db,workflowId:'wf-todo-app-base-repos-mud7kk5c',gate:{...g,text:'Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled.'},repo:repoRoot,now:NOW});
   assert.equal(hold.stale,false);
   assert.deepEqual(hold.waits,['.starciwork/brand/index.yaml is absent']);
   assert.deepEqual(namedPaths('record .starciwork/shell/index.yaml. And .starciwork/brand/.'),['.starciwork/shell/index.yaml','.starciwork/brand']);
@@ -154,7 +154,7 @@ test('STALE-WAIT: a queued job waiting past stallMinutes on a blocker that settl
   assert.equal(byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf}),'STALE-WAIT').length,0);
 }));
 
-// Owner, 2026-09-24: "check tele sao toàn stale block? bản thân workflow không thể cứu nó hay sao?"
+// Owner, 2026-09-24: "check Telegram, why is it all stale blocks? can't the workflow rescue it itself?"
 // Every STALE-* / STALLED finding went to the owner's Telegram. Now the owning Kernel gets a
 // `[stall]` wake first, the supervisor hears only what outlived that wake, and the owner gets one
 // digest of what waits on the owner.
@@ -199,7 +199,7 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
     read:()=>({ok:true,screen:screens[Math.min(i++,screens.length-1)]}),send:(a)=>{sends.push(a);return {ok:true};},sleep:()=>{}};};
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:{...deps([IDLE]),show:()=>({ok:true,connected:false,writable:true})}}).action,'kernel-unavailable');
   assert.deepEqual([wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([ACTIVE])})].map(r=>[r.action,r.state]),[['kernel-busy','active']]);
-  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps(['PS D:\\repo> '])}).action,'kernel-exited');
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([`PS ${path.parse(process.cwd()).root}repo> `])}).action,'kernel-exited');
   assert.equal(sends.length,0,'nothing typed into a busy Kernel or a shell');
   const r=wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])});
   assert.equal(r.action,'kernel-woken');
@@ -249,13 +249,13 @@ test('a peer-dependency gate names no ask, so a closed ask is no evidence, and t
   assert.doesNotMatch(stale.line,/no owner ask open/);
 }));
 
-// Live false positive (2026-09-24, mia-mia): STALE-GATE for wf-miamia-base-repos-mud7kk5c inc-55060d946270
-// because peer heads-up pm-a34aec2c6891 ("Brand job admitted after Grammar 0.5.0 proof") arrived after the
+// Live false positive: a STALE-GATE fired on an owner gate
+// because a peer heads-up ("Brand job admitted after Grammar 0.5.0 proof") arrived after the
 // gate. The gate waits for .starciwork/brand/index.yaml to SETTLE; the brand job was only admitted and the
 // record did not exist yet. A gate that names a path is released by that path landing and nothing else;
 // a pending peer message is UNREAD-PEER (the Kernel reads its inbox), never STALE-GATE.
 test('a gate naming a record is not released by a peer heads-up while the record is absent; the pending message is UNREAD-PEER',t=>withLedger(t,({repoRoot,ledger})=>{
-  const BASE='wf-miamia-base-repos-mud7kk5c',WORK='wf-miamia-work-and-stacks-mud7kjun';
+  const BASE='wf-todo-app-base-repos-mud7kk5c',WORK='wf-todo-app-work-and-stacks-mud7kjun';
   const text=`Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled by peer ${WORK} (heads-up when brand lands).`;
   seedWorkflow(ledger,{id:BASE,now:NOW-600*MIN,events:[
     {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
@@ -271,7 +271,7 @@ test('a gate naming a record is not released by a peer heads-up while the record
   assert.match(found.find(f=>f.type==='GATE').line,/justified: waits: \.starciwork\/brand\/index\.yaml is absent/);
   const unread=found.find(f=>f.type==='UNREAD-PEER');
   assert.equal(unread.alert,false);
-  assert.match(unread.line,/^UNREAD-PEER wf-miamia-base-repos-mud7kk5c pm-a34aec2c6891 from wf-miamia-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read api inbox/);
+  assert.match(unread.line,/^UNREAD-PEER wf-todo-app-base-repos-mud7kk5c pm-a34aec2c6891 from wf-todo-app-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read api inbox/);
 
   // Acked, the message is no finding at all; the record landing (settled) is what releases the gate.
   ledger.db.prepare("UPDATE inbox SET status='applied',applied_at=? WHERE key='pm-a34aec2c6891'").run(NOW-10*MIN);

@@ -16,9 +16,9 @@ test('a refused command in an instruction is caught, in every command form', asy
     // The original supervise.yaml runtime-defect text: an unquoted command in parentheses.
     'a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster.',
     // The original chatSeat line.
-    'fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot), commits there.',
+    'fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is the owner config roots.lanes), commits there.',
     // The original claude-debug step: backticked commands.
-    'Worktree under `D:/starci-lanes/<lane>`: `git -C D:/x/.claude worktree add D:/starci-lanes/<lane> -b lane/<lane> origin/main`; junction `node_modules` with `cmd /c mklink /J`.',
+    'Worktree under `<lanesRoot>/<lane>`: `git -C ../.claude worktree add <lanesRoot>/<lane> -b lane/<lane> origin/main`; junction `node_modules` with `cmd /c mklink /J`.',
     'Clean the scratch tree with `rm -rf <dir>` before the next run.',
     'If the tree is stuck, run taskkill /F /IM node.exe and start again.',
     'Hand the critique to a second agent: "codex exec --model gpt-5 <prompt>".',
@@ -44,7 +44,7 @@ test('a command shown under an explicit prohibition is not a finding', async () 
     'Do not run `git worktree add <dir>` yourself; the runtime makes the tree.',
     'Use safeRemoveTree instead of `rm -rf <dir>`.',
     '`git worktree add <dir>` is refused for every op (WORKTREE_NOT_OPS).',
-    'Không bao giờ chạy `rm -rf node_modules` trong worktree.',
+    'Kh\u00f4ng bao gi\u1edd ch\u1ea1y `rm -rf node_modules` trong worktree.',
   ];
   for (const text of prohibitions) assert.deepEqual(await textFindings(text), [], text);
 });
@@ -54,7 +54,7 @@ test('a description of what the runtime does or what happened is not a finding',
     '3. land.mjs fast-forwards live main by compare-and-swap (git update-ref main <new> <base>) and updates the working tree.',
     '`scripts/api/git/worktree-add.mjs` is the only place the runtime runs `git worktree add` (`check-worktree-add.mjs`).',
     'createWorktree is the only `git worktree add` in the runtime scripts.',
-    'A worker\'s private worktree beside nivo-fe was removed with `git worktree remove --force`, which followed the junctions and deleted 674 live files.',
+    'A worker\'s private worktree beside todo-app-fe was removed with `git worktree remove --force`, which followed the junctions and deleted 674 live files.',
     'A `git worktree remove` ran through a node_modules junction.',
   ];
   for (const text of descriptions) assert.deepEqual(await textFindings(text), [], text);
@@ -113,7 +113,7 @@ test('a tree scan reports the yaml field and the guard code; the live tree is cl
   try {
     fs.mkdirSync(path.join(dir, 'modules', 'supervisor'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'modules', 'supervisor', 'x.yaml'),
-      'classes:\n  fix:\n    en: "open a lane (git worktree add <d> -b lane/x main)"\n    vi: "Không bao giờ chạy `git worktree add`."\n');
+      'classes:\n  fix:\n    en: "open a lane (git worktree add <d> -b lane/x main)"\n    vi: "Kh\u00f4ng bao gi\u1edd ch\u1ea1y `git worktree add`."\n');
     const r = await scanGuidance(dir, { files: ['modules/supervisor/x.yaml'] });
     assert.equal(r.ok, false);
     assert.deepEqual(r.findings.map((f) => [f.file, f.key, f.code]), [['modules/supervisor/x.yaml', 'classes.fix.en', 'WORKTREE_NOT_OPS']]);

@@ -14,7 +14,6 @@ provenance:
   reviewedAt: 2026-09-16
   sources:
     - docs/design-pattern-catalog.md
-    - docs/design-pattern-source-review-20260916.md
   limitations: >-
     Primary framework/database documentation, original engineering analyses and selected
     source inspection are recorded in the linked Markdown.

@@ -117,7 +117,7 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the launc
   // --model (devin: start.modelArgument false) or has no card cannot honour a pin.
   const card = (agent) => ({ claude: { start: { api: 'orchestration.worker-start' } }, devin: { start: { api: 'orchestration.worker-start', modelArgument: false } } }[agent] ?? null);
   const bad = pinProblems([{ where: 'kernel', agent: 'devin', model: 'swe-2-max' }, { where: 'k2', agent: 'claude', model: 'claude-opus-5-5' },
-    { where: 'k3', agent: 'devin', model: null }, { where: 'k4', agent: 'qwen', model: 'q' }], { card });
+    { where: 'k3', agent: 'devin', model: null }, { where: 'k4', agent: 'no-card-agent', model: 'q' }], { card });
   assert.deepEqual(bad.map((b) => b.where), ['kernel', 'k4']);
 });
 

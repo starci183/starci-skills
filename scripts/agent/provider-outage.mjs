@@ -75,12 +75,6 @@ const screenMatch = (spec, screen) => {
   return { provider: spec.provider, failureKind: spec.failureKind, source: 'screen', match: clip(screen.slice(start, end < 0 ? undefined : end)) };
 };
 
-/** Quota evidence in free failure text (a quota probe's answer): {provider, failureKind, source:'text', match} or null. */
-export function quotaExhaustedInText(provider, texts, { card } = {}) {
-  const spec = quotaSpecOf(provider, { card });
-  return spec?.text.length ? textMatch(spec, joinTexts(texts)) : null;
-}
-
 /**
  * Outage evidence in free failure text (signal, error): {provider, failureKind, source:'text', match} or null.
  * `texts` is any list of strings/objects; objects are JSON-stringified.

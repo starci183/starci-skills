@@ -56,7 +56,7 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
     invalid: [
       { filename: HOOK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
       { filename: at("apps/web/src/modules/feed/index.ts"), code: lines(401), errors: [{ messageId: "lines", data: { count: 401, max: 400 } }] },
-      { filename: at("packages/nivo-ui/src/leaves/Chip/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
+      { filename: at("packages/todo-app-ui/src/leaves/Chip/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
       { filename: DRAWING, code: lines(301), errors: [{ messageId: "lines", data: { count: 301, max: 300 } }] },
       // the connected entry has the smaller budget
       { filename: BLOCK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
@@ -86,7 +86,7 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
     invalid: [
       { filename: BLOCK, code: unit("Feed", 7, 0), errors: [{ messageId: "state" }] },
       { filename: HOOK, code: unit("useFeed", 7, 0), errors: [{ messageId: "state" }] },
-      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: unit("Chip", 0, 7), errors: [{ messageId: "data" }] },
+      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: unit("Chip", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 8, 8), errors: [{ messageId: "state" }, { messageId: "data" }] },
       { filename: at("apps/admin/src/components/leaves/Chip/component.tsx"), code: unit("Chip", 7, 0), errors: [{ messageId: "state" }] },
@@ -105,7 +105,7 @@ test("BUDGET-3: no hand-rolled polling loop", () => {
       { filename: BLOCK, code: "declare const useQueryFeedSwr: (o: object) => unknown\nconst E = () => { const d = useQueryFeedSwr({ refreshInterval: 5000 }); return d }" },
       // a one-shot delay is not a loop
       { filename: BLOCK, code: "import { useEffect } from \"react\"\ndeclare const setOpen: (v: boolean) => void\nconst E = () => { useEffect(() => { const t = setTimeout(() => setOpen(false), 300); return () => clearTimeout(t) }, []) }" },
-      // a shared clock ticking the time for labels reads no data (nivo-fe apps/app/src/hooks/time/useNow.ts)
+      // a shared clock ticking the time for labels reads no data (apps/app/src/hooks/time/useNow.ts)
       {
         filename: at("apps/web/src/hooks/time/useNow.ts"),
         code: "import { useSyncExternalStore } from \"react\"\nconst listeners = new Set<() => void>()\nlet instant: number | null = null\nlet timer: ReturnType<typeof setInterval> | undefined\nconst tick = () => {\n  instant = Date.now()\n  for (const listener of listeners) listener()\n}\nconst subscribe = (listener: () => void): (() => void) => {\n  listeners.add(listener)\n  if (timer === undefined) timer = setInterval(tick, 60_000)\n  return () => { listeners.delete(listener); if (listeners.size === 0 && timer !== undefined) { clearInterval(timer); timer = undefined } }\n}\nexport const useNow = (): number | null => useSyncExternalStore(subscribe, () => instant ?? Date.now())",

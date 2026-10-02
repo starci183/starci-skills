@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowUpRight, Check, Cog, Diamond, FileText, Flag, GitMerge, ListChecks, Pencil, Scale, ShieldAlert, Terminal, Trash2, Dot, type LucideIcon } from 'lucide-react';
 import type { LogRow } from '../../contract';
 import type { Concept } from '../concept';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C17';
 
@@ -22,10 +23,10 @@ export const levelTone: Record<LogRow['level'], 'warning' | 'failed' | undefined
 
 /** Kind-prefix choices for the filter (server matches by prefix). */
 export const kindFamilies: { value: string; label: string }[] = [
-  { value: '', label: 'Mọi loại' }, { value: 'step.', label: 'step.* — bước' }, { value: 'file.', label: 'file.* — sửa tệp' },
-  { value: 'cmd.', label: 'cmd.* — lệnh' }, { value: 'decision', label: 'decision — quyết định' }, { value: 'dispatch', label: 'dispatch — giao việc' },
-  { value: 'settle', label: 'settle — chốt' }, { value: 'check.', label: 'check.* — kiểm tra' }, { value: 'land', label: 'land — hạ cánh' },
-  { value: 'reconciler.', label: 'reconciler.* — bộ điều phối' }, { value: 'incident', label: 'incident — sự cố' },
+  { value: '', label: t('All kinds') }, { value: 'step.', label: t('step.* — step') }, { value: 'file.', label: t('file.* — file edit') },
+  { value: 'cmd.', label: t('cmd.* — command') }, { value: 'decision', label: t('decision — decision') }, { value: 'dispatch', label: t('dispatch — dispatch') },
+  { value: 'settle', label: t('settle — settle') }, { value: 'check.', label: t('check.* — check') }, { value: 'land', label: t('land — land') },
+  { value: 'reconciler.', label: t('reconciler.* — reconciler') }, { value: 'incident', label: t('incident — incident') },
 ];
 
 const ansiPattern = new RegExp(String.raw`\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[@-Z\\-_])`, 'g');

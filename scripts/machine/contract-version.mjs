@@ -22,7 +22,7 @@
 // A leg admitted before this module existed has no recorded version: its contracts row's
 // created_at is its admission time, which is all the comparison needs.
 //
-// Owner, 2026-09-28 ("Đóng băng luật vẽ"): the draw rules changed eight times in one day and every
+// Owner, 2026-09-28 ("Freeze the draw rules"): the draw rules changed eight times in one day and every
 // change made running draw legs owe another redo (attempts 9-11 per node). So an op FAMILY can be
 // frozen (modules/kernel/contract-freeze.yaml): a change that governs a frozen family carries a
 // `batch` (explicit, or the family's default for a change landing at/after its `since`), and for a

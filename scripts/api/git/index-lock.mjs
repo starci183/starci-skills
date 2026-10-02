@@ -1,10 +1,10 @@
 // index-lock.mjs — the ONE recovery of a stale `.git/index.lock` in a shared product checkout.
 //
-// Every workflow of a product repo works in one checkout (nivo-backend, starci-next, ...). A git process that
+// Every workflow of a product repo works in one checkout (todo-app, ecommerce-app, ...). A git process that
 // dies mid-write (a host terminal wipe, a killed worker) leaves `<gitdir>/index.lock` behind, and from then on
 // every `git add` / `git commit` in that checkout refuses "Unable to create .../index.lock: File exists" - for
-// every workflow at once. starci-next sn-subscription backend.implement a20 (2026-09-26 01:10) settled blocked on
-// a 403 KB lock from 01:01:34 with no git process alive; the worker rightly would not delete a shared lock.
+// every workflow at once. One op once settled blocked on
+// a 403 KB lock left over with no git process alive; the worker rightly would not delete a shared lock.
 //
 // indexLock removes such a lock only when all of these hold:
 //   - it is a plain file (never a link), older than allocation.housekeeping.gitIndexLockStaleMs (runtimes.yaml);

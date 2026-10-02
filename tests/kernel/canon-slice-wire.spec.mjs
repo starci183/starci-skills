@@ -2,7 +2,7 @@
 // and config files go to ONE canon-wire leg per wave (HFS has no shared registration file: owners are derived
 // from knowledge/hfs/slots.yaml, so policy sharedRoots is empty), and a blocked slice is redone from its commit
 // (scripts/kernel/cut-seam.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
-// enqueue.cutExecution). nivo wf-nivo-fe-canon-mujek980: op-code.refactor-7e9f7e20c1 (slice 7/34) committed
+// enqueue.cutExecution). A canon slice (7/34) committed
 // 9 -> 7 findings, then blocked shared-change - the rest needed its product-shells owners MOVED into
 // features/layouts, none of which it owned; 22 of 56 slices failed so.
 import test from 'node:test';
