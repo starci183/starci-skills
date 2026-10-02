@@ -2,7 +2,7 @@ import "server-only"
 import { hasLocale } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
-import { routing } from "./index"
+import { routing } from "./routing"
 
 /**
  * What an app's `[locale]` layout resolves before it mounts the shell: the language the address states and

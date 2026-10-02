@@ -2,7 +2,7 @@ import "server-only"
 import { hasLocale } from "next-intl"
 import { getRequestConfig } from "next-intl/server"
 import { locale as routeLocale } from "next/root-params"
-import { DEFAULT_LOCALE, LOCALES, PRODUCT_TIME_ZONE } from "./index"
+import { DEFAULT_LOCALE, LOCALES, PRODUCT_TIME_ZONE } from "./routing"
 
 /** The apps of the product. */
 type AppName = "landing" | "app"
