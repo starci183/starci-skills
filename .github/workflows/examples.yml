@@ -90,9 +90,9 @@ jobs:
       - name: Install runtime dependencies
         run: npm ci
       - name: Example YAML parses under the runtime's own loader
-        run: starci runtime check --only example-yaml
+        run: npm run starci --silent -- runtime check --only example-yaml
       - name: Example Work-tree layout (ids, refs, evidence)
-        run: node scripts/work/validate/check-example-work.mjs
+        run: starci work check-example-work
       - name: Example Work-gate fixture suite
         run: node --test tests/checks/example-work-gate.spec.mjs
 

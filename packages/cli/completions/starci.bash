@@ -14,20 +14,20 @@ _starci() {
         app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "pass run" -- "$cur") );;
-        gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync read repo-presentation run sonar starcistacks test-world unit" -- "$cur") );;
+        gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync read reference-conventions repo-presentation run sonar starcistacks test-world unit" -- "$cur") );;
         guard) COMPREPLY=( $(compgen -W "command footprint-scan seat-tools verify-commit" -- "$cur") );;
-        harness) COMPREPLY=( $(compgen -W "open start status stop" -- "$cur") );;
+        harness) COMPREPLY=( $(compgen -W "install-task open start status stop" -- "$cur") );;
         kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report contract-release coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
-        reconciler) COMPREPLY=( $(compgen -W "install-task restart start status stop up" -- "$cur") );;
+        reconciler) COMPREPLY=( $(compgen -W "install-task once restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check clean-test launch-smoke proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
-        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
-        workflow) COMPREPLY=( $(compgen -W "assess define start status stop" -- "$cur") );;
+        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        workflow) COMPREPLY=( $(compgen -W "assess bias define start status stop" -- "$cur") );;
             *) COMPREPLY=();;
         esac
         return 0

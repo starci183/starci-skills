@@ -538,6 +538,22 @@ starci gate read --knowledge knowledge/op-gate.yaml
 
 Removed spellings: `node scripts/gates/read-digest.mjs`, `node .claude/scripts/gates/read-digest.mjs`
 
+### starci gate reference-conventions
+
+probe the installed backend reference rules of a reference root
+
+Positionals: reference-root?
+
+exit: 0 probes passed; 1 a probe failed; 2 bad usage
+
+json: none
+
+```sh
+starci gate reference-conventions <backend-reference-root>
+```
+
+Removed spellings: `node scripts/gates/probe-reference-conventions.mjs`
+
 ### starci gate repo-presentation
 
 check repository presentation rules for a product or runtime tree
@@ -755,6 +771,25 @@ starci guard verify-commit <old> <new>
 ## starci harness
 
 start, stop, inspect or open the local StarCi harness
+
+### starci harness install-task
+
+print or register the scheduled task of the harness tunnel
+
+| flag | type | |
+| --- | --- | --- |
+| `--apply` | boolean |  |
+
+exit: 0 printed or registered; 1 registration failed; 2 bad usage
+
+json: flag
+
+```sh
+starci harness install-task
+starci harness install-task --apply
+```
+
+Removed spellings: `node scripts/reconciler/tunnel-task.mjs --install-task`
 
 ### starci harness open
 
@@ -2293,6 +2328,26 @@ starci reconciler install-task --apply
 
 Removed spellings: `node scripts/reconciler/boot.mjs --install-task`
 
+### starci reconciler once
+
+run one reconcile pass of the controllers in memory, shadow unless --apply
+
+| flag | type | |
+| --- | --- | --- |
+| `--controller` | string |  |
+| `--key` | string |  |
+| `--apply` | boolean |  |
+
+exit: 0 the pass finished; 1 the pass failed or the lead was refused; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler once --controller job --json
+```
+
+Removed spellings: `node scripts/reconciler/engine.mjs --once`
+
 ### starci reconciler restart
 
 stop the reconciler engine and ensure a new leader
@@ -3586,6 +3641,20 @@ starci work brand-palette --scan .starciwork --json
 
 Removed spellings: `node scripts/work/brand/brand-palette.mjs`
 
+### starci work check-example-work
+
+check the layout, ids, refs and evidence of every example Work tree
+
+exit: 0 clean or warnings only; 1 refused records; 2 bad usage
+
+json: none
+
+```sh
+starci work check-example-work
+```
+
+Removed spellings: `node scripts/work/validate/check-example-work.mjs`
+
 ### starci work compose-direction
 
 place drawn content into its measured page or overlay shell
@@ -3909,6 +3978,24 @@ starci work draw-taste --html <render.html> --json
 ```
 
 Removed spellings: `node scripts/work/draw/draw-taste.mjs`
+
+### starci work evidence-binding
+
+prove that every done leaf's evidence still binds to the source it claims
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+
+exit: 0 clean; 1 findings; 2 invalid arguments or an unreadable input
+
+json: flag
+
+```sh
+starci work evidence-binding --work <.starciwork root>
+```
+
+Removed spellings: `node scripts/work/validate/check-evidence-binding.mjs`
 
 ### starci work example-critique
 
@@ -4237,6 +4324,27 @@ starci workflow assess --repo <path> --json
 ```
 
 Removed spellings: `node scripts/goal/assess.mjs`, `node .claude/scripts/goal/assess.mjs`
+
+### starci workflow bias
+
+normalize a routing bias or extract one from the owner's text
+
+| flag | type | |
+| --- | --- | --- |
+| `--normalize` | string |  |
+
+Positionals: text?
+
+exit: 0 printed the JSON; 1 the JSON could not be read; 2 bad usage
+
+json: always
+
+```sh
+starci workflow bias --normalize '{"prefer":["codex"],"avoid":["devin"]}'
+starci workflow bias "don't use codex"
+```
+
+Removed spellings: `node scripts/agent/bias.mjs`, `node .claude/scripts/agent/bias.mjs`
 
 ### starci workflow define
 

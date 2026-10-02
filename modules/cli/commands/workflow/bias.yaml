@@ -1,0 +1,19 @@
+group: workflow
+verb: bias
+owner: runtime
+summary: normalize a routing bias or extract one from the owner's text
+impl: {script: scripts/agent/bias.mjs}
+positional:
+  - {name: text, required: false, variadic: true}
+flags:
+  - {name: normalize, type: string, summary: "a JSON bias object {prefer, avoid}: aliases canonicalized, unknown pools dropped, avoid wins"}
+exit: {"0": printed the JSON, "1": the JSON could not be read, "2": bad usage}
+json: always
+examples:
+  - starci workflow bias --normalize '{"prefer":["codex"],"avoid":["devin"]}'
+  - starci workflow bias "don't use codex"
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/agent/bias.mjs
+  - node .claude/scripts/agent/bias.mjs

@@ -17,7 +17,7 @@ it. `start` brings them back and shows, in one list, what is green and what is r
 workflow and never approves anything on the owner's behalf: a replacement Kernel resumes its already-approved workflow
 by itself. It never defines a goal and never starts a new workflow (that is `define-goal` / `start-kernel`).
 
-Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/reconciler/boot.mjs up`).
+Executable: `.claude/scripts/reconciler/start.mjs` (also `starci reconciler up`).
 
 ## Steps
 

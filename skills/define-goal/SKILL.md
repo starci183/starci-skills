@@ -43,7 +43,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    wins conflicts):
 
    ```
-   node .claude/scripts/agent/bias.mjs --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
+   starci workflow bias --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
    ```
 
    `bias.mjs "<text>"` is the no-agent fallback for automation. Keep the JSON:

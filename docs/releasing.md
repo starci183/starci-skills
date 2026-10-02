@@ -36,7 +36,7 @@ It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is re
 Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:
 
 ```sh
-starci release launch-smoke --app-repo <scratch app main checkout> --out /absolute/launch-smoke.json
+starci release launch-smoke --app-repo <scratch app main checkout> --out <launch-smoke-output>/launch-smoke.json
 ```
 
 It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It also proves the workflow worktree on the scratch app: the Kernel's worktree in `orca worktree list`, a be op and an fe op in parallel in it, a failing op preserved and reset to its checkpoint, and a finish that fast-forwards main and marks the worktree release-pending, after which the host-side controller removes it, with main byte-identical but for the two green files. Run it with the reconciler running, since its controller removes the worktree. The scratch app must be registered in Orca, and its main receives those two files and is pushed. It always stops and releases every agent it started and prints one `starci/launch-smoke@2` JSON result; exit 0 means all three paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
@@ -44,20 +44,21 @@ It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml
 ## Make an archive
 
 ```sh
-npm pack --json --pack-destination /absolute/release-output
+npm pack --json --pack-destination <release-output>
+npm pack --json --pack-destination <release-output> packages/cli
 ```
 
-Create that output directory first, outside the runtime and product trees. Run `npm run check && npm test` in the packing checkout yourself before packing — `npm pack` runs no verification of its own. Inspect the resulting file inventory for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. `package.json` `files[]` is the authority on what the payload contains — it is an allowlist with explicit negations for generated output; keep all runtime references available after relocation.
+Create that output directory first, outside the runtime and product trees. Run `npm run check && npm test` in the packing checkout yourself before packing — `npm pack` runs no verification of its own. Inspect both resulting file inventories for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. Each package's `files[]` is the authority on what its payload contains — it is an allowlist with explicit negations for generated output; keep all runtime references available after relocation.
 
-Test the **archive**, not only the source checkout:
+Test both **archives**, not only the source checkout:
 
 ```sh
-npx --yes --package=/absolute/release-output/<archive>.tgz starci --help
-npx --yes --package=/absolute/release-output/<archive>.tgz starci runtime install --dir /absolute/isolated-host
-node /absolute/isolated-host/.claude/bin/starci.mjs doctor --dir /absolute/isolated-host --quick
+npx --yes --package=<cli-archive>.tgz starci --help
+npx --yes --package=<cli-archive>.tgz starci runtime install --dir <isolated-host>
+npx --yes --package=<cli-archive>.tgz starci runtime doctor --dir <isolated-host> --quick
 ```
 
-Also verify an update preserving custom host instructions and a seeded `config.yaml`. Record the archive hash and test results with the handoff. Do not test installation against an active user's runtime.
+Also verify an update preserving custom host instructions and a seeded `config.yaml`. Record both archive hashes and the test results with the handoff. Do not test installation against an active user's runtime.
 
 ## Publication is a separate approval
 

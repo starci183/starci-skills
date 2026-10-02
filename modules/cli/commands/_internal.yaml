@@ -1,5 +1,4 @@
 internal:
-  - {path: scripts/agent/bias.mjs, why: "Model-routing bias helper", usedBy: [scripts/route/route-model.mjs]}
   - {path: scripts/agent/quota/index.mjs, why: "Provider quota probe child", usedBy: [scripts/agent/credential-probe.mjs]}
   - {path: scripts/agent/send.mjs, why: "Agent prompt-delivery helper", usedBy: [scripts/agent/lib.mjs]}
   - {path: scripts/api/orca/account-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/quota/orca-account.mjs]}
@@ -63,7 +62,6 @@ internal:
   - {path: scripts/checks/check-worktree-add.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/cli/main.mjs, why: "Runtime-side catalog dispatcher", usedBy: [packages/cli/src/main.mjs]}
   - {path: scripts/context/pack.mjs, why: "Operation context-pack builder", usedBy: [scripts/kernel/dispatch-op.mjs]}
-  - {path: scripts/gates/probe-reference-conventions.mjs, why: "Read-only reference-rule probe", usedBy: [knowledge/patterns/scan-coverage.yaml]}
   - {path: scripts/housekeeping/blob-gc.mjs, why: "Blob garbage-collection controller", usedBy: [scripts/housekeeping/hk-ledger.mjs]}
   - {path: scripts/kernel/ask-server.mjs, why: "Kernel ask-form server child", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/dispatch-op.mjs, why: "Kernel operation-dispatch helper", usedBy: [scripts/kernel/cli.mjs]}
@@ -80,18 +78,14 @@ internal:
   - {path: scripts/machine/worker-output.mjs, why: "Worker transcript projection", usedBy: [scripts/kernel/transcripts.mjs]}
   - {path: scripts/reconciler/controllers/job.mjs, why: "Engine-discovered job controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/controllers/workflow.mjs, why: "Engine-discovered workflow controller", usedBy: [scripts/reconciler/engine.mjs]}
-  - {path: scripts/reconciler/engine.mjs, why: "Reconciler engine child", usedBy: [scripts/reconciler/boot.mjs]}
   - {path: scripts/reconciler/ledger-health.mjs, why: "Host ledger-health controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/fleet.mjs]}
   - {path: scripts/reconciler/services.mjs, why: "Host service-registry controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
-  - {path: scripts/reconciler/tunnel-task.mjs, why: "Host-run harness tunnel task registration entry", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/route/route-model.mjs, why: "Model-route selector", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/route/route-plan.mjs, why: "Goal route-plan helper", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/uat/test-secret.mjs, why: "Runtime test-secret reader behind the app secret owner", usedBy: [scripts/supervisor/push-mains.mjs]}
   - {path: scripts/work/purge-workflow.mjs, why: "Finished-workflow purge helper", usedBy: [scripts/housekeeping/hk-ledger.mjs]}
-  - {path: scripts/work/validate/check-evidence-binding.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
-  - {path: scripts/work/validate/check-example-work.mjs, why: "Example work-record validator", usedBy: [.github/workflows/examples.yml]}
   - {path: scripts/work/validate/check-work-artifacts.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-consistency.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-deep.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}

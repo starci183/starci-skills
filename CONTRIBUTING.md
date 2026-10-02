@@ -55,8 +55,10 @@ record and is worse than a red check.
   keep them declarative — no code, no comments restating the field name.
 - **The CLI catalog is authoritative.** `modules/cli/commands/` is the one source of the CLI
   surface. Adding a verb means adding its YAML file. Run
-  `starci runtime check --only cli-catalog-drift` and regenerate with the generator named in
-  its message; keep the catalog parity and drift checks green.
+  `starci runtime check --only cli-catalog-drift`, regenerate stale outputs with
+  `starci runtime gen-catalog --write`, and use `starci runtime gen-catalog --check` to confirm
+  the generated catalog, reference, and completions agree. Keep the catalog parity and drift
+  checks green.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
   visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
   hashes bytes).

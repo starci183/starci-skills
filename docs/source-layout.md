@@ -113,7 +113,7 @@ assess deployment completeness separately.
 Source-layout conformance is part of `starci app lint` (its `starci app check` half), not a separate command:
 
 ```sh
-starci app lint --repo <app> --format json
+starci app lint --cwd <app> --format json
 ```
 
 The HFS tree law itself is reported by `starci app check` (the root slots once, each side's slots under
@@ -137,7 +137,7 @@ Tiers and the import direction (`tiers.runtime`):
 
 | Tier | Paths | May import |
 |---|---|---|
-| entry | `bin/starci.mjs`, `ui/` (server and API) | every tier below |
+| entry | `packages/cli/bin/starci.mjs`, `ui/` (server and API) | every tier below |
 | checks | `scripts/checks/check-<topic>.mjs` | reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package |
 | reconciler | `scripts/reconciler/` | supervisor, kernel, domain, gates, machine, hfs, api, db, base |
 | supervisor | `scripts/supervisor/` | kernel, domain, gates, machine, hfs, api, db, base |

@@ -165,7 +165,7 @@ there are no aliases.
 - [Debugging: the ten questions and their SQL](docs/debugging.md)
 - [Writing an op manifest](docs/ops.md)
 - [Host contracts and agent cards](docs/host-contract.md)
-- [CLI and script reference](docs/cli.md)
+- [CLI reference](docs/cli.md)
 - [Build, test, package and release](docs/releasing.md)
 
 Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need this page and `docs/`.

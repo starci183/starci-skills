@@ -1,0 +1,15 @@
+group: work
+verb: evidence-binding
+owner: runtime
+summary: prove that every done leaf's evidence still binds to the source it claims
+impl: {script: scripts/work/validate/check-evidence-binding.mjs}
+flags:
+  - {name: work, type: string, required: true, summary: the .starciwork root to check}
+exit: {"0": clean, "1": findings, "2": invalid arguments or an unreadable input}
+json: flag
+examples:
+  - starci work evidence-binding --work <.starciwork root>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/work/validate/check-evidence-binding.mjs

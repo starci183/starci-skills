@@ -1,0 +1,18 @@
+group: harness
+verb: install-task
+owner: runtime
+summary: print or register the scheduled task of the harness tunnel
+impl:
+  script: scripts/reconciler/tunnel-task.mjs
+  args: [--install-task]
+flags:
+  - {name: apply, type: boolean, summary: register the task instead of printing it}
+exit: {"0": printed or registered, "1": registration failed, "2": bad usage}
+json: flag
+examples:
+  - starci harness install-task
+  - starci harness install-task --apply
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/tunnel-task.mjs --install-task

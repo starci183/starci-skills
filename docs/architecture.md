@@ -124,8 +124,8 @@ op declared (`declared_exit_code`), and only the raw one decides a verdict.
 ## The reconciler
 
 `scripts/reconciler/engine.mjs` is the one host runtime loop. The scheduled task
-`StarCi-Reconciler` runs `scripts/reconciler/boot.mjs ensure` at logon and periodically;
-`boot.mjs --restart` is the engine-only restart entry; `scripts/reconciler/start.mjs` (the `start` skill) brings the
+`StarCi-Reconciler` runs `starci reconciler start` at logon and periodically;
+`starci reconciler restart` is the restart entry; the `start` skill brings the
 whole host up and prints one green/red checklist (see "Start"). Every engine start, exit and cause is a
 `process_runs` row; every leadership epoch is a `leader_history` row. Each controller runs
 `off`, `shadow` or `active` (`controller_modes`, with every change recorded in `mode_changes`
@@ -163,7 +163,7 @@ repeatedly is replaced.
 
 ### Start
 
-`starci reconciler up` (skill `start`, the one start skill; `boot.mjs --restart` is the engine-only lever) runs, in order: preflight (Node bundles
+`starci reconciler up` (skill `start`, the one start skill; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
 SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
