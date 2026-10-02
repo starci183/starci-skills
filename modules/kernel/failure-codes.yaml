@@ -13291,6 +13291,17 @@ BE_COOKIE_ATTRIBUTES:
   owner: op-retry
   kind: check-finding
 
+BE_AMBIENT_ID:
+  title: "An id is minted from the ambient random source"
+  title_vi: "Mã định danh được sinh trực tiếp từ nguồn ngẫu nhiên"
+  meaning_vi: "Mã ở `<file>` gọi `randomUUID` của Node crypto (import tên, import namespace hoặc `crypto` toàn cục), một bộ sinh `v1`, `v4`, `v6`, `v7` của `uuid`, hoặc `nanoid`/`ulid` thay vì lấy từ cổng `Ids`; spec khi đó không điều khiển được mã nào được sinh ra và một lần chạy lỗi không tái hiện được."
+  causes_vi:
+    - "Vi phạm luật R142: dịch vụ gọi `randomUUID()` trực tiếp để tạo khóa hoặc mã sự kiện"
+    - "Spec tự sinh mã bằng `randomUUID` thay vì dùng `fakeIds()`"
+  nextStep_vi: "Tiêm cổng bằng `@InjectIds() private readonly ids: Ids` và gọi `ids.next()`; trong spec cấp `fakeIds([...])` qua token của `platform/ids`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_ERROR_CAUSE_DROPPED:
   title: "A catch replaces the failure without carrying it"
   title_vi: "Catch thay lỗi mà không giữ lỗi gốc"

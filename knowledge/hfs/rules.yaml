@@ -1289,3 +1289,11 @@ rules:
     failureCodes: ["BE_COOKIE_ATTRIBUTES"]
     enforcers:
       - {kind: eslint-be, id: response-cookie-attributes}
+  - id: R142
+    code: "BE_AMBIENT_ID"
+    law: "`randomUUID` of Node's crypto (named, namespace or global), the `v1`, `v4`, `v6` and `v7` generators of `uuid`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included; code asks the injected `Ids` port (`ids.next()`) and specs use `fakeIds()`."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_AMBIENT_ID"]
+    enforcers:
+      - {kind: eslint-be, id: no-ambient-id}
