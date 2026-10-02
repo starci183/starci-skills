@@ -134,7 +134,7 @@ Also: `starci reconciler status`, `starci reconciler up --check`,
 1. Reproduce from evidence (section 3) and name the root cause; contain with the smallest lever (a controller `off` in
    `config.yaml`) only when the engine is being harmed, and record it.
 2. One lane per disjoint file set, each a staged checkout made by the runtime worktree API: from the live `.claude`,
-   `node scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
+   `starci supervisor workers stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
    `sup/<job>` under `<lanesRoot>/staging` (default `<lanes root>/staging`) with its `node_modules` link and
    `config.yaml` already in place, and prints its path; copy `packages/grammar/dist` from the live checkout. A lane never
    makes its own worktree or link and never deletes a tree recursively; a missing `packages/node_modules` is reported as

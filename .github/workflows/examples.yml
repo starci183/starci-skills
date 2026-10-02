@@ -70,10 +70,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+      - name: Install runtime dependencies
+        run: npm ci
       - id: list
-        run: echo "apps=$(starci runtime check --only examples-ci -- --matrix)" >> "$GITHUB_OUTPUT"
+        run: echo "apps=$(npm run starci --silent -- runtime check --only examples-ci -- --matrix)" >> "$GITHUB_OUTPUT"
       - id: images
-        run: echo "images=$(starci runtime check --only examples-ci -- --images)" >> "$GITHUB_OUTPUT"
+        run: echo "images=$(npm run starci --silent -- runtime check --only examples-ci -- --images)" >> "$GITHUB_OUTPUT"
 
   # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
   records:
@@ -130,7 +132,7 @@ jobs:
       # THE lint of the app (ESLint with both canons, stylelint, starci app check), also written as the one Sonar import file.
       - name: starci app lint
         working-directory: .
-        run: node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
+        run: starci app lint --cwd "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
       - name: Unit tests with coverage (per-file 100 on the services; writes be/coverage/lcov.info)
         if: ${{ !cancelled() }}
         run: npm test -- --ci

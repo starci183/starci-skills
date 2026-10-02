@@ -20,8 +20,8 @@
 //
 // The preview's orca command is the launch starci kernel dispatch issues (it files the Task itself):
 //   orca orchestration worker-start --spec <prompt> --worktree <sel> --agent <provider> [--model <id> --effort <level>]
-// CLI:
-//   node scripts/kernel/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: --op <id> [--records a,b] [--state <.starciwork>]
 //       [--params '<json>'] [--model <target>] [--budget <n>] [--lease <token>]
 //       [--worktree <sel>] [--json]
 
@@ -125,7 +125,7 @@ export const splitGoalLegParams = (brief, leg) => {
 };
 
 function usage(code) {
-  console.error(`use: node scripts/kernel/dispatch-op.mjs --op <id>
+  console.error(`args: --op <id>
     [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]
     [--budget <n>] [--lease <token>] [--worktree <selector>] [--json]`);
   process.exit(code);

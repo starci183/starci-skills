@@ -23,15 +23,37 @@ test('a script imported, spawned or run by a package script, a skill or a YAML e
   }), []);
 });
 
+test('a runtime check-only command and a catalog impl are executable readers', () => {
+  assert.deepEqual(run({
+    'scripts/checks/check-workflow.mjs': '',
+    'scripts/checks/check-contract.mjs': '',
+    'scripts/checks/check-skill.mjs': '',
+    'scripts/checks/check-package.mjs': '',
+    'scripts/checks/check-hook.mjs': '',
+    'scripts/checks/check-npm-wrapper.mjs': '',
+    'scripts/housekeeping/catalog-reader.mjs': '',
+    '.github/workflows/checks.yml': 'steps:\n  - run: starci runtime check --only workflow\n  - run: npm run starci --silent -- runtime check --only npm-wrapper\n',
+    'modules/ops/ops/contract.yaml': 'check: starci runtime check --only=contract\n',
+    'skills/checks/SKILL.md': 'Run `starci runtime check --only skill`.\n',
+    'package.json': '{"scripts":{"check:package":"starci runtime check --only package"}}',
+    '.husky/pre-push': '#!/bin/sh\nstarci runtime check --only hook\n',
+    'modules/cli/commands/runtime/catalog-reader.yaml': 'impl: {script: scripts/housekeeping/catalog-reader.mjs}\n',
+  }), []);
+});
+
 test('a script named only by a doc, a README, YAML prose, retired-paths, a contract-change or a comment is dead', () => {
   const findings = run({
     'scripts/supervisor/why-backfill.mjs': 'export const x = 1;',
     'scripts/work/migrate-ui-shapes.mjs': '',
     'scripts/kernel/repair-rejected-attempts.mjs': '',
     'scripts/kernel/commented.mjs': '',
+    'scripts/checks/check-prose-only.mjs': '',
+    'scripts/checks/check-commented-hook.mjs': '',
     'docs/why.md': 'Dry-run backfill: `node scripts/supervisor/why-backfill.mjs`.\n',
     'README.md': 'see scripts/work/migrate-ui-shapes.mjs\n',
     'modules/cli/commands/kernel/dispatch.yaml': 'reads: scripts/kernel/repair-rejected-attempts.mjs seals the rest\n',
+    'modules/ops/ops/prose.yaml': 'description: starci runtime check --only prose-only\n',
+    '.husky/pre-commit': '# starci runtime check --only commented-hook\n',
     'modules/kernel/retired-paths.yaml': '  - {path: scripts/kernel/commented.mjs}\n',
     'modules/kernel/contract-changes/x.yaml': 'run: node scripts/kernel/commented.mjs\n',
     'scripts/lib/other.mjs': '// node scripts/kernel/commented.mjs\n/* scripts/kernel/commented.mjs */\n * scripts/kernel/commented.mjs\n',
@@ -40,6 +62,8 @@ test('a script named only by a doc, a README, YAML prose, retired-paths, a contr
   assert.deepEqual(codes(findings).filter(([, p]) => p !== 'scripts/lib/other.mjs'), [
     ['RT_DEAD_SCRIPT', 'scripts/supervisor/why-backfill.mjs'], ['RT_DEAD_SCRIPT', 'scripts/work/migrate-ui-shapes.mjs'],
     ['RT_DEAD_SCRIPT', 'scripts/kernel/repair-rejected-attempts.mjs'], ['RT_DEAD_SCRIPT', 'scripts/kernel/commented.mjs'],
+    ['RT_DEAD_SCRIPT', 'scripts/checks/check-prose-only.mjs'],
+    ['RT_DEAD_SCRIPT', 'scripts/checks/check-commented-hook.mjs'],
   ]);
 });
 

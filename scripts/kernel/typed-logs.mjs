@@ -27,7 +27,8 @@
 // (scripts/lib/secret-patterns.mjs, shared with scripts/supervisor/push-mains.mjs) plus OTPs, bearer tokens and
 // secret-named keys. A value is blanked, its key kept.
 //
-//   node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json].
 //       derive rows from the ledger's events; a dry run (the default) counts
 //       what it would insert and writes nothing. --rederive derives from every event again (seq 0), so a new
 //       derivation reaches old events; rows already stored are duplicates by src and are not written twice.
@@ -533,7 +534,7 @@ const argsOf = (argv) => { const a = { _: [] }; for (let i = 0; i < argv.length;
 async function main() {
   const args = argsOf(process.argv.slice(2));
   if (args._[0] !== 'sync' || !args.repo) {
-    console.error('use: node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]   (dry run unless --apply)');
+    console.error('args: sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]   (dry run unless --apply)');
     process.exit(2);
   }
   const repo = path.resolve(args.repo);

@@ -35,6 +35,8 @@ export const WORKFLOW = '.github/workflows/examples.yml';
 export const CODECOV = 'codecov.yml';
 /** The step that prints the matrix, and the expression every matrix job reads it through. */
 export const MATRIX_COMMAND = 'starci runtime check --only examples-ci -- --matrix';
+const checkoutCommand = (command) => command.replace(/^starci\s+/, 'npm run starci --silent -- ');
+const runsCommand = (step, command) => [command, checkoutCommand(command)].some((candidate) => String(step?.run ?? '').includes(candidate));
 export const MATRIX_JOB = 'apps';
 export const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
 
@@ -132,7 +134,7 @@ export function checkExamplesCi(root = ROOT) {
   if (doc) {
     const jobs = doc.jobs ?? {};
     const lister = jobs[MATRIX_JOB];
-    if (!lister || !(lister.steps ?? []).some((step) => String(step.run ?? '').includes(MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
+    if (!lister || !(lister.steps ?? []).some((step) => runsCommand(step, MATRIX_COMMAND)) || !String(lister.outputs?.apps ?? '').includes('steps.'))
       add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
     const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
     if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
@@ -163,7 +165,7 @@ export function checkExamplesCi(root = ROOT) {
   if (doc) {
     const images = doc.jobs?.[IMAGES_JOB];
     const steps = images?.steps ?? [];
-    if (!images || !steps.some((step) => String(step.run ?? '').includes(IMAGES_COMMAND)) && !(doc.jobs?.[MATRIX_JOB]?.steps ?? []).some((step) => String(step.run ?? '').includes(IMAGES_COMMAND)))
+    if (!images || !steps.some((step) => runsCommand(step, IMAGES_COMMAND)) && !(doc.jobs?.[MATRIX_JOB]?.steps ?? []).some((step) => runsCommand(step, IMAGES_COMMAND)))
       add('EXAMPLES_CI_IMAGES_NOT_DERIVED', WORKFLOW, `a job ${IMAGES_JOB} must build every image of every example from the output of \`${IMAGES_COMMAND}\` (never a hand-written list)`);
     else if (!String(images.strategy?.matrix?.include ?? '').includes('fromJSON(needs.') || steps.some((step) => String(step.with?.push) === 'true' || /docker push|--push/.test(String(step.run ?? ''))))
       add('EXAMPLES_CI_IMAGES_NOT_DERIVED', `${WORKFLOW}#jobs.${IMAGES_JOB}`, 'the images matrix must be include: fromJSON of the derived output, and the job never pushes an image');

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // worker-list-all.mjs — every page of Orca's supervised worker listing (scripts/api/orca/worker-list.mjs workerList,
 // one page of at most 100 rows, newest first), and the active workers over every Run.
-//   node scripts/machine/worker-list-all.mjs [--run <run_id>] [--terminal-state <state>]
+// Internal entry: spawned by scripts/checks/check-orca-tree.mjs; not invoked directly.
+// Args: [--run <run_id>] [--terminal-state <state>].
 //
 // workerListAll follows page.nextCursor unchanged until hasMore is false. Without `run` Orca scopes the list to the Run
 // bound to the calling terminal, or to every Run when there is no binding; `scope.source` (flag | bound | all) says

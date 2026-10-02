@@ -89,7 +89,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 
 1. READ: your Decision Items first (`starci machine decisions supervisor --list`; escalated progress-stall and
    runtime-defect items are the outcome duty above), then `starci supervisor poll --repo <r> --once` (the read-only digest: workflows, OWED, STALLED, LAUNCH-FAIL),
-   the worker board (`node scripts/supervisor/workers.mjs list`), the land queue (`starci supervisor land --status`), and
+   the worker board (`starci supervisor workers list`), the land queue (`starci supervisor land --status`), and
    `starci kernel status --repo <r> --workflow <wf> --json` for every workflow an item names (frontier,
    nextActions, queuedCauses, incidents, kernelRev, and drawReviews / autopilot fields when present). Re-read status
    before acting on anything older than this digest.
@@ -137,7 +137,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
   `starci machine lessons match --signature <s>` / `--text <symptom>`. Owner lessons outweigh your own.
 - A signature that repeats opens a hypothesis automatically (the tick). Fix it in a lane with a spec that reproduces
   the signature, then land EVERY change you author through
-  `node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/<name>.spec.mjs>] --reason <text>`
+  `starci supervisor lesson-actions land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>] [--wrongly-blocked <tests/<name>.spec.mjs>] --reason <text>`
   (it enforces the tier, the check guardrail and the daily cap, then calls the land gate and records the experiment).
 - Tiers. AUTO (land it, it shows in the digest): bug fixes in checkers/scripts/runtime; checker calibration WITH a
   spec holding the correct example the check wrongly blocked; grammar additions/fixes (a release bump; npm publish
@@ -170,8 +170,8 @@ settles your Dispatch, and a settled Supervisor is released. Your [Worker]s are 
 
 1. Read `modules/supervisor/supervise.yaml` and `docs/supervisor.md` in full.
 2. Register the channel from THIS terminal (it records your terminal handle, so the owner's messages reach you):
-   `node scripts/supervisor/channel.mjs register --id {supervisorId} --label "Supervisor"`
-3. Read the inbox: `node scripts/supervisor/channel.mjs inbox --id {supervisorId}` and answer each message
+   `starci supervisor channel register --id {supervisorId} --label "Supervisor"`
+3. Read the inbox: `starci supervisor channel inbox --id {supervisorId}` and answer each message
    (`channel.mjs reply --id {supervisorId} --to <inboxId> --text-file <file>`), in {ownerLanguage}.
 4. Read your Decision Items and the digest (below) and act on them. Then yield.
 
@@ -184,10 +184,10 @@ one-line wake into this terminal. It never carries owner text: owner messages ar
              stored for it automatically (it is not sent to Telegram).
 - `[decide]` Decision Items wait: `starci machine decisions supervisor --list` and resolve each (above).
 - The Fleet controller opens Decision Items for owed work; read and resolve them on each wake.
-- `[land]`   a worker filed a report or a land finished: `node scripts/supervisor/workers.mjs list` and land or
+- `[land]`   a worker filed a report or a land finished: `starci supervisor workers list` and land or
              redirect (`starci supervisor land --job <jobId>`).
 - `[report]` a worker filed a diagnosis (`--outcome diagnosed`) or a blocked/failed report:
-             `node scripts/supervisor/workers.mjs show --job <id>`, then decide.
+             `starci supervisor workers show --job <id>`, then decide.
 - `[worker]` a worker died or stalled: decide (respawn, reassign, or take it yourself).
 Act until nothing is immediately executable, then YIELD the turn. Never sleep, never poll in a loop, never keep a
 turn alive: the Host controller owns the cadence and wakes you.
@@ -201,7 +201,7 @@ turn alive: the Host controller owns the cadence and wakes you.
   stuck item of every workflow with its action and SLA clock. Work all of them (your mission).
 - For EVERY OWED cluster, this tick: a `fixed-by <sha>?` item is verified against the diff, then you resolve it
   `--by supervisor` citing the sha and notify its Kernel (`starci supervisor notify --repo <repo> --workflow <wf> --text-file <f> --item <key>`); an open cluster
-  becomes ONE [Worker] job (`node scripts/supervisor/workers.mjs create --cluster <id> ...`, then
+  becomes ONE [Worker] job (`starci supervisor workers create --cluster <id> ...`, then
   `workers.mjs spawn`), or you fix it yourself when it is small, or you take the ruling yourself and record it.
   One worker per cluster, never one per incident. The cap is adaptive (`workers.mjs cap`), at most 10.
 - Rulings: you are the single decision desk for runtime and cross-workflow conflicts. Record each ruling in the
@@ -221,7 +221,7 @@ file leases, visible in /status and landed through the gate.
 
 - NEVER edit the live `.claude` tree in place and never commit on main directly, and never write lane code yourself
   (raci.mustNot): a [Worker] writes it in its staging checkout and you land it - through
-  `node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
+  `starci supervisor lesson-actions land --signature <s> --commit <sha> --lane <name> ...` (it calls `land.mjs` and
   records the experiment), or a worker job via `starci supervisor land --job <id>`. The gate cherry-picks onto current main in a
   scratch worktree, runs node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-cli-parity,
   the named specs and the specs touching the changed files, requires a contract-changes entry with `paths` for any

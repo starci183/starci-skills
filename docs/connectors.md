@@ -182,12 +182,12 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   `modules/reconciler/fleet.yaml` and `scripts/reconciler/notifier.mjs`.
 
 ```
-node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]
-node scripts/supervisor/channel.mjs heartbeat --id <id>
-node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]     # unread; marks read unless --peek
-node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
-node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]     # "TELEGRAM <inboxId>: <text>", exit 0; 124 on timeout
-node scripts/supervisor/telegram-bridge.mjs start | run | status | stop
+starci supervisor channel register --id <id> --label <text> [--repos <csv>]
+starci supervisor channel heartbeat --id <id>
+starci supervisor channel inbox --id <id> [--json] [--peek]     # unread; marks read unless --peek
+starci supervisor channel reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
+starci supervisor channel wait --id <id> [--timeout-ms <n>]     # "TELEGRAM <inboxId>: <text>", exit 0; 124 on timeout
+starci supervisor telegram-bridge start | run | status | stop
 ```
 
 What a supervisor may do on a chat message is `modules/supervisor/supervise.yaml` `channel`: the

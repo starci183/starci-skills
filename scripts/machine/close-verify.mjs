@@ -22,10 +22,11 @@
 //
 // A caller running INSIDE the terminal it closes (a Kernel finishing its workflow, a [Worker] filing its report) cannot
 // verify: the close ends its own process. closeSelfSafe hands the close to a detached verifier process
-// (`node close-verify.mjs --terminal <h> --delay-ms <ms> --owner <tag>`) that waits for the caller to finish writing,
+// (the `closeSelfSafe` detached verifier) that waits for the caller to finish writing,
 // closes, verifies and appends the result to the Supervisor's machine log as a gc.collect row.
 //
-//   node scripts/machine/close-verify.mjs --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log]
+// Internal entry: spawned by scripts/kernel/kernel-watchdog.mjs; not invoked directly.
+// Args: --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log].
 //
 // A worker's agent process needs no kill-and-read-back here: `worker-release` alone ends it (live smoke E1, 2026-10-02), so a close
 // is proven by the terminal alone.

@@ -3,7 +3,8 @@
 // envelope. `starci kernel report` prints this block after filing so the op terminal
 // shows the reports row's projection — the row is the truth, this is its view.
 //
-//   node scripts/kernel/report-render.mjs <report.json>
+// Internal entry: spawned by scripts/kernel/verbs/report.mjs; not invoked directly.
+// Args: <report.json>.
 
 import fs from 'node:fs';
 import { isMain } from '../lib/is-main.mjs';
@@ -27,6 +28,6 @@ export function renderReportBlock(report = {}) {
 
 if (isMain(import.meta.url)) {
   const file = process.argv[2];
-  if (!file) { console.error('use: node scripts/kernel/report-render.mjs <report.json>'); process.exit(2); }
+  if (!file) { console.error('args: <report.json>'); process.exit(2); }
   console.log(renderReportBlock(JSON.parse(fs.readFileSync(file, 'utf8'))));
 }

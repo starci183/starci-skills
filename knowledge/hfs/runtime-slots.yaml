@@ -112,12 +112,12 @@ ruleParams:
       - {root: packages/eslint/fe/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
     # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
     pinned:
-      - {path: bin/starci.mjs, why: the npm bin}
+      - {path: packages/cli/bin/starci.mjs, why: the @starci/cli npm bin}
       - {path: scripts/kernel/cli.mjs, why: every Kernel and op prompt runs it}
       - {path: scripts/kernel/start-workflow.mjs, why: the start-kernel skill and the bin}
       - {path: scripts/supervisor/start-supervisor.mjs, why: the supervisor seat launch}
       - {path: "scripts/api/orca/<call>.mjs", why: the only Orca form agent prose may cite (scripts/checks/check-host-boundary.mjs)}
-    # The retained runtime self-checks `starci runtime check` (bin/starci.mjs) runs after the runtime check, in this order.
+    # The retained runtime self-checks `starci runtime check` runs after the runtime check, in this order.
     selfChecks:
       - {id: ops-registry, run: scripts/route/build-ops-registry.mjs, args: [--check]}
       - {id: providers, run: scripts/checks/check-providers.mjs}
@@ -241,7 +241,7 @@ slots:
   # ----- entry ----------------------------------------------------------------------------------------------
   - id: runtime.cli
     profiles: [runtime]
-    path: bin/starci.mjs
+    path: packages/cli/bin/starci.mjs
     presence: required
     tracked: tracked
     tier: entry
@@ -651,4 +651,4 @@ consumers:
   - scripts/hfs/runtime-check.mjs
   - scripts/checks/check-host-boundary.mjs
   - scripts/checks/check-contract-cites.mjs
-  - bin/starci.mjs
+  - packages/cli/bin/starci.mjs

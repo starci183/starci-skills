@@ -225,15 +225,20 @@ test('owedToWire: findings left on owned paths pass only when declared, held by 
   assert.equal((await canonParityVerdict(noOwed, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }))).reason, 'cut-postcondition-red');
 });
 
-test('a NODE_PATH prefix is dropped before a declared runtime check is classified and re-run', async () => {
+test('a NODE_PATH prefix is dropped before either dispatcher form is classified and re-run', async () => {
   const { withoutNodePath } = await import('../../scripts/kernel/settle/canon-parity.mjs');
   assert.equal(withoutNodePath(`NODE_PATH=${DRIVE}x/node_modules starci runtime validate X --strict --json`), 'starci runtime validate X --strict --json');
-  assert.equal(withoutNodePath(`$env:NODE_PATH='${DRIVE}x'; node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`), `node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`);
+  const nodeCommand = `node ${DRIVE}r/.claude/packages/cli/bin/starci.mjs runtime validate X --json`;
+  assert.equal(withoutNodePath(`$env:NODE_PATH='${DRIVE}x'; ${nodeCommand}`), nodeCommand);
   assert.equal(withoutNodePath('FOO=1 node x.mjs'), 'FOO=1 node x.mjs');
+  const nodeClass = classifyCheck({ command: nodeCommand });
+  assert.equal(nodeClass.rel, 'packages/cli/bin/starci.mjs');
+  assert.deepEqual(nodeClass.argv, ['runtime', 'validate', 'X', '--json']);
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
   const strict = { name: 'starci-validate-strict', command: `NODE_PATH=${DRIVE}x/node_modules starci runtime validate X --strict --json`, exitCode: 0 };
   let ran = null;
-  const v = await canonParityVerdict(sliceItem(base, [...RED, strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
+  const v = await canonParityVerdict(sliceItem(base, [strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
   assert.equal(v.green, true, JSON.stringify(v));
-  assert.deepEqual(ran.argv, ['validate', 'X', '--strict', '--json']);
+  assert.equal(ran.rel, 'packages/cli/bin/starci.mjs');
+  assert.deepEqual(ran.argv, ['runtime', 'validate', 'X', '--strict', '--json']);
 });

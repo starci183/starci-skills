@@ -34,6 +34,7 @@ test('every gate runs; a red gate names its failing files; the owner gate is rep
   assert.equal(r.schema, GATES_SCHEMA);
   assert.deepEqual(r.gates.map((g) => g.name), ['draw-acceptance', 'draw-metrics', 'validate-strict', 'shell-conformance', 'draw-layer', 'draw-loop']);
   const strict = r.checks.find((c) => c.name === 'validate-strict');
+  assert.equal(strict.command, `starci runtime validate ${uiRel} --strict --json`);
   assert.equal(strict.exitCode, 1);
   assert.deepEqual(strict.failing, [child], 'the child record is named so starci kernel record-checks can attribute it (foreign)');
   assert.deepEqual(strict.codes, ['DATA_STATUS_DRAWN']);

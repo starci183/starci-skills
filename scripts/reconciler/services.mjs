@@ -5,7 +5,7 @@
 // restart}. probe() is read-only and async (a child process or an HTTP GET, never a blocking spawnSync inside the
 // engine). start() does NOT act: it returns the actuator command {cmd, args}, which the controller hands to
 // ctx.run, so shadow mode records it and only active mode runs it. Every actuator is this file's own CLI
-// (`node scripts/reconciler/services.mjs --start <name>`), so one place starts each service.
+// (the services actuator), so one place starts each service.
 //
 // Ports and URLs are read once, from one source each (servicePorts): the harness port from runtimes.yaml
 // allocation.supervisorTick.statusApp.port, the public harness hostname from ~/.cloudflared/harness.yml ingress
@@ -18,15 +18,16 @@
 // `restart` events: no restarts_json), every probe to `service_probes`. The same table also holds the Host
 // controller's seat rows (`seat:...`) and ledger rows (`ledger:<id>`), so `boot.mjs --status` shows everything the Host owns.
 //
-//   node scripts/reconciler/services.mjs --list [--json]            the rows of the services table
-//   node scripts/reconciler/services.mjs --probe <name> [--json]    one read-only probe
-//   node scripts/reconciler/services.mjs --start <name> [--json]    the actuator (run by ctx.run in active mode only)
-//   node scripts/reconciler/services.mjs --reopen <name> [--json]   a quarantined service/seat back to `declared`
-//   node scripts/reconciler/services.mjs --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
-//   node scripts/reconciler/services.mjs --processes                the process table (host-health listProcesses) as JSON
-//   node scripts/reconciler/services.mjs --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
-//   node scripts/reconciler/services.mjs --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
-//   node scripts/reconciler/services.mjs --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal
+// Internal entry: spawned by scripts/reconciler/controllers/host.mjs; not invoked directly.
+// Args: --list [--json]            the rows of the services table
+//       --probe <name> [--json]    one read-only probe
+//       --start <name> [--json]    the actuator (run by ctx.run in active mode only)
+//       --reopen <name> [--json]   a quarantined service/seat back to `declared`
+//       --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
+//       --processes                the process table (host-health listProcesses) as JSON
+//       --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
+//       --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
+//       --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

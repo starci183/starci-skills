@@ -53,7 +53,7 @@ nothing is ahead.
 
 3. If a suite is red, start one fixer agent per failing group (one spec file or one source file, exactly the groups the
    run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own staged lane (made first with
-   `node .claude/scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>`, which prints the path the worker
+   `starci supervisor workers stage --self --name <lane> --files <csv>`, which prints the path the worker
    starts in: `--worktree path:<staged path>`), writes or updates the specs of the code it repairs, runs only those specs and lands with
    `starci supervisor land --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
    a workflow op in the workflow's worktree: its green settle is a checkpoint on `wf-<workflowId>`, and the app's main

@@ -16,7 +16,7 @@
 //   draw-metrics      scripts/work/draw-loop-settle.mjs: every live part re-rendered and re-measured by the runtime
 //                     (DRAW_METRICS_FAILED / DRAW_METRICS_UNVERIFIED / DRAW_FEEDBACK_UNADDRESSED). --no-remeasure
 //                     skips it (it renders; the settle still runs it).
-//   validate-strict   bin/starci.mjs validate <ui dir> --strict: each refused record is named in `failing`; a refusal
+//   validate-strict   starci runtime validate <ui dir> --strict: each refused record is named in `failing`; a refusal
 //                     in a child record outside the job's owned paths is attributed foreign by starci kernel record-checks.
 //   shell-conformance scripts/work/ui/shell-conformance.mjs <ui dir>.
 //   draw-layer        scripts/work/draw/draw-layer.mjs over every live part (standard principles of every drawing, owner
@@ -103,9 +103,9 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   }
 
   // 3. validate-strict on the record dir; each refused record is a failing file (a child outside the slice is foreign).
-  const v = runners.validate ? await runners.validate(uiDir, root) : spawnJson('bin/starci.mjs', ['validate', slash(uiDir), '--strict', '--json'], root);
+  const v = runners.validate ? await runners.validate(uiDir, root) : spawnJson('packages/cli/bin/starci.mjs', ['runtime', 'validate', slash(uiDir), '--strict', '--json'], root);
   const refused = refusalsOf(v.doc?.refused, SKILL_ROOT, root);
-  gates.push({ name: 'validate-strict', command: `node ${slash(path.join(SKILL_ROOT, 'bin', 'starci.mjs'))} validate ${uiRel} --strict --json`,
+  gates.push({ name: 'validate-strict', command: `starci runtime validate ${uiRel} --strict --json`,
     exitCode: v.doc ? (v.doc.ok === false || refused.length ? 1 : 0) : (v.exitCode || 2), codes: uniq(refused.map((r) => r.code)).sort(), failing: uniq(refused.map((r) => r.file)),
     evidence: v.doc ? (refused.length ? `${refused.length} refusal(s): ${refused.slice(0, 5).map((r) => `${r.file} [${r.code}] ${r.message}`).join(' | ').slice(0, 1500)}` : 'strict validation: 0 refused') : `validate did not answer JSON: ${v.stderr.slice(0, 400)}` });
 

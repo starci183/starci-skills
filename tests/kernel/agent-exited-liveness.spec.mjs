@@ -26,7 +26,7 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=
 
 // A captured Codex op whose agent exited mid-turn. The
 // spinner residue ("Working", "Running hook") is still on screen; the last row is the shell prompt.
-const DEAD_CODEX=['',`• Ran node '${APPDIR}\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
+const DEAD_CODEX=['',`• Ran node '${APPDIR}\\.claude\\packages\\cli\\bin\\starci.mjs' runtime validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',

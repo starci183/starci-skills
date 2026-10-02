@@ -3,9 +3,10 @@
 // first controller of the reconciler architecture (one loop engine, idempotent controllers per concern, LLMs as
 // deciders only). The watchdog loop only CALLS it (scripts/kernel/kernel-watchdog.mjs), so it can move into the engine as is.
 //
-//   node scripts/kernel/settle/job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json]
-//   node scripts/kernel/settle/job-settle.mjs --all [--dry-run] [--json]          every config.yaml supervisor.repos ledger
-//   node scripts/kernel/settle/job-settle.mjs --invariant [--repo <r>] [--json]  read-only report of reported jobs past invariantMaxAgeMs
+// Internal entry: spawned by scripts/reconciler/services.mjs; not invoked directly.
+// Args: --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json]
+//       --all [--dry-run] [--json]          every config.yaml supervisor.repos ledger
+//       --invariant [--repo <r>] [--json]  read-only report of reported jobs past invariantMaxAgeMs
 //
 // reconcileJobSettle({repo, workflowId?, jobId?}) drives each job whose worker filed a report through explicit states,
 // one typed ledger event per transition:
@@ -34,7 +35,8 @@
 //   - a checks row the Kernel already recorded for the attempt: green -> settle; red -> kernel;
 //   - else every check the report declares must claim exit 0 (a *-before/baseline measurement is evidence, not a
 //     verdict, and is skipped), and every one that is a check (not a git/read action)
-//     must be a runtime check the settler can re-run without a shell: node <runtime>/bin/starci.mjs validate ...,
+//     must be a runtime check the settler can re-run without a shell: starci runtime validate ...,
+//     node <runtime>/packages/cli/bin/starci.mjs runtime validate ...,
 //     node <runtime>/scripts/checks/<x>.mjs ... (never --fix/--write/--apply), starci work graph
 //     validate|show|diff ...; each re-run (argv, no shell, cwd = the ledger repo) must exit 0;
 //   - a cut slice (payload.cut) records the two cut checks settle demands: a canon slice (params.canonFamilies) re-runs
@@ -189,13 +191,20 @@ export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
   if (!command || ACTION.test(command)) return { kind: 'action' };
   const argv = argvOf(command);
   if (!argv) return { kind: 'foreign', why: 'shell-or-placeholder' };
+  const cliRel = 'packages/cli/bin/starci.mjs';
+  if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) {
+    const rest = argv.slice(1);
+    if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
+    if (rest[0] !== 'runtime' || rest[1] !== 'validate') return { kind: 'foreign', why: 'not-a-runtime-check' };
+    return { kind: 'runtime', script: path.join(skillRoot, ...cliRel.split('/')), argv: rest, rel: cliRel };
+  }
   if (!/^node(?:\.exe)?$/i.test(path.basename(argv[0])) || !argv[1]) return { kind: 'foreign', why: 'not-a-runtime-check' };
-  const rel = /(?:^|\/)\.claude\/((?:bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
+  const rel = /(?:^|\/)\.claude\/((?:packages\/cli\/bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
     ?? (norm(path.resolve(argv[1])).toLowerCase().startsWith(`${norm(skillRoot).toLowerCase()}/`) ? norm(path.relative(skillRoot, path.resolve(argv[1]))) : null);
   if (!rel) return { kind: 'foreign', why: 'outside-runtime' };
   const rest = argv.slice(2);
   if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-  const ok = (rel === 'bin/starci.mjs' && rest[0] === 'validate')
+  const ok = (rel === cliRel && rest[0] === 'runtime' && rest[1] === 'validate')
     || (/^scripts\/checks\/[\w.-]+\.mjs$/.test(rel))
     || (rel === 'scripts/work/work-graph.mjs' && ['validate', 'show', 'diff'].includes(rest[0]));
   if (!ok) return { kind: 'foreign', why: `not-a-check-script:${rel}` };

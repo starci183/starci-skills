@@ -58,7 +58,7 @@ maps the runtime directories below.
 
 ## Development
 
-From this repository root, run `npm ci`, `npm run check` for syntax and contract gates,
+From this repository root, run `npm ci`, `npm run check` (`starci runtime check`) for syntax and contract gates,
 and `npm test` for the Node test suite. The runtime package has no separate TypeScript
 typecheck, lint, or build script; product examples declare their own `typecheck`,
 `lint`, `build`, and `test` commands. Run the runtime presentation gate with
@@ -66,18 +66,17 @@ typecheck, lint, or build script; product examples declare their own `typecheck`
 
 ## Install
 
-From a clone of this repository:
+Install the one CLI globally, then install the runtime into a host:
 
 ```sh
-git clone https://github.com/starci183/starci-skills.git
-cd starci-skills
-npm ci
-starci runtime install --dir /absolute/path/to/host
-starci runtime doctor --dir /absolute/path/to/host
+npm i -g @starci/cli
+starci runtime install --dir <host>
+starci runtime doctor --dir <host>
 ```
 
-Once published, the equivalent is `npx starci runtime install --dir /absolute/path/to/host`. The same installer
-is reachable directly at `node scripts/install/install.mjs init --dir <host>`.
+Without a global install, use `npx @starci/cli` in place of `starci`. Use
+`starci runtime update --dir <host>` to update an installed tree and
+`starci runtime version` to print the runtime version.
 
 The installer:
 
@@ -91,13 +90,18 @@ The installer:
 5. Prints the consumer `.gitignore` lines — `.starciwork/` (runtime state) and `config.yaml`
    (local config) must never be committed by the host project.
 
+The CLI records the selected runtime in `<home>/.starci/runtime.json` and writes the
+`starci` shim under `<home>/.starci/bin`, so agents can run the same command. A runtime
+group used before installation exits 3 and prints
+`starci: the runtime group "<g>" needs the StarCi runtime, which is not installed (run: starci runtime install)`.
+
 ## How it runs
 
 ```text
 owner prompt
   └─ define-goal        → goal + op chain queued in the project ledger (runtime.sqlite)
        └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
-            └─ cli.mjs  → survey → plan → enqueue → dispatch → settle → finish
+            └─ starci kernel survey → plan → enqueue → dispatch → settle → finish
                  └─ dispatch spawns one ephemeral [Op] agent per job
                       (adapter card injects the provider CLI flags)
 ```
@@ -125,7 +129,7 @@ engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config
 scripts/            executables — kernel/cli.mjs, kernel/start-workflow.mjs, goal/, route/,
                     agent/, api/, reconciler/, supervisor/, connectors/, work/, guards/,
                     uat/, checks/, context/, lib/, reconcile/, example/, install/
-bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal | validate
+packages/cli/       @starci/cli, the thin dispatcher and the only starci bin
 modules/host/       per-host contracts — orca call surface (data only)
 skills/             user-facing skills — define-goal, start-kernel, workflow-chat,
                     start (restart is an alias), run-assisted-uat, orca-cli, orchestration, computer-use
@@ -140,20 +144,18 @@ packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicon
 
 ## CLI
 
-```sh
-node bin/starci.mjs --help
-starci runtime install --dir <host>      # install
-starci runtime update --dir <host>    # update an install
-starci runtime doctor --dir <host>    # verify an install (runs its own specs)
-node bin/starci.mjs starci kernel <verb>             # kernel api gate
-starci workflow start                  # start-workflow
-starci workflow define                   # define-goal
-starci runtime validate <work-root>   # read-only Work record/layout validation
-```
+`@starci/cli` owns the only `starci` binary. Its command groups are:
 
-Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
-directly, e.g. `starci gate run`. The full surface — install verbs, the
-api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli.md).
+| Groups | Surface |
+| --- | --- |
+| `app`, `workflow`, `kernel`, `runtime` | Product apps, workflow lifecycle, the Kernel gate, and runtime management |
+| `supervisor`, `debug`, `harness`, `reconciler` | Host supervision, inspection, UI, and reconciliation |
+| `guard`, `gate`, `release`, `work` | Fast guards, quality gates, releases, and Work records |
+| `machine`, `connect`, `route`, `uat`, `orca` | Host state, connectors, routing, UAT, and Orca adapters |
+
+The generated [CLI reference](docs/cli.md) is the complete source for verbs, flags,
+examples, and exit codes. Removed spellings are refused with their replacement and exit 2;
+there are no aliases.
 
 ## Documentation
 

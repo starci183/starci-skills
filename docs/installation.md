@@ -9,17 +9,24 @@ downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
 ```sh
-npx --yes --package=<reviewed-archive>.tgz starci runtime install --dir /absolute/host
-npx --yes --package=<reviewed-archive>.tgz starci runtime doctor --dir /absolute/host --quick
+npm i -g @starci/cli
+starci runtime install --dir <host>
+starci runtime doctor --dir <host> --quick
 ```
+
+Use `npx @starci/cli` in place of `starci` when a global install is not
+appropriate.
+
+Product repositories need only `@starci/cli` as a development dependency.
+Their managed templates invoke only `starci app ...`.
 
 `--dir` always means the **host** — the directory that will own `.claude/` —
 not automatically a project backend or frontend.
 
-## What `init` does
+## What `runtime install` does
 
-The installer (`bin/starci.mjs` → `scripts/install/install.mjs`) copies the
-payload `package.json` `files[]` declares into `/absolute/host/.claude`, then:
+The installer copies the payload declared by `package.json` `files[]` into
+`<host>/.claude`, then:
 
 1. Writes the managed agent bootstrap into the host's entry files. There is
    **one** template — `init/AGENTS.md`; every supported host file (AGENTS.md,
@@ -41,11 +48,20 @@ payload `package.json` `files[]` declares into `/absolute/host/.claude`, then:
    records the install manifest `.starci-skills.json` with the version and
    file hashes. A failed copy or verify records nothing.
 
-`init` refuses an unmanaged `.claude` by default. `--no-bootstrap` leaves host
+`starci runtime install` refuses an unmanaged `.claude` by default. `--no-bootstrap` leaves host
 entry files untouched (you then owe the agent the runtime path yourself).
 `--force` can replace locally edited runtime files — back up and inspect
 before opting in. The installer does not run git commands, create project
 records, or touch product sources. See [runtime distribution](runtime-distribution.md).
+
+The CLI records the active runtime root in `<home>/.starci/runtime.json` and
+writes a `starci` shim under `<home>/.starci/bin`, allowing agents to invoke the
+same CLI. If a runtime group is used before a runtime is installed, the command
+exits 3 and prints:
+
+```text
+starci: the runtime group "<g>" needs the StarCi runtime, which is not installed (run: starci runtime install)
+```
 
 ## Git hygiene in bound repositories
 
@@ -89,8 +105,9 @@ automatically in that task's directory ancestry.
 ## Update
 
 ```sh
-npx --yes --package=<reviewed-archive>.tgz starci runtime update --dir /absolute/host
-npx --yes --package=<reviewed-archive>.tgz starci runtime doctor --dir /absolute/host
+starci runtime update --dir <host>
+starci runtime doctor --dir <host>
+starci runtime version
 ```
 
 Updates replace unchanged installer-owned files, verify the installed tree,
@@ -98,18 +115,18 @@ then record the new version only after a successful check. Locally changed or
 unowned content is preserved and reported — inspect that report; a successful
 copy is not proof a mixed installation is compatible. An install recorded
 under a different protocol is not upgraded in place: remove `.claude` by hand
-and run `init`. Existing ledgers, goals, reports, receipts and local
+and run `starci runtime install --dir <host>`. Existing ledgers, goals, reports, receipts and local
 settings are preserved.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| `npx starci` cannot find the release | Use the reviewed `.tgz` path; it may not be published. |
-| Bootstrap entry missing or stale | Re-run `init`; the managed block is regenerated from `init/AGENTS.md`. |
+| `npx @starci/cli` cannot find the release | Use a reviewed package version; it may not be published. |
+| Bootstrap entry missing or stale | Re-run `starci runtime install --dir <host>`; the managed block is regenerated from `init/AGENTS.md`. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |
 | Runtime sources inconsistent | `starci runtime doctor --dir <host> --quick`; report errors before running workflows. |
-| Interrupted init/update | Re-run from the same reviewed package, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
+| Interrupted install/update | Re-run the same `starci runtime install` or `starci runtime update` command, then `starci runtime doctor --dir <host> --quick`. See [runtime distribution](runtime-distribution.md). |
 | Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |

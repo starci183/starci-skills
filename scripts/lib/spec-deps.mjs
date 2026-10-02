@@ -79,8 +79,9 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
   });
 }
 
-// CLI: node scripts/lib/spec-deps.mjs <root> <changed-file>...  -> prints the dependent spec paths, one per line.
-//      git diff --name-only <base> <head> | node scripts/lib/spec-deps.mjs <root> -
+// Internal entry: spawned by scripts/supervisor/land.mjs; not invoked directly.
+// Args: <root> <changed-file>... -> prints the dependent spec paths, one per line.
+// Stdin mode accepts `-` in place of changed-file arguments.
 // `-` reads the changed files from stdin, one per line: a large change (a tree move) exceeds the Windows command line
 // (about 32K characters), where passing them as arguments fails before node starts.
 if (isMain(import.meta.url)) {

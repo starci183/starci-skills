@@ -315,7 +315,7 @@ test('the check refuses a missing or unreadable root instead of reporting about 
 // `starci work-change` is not one of the runtime's verbs, so the report contract is asserted where a
 // caller actually gets it. A spec that spawned the CLI would be asserting a command nobody can run.
 test('a report without a baseline says which findings it could not evaluate',()=>{
-  const usage=spawnSync(process.execPath,['bin/starci.mjs','help'],{cwd:runtime,encoding:'utf8',windowsHide:true});
+  const usage=spawnSync(process.execPath,['packages/cli/bin/starci.mjs','help'],{cwd:runtime,encoding:'utf8',windowsHide:true});
   assert.doesNotMatch(usage.stdout,/work-change/,'the check has no CLI verb; if one is added, this report contract belongs behind it too');
   const report=checkWorkChange({workRoot:EXAMPLE});
   assert.equal(report.schema,'starci/work-change@1');

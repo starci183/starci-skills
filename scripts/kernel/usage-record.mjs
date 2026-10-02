@@ -15,7 +15,8 @@
 //                already recorded for that session, so a re-run never double counts.
 //   Supervisor   machine.sqlite llm_usage 'supervisor-turn' rows, same increments (`supervisor:<session>@<turns>`).
 //
-//   node scripts/kernel/usage-record.mjs sweep [--lookback-ms <ms>] [--dry-run] [--json]
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: sweep [--lookback-ms <ms>] [--dry-run] [--json].
 //     one pass over every registered ledger and the Supervisor; the Host controller runs it every 5 minutes.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -374,7 +375,7 @@ if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const arg = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   if (argv[0] !== 'sweep') {
-    console.error('usage: node scripts/kernel/usage-record.mjs sweep [--lookback-ms <ms>] [--dry-run] [--json]');
+    console.error('args: sweep [--lookback-ms <ms>] [--dry-run] [--json]');
     process.exit(2);
   }
   const r = await sweepUsage({ lookbackMs: Number(arg('lookback-ms') ?? DEFAULT_LOOKBACK_MS), dryRun: argv.includes('--dry-run') });

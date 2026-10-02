@@ -74,7 +74,7 @@ test('strict names a work family no catalogued schema defines, and skips kernel 
 
 test('the CLI takes --strict and reports it', (t) => {
   const work = tree(t, { 'features/task/br/complete/once/index.yaml': `${exampleRule.trimEnd()}\ncolour: blue\n` });
-  const run = spawnSync(process.execPath, [path.join(root, 'bin', 'starci.mjs'), 'validate', recordDir(work), '--strict', '--json'], { encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'runtime', 'validate', recordDir(work), '--strict', '--json'], { encoding: 'utf8' });
   assert.equal(run.status, 1, run.stderr);
   const report = JSON.parse(run.stdout);
   assert.equal(report.strict, true);
@@ -88,7 +88,7 @@ test('--owned scopes out-of-slice findings when the target is a feature dir unde
   const bad = `${exampleRule.trimEnd()}\ncolour: blue\n`;
   const work = tree(t, { 'features/task/br/complete/once/index.yaml': bad, 'features/task/index.yaml': 'schema: work/feature@1\nid: task\ntitle: Task\ndescription: d\n' });
   const target = path.join(work, 'features', 'task');
-  const args = [path.join(root, 'bin', 'starci.mjs'), 'validate', target, '--strict', '--json'];
+  const args = [path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'runtime', 'validate', target, '--strict', '--json'];
   const own = path.join(work, 'features', 'task', 'index.yaml');
   const scoped = spawnSync(process.execPath, [...args, '--owned', own], { encoding: 'utf8', cwd: path.dirname(work) });
   const report = JSON.parse(scoped.stdout);

@@ -13955,7 +13955,7 @@ RT_CLI_CATALOG_DRIFT:
   causes_vi:
     - "Sửa một file catalog trong modules/cli/commands mà quên chạy gen-catalog --write"
     - "Sửa tay một đầu ra sinh tự động thay vì sửa catalog nguồn"
-  nextStep_vi: "Người giám sát chạy node scripts/cli/gen-catalog.mjs --write rồi commit cả catalog lẫn các đầu ra; không sửa tay tệp đã sinh."
+  nextStep_vi: "Người giám sát chạy starci runtime gen-catalog --write rồi commit cả catalog lẫn các đầu ra; không sửa tay tệp đã sinh."
   owner: supervisor
   kind: check-finding
 
@@ -14030,7 +14030,7 @@ RT_GENERATED_BLOCK_STALE:
   causes_vi:
     - "Sửa slots.yaml hoặc rules.yaml mà không chạy lại readme-blocks.mjs --write"
     - "Sửa tay nội dung bên trong một khối sinh tự động"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write hoặc node scripts/hfs/derived-fields.mjs --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
+  nextStep_vi: "Người giám sát chạy starci runtime readme-blocks --write hoặc starci runtime derived-fields --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
   owner: supervisor
   kind: check-finding
 

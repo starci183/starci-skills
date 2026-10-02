@@ -16,7 +16,8 @@
 // that keeps Orca's completeness verdict with the bytes (contentComplete, clipping): a bounded tail or a terminal
 // fallback is never stored as if it were the whole transcript.
 //
-//   node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]
+// Internal entry: spawned by scripts/kernel/verbs/report.mjs; not invoked directly.
+// Args: snapshot --repo <repo> [--every-ms <ms>] [--json].
 //     one pass over the repo ledger's open attempts; a periodic caller (the reconciler) runs it every minute.
 import path from 'node:path';
 import { workerOutput } from '../machine/worker-output.mjs';
@@ -115,7 +116,7 @@ if (isMain(import.meta.url)) {
   const arg = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   const [cmd] = argv;
   if (cmd !== 'snapshot' || !arg('repo')) {
-    console.error('usage: node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]');
+    console.error('args: snapshot --repo <repo> [--every-ms <ms>] [--json]');
     process.exit(2);
   }
   const { openLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');

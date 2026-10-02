@@ -182,7 +182,7 @@ test('a commit on the owned paths since dispatch fences the job even with a clea
 // stray PowerShell tab per dead op. The recovery now closes that terminal with its
 // tab, but only on fresh proof: disconnected, or a frame that ends in a bare shell prompt.
 // A captured Codex op whose agent exited mid-turn.
-const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
+const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude\\packages\\cli\\bin\\starci.mjs' runtime validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',

@@ -19,7 +19,8 @@
 // scripts/machine/op-metrics.mjs (stuck[], opTelemetry.stuckSla), the findings from stall.mjs, the ask tags from
 // scripts/supervisor/poll.mjs openAsks.
 //
-//   node scripts/reconciler/controllers/workflow.mjs --dry [--repo <path>]... [--workflow <id>] [--json]
+// Internal entry: spawned by scripts/reconciler/engine.mjs; not invoked directly.
+// Args: --dry [--repo <path>]... [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints the plan (clocks, would-DIs, re-parks, finish); writes nothing.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -495,7 +496,7 @@ if (isMain(import.meta.url)) {
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [path.resolve(argv[i + 1])] : []));
   const only = argv.flatMap((a, i) => (a === '--workflow' && argv[i + 1] ? [argv[i + 1]] : []));
   if (!argv.includes('--dry')) {
-    console.log('usage: node scripts/reconciler/controllers/workflow.mjs --dry [--repo <path>]... [--workflow <id>] [--json]\n(the engine runs this controller: node scripts/reconciler/engine.mjs --once --controller workflow)');
+      console.log('args: --dry [--repo <path>]... [--workflow <id>] [--json]\n(the reconciler engine runs this controller)');
   } else {
     const ctx = dryCtx(repos.length ? { repos } : {});
     const keys = (await listWorkflows(ctx)).filter((k) => !only.length || only.includes(parseKey(k)?.workflowId));

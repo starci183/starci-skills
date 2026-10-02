@@ -15,8 +15,9 @@
 // modules/reconciler/sla.yaml; a slaKey is a dotted key under modules/models/runtimes.yaml `allocation:`, cited
 // instead of copied.
 //
-//   node scripts/reconciler/sla.mjs --once [--json]     one pass against machine.sqlite (writes violations)
-//   node scripts/reconciler/sla.mjs --list [--json]     the open clocks and the catalogue, read only
+// Internal entry: spawned by scripts/reconciler/engine.mjs; not invoked directly.
+// Args: --once [--json]     one pass against machine.sqlite (writes violations)
+//       --list [--json]     the open clocks and the catalogue, read only.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -462,6 +463,6 @@ if (isMain(import.meta.url)) {
     try { out = await slaPass({ ...ctx, machine: m, stateFile: m.file }); } finally { m.close(); }
     console.log(json ? JSON.stringify(out, null, 2) : `sla pass: ${out.violated.length} violated, ${out.cleared.length} cleared${out.skipped.length ? `; skipped ${out.skipped.join(', ')}` : ''}`);
   } else {
-    console.log('usage: node scripts/reconciler/sla.mjs --once|--list [--json]');
+    console.log('args: --once|--list [--json]');
   }
 }

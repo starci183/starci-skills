@@ -139,7 +139,7 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a command whose files exist, flags, globs,
     put(dir, 'be/src/tests/e2e/login/gate.e2e-spec.ts');
     put(dir, '.starciwork/features/login/impl/demo/gate/index.yaml', RECORD({
       e2e: 'npm run test:e2e -- be/src/tests/e2e/login/gate.e2e-spec.ts',
-      implementation: 'node ../other/.claude/bin/starci.mjs validate ../demo/.starciwork/features/login --strict --json',
+      implementation: 'node ../other/.claude/packages/cli/bin/starci.mjs runtime validate ../demo/.starciwork/features/login --strict --json',
       requirements: 'docker compose -f ../infra/compose.yaml build && node be/dist/apps/core/main.js --config "src/**/*.json" --port=3000',
     }));
   }) });
