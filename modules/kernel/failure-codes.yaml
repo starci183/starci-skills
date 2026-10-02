@@ -13957,3 +13957,25 @@ HFS_DOCKER_SECRETS:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
   kind: check-finding
+
+EXAMPLES_CI_IMAGES_NOT_DERIVED:
+  title: "The examples workflow does not build every image from a derived matrix"
+  title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
+  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `node scripts/checks/check-examples-ci.mjs --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
+  causes_vi:
+    - "Danh sách image viết tay trong workflow, hoặc thiếu job images"
+    - "Một bước build có push: true hoặc docker push"
+  nextStep_vi: "Dựng lại job `images` với include: fromJSON của đầu ra `--images` và bỏ mọi thao tác push."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_APP_QUALITY_DRIFT:
+  title: "An example's codecov.yml or sonar-project.properties differs from its render"
+  title_vi: "codecov.yml hoặc sonar-project.properties của ví dụ lệch khỏi bản sinh"
+  meaning_vi: "Hai tệp chất lượng của mỗi ví dụ được sinh từ jest preset nguồn của repo này, cùng phạm vi coverage với cờ trong codecov.yml gốc; phạm vi loại trừ của Sonar là phần bù của nó."
+  causes_vi:
+    - "Preset nguồn đổi mà các tệp chưa được sinh lại"
+    - "Sửa tay tệp sinh ra"
+  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
+  owner: runtime-core
+  kind: check-finding
