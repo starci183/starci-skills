@@ -28,7 +28,7 @@ import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
 import { isOwnedBy, isOwnedType, originsOf } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
-import { originsOfType, typed } from "./lib/types.mjs"
+import { moduleOf, originsOfType, typed } from "./lib/types.mjs"
 
 /** The test composition root (slot `be.tests.world`): it composes app options like `main.ts` and hands run state to jest workers through the environment. */
 const isTestWorld = (hfs, file) => hfs.slotOf(file) === "be.tests.world"
@@ -304,6 +304,22 @@ const isSecretValue = (context, node) => {
     return isOwnedType(context, node, "Secret", "platform", "config") || (holder !== null && isOwnedType(context, holder, "Secret", "platform", "config"))
 }
 
+/** The packages that declare the Node crypto types: a digest read out of a `Hash` or `Hmac` is secret-derived material. */
+const CRYPTO_PACKAGES = new Set(["crypto", "node:crypto"])
+
+/** A `.digest(...)` of a `Hash` or `Hmac` of Node's crypto, found by where the called signature is declared, never by the receiver's name. */
+const isCryptoDigest = (context, node) => {
+    if (node.type !== "CallExpression" || node.callee.type !== "MemberExpression") return false
+    const { checker, toTs } = typed(context)
+    const tsCall = toTs(node)
+    const declaration = tsCall ? checker.getResolvedSignature(tsCall)?.declaration : undefined
+    if (!declaration || !declaration.name || declaration.name.getText() !== "digest") return false
+    const owner = declaration.parent
+    const ownerName = (ts.isInterfaceDeclaration(owner) || ts.isClassDeclaration(owner)) && owner.name ? owner.name.text : ""
+    if (ownerName !== "Hash" && ownerName !== "Hmac") return false
+    return CRYPTO_PACKAGES.has(moduleOf(declaration, String(declaration.getSourceFile().fileName).split("\\").join("/")))
+}
+
 /** A secret is compared with `timingSafeEqual`, never with an equality operator. */
 export const secretCompareTimingSafe = {
     meta: {
@@ -322,7 +338,7 @@ export const secretCompareTimingSafe = {
                 if (!["===", "!==", "==", "!="].includes(node.operator)) return
                 if (isPresenceOperand(node.left) || isPresenceOperand(node.right)) return
                 for (const side of [node.left, node.right]) {
-                    if (isSecretValue(context, side)) {
+                    if (isSecretValue(context, side) || isCryptoDigest(context, side)) {
                         context.report({ node, messageId: "compare", data: { name: context.sourceCode.getText(side), operator: node.operator } })
                         return
                     }

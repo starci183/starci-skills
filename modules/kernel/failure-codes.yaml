@@ -13279,6 +13279,18 @@ FE_COOKIE_ATTRIBUTES:
   owner: op-retry
   kind: check-finding
 
+BE_COOKIE_ATTRIBUTES:
+  title: "A cookie a door writes leaves its attributes to the defaults"
+  title_vi: "Cookie do cửa backend ghi ra không nêu rõ thuộc tính"
+  meaning_vi: "Một lời gọi `cookie` hoặc `setCookie` trên phản hồi của Express hay Fastify ở `<file>` không nêu `httpOnly: true`, `secure: true` hoặc `sameSite` là `lax`/`strict` bằng giá trị cố định, hoặc `Set-Cookie` được ghi tay thành header; cookie đó khi đó đọc được từ script của trang, đi qua HTTP thường hoặc đi theo request chéo trang."
+  causes_vi:
+    - "Vi phạm luật R141: gọi `res.cookie(name, value)` không có options, hoặc options thiếu một trong ba thuộc tính"
+    - "`sameSite: \"none\"`, `secure: false` hoặc `httpOnly` lấy từ một biến boolean không cố định"
+    - "Ghi header `Set-Cookie` bằng `setHeader`, `append` hoặc `header`"
+  nextStep_vi: "Khai báo một hằng số options `as const` trong module sở hữu cookie với `httpOnly: true`, `secure: true` và `sameSite: \"lax\"` hoặc `\"strict\"`, rồi truyền nó vào mọi lần `res.cookie`; bỏ mọi header `Set-Cookie` viết tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_ERROR_CAUSE_DROPPED:
   title: "A catch replaces the failure without carrying it"
   title_vi: "Catch thay lỗi mà không giữ lỗi gốc"

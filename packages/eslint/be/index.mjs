@@ -23,6 +23,7 @@ import { recommended as buildersRecommended, rules as buildersRules } from "./bu
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as configOwnerRecommended, rules as configOwnerRules } from "./config-owner.mjs"
 import { recommended as connectionsRecommended, rules as connectionsRules } from "./connections.mjs"
+import { recommended as cookiesRecommended, rules as cookiesRules } from "./cookies.mjs"
 import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
 import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
@@ -64,6 +65,7 @@ const CONTRIBUTIONS = [
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
     { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
     { law: "connections", rules: connectionsRules, recommended: connectionsRecommended },
+    { law: "cookies", rules: cookiesRules, recommended: cookiesRecommended },
     { law: "cqrs", rules: cqrsRules, recommended: cqrsRecommended },
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
     { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },

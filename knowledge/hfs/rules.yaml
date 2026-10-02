@@ -1280,3 +1280,11 @@ rules:
     failureCodes: ["RT_ABSOLUTE_PATH"]
     enforcers:
       - {kind: runtime, id: absolute-path, at: scripts/hfs/runtime-rules/absolute-path.mjs}
+  - id: R141
+    code: "BE_COOKIE_ATTRIBUTES"
+    law: "A cookie a back-end door writes through the response of Express or Fastify (`cookie`, `setCookie`) states `httpOnly: true`, `secure: true` and `sameSite` `lax` or `strict` in options typed with those literals, and `Set-Cookie` is never written as a header (`setHeader`, `append`, `header`); the call is recognised by where its signature is declared, never by the receiver's name."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_COOKIE_ATTRIBUTES"]
+    enforcers:
+      - {kind: eslint-be, id: response-cookie-attributes}

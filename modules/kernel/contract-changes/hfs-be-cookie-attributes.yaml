@@ -1,0 +1,19 @@
+id: hfs-be-cookie-attributes
+effectiveAt: '2026-10-02T09:30:00+07:00'
+summary: >-
+  R141 BE_COOKIE_ATTRIBUTES (alpha.5 item 6.10), built ahead of the first back-end door that writes a cookie. eslint-be
+  `response-cookie-attributes`: a cookie written through the response of Express or Fastify (`cookie`, `setCookie`, found by
+  where the called signature is declared) states `httpOnly: true`, `secure: true` and `sameSite` `lax` or `strict` in options
+  typed with those literals, and `Set-Cookie` is never written as a header. `secret-compare-timing-safe` (R41) also recognises, by
+  type, the `.digest()` of a `Hash` or `Hmac` of Node's crypto as secret-derived material, beside the `Secret` brand of
+  platform/config. Violating and passing cases are in cookies.spec.mjs and config-owner.spec.mjs.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-cookie-attributes.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - packages/eslint/be/cookies.mjs
+  - packages/eslint/be/config-owner.mjs
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/README.md
