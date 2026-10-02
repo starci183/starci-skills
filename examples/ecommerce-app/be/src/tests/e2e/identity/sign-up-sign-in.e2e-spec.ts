@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { present } from "../../fixtures/present.mapper"
 import type {
     AccountData,
@@ -12,6 +12,9 @@ import { PUBLIC_TABLES, PERSON_BY_ID } from "../../fixtures/persistence/e2e-veri
 import { KEYCLOAK_SIGN_IN_CLIENT } from "../../world/test-apps.options"
 import { useTestWorld } from "../../world/use-test-world"
 
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
+
 /**
  * fr.identity.sign-in as one complete journey over the public doors only: register (the shopper is created in the stack's
  * real Keycloak realm, which owns the credential), a refused duplicate and refused wrong pairs, sign-in (the realm's
@@ -23,7 +26,7 @@ import { useTestWorld } from "../../world/use-test-world"
  * Run: npm run test:e2e -- identity/sign-up-sign-in
  */
 describe("identity sign-up and sign-in journey", () => {
-    const email = `e2e-${randomUUID()}@ecommerce.dev`
+    const email = `e2e-${ids.next()}@ecommerce.dev`
     const password = "e2e-journey-pass-1"
 
     const world = useTestWorld({ apps: ["identity", "order"] })

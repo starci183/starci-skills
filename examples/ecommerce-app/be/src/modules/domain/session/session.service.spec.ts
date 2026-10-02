@@ -1,7 +1,8 @@
-import { FakeClock, fakeCache, mock } from "@starci/jest-preset"
+import { FakeClock, fakeCache, fakeIds, mock } from "@starci/jest-preset"
 import { CACHE } from "@modules/integrations/cache"
 import { KEYCLOAK, KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
+import { IDS } from "@modules/platform/ids"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { Test } from "@nestjs/testing"
@@ -9,33 +10,33 @@ import { SessionErrorCode } from "./errors/session.error"
 import { SESSION_KEY } from "./session.cache-keys"
 import { SessionService } from "./session.service"
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
 const build = async () => {
     const clock = new FakeClock("2026-01-01T00:00:00.000Z")
     const cache = fakeCache(clock)
     const keycloak = mock<KeycloakClient>()
     const logger = mock<Logger>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             SessionService,
             { provide: CACHE, useValue: cache },
             { provide: KEYCLOAK, useValue: keycloak },
             { provide: LOGGER, useValue: logger },
+            { provide: IDS, useValue: ids },
         ],
     }).compile()
-    return { sessions: moduleRef.get(SessionService), cache, clock, keycloak, logger }
+    return { sessions: moduleRef.get(SessionService), cache, clock, keycloak, logger, ids }
 }
 
 describe("SessionService", () => {
     describe("issue", () => {
-        it("returns a random uuid token and keeps the person and the refresh token behind it for an hour", async () => {
+        it("returns the next id as the token and keeps the person and the refresh token behind it for an hour", async () => {
             const { sessions, cache } = await build()
 
             const issued = await sessions.issue({ personId: "p-1", providerRefreshToken: "refresh-1" })
 
             expect(issued.personId).toBe("p-1")
-            expect(issued.sessionToken).toMatch(UUID)
+            expect(issued.sessionToken).toBe("00000000-0000-4000-8000-000000000001")
             const request = { key: SESSION_KEY, args: [issued.sessionToken] }
             expect(cache.has(request)).toBe(true)
             expect(cache.ttlOf(request)).toBe(3600)

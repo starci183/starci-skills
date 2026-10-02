@@ -36,6 +36,7 @@ import {
     OriginGuard,
     RateLimitGuard,
 } from "@modules/platform/http-security"
+import { IdsModule } from "@modules/platform/ids"
 import { I18nModule } from "@modules/platform/i18n"
 import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { LoggingModule } from "@modules/platform/logging"
@@ -58,6 +59,7 @@ export class AppModule {
             module: AppModule,
             imports: [
                 ClockModule.register({ isGlobal: true }),
+                IdsModule.register({ isGlobal: true }),
                 LoggingModule.register({ isGlobal: true }),
                 I18nModule.register({
                     isGlobal: true,
@@ -105,7 +107,7 @@ export class AppModule {
                 }),
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
-                InboxModule.register({ isGlobal: true }),
+                InboxModule.register({ isGlobal: true, connection: BILLING_ENTITY_MANAGER }),
                 EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [BILLING_ENTITY_MANAGER] }),
                 InvoiceModule.register({ isGlobal: true, ...options.invoice }),
                 PaymentModule.register({ isGlobal: true }),

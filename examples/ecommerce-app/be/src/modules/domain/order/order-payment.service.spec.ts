@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
+import { FakeClock, fakeInbox, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { OrderExpiredEvent, OrderPaidEvent } from "@modules/events/order"
 import { ReceiptQueue } from "@modules/queues/receipt"
@@ -7,7 +7,6 @@ import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { EVENT_BUS } from "@modules/platform/event-bus"
 import { INBOX } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OrderLogEvent } from "./order.log-events"
@@ -17,8 +16,8 @@ import { EXPIRE_PENDING_ORDERS_PLACED_BEFORE, MARK_ORDER_PAID_IF_PENDING } from 
 const AT = "2026-02-03T04:05:06.000Z"
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
-    const inbox = mock<Inbox>()
-    inbox.claim.mockResolvedValue(claimed)
+    const inbox = fakeInbox()
+    if (!claimed) inbox.seen("billing-payment-confirmed", "o-1")
     const bus = recordingEventBus()
     const logger = mock<Logger>()
     const receipts = mock<ReceiptQueue>()
@@ -48,7 +47,7 @@ describe("OrderPaymentService", () => {
 
             await service.recordPayment({ eventId: "o-1", orderId: "o-1" })
 
-            expect(inbox.claim).toHaveBeenCalledWith("billing-payment-confirmed", "o-1")
+            expect(inbox.claims).toEqual([{ source: "billing-payment-confirmed", eventId: "o-1" }])
             expect(receipts.enqueueSendReceipt).toHaveBeenCalledWith({ orderId: "o-1" }, expect.anything())
             expect(tx.em.query).toHaveBeenCalledWith(MARK_ORDER_PAID_IF_PENDING, ["o-1", new Date(AT)])
             expect(bus.writes).toEqual([
@@ -87,7 +86,7 @@ describe("OrderPaymentService", () => {
 
             await expect(service.recordPayment({ eventId: "o-1", orderId: "o-1" })).rejects.toBe(failure)
 
-            expect(inbox.release).toHaveBeenCalledWith("billing-payment-confirmed", "o-1")
+            expect(inbox.released).toEqual([{ source: "billing-payment-confirmed", eventId: "o-1" }])
         })
     })
 

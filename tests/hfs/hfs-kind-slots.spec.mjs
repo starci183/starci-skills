@@ -74,5 +74,5 @@ test('the kind slots carry the trigger of their kind and the old websocket trans
   assert.equal(byId.get('be.feature.webhooks').pattern, 'webhooks');
   assert.equal(byId.get('be.feature.realtime').pattern, 'realtime');
   assert.equal(byId.has('be.transport.websocket'), false);
-  assert.equal(classify(undefined, 'src/features/chat/transport/websocket/chat.gateway.ts'), 'owned:be.feature', 'a websocket folder of an api feature is owned by no transport slot: BE_FEATURE_SHAPE refuses it');
+  assert.equal(classify(undefined, 'src/features/api/chat/transport/websocket/chat.gateway.ts'), 'owned:be.feature', 'a websocket folder of an api feature is owned by no transport slot: BE_FEATURE_SHAPE refuses it');
 });

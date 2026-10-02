@@ -533,7 +533,7 @@ test("module-per-transport: an app imports only the transport modules its kind c
     wrongKind.tester.run("module-per-transport", rules["module-per-transport"], {
         valid: ok(wrongKind, [...TRANSPORT_CLEAN.slice(0, 2), "apps/core/src/app.module.ts"]),
         invalid: [...bad(wrongKind, [
-            ["apps/jobs/src/app.module.ts", [3, /composes message transports only/]],
+            ["apps/jobs/src/app.module.ts", [3, /composes message, queue transports only/]],
         ])],
     })
     const application = transportRepo(t, { "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule, AModule") })
@@ -660,10 +660,10 @@ test("schema-owner: the table of a projection is declared by the projection enti
             patterns: ["projection"],
             connections: [{ name: "primary", envPrefix: "PRIMARY", owner: "core", isolation: "database" }, { name: "agentos", envPrefix: "AGENTOS", owner: "core", isolation: "database" }],
         },
-        apps: [{ name: "core", kind: "api" }, { name: "migrate", kind: "migrate" }],
+        apps: [{ name: "core", kind: "api" }, { name: "cli", kind: "cli" }],
         files: {
             ...SCHEMA_GOOD,
-            "apps/migrate/src/main.ts": "void 0;\n",
+            "apps/cli/src/main.ts": "void 0;\n",
             [CORE_APP]: REGISTER(entry, "import { summaryEntities } from '../../../src/modules/projections/summary';"),
             [`${PROJECTION}/index.ts`]: "export { summaryEntities } from './persistence/connection';\n",
             [`${PROJECTION}/persistence/connection.ts`]: "import { SummaryProjectionEntity } from '../summary.projection-entity';\nexport const summaryEntities = [SummaryProjectionEntity];\n",

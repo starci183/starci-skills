@@ -1,10 +1,9 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeInbox, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { INBOX } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { BEGIN_SAGA, MOVE_SAGA, READ_SAGA } from "./persistence/saga.sql"
 import { SagaService } from "./saga.service"
 
@@ -12,8 +11,8 @@ const AT = "2026-02-03T04:05:06.000Z"
 const RUN = { saga: "place-order", correlationId: "o-1" }
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
-    const inbox = mock<Inbox>()
-    inbox.claim.mockResolvedValue(claimed)
+    const inbox = fakeInbox()
+    if (!claimed) inbox.seen("saga:place-order", "e-1")
     const moduleRef = await Test.createTestingModule({
         providers: [
             SagaService,
@@ -71,7 +70,7 @@ describe("SagaService", () => {
 
             expect(await service.compensate({ ...RUN, eventId: "e-1", compensate })).toBe("applied")
 
-            expect(inbox.claim).toHaveBeenCalledWith("saga:place-order", "e-1")
+            expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
             expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
                 "place-order",
                 "o-1",
@@ -151,7 +150,7 @@ describe("SagaService", () => {
                 service.compensate({ ...RUN, eventId: "e-1", compensate: () => Promise.reject(failure) }),
             ).rejects.toBe(failure)
 
-            expect(inbox.release).toHaveBeenCalledWith("saga:place-order", "e-1")
+            expect(inbox.released).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
         })
     })
 
@@ -164,7 +163,7 @@ describe("SagaService", () => {
 
             expect(await service.complete({ ...RUN, eventId: "e-1" })).toBe("applied")
 
-            expect(inbox.claim).toHaveBeenCalledWith("saga:place-order", "e-1")
+            expect(inbox.claims).toEqual([{ source: "saga:place-order", eventId: "e-1" }])
             expect(manager.query).toHaveBeenNthCalledWith(2, MOVE_SAGA, [
                 "place-order",
                 "o-1",

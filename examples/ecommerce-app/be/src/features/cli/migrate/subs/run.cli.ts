@@ -36,7 +36,7 @@ export async function migrateConnections(
 /** `cli migrate run`: migrates every connection of the back end, in order, and logs what it applied. */
 export class RunCli extends CommandRunner {
     constructor(
-        @InjectDatabaseOptions() private readonly database: DatabaseOptions,
+        @InjectDatabaseOptions() private readonly options: DatabaseOptions,
         @InjectConnectionSource() private readonly open: OpenConnection,
         @InjectLogger() private readonly logger: Logger,
     ) {
@@ -45,7 +45,7 @@ export class RunCli extends CommandRunner {
 
     /** Runs the migrations of every connection and logs the applied names. */
     async run(): Promise<void> {
-        const applied = await migrateConnections(this.database.connections, this.open)
+        const applied = await migrateConnections(this.options.connections, this.open)
         this.logger.info(LoggingLogEvent.MigrationsApplied, { applied })
     }
 }

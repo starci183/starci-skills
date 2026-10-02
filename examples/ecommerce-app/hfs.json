@@ -4,7 +4,7 @@
   "project": "ecommerce-app",
   "sides": {
     "be": {
-      "kinds": ["api", "cli", "jobs", "reactors", "realtime", "webhooks"],
+      "kinds": ["api", "cli", "jobs", "reactors", "realtime", "saga", "webhooks"],
       "apps": [
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },

@@ -1,8 +1,11 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { CACHE, CacheErrorCode, defineCacheKey } from "@modules/integrations/cache"
 import type { Cache } from "@modules/integrations/cache"
 import { CACHE_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /** A probe key of this spec: a person id cached for a minute. */
 const PROBE_KEY = defineCacheKey<string>({
@@ -32,7 +35,7 @@ describe("cache: redis client (integration)", () => {
     const cache = (): Cache => world.resolve<Cache>(CACHE)
 
     it("sets a value, reads it back from the run's Redis, and deletes it", async () => {
-        const id = randomUUID()
+        const id = ids.next()
         const keysBefore = await world.infra.redis.size()
 
         await cache().set({ key: PROBE_KEY, args: [id], value: `person-${id}` })
@@ -44,14 +47,14 @@ describe("cache: redis client (integration)", () => {
     })
 
     it("a stored value of another shape reads as absent through the key's parser", async () => {
-        const id = randomUUID()
+        const id = ids.next()
         await cache().set({ key: PROBE_KEY, args: [id], value: "not a number" })
 
         expect(await cache().get({ key: NUMBER_KEY, args: [id] })).toBeNull()
     })
 
     it("an unreachable Redis is the declared cache-unavailable refusal, and the client serves again once Redis is back", async () => {
-        const id = randomUUID()
+        const id = ids.next()
 
         await world.infra.redis.during(async () => {
             await expect(cache().get({ key: PROBE_KEY, args: [id] })).rejects.toMatchObject({

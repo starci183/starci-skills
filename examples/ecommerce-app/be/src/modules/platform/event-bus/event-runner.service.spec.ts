@@ -133,6 +133,23 @@ describe("EventRunnerService", () => {
             expect(transport.send).not.toHaveBeenCalled()
         })
 
+        it("hands one event to every consumer registered for it and retries it once when any of them failed", async () => {
+            const { runner, handle, transport } = await build()
+            const second = jest.fn<Promise<void>, Array<never>>()
+            const third = jest.fn<Promise<void>, Array<never>>()
+            handle.mockRejectedValue(new Error("the first consumer failed"))
+            second.mockResolvedValue(undefined)
+            third.mockRejectedValue(new Error("the third consumer failed too"))
+            runner.add({ event: PingEvent, handle: second })
+            runner.add({ event: PingEvent, handle: third })
+
+            await runner.receive(message())
+
+            expect(second).toHaveBeenCalledTimes(1)
+            expect(third).toHaveBeenCalledTimes(1)
+            expect(transport.send).toHaveBeenCalledTimes(1)
+        })
+
         it("leaves an event nobody here consumes alone", async () => {
             const { runner, handle, transport, logger } = await build()
 

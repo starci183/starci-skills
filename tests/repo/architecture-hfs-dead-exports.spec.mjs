@@ -157,3 +157,11 @@ test('HFS_UNUSED_EXPORT: an export used only by a cli unit spec or a test world 
   };
   assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['nobody', 'onlyE2e']);
 });
+
+test('HFS_UNUSED_EXPORT: the unit spec of a webhook, gateway or subscription door counts as a consumer: a door has no service of its own', t => {
+  const files = {
+    ...CONSUMER_FILES,
+    'src/features/webhooks/pay/transport/http/pay.webhook.spec.ts': "import { nobody } from '../../../../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n",
+  };
+  assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['onlyE2e']);
+});

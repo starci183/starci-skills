@@ -215,6 +215,7 @@ ruleParams:
       api: []
       webhooks: []
       realtime: []
+      saga: [saga]
       reactors: [event-bus]
       jobs: [fenced-job, queue]
       cli: []
@@ -227,6 +228,7 @@ ruleParams:
       queue: {topic: queues, variable: queue, patterns: [queue]}
       webhook: {topic: webhooks, variable: provider, trigger: webhooks, patterns: [webhooks], needs: [service], defaults: {event: "@name"}}
       realtime: {topic: realtime, variable: channel, trigger: realtime, patterns: [realtime], needs: [service]}
+      saga: {topic: saga, variable: saga, trigger: saga, patterns: [saga], needs: [owner, from, failed, done, service], defaults: {step: "@name"}}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
       api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
@@ -758,7 +760,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/{api/,jobs/,reactors/}<feature>/application/"     # inside a trigger kind (jobs, reactors) the feature folder is one level down
+    path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/"     # inside a trigger kind (jobs, reactors, saga) the feature folder is one level down
     presence: required
     tracked: tracked
     tier: feature
@@ -768,28 +770,30 @@ slots:
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.saga
     profiles: [be]
-    path: "src/features/api/<feature>/saga/"
+    path: "src/features/saga/<saga>/"
     pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R169 to R173); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
-    presence: opt-in
+    presence: opt-in              # a saga: the orchestrator of a business flow that crosses services, started and advanced only by events (knowledge/patterns/be/saga.yaml)
+    trigger: saga
     tracked: tracked
     tier: feature
-    allows: ["<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts"]   # the orchestrator (a step list plus compensations, a `*.service.ts` because a handler injects only services, unit-tested beside it) and the typed, versioned state of a run
-    forbids: [graphql/, http/, message/, schedule/, transport/]
+    owner: true
+    requires: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga-state.ts", steps/, compensations/, transport/]
+    allows: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts", "<saga>.saga.log-events.ts", application/, steps/, compensations/, transport/]   # the orchestrator is a `*.service.ts` because a handler injects only services; unit-tested beside it
     tests: unit-beside            # <saga>.saga.service.spec.ts beside the orchestrator; the state machine and its fence are platform/saga's service; each compensation path has an e2e spec
-    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED, BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.saga.steps
     profiles: [be]
-    path: "src/features/api/<feature>/saga/steps/"
+    path: "src/features/saga/<saga>/steps/"
     pattern: saga
     presence: opt-in
     tracked: tracked
     tier: feature
-    allows: ["<step>.saga-step.ts"]    # one step, dispatching one command and naming the event it puts on the wire
+    allows: ["<step>.saga-step.ts"]    # one step of the flow: its name and the event it puts on the wire (the contract); its work is done by the domain, not by the step
     tests: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
   - id: be.feature.saga.compensations
     profiles: [be]
-    path: "src/features/api/<feature>/saga/compensations/"
+    path: "src/features/saga/<saga>/compensations/"
     pattern: saga
     presence: opt-in
     tracked: tracked
@@ -799,7 +803,7 @@ slots:
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/{api/,jobs/,reactors/}<feature>/application/support/"
+    path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -832,7 +836,7 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
-    path: "src/features/{api/,reactors/}<feature>/transport/message/"
+    path: "src/features/{api/,reactors/,saga/}<feature>/transport/message/"
     presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
     pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
@@ -1154,7 +1158,7 @@ slots:
     tier: projections
     owner: true
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
-    allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
+    allows: [index.ts, "<name>.module.ts", "<name>.module-definition.ts", "<name>.options.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
     tests: none
     rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations

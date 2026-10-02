@@ -31,6 +31,7 @@ import {
     OriginGuard,
     RateLimitGuard,
 } from "@modules/platform/http-security"
+import { IdsModule } from "@modules/platform/ids"
 import { I18nModule } from "@modules/platform/i18n"
 import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import {
@@ -47,8 +48,9 @@ import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/plat
 import { QueueModule, queueEntities, queueMigrations } from "@modules/platform/queue"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
-import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/api/checkout"
+import { CheckoutGraphqlModule } from "@features/api/checkout"
 import { HealthHttpModule } from "@features/api/health"
+import { PlaceOrderMessageModule } from "@features/saga/place-order"
 import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 import { ExpireOrdersQueueModule } from "@features/jobs/expire-orders"
 import { orderExpirySchedulerOf } from "@modules/queues/order-expiry"
@@ -69,6 +71,7 @@ export class AppModule {
             module: AppModule,
             imports: [
                 ClockModule.register({ isGlobal: true }),
+                IdsModule.register({ isGlobal: true }),
                 LoggingModule.register({ isGlobal: true }),
                 I18nModule.register({
                     isGlobal: true,
@@ -142,10 +145,10 @@ export class AppModule {
                 EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [ORDER_ENTITY_MANAGER] }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
-                InboxModule.register({ isGlobal: true }),
+                InboxModule.register({ isGlobal: true, connection: ORDER_ENTITY_MANAGER }),
                 RealtimeModule.register({ isGlobal: true }),
                 LoyaltyModule.register({ isGlobal: true }),
-                OrderSummaryModule,
+                OrderSummaryModule.register({ isGlobal: true }),
                 SagaModule.register({ isGlobal: true }),
                 QueueModule.register({
                     isGlobal: true,
@@ -164,7 +167,7 @@ export class AppModule {
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,
-                CheckoutMessageModule,
+                PlaceOrderMessageModule,
                 OrderPaymentStatusMessageModule,
                 OrderPaidLoyaltyMessageModule,
                 OrderStatusPushMessageModule,

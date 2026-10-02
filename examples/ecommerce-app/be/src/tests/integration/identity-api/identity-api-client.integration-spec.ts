@@ -1,8 +1,11 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { IDENTITY_API, IdentityApiErrorCode } from "@modules/integrations/identity-api"
 import type { IdentityApiClient } from "@modules/integrations/identity-api"
 import { IDENTITY_API_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /**
  * identity-api: the order app's real client of the identity service against the real identity app the world boots beside
@@ -19,7 +22,7 @@ describe("identity-api: identity service client (integration)", () => {
         const person = await world.signedInPerson("identity-api")
 
         expect(await identityApi().verify(person.sessionToken)).toEqual({ personId: person.personId })
-        expect(await identityApi().verify(`unknown-${randomUUID()}`)).toBeNull()
+        expect(await identityApi().verify(`unknown-${ids.next()}`)).toBeNull()
         await expect(identityApi().check()).resolves.toBeUndefined()
     })
 

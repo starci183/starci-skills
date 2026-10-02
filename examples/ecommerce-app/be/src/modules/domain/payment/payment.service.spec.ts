@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
+import { FakeClock, fakeInbox, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { INVOICE_SERVICE } from "@modules/domain/invoice"
 import type { InvoiceService } from "@modules/domain/invoice"
@@ -8,7 +8,6 @@ import { CLOCK } from "@modules/platform/clock"
 import { BILLING_ENTITY_MANAGER } from "@modules/platform/database"
 import { EVENT_BUS } from "@modules/platform/event-bus"
 import { INBOX } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { paymentRow } from "@tests/fixtures/builders/payment.builder"
@@ -30,8 +29,8 @@ const notice: BankTransferNotice = {
 const openInvoice = { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 }
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
-    const inbox = mock<Inbox>()
-    inbox.claim.mockResolvedValue(claimed)
+    const inbox = fakeInbox()
+    if (!claimed) inbox.seen("sepay", "92704")
     const bus = recordingEventBus()
     const logger = mock<Logger>()
     const invoices = mock<InvoiceService>()
@@ -58,7 +57,7 @@ describe("PaymentService", () => {
 
             await service.acceptBankTransfer(notice)
 
-            expect(inbox.claim).toHaveBeenCalledWith("sepay", "92704")
+            expect(inbox.claims).toEqual([{ source: "sepay", eventId: "92704" }])
             expect(invoices.findOpen).toHaveBeenCalledWith({ manager: expect.anything(), orderId: "o-1" })
             expect(invoices.markPaid).toHaveBeenCalledWith({
                 manager: expect.anything(),
@@ -144,7 +143,7 @@ describe("PaymentService", () => {
 
             await expect(service.acceptBankTransfer(notice)).rejects.toBe(failure)
 
-            expect(inbox.release).toHaveBeenCalledWith("sepay", "92704")
+            expect(inbox.released).toEqual([{ source: "sepay", eventId: "92704" }])
             expect(tx.rollbacks).toBe(1)
         })
     })
