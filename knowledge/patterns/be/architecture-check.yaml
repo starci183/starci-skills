@@ -245,4 +245,4 @@ rules:
         - BE_FEATURE_NOT_COMPOSED
       manual:
         - Confirm a shared helper two kinds need sits in modules/*, not in a feature.
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]

@@ -36,6 +36,12 @@ jobs:
         working-directory: packages
         run: npm ci
 
+      # @starci/test-world is built by the scaffold end-to-end spec (tests/hfs/hfs-scaffold-app.e2e.spec.mjs) with ITS OWN pinned
+      # TypeScript: it needs its own install (without one tsc resolves the newer compiler of packages/node_modules and refuses its tsconfig).
+      - name: Install @starci/test-world
+        working-directory: packages/test-world
+        run: npm ci
+
       # packages/grammar/dist is untracked; `npm run check` refuses a missing or stale one
       # (scripts/checks/check-grammar-dist.mjs), so build it from this commit's source first.
       - name: Build @starci/grammar

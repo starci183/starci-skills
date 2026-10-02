@@ -52,7 +52,7 @@ rules:
         - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm each published event crosses a context or starts asynchronous work, and no handler publishes to tell itself something.
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
   - id: BE-EVENT-BUS-2
     title: An event is a typed class that equals its vendored contract
     kind: mandatory
@@ -76,7 +76,7 @@ rules:
         - BE_EVENT_CLASS_CONTRACT
       manual:
         - Confirm a payload change is additive.
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
   - id: BE-EVENT-BUS-3
     title: Publish through the bus, in the domain transaction, to Kafka only
     kind: mandatory
@@ -102,7 +102,7 @@ rules:
         - BE_CQRS_SHAPE
         - BE_READONLY_BOUNDARY
       manual: []
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
   - id: BE-EVENT-BUS-4
     title: A consumer is a thin door; delivery is at least once with retry and a dead letter
     kind: mandatory
@@ -128,7 +128,7 @@ rules:
         - BE_INBOX_DEDUPE_MISSING
       manual:
         - Confirm the retry budget and backoff fit the consumer's side effects.
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
   - id: BE-EVENT-BUS-5
     title: A declared event bus is proven on the test world
     kind: mandatory
@@ -149,7 +149,7 @@ rules:
       automated:
         - BE_PATTERN_SPEC_MISSING
       manual: []
-    relatedExamples: [event-bus]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
 files:
   - path: src/modules/platform/outbox/index.ts
     slot: be.platform

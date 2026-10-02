@@ -43,7 +43,7 @@ rules:
         - BE_SQL_TABLE_OWNER
       manual:
         - Confirm the projection sits on the connection of the context that serves the read.
-    relatedExamples: [projection]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/projections]
   - id: BE-PROJECTIONS-2
     title: A projection speaks recompute and get, and hides its entity
     kind: mandatory
@@ -64,7 +64,7 @@ rules:
         - BE_PROJECTION_SHAPE
       manual:
         - Confirm each recompute reads only source facts and upserts by a natural key.
-    relatedExamples: [projection]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/projections]
   - id: BE-PROJECTIONS-3
     title: A projection publishes nothing and is kept current by a reactor or a job
     kind: mandatory
@@ -86,7 +86,7 @@ rules:
         - BE_KIND_ISOLATION
       manual:
         - Confirm no projection class holds an event bus or a queue producer.
-    relatedExamples: [projection]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/projections]
   - id: BE-PROJECTIONS-4
     title: A declared projection is proven on the test world
     kind: mandatory
@@ -104,7 +104,7 @@ rules:
       automated:
         - BE_PATTERN_SPEC_MISSING
       manual: []
-    relatedExamples: [projection]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/projections]
   - id: BE-PROJECTIONS-5
     title: A projection stays inside the context that serves the read
     kind: mandatory
@@ -124,7 +124,7 @@ rules:
         - BE_CONTEXT_COUPLING
       manual:
         - Confirm the projection sits on the connection of the context that serves the read.
-    relatedExamples: [projection]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/projections]
 files:
   - path: src/modules/projections/<name>/index.ts
     slot: be.projections

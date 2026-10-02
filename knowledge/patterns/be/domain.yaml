@@ -51,7 +51,7 @@ rules:
         - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Confirm the capability is named after the business capability, not after a technical layer.
-    relatedExamples: [domain]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/domain]
   - id: BE-DOMAIN-2
     title: Work inside one context is synchronous; an event crosses contexts or starts async work
     kind: mandatory
@@ -72,7 +72,7 @@ rules:
         - BE_CONTEXT_COUPLING
       manual:
         - Confirm no published event is consumed by the context that published it only to tell itself something.
-    relatedExamples: [domain]
+    relatedExamples: [examples/ecommerce-app/be/src/modules/domain]
 files:
   - path: src/modules/domain/<capability>/index.ts
     slot: be.domain
