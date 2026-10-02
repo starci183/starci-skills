@@ -40,7 +40,7 @@ test("sepay (intent style, the todo integration): create, read, settle, replay",
         assert.deepEqual(JSON.parse(sent?.body ?? "{}"), { id, status: "paid", periodEnd: "2026-04-01T00:00:00.000Z" })
         assert.equal(sepayVerifyBearer(sent?.headers["authorization"], secret), true)
         assert.equal(sepayVerifySignature(sent?.body ?? "", sent?.headers["x-sepay-timestamp"], sent?.headers["x-sepay-signature"], secret), true)
-        assert.ok(Math.abs(Number(sent?.headers["x-sepay-timestamp"]) - Date.now()) < 60_000, "signed now")
+        assert.match(sent?.headers["x-sepay-timestamp"] ?? "", /^\d{13}$/, "signed at the fake's clock, epoch ms")
         assert.deepEqual((await call("GET", details, apiKey)).json, { id, status: "paid", periodEnd: "2026-04-01T00:00:00.000Z" })
 
         await client.replayWebhook(id)
@@ -71,7 +71,8 @@ test("sepay: a stale replay carries the captured body re-signed validly at now -
         assert.equal(sepayVerifySignature(stale?.body ?? "", stale?.headers["x-sepay-timestamp"], stale?.headers["x-sepay-signature"], secret), true)
         await client.delayWebhook({ reference: "SUB-OLD", status: "paid", delayMs: 10, ageMs: 300_000 })
         await waitUntil(() => app.received.length === 3)
-        const delayedAge = Date.now() - Number(app.received[2]?.headers["x-sepay-timestamp"])
+        // the fake's clock is the harness's fixed clock: the delayed delivery is signed exactly 300000 ms before it
+        const delayedAge = Number(original?.headers["x-sepay-timestamp"]) - Number(app.received[2]?.headers["x-sepay-timestamp"])
         assert.ok(delayedAge >= 290_000 && delayedAge <= 330_000, `the delayed one is signed five minutes back (${delayedAge} ms)`)
         await assert.rejects(client.replayWebhook("SUB-OLD", { ageMs: -1 }), /non-negative/)
     })

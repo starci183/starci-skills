@@ -66,6 +66,8 @@ const fakeFetch = (log: Array<string>) =>
         log.push(`${init?.method ?? "GET"} ${path}`)
         if (path === "/version") return new Response('"2.9.0"', { status: 200 })
         if (path === "/proxies" && (init?.method ?? "GET") === "GET") return new Response("{}", { status: 200 })
+        if (path.endsWith("/toxics") && (init?.method ?? "GET") === "GET") return new Response("[]", { status: 200 })
+        if (/^\/proxies\/[^/]+$/.test(path) && init?.method === "POST") return new Response("{}", { status: 200 })
         if (path === "/proxies") return new Response("{}", { status: 201 })
         return new Response(null, { status: 204 })
     }) as typeof fetch
