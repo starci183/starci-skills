@@ -7,7 +7,7 @@
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
 //      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
-//      RT_ABSOLUTE_PATH, RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs)
+//      RT_ABSOLUTE_PATH, RT_HOOK_SHAPE (the app hook templates keep the gate model), RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
 //      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
 //   4. the pending ratchet (runtime-rules/pending.mjs): the manifest's `pending` list turns the findings it names into level
@@ -31,6 +31,8 @@ import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { prosePathFindings } from './runtime-rules/prose-path.mjs';
 import { proseRestateFindings } from './runtime-rules/prose-restates.mjs';
 import { generatedBlockFindings } from './runtime-rules/generated-block.mjs';
+import { hookShapeFindings } from './runtime-rules/hook-shape.mjs';
+import { rightsPolicyFindings } from './runtime-rules/rights-policy.mjs';
 import { ruleIdFindings } from './runtime-rules/rule-ids.mjs';
 import { factFindings } from './runtime-rules/facts.mjs';
 import { externalOwnerFindings } from './runtime-rules/external-owner.mjs';
@@ -123,6 +125,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...prosePathFindings(ctx),
     ...proseRestateFindings(ctx),
     ...ciUploadFindings(ctx),
+    ...hookShapeFindings(ctx),
+    ...rightsPolicyFindings(ctx),
   );
   const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });

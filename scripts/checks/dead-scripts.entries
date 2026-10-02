@@ -10,8 +10,10 @@ scripts/checks/check-example-derived.mjs	CLI of the example standard (docs/examp
 scripts/example/example-evidence.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); specs read it
 scripts/example/example-verify.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
 scripts/gates/repo-presentation.mjs	gate CLI that a product repository runs (docs/repo-presentation.md); no spec
+scripts/guards/git-hooks.mjs	generated runtime hook installer with no current code importer; the CLI lane's `starci runtime link` verb is its future reader
 scripts/kernel/launch-smoke.mjs	release smoke run by the owner (docs/releasing.md); specs read it
 scripts/route/route-op.mjs	routing CLI named by the op prompts (docs/ops.md); no spec
 scripts/uat/assisted-runner.mjs	UAT runner CLI named by the op prompts; specs read it
 scripts/work/validate/check-evidence-binding.mjs	validator CLI (docs/verify-proof.md); a spec reads it
 scripts/work/validate/work-change.mjs	validator CLI of work records (docs); a spec reads it
+scripts/guards/release-record.mjs	the L4 record of a release (written by the release cut, read by the pre-push gate of the hooks): the release cut of the GOVERNANCE lane is its future importer

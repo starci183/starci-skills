@@ -47,6 +47,11 @@
 //  - launches: `orca terminal create` and a headless agent CLI (codex exec, claude|cursor-agent|devin -p/--print,
 //    gemini -p, opencode run) - an agent Orca does not supervise; every agent starts through orca orchestration
 //    worker-start. A heredoc body, an echo or a commit message that only mentions a command runs nothing and passes.
+//  - role rights (rights.mjs, rules R223 RIGHTS_ROLE_DENIED and R224 RIGHTS_PROTECTED_ZONE): by the caller's role - the job guard,
+//    the seat guard or STARCI_ROLE, never a claim in the command - a push, a tag, a publish, an op's commit, a whole-suite
+//    run, a clean install without the host lock and a release cut are refused, and a supervisor self-upgrade never writes the
+//    protected zone (modules/kernel/protected-zone.yaml) nor an op the .claude runtime checkout: Edit, Write, MultiEdit and
+//    NotebookEdit calls are read next to the shell text.
 // Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/machine/lock-recovery.mjs preflightIndexLock).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
@@ -54,22 +59,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';
-import { guardsRoot } from './guards-root.mjs';
 import { launchVerdict } from './launch-verdict.mjs';
 import { envDumpVerdict } from './env-dump-verdict.mjs';
 import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, rightsRoleOf, runtimeRootOf, writeTargetsOf } from './rights.mjs';
+import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
-
-/** The guard bound to Orca terminal `handle` (<guards root>/terminals/<handle>.json), or null. */
-export function boundGuard(handle, { root = skillRoot } = {}) {
-  if (!handle) return null;
-  try { return JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'terminals', `${safeName(handle)}.json`), 'utf8')); }
-  catch { return null; }
-}
+export { boundGuard } from './rights.mjs';
 
 /* ------------------------------------------------------------ command text */
 
@@ -430,13 +429,68 @@ const loadDeps = async () => {
   return { policy, npm, git: { lsFiles, revParseQuery, configGet }, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
 };
 
+const NEEDS_HOST_LOCK = /\b(?:npm|pnpm|yarn|bun)\b[^\n]*\b(?:ci|clean-install|install-clean|cit|install-ci-test)\b/;
+
+/** A synchronous reader of the host lock owner (loaded only when a command or a release claim needs it), or a null reader. */
+async function lockOwnerReader(env) {
+  try {
+    const lock = await import('../machine/host-lock.mjs');
+    return () => { try { return lock.hostLockOwner({ env }); } catch { return null; } };
+  } catch { return () => null; }
+}
+
+/** {role, handle, lockOwner, policy}: the caller's role and the shared command policy loaded only for a bound role. */
+async function rightsContext({ guard = null, seat = null, env = process.env, text = '' } = {}) {
+  const claimsRelease = String(env?.STARCI_ROLE ?? '').toLowerCase() === 'release';
+  const lockOwner = claimsRelease || NEEDS_HOST_LOCK.test(text) ? await lockOwnerReader(env) : () => null;
+  const role = rightsRoleOf({ guard, seat, env, lockOwner: claimsRelease ? lockOwner() : null });
+  return { role, handle: env?.ORCA_TERMINAL_HANDLE ?? null, lockOwner, policy: role && role !== 'release' ? loadCommandPolicy({ root: skillRoot }) : null };
+}
+
+/** The refusal of one file write for the rights role, or null: the zone declaration loads only for a role that can be refused. */
+async function fileRightsVerdict({ role, filePath, tool = 'Edit', edit = null, guard = null, shell = false }) {
+  if ((role !== 'supervisor' && role !== 'op') || !runtimeRootOf(filePath)) return null;
+  let zone = { runtimeRoot: runtimeRootOf(filePath) };
+  if (role === 'supervisor') {
+    const pz = await import('./protected-zone.mjs');
+    zone = { ...pz.zoneOfPath(filePath), catalogNames: pz.catalogNames };
+  }
+  return fileWriteVerdict({ role, filePath, tool, edit, guard, zone, shell });
+}
+
+/** The rights refusal of one parsed shell call: its commands (policyVerdict) and the files they write (fileRightsVerdict). */
+const policyToolVerdict = (command, verdict) => {
+  const whole = [command.word ?? command.program, ...command.args].join(' ');
+  return { tool: command.program, ...verdict, command: verdict.command === whole ? command.args.join(' ').slice(0, 200) : verdict.command };
+};
+
+async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
+  if (!ctx.role) return null;
+  // The file rights are the more specific refusal (a write into the protected zone, an op writing the runtime checkout): they come before the generic command policy.
+  if (ctx.role === 'supervisor' || ctx.role === 'op') {
+    const targets = [...commands.flatMap((c) => writeTargetsOf(c)), ...redirectTargetsOf(command, cwd)];
+    for (const filePath of targets) {
+      const v = await fileRightsVerdict({ role: ctx.role, filePath, tool: 'shell', guard, shell: true });
+      if (v) return { tool: 'shell', ...v };
+    }
+  }
+  for (const c of commands) {
+    const v = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
+    if (v) return policyToolVerdict(c, v);
+  }
+  return null;
+}
+
 /**
  * The first refusal for one shell call, or null: {tool, code, command, reason, remedy}. `dialect` is the text's shell
  * (PowerShell for Claude's PowerShell tool; bash otherwise, which also reads plain Windows command lines).
  */
-export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null }) {
-  const d = deps ?? await loadDeps();
+export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null, rights = null }) {
+  let d = deps;
+  const fullDeps = async () => { d ??= await loadDeps(); return d; };
   const commands = commandsOf(command, { cwd, env, dialect });
+  if (commands.length && commands.every(intrinsicPolicyRead) && !redirectTargetsOf(command, cwd).length) return null;
+  const ctx = rights ?? await rightsContext({ guard, env, text: command });
   const byQuery = queryKillVerdict(commands, command);
   if (byQuery) return { tool: 'process-query', ...byQuery };
   for (const c of commands) {
@@ -450,13 +504,34 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
     if (del) return { tool: c.program, ...del };
     const launch = launchVerdict(c.program, c.args, guard);
     if (launch) return { tool: c.program, ...launch };
-    if (c.program === 'git') { const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: d.policy.parseGitArgv }); if (h) return h; }
-    if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }
+    // push/tag outside an op's workflow tree have no older git-policy refusal. Return the shared role refusal before
+    // loading the full git policy/dependency stack; inside the workflow tree, WORKFLOW_HISTORY_CHANGE still wins.
+    if (c.program === 'git' && ['push', 'tag'].includes(gitSubOf(c.args).sub)) {
+      let gitCwd = c.cwd;
+      for (let i = 0; i < c.args.length; i += 1) if (c.args[i] === '-C' && c.args[i + 1]) gitCwd = path.resolve(gitCwd, c.args[++i]);
+      if (!guard?.workflowWorktree || !insideDir(gitCwd, guard.workflowWorktree)) {
+        const byPolicy = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
+        if (byPolicy) return policyToolVerdict(c, byPolicy);
+      }
+    }
+    if (c.program === 'git') {
+      const loaded = await fullDeps();
+      const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: loaded.policy.parseGitArgv });
+      if (h) return h;
+      const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: loaded });
+      if (v) return v;
+    }
     const mailbox = kernelMailboxVerdict(c.program, c.args, guard);
     if (mailbox) return { tool: c.program, ...mailbox };
-    if (d.npm.PACKAGE_MANAGERS.includes(c.program)) { const v = await installVerdict({ program: c.program, args: c.args, cwd: c.cwd, guard, deps: d }); if (v) return v; }
+    if (['npm', 'pnpm', 'yarn', 'bun'].includes(c.program)) {
+      const loaded = await fullDeps();
+      if (loaded.npm.PACKAGE_MANAGERS.includes(c.program)) {
+        const v = await installVerdict({ program: c.program, args: c.args, cwd: c.cwd, guard, deps: loaded });
+        if (v) return v;
+      }
+    }
   }
-  return null;
+  return rightsOfCall({ commands, command, cwd, ctx, guard });
 }
 
 /**
@@ -484,17 +559,53 @@ function shellCallOf(input) {
 // A cheap first look for the unguarded case: only a command naming a package manager can be refused without a guard.
 const NAMES_PACKAGE_MANAGER = /\b(?:npm|pnpm|yarn)\b/i;
 
+const FILE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+
+/** One file-writing tool call of a hook input: {tool, filePath, edit: {old, new}, cwd}, or null. */
+function fileCallOf(input) {
+  const tool = String(input?.tool_name ?? '');
+  if (!FILE_TOOLS.has(tool)) return null;
+  const given = input.tool_input ?? {};
+  const target = given.file_path ?? given.notebook_path ?? given.path;
+  if (typeof target !== 'string' || !target) return null;
+  const cwd = path.resolve(input.cwd || process.cwd());
+  const edits = Array.isArray(given.edits) ? given.edits : [given];
+  const joined = (...keys) => edits.map((e) => keys.map((k) => e?.[k]).find((v) => typeof v === 'string') ?? '').join('\n');
+  return { tool, filePath: path.resolve(cwd, target), edit: { old: joined('old_string'), new: joined('new_string', 'new_source', 'content') }, cwd };
+}
+
+/** The rights-only refusal of a session with a role but no job guard (the Supervisor seat, a STARCI_ROLE session): its commands and the files they write. */
+async function rightsOnlyVerdict({ command, cwd, env, dialect, ctx }) {
+  const commands = commandsOf(command, { cwd, env, dialect });
+  return rightsOfCall({ commands, command, cwd, ctx, guard: null });
+}
+
 /** The hook's decision for one input: {verdict, guard} to refuse (guard null for an unguarded session), else null. */
-export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null } = {}) {
-  const guard = boundGuard(env.ORCA_TERMINAL_HANDLE, { root });
+export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null, bindings = null } = {}) {
+  const handle = env.ORCA_TERMINAL_HANDLE;
+  const guard = bindings ? bindings.guard : boundGuard(handle, { root, env });
+  const seat = bindings ? bindings.seat : (guard ? null : boundSeat(handle, { root, env }));
+  const file = fileCallOf(input);
+  if (file) {
+    // File rights do not consume the command table. A release claim without its lock resolves to owner here; both are
+    // unrestricted for files, so no host-lock or YAML import is needed.
+    const role = rightsRoleOf({ guard, seat, env, lockOwner: null });
+    const verdict = await fileRightsVerdict({ role, filePath: file.filePath, tool: file.tool, edit: file.edit, guard });
+    return verdict ? { verdict: { tool: file.tool, ...verdict }, guard, cwd: file.cwd } : null;
+  }
   const call = shellCallOf(input);
   if (!call) return null;
+  const ctx = await rightsContext({ guard, seat, env, text: call.command });
   if (!guard) {
-    if (!NAMES_PACKAGE_MANAGER.test(call.command)) return null;
-    const verdict = await unguardedVerdict({ ...call, env, npm: deps?.npm ?? null });
+    if (NAMES_PACKAGE_MANAGER.test(call.command)) {
+      const verdict = await unguardedVerdict({ ...call, env, npm: deps?.npm ?? null });
+      if (verdict) return { verdict, guard: null, cwd: call.cwd };
+    }
+    if (!ctx.role) return null;
+    const verdict = await rightsOnlyVerdict({ ...call, env, ctx });
     return verdict ? { verdict, guard: null, cwd: call.cwd } : null;
   }
-  const verdict = await commandVerdict({ ...call, guard, env, deps });
+  const verdict = await commandVerdict({ ...call, guard, env, deps, rights: ctx });
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
 
@@ -504,9 +615,20 @@ if (isMain(import.meta.url)) {
   process.stdin.on('data', (chunk) => { raw += chunk; });
   process.stdin.on('end', async () => {
     try {
-      // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
-      if (!boundGuard(readEnv('ORCA_TERMINAL_HANDLE')) && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
-      const decision = await hookDecision(JSON.parse(raw));
+      // The common case - no guard, no seat, no claimed role and no package manager named - exits before anything heavier than two file reads.
+      const handle = readEnv('ORCA_TERMINAL_HANDLE');
+      const guard = boundGuard(handle);
+      const seat = guard ? null : boundSeat(handle);
+      if (!guard && !seat && !readEnv('STARCI_ROLE') && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
+      const input = JSON.parse(raw);
+      const direct = input?.tool_input?.command;
+      // Intrinsically read-only one-program calls cannot meet an older guard rule or write a shell target. Avoid the full
+      // shell/environment parse and YAML load on this latency-critical path; compound/substituted/redirection text stays slow.
+      if (typeof direct === 'string' && direct.trim() && !/[;&|(){}<>\n\r`$]/.test(direct)) {
+        const first = direct.trim().split(/\s+/, 1)[0];
+        if (intrinsicPolicyRead({ program: programOf(first) })) process.exit(0);
+      }
+      const decision = await hookDecision(input, { bindings: { guard, seat } });
       if (!decision) process.exit(0);
       const { refusalLines, logRefusal } = await import('./refusals.mjs');
       const { tool, ...verdict } = decision.verdict;

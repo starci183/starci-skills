@@ -9,7 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
   assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
-  toolGuardCommand,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
+  toolGuardCommand,TOOL_GUARD_MATCHER,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
 } from '../../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../../scripts/agent/lib.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
@@ -244,7 +244,7 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   const claude=ensureLaunchTrust({agent:'claude',cwd,env});
   assert.deepEqual(claude.toolGuard,[{file:settings,state:'written'}]);
   const pre=JSON.parse(fs.readFileSync(settings,'utf8')).hooks.PreToolUse;
-  assert.deepEqual(pre,[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash|PowerShell',hooks:[{type:'command',command,timeout:30}]}],'the owner\'s hook stays; an older guard entry is replaced, never doubled');
+  assert.deepEqual(pre,[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:TOOL_GUARD_MATCHER,hooks:[{type:'command',command,timeout:30}]}],'the owner\'s hook stays; an older guard entry is replaced, never doubled');
   assert.deepEqual(ensureLaunchTrust({agent:'claude',cwd,env}).toolGuard,[{file:settings,state:'already'}]);
   // Devin: its local project config, the guard only (no model pin: Devin ignores one in a project config), any other key kept.
   fs.mkdirSync(path.dirname(devinFile),{recursive:true});

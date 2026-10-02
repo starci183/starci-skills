@@ -1,0 +1,73 @@
+# protected-zone.yaml - the PROTECTED ZONE of the runtime (one declaration, data only, no schema stamp).
+# The PROTECTED ZONE of the runtime (rule R224 RIGHTS_PROTECTED_ZONE; the three change paths of the source process).
+# This file is the ONE declaration: scripts/guards/protected-zone.mjs reads it, the command guard enforces it, and every
+# document cites the rule id, never a copy of the list.
+#
+# Path 1 (the owner edits .claude by prompt) may change anything here. Path 2 (the supervisor self-upgrading .claude: the
+# supervisor seat and its [Worker] jobs) may not edit a zone path or a catalog entry listed below; it files an owner
+# proposal instead. Path 3 (an op working on an app) never writes inside the runtime checkout at all (R224,
+# RIGHTS_OP_RUNTIME_WRITE): it records a lesson or an upgrade request.
+#
+# paths are repository-relative globs of a runtime checkout (any worktree of it); a trailing /** covers a subtree.
+zones:
+  - id: guard-and-rights
+    why: the command guard and the role rights it enforces
+    paths:
+      - scripts/guards/**
+      - tests/guards/**
+      - modules/kernel/protected-zone.yaml
+  - id: release-and-hooks
+    why: the release cut, the push path and the git hooks every app and the runtime inherit
+    paths:
+      - scripts/supervisor/release-cut.mjs
+      - scripts/supervisor/push-git.mjs
+      - scripts/supervisor/push-mains.mjs
+      - scripts/hfs/runtime-rules/hook-shape.mjs
+      - packages/hfs/templates/app/hooks/**
+  - id: ci-triggers
+    why: which events start CI in the runtime, its examples and every scaffolded app
+    paths:
+      - .github/workflows/**
+      - packages/hfs/templates/app/ci-workflows/**
+      - examples/*/.github/workflows/**
+  - id: test-policy
+    why: spec selection, budgets and the specs.* switches decide how much is tested and when
+    paths:
+      - scripts/lib/spec-deps.mjs
+      - tests/setup/**
+      - config.example.yaml
+      - config.yaml
+  - id: host-lock
+    why: the one lock that serialises heavy runs on the host
+    paths:
+      - scripts/machine/host-lock.mjs
+      - tests/machine/host-lock.spec.mjs
+  - id: permissions
+    why: the supervisor's own permission, hook and model settings
+    paths:
+      - .claude/settings.json
+      - .claude/settings.local.json
+      - .codex/**
+      - .devin/**
+# Catalog entries that enforce the zone. The files are shared with ordinary upgrades, so only an edit that names one of
+# these ids or codes is refused (the Edit tool's old and new text are read; a shell write to the file is refused outright).
+catalogEntries:
+  - file: knowledge/hfs/rules.yaml
+    ids: [R221, R222, R223, R224, R225]
+    codes: [RIGHTS_ROLE_DENIED, RIGHTS_PROTECTED_ZONE, RT_HOOK_SHAPE]
+  - file: modules/kernel/failure-codes.yaml
+    ids: []
+    codes:
+      - RIGHTS_GIT_PUSH
+      - RIGHTS_GIT_TAG
+      - RIGHTS_GIT_SYNC
+      - RIGHTS_RAW_TOOL
+      - RIGHTS_GIT_COMMIT
+      - RIGHTS_NPM_PUBLISH
+      - RIGHTS_SUITE_RUN
+      - RIGHTS_NPM_CI_UNLOCKED
+      - RIGHTS_RELEASE_CUT
+      - RIGHTS_PROTECTED_ZONE
+      - RIGHTS_OP_RUNTIME_WRITE
+      - RIGHTS_PUSH_NOT_RELEASE
+      - RT_HOOK_SHAPE

@@ -112,18 +112,18 @@ describe('the generated file set', () => {
 });
 
 describe('.husky/pre-commit', () => {
-  it('runs work hygiene, typecheck, the staged eslint of each side from its folder, stylelint over the staged fe css, prettier and the be unit specs of staged files, never integration, e2e or contract', () => {
+  it('is L0 only: work hygiene, the staged eslint of each side from its folder, stylelint over the staged fe css and prettier; no typecheck, no test run', () => {
     const hook = rendered()['.husky/pre-commit'];
-    for (const step of ['npx hfs work-hygiene', 'npm run typecheck', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted', 'npm run test:affected -- --findRelatedTests $specs']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright|vitest/);
+    for (const step of ['npx hfs work-hygiene', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook.split('\n').filter((line) => !line.startsWith('#')).join('\n'), /typecheck|test:|jest|lint-staged|playwright|vitest|specs/);
   });
 });
 
 describe('.husky/pre-push', () => {
-  it('runs typecheck, the one lint, format and the affected be unit specs, and never e2e', () => {
+  it('is the release gate check: backups, main and v tags by the release cut only, no typecheck, lint, format or test run', () => {
     const hook = rendered()['.husky/pre-push'];
-    for (const step of ['npm run typecheck', 'npm run lint', 'npm run format:check', 'npm run test:affected -- --changedSince=origin/main']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /test:(e2e|integration|contract)|typecheck:tests|playwright/);
+    for (const marker of ['starci-release', 'refs/backup/*', 'refs/heads/main | refs/tags/v*', "'v[0-9]*'", 'RIGHTS_PUSH_NOT_RELEASE', 'git cat-file -t']) assert.ok(hook.includes(marker), marker);
+    assert.doesNotMatch(hook.split('\n').filter((line) => !line.startsWith('#')).join('\n'), /npm |npx |typecheck|jest|playwright/);
   });
   it('a hook and a workflow call only scripts the managed package.json defines', () => {
     const scripts = scriptsOf();
