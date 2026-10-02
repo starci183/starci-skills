@@ -1,6 +1,7 @@
 // hfs scaffold app <name> - the first tree of a new app, the one shape every StarCi product has:
 //
-//   <name>/            hfs.json (kind app), package.json (every dependency of both sides at its canon pin, the managed scripts),
+//   <name>/            hfs.json (kind app), package.json (the monorepo root: workspaces fe/apps/* and fe/packages/*, npm, turbo,
+//                      the back end's dependencies and every tool at its canon pin, the managed scripts), turbo.json,
 //                      package-lock.json, README.md, the managed root files (CI, husky, .gitignore block, Sonar, prettier),
 //                      .starciwork, .starcistacks/application-stacks.yaml and .sops.yaml (the stack tree lives at the app root, never
 //                      under be/); scripts/codegen.mjs, the app's own step of `npm run codegen`
@@ -23,6 +24,7 @@ import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
+import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
@@ -60,16 +62,17 @@ export const STARTER_SIDES = Object.freeze({
 /**
  * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. A name with a
  * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference apps (examples/todo-app)
- * declare.
+ * declare. The root package.json holds the back end's runtime and every tool; each fe app workspace declares the packages its
+ * own source imports (HFS_MONO_WORKSPACE_DEP), FE_APP_DEPENDENCIES.
  */
 const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@heroui/react': null, '@heroui/styles': null, '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
-    '@nestjs/platform-express': null, '@starci/grammar': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
-    'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', 'server-only': '^0.0.1', tslib: '^2.8.1',
+    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
+    '@nestjs/platform-express': null,
+    'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', tslib: '^2.8.1',
   },
   devDependencies: {
-    '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
+    turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
     '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/test-world': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4', '@types/express': '^4.17.21',
     '@types/jest': null, '@types/node': null, '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', eslint: null, 'eslint-plugin-react-hooks': null,
     husky: '^9.1.7', jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: '^4', 'ts-jest': null,
@@ -77,18 +80,33 @@ const STARTER_DEPENDENCIES = Object.freeze({
   },
 });
 
+/** The runtime dependencies of every fe app workspace of the starter: what its skeleton imports. */
+const FE_APP_DEPENDENCIES = Object.freeze({
+  '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+  'server-only': '^0.0.1',
+});
+
 /** The app hfs.json of a new app called `name`. */
 export const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
 
-/** The root package.json of a new app: name, the dependencies at their pins; the managed scripts are sync's. */
-function packageManifest(name, pins) {
+/** A dependency section at the canon pins (a null range takes the pin, which must exist). */
+function pinnedSection(entries, pins) {
   const pinned = (dependency, range) => {
     if (range !== null) return range;
     if (!pins[dependency]) throw new ScaffoldError('HFS_SCAFFOLD_PIN_MISSING', `${dependency} has no canon pin in knowledge/hfs/canon-pins.yaml`);
     return pins[dependency].version;
   };
-  const section = entries => Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
-  return { name, version: '0.0.0', private: true, dependencies: section(STARTER_DEPENDENCIES.dependencies), devDependencies: section(STARTER_DEPENDENCIES.devDependencies) };
+  return Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
+}
+
+/** The root package.json of a new app, the monorepo root: name, the workspaces, npm, the dependencies at their pins; the managed scripts are sync's. */
+function packageManifest(name, pins) {
+  return { name, version: '0.0.0', private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], dependencies: pinnedSection(STARTER_DEPENDENCIES.dependencies, pins), devDependencies: pinnedSection(STARTER_DEPENDENCIES.devDependencies, pins) };
+}
+
+/** The package.json of the fe app workspace `app` of the app `project`: @<project>/<app>, private, the workspace scripts, its own dependencies. */
+function feAppManifest(project, app, pins) {
+  return { name: feAppPackageName(project, app), version: '0.0.0', private: true, scripts: { ...FE_APP_SCRIPTS }, dependencies: pinnedSection(FE_APP_DEPENDENCIES, pins) };
 }
 
 function listFiles(dir, base = dir) {
@@ -188,6 +206,7 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
     { path: 'package.json', content: jsonText(pkg) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: jsonText(feAppManifest(name, entry.name, pins)) })),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
   ];
   for (const file of files) {

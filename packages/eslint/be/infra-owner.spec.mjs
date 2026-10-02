@@ -20,8 +20,8 @@ const tester = new RuleTester({
 
 const HTTP = at("src/modules/platform/http/http.client.ts")
 const RETRY = at("src/modules/platform/retry/retry.service.ts")
-const MESSAGING = at("src/modules/platform/messaging/messaging.service.ts")
-const SCHEDULING = at("src/modules/platform/scheduling/scheduling.service.ts")
+const EVENT_BUS = at("src/modules/platform/event-bus/event-bus.service.ts")
+const QUEUE = at("src/modules/platform/queue/queue.service.ts")
 const LOGGING = at("src/modules/platform/logging/logging.service.ts")
 const CLOCK = at("src/modules/platform/clock/clock.service.ts")
 const CACHE = at("src/modules/integrations/cache/cache.client.ts")
@@ -55,9 +55,13 @@ test("infra-import-owner: each raw library is used only by its owner", () => {
             { filename: HTTP, code: `export const wait = () => new Promise((resolve) => setTimeout(resolve, 5))` },
             { filename: RETRY, code: `import { setTimeout as sleep } from "node:timers/promises"\nexport const wait = () => sleep(5)` },
             { filename: RETRY, code: `export const wait = () => new Promise((resolve) => setTimeout(resolve, 5))` },
-            { filename: MESSAGING, code: `import { Worker } from "bullmq"\nimport { Kafka } from "kafkajs"\nimport { BullModule } from "@nestjs/bullmq"\nexport { Worker, Kafka, BullModule }` },
-            { filename: MESSAGING, code: `export const tick = () => setInterval(() => 1, 5)` },
-            { filename: SCHEDULING, code: `import { ScheduleModule } from "@nestjs/schedule"\nexport { ScheduleModule }\nexport const t = setInterval(() => 1, 5)` },
+            { filename: EVENT_BUS, code: `import { Kafka } from "kafkajs"
+export { Kafka }` },
+            { filename: QUEUE, code: `import { Worker } from "bullmq"
+import { BullModule } from "@nestjs/bullmq"
+export { Worker, BullModule }` },
+            { filename: EVENT_BUS, code: `export const tick = () => setInterval(() => 1, 5)` },
+            { filename: QUEUE, code: `export const tick = () => setTimeout(() => 1, 5)` },
             { filename: LOGGING, code: `import winston from "winston"\nexport { winston }` },
             { filename: CLOCK, code: `import dayjs from "dayjs"\nimport utc from "dayjs/plugin/utc"\nimport { toZonedTime } from "date-fns-tz"\nexport { dayjs, utc, toZonedTime }` },
             { filename: at("src/modules/platform/primitives/time.ts"), code: `import moment from "moment"\nexport { moment }` },
@@ -115,6 +119,14 @@ export { axios }`, errors: [{ messageId: "foreign" }] },
             { filename: CONFIG, code: `import { ConfigModule } from "@nestjs/config"\nexport { ConfigModule }`, errors: [{ messageId: "nowhere" }] },
             { filename: CONFIG, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },
             { filename: DOMAIN, code: `import { EventEmitter2 } from "@nestjs/event-emitter"\nexport { EventEmitter2 }`, errors: [{ messageId: "nowhere" }] },
+            { filename: DOMAIN, code: `import { EventEmitter2 } from "eventemitter2"
+export { EventEmitter2 }`, errors: [{ messageId: "nowhere" }] },
+            { filename: QUEUE, code: `import { Cron } from "@nestjs/schedule"
+export { Cron }`, errors: [{ messageId: "nowhere" }] },
+            { filename: QUEUE, code: `import { Kafka } from "kafkajs"
+export { Kafka }`, errors: [{ messageId: "foreign" }] },
+            { filename: EVENT_BUS, code: `import { Worker } from "bullmq"
+export { Worker }`, errors: [{ messageId: "foreign" }] },
         ],
     })
 })

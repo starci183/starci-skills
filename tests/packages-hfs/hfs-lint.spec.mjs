@@ -104,3 +104,45 @@ test('parseLintArgs takes every argument after --changed up to the next flag, an
   assert.throws(() => parseLintArgs(['--nope']), /unknown argument/);
   assert.throws(() => parseLintArgs(['--sonar']), /needs a value/);
 });
+
+/** repoWith plus the fe workspace fe/apps/app (its package.json), and an fe ESLint that reports `messages` on fe/apps/app/src/page.tsx. */
+const workspaceRepo = (messages) => {
+  const dir = repoWith([{ ruleId: 'starci-be/zeta', line: 2, message: 'a be finding' }]);
+  fs.mkdirSync(path.join(dir, 'fe', 'apps', 'app', 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'fe', 'apps', 'app', 'package.json'), JSON.stringify({ name: '@demo/app', private: true }));
+  fakeLinter(path.join(dir, 'fe'), 'eslint', messages.length ? [{ filePath: path.join(dir, 'fe', 'apps', 'app', 'src', 'page.tsx'), messages }] : []);
+  return dir;
+};
+
+test('--workspace reports a finding inside the workspace and drops one outside it (another workspace, the be side)', async () => {
+  const dir = workspaceRepo([{ ruleId: 'starci-fe/leaf', line: 4, message: '[FE_X] inside' }]);
+  const hfsCheck = hfsOf(finding('HFS_IN', 'fe/apps/app/src/page.tsx'), finding('HFS_OTHER_WS', 'fe/apps/landing/src/page.tsx'), finding('HFS_BE', 'be/src/a.ts'), finding('HFS_NO_PATH', null));
+  const { report, exit } = await run(dir, ['--workspace', 'fe/apps/app'], hfsCheck);
+  assert.equal(exit, 1);
+  assert.equal(report.workspace, 'fe/apps/app');
+  assert.deepEqual(report.findings.map((f) => [f.engine, f.code, f.path]).sort(), [['eslint', 'FE_X', 'fe/apps/app/src/page.tsx'], ['hfs', 'HFS_IN', 'fe/apps/app/src/page.tsx']]);
+  assert.match(report.engines.eslint.sides.be.skipped, /outside --workspace/);
+  const whole = await run(dir, [], hfsCheck);
+  assert.equal(whole.report.findings.filter((f) => f.engine === 'hfs').length, 4, 'the root lint keeps every app finding');
+});
+
+test('--workspace with nothing inside it is clean, though the app has findings elsewhere', async () => {
+  const dir = workspaceRepo([]);
+  const { report, exit } = await run(dir, ['--workspace', 'fe/apps/app'], hfsOf(finding('HFS_BE', 'be/src/a.ts')));
+  assert.equal(exit, 0);
+  assert.equal(report.ok, true);
+});
+
+test('--workspace refuses a folder that is not an fe workspace (exit 2, never a pass)', async () => {
+  const dir = workspaceRepo([]);
+  for (const bad of ['be/apps/core', 'fe', 'fe/apps/app/src', 'fe/apps/missing']) {
+    const { report, exit } = await run(dir, ['--workspace', bad], hfsOf());
+    assert.equal(exit, 2, bad);
+    assert.equal(report.ok, false, bad);
+  }
+});
+
+test('parseLintArgs takes --workspace and refuses it with --changed', () => {
+  assert.equal(parseLintArgs(['--workspace', 'fe/apps/app']).workspace, 'fe/apps/app');
+  assert.throws(() => parseLintArgs(['--workspace', 'fe/apps/app', '--changed', 'a.ts']), /do not combine/);
+});

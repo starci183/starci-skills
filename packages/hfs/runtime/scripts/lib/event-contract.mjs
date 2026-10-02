@@ -1,9 +1,9 @@
-// event-contract.mjs - the async contract between the services of one product (R131 HFS_EVENT_CONTRACT).
+// event-contract.mjs - the async contract between the services of one product (R139 HFS_EVENT_CONTRACT).
 // A provider service declares the events it publishes in `be/apps/<service>/src/events.ts`, a literal table
 //   export const EVENTS = { "order.placed": { version: 1, payload: { orderId: "string" } } } as const
 // (the queue an event travels on is its name)
 // An event may declare `compensates: "<event name>"`: it announces the failure of the step that event started, so the services
-// that consume it undo that step (a compensating flow; R132 asks its e2e spec to drive the whole flow).
+// that consume it undo that step (a compensating flow; R140 asks its e2e spec to drive the whole flow).
 // and commits the snapshot of it, `be/contracts/<service>/events.json` (`hfs emit-contracts` writes it, never a hand). A consumer
 // service declares what it reads in `be/apps/<service>/src/consumes.ts`, a literal table
 //   export const CONSUMES = { order: { "order.placed": 1 } } as const

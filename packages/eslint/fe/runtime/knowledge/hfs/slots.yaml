@@ -47,6 +47,8 @@ versioning:
 #   tests       unit-beside | e2e | none.
 #   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
 #   budget      size budgets (lines per file, files per slot, exports).
+#   pattern     the design pattern whose declaration (hfs.json sides.<side>.patterns) enables this opt-in slot; a path in the slot of an
+#               undeclared pattern is HFS_SLOT_NOT_ENABLED, and a declared pattern's proof scenarios are ruleParams.be.patternScenarios.
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
@@ -74,13 +76,16 @@ appKinds:
 # ---------------------------------------------------------------------------------------------------------
 tiers:
   be:
-    app:          {mayImport: [feature, domain, platform, integrations, package]}
-    feature:      {mayImport: [domain, platform, integrations, package]}          # never another feature
-    domain:       {mayImport: [domain, platform, integrations, package], acyclic: true}
+    app:          {mayImport: [feature, domain, events, queues, projections, platform, integrations, package]}
+    feature:      {mayImport: [domain, events, queues, projections, platform, integrations, package]}          # never another feature
+    domain:       {mayImport: [domain, events, queues, platform, integrations, package], acyclic: true}      # a domain service writes the outbox: it publishes events and enqueues queue jobs inside its own transaction
+    events:       {mayImport: [events, platform, package], acyclic: true}          # modules/events/<service>: typed event classes (pattern event-bus)
+    queues:       {mayImport: [queues, events, platform, package], acyclic: true}  # modules/queues/<queue>: typed producers and schedulers (pattern queue)
+    projections:  {mayImport: [projections, domain, events, platform, integrations, package], acyclic: true}   # modules/projections/<name>: read models (pattern projection)
     integrations: {mayImport: [platform, package]}
     platform:     {mayImport: [platform, package], acyclic: true}
-    e2e:          {mayImport: [e2e, app, feature, domain, platform, integrations, fixtures, package]}
-    fixtures:     {mayImport: [domain, platform, integrations, package]}          # public contracts only
+    e2e:          {mayImport: [e2e, app, feature, domain, events, queues, projections, platform, integrations, fixtures, package]}
+    fixtures:     {mayImport: [domain, events, queues, projections, platform, integrations, package]}          # public contracts only
     package:      {mayImport: [package]}
   fe:
     route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
@@ -120,14 +125,15 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/messaging, integrations/messaging]
-      "@nestjs/bullmq": [platform/messaging, integrations/messaging]
-      kafkajs: [platform/messaging]
-      "@nestjs/schedule": [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      setInterval: [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      setTimeout: [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      "node:timers": [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      "node:timers/promises": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      bullmq: [platform/queue, platform/messaging]   # platform/messaging: interim BullMQ transport of the ecommerce example until platform/event-bus lands; pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
+      "@nestjs/bullmq": [platform/queue, platform/messaging]
+      kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
+      "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
+      eventemitter2: []
+      setInterval: [platform/retry, platform/event-bus, platform/queue, platform/http]
+      setTimeout: [platform/retry, platform/event-bus, platform/queue, platform/http]
+      "node:timers": [platform/retry, platform/event-bus, platform/queue, platform/http]
+      "node:timers/promises": [platform/retry, platform/event-bus, platform/queue, platform/http]
       winston: [platform/logging]
       dayjs: [platform/clock, platform/primitives]
       moment: [platform/clock, platform/primitives]
@@ -155,10 +161,15 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, saga, saga-state, step, compensation, event, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga, contracts, port, resolver, controller, gateway, consumer, job, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
+    # BE_PATTERN_SPEC_MISSING: a declared pattern (hfs.json sides.be.patterns) is proven on the test world. Each id below needs a test titled
+    # "<pattern>/<id>: ..." in an e2e or integration spec (be/src/tests/e2e, be/src/tests/integration).
+    patternScenarios:
+      event-bus: [atomic-with-transaction, relay-only-after-commit, redelivery-then-dead-letter, duplicate-delivery-is-a-noop]
+      queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -186,14 +197,27 @@ slots:
     rules: [HFS_README_*]
   - id: app.package-manifest
     profiles: [app]
-    # The one package.json of the app: every dependency of both sides and every script; npm workspaces only for fe/packages/*.
+    # The one package.json of the app, at the app root: be's dependencies and every tool, and every script; npm workspaces are
+    # exactly fe/apps/* and fe/packages/* (HFS_MONO_WORKSPACES), each with its own package.json. be has no package.json of its own.
     path: package.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
     managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
-    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES, HFS_MONO_WORKSPACE_DEP]
+  - id: app.task-graph
+    profiles: [app]
+    # The turbo task graph of the app (build, dev, lint, typecheck over the fe workspaces; build depends on ^build and caches
+    # .next and dist): rendered by hfs sync from templates/app/task-graph/turbo.json, judged for drift by hfs check. turbo needs
+    # it beside the root package.json and lockfile.
+    path: turbo.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: task-graph
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES]
   - id: app.lockfile
     profiles: [app]
     path: package-lock.json
@@ -413,11 +437,13 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
   - id: be.nest-cli
     profiles: [be]
+    # The Nest monorepo of the back end: `monorepo: true` and one project per declared be app (apps/<app>, even for one service).
     path: nest-cli.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
+    rules: [HFS_MONO_NEST_PROJECTS]
   - id: be.tool-config-local
     profiles: [be]
     path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.prettierrc.*,prettier.config.*,jest.config.ts,jest.config.mjs,jest.config.cjs,jest.config.json,jest.config.e2e.js}"
@@ -442,22 +468,14 @@ slots:
     tests: none
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TS_STRICT]
-  - id: fe.tool-config-repo
-    profiles: [fe]
-    # The one tool file a preset cannot render because it carries the repository's own facts: turbo.json (its task graph).
-    path: turbo.json
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
   - id: fe.tool-config-local
     profiles: [fe]
-    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*}"
+    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*,turbo.json}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
+    goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); the task graph is the app root's turbo.json (app.task-graph); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.docs
     profiles: [be, fe]
@@ -587,7 +605,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the literal `EVENTS` table of `apps/<app>/src/events.ts`; the consumers of its events are judged against it (R131 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the literal `EVENTS` table of `apps/<app>/src/events.ts`; the consumers of its events are judged against it (R139 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -601,7 +619,7 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts, events.ts, consumes.ts]   # events.ts: the events this service publishes (R131); consumes.ts: what it reads of its siblings (R131)
+    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts, events.ts, consumes.ts]   # events.ts: the events this service publishes (R139); consumes.ts: what it reads of its siblings (R139)
     contractTables: [operations.ts, events.ts, consumes.ts]   # read as data by `hfs emit-contracts` and `hfs check`, imported by nothing: roots of the dead-file walk
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
@@ -671,7 +689,7 @@ slots:
   - id: be.feature.saga
     profiles: [be]
     path: "src/features/<feature>/saga/"
-    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R134 to R138); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R142 to R146); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
     presence: opt-in
     tracked: tracked
     tier: feature
@@ -736,6 +754,7 @@ slots:
     profiles: [be]
     path: "src/features/<feature>/transport/message/"
     presence: opt-in              # queue worker: consumed only by a worker app
+    pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
     tier: feature
     requires: ["<feature>-message.module.ts"]
@@ -792,19 +811,6 @@ slots:
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
-  - id: be.events
-    profiles: [be]
-    path: "src/modules/events/<service>/"
-    pattern: event-bus            # typed events of a service, published and consumed through platform/event-bus (enabled by `patterns: ["event-bus"]`)
-    presence: opt-in
-    tracked: tracked
-    tier: domain
-    owner: true
-    requires: [index.ts]
-    allows: ["<event>.event.ts"]  # one class per event of be/contracts/<service>/events.json: its declaration (name, version) and create()
-    tests: none
-    budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE]
   - id: be.errors
     profiles: [be]
     path: "src/modules/{domain,integrations}/<capability>/errors/"
@@ -865,6 +871,55 @@ slots:
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
+  # ----- BE: pattern slots (opt-in; enabled by hfs.json sides.be.patterns). A path under one is HFS_SLOT_NOT_ENABLED unless its pattern is declared.
+  - id: be.platform.event-bus
+    profiles: [be]
+    path: "src/modules/platform/event-bus/"
+    presence: opt-in
+    pattern: event-bus            # the ONE durable event transport: transactional outbox, relay, Kafka, inbox, retry and dead letter (knowledge/patterns/be/event-bus.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, event-bus.module.ts, event-bus.port.ts, event-bus.contracts.ts, event-bus.service.ts, event-bus.service.spec.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
+  - id: be.platform.queue
+    profiles: [be]
+    path: "src/modules/platform/queue/"
+    presence: opt-in
+    pattern: queue                # the ONE BullMQ owner: the outbox relay into queues (jobId = outbox id) and job schedulers (knowledge/patterns/be/queues.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, queue.module.ts, queue.port.ts, queue.contracts.ts, queue.service.ts, queue.service.spec.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
+  - id: be.events
+    profiles: [be]
+    path: "src/modules/events/<service>/"
+    presence: opt-in
+    pattern: event-bus            # typed event classes of one service; each equals an entry of be/contracts/<service>/events.json
+    tracked: tracked
+    tier: events
+    owner: true
+    requires: [index.ts]
+    allows: ["<event>.event.ts", index.ts]
+    tests: none
+    rules: [BE_EVENT_CLASS_CONTRACT, BE_TIER_DIRECTION]
+  - id: be.queues
+    profiles: [be]
+    path: "src/modules/queues/<queue>/"
+    presence: opt-in
+    pattern: queue                # a typed producer of one queue: enqueueX(payload, tx) writes the outbox; its schedulers live beside it
+    tracked: tracked
+    tier: queues
+    owner: true
+    requires: [index.ts, "<queue>.queue.ts"]
+    allows: ["<queue>.queue.ts", "<queue>.contracts.ts", index.ts]
+    tests: none
+    rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"
@@ -984,16 +1039,18 @@ slots:
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next
     profiles: [fe]
-    path: "apps/<app>/{next.config.ts,tsconfig.json,postcss.config.mjs}"
+    # Each fe app is an npm workspace: its package.json is @<project>/<app> with its own runtime dependencies and the fixed
+    # workspace scripts (HFS_MONO_FE_WORKSPACE); turbo runs them.
+    path: "apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}"
     appKind: next
     presence: required
     tracked: tracked
     tier: none
     minInstances: 1
-    requires: [next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
+    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
                "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
-    rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
+    rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS, HFS_MONO_FE_WORKSPACE, HFS_MONO_WORKSPACE_DEP]
   - id: fe.app-optional
     profiles: [fe]
     path: "apps/<app>/public/"

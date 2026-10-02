@@ -215,9 +215,9 @@ test('plain tool commands, a createPlugin that is not stylelint and a rule-like 
   assert.deepEqual(await findings(dir), []);
 });
 
-test('the fe side: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier configs, lint-staged) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and app-owned ones are not', () => {
+test('the fe side: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier configs, lint-staged, a turbo.json of its own) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and app-owned ones are not', () => {
   const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration: APP, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT' || finding.code === 'HFS_PLAINTEXT_SECRET').map((finding) => [finding.code, finding.path]);
-  const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs'].map((file) => `fe/${file}`);
+  const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs', 'turbo.json'].map((file) => `fe/${file}`);
   assert.deepEqual(at(forbidden).sort(), forbidden.map((file) => ['HFS_TOOL_CONFIG_LOCAL', file]).sort());
-  assert.deepEqual(at(['fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/turbo.json', '.prettierrc', '.prettierignore', 'fe/apps/web/tsconfig.json']), []);
+  assert.deepEqual(at(['fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'turbo.json', '.prettierrc', '.prettierignore', 'fe/apps/web/tsconfig.json']), []);
 });

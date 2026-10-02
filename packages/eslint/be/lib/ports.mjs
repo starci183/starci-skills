@@ -23,7 +23,10 @@ export const baseName = (file) => String(file).replace(/\\/g, "/").split("/").po
  */
 export const ownerNameOf = (hfs, file) => {
     const bindings = hfs.classify(file).bindings ?? {}
-    return bindings.capability ?? bindings.feature ?? null
+    if (bindings.capability ?? bindings.feature) return bindings.capability ?? bindings.feature
+    // A pattern slot names its capability literally (`src/modules/platform/event-bus/`), so no variable binds it: the owner folder is its name.
+    const root = hfs.ownerOf(file)
+    return root === null || root === undefined ? null : root.split("/").pop()
 }
 
 /**

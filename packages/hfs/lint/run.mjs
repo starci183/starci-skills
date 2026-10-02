@@ -1,6 +1,6 @@
 // hfs lint - the ONE lint entry and the ONE report of a StarCi app.
 //
-//   hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
+//   hfs lint [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 //
 // It runs at the app root (the folder of hfs.json), over the app (or over the app-relative files named by --changed):
 //   1. ESLint once per side, from the side folder, through the app's own install and that side's eslint.config.mjs (be/ the be canon,
@@ -12,6 +12,9 @@
 // `--sonar <file>` writes the same findings as THE Sonar Generic Issue Import file (engine ids starci-hfs, eslint, stylelint in one
 // document); the exit code is the land-gate input: 0 no finding, 1 at least one, 2 a tool could not run (never a pass).
 // --changed restricts ESLint and stylelint to the listed files and keeps of the app findings only those on a listed file or on no file.
+// --workspace scopes the same lint to one npm workspace of the fe side (fe/apps/<app> or fe/packages/<pkg>, app-relative): ESLint and
+// stylelint over that folder only, and of the app findings only those inside it. It is the `lint` script of every fe workspace (the
+// turbo `lint` task); the root `npm run lint` stays the whole app. There is no second linter: a workspace lint is this lint, scoped.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -25,22 +28,32 @@ export const LINT_SCHEMA = 'starci/lint@1';
 const STYLE_SIDE = 'fe';
 const CODE_PREFIX = /^\[([A-Z][A-Z0-9_]+)\] /;
 const posix = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '');
+/** An npm workspace of the fe side, app-relative: one folder below fe/apps or fe/packages (the root package.json workspaces). */
+const WORKSPACE = /^fe\/(?:apps|packages)\/[a-z0-9][a-z0-9-]*$/;
+
+/** The app-relative workspace of `opts.workspace` (already app-relative), or a refusal when it is not one folder of fe/apps or fe/packages. */
+export function workspaceOf(workspace) {
+  const rel = posix(workspace).replace(/\/+$/, '');
+  if (!WORKSPACE.test(rel)) throw new Error(`--workspace ${workspace} is not an fe workspace (fe/apps/<app> or fe/packages/<pkg>, from the app root)`);
+  return rel;
+}
 
 /** The flags of `hfs lint`; `--changed` takes every argument up to the next flag. */
 export function parseLintArgs(argv) {
-  const opts = { changed: null, fix: false, format: 'text', repo: undefined, sonar: undefined };
+  const opts = { changed: null, fix: false, format: 'text', repo: undefined, sonar: undefined, workspace: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(posix(argv[++i]));
     } else if (arg === '--fix') opts.fix = true;
-    else if (['--format', '--repo', '--sonar'].includes(arg)) {
+    else if (['--format', '--repo', '--sonar', '--workspace'].includes(arg)) {
       if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}`);
   }
   if (!['text', 'json'].includes(opts.format)) throw new Error('--format is text or json');
+  if (opts.workspace !== undefined && opts.changed !== null) throw new Error('--workspace and --changed do not combine: a workspace lint judges the whole workspace');
   return opts;
 }
 
@@ -84,8 +97,14 @@ const onSide = (changed, side) => changed.filter((file) => file.startsWith(`${si
  */
 export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = () => [] }) {
   const changed = opts.changed === null ? null : new Set(opts.changed);
-  const existing = changed ? [...changed].filter((file) => fs.existsSync(path.join(repoRoot, file))) : [];
   const errors = [];
+  let workspace = null;
+  if (opts.workspace !== undefined) {
+    try { workspace = workspaceOf(opts.workspace); } catch (error) { errors.push(String(error?.message ?? error)); }
+  }
+  /** Whether an app-relative path lies inside the scoped workspace. */
+  const inWorkspace = (file) => posix(file).startsWith(`${workspace}/`);
+  const existing = changed ? [...changed].filter((file) => fs.existsSync(path.join(repoRoot, file))) : [];
   const findings = [];
   const raw = { eslint: [], stylelint: [] };
   const engines = {};
@@ -93,13 +112,18 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   let app = null;
   try { app = readRepoDeclaration(loadSlotManifest(), repoRoot); } catch (error) { errors.push(`hfs lint runs at the app root: ${String(error?.message ?? error)}`); }
   if (app && !app.sides) { errors.push(`${repoRoot} is the ${app.side} side of an app; hfs lint runs at the app root, the folder of hfs.json`); app = null; }
+  if (opts.workspace !== undefined && workspace === null) app = null;
+  if (workspace !== null && !fs.existsSync(path.join(repoRoot, workspace, 'package.json'))) { errors.push(`--workspace ${workspace} holds no package.json; it is not a workspace of this app`); app = null; }
+  /** The workspace folder relative to the fe side folder (apps/<app> or packages/<pkg>). */
+  const onFe = workspace === null ? null : workspace.slice(STYLE_SIDE.length + 1);
 
   // 1. ESLint, once per side, from the side folder with that side's config.
   engines.eslint = { sides: {} };
   for (const side of app ? SIDES : []) {
+    if (workspace !== null && side !== STYLE_SIDE) { engines.eslint.sides[side] = { files: 0, skipped: `outside --workspace ${workspace}` }; continue; }
     const sources = onSide(existing, side).filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
     if (changed !== null && !sources.length) { engines.eslint.sides[side] = { files: 0, skipped: 'no changed source file' }; continue; }
-    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : ['.'])] });
+    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : [onFe ?? '.'])] });
     if (linted.error) errors.push(linted.error);
     else {
       // The side canon names side-relative paths in its messages; the report names every path from the app root.
@@ -115,7 +139,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   if (app) {
     const styles = onSide(existing, STYLE_SIDE).filter((file) => file.endsWith('.css'));
     if (changed === null || styles.length) {
-      const linted = runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
+      const linted = runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [onFe ? `${onFe}/src/**/*.css` : STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
       if (linted.error) errors.push(linted.error);
       else {
         const appRelative = appRelativeMessages(STYLE_SIDE, path.join(repoRoot, STYLE_SIDE));
@@ -133,7 +157,10 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     try { checked = await hfsCheck(repoRoot); } catch (error) { errors.push(`hfs check could not run: ${String(error?.message ?? error)}`); }
   }
   const repoErrors = checked.findings.filter((finding) => finding.level === 'error');
-  const kept = changed === null ? repoErrors : repoErrors.filter((finding) => !finding.path || changed.has(posix(finding.path)));
+  // A workspace lint keeps only the app findings inside the workspace; the rest belong to the root lint of the whole app.
+  const kept = workspace !== null
+    ? repoErrors.filter((finding) => finding.path && inWorkspace(finding.path))
+    : changed === null ? repoErrors : repoErrors.filter((finding) => !finding.path || changed.has(posix(finding.path)));
   for (const finding of kept) {
     findings.push({ engine: 'hfs', rule: finding.code, code: finding.code, severity: 'error', path: finding.path ? posix(finding.path) : null, line: finding.line ?? null, column: finding.column ?? null, message: finding.message, titleVi: finding.titleVi, nextStepVi: finding.nextStepVi });
   }
@@ -149,7 +176,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     linterReport('eslint', raw.eslint, { root: repoRoot, sourceRoots, tracked }),
     linterReport('stylelint', raw.stylelint, { root: repoRoot, sourceRoots, tracked }),
   ]);
-  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort() : null, counts: { error: findings.length }, engines, errors, findings };
+  const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort() : null, workspace, counts: { error: findings.length }, engines, errors, findings };
   return { report, sonar, exit: errors.length ? 2 : findings.length ? 1 : 0 };
 }
 

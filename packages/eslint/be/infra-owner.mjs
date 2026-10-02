@@ -53,7 +53,7 @@ export const infraImportOwner = {
         schema: [],
         messages: {
             foreign: "`{{name}}` is owned by {{owners}}. Use that capability's port (injected with its `Inject*()` decorator) instead of the raw library, or move this code into the owner.",
-            nowhere: "`{{name}}` is not used in a back end: its job belongs to a platform port (config through the typed `<c>.config.ts`, events through the outbox, schedules through `platform/scheduling`). Remove it.",
+            nowhere: "`{{name}}` is not used in a back end: its job belongs to a platform port (config through the typed `<c>.config.ts`, events through `eventBus.publish(event, tx)` of `platform/event-bus`, schedules and background jobs through a queue's BullMQ job scheduler of `platform/queue`). Remove it.",
         },
     },
     create(context) {

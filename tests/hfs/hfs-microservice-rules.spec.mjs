@@ -1,5 +1,5 @@
-// The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R128 HFS_SERVICE_PLACEMENT, R129 HFS_IMAGE_UNPINNED,
-// R130 HFS_SERVICE_STACK_DECLARATION, R131 HFS_EVENT_CONTRACT, R132 BE_ASYNC_SPEC_MISSING, plus the event contract emit
+// The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R136 HFS_SERVICE_PLACEMENT, R137 HFS_IMAGE_UNPINNED,
+// R138 HFS_SERVICE_STACK_DECLARATION, R139 HFS_EVENT_CONTRACT, R140 BE_ASYNC_SPEC_MISSING, plus the event contract emit
 // (packages/hfs/emit). Each rule has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the base.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +36,7 @@ const COMPONENTS = [
 ].join('\n');
 const withStack = (components) => (dir) => put(dir, '.starcistacks/application-stacks.yaml', stack(components));
 
-// ------------------------------------------------------------------------------------------------ R128 HFS_SERVICE_PLACEMENT
+// ------------------------------------------------------------------------------------------------ R136 HFS_SERVICE_PLACEMENT
 
 test('HFS_SERVICE_PLACEMENT: a Dockerfile or a package.json of a folder outside be/apps/<service> is a second service root', () => {
   const findings = only(APP, (dir) => {
@@ -48,7 +48,7 @@ test('HFS_SERVICE_PLACEMENT: a Dockerfile or a package.json of a folder outside 
   assert.match(findings[0].message, /be\/apps\/<service>\//);
 });
 
-test('HFS_SERVICE_PLACEMENT: the Dockerfile of a be app, of a front-end app, the root package.json and a workspace package pass', () => {
+test('HFS_SERVICE_PLACEMENT: the Dockerfile of a be app, of a front-end app, the root package.json and the package.json of an fe workspace pass', () => {
   assert.deepEqual(only(APP, (dir) => {
     put(dir, 'be/apps/core/Dockerfile', 'FROM node\n');
     put(dir, 'fe/apps/web/Dockerfile', 'FROM node\n');
@@ -56,7 +56,7 @@ test('HFS_SERVICE_PLACEMENT: the Dockerfile of a be app, of a front-end app, the
   }, 'HFS_SERVICE_PLACEMENT'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R129 HFS_IMAGE_UNPINNED
+// ------------------------------------------------------------------------------------------------ R137 HFS_IMAGE_UNPINNED
 
 test('HFS_IMAGE_UNPINNED: a multi-service stack with a moving image (no tag, latest, major only) is refused, each component named', () => {
   const findings = only(MULTI, withStack([
@@ -76,7 +76,7 @@ test('HFS_IMAGE_UNPINNED: exact versions and digests pass, and a single-service 
   assert.deepEqual(only(APP, withStack('  postgres:\n    image: postgres:16\n    role: stateful\n'), 'HFS_IMAGE_UNPINNED'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R130 HFS_SERVICE_STACK_DECLARATION
+// ------------------------------------------------------------------------------------------------ R138 HFS_SERVICE_STACK_DECLARATION
 
 test('HFS_SERVICE_STACK_DECLARATION: a service app with no component, or one that is not role service, is refused', () => {
   const findings = only(MULTI, withStack('  core:\n    image: demo/core:1.0.0\n    role: stateful\n'), 'HFS_SERVICE_STACK_DECLARATION');
@@ -87,7 +87,7 @@ test('HFS_SERVICE_STACK_DECLARATION: every service app declared as a role servic
   assert.deepEqual(only(MULTI, withStack(COMPONENTS), 'HFS_SERVICE_STACK_DECLARATION'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R131 HFS_EVENT_CONTRACT
+// ------------------------------------------------------------------------------------------------ R139 HFS_EVENT_CONTRACT
 
 const EVENTS_TS = 'export const EVENTS = {\n  "order.placed": { version: 1, payload: { orderId: "string", totalCents: "number", note: "string?" } },\n} as const\n';
 const CONSUMES_TS = (version = 1, event = 'order.placed') => `export const CONSUMES = {\n  core: { "${event}": ${version} },\n} as const\n`;
@@ -159,7 +159,7 @@ test('hfs emit-contracts writes events.json for an api or worker app that declar
   assert.equal(text, `${JSON.stringify({ events: { 'invoice.rejected': { payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
 });
 
-// ------------------------------------------------------------------------------------------------ R132 BE_ASYNC_SPEC_MISSING
+// ------------------------------------------------------------------------------------------------ R140 BE_ASYNC_SPEC_MISSING
 
 const snapshot = (service, events) => `${JSON.stringify({ events, schema: 'starci/event-contract@1', service }, null, 2)}\n`;
 const consumesOf = (service, event) => `export const CONSUMES = { ${service}: { "${event}": 1 } } as const\n`;
@@ -196,7 +196,7 @@ test('BE_ASYNC_SPEC_MISSING: every consumed event named by an e2e spec through t
   assert.deepEqual(r132({ 'be/src/tests/e2e/orders/whole-saga.e2e-spec.ts': SPEC('order.placed', 'billing.invoice-rejected') }), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R131 queues of the consumers
+// ------------------------------------------------------------------------------------------------ R139 queues of the consumers
 
 const QUEUE_SOURCE = 'be/src/modules/domain/invoice/invoice.contracts.ts';
 const queueSource = (module, name) => `import { defineQueue } from '${module}';\nexport const SHIPPED_QUEUE = defineQueue({ name: '${name}', attempts: 3, backoffMs: 1000, parse: () => null });\n`;

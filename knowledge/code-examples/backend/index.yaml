@@ -10,3 +10,9 @@ examples:
   - id: saga
     path: saga
     title: A saga with steps, compensations and a fenced state
+  - id: event-bus
+    path: event-bus
+    title: Publish an event in the domain transaction and consume it
+  - id: queue
+    path: queue
+    title: A typed queue producer called inside the domain transaction

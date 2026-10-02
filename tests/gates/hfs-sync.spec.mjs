@@ -80,7 +80,7 @@ describe('the generated file set', () => {
     assert.deepEqual(Object.keys(rendered()).sort(), [
       '.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
       'be/eslint.config.mjs', 'be/jest.config.js', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json',
-      'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'package.json', 'sonar-project.properties',
+      'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'package.json', 'sonar-project.properties', 'turbo.json',
     ]);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy, the side ones under the side folder', () => {
@@ -400,34 +400,35 @@ describe('the be side tool configuration', () => {
 });
 
 describe('the package.json scripts of the app', () => {
-  it('are the fixed scripts of both sides, a be script run from be/, an fe script from fe/, plus dev, start and migrate per app', () => {
+  it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start and migrate per app', () => {
     const scripts = scriptsOf();
     assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
     assert.equal(scripts.migrate, 'node be/dist/apps/migrate/src/main.js');
     assert.equal(scripts['dev:be'], 'cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/core/src/main.ts');
-    assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && cd fe/apps/app && next dev');
-    assert.equal(scripts['start:app'], 'cd fe/apps/app && next start');
+    assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && turbo run dev --filter=@nivo/app', 'turbo runs the workspace @<project>/<app> after the packages it imports');
+    assert.equal(scripts['start:app'], 'npm run start -w @nivo/app');
     assert.equal(scripts.test, 'cd be && jest --selectProjects unit --coverage');
     assert.equal(scripts['test:stack'], 'cd be && starci-test-stack');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts[`test:${project}`], `npm run typecheck:tests && cd be && jest --selectProjects ${project}`);
     assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');
     assert.equal(scripts.lint, 'npm run codegen --silent && hfs lint', 'one lint gate over both sides, stylelint and the app checks');
     assert.equal(scripts['lint:fix'], scripts.lint.replace('hfs lint', 'hfs lint --fix'));
-    assert.match(scripts['build:fe'], /^npm run codegen --silent && \(cd fe\/apps\/app && next build\) && \(cd fe\/apps\/admin && next build\)$/);
+    assert.equal(scripts['build:fe'], 'npm run codegen --silent && turbo run build --filter=./fe/apps/*', 'turbo builds every fe app workspace, the packages first (^build)');
     assert.doesNotMatch(Object.values(scripts).join('\n'), /--rule|--no-inline-config|--no-eslintrc|--ignore-pattern|vitest|playwright|scripts\/check-/);
   });
-  it('typecheck builds the fe workspace packages before it type-checks the fe apps that import them from dist/', () => {
-    const withPackages = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck.split(' && ');
-    const build = withPackages.indexOf('npm run build --workspaces --if-present');
-    assert.ok(build > 0, `the typecheck of an app with fe packages builds them: ${withPackages.join(' && ')}`);
-    assert.ok(build < withPackages.indexOf('tsc -p fe/apps/app/tsconfig.json --noEmit'), 'the packages are built before the fe app is type-checked');
-    const without = scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck;
-    assert.equal(without, 'npm run codegen --silent && tsc -p be/tsconfig.json && tsc -p fe/apps/app/tsconfig.json --noEmit', 'an app without fe packages builds nothing');
+  it('typecheck runs the be tsc, then every fe workspace typecheck through turbo, which builds the packages an app imports first (^build in turbo.json)', () => {
+    const typecheck = 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck';
+    assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }], optionalSlots: ['fe.package.ui'] } })).typecheck, typecheck);
+    assert.equal(scriptsOf(app({ fe: { apps: [{ name: 'app', kind: 'next' }] } })).typecheck, typecheck, 'with or without packages: the task graph decides');
+    const graph = JSON.parse(rendered()['turbo.json']);
+    assert.deepEqual(graph.tasks.typecheck.dependsOn, ['^build']);
+    assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
+    assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);
   });
   it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
-    assert.equal(one['dev:fe'], 'npm run codegen --silent && cd fe/apps/web && next dev');
+    assert.equal(one['dev:fe'], 'npm run codegen --silent && turbo run dev --filter=@nivo/web');
     const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] } }));
     assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:admin', 'start:app', 'start:core', 'start:jobs']);
     assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"start:x": "node be\/dist\/apps\/x\/src\/main\.js",/);
@@ -533,7 +534,13 @@ describe('hfs scaffold app: the first tree', () => {
     for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml', '.sops.yaml', 'scripts/codegen.mjs',
       'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/api/src/main.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/api.options.ts',
       'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
-    assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package(-lock)?\.json$/.test(file)), 'no side and no app holds a package.json or lockfile');
+    assert.ok(!files.some(file => /^be\/(.*\/)?package\.json$/.test(file)), 'the back end holds no package.json');
+    assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package-lock\.json$/.test(file)), 'no side and no workspace holds a lockfile');
+    const web = JSON.parse(read(root, 'fe/apps/web/package.json'));
+    assert.deepEqual([web.name, web.private, Object.keys(web.scripts).sort()], [`@${path.basename(root)}/web`, true, ['build', 'dev', 'lint', 'start', 'typecheck']], 'each fe app is a workspace with its own package.json');
+    const rootManifest = JSON.parse(read(root, 'package.json'));
+    assert.deepEqual([rootManifest.workspaces, typeof rootManifest.packageManager, typeof rootManifest.devDependencies.turbo], [['fe/apps/*', 'fe/packages/*'], 'string', 'string'], 'the root is the monorepo root');
+    assert.ok(files.includes('turbo.json'), 'the task graph sits at the app root');
     assert.ok(!files.includes('package-lock.json'), 'the scaffold writes no lockfile by hand: npm resolves it');
     // .starcistacks and its sops rule live at the app root, beside be/, fe/ and .starciwork; no side holds either.
     assert.ok(!files.some(file => /^(be|fe)\/(\.starcistacks\/|\.sops\.yaml$)/.test(file)), 'no side holds a .starcistacks or a .sops.yaml');

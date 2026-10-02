@@ -2,7 +2,7 @@
  * The async contract of a service: `contracts/<app>/events.json`, emitted from the literal `EVENTS` table of
  * `apps/<app>/src/events.ts` (the events the service publishes: stream, version, payload fields). Nothing is executed: the
  * table is read as a TypeScript syntax tree with the repository's own `typescript`. The reader and the printer are the runtime's
- * (`scripts/lib/event-contract.mjs`), so `hfs check` (R131 HFS_EVENT_CONTRACT) compares the committed file with exactly this text.
+ * (`scripts/lib/event-contract.mjs`), so `hfs check` (R139 HFS_EVENT_CONTRACT) compares the committed file with exactly this text.
  */
 import fs from 'node:fs';
 import path from 'node:path';

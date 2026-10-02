@@ -112,8 +112,18 @@ topics:
   - id: be.background
     title: Background work
     path: background.yaml
-    decides: Jobs and consumers as transports, worker apps, runners for every sweep, typed queues and the outbox, lease and fencing
+    decides: Jobs and consumers as transports, worker apps, runners for every sweep, producers through the bus or a typed queue, lease and fencing
     rules: BE-BACKGROUND-1 … BE-BACKGROUND-5
+  - id: be.event-bus
+    title: Event bus
+    path: event-bus.yaml
+    decides: Synchronous work inside one context, typed event classes equal to the vendored contract, publish(event, tx) from a domain transaction, the transactional outbox, relay, Kafka, consumers with retry, dead letter and the inbox
+    rules: BE-EVENT-BUS-1 … BE-EVENT-BUS-5
+  - id: be.queues
+    title: Queues and schedulers
+    path: queues.yaml
+    decides: Typed queue producers that write the outbox in the caller's transaction, the BullMQ owner and relay, job schedulers instead of cron
+    rules: BE-QUEUES-1 … BE-QUEUES-4
   - id: be.messages
     title: Messages catalog and locale
     path: messages.yaml
