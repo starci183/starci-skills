@@ -34,8 +34,9 @@ rules:
       image, run as `cli <group> <command>`. `apps/cli/src/main.ts` boots with `CommandFactory.run(AppModule, logger)` of
       nest-commander and never serves: no `NestFactory.create*`, no `.listen()`, no microservice connection, no
       `@nestjs/platform-*` adapter and no `@nestjs/microservices`. `apps/cli/src/app.module.ts` composes the platform modules
-      the commands need and the cli feature root module `CliModule`; `apps/cli/src/cli.options.ts` carries what the cli reads
-      from the environment, the connections it migrates among them.
+      the commands need (the database capability over every connection with its entities and migrations, like an api app) and
+      the static cli feature root module `CliModule`; `apps/cli/src/cli.options.ts` carries what the cli reads from the
+      environment, the connections it migrates among them.
     rationale: |-
       One image for every operator action gives one place to find, deploy and audit them, and a process that never listens
       cannot become a second, unguarded door into the application.
@@ -67,11 +68,14 @@ rules:
     hfsRules: [R133]
     requirement: |-
       A nest-commander command (`@Command` or `@SubCommand`) is declared only in the cli feature root `src/features/cli/`
-      (slot `be.cli`). The root holds `index.ts`, `cli.module.ts` and `cli.module-definition.ts` (the module-definition
-      pattern) and one folder per group: `<group>/<group>.cli.ts` (the group `@Command` with its `subCommands`),
-      `<group>/<group>.module.ts`, `<group>/<group>.module-definition.ts` and `<group>/subs/<name>.cli.ts` (a `@SubCommand`
-      class extending `CommandRunner`), one command per file. `CliModule` imports each group module. The suffix is `.cli.ts`,
-      because `.command.ts` is the CQRS message (api.yaml).
+      (slot `be.cli`). The root holds `index.ts` and `cli.module.ts` and one folder per group: `<group>/<group>.cli.ts` (the
+      group `@Command` with its `subCommands`), `<group>/<group>.module.ts` and `<group>/subs/<name>.cli.ts` (a `@SubCommand`
+      class extending `CommandRunner`), one command per file. The cli feature root is a feature, so every module of it is a
+      static `@Module({ imports, providers })` with no module definition, no options file and no `register`: `CliModule`
+      imports each group module and a group module provides its commands. A command takes its inputs from a platform
+      capability (the connections through `InjectDatabaseOptions()` and their opener through `InjectConnectionSource()` of
+      `platform/database`) or from a nest-commander `@Option` of its own (`cli seed run --env <name>`). The suffix is
+      `.cli.ts`, because `.command.ts` is the CQRS message (api.yaml).
     rationale: |-
       A fixed group and sub-command layout maps the command line `cli <group> <command>` to one file path, so an operator
       command and its spec are found from the name alone.
@@ -185,12 +189,10 @@ files:
             `-- cli/
                 |-- index.ts
                 |-- cli.module.ts
-                |-- cli.module-definition.ts
                 |-- migrate/
                 |   |-- migrate.cli.ts
                 |   |-- migrate.cli.spec.ts
                 |   |-- migrate.module.ts
-                |   |-- migrate.module-definition.ts
                 |   `-- subs/
                 |       |-- run.cli.ts
                 |       `-- run.cli.spec.ts
@@ -198,23 +200,19 @@ files:
                     |-- seed.cli.ts
                     |-- seed.cli.spec.ts
                     |-- seed.module.ts
-                    |-- seed.module-definition.ts
                     `-- subs/
-                        |-- demo.cli.ts
-                        `-- demo.cli.spec.ts
+                        |-- run.cli.ts
+                        `-- run.cli.spec.ts
   entries:
     - {path: apps/cli/Dockerfile, slot: repo.app-image, role: entry, rules: [R131], spec: none, why: 'the one cli image, run as `cli <group> <command>`'}
     - {path: apps/cli/src/main.ts, slot: be.app.cli, role: entry, rules: [R132, R33], spec: none, why: 'CommandFactory.run(AppModule, logger); never serves'}
     - {path: apps/cli/src/app.module.ts, slot: be.app.cli, role: module, rules: [R32, R132], spec: none, why: 'composes the platform modules and CliModule; no business code'}
     - {path: apps/cli/src/cli.options.ts, slot: be.app.cli, role: options, rules: [R131, R34], spec: none, why: 'what the cli reads from the environment, the connection list it migrates among them'}
     - {path: src/features/cli/index.ts, slot: be.cli, role: entry, rules: [R30], spec: none, why: 'exports CliModule to the cli app'}
-    - {path: src/features/cli/cli.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'the cli feature root module; imports each group module'}
-    - {path: src/features/cli/cli.module-definition.ts, slot: be.cli, role: module-definition, rules: [R133, R45], spec: none, why: 'the configurable module builder of the root module'}
+    - {path: src/features/cli/cli.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'the static cli feature root module; imports each group module'}
     - {path: src/features/cli/migrate/migrate.cli.ts, slot: be.cli, role: cli, rules: [R133, R134], spec: required, why: 'the migrate group @Command and its subCommands'}
-    - {path: src/features/cli/migrate/migrate.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'registers the migrate group and its sub-commands'}
-    - {path: src/features/cli/migrate/migrate.module-definition.ts, slot: be.cli, role: module-definition, rules: [R133, R45], spec: none, why: 'the configurable module builder of the group'}
+    - {path: src/features/cli/migrate/migrate.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'the static migrate group module: provides its command and sub-commands'}
     - {path: src/features/cli/migrate/subs/run.cli.ts, slot: be.cli, role: cli, rules: [R133, R34], spec: required, why: '`cli migrate run`: runs the migrations of every connection; the only migration runner'}
     - {path: src/features/cli/seed/seed.cli.ts, slot: be.cli, role: cli, rules: [R133, R134], spec: required, why: 'the seed group @Command and its subCommands'}
-    - {path: src/features/cli/seed/seed.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'registers the seed group and its sub-commands'}
-    - {path: src/features/cli/seed/seed.module-definition.ts, slot: be.cli, role: module-definition, rules: [R133, R45], spec: none, why: 'the configurable module builder of the group'}
-    - {path: src/features/cli/seed/subs/demo.cli.ts, slot: be.cli, role: cli, rules: [R133], spec: required, why: '`cli seed demo`: writes the demo rows through the domain services'}
+    - {path: src/features/cli/seed/seed.module.ts, slot: be.cli, role: module, rules: [R133, R45], spec: none, why: 'the static seed group module: provides its command and sub-commands'}
+    - {path: src/features/cli/seed/subs/run.cli.ts, slot: be.cli, role: cli, rules: [R133], spec: required, why: '`cli seed run [--env <name>]`: runs the seed files of .starcistacks/<env>/seeds on the connection each names'}

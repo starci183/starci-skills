@@ -45,7 +45,8 @@ versioning:
 #   requiredWhen       connections: required only when hfs.json declares a database connection.
 #   allows / forbids   names inside the instance; the loader exposes them, slot-check enforces them.
 #   tests       unit-beside | e2e | none.
-#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
+#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules); on an
+#               owner slot (be.cli) the app kinds that list its root module, every folder of the root holding one static module.
 #   budget      size budgets (lines per file, files per slot, exports).
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
@@ -740,17 +741,21 @@ slots:
     # The cli feature root: every one-off action of the back end, compiled only into apps/cli. A group is a nest-commander
     # @Command (<group>/<group>.cli.ts) whose sub-commands are @SubCommand classes extending CommandRunner
     # (<group>/subs/<name>.cli.ts), each with its unit spec beside it (<name>.cli.spec.ts): a command is an action runner, not a
-    # thin transport (BE_CLI_COMMAND_SHAPE). `.cli.ts` because `.command.ts` is the CQRS message (HFS delta 3). The feature root
-    # module (cli.module.ts, module-definition pattern) imports each group module.
+    # thin transport (BE_CLI_COMMAND_SHAPE). `.cli.ts` because `.command.ts` is the CQRS message (HFS delta 3). Every module of
+    # the root is a static @Module (a feature holds no module definition): cli.module.ts imports each group module, a group
+    # module provides its commands, and a command takes its inputs from a platform capability (the connections and their opener
+    # from platform/database) or from a command-line @Option.
     path: "src/features/cli/"
     presence: optional
     tracked: tracked
     tier: feature
     owner: true
-    requires: [index.ts, cli.module.ts, cli.module-definition.ts]
-    allows: [index.ts, cli.module.ts, cli.module-definition.ts, "<group>/<group>.cli.ts", "<group>/<group>.cli.spec.ts", "<group>/<group>.module.ts", "<group>/<group>.module-definition.ts", "<group>/<group>.options.ts", "<group>/<group>.decorators.ts", "<group>/subs/<name>.cli.ts", "<group>/subs/<name>.cli.spec.ts"]
+    requires: [index.ts, cli.module.ts]
+    # A composed root: an app of kind cli lists cli.module.ts, never a group module (BE_MODULE_SHAPE).
+    composedBy: [cli]
+    allows: [index.ts, cli.module.ts, "<group>/<group>.cli.ts", "<group>/<group>.cli.spec.ts", "<group>/<group>.module.ts", "<group>/subs/<name>.cli.ts", "<group>/subs/<name>.cli.spec.ts"]
     tests: unit-beside
-    rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_SCHEMA_AUTHORITY]
+    rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_MODULE_SHAPE, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain

@@ -25,7 +25,7 @@
 export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
 const MAX_VIOLATIONS = 200;
-const DOOR_ROLES = new Set(['controller', 'resolver', 'gateway', 'consumer', 'job', 'cli']);
+const DOOR_ROLES = new Set(['controller', 'resolver', 'gateway', 'consumer', 'job']);
 const APP_ENTRY = 'main.ts';
 const ID = -1;
 const LIT = -2;
@@ -76,7 +76,7 @@ function uniformByDesign(resolver, rel) {
   const base = rel.slice(rel.lastIndexOf('/') + 1);
   if (slot.appKind !== undefined) return base === APP_ENTRY && (slot.requires ?? []).includes(APP_ENTRY);
   const role = base.split('.').at(-2);
-  return (slot.composedBy?.length ?? 0) > 0 && DOOR_ROLES.has(role) && base.endsWith('.ts');
+  return !slot.owner && (slot.composedBy?.length ?? 0) > 0 && DOOR_ROLES.has(role) && base.endsWith('.ts');
 }
 
 function homeText(profile, sameOwner, crossApp) {

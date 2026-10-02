@@ -29,7 +29,6 @@ const cliTree = () => (dir) => {
   put(dir, 'be/apps/cli/Dockerfile', 'FROM node:22-alpine\n');
   put(dir, 'be/src/features/cli/index.ts');
   put(dir, 'be/src/features/cli/cli.module.ts');
-  put(dir, 'be/src/features/cli/cli.module-definition.ts');
   put(dir, 'be/src/features/cli/migrate/migrate.cli.ts');
   put(dir, 'be/src/features/cli/migrate/migrate.module.ts');
   put(dir, 'be/src/features/cli/migrate/migrate.cli.spec.ts');

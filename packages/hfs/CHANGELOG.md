@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Changed: `hfs scaffold app` writes the final front end: two Next apps, `fe/apps/landing` and `fe/apps/app`, over the shared workspace packages `fe/packages/<name>-ui` (`@<name>/ui`: the brand shell, the locale shell and the boundary notices both apps mount) and `fe/packages/<name>-i18n` (`@<name>/i18n`: the next-intl stack written once, `createAppI18n` plus the `./proxy` and `./routing` subpaths; R59). hfs.json declares `fe.package.ui` and `fe.package.i18n`; each workspace's package.json declares exactly what its source imports; the request config still reads the locale through `next/root-params` (FE-I18N-1), now in the package. Template path variables: an fe `apps/<name>/` folder is the skeleton of that app alone (`__app__` is gone from the fe side), `__project__` is the project name.
 - Changed: the managed fe scripts (`dev:fe`, `start:<app>`, `build:fe`) run `next` from the app directory (`cd fe/apps/<app> && next ...`) so next-intl finds its request config; the fe skeleton reads the request locale through `next/root-params` (`experimental.rootParams`), pins the workspace root three levels above the app and uses the `.*[.].*` proxy matcher; the bundled runtime carries the `&&`/`||`-aware FE_SWR_KEY_IDENTITY check.
 ## Unreleased (C0 batch)
 

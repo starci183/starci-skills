@@ -3,6 +3,8 @@ import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { DATABASE_MANAGERS, DatabaseProbe } from "./database-probe.service"
+import { openConnectionSource } from "./connection-source.client"
+import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { IDENTITY_CONNECTION } from "./identity.connection"
 import { IDENTITY_ENTITY_MANAGER } from "./identity.decorators"
@@ -19,7 +21,8 @@ const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, EntityManagerToken> = new Map<s
 
 @Module({})
 /**
- * The database capability: opens one named TypeORM connection per entry of the options and probes them for health.
+ * The database capability: opens one named TypeORM connection per entry of the options and probes them for health; it
+ * provides its options and the opener of a one-off data source (the cli migrate command).
  * Schema changes never happen here (`synchronize` is false, migrations run only in the cli migrate command).
  */
 export class DatabaseModule extends ConfigurableModuleClass {
@@ -62,8 +65,14 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 },
                 ...managers,
                 DatabaseProbe,
+                { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
             ],
-            exports: [DatabaseProbe, ...managers.map((manager) => manager.provide)],
+            exports: [
+                DatabaseProbe,
+                DATABASE_OPTIONS,
+                CONNECTION_SOURCE,
+                ...managers.map((manager) => manager.provide),
+            ],
         }
     }
 }
