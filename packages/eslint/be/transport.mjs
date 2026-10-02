@@ -13,7 +13,7 @@ import ts from "typescript"
 import { walk } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { decoratorArguments, decoratorCallee, importOf, isImportedFrom, moduleReferences } from "./lib/import-source.mjs"
-import { isTransportSlot } from "./lib/transport-slots.mjs"
+import { isTransportSlot, KIND_DOOR_SLOTS } from "./lib/transport-slots.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** The HTTP route decorators of `@nestjs/common`. */
@@ -25,15 +25,17 @@ const GRAPHQL_OPERATIONS = ["Query", "Mutation", "Subscription", "ResolveField"]
 /** The slot of REST doors. */
 const HTTP_SLOT = "be.transport.http"
 
+/** The slot of provider webhook doors (the REST doors of the webhook kind). */
+const WEBHOOK_SLOT = "be.webhooks"
+
 /** Slots whose classes are entered through a method the framework calls on a schedule, a queue or a command line. */
 const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.transport.schedule", "be.feature.transport.cli"])
 
-/** True for the decorators that make a method a transport handler. */
+/** True for the decorators that make a method a transport handler (a socket handler belongs to the realtime kind, which has its own laws). */
 const isRouteDecorator = (context, decorator) => {
     const callee = decoratorCallee(decorator)
     return isImportedFrom(context, callee, "@nestjs/common", HTTP_ROUTES)
         || isImportedFrom(context, callee, "@nestjs/graphql", GRAPHQL_OPERATIONS)
-        || isImportedFrom(context, callee, "@nestjs/websockets", "SubscribeMessage")
 }
 
 /** True when the class declares (transitively through its members' decorators) nothing but is a transport door: it has handler methods. */
@@ -115,7 +117,8 @@ export const transportIsThin = {
     create(context) {
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(context.filename)
-        if (!isTransportSlot(slot)) return {}
+        // a webhook or realtime door answers to its own kind laws (webhooks.mjs, realtime.mjs), not to the one-dispatch shape
+        if (!isTransportSlot(slot) || KIND_DOOR_SLOTS.includes(slot)) return {}
         const sourceCode = context.sourceCode
         const isMapper = (callee) => {
             if (callee.type !== "Identifier") return false
@@ -345,19 +348,19 @@ export const noGraphqlJson = {
 /** True for a `@Controller` decorator of `@nestjs/common`. */
 const isController = (context, decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Controller")
 
-/** A door is a door whatever its protocol, and every REST door lives in the `transport/http` slot of a feature. */
+/** A door is a door whatever its protocol, and every REST door lives in the `transport/http` slot of a feature or in the door slot of the webhook kind. */
 export const doorLivesInFeatures = {
     meta: {
         type: "problem",
         docs: { description: "A `@Controller` is declared in the `transport/http` slot of a feature." },
         schema: [],
         messages: {
-            wrongSlot: "A `@Controller` belongs in `src/features/<feature>/transport/http/` (slot `be.transport.http`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
+            wrongSlot: "A `@Controller` belongs in `src/features/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/` (slot `be.webhooks`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
         },
     },
     create(context) {
         const slot = hfsOf(context).slotOf(context.filename)
-        if (slot === HTTP_SLOT) return {}
+        if (slot === HTTP_SLOT || slot === WEBHOOK_SLOT) return {}
         return {
             Decorator(node) {
                 if (isController(context, node)) context.report({ node, messageId: "wrongSlot", data: { slot: slot ?? "none" } })

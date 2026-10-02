@@ -3,7 +3,9 @@
  *
  * A unit spec is a `*.spec.ts` outside the folders that own the other test kinds (`src/tests/{e2e,integration,contract,world}`)
  * only. Only a `<name>.service.spec.ts` beside `<name>.service.ts` is a
- * legitimate unit spec (R47); the quality rules of R48 judge exactly those.
+ * legitimate unit spec (R47), and so is the spec of a door of a feature kind that has no service of its own
+ * (`<provider>.webhook.spec.ts`, `<channel>.gateway.spec.ts`, `<channel>.subscription.spec.ts` beside its door, in the kind's slot);
+ * the quality rules of R48 judge the service specs.
  */
 import { basename } from "node:path"
 
@@ -31,3 +33,13 @@ export const isServiceSpecFile = (hfs, filename) => /\.service\.spec\.ts$/.test(
 
 /** The `<name>` of a `<name>.service.spec.ts`. */
 export const serviceNameOfSpec = (filename) => baseOf(filename).replace(/\.service\.spec\.ts$/, "")
+
+/** The slots of the feature kinds whose door carries its own unit spec beside it. */
+const DOOR_SPEC_SLOTS = new Set(["be.webhooks", "be.realtime"])
+
+/** The door a `<name>.<role>.spec.ts` of a feature kind tests, or null: `payment.webhook.spec.ts` gives `payment.webhook.ts`. */
+export const doorOfSpec = (hfs, filename) => {
+    if (!isUnitSpecFile(hfs, filename) || !DOOR_SPEC_SLOTS.has(hfs.slotOf(filename) ?? "")) return null
+    const match = /^(.+.(?:webhook|gateway|subscription)).spec.ts$/.exec(baseOf(filename))
+    return match ? `${match[1]}.ts` : null
+}

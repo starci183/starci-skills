@@ -13,6 +13,7 @@
  * The `APP_GUARD` registration and the app-level guard live in the composition check, not here: a rule reading
  * one file cannot see which module the app registered.
  */
+import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { decoratorName, keyName } from "./lib/ast.mjs"
 import { isOwnedEnumMember } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
@@ -49,7 +50,7 @@ export const noUntypedBody = {
         const filename = normalizePath(context.filename || context.getFilename())
         if (isDeclarationFile(filename)) return {}
         const slot = hfsOf(context).slotOf(filename) ?? ""
-        const inTransport = slot.startsWith("be.transport.") || slot.startsWith("be.feature.transport.")
+        const inTransport = isTransportSlot(slot) || slot.startsWith("be.feature.transport.")
         return {
             Identifier(node) {
                 if (node.name === "GraphQLJSON" && !/^Import.*Specifier$/.test(node.parent?.type ?? "")) {

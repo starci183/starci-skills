@@ -22,6 +22,7 @@
  * never of a path pattern.
  */
 import ts from "typescript"
+import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { keyName, walk } from "./lib/ast.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { baseName, isMigrationFile, packageOfFile } from "./lib/ports.mjs"
@@ -269,7 +270,7 @@ const PARAMETER_HOLDERS = new Set(["Identifier", "ObjectPattern", "ArrayPattern"
 const boundaryOf = (hfs, filename) => {
     const slot = hfs.slotOf(filename) ?? ""
     const name = baseName(filename)
-    if (slot.startsWith("be.transport.") || slot === "be.feature.transport.cli") return "file"
+    if (isTransportSlot(slot)) return "file"
     if (/\.(?:contracts|command|query)\.ts$/.test(name)) return "file"
     if (name.endsWith(".handler.ts")) return "execute"
     return null
