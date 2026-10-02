@@ -182,7 +182,7 @@ test("the add table CLI accepts --fe and --no-types and reports its created file
   assert.equal(has(root, "supabase/types/database.types.ts"), false);
 });
 
-test("add app writes an edition-matched Next workspace and registers it in both manifests", () => {
+test("add app refuses a second lite front end and keeps full add-app behavior", () => {
   const root = repo();
   fs.writeFileSync(
     path.join(root, "package.json"),
@@ -193,22 +193,47 @@ test("add app writes an edition-matched Next workspace and registers it in both 
     path.join(root, "fe", "apps", "web", "package.json"),
     `${JSON.stringify({ name: "@demo/web", private: true, scripts: { build: "next build" }, dependencies: { next: "16.0.0" } }, null, 2)}\n`,
   );
-  const result = addApp({ root, name: "admin" });
-  assert.ok(result.created.includes("fe/apps/admin/src/modules/db/server.ts"));
+  assert.throws(
+    () => addApp({ root, name: "admin" }),
+    (error) =>
+      error?.code === "HFS_ADD_LITE_SINGLE_APP" &&
+      error.message ===
+        "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run hfs upgrade --edition full",
+  );
+  assert.equal(has(root, "fe/apps/admin"), false);
+
+  const fullRoot = repo();
+  const fullDeclaration = JSON.parse(read(fullRoot, "hfs.json"));
+  fullDeclaration.edition = "full";
+  fs.writeFileSync(
+    path.join(fullRoot, "hfs.json"),
+    `${JSON.stringify(fullDeclaration, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(fullRoot, "package.json"),
+    `${JSON.stringify({ name: "demo", private: true, workspaces: ["fe/packages/*"] }, null, 2)}\n`,
+  );
+  fs.mkdirSync(path.join(fullRoot, "fe", "apps", "web"), { recursive: true });
+  fs.writeFileSync(
+    path.join(fullRoot, "fe", "apps", "web", "package.json"),
+    `${JSON.stringify({ name: "@demo/web", private: true, scripts: { build: "next build" }, dependencies: { next: "16.0.0" } }, null, 2)}\n`,
+  );
+  const result = addApp({ root: fullRoot, name: "admin" });
+  assert.ok(result.created.includes("fe/apps/admin/src/app/[locale]/layout.tsx"));
   assert.equal(
-    JSON.parse(read(root, "fe/apps/admin/package.json")).name,
+    JSON.parse(read(fullRoot, "fe/apps/admin/package.json")).name,
     "@demo/admin",
   );
-  assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [
+  assert.deepEqual(JSON.parse(read(fullRoot, "hfs.json")).sides.fe.apps, [
     { name: "web", kind: "next" },
     { name: "admin", kind: "next" },
   ]);
-  assert.deepEqual(JSON.parse(read(root, "package.json")).workspaces, [
+  assert.deepEqual(JSON.parse(read(fullRoot, "package.json")).workspaces, [
     "fe/packages/*",
     "fe/apps/*",
   ]);
   assert.throws(
-    () => addApp({ root, name: "admin" }),
+    () => addApp({ root: fullRoot, name: "admin" }),
     (error) => error?.code === "HFS_ADD_EXISTS",
   );
 });
@@ -254,11 +279,11 @@ test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, an
   );
   assert.match(
     read(root, "be/src/features/cli/migrate/subs/run.cli.ts"),
-    /\["run", "db:push"\]/,
+    /await this\.migrations\.run\(\)/,
   );
   assert.match(
     read(root, "be/src/features/cli/seed/subs/run.cli.ts"),
-    /InjectPrimaryEntityManager/,
+    /await this\.seeds\.run\(\)/,
   );
   assert.match(
     read(root, "be/src/features/cli/cli.module.ts"),

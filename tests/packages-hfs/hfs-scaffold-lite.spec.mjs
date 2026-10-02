@@ -59,8 +59,10 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/database/database.module.ts', 'be/src/modules/platform/database/database.options.ts',
   'be/src/modules/platform/database/database.port.ts', 'be/src/modules/platform/database/database.sql.ts',
   'be/src/modules/platform/database/errors/database.error.ts', 'be/src/modules/platform/database/index.ts',
+  'be/src/modules/platform/database/migration-runner.service.ts',
   'be/src/modules/platform/database/primary.config.ts', 'be/src/modules/platform/database/primary.connection.ts',
   'be/src/modules/platform/database/primary.decorators.ts',
+  'be/src/modules/platform/database/seed-runner.service.ts',
   'be/src/modules/platform/errors/domain.error.ts', 'be/src/modules/platform/errors/errors.contracts.ts',
   'be/src/modules/platform/errors/errors.decorators.ts', 'be/src/modules/platform/errors/errors.filter.ts',
   'be/src/modules/platform/errors/errors.log-events.ts', 'be/src/modules/platform/errors/errors.module-definition.ts',
@@ -99,6 +101,8 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/app/health/live/route.ts',
   'fe/apps/web/src/components/blocks/SignInForm/component.tsx',
   'fe/apps/web/src/components/blocks/SignInForm/index.tsx',
+  'fe/apps/web/src/components/blocks/SignOutButton/component.tsx',
+  'fe/apps/web/src/components/blocks/SignOutButton/index.tsx',
   'fe/apps/web/src/components/composites/ErrorNotice/index.tsx',
   'fe/apps/web/src/components/composites/GlobalErrorNotice/index.tsx',
   'fe/apps/web/src/components/composites/LoadingNotice/index.tsx',
@@ -113,14 +117,15 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppHomePage/index.tsx',
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
-  'fe/apps/web/src/features/pages/SignInPage/index.tsx',
+  'fe/apps/web/src/hooks/auth/index.ts', 'fe/apps/web/src/hooks/auth/useSignOut.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
   'fe/apps/web/src/modules/config/index.ts', 'fe/apps/web/src/modules/db/auth/read-session.ts',
   'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/browser.ts',
   'fe/apps/web/src/modules/db/index.ts', 'fe/apps/web/src/modules/db/outcome.ts',
   'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/server.ts',
   'fe/apps/web/src/modules/i18n/index.ts', 'fe/apps/web/src/modules/i18n/messages/vi.json',
-  'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/routes/index.ts',
+  'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/i18n/routing.ts',
+  'fe/apps/web/src/modules/routes/index.ts',
   'fe/apps/web/src/proxy.ts', 'fe/apps/web/tsconfig.json', 'fe/eslint.config.mjs',
   'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'hfs.json', 'package-lock.json', 'package.json',
   'scripts/codegen.mjs', 'sonar-project.properties', 'supabase/config.toml',
@@ -173,6 +178,14 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) =>
     'next', 'next-intl', 'react', 'react-dom', 'server-only',
   ].sort());
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
+  assert.match(
+    fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/migration-runner.service.ts'.split('/')), 'utf8'),
+    /\["run", "db:push"\]/,
+  );
+  assert.match(
+    fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/seed-runner.service.ts'.split('/')), 'utf8'),
+    /SEED_FILE = "supabase\/seed\.sql"/,
+  );
   assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined)), renderTargets(declaration, undefined).map(target => ({
     path: target.path,
     status: 'ok',

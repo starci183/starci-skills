@@ -585,7 +585,7 @@ function createScopeResolver(manifest, repo) {
     if (toOwner && repo.kind !== RUNTIME_KIND) {
       const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
       const ownerSlot = byId.get(toOwner.slot);
-      const entry = isEntryFile(relative) || (ownerSlot.entries ?? []).includes(relative) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
+      const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
       if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
     }
     return { allowed: true, reason: 'allowed', fromTier, toTier };

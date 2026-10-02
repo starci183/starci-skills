@@ -56,9 +56,10 @@ export function entryOf(graph, config, key, owner) {
   return null;
 }
 
-/** The additional public entry files (repository-relative, in the graph) the slot manifest declares for the owner (slot field `entries`). */
-function extraEntries(graph, owner) {
-  return (graph.resolver.slot(owner.slot)?.entries ?? []).map(name => `${owner.root}/${name}`).filter(rel => graph.files.has(rel));
+/** The additional public entry files (repository-relative, in the graph) the slot manifest declares for the owner (slot field `entries`, on the slot that holds its entry file). */
+function extraEntries(graph, entry) {
+  const found = graph.resolver.classifyPath(entry);
+  return (found.slot ? graph.resolver.slot(found.slot)?.entries ?? [] : []).map(name => `${found.root}/${name}`).filter(rel => graph.files.has(rel));
 }
 
 /** Names an import/export declaration takes from its target: {all} or {pairs: [{imported, exported}]}. */
@@ -289,7 +290,7 @@ export function checkDeadExports({ context, graph, config }) {
     const entry = entryOf(graph, config, key, owner);
     if (!entry) continue;
     owners += 1;
-    for (const publicEntry of [entry, ...extraEntries(graph, owner)]) {
+    for (const publicEntry of [entry, ...extraEntries(graph, entry)]) {
       const names = exportedNames(ts, graph.files.get(publicEntry).sourceFile);
       const used = consumed(publicEntry, key, 0, new Set([publicEntry]));
       // A consumer outside the owner that imports a file the entry re-exports by name reaches the entry's export of that name.

@@ -157,7 +157,7 @@ test('lite: the db owner outcome is THE Outcome union (counted), alone it raises
 
 test('lite: a second Outcome union next to the db owner one is FE_TRANSPORT_OWNER on both', t => {
   const report = runEdition(t, 'lite', { [DB_OUTCOME]: OUTCOME, [`${API}/outcome.ts`]: OUTCOME });
-  assert.deepEqual(hits(report).map(item => item.path).sort(), [DB_OUTCOME, `${API}/outcome.ts`]);
+  assert.deepEqual(hits(report).map(item => item.path).sort(), [DB_OUTCOME, `${API}/outcome.ts`].sort());
   assert.match(messages(report)[0], /2 Outcome unions/);
 });
 
