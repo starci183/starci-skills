@@ -1,5 +1,5 @@
 import * as billing from "@modules/events/billing"
-import { breakingChanges, readContractFile, samplePayload } from "../../fixtures/contracts/event-contract.builder"
+import { breakingChanges, readContractFile, samplePayload } from "../../fixtures/builders/event-contract.builder"
 
 const classes = Object.values(billing)
 const contract = readContractFile("billing", "events.json")
