@@ -2,6 +2,7 @@ import { Test } from "@nestjs/testing"
 import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { OrderExpiredEvent, OrderPaidEvent } from "@modules/events/order"
+import { ReceiptQueue } from "@modules/queues/receipt"
 import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { EVENT_BUS } from "@modules/platform/event-bus"
@@ -21,6 +22,7 @@ const build = async (entityManager: MockEntityManager, claimed = true) => {
     inbox.claim.mockResolvedValue(claimed)
     const bus = mock<EventBus>()
     const logger = mock<Logger>()
+    const receipts = mock<ReceiptQueue>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             OrderPaymentService,
@@ -29,22 +31,24 @@ const build = async (entityManager: MockEntityManager, claimed = true) => {
             { provide: INBOX, useValue: inbox },
             { provide: EVENT_BUS, useValue: bus },
             { provide: LOGGER, useValue: logger },
+            { provide: ReceiptQueue, useValue: receipts },
         ],
     }).compile()
-    return { service: moduleRef.get(OrderPaymentService), inbox, bus, logger }
+    return { service: moduleRef.get(OrderPaymentService), inbox, bus, logger, receipts }
 }
 
 describe("OrderPaymentService", () => {
     describe("recordPayment", () => {
-        it("claims the event first, then moves the pending order to paid and publishes order.paid in one committed transaction", async () => {
+        it("claims the event first, then moves the pending order to paid, publishes order.paid and enqueues the receipt in one committed transaction", async () => {
             const tx = fakeTransaction(
                 mockEntityManager({ query: [MARK_ORDER_PAID_IF_PENDING, [{ person_id: "p-1", total_minor_units: 1250 }]] }),
             )
-            const { service, inbox, bus } = await build(tx.em)
+            const { service, inbox, bus, receipts } = await build(tx.em)
 
             await service.recordPayment({ eventId: "o-1", orderId: "o-1" })
 
             expect(inbox.claim).toHaveBeenCalledWith("billing-payment-confirmed", "o-1")
+            expect(receipts.enqueueSendReceipt).toHaveBeenCalledWith({ orderId: "o-1" }, expect.anything())
             expect(tx.em.query).toHaveBeenCalledWith(MARK_ORDER_PAID_IF_PENDING, ["o-1", new Date(AT)])
             expect(bus.publish).toHaveBeenCalledWith(
                 OrderPaidEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1250, paidAt: AT }),
@@ -65,12 +69,13 @@ describe("OrderPaymentService", () => {
 
         it("logs and leaves the order alone when it is not pending any more", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [MARK_ORDER_PAID_IF_PENDING, []] }))
-            const { service, bus, logger } = await build(tx.em)
+            const { service, bus, logger, receipts } = await build(tx.em)
 
             await service.recordPayment({ eventId: "o-1", orderId: "o-1" })
 
             expect(logger.warn).toHaveBeenCalledWith(OrderLogEvent.PaymentForClosedOrder, { orderId: "o-1" })
             expect(bus.publish).not.toHaveBeenCalled()
+            expect(receipts.enqueueSendReceipt).not.toHaveBeenCalled()
         })
 
         it("gives the claim back and rethrows when the transaction fails, so the redelivery is processed again", async () => {
@@ -87,7 +92,7 @@ describe("OrderPaymentService", () => {
 
     describe("expireOverdue", () => {
         it("expires the overdue pending orders and publishes order.expired for each in the same transaction", async () => {
-            const cutoff = new Date("2026-02-02T04:05:06.000Z")
+            const cutoff = new Date("2026-02-03T03:05:06.000Z")
             const tx = fakeTransaction(
                 mockEntityManager({
                     query: [
@@ -101,7 +106,7 @@ describe("OrderPaymentService", () => {
             )
             const { service, bus } = await build(tx.em)
 
-            const result = await service.expireOverdue({ placedBefore: cutoff, limit: 100 })
+            const result = await service.expireOverdue({ olderThanMs: 3_600_000, limit: 100 })
 
             expect(result).toEqual({ expired: 2 })
             expect(tx.em.query).toHaveBeenCalledWith(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [cutoff, 100])
@@ -122,7 +127,7 @@ describe("OrderPaymentService", () => {
             const tx = fakeTransaction(mockEntityManager({ query: [EXPIRE_PENDING_ORDERS_PLACED_BEFORE, []] }))
             const { service, bus } = await build(tx.em)
 
-            expect(await service.expireOverdue({ placedBefore: new Date(AT), limit: 100 })).toEqual({ expired: 0 })
+            expect(await service.expireOverdue({ olderThanMs: 3_600_000, limit: 100 })).toEqual({ expired: 0 })
             expect(bus.publish).not.toHaveBeenCalled()
         })
     })

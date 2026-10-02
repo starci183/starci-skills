@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { OrderExpiredEvent, OrderPaidEvent } from "@modules/events/order"
+import { ReceiptQueue } from "@modules/queues/receipt"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectOrderEntityManager } from "@modules/platform/database"
@@ -37,7 +38,7 @@ interface ExpiredOrderRow {
 /**
  * The payment lifecycle of an order, kept by the order context: the local copy of what billing announced. `recordPayment`
  * takes a delivery of `billing.payment-confirmed`: it claims the event in the inbox first, then in ONE transaction moves the
- * pending order to paid and publishes `order.paid`; an order that is not pending (expired or cancelled before the money
+ * pending order to paid, publishes `order.paid` and enqueues the send-receipt job; an order that is not pending (expired or cancelled before the money
  * arrived) is logged and left alone. `expireOverdue` moves the pending orders nobody paid in time to expired and publishes
  * `order.expired` for each, in the same transaction.
  */
@@ -48,6 +49,7 @@ export class OrderPaymentService {
         @InjectInbox() private readonly inbox: Inbox,
         @InjectEventBus() private readonly bus: EventBus,
         @InjectLogger() private readonly logger: Logger,
+        private readonly receiptQueue: ReceiptQueue,
     ) {}
 
     /** Records the payment of one order exactly once. */
@@ -61,14 +63,15 @@ export class OrderPaymentService {
         }
     }
 
-    /** Expires the pending orders placed at or before the cutoff and announces each one; answers how many it expired. */
+    /** Expires the orders pending for at least `olderThanMs` and announces each one; answers how many it expired. */
     expireOverdue(params: ExpireOverdueOrdersParams): Promise<ExpireOverdueOrdersResult> {
         return this.entityManager.transaction(async (manager) => {
+            const now = this.clock.now()
             const expired: Array<ExpiredOrderRow> = await manager.query(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [
-                params.placedBefore,
+                new Date(now.getTime() - params.olderThanMs),
                 params.limit,
             ])
-            const at = this.clock.now().toISOString()
+            const at = now.toISOString()
             for (const row of expired) {
                 await this.bus.publish(
                     OrderExpiredEvent.create({ orderId: row.id, personId: row.person_id, expiredAt: at }),
@@ -97,5 +100,6 @@ export class OrderPaymentService {
             }),
             manager,
         )
+        await this.receiptQueue.enqueueSendReceipt({ orderId }, manager)
     }
 }

@@ -8,8 +8,8 @@ export interface RecordOrderPaymentParams {
 
 /** What expiring the overdue orders takes. */
 export interface ExpireOverdueOrdersParams {
-    /** Orders placed at or before this instant and still pending expire. */
-    readonly placedBefore: Date
+    /** Orders that have been pending for at least this long, in milliseconds, expire. */
+    readonly olderThanMs: number
     /** The most orders one run expires, so a long backlog is worked off in bounded transactions. */
     readonly limit: number
 }
