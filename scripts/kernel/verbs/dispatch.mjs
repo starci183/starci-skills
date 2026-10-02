@@ -286,10 +286,9 @@ export default {
   const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
   const title = terminalTitle;
   // The one launch (contract-changes/launch-through-worker-start.yaml, worker-start-spec.yaml): worker-start --spec
-  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's pin at the kind's tier, else the
-  // profile's requestedModel (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
-  const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel,
-    payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
+  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's
+  // pin at the kind's tier, else the registry default (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
+  const launchModel = resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
   const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false; // the plan shows the flags spawnAgent really sends: a card with start.modelArgument false (devin) gets no --model/--effort
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },

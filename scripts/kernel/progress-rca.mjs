@@ -11,10 +11,9 @@
 //   rcaOf       every recent failed/blocked attempt of the workflow read TOGETHER (report summary, blocker kind,
 //               failureClass, rootCause, worker liveness), clustered by cause.
 //   actionsOf   a RANKED list of concrete candidate actions from a fixed catalogue: each carries its exact api
-//               command, its expected effect, its tier (light = a direct Kernel edit; heavy = dispatch the owning
-//               op with the RCA as its brief; proposal = a tier-2 kernel-proposal for the Supervisor; supervisor =
-//               a runtime or cross-workflow cause the Kernel cannot fix) and whether the decision log already
-//               tried it (a failed try sinks, it is never offered as new).
+//               command, its expected effect, its tier (light = a direct Kernel edit; heavy = dispatch the owning op
+//               with the RCA as its brief; proposal = a tier-2 kernel-proposal for the Supervisor; supervisor = a runtime
+//               or cross-workflow cause the Kernel cannot fix) and whether the decision log already tried it (a failed try sinks, it is never offered as new).
 //
 // Read-only over the ledger. `api status` exposes `progress` and `rca` (scripts/kernel/status/*.mjs); the
 // workflow controller (modules/reconciler/workflow.yaml) reuses it for the progress-stall DI and escalation.
@@ -28,12 +27,13 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { SLOT_STATUSES, priorityTable, readThrottleState } from '../machine/ram-throttle.mjs';
 import { specsOf } from '../route/spec-deferral.mjs';
+import { loadRuntimes } from '../agent/models.mjs';
 import { JOB_ROW } from '../machine/job-row.mjs';
 import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
-import { altOf } from '../lib/source-phrases.mjs';
+import { MISSING_PATHS_RE, GRANT_NARROW_RE, TOOL_TIMEOUT_RE, TEST_GAP_RE, CHECKER_UNAVAILABLE_RE } from './rca-matchers.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -99,7 +99,8 @@ export function unitsOf(jobs) {
 
 /* ------------------------------------------------------------ parallelism */
 
-const runtimesDoc = (() => { let doc; return () => { if (doc === undefined) { try { doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8')); } catch { doc = null; } } return doc; }; })();
+// The merged view (runtimes.yaml policy + registry.yaml `pools` under `runtimes`) comes from the one loader.
+const runtimesDoc = (() => { let doc; return () => { if (doc === undefined) { try { doc = loadRuntimes(path.join(skillRoot, 'modules', 'models')); } catch { doc = null; } } return doc; }; })();
 
 /** The priority table (runtimes.yaml ramThrottle.priorities + the Supervisor's host overrides). Never throws. */
 export function priorities() {
@@ -107,11 +108,9 @@ export function priorities() {
   catch { try { return priorityTable(null, {}); } catch { return {}; } }
 }
 
-/**
- * How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
+/** How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
  * worker RAM cap, the pools and its queued-ready work allow). Pure over `core` (the api status fields ramThrottle,
- * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}.
- */
+ * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}. */
 export function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
   const rtCap = Number(rt?.maxParallelOps) || 20;
   const thr = core.ramThrottle ?? {};
@@ -174,9 +173,8 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     since = since == null ? quietSince : Math.min(since, quietSince);
   }
   // SETTLE-FIRST, the Kernel's half (owner ruling settle-runtime-service): the runtime settles green reports itself
-  // (scripts/kernel/settle/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done
-  // reports it could not verify (`kernelItems`, oldest first, already aged past settleBacklog.ageMs). Without them
-  // (a caller that passes none) the old reading stands: filed reports never consumed.
+  // (scripts/kernel/settle/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done reports
+  // it could not verify (`kernelItems`, oldest first, already aged past settleBacklog.ageMs). Without them the old reading stands: filed reports never consumed.
   const unsettled = kernelItems
     ? kernelItems.map((k) => ({ job_id: k.jobId, created_at: now - k.ageMin * 60_000, reason: k.reason }))
     : (core.reports ?? []).filter((r) => !r.consumed_at && now - Number(r.created_at) >= settings.settleBacklog.ageMs);
@@ -231,14 +229,7 @@ export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
-// The cause matchers below read a report or blocker in whichever language it was written: the Vietnamese
-// alternatives are lexicon data (modules/goal/source-phrases.yaml rca), never source literals.
-const rcaText = (en, key) => new RegExp(`${en}|${altOf(`rca.${key}`)}`, 'i');
-const MISSING_PATHS_RE = rcaText('does not exist|do not exist|not exist(?:ing)?\\b|are absent|is absent|files=0|scanned 0', 'missingPaths');
-const GRANT_NARROW_RE = rcaText('outside (?:the )?(?:owned|allowlist|grant|binding)|beyond the grant', 'grantTooNarrow');
-const TOOL_TIMEOUT_RE = rcaText('timed? ?out|timeout|30[- ]?s(?:econd)?\\b|exit(?:code)?[=: ]*124', 'toolTimeout');
-const TEST_GAP_RE = rcaText('regression suite|no (?:existing )?regression', 'testGap');
-const CHECKER_UNAVAILABLE_RE = rcaText('status[= ]unavailable|unavailable \\(exit|checker (?:is )?unavailable', 'checkerUnavailable');
+// The cause matchers (rca-matchers.mjs) read a report or blocker in whichever language it was written.
 
 /** The causes of one failed/blocked attempt, primary first. Pure. */
 export function causesOf({ status = 'failed', result = {}, report = null }) {
@@ -373,9 +364,8 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
   const lastFailedOf = (u) => [...u.jobs].reverse().find((j) => j.status === 'failed') ?? null;
   const cl = new Map((rca?.clusters ?? []).map((c) => [c.cause, c]));
 
-  // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what
-  // is left is a judgment - a blocked/failed/ask/partial outcome, or a done report whose checks the settler could not
-  // re-verify. Each keeps its slot and its unit's verdict hostage until the Kernel decides it.
+  // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what is left
+  // is a judgment - a blocked/failed/ask/partial outcome, or a done report whose checks the settler could not re-verify. Each keeps its slot and its unit's verdict hostage until the Kernel decides it.
   if (progress?.unsettledReports?.length) {
     const ids = progress.unsettledReports.filter(Boolean);
     const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
@@ -385,9 +375,8 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
       command: items.slice(0, 20).map((it) => `${it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : ''}${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${verdictOf(it)}`).join(' ; '),
       expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
   }
-  // 0b. IMPORTS_BROKEN_AFTER_MOVE (DESIGN §16.7, FMEA #20): moved code left importers on the old path and no repoint
-  // unit owns them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the
-  // settle backlog: every later unit's checker fails on these imports until it runs.
+  // 0b. IMPORTS_BROKEN_AFTER_MOVE (DESIGN §16.7, FMEA #20): moved code left importers on the old path and no repoint unit owns
+  // them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the settle backlog: every later unit's checker fails on these imports until it runs.
   const brokenCluster = cl.get('broken-import');
   if ((importsBroken?.count && !importsBroken.repointQueued) || (!importsBroken && brokenCluster?.open)) {
     const files = importsBroken?.brokenFiles ?? [];

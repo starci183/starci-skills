@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {configuredAllocationPolicy,parseAllocationGrant,validateConfig} from '../../engine/config.mjs';
-import {balanceDeficits,selectPool} from '../../scripts/agent/models.mjs';
+import {balanceDeficits,selectPool,loadRuntimes} from '../../scripts/agent/models.mjs';
 import {auditAuthorOf,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../../scripts/agent/balance.mjs';
 import {isFixtureLedgerPath,machineLedgerFiles} from '../../scripts/machine/ledger-files.mjs';
 import {openLedger} from '../../engine/db/ledger.mjs';
@@ -21,10 +21,10 @@ import {withLedger,seedWorkflow,sameDriveTmp} from '../helpers/ledger-fixture.mj
 // uat.assisted.verify) walk the ui order - Sol first, Devin behind it; the mechanical ops provision.ask,
 // workspace.manage, task.execute and knowledge.repair walk the implement order the hands serve; the kernel's own
 // model calls walk sol-think (Sol first, Opus overflow). Owner ruling 2026-09-29: the Qwen pool is removed. These
-// specs hold that contract on the shipped runtimes.yaml.
+// specs hold that contract on the shipped runtimes.yaml (allocation policy) and registry.yaml (the pool map).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const read=file=>parseYaml(fs.readFileSync(path.join(ROOT,file),'utf8'));
-const runtimes=read('modules/models/runtimes.yaml');
+const runtimes=loadRuntimes(path.join(ROOT,'modules','models'));
 const EVEN={'claude-agent':25,'codex-agent':25,'devin-agent':25};
 const OWNER={'devin-agent':35,'claude-agent':20,'codex-agent':10};
 const balanced=(opts)=>selectPool({runtimes,policy:'balanced',shares:EVEN,...opts});
@@ -315,7 +315,7 @@ test('config.yaml allocation validates policy, shares, window and grants',()=>{
   assert.deepEqual([bare.policy,bare.shares,bare.windowHours,bare.grants],[null,null,24,null]);
   for(const [bad,why] of [
     [{policy:'round-robin'},/policy must be one of/],
-    [{shares:{'nope-agent':1}},/not a modules\/models\/runtimes.yaml pool/],
+    [{shares:{'nope-agent':1}},/not a modules\/models\/registry.yaml pool/],
     [{shares:{'claude-agent':-1}},/non-negative/],
     [{shares:{'claude-agent':0}},/at least one pool a positive weight/],
     [{windowHours:0},/windowHours/],

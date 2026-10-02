@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {hostToolsRequired,kindRoute,raiseToFloor,selectPool} from '../../scripts/agent/models.mjs';
+import {hostToolsRequired,kindRoute,raiseToFloor,selectPool,loadRuntimes} from '../../scripts/agent/models.mjs';
 
 // runtimes.yaml roleOfKind is the allocator's reading of every kind: role, think/hands-on work and the
 // least difficulty it routes at. These specs hold the owner's rules on that table: canonical-record and
 // verdict ops are think work at a hard floor, source setup is any pool, and a floor only raises.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const read=file=>parseYaml(fs.readFileSync(path.join(ROOT,file),'utf8'));
-const runtimes=read('modules/models/runtimes.yaml');
+const runtimes=loadRuntimes(path.join(ROOT,'modules','models'));
 const kinds=read('modules/models/kinds.yaml');
 const DIFFICULTY=['easy','medium','hard','insane'];
 const rank=d=>DIFFICULTY.indexOf(d);
@@ -191,5 +191,5 @@ test('a prefer bias cannot hoist a pool outside the think order into strategy wo
   // A verdict walks the review order instead: the hands lead it and a prefer cannot hoist the overflow.
   const review=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['claude-agent']}});
   assert.deepEqual([review.order,review.target],['review','devin-agent']);
-  assert.deepEqual(runtimes.runtimes['devin-agent'].roles,['implement','verify','write'],'Devin carries no decide or plan role');
+  assert.deepEqual(runtimes.runtimes['devin-agent'].roles,['implement','verify','write'],'Devin carries no decide or plan role (registry.yaml pools)');
 });

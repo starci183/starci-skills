@@ -6,7 +6,6 @@ paths:
   - modules/models/registry.yaml
   - modules/models/kinds.yaml
   - modules/models/selection.yaml
-  - modules/models/index.yaml
   - modules/models/profiles/qwen-agent.yaml
   - modules/models/profiles/devin-agent.yaml
   - modules/models/profiles/claude-agent.yaml

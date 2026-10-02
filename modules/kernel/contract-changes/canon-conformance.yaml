@@ -13,5 +13,5 @@ paths:
   - modules/ops/registry.yaml
   - modules/goal/archetypes.yaml
   - modules/schemas/index.yaml
-  - modules/models/index.yaml
+  - modules/models/registry.yaml
   - tests/canon-conformance.spec.mjs

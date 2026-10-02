@@ -15,7 +15,7 @@ effort: medium
 #     interactive gate, an auth screen, a readiness or model-attestation
 #     failure) falls through to the next member in the same boot.
 #   single pin: {agent?, model?, effort?} — agent is an execution-agent id
-#     (claude|codex|devin), model a modules/models/runtimes.yaml model id
+#     (claude|codex|devin), model a modules/models/registry.yaml model id
 #     (without agent, the pool that carries it supplies the agent). A pin is
 #     authoritative: a dead probe, unknown model, unsupported CLI flag or
 #     model-attestation mismatch fails closed instead of substituting.
@@ -76,10 +76,10 @@ budgets:
 #           machine ledger registered); when every eligible pool is at or over its share, the one furthest
 #           below. The order ranks, the share caps. --prefer only breaks ties under balanced; --avoid always removes.
 #     Absent = the runtimes.yaml allocation.policy default (prefer-then-overflow).
-#   shares: target shares per runtimes.yaml pool, normalized over the named pools. Absent = equal.
+#   shares: target shares per registry.yaml pool, normalized over the named pools. Absent = equal.
 #   windowHours: how far back the dispatches are counted.
 #   grants: '<pool>=<slots>@<role>+<role>' — the default grant every workflow gets. Once a grants list is
-#     declared it is the whole set: a pool whose runtimes.yaml capacityAuthority is explicit-workflow-quota
+#     declared it is the whole set: a pool whose registry.yaml capacityAuthority is explicit-workflow-quota
 #     (Devin) routes only for the roles and up to the running slots a grant names ([] closes it).
 allocation:
   mode: adaptive
@@ -89,7 +89,7 @@ allocation:
   windowHours: 24
   grants: [devin-agent=10@implement+verify+write]
 # Non-operation models are a quota-aware peer pool over the provider-window runtime pools of
-# modules/models/runtimes.yaml: claude-agent (Claude Opus 5.5) and codex-agent (GPT-6 Sol), the two
+# modules/models/registry.yaml: claude-agent (Claude Opus 5.5) and codex-agent (GPT-6 Sol), the two
 # runtimes that carry plan, decide and verify. Member order is the route order; eligibility and qualification
 # still admit every actual call.
 models:

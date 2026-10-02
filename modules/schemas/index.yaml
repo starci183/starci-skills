@@ -794,7 +794,7 @@ schemas:
     file: modules/schemas/profile-registry.schema.yaml
     dialect: json-schema
     subsystem: model
-    governs: "The model/runtime registry contract — runtimes[], aliases, executionModel, defaults, targets, skills, operators, fallback."
+    governs: "The ONE model catalog — models (id, provider, tier, price), pools (membership, roles, concurrency, difficulty pins), runtimes[], aliases, executionModel, targets, skills, operators, fallback."
     binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
     usedBy: [scripts/checks/check-providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:
@@ -930,9 +930,6 @@ moduleLocalDocumentKinds:
     files: [modules/goal/source-phrases.yaml]
 
   # --- models ---------------------------------------------------------------
-  - id: starci/module-models-index@1
-    governs: "The modules/models coverage manifest."
-    files: [modules/models/index.yaml]
   - id: starci/module-model-selection@1
     governs: "Which model may take which workload — qualification, probation, ordering."
     files: [modules/models/selection.yaml]
@@ -940,7 +937,7 @@ moduleLocalDocumentKinds:
     governs: "The units, waves and shared seams scripts/gates/canon-scan.mjs cuts a canon-conformance cleanup by."
     files: [modules/models/canon-conformance.yaml]
   - id: starci/module-model-profile@1
-    governs: "One routing/capability target: identity, capacity cache, launch shape, position."
+    governs: "One routing/capability target's behavioral position: business frame, when-needed, failure modes. Model facts (provider, models, capacity, launch) live only in modules/models/registry.yaml."
     files:
       - modules/models/profiles/claude-agent.yaml
       - modules/models/profiles/codex-agent.yaml
@@ -956,7 +953,7 @@ moduleLocalDocumentKinds:
       - modules/models/agents/devin.yaml
       - modules/models/agents/cursor.yaml
   - id: starci/runtimes@1
-    governs: "The quota-window runtime pools, allocation policy and roleOfKind table. The only concurrency authority."
+    governs: "The operational runtime policy: allocation orders, roleOfKind table and host tuning. Pool membership, models and concurrency live in modules/models/registry.yaml pools."
     files: [modules/models/runtimes.yaml]
   - id: starci/kinds@1
     governs: "The operation-kind catalog: lanes, routes, blockers, the kernel-agent legality graph."
@@ -970,10 +967,6 @@ moduleLocalDocumentKinds:
   - id: starci/model-qualifications@1
     governs: "The measured-qualification store. Empty in the package: shipping is not certifying."
     files: [modules/models/qualifications.yaml]
-  - id: starci/model-prices@1
-    governs: "The per-model price table behind llm_usage cost_usd. A model with no declared rate has NULL cost, never a guess."
-    files: [modules/models/prices.yaml]
-
   # --- hosts ----------------------------------------------------------------
   - id: starci/orca-provider@1
     governs: "The Orca host contract entry — hierarchy names, environment binding, kernel and op call templates."

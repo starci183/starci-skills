@@ -15,13 +15,21 @@ const ADAPTIVE_ALLOCATION_MODE='adaptive';
 const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
 // The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
-// reasons on a silent empty document.
+// reasons on a silent empty document. The pool map (provider, roles, models, maxParallel)
+// lives in the ONE model catalog — modules/models/registry.yaml `pools` — and is merged in
+// under `runtimes` so consumers read the same shape as before.
 let runtimeProfileCache=null;
 export function runtimeProfile(){
   const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));
+  const registryFile=fileURLToPath(new URL('../modules/models/registry.yaml',import.meta.url));
   let stat;try{stat=fs.statSync(source);}catch{throw Error('Missing modules/models/runtimes.yaml');}
-  const version=`${stat.mtimeMs}:${stat.size}`;
-  if(runtimeProfileCache?.version!==version)runtimeProfileCache={version,profile:parseYaml(fs.readFileSync(source,'utf8'))};
+  let rstat;try{rstat=fs.statSync(registryFile);}catch{throw Error('Missing modules/models/registry.yaml');}
+  const version=`${stat.mtimeMs}:${stat.size}:${rstat.mtimeMs}:${rstat.size}`;
+  if(runtimeProfileCache?.version!==version){
+    const doc=parseYaml(fs.readFileSync(source,'utf8'));
+    const registry=parseYaml(fs.readFileSync(registryFile,'utf8'));
+    runtimeProfileCache={version,profile:{...(doc??{}),runtimes:registry?.pools??{}}};
+  }
   return structuredClone(runtimeProfileCache.profile);
 }
 /**
@@ -251,7 +259,7 @@ function validateAllocationBalance(allocation,runtimes){
     const shares=allocation.shares;
     if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
     for(const [pool,weight] of Object.entries(shares)){
-      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/runtimes.yaml pool (known: ${Object.keys(runtimes).sort().join(', ')}).`);
+      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${Object.keys(runtimes).sort().join(', ')}).`);
       if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
     }
     if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
@@ -265,13 +273,13 @@ function validateAllocationBalance(allocation,runtimes){
       const grant=parseAllocationGrant(text);
       if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
       const runtime=runtimes[grant.pool];
-      if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/runtimes.yaml pool.`);
+      if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/registry.yaml pool.`);
       if(seen.has(grant.pool))bad(`grants names ${grant.pool} more than once.`);
       seen.add(grant.pool);
       const max=Number(runtime.maxParallel);
-      if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (runtimes.yaml maxParallel).`);
+      if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (registry.yaml maxParallel).`);
       const unserved=grant.roles.filter(role=>!(runtime.roles??[]).includes(role));
-      if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (runtimes.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
+      if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (registry.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
     }
   }
 }

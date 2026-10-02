@@ -468,16 +468,16 @@ test('a stage refuses to start a child from a terminal that is not the one launc
   assert.equal(fake.names().includes('worker-start'), false);
 });
 
-test('the no-op agent is the cheapest priced model a runtimes.yaml pool pins, with that tier effort', () => {
+test('the no-op agent is the cheapest priced model a registry.yaml pool pins, with that tier effort', () => {
   const runtimes = { runtimes: {
     a: { provider: 'claude', models: { easy: 'big', hard: 'big' } },
     b: { provider: 'codex', models: { easy: 'small', hard: 'mid' }, effort: { easy: 'low', hard: 'high' } },
     c: { provider: 'devin', models: { medium: 'unpriced' } } } };
   const prices = { models: { big: { input: 4, output: 20 }, mid: { input: 2, output: 10 }, small: { input: 0.1, output: 0.5 }, unpriced: { input: null, output: null } } };
   assert.deepEqual(noopAgent({ runtimes, prices }), { provider: 'codex', model: 'small', effort: 'low', pool: 'b', tier: 'easy', usdPerMTok: 0.6 });
-  assert.match(noopAgent({ runtimes: { runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no runtimes.yaml pool pins a priced model/);
+  assert.match(noopAgent({ runtimes: { runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no registry\.yaml pool pins a priced model/);
   const live = noopAgent();
-  assert.ok(live.provider && live.model, 'the shipped runtimes.yaml has a priced no-op model');
+  assert.ok(live.provider && live.model, 'the shipped registry.yaml has a priced no-op model');
 });
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {

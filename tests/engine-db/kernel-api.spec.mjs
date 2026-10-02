@@ -266,7 +266,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
 
   // pool-full: the persisted route decision names a pool whose declared
   // maxParallel is already committed worker-wide, across every workflow.
-  const pool='claude-agent',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
+  const pool='claude-agent',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','registry.yaml'),'utf8')).pools[pool].maxParallel;
   seed(repo,ledger=>{
     const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(second).payload_json);
     ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
@@ -277,7 +277,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   });
   const full=because(second,statusOf());
   assert.equal(full.queuedBecause,'pool-full');
-  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from runtimes.yaml');
+  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from registry.yaml');
 
   // circuit-open outranks pool-full: a dead provider credential is not a wait.
   const machine=openMachine({file:process.env[TEST_REGISTRY_ENV]});

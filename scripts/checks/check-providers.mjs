@@ -15,8 +15,8 @@ const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
 //     the card is the document's top level, claude/codex add a `capabilities:` key)
 //   modules/host/orca/<doc>.yaml        — the Orca host contract docs (index, api,
 //     calls, capabilities, recipes, validation, envelopes)
-//   modules/models/profiles/<target>.yaml — profiles whose launch.orca.adapter
-//     names an agent card
+//   modules/models/profiles/<target>.yaml — behavioral profiles whose `target`
+//     names a registry.yaml pool or launch target
 const agentsDir=root=>path.join(root,'modules','models','agents');
 const hostsDir=root=>path.join(root,'modules','host');
 const profilesDir=root=>path.join(root,'modules','models','profiles');
@@ -86,23 +86,29 @@ export function validateProviderContracts({root=skillRoot}={}){
     }
   }
 
-  // 3. Every launch names a real agent card — model profiles (launch.orca.agent) and the registry's
-  //    orcaLaunch.agent alike: the one launch is worker-start --agent <card>.
+  // 3. Every launch names a real agent card — the registry's targets.<t>.orcaLaunch.agent and every
+  //    pool's provider alike: the one launch is worker-start --agent <card>. A behavioral profile's
+  //    `target` must name a registry.yaml pool or launch target.
+  let registry=null;
+  try{registry=fs.existsSync(REGISTRY_FILE)?readYamlFile(REGISTRY_FILE):null;}
+  catch(error){errors.push(`modules/models/registry.yaml does not parse: ${error.message}`);}
   const profileFiles=yamlFilesIn(PROFILES_DIR);
   for(const name of profileFiles){
     const rel=`modules/models/profiles/${name}`;
     let profile=null;
     try{profile=readYamlFile(path.join(PROFILES_DIR,name));}
     catch(error){errors.push(`Model profile ${rel} does not parse: ${error.message}`);continue;}
-    const agent=profile?.launch?.orca?.agent;
-    add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Profile ${rel} launch.orca.agent names no agent card: ${agent}`);
+    const target=profile?.target;
+    add(errors,typeof target==='string'&&(Object.hasOwn(registry?.pools??{},target)||Object.hasOwn(registry?.targets??{},target)),
+      `Profile ${rel} target names no registry.yaml pool or target: ${target}`);
   }
-  let registry=null;
-  try{registry=fs.existsSync(REGISTRY_FILE)?readYamlFile(REGISTRY_FILE):null;}
-  catch(error){errors.push(`modules/models/registry.yaml does not parse: ${error.message}`);}
   for(const [name,target] of Object.entries(registry?.targets||{})){
     const agent=target?.orcaLaunch?.agent;
     add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Registry target ${name} orcaLaunch.agent names no agent card: ${agent}`);
+  }
+  for(const [name,pool] of Object.entries(registry?.pools||{})){
+    const agent=pool?.provider;
+    add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Registry pool ${name} provider names no agent card: ${agent}`);
   }
 
   // 4. The Orca call contract is the argv source scripts/api/orca/lib.mjs
@@ -194,7 +200,7 @@ export function compareCallsToLiveSchema({root=skillRoot,listing}={}){
 
 /** Checks entry: `node scripts/checks/check-providers.mjs` prints the validation report as JSON. */
 export function providersMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/check-providers.mjs [--live] [--root <dir>]\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, the Orca call contract in modules/host/orca/calls.yaml, and the adapter references in modules/models/profiles/*.yaml and registry.yaml). Static by default - no process is run. --live additionally compares every calls.yaml command and flag against the live `orca agent-context --json` signature and exits 1 with the diff. --root checks another StarCi tree. Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/check-providers.mjs [--live] [--root <dir>]\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, the Orca call contract in modules/host/orca/calls.yaml, and the launch references in registry.yaml and the profile targets of modules/models/profiles/*.yaml). Static by default - no process is run. --live additionally compares every calls.yaml command and flag against the live `orca agent-context --json` signature and exits 1 with the diff. --root checks another StarCi tree. Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
   const result=validateProviderContracts({root});

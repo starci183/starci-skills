@@ -1,18 +1,15 @@
 # Profile: claude-agent — the Anthropic managed-agent pool.
 # Business frame: the thinking seat. First choice for every think kind and for
 # the [Kernel]; overflow for hands-on work.
-# Every claim below traces to a cited source; inferred analysis is marked.
+# Registry facts (provider, runtime, model pins, capacity, launch agent) live in
+# modules/models/registry.yaml — pools.claude-agent and targets.claude-agent. This
+# file carries only the behavioral position; every claim below traces to a cited
+# source; inferred analysis is marked.
 
-target: claude-agent            # registry.yaml: targets.claude-agent
-provider: claude                # runtimes.yaml: runtimes.claude-agent.provider
-runtime: claude                 # registry.yaml: targets.claude-agent.runtime
+target: claude-agent            # registry.yaml: pools.claude-agent + targets.claude-agent
 schema: starci/module-model-profile@1  # module-local document kind; no upstream schema
 
 identity:
-  requestedModel: claude-opus-5-5   # the profile's own fallback model; runtimes.yaml runtimes.claude-agent.models pins it at every difficulty
-  profiles:                     # registry.yaml targets.claude-agent.profiles
-    working: opus
-    reasoning: opus-reviewer
   note: >-
     Claude Opus 5.5 (`claude-opus-5-5`): 1M-token context, 128K output tokens,
     adaptive thinking always on. The API's default effort is `medium`; StarCi
@@ -22,13 +19,6 @@ identity:
     unversioned host default is not proof of it — the dispatch's model
     attestation is (modules/models/registry.yaml examplesNote, selection.yaml
     pool-name-as-model).
-
-capacity:
-  maxParallel: 6                # cached from runtimes.yaml; route-model.mjs reports drift
-  roles: [implement, verify, write, decide, plan]   # runtimes.yaml — all five
-
-launch:
-  orca: {agent: claude}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 

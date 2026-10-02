@@ -117,7 +117,7 @@ agent are unavailable, and a terminal scrollback is never a source. `llm_usage` 
 (non-cached) input, `output_tokens` includes reasoning, `reasoning_tokens` is that subset. An op attempt gets one row per model when it
 settles (`recordAttemptUsage`, idempotent); a Kernel session gets `kernel-turn` rows and the Supervisor seat `supervisor-turn` rows
 (machine.sqlite) as increments over what is already recorded for that session (`turn_ref` `<seat>:<session>@<turns>`), so a re-run
-never counts twice. `cost_usd` is set only when every rate the model used is declared in `modules/models/prices.yaml`.
+never counts twice. `cost_usd` is set only when every rate the model used is declared in `modules/models/registry.yaml` `models.<id>.price`.
 
 While an attempt runs, the Host controller stores a redacted scrollback snapshot every 60 s in
 `attempt_transcript_snapshots`; Kernel and Supervisor seats get `seat_transcript_snapshots` in

@@ -166,7 +166,7 @@ test('--help prints the CLI usage and exits 0',()=>{
 });
 
 // The model catalog is GPT-6 Sol/Luna on the codex-agent window and Claude Opus 5.5 on
-// claude-agent (modules/models/runtimes.yaml). The launch model is the pool's difficulty pin.
+// claude-agent (modules/models/registry.yaml pools). The launch model is the pool's difficulty pin.
 const planModels=(t,kind,difficulty)=>{
   const r=run(['--kind',kind,'--difficulty',difficulty,'--plan','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
   assert.equal(r.status,0,r.stderr||r.error?.message);
@@ -200,7 +200,7 @@ test('an explicit --model naming a removed catalog id fails closed as unknown',(
   for(const removed of ['gpt-5.6-sol','claude-fable']){
     const r=dispatch(removed);
     assert.equal(r.status,1,`--model ${removed} must refuse, got ${r.status}: ${r.stdout}`);
-    assert.match(r.stderr,new RegExp(`no model profile ${removed.replaceAll('.','\\.')}`));
+    assert.match(r.stderr,new RegExp(`no model target '${removed.replaceAll('.','\\.')}' in modules/models/registry\\.yaml`));
   }
   for(const current of ['gpt-6-sol','gpt-6-luna']){
     const r=dispatch(current);

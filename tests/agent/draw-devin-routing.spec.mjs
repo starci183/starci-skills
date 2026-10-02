@@ -12,8 +12,8 @@ import { criticFor } from '../../scripts/work/draw-critic.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const read = (rel) => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
-const runtimes = read('modules/models/runtimes.yaml');
 const registry = read('modules/models/registry.yaml');
+const runtimes = { ...read('modules/models/runtimes.yaml'), runtimes: registry.pools };
 
 test('interface.draw walks the draw order: Devin first, Codex the fallback', () => {
   assert.deepEqual(runtimes.roleOfKind['interface.draw'], { role: 'write', work: 'think', floor: 'hard', order: 'draw' });
@@ -30,7 +30,7 @@ test('interface.draw walks the draw order: Devin first, Codex the fallback', () 
   // Devin runs Playwright in product checkouts: the manifest's browser-dom host tool is on its card.
   assert.deepEqual(hostToolsRequired('interface.draw'), ['browser-dom']);
   assert.ok(hostToolsOf('devin').includes('browser-dom') && hostToolsOf('codex').includes('browser-dom'));
-  assert.ok(runtimes.runtimes['devin-agent'].roles.includes('write'), 'the devin pool serves the draw kind role');
+  assert.ok(registry.pools['devin-agent'].roles.includes('write'), 'the devin pool serves the draw kind role');
 });
 
 test('brand.decide walks the brand order: Claude first, Codex the fallback; interface.asset keeps the Codex image tool', () => {

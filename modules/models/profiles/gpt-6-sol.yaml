@@ -3,35 +3,28 @@
 # reasoning model. The codex-agent pool launches it for every hard or insane
 # operation; this target is the explicit route an owner names with
 # `--model gpt-6-sol` to reach Sol at any difficulty.
+# Registry facts (provider, runtime, launch agent, the launch model itself) live
+# in modules/models/registry.yaml — targets.gpt-6-sol.defaultModel.
 
 target: gpt-6-sol             # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
-provider: codex
-runtime: codex                # registry.yaml targets.gpt-6-sol.runtime
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: gpt-6-sol   # the slug `codex debug models` lists (codex-cli 0.155.1)
-  profiles:
-    working: gpt-6-sol
-    reasoning: gpt-6-sol
   sharedQuota: >-
     Sol consumes the same observed Codex provider capacity as Luna — naming
     this target adds no headroom to the codex-agent window.
-
-launch:
-  orca: {agent: codex}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 business:
   question: >-
     "Which Codex model decides, plans and carries hard work?" — Sol.
   whenNeeded:
-    - Hard and insane operations routed to codex-agent — runtimes.yaml pins Sol there.
+    - Hard and insane operations routed to codex-agent — registry.yaml pins Sol there.
     - Think work when claude-agent is unavailable — think kinds route at a hard floor, so codex-agent launches Sol.
     - "The [Kernel] seat when the owner pins `kernel: {agent: codex, model: gpt-6-sol}` (config.example.yaml)."
     - An owner-named explicit route to Sol for an easy or medium operation.
   whenNot:
     - Easy/medium bulk work on the pool — the pool pins Luna there.
-    - "Never as a way to buy qualification: naming a target changes capacity, never qualification or effect authority (runtimes.yaml runtimes.codex-agent)."
+    - "Never as a way to buy qualification: naming a target changes capacity, never qualification or effect authority (registry.yaml pools.codex-agent)."
   pickedBy: >-
     The allocator through the codex-agent pool's difficulty pin, or an owner who
     names this target explicitly.

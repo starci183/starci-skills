@@ -306,7 +306,7 @@ export function createResourceController(overrides = {}) {
    * the last pass: provider-rate-limited events of every product ledger (payload pool / model / target, else the
    * job's routed pool, else every pool of payload.provider) and provider-health rows of failureKind rate-limited
    * observed since. Halve on a signal (floor backoffFloor, at most once per backoffDecreaseCooldownMs), +1 per
-   * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's runtimes.yaml maxParallel. Active:
+   * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's registry.yaml maxParallel. Active:
    * machine.sqlite pool_backoff rows (route reads them and prefers the next eligible pool); shadow: a would-row
    * when the caps change. A pool held at its floor while the rate limit persists for backoffPersistMs opens the
    * provider circuit (api provider-backoff) on every product ledger, once per floor episode.

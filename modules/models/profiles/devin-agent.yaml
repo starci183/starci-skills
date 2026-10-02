@@ -1,30 +1,17 @@
 # Profile: devin-agent — the Cognition Devin command-terminal pool.
 # Business frame: the owner-gated executor. Owner-assigned capacity: 10 parallel
 # lanes under explicit-workflow-quota authority.
+# Registry facts (provider, runtime, model pins, capacity, launch agent) live in
+# modules/models/registry.yaml — pools.devin-agent and targets.devin-agent.
 
-target: devin-agent           # registry.yaml + runtimes.yaml
-provider: devin               # runtimes.yaml — provider cognition-devin (registry.yaml targets)
-runtime: devin                # registry.yaml
+target: devin-agent           # registry.yaml: pools.devin-agent + targets.devin-agent
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: swe-2-max   # the profile's own fallback model; runtimes.yaml runtimes.devin-agent.models pins it per difficulty
-  profiles:
-    working: devin-worker     # registry.yaml targets — one bounded task in the workflow worktree via Devin CLI
-    reasoning: devin-reviewer # registry.yaml targets — verify one bounded change, never expand scope
   logicalIdentity: >-
     modules/models/registry.yaml: the logical model identity is `devin-agent`; the local
     CLI may use an account-selected underlying model and StarCi does not rename or
     infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
-
-capacity:
-  maxParallel: 10             # cached from runtimes.yaml — owner-assigned capacity
-  capacityAuthority: explicit-workflow-quota   # only a granted workflow quota opens slots; config.yaml allocation.grants is the owner's default grant for every workflow
-  quotaTelemetry: launch-status                # quota is observed through launch status
-  roles: [implement, verify, write]            # NO decide, NO plan
-
-launch:
-  orca: {agent: devin}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 

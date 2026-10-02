@@ -111,7 +111,7 @@ Three rules hold at every gear:
 
 1. **`s` and `m` operations are always one agent.** The table applies to `l` and `xl` only.
 2. **A gear never raises a ceiling.** It raises only what `api estimate` *requests*. A pool's
-   `runtimes.<pool>.maxParallel`, the workers' `maxParallelOps` and the workflow's `budgets.maxOps`
+   `registry.yaml` `pools.<pool>.maxParallel`, the workers' `maxParallelOps` and the workflow's `budgets.maxOps`
    all clamp it afterwards, and the lowest one admits.
 3. **Requested is not achievable.** `api estimate` returns `agentsRequested` from this table and
    `agentsAchievable` after the closure's disjoint path partition bounds it — a two-directory

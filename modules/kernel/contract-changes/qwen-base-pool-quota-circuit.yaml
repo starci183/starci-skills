@@ -6,7 +6,6 @@ paths:
   - modules/kernel/driver-loop.yaml
   - modules/models/runtimes.yaml
   - modules/models/registry.yaml
-  - modules/models/index.yaml
   - modules/models/agents/qwen.yaml
   - modules/models/profiles/qwen-agent.yaml
 reach: new-legs

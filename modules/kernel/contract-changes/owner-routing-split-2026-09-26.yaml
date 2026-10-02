@@ -5,7 +5,6 @@ paths:
   - modules/models/runtimes.yaml
   - modules/models/selection.yaml
   - modules/models/registry.yaml
-  - modules/models/index.yaml
   - modules/models/profiles/claude-agent.yaml
   - modules/models/profiles/devin-agent.yaml
   - modules/models/profiles/qwen-agent.yaml

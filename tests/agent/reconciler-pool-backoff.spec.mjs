@@ -10,7 +10,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { aimdStep, backoffPersists, capsOf, poolRowOf, entriesOfRows } from '../../scripts/machine/pool-backoff.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { selectPool } from '../../scripts/agent/models.mjs';
+import { selectPool, loadRuntimes } from '../../scripts/agent/models.mjs';
 import { createResourceController, POOLS_KEY } from '../../scripts/reconciler/controllers/resource.mjs';
 
 const T = 2_000_000_000_000;
@@ -53,7 +53,7 @@ test('capsOf: only backed-off pools of a fresh publication', () => {
 });
 
 test('route: a pool at its backed-off cap is rejected and the next eligible pool takes the job', () => {
-  const runtimes = parseYaml(fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'modules', 'models', 'runtimes.yaml'), 'utf8'));
+  const runtimes = loadRuntimes(path.join(import.meta.dirname, '..', '..', 'modules', 'models'));
   const capacity = { 'devin-agent': { running: 5, auth: 'ok' }, 'codex-agent': { running: 1, auth: 'ok' } };
   const base = { kind: 'backend.implement', difficulty: 'medium', runtimes, capacity };
   const free = selectPool({ ...base, backoff: {} });

@@ -16,7 +16,7 @@
 // provider availability signals. With neither this script asks
 // scripts/route/route-model.mjs for the model.manageWorkflow
 // kernelFunctionKind (risk high, --repo for the provider circuit) and maps
-// its pick and fallback chain to agents via modules/models/profiles/<target>.yaml.
+// its pick and fallback chain to agents via modules/models/registry.yaml pools/targets.
 // Router refusal or exhaustion is a typed failure, never an implicit Devin kernel.
 //
 // Every Kernel is an Orca worker (modules/kernel/contract-changes/launch-through-worker-start.yaml): the launching
@@ -45,7 +45,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
-import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
+import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
@@ -109,37 +109,37 @@ async function probeAgent(agent) {
   return probeCache.get(agent);
 }
 
-// The pool target a provider pin launches on: the runtimes.yaml pool owned by
+// The pool target a provider pin launches on: the registry.yaml pool owned by
 // that provider that carries the kernel-manager role (decide) first, else the
 // provider's first pool.
 function poolTargetForAgent(agent) {
-  const file = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
-  let doc = null;
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; }
-  const owned = Object.entries(doc?.runtimes ?? {}).filter(([, rt]) => rt?.provider === agent);
+  const doc = loadModelRegistry();
+  const owned = Object.entries(doc?.pools ?? {}).filter(([, rt]) => rt?.provider === agent);
   return owned.find(([, rt]) => Array.isArray(rt?.roles) && rt.roles.includes('decide'))?.[0]
     ?? owned[0]?.[0] ?? null;
 }
 
-// kernel.model resolves its provider through the runtime pools: a model id a
-// pool pins (runtimes.*.models[role]) or the pool target itself names the
-// provider. runtimes.yaml is the single capacity/model-pin authority.
+// kernel.model resolves its provider through the model catalog: the model id's
+// declared provider (models.<id>.provider), a pool id/target, a pool's
+// per-difficulty pin or defaultModel, or a launch target's runtime.
+// registry.yaml is the single capacity/model-pin authority.
 function agentForModel(model) {
-  const file = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
-  let doc = null;
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; }
-  for (const [id, rt] of Object.entries(doc?.runtimes ?? {})) {
+  const doc = loadModelRegistry();
+  if (!doc) return null;
+  const direct = doc?.models?.[model]?.provider;
+  if (direct) return direct;
+  for (const [id, rt] of Object.entries(doc.pools ?? {})) {
     if (id === model || rt?.target === model) return rt?.provider ?? null;
-    if (Object.values(rt?.models ?? {}).includes(model)) return rt?.provider ?? null;
+    if (rt?.defaultModel === model || Object.values(rt?.models ?? {}).includes(model)) return rt?.provider ?? null;
   }
-  return null;
+  return doc?.targets?.[model]?.runtime ?? null;
 }
 
-// A pool target's provider is declared by its model profile
-// (modules/models/profiles/<target>.yaml).
+// A launch target's provider is declared by the registry: the pool's provider,
+// else the target's runtime adapter id (modules/models/registry.yaml).
 function agentForTarget(target) {
-  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${target}.yaml`);
-  try { return parseYaml(fs.readFileSync(file, 'utf8'))?.provider ?? null; } catch { return null; }
+  const doc = loadModelRegistry();
+  return doc?.pools?.[target]?.provider ?? doc?.targets?.[target]?.runtime ?? null;
 }
 
 // One provider's availability for a kernel group member: the quota probe plus
@@ -283,7 +283,7 @@ async function resolveKernelRoute(db) {
       agent, routedBy: 'route-model', effort: cfgEffort, config, warnings,
       ...(result.availability?.[c.target] ? { availability: result.availability[c.target] } : {}),
       route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: c.target, model: c.model ?? null,
-        profile: i === 0 ? (pick.profile ?? null) : `profiles/${c.target}.yaml`, mode: c.mode ?? null, rule: result.rule ?? null },
+        profile: 'modules/models/registry.yaml', mode: c.mode ?? null, rule: result.rule ?? null },
     });
     if (completed.error) { warn(completed.error); continue; }
     members.push(completed);

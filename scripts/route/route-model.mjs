@@ -2,7 +2,9 @@
 // route-model.mjs — resolve which model target may take a workload, by EXECUTING
 // the declarative rules in modules/models/selection.yaml (the source of truth).
 // Ordering facts come from the files
-// selection.yaml cites: modules/models/runtimes.yaml (preference/tiers) and
+// selection.yaml cites: modules/models/registry.yaml `pools` (the ONE model
+// catalog: membership, roles, models, maxParallel), modules/models/runtimes.yaml
+// (preference/tiers) and
 // modules/models/qualifications.yaml (the shipped evidence store — empty means
 // no measured qualification, so eligible routes are probation, the
 // kernel-function step for the kernel's own calls, or refusal).
@@ -97,19 +99,8 @@ function preflightFor(runtime) {
   return { probes, declared: null };
 }
 
-// runtimes.yaml is the single capacity authority — model profiles repeat
-// capacity.maxParallel as a cached copy that can drift. Drift is reported,
-// never silently reconciled: the runtimes.yaml value always wins.
-function capacityDrift(candidates, runtimes) {
-  const out = [];
-  for (const c of candidates) {
-    const declared = runtimes?.runtimes?.[c.id]?.maxParallel;
-    const cached = c.profileMaxParallel;
-    if (cached != null && declared != null && Number(cached) !== Number(declared))
-      out.push({ target: c.id, profileMaxParallel: Number(cached), runtimesMaxParallel: Number(declared) });
-  }
-  return out;
-}
+// registry.yaml `pools` is the single capacity authority: no second copy of
+// maxParallel exists, so no drift check is possible or needed.
 
 function parseArgs(argv) {
   const a = { tools: [] };
@@ -251,20 +242,16 @@ function probationAdmissionReasons(w, rules) {
 // --- candidates ------------------------------------------------------------------
 
 function loadCandidates(modelsDir) {
-  const index = readYaml(path.join(modelsDir, 'index.yaml'));
-  const pools = (index?.pools ?? []).filter(p => p.automaticChains !== false);
-  const out = [];
-  for (const pool of pools) {
-    const profile = readYaml(path.join(modelsDir, pool.profile ?? `profiles/${pool.target}.yaml`));
-    out.push({
-      id: pool.target, target: profile?.target ?? pool.target,
-      provider: profile?.provider ?? pool.provider,
-      roles: profile?.capacity?.roles ?? pool.roles ?? [],
-      profileMaxParallel: profile?.capacity?.maxParallel ?? null, // stale-prone copy — drift-checked vs runtimes.yaml
-      profile: pool.profile ?? `profiles/${pool.target}.yaml`,
-    });
-  }
-  return out;
+  // registry.yaml `pools` holds exactly the automatic-chain pools; explicit-only
+  // targets like cursor-agent live under `targets` and never appear here.
+  const registry = readYaml(path.join(modelsDir, 'registry.yaml'));
+  return Object.entries(registry?.pools ?? {}).map(([id, pool]) => ({
+    id, target: pool?.target ?? id,
+    provider: pool?.provider ?? null,
+    roles: pool?.roles ?? [],
+    profile: fs.existsSync(path.join(modelsDir, 'profiles', `${pool?.target ?? id}.yaml`))
+      ? `profiles/${pool?.target ?? id}.yaml` : 'modules/models/registry.yaml',
+  }));
 }
 
 // Candidate order sources, in precedence order:
@@ -317,7 +304,7 @@ function planEvidenceNote(evidence, qr) {
   return null;
 }
 
-function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty, profileCap = {}) {
+function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty) {
   const probationReasons = probationAdmissionReasons(w, rules);
   // A pool serves the kind when it serves its role or the order the kind walks
   // (owner routing 2026-09-26: the implement order's mechanical ops are
@@ -326,8 +313,8 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
   const serveKey = orderKeyOf({ work: w.work, order: w.order }, w.role);
   return chain.map(id => {
     const rt = runtimes?.runtimes?.[id] ?? null;
-    if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no runtimes.yaml entry for this pool'] };
-    // The launch model is the pool's per-difficulty pin (runtimes.yaml
+    if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no registry.yaml entry for this pool'] };
+    // The launch model is the pool's per-difficulty pin (registry.yaml pools
     // models[difficulty]); a pool without that pin is structurally off this
     // chain, the same gate models.mjs::selectPool applies.
     const lm = resolveLaunchModel(id, difficulty, { runtimes });
@@ -336,9 +323,6 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
     const base = { id, target: rt.target ?? id, provider: rt.provider ?? null, model, maxParallel: rt.maxParallel ?? null,
       effort: lm.effort ?? null,
       preflight: pf.probes, ...(pf.declared ? { preflightDeclared: pf.declared } : {}) };
-    const pc = profileCap[id];
-    if (pc != null && rt.maxParallel != null && Number(pc) !== Number(rt.maxParallel))
-      base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role) && !rt.roles.includes(serveKey))
       return { ...base, status: 'rejected', structural: true, reasons: [
         `pool does not serve role '${w.role}'${serveKey !== w.role ? ` or order '${serveKey}'` : ''}`] };
@@ -356,9 +340,9 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
   });
 }
 
-function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
+function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
   const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role));
-  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
+  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
   // of plan mode is "who takes this once qualification exists". Probation
@@ -398,10 +382,8 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
         maxParallel: c.maxParallel, status: c.status,
         ...(c.effort ? { effort: c.effort } : {}),
         preflight: c.preflight, ...(c.preflightDeclared ? { preflightDeclared: c.preflightDeclared } : {}),
-        ...(c.capacityDrift ? { capacityDrift: c.capacityDrift } : {}),
         ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
       })),
-      ...(owner.drift?.length ? { capacityDrift: owner.drift } : {}),
       pick: primary
         ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: reasonFor(primary),
             fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
@@ -425,11 +407,8 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
         : '';
       console.log(`  ${i + 1}. ${c.target}  ${spec}  status=${c.status}` +
         (c.note ? `  (${c.note})` : ''));
-      if (c.capacityDrift) console.log(`     capacity drift: ${c.capacityDrift}`);
       if (args.verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
     });
-    for (const d of owner.drift ?? [])
-      console.log(`capacity drift: ${d.target} profile pins maxParallel ${d.profileMaxParallel}; runtimes.yaml declares ${d.runtimesMaxParallel} (runtimes.yaml wins)`);
     if (primary) {
       console.log(`primary: ${primary.target} (${reasonFor(primary)})`);
       console.log(`fallbacks: [${fallbacks.map(c => `${c.target} (${c.status})`).join(', ')}]`);
@@ -482,8 +461,10 @@ async function main() {
   const modelsDir = path.resolve(args.modelsDir ?? path.join(skillRoot, 'modules', 'models'));
   const rules = loadRules(modelsDir);
   const kinds = readYaml(path.join(modelsDir, 'kinds.yaml'));
-  const runtimes = readYaml(path.join(modelsDir, 'runtimes.yaml'));
   const registry = readYaml(path.join(modelsDir, 'registry.yaml'));
+  // The merged runtimes view: runtimes.yaml's allocation policy plus the ONE
+  // catalog's pool map (registry.yaml pools) under `runtimes`.
+  const runtimes = { ...(readYaml(path.join(modelsDir, 'runtimes.yaml')) ?? {}), runtimes: registry?.pools ?? {} };
   const quals = readYaml(path.join(modelsDir, 'qualifications.yaml'));
   const evidenceByRuntime = {};
   for (const rec of quals?.qualifications ?? []) if (rec?.runtimeId) evidenceByRuntime[rec.runtimeId] = rec;
@@ -524,11 +505,9 @@ async function main() {
     cfgRole, cfgPoolName, cfgMembers, preferredProvider, effort };
 
   const candidates = loadCandidates(modelsDir);
-  owner.drift = capacityDrift(candidates, runtimes);
-  const profileCap = Object.fromEntries(candidates.map(c => [c.id, c.profileMaxParallel]));
   if (args.plan) {
     if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
-    runPlan({ ...args, difficulty }, rules, runtimes, w, evidenceByRuntime, owner, profileCap);
+    runPlan({ ...args, difficulty }, rules, runtimes, w, evidenceByRuntime, owner);
     return;
   }
 
@@ -641,7 +620,6 @@ async function main() {
       preferredProvider,
       ...(w.modelFunction ? { kernelRole: cfgRole, pool: cfgPoolName ?? null, members: cfgMembers ?? null } : {}),
     },
-    ...(owner.drift.length ? { capacityDrift: owner.drift } : {}),
     assumptions: {
       approved: w.approved, scope: w.scope, noExternalEffects: w.noExternalEffects,
       strictMachineGates: w.strictMachineGates, freshIndependentReview: w.freshIndependentReview,
@@ -670,8 +648,7 @@ async function main() {
       (preferredProvider ? `  preferredProvider=${preferredProvider} (bias, not a chain)` : '') +
       (result.config.pool ? `  ${result.config.kernelRole} pool '${result.config.pool}' -> [${(result.config.members ?? []).join(', ')}]` : '') +
       (owner.error ? `  (${owner.error})` : ''));
-    for (const d of owner.drift)
-      console.log(`capacity drift: ${d.target} profile pins maxParallel ${d.profileMaxParallel}; runtimes.yaml declares ${d.runtimesMaxParallel} (runtimes.yaml wins)`);
+
     if (pick) {
       console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
       console.log(`  rule: ${rule}`);

@@ -1924,11 +1924,11 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 /* -------------------------------------------------------------- dispatch */
 const resolveModel = (target) => {
   if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
-  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${target}.yaml`);
-  if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
-  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  return { target, provider: doc?.provider ?? null,
-    requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
+  const file = path.join(skillRoot, 'modules', 'models', 'registry.yaml');
+  const doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null;
+  const entry = doc?.pools?.[target] ?? doc?.targets?.[target];
+  if (!entry) return { error: `no model target '${target}' in modules/models/registry.yaml (pools, targets)` };
+  return { target, provider: entry.provider ?? entry.runtime ?? null, profile: 'modules/models/registry.yaml' };
 };
 
 const ownerLanguage = () => ownerLanguageOf();

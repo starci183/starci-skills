@@ -4,7 +4,7 @@
 //   agent-binary-missing     its CLI binary (the card's start.cli, or Orca's agentCmdOverrides command) is not on PATH;
 //   agent-bypass-missing     Orca's settings.agentDefaultArgs for the agent lack the card's bypassFlag (an approval prompt no one answers);
 //   model-not-listed         the model is no model the runtime declares for that provider (a provider that declares none, like Cursor whose
-//                            models Orca lists dynamically, is not judged) (prices.yaml, the runtimes.yaml pool models);
+//                            models Orca lists dynamically, is not judged) (registry.yaml models + the pools' model pins);
 //                            a card with no model flag (Devin) takes no model.
 // No agent list is hard-coded: the card, Orca's settings and PATH decide. A test process reads none of them unless a spec passes
 // its own `settingsFile` / `pathDirs` (the host's real settings must not decide a spec's verdict).
@@ -33,16 +33,16 @@ export function orcaSettingsFile(opts = {}) {
   return path.join(data, 'profiles', profile, 'orca-data.json');
 }
 
-/** The models the runtime declares for `provider`. */
+/** The models the runtime declares for `provider`: the registry `models` entries plus every pool's pins. */
 export function modelsOfProvider(provider) {
   const found = new Set();
-  for (const [id, row] of Object.entries(readYaml('modules/models/prices.yaml')?.models ?? {})) if (row?.provider === provider) found.add(id);
-  const walk = (node) => {
-    if (!node || typeof node !== 'object') return;
-    if (node.provider === provider && node.models && typeof node.models === 'object') for (const v of Object.values(node.models)) if (typeof v === 'string') found.add(v);
-    for (const v of Object.values(node)) walk(v);
-  };
-  walk(readYaml('modules/models/runtimes.yaml'));
+  const registry = readYaml('modules/models/registry.yaml');
+  for (const [id, row] of Object.entries(registry?.models ?? {})) if (row?.provider === provider) found.add(id);
+  for (const pool of Object.values(registry?.pools ?? {})) {
+    if (pool?.provider !== provider) continue;
+    if (typeof pool.defaultModel === 'string') found.add(pool.defaultModel);
+    for (const v of Object.values(pool.models ?? {})) if (typeof v === 'string') found.add(v);
+  }
   return found;
 }
 
@@ -74,7 +74,7 @@ export function hostAgentVerdict({ provider, model = null, card, env = process.e
   }
   if (card?.start?.modelArgument !== false && model) {
     const listed = models ?? modelsOfProvider(provider);
-    if (listed.size && !listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models: prices, runtime pools)` };
+    if (listed.size && !listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models/registry.yaml: models, pools)` };
   }
   return { ok: true };
 }

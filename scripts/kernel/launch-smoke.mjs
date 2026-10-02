@@ -25,7 +25,7 @@
 //                      the host-side controller must then remove it (gone from `orca worktree list`, its directory and
 //                      branch gone); only then main's checkout holds exactly the two green files more, every other file unchanged.
 //
-// Every agent is a no-op on the cheapest model modules/models/runtimes.yaml pins (priced by modules/models/prices.yaml):
+// Every agent is a no-op on the cheapest model modules/models/registry.yaml pins (priced by its models.<id>.price):
 // a leaf writes its result line (`mark`; an op also writes its owned file in the workflow worktree) and reports
 // worker_done; a parent first runs its `stage` (which starts its children from the parent's own terminal, the way the
 // runtime does) and then does the same. The smoke reads each worker back (worker-read), checks the depth and the creator
@@ -95,7 +95,7 @@ const GREEN_STATUS = new Set(['completed', 'succeeded']);
 const TIER_ORDER = ['easy', 'medium', 'hard', 'insane'];
 
 /**
- * The no-op agent: the cheapest model a runtimes.yaml pool pins at any tier (input + output list price per 1M tokens;
+ * The no-op agent: the cheapest model a registry.yaml pool pins at any tier (input + output list price per 1M tokens;
  * an unpriced model is never picked), with that tier's effort. {provider, model, effort, pool, tier, usdPerMTok} | {error}.
  */
 export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() } = {}) {
@@ -109,7 +109,7 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() }
   }
   const rank = (t) => { const i = TIER_ORDER.indexOf(t); return i < 0 ? TIER_ORDER.length : i; };
   found.sort((a, b) => a.usdPerMTok - b.usdPerMTok || rank(a.tier) - rank(b.tier) || a.pool.localeCompare(b.pool));
-  return found[0] ?? { error: 'no runtimes.yaml pool pins a priced model (modules/models/prices.yaml)' };
+  return found[0] ?? { error: 'no registry.yaml pool pins a priced model (modules/models/registry.yaml models.<id>.price)' };
 }
 
 /**

@@ -3,28 +3,19 @@
 # Sol fallback for think work when Claude is unavailable, AND the workers' only
 # image generator. Owns the interface.asset route and is the interface.draw fallback behind Devin
 # (owner ruling 2026-09-27); it is also the draw loop's independent critic (runtimes.yaml drawLoop.critic).
+# Registry facts (provider, runtime, model pins, capacity, launch agent) live in
+# modules/models/registry.yaml — pools.codex-agent and targets.codex-agent.
 
-target: codex-agent           # registry.yaml + runtimes.yaml
-provider: codex               # runtimes.yaml
-runtime: codex                # registry.yaml targets.codex-agent.runtime
+target: codex-agent           # registry.yaml: pools.codex-agent + targets.codex-agent
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: gpt-6-luna  # the profile's own fallback model; the launch pin per difficulty is runtimes.yaml runtimes.codex-agent.models
-  profiles:
-    working: gpt-6-luna       # registry.yaml targets — bounded implementation inside frozen goal/write boundaries
-    reasoning: gpt-6-sol      # registry.yaml targets — plan strategy, analyze complex evidence, decide
-
-capacity:
-  maxParallel: 10             # cached from runtimes.yaml; the largest pool
-  roles: [implement, verify, write, decide, plan]   # all five
   sharedQuota: >-
     Sol and Luna consume the SAME observed Codex provider capacity — the
     launch-only gpt-6-sol/gpt-6-luna targets do not multiply provider headroom
     (modules/models/registry.yaml). One quota cooldown on the provider parks both.
 
 launch:
-  orca: {agent: codex}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
   hostTools: >-
     modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom (Codex CLI
     built-ins, present in a worker-start Codex worker too). It is the only image-capable pool: interface.asset
@@ -49,6 +40,6 @@ business:
     Allocator work/role order + tier lists; the image routes are where it
     structurally dominates.
   failureModes:
-    - "Confusing requestedModel (luna) with the hard-tier model (sol): the pool pins per-difficulty models; attestation reads the difficulty's model, not the profile's requestedModel."
+    - "Confusing the pool default (Luna) with the hard-tier pin (Sol): the pool pins per-difficulty models; attestation reads the difficulty's model, not the pool's defaultModel (modules/models/registry.yaml pools.codex-agent)."
     - Provider-level quota exhaustion disables Luna and Sol at once — the interface.asset route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
     - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the think and image lanes depend on."

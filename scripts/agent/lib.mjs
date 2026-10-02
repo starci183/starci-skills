@@ -31,6 +31,7 @@ import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
 import { recordLaunchedTerminal } from './launched-terminals.mjs';
+import { loadModelRegistry } from './models.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -296,8 +297,7 @@ export function awaitAttestation(handle, adapter, { delivered = null } = {}) {
 export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 'prompt', io = null }) {
   const d = adapter?.delivery ?? {};
   const limit = Number(d.maxInlineChars) || 0;
-  // worktree may be an Orca selector ('active') rather than a filesystem path —
-  // file-reference delivery only applies when it resolves to a real directory.
+  // worktree may be an Orca selector ('active') rather than a filesystem path — file-reference delivery only applies when it resolves to a real directory.
   if (d.mode === 'file-reference-above-inline-limit' && limit && prompt.length > limit && worktree && fs.existsSync(worktree)) {
     const transient = !(typeof d.fileDirectory === 'string' && d.fileDirectory.trim());
     const dir = transient
@@ -310,8 +310,7 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
       .replace('<file>', file.replaceAll('\\', '/'));
     return { ...sendPrompt(handle, sendText, adapter, io), sentText: sendText, artifact: { file, dir, transient } };
   }
-  // sentText is what the terminal was given: awaitSubmission and the api's
-  // liveness reads find an unsubmitted paste by it (inc-06aeecf432f1).
+  // sentText is what the terminal was given: awaitSubmission and the api's liveness reads find an unsubmitted paste by it (inc-06aeecf432f1).
   return { ...sendPrompt(handle, prompt, adapter, io), sentText: prompt };
 }
 
@@ -392,7 +391,9 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
   if (refusal) return { ...refusal, provider, taskId: null, runId: run ?? null };
   const takesModel = card?.start?.modelArgument !== false;
-  if (takesModel && !model) model = card?.start?.defaultModel ?? null;
+  // A card's `start.defaultModel: pool` names the provider pool's registry.yaml defaultModel; a concrete id pins itself.
+  if (takesModel && !model)
+    model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
   // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.
@@ -408,9 +409,8 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
     request: request ? { ...request, run, agent, model: takesModel ? model : null } : request });
   const dispatchId = started?.dispatchId ?? null;
   const taskId = started?.taskId ?? null;
-  // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop):
-  // no effect -> nothing; unknown -> worker-show first, cleaned only when Orca shows the worker ended; a partial
-  // effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
+  // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop): no effect -> nothing; unknown
+  // -> worker-show first, cleaned only when Orca shows the worker ended; a partial effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
   const cleanupOf = io?.cleanup ?? ((id) => {
     const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
     const release = bestEffortCall(() => orca.release({ dispatch: id }));
@@ -480,8 +480,8 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   heading = null, objective, entry = null, priorRunId = null, request, onCreated = null, parentDispatch = null, maxDepth = null, io = null } = {}) {
   if (!request || typeof request !== 'object') throw new Error('startAgent needs request: the ledger identity of this launch (calls.yaml replay: request)');
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate };
-  // The depth preflight runs before the Run exists, so a refused launch leaves nothing behind in Orca. With no parent
-  // named, the entry terminal's own Dispatch (worker-list) is the parent: a Kernel started from a worker nests.
+  // The depth preflight runs before the Run exists, so a refused launch leaves nothing behind in Orca. With no parent named,
+  // the entry terminal's own Dispatch (worker-list) is the parent: a Kernel started from a worker nests.
   if (!parentDispatch && entry) parentDispatch = entryDispatchOf(entry, io?.workerList ? { list: io.workerList } : {});
   const preflight = depthPreflight({ parentDispatch, maxDepth, show: io?.spawn?.show ?? workerShow });
   if (preflight.refusal) return { ...preflight.refusal, provider };
