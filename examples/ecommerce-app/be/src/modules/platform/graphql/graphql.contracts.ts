@@ -19,12 +19,32 @@ export interface GraphqlContextInput {
     readonly extra?: ConnectionExtra
 }
 
+/** The request headers of an upgrade request: any header by name, the Authorization one typed. */
+export interface ConnectionHeaders {
+    readonly [name: string]: string | ReadonlyArray<string> | undefined
+    readonly authorization?: string
+}
+
+/** The socket an upgrade request came in on. */
+export interface ConnectionSocket {
+    /** The address of the peer. */
+    readonly remoteAddress?: string
+}
+
+/** What the connection handler of the subscription server receives when a client initialises: its params and its extras. */
+export interface SubscriptionConnection {
+    /** The params the client sent when it initialised the connection. */
+    readonly connectionParams?: Readonly<Record<string, unknown>>
+    /** The extras the server keeps for the connection, unchecked. */
+    readonly extra: unknown
+}
+
 /** What the app reads of the upgrade request of a subscription connection. */
 export interface ConnectionRequest {
     /** The request headers. */
-    readonly headers: Readonly<{ [name: string]: string | ReadonlyArray<string> | undefined; authorization?: string }>
+    readonly headers: ConnectionHeaders
     /** The socket the connection came in on. */
-    readonly socket: { readonly remoteAddress?: string }
+    readonly socket: ConnectionSocket
 }
 
 /** What a subscription connection keeps for its operations: its upgrade request and the Authorization the client sent as a connection param. */

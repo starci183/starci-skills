@@ -20,6 +20,20 @@ describe("payment confirmation marks the order paid", () => {
         await productBuilder(world.db.order).build({ id: "sku-lamp", priceMinorUnits: 3_000, stock: 10 })
     })
 
+    /** Waits for billing to issue the invoice of an order. */
+    const issuedInvoice = (orderId: string) =>
+        world.waitFor("billing issues the invoice", async () => {
+            const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId])
+            return rows[0]?.status === "issued" ? rows[0] : null
+        })
+
+    /** Waits for the order service to show the order as paid in its read model. */
+    const paidSummary = (orderId: string) =>
+        world.waitFor("the order service marks the order paid", async () => {
+            const rows = await readRows(world.db.order, ORDER_SUMMARY, [orderId])
+            return rows[0]?.status === "paid" ? rows[0] : null
+        })
+
     it("billing.payment-confirmed marks a pending order paid once, and the same transfer sent again changes nothing", async () => {
         const session = await world.signedInPerson("payment-confirmed")
         const buyer = world.apps.order.api.bearing(session.sessionToken)
@@ -31,19 +45,13 @@ describe("payment confirmation marks the order paid", () => {
             variables: { input: { idempotencyKey: "payment-confirmed-1" } },
         })
         const orderId = present(placed.data, "placeOrder data").placeOrder.orderId
-        await world.waitFor("billing issues the invoice", async () => {
-            const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId])
-            return rows[0]?.status === "issued" ? rows[0] : null
-        })
+        await issuedInvoice(orderId)
         expect((await readRows(world.db.order, ORDER_SUMMARY, [orderId]))[0]?.status).toBe("pending")
 
         const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 3_000 })
 
         expect(delivery?.status).toBe(204)
-        const paid = await world.waitFor("the order service marks the order paid", async () => {
-            const rows = await readRows(world.db.order, ORDER_SUMMARY, [orderId])
-            return rows[0]?.status === "paid" ? rows[0] : null
-        })
+        const paid = await paidSummary(orderId)
         expect(paid.status).toBe("paid")
         const claims = await readCount(world.db.order, INBOX_CLAIM_COUNT, "billing-payment-confirmed")
 

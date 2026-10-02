@@ -3,9 +3,8 @@ import type { CommandBus } from "@nestjs/cqrs"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import { InjectJobClaims } from "@modules/platform/jobs"
 import type { ClaimedJob, JobClaims, JobStep } from "@modules/platform/jobs"
+import { ORDER_PAYMENT_WINDOW_MS, isExpireOrdersPayload } from "@modules/queues/order-expiry"
 import { ExpireOverdueCommand } from "../application/expire-overdue.command"
-import { ORDER_PAYMENT_WINDOW_MS } from "../application/expire-overdue.contracts"
-import { isExpireOrdersPayload } from "../application/expire-overdue.policy"
 
 /** The most orders one sweep expires; a longer backlog is worked off by the next ticks. */
 const EXPIRY_BATCH = 100

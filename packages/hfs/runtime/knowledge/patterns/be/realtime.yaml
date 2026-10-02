@@ -140,11 +140,12 @@ rules:
 files:
   - path: src/features/realtime/<channel>/index.ts
     slot: be.feature.realtime
+    template: realtime/channel.index.ts.tpl
     role: The public surface of the kind folder, the module class an api-kind app composes.
   - path: src/features/realtime/<channel>/transport/graphql/<channel>-graphql.module.ts
     slot: be.feature.realtime.graphql
+    template: realtime/channel.graphql.module.ts.tpl
     role: Nest module of the subscription door, composed only by an api-kind app.
-    optional: true
   - path: src/features/realtime/<channel>/transport/websocket/<channel>-websocket.module.ts
     slot: be.feature.realtime.websocket
     role: Nest module of the gateway door, composed only by an api-kind app.
@@ -161,28 +162,35 @@ files:
     optional: true
   - path: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.ts
     slot: be.feature.realtime.graphql
+    template: realtime/channel.subscription.ts.tpl
     role: A GraphQL subscription door (one Resolver class).
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
     spec: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.spec.ts
-    optional: true
   - path: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.spec.ts
     slot: be.feature.realtime.graphql
+    template: realtime/channel.subscription.spec.ts.tpl
     role: Unit spec of the subscription beside it.
-    optional: true
-  - path: src/features/realtime/<channel>/transport/graphql/dto/<name>.type.ts
+  - path: src/features/realtime/<channel>/transport/graphql/dto/<channel>-changed.type.ts
     slot: be.feature.realtime.dto
-    role: The typed frame or the typed arguments of the door.
+    template: realtime/channel.type.ts.tpl
+    role: "The typed frame of the door, what the subscriber may see of a change."
+  - path: src/features/realtime/<channel>/transport/graphql/dto/<channel>.input.ts
+    slot: be.feature.realtime.dto
+    template: realtime/channel.input.ts.tpl
+    role: The typed, bounded arguments of the door.
     rules: [BE_INPUT_BOUNDED]
-    optional: true
   - path: src/modules/platform/realtime/realtime.hub.ts
     slot: be.platform
     role: RealtimeHub, the one owner of the socket and subscription engine (publish and subscribe).
     spec: src/modules/platform/realtime/realtime.service.spec.ts
+    optional: true
   - path: src/features/reactors/<name>/transport/message/<event>.consumer.ts
     slot: be.transport.message
     role: The reactor consumer that receives the domain event and pushes the frame through the hub.
+    optional: true
   - path: src/tests/e2e/<area>/<channel>-push.e2e-spec.ts
     slot: be.tests.e2e
     role: "Titles realtime/<scenario>: ... prove the pattern against a real client."
     spec: realtime/subscriber-receives-push, realtime/foreign-topic-is-isolated, realtime/disconnect-releases-subscription
     rules: [BE_PATTERN_SPEC_MISSING]
+    optional: true

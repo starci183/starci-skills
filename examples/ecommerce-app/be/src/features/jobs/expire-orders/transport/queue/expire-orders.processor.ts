@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
+import { ORDER_EXPIRY_QUEUE } from "@modules/queues/order-expiry"
 import { FencedProcessor } from "@modules/platform/jobs"
 import type { ClaimedJob } from "@modules/platform/jobs"
-import { ORDER_EXPIRY_QUEUE } from "../../application/expire-overdue.contracts"
 import { ExpireOverdueStep } from "../../steps/expire-overdue.step"
 
 @Injectable()

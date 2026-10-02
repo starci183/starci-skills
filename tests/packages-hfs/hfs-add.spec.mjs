@@ -46,7 +46,7 @@ const withPlatform = (dir, ...topics) => {
 
 test('the files trees and the template bodies are one set: every named template exists and every template is named', () => {
   const named = new Set();
-  for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
+  for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus', 'webhooks', 'realtime']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
   const dir = path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'patterns');
   const walk = (folder, prefix) => fs.readdirSync(path.join(dir, folder), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${folder}/${entry.name}`, prefix) : [`${folder}/${entry.name}`]));
   const present = new Set(fs.readdirSync(dir).flatMap((topic) => walk(topic, topic)));
@@ -159,6 +159,42 @@ test('hfs add reactor brings the event-bus platform capability with its first me
   const created = result.out.split('\n').filter((line) => line.startsWith('created '));
   assert.ok(created.some((line) => /migrations\/\d{13}-create-event-outbox\.ts$/.test(line)));
   assert.ok(exists(dir, 'be/src/features/reactors/payment-status/transport/message/payment-settled.consumer.ts'));
+});
+
+test('hfs add webhook writes the transport/http door tree with its signature proof and request, and registers the kind and its pattern', async () => {
+  const dir = repo();
+  const missing = await cli(['add', 'webhook', 'payment-gateway', '--repo', dir]);
+  assert.equal(missing.code, 2);
+  assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
+  const result = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--repo', dir]);
+  assert.equal(result.code, 0, result.err);
+  const base = 'be/src/features/webhooks/payment-gateway';
+  for (const file of ['index.ts', 'transport/http/payment-gateway-http.module.ts', 'transport/http/payment-gateway.webhook.ts', 'transport/http/payment-gateway.webhook.spec.ts', 'transport/http/dto/payment-gateway.request.ts']) {
+    assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
+  }
+  const door = read(dir, `${base}/transport/http/payment-gateway.webhook.ts`);
+  assert.match(door, /export class PaymentGatewayWebhook/);
+  assert.ok(door.includes('@Public({ reason: PublicReason.SignedWebhook })'));
+  assert.ok(door.includes('this.signature.verify({ provider: "payment-gateway"'));
+  assert.ok(door.includes('this.deliveries.acceptPaymentGatewayDelivery(delivery)'));
+  assert.ok(read(dir, `${base}/index.ts`).includes('export { PaymentGatewayHttpModule }'));
+  assert.deepEqual(hfsJson(dir).sides.be.patterns, ['webhooks']);
+  assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'webhooks']);
+});
+
+test('hfs add realtime writes the transport/graphql subscription tree and registers the kind and its pattern', async () => {
+  const dir = repo();
+  const result = await cli(['add', 'realtime', 'order-status', '--service', 'orderStatusTopic=@modules/domain/order', '--repo', dir]);
+  assert.equal(result.code, 0, result.err);
+  const base = 'be/src/features/realtime/order-status';
+  for (const file of ['index.ts', 'transport/graphql/order-status-graphql.module.ts', 'transport/graphql/order-status.subscription.ts', 'transport/graphql/order-status.subscription.spec.ts', 'transport/graphql/dto/order-status-changed.type.ts', 'transport/graphql/dto/order-status.input.ts']) {
+    assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
+  }
+  const door = read(dir, `${base}/transport/graphql/order-status.subscription.ts`);
+  assert.match(door, /export class OrderStatusSubscription/);
+  assert.ok(door.includes('this.hub.subscribe(orderStatusTopic(principal.id, input.id))'));
+  assert.deepEqual(hfsJson(dir).sides.be.patterns, ['realtime']);
+  assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'realtime']);
 });
 
 test('hfs add refuses an unknown noun, a bad name and a repository that is not an app root', async () => {

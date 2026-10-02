@@ -152,37 +152,45 @@ rules:
 files:
   - path: src/features/webhooks/<provider>/index.ts
     slot: be.feature.webhooks
+    template: webhooks/webhook.index.ts.tpl
     role: The public surface of the kind folder, the module class an api-kind app composes.
   - path: src/features/webhooks/<provider>/transport/http/<provider>-http.module.ts
     slot: be.feature.webhooks.http
+    template: webhooks/webhook.http.module.ts.tpl
     role: Nest module of the door, composed only by an api-kind app.
   - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts
     slot: be.feature.webhooks.http
+    template: webhooks/webhook.door.ts.tpl
     role: The signed door, one controller with one POST handler.
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
     spec: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
   - path: src/features/webhooks/<provider>/transport/http/<provider>.webhook.spec.ts
     slot: be.feature.webhooks.http
+    template: webhooks/webhook.door.spec.ts.tpl
     role: Unit spec of the door beside it.
   - path: src/features/webhooks/<provider>/transport/http/dto/<event>.request.ts
     slot: be.feature.webhooks.dto
     role: The typed, bounded provider payload.
     rules: [BE_INPUT_BOUNDED]
-    optional: true
+    template: webhooks/webhook.request.ts.tpl
   - path: src/modules/platform/http-security/webhook-signature.service.ts
     slot: be.platform
     role: WebhookSignatureService, the one owner of the signature and replay proof.
     spec: src/modules/platform/http-security/webhook-signature.service.spec.ts
+    optional: true
   - path: src/modules/domain/<capability>/<capability>.service.ts
     slot: be.domain
     role: The intake method, which claims the inbox and publishes the event in its transaction.
     rules: [BE_INBOX_DEDUPE_MISSING, BE_OUTBOX_WRITE_TX]
+    optional: true
   - path: src/modules/events/<service>/<event>.event.ts
     slot: be.events
     role: The typed event the intake publishes.
     rules: [BE_EVENT_CLASS_CONTRACT]
+    optional: true
   - path: src/tests/e2e/<area>/<provider>-webhook.e2e-spec.ts
     slot: be.tests.e2e
     role: "Titles webhooks/<scenario>: ... prove the pattern against the provider fake."
     spec: webhooks/bad-signature-is-refused, webhooks/replay-is-refused, webhooks/accepted-delivery-publishes-once
     rules: [BE_PATTERN_SPEC_MISSING]
+    optional: true

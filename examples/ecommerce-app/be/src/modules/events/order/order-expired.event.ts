@@ -1,4 +1,4 @@
-import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
+import { BaseEvent, readEventOf } from "@modules/platform/event-bus"
 import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `order.expired` (the contract `be/contracts/order/events.json`). */
@@ -10,6 +10,12 @@ export interface OrderExpiredPayload {
     /** When the order expired, ISO 8601. */
     readonly expiredAt: string
 }
+
+/** True when the payload record has the fields and types of the payload. */
+const isOrderExpiredPayload = (
+    payload: Record<string, unknown>,
+): payload is Record<string, unknown> & OrderExpiredPayload =>
+    typeof payload.orderId === "string" && typeof payload.personId === "string" && typeof payload.expiredAt === "string"
 
 /** An unpaid order expired: version 1 of the order service's contract; it starts the order summary refresh and the status push. */
 export class OrderExpiredEvent extends BaseEvent {
@@ -32,11 +38,10 @@ export class OrderExpiredEvent extends BaseEvent {
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
     static parse(envelope: unknown): ParsedEvent<OrderExpiredEvent> {
-        const read = readEnvelope(envelope)
-        if (read === null) return null
-        const { orderId, personId, expiredAt } = read.payload
-        return typeof orderId === "string" && typeof personId === "string" && typeof expiredAt === "string"
-            ? new OrderExpiredEvent(read.eventId, { orderId, personId, expiredAt })
-            : null
+        return readEventOf(
+            envelope,
+            isOrderExpiredPayload,
+            (eventId, payload) => new OrderExpiredEvent(eventId, payload),
+        )
     }
 }

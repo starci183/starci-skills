@@ -1,2 +1,5 @@
 export type { Outcome } from "./outcome.contracts"
 export { ok, refused, unwrapOutcome } from "./outcome.mapper"
+export { PassLoop } from "./pass-loop.mapper"
+export type { PassLoopParams } from "./pass-loop.mapper"
+export { isRecord } from "./record.policy"

@@ -201,6 +201,8 @@ ruleParams:
       job: {topic: jobs, variable: job, trigger: jobs, patterns: [fenced-job, queue], also: [queue], defaults: {step: "@name"}}
       reactor: {topic: reactors, variable: reactor, trigger: reactors, patterns: [event-bus], needs: [event, from, service], defaults: {action: "@name"}}
       queue: {topic: queues, variable: queue, patterns: [queue]}
+      webhook: {topic: webhooks, variable: provider, trigger: webhooks, patterns: [webhooks], needs: [service], defaults: {event: "@name"}}
+      realtime: {topic: realtime, variable: channel, trigger: realtime, patterns: [realtime], needs: [service]}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
@@ -1032,7 +1034,7 @@ slots:
     tracked: tracked
     tier: queues
     owner: true
-    requires: [index.ts, "<queue>.queue.ts", "<queue>.module.ts"]
+    requires: [index.ts, "<queue>.queue.ts"]   # the module exists when a domain module imports the producer; a scheduler-only queue has none
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]

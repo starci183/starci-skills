@@ -5,6 +5,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { PassLoop } from "@modules/platform/primitives"
 import { InjectEventBusOptions, InjectEventRelayManagers, InjectEventTransport } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
 import type { EventBusOptions } from "./event-bus.options"
@@ -28,8 +29,7 @@ const messageOf = (row: OutboxRow): OutboundMessage => ({
  * through their inbox. The loop runs from the start of the app to its shutdown and pauses only when the outbox is empty.
  */
 export class EventRelayService implements OnApplicationBootstrap, OnApplicationShutdown {
-    private running = false
-    private loop: Promise<void> = Promise.resolve()
+    private readonly loop: PassLoop
 
     constructor(
         @InjectEventBusOptions() private readonly options: EventBusOptions,
@@ -37,7 +37,14 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
         @InjectEventTransport() private readonly transport: EventTransport,
         @InjectClock() private readonly clock: Clock,
         @InjectLogger() private readonly logger: Logger,
-    ) {}
+    ) {
+        this.loop = new PassLoop({
+            pass: () => this.relay(),
+            onFailure: (cause) => this.logger.error(EventBusLogEvent.RelayFailed, cause),
+            wait: (ms) => this.transport.wait(ms),
+            idleMs: this.options.relayIntervalMs,
+        })
+    }
 
     /** One pass over every connection: sends the oldest waiting rows of each (at most the batch size) and answers how many it sent. */
     async relay(): Promise<number> {
@@ -48,14 +55,12 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
 
     /** Starts the relay loop over the outbox of every connection the options name. */
     onApplicationBootstrap(): void {
-        this.running = true
-        this.loop = this.run()
+        this.loop.start()
     }
 
     /** Stops the loop and waits for its last pass. */
     async onApplicationShutdown(): Promise<void> {
-        this.running = false
-        await this.loop
+        await this.loop.stop()
     }
 
     private relayOf(manager: EntityManager): Promise<number> {
@@ -68,13 +73,4 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
         })
     }
 
-    private async run(): Promise<void> {
-        while (this.running) {
-            const sent = await this.relay().catch((cause: unknown) => {
-                this.logger.error(EventBusLogEvent.RelayFailed, cause)
-                return 0
-            })
-            if (sent === 0 && this.running) await this.transport.wait(this.options.relayIntervalMs)
-        }
-    }
 }

@@ -8,7 +8,7 @@ import type { ErrorsService } from "@modules/platform/errors"
 import { REQUEST_LOCALE } from "@modules/platform/i18n"
 import type { RequestLocale } from "@modules/platform/i18n"
 import { GRAPHQL_DEPTH_MAX } from "./graphql.contracts"
-import type { GraphqlContext, GraphqlContextInput } from "./graphql.contracts"
+import type { GraphqlContext, GraphqlContextInput, SubscriptionConnection } from "./graphql.contracts"
 import { graphqlContextOf, isConnectionExtra, rememberAuthorization } from "./graphql-context.mapper"
 import { depthLimitRule } from "./graphql-depth.policy"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./graphql.module-definition"
@@ -35,10 +35,7 @@ export class GraphqlModule extends ConfigurableModuleClass {
                         introspection: true,
                         subscriptions: {
                             "graphql-ws": {
-                                onConnect: (connection: {
-                                    readonly connectionParams?: Readonly<Record<string, unknown>>
-                                    readonly extra: unknown
-                                }): void => {
+                                onConnect: (connection: SubscriptionConnection): void => {
                                     if (isConnectionExtra(connection.extra)) {
                                         rememberAuthorization(connection.connectionParams, connection.extra)
                                     }

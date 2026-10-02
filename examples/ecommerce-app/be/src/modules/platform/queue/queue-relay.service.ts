@@ -5,6 +5,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { PassLoop } from "@modules/platform/primitives"
 import { InjectQueueOptions, InjectQueueRelayManagers, InjectQueueTransport } from "./queue.decorators"
 import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
@@ -21,8 +22,7 @@ import type { QueueRow } from "./persistence/queue.rows"
  * shutdown and pauses only when the outbox is empty.
  */
 export class QueueRelayService implements OnApplicationBootstrap, OnApplicationShutdown {
-    private running = false
-    private loop: Promise<void> = Promise.resolve()
+    private readonly loop: PassLoop
 
     constructor(
         @InjectQueueOptions() private readonly options: QueueOptions,
@@ -30,7 +30,14 @@ export class QueueRelayService implements OnApplicationBootstrap, OnApplicationS
         @InjectQueueTransport() private readonly transport: QueueTransport,
         @InjectClock() private readonly clock: Clock,
         @InjectLogger() private readonly logger: Logger,
-    ) {}
+    ) {
+        this.loop = new PassLoop({
+            pass: () => this.relay(),
+            onFailure: (cause) => this.logger.error(QueueLogEvent.RelayFailed, cause),
+            wait: (ms) => this.transport.wait(ms),
+            idleMs: this.options.relayIntervalMs,
+        })
+    }
 
     /** One pass over every connection: adds the oldest waiting rows of each (at most the batch size) and answers how many it added. */
     async relay(): Promise<number> {
@@ -41,14 +48,12 @@ export class QueueRelayService implements OnApplicationBootstrap, OnApplicationS
 
     /** Starts the relay loop over the outbox of every connection the options name. */
     onApplicationBootstrap(): void {
-        this.running = true
-        this.loop = this.run()
+        this.loop.start()
     }
 
     /** Stops the loop and waits for its last pass. */
     async onApplicationShutdown(): Promise<void> {
-        this.running = false
-        await this.loop
+        await this.loop.stop()
     }
 
     private relayOf(manager: EntityManager): Promise<number> {
@@ -59,15 +64,5 @@ export class QueueRelayService implements OnApplicationBootstrap, OnApplicationS
             await tx.query(MARK_ROWS_SENT, [rows.map((row) => row.id), this.clock.now()])
             return rows.length
         })
-    }
-
-    private async run(): Promise<void> {
-        while (this.running) {
-            const added = await this.relay().catch((cause: unknown) => {
-                this.logger.error(QueueLogEvent.RelayFailed, cause)
-                return 0
-            })
-            if (added === 0 && this.running) await this.transport.wait(this.options.relayIntervalMs)
-        }
     }
 }
