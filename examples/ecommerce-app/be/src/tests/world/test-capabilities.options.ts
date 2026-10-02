@@ -11,18 +11,21 @@ import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
-import { MessagingModule } from "@modules/platform/messaging"
+import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { EventBusModule } from "@modules/platform/event-bus"
+import { InboxModule } from "@modules/platform/inbox"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { OrderSummaryModule } from "@modules/projections/order-summary"
 import {
     cacheOptionsOf,
-    messagingOptionsOf,
+    eventBusOptionsOf,
     identityApiOptionsOf,
     keycloakAdminOptionsOf,
     keycloakOptionsOf,
     orderApiOptionsOf,
     receiptStorageOptionsOf,
 } from "./test-apps.options"
+import { ProbeConsumerModule } from "./probe-consumer.module"
 
 /** The catalog capability over the order database: stock, reservations. */
 export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
@@ -34,9 +37,11 @@ export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => CacheModule.register({ isGlobal: true, ...cacheOptionsOf(w) }),
 ]
 
-/** The messaging capability over the run's Redis: publisher and consumer registry. */
-export const MESSAGING_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
-    (w) => MessagingModule.register({ isGlobal: true, ...messagingOptionsOf(w) }),
+/** The event bus over the run's Kafka and the outbox of the order database (publisher, relay, consumer registry), the inbox of the billing database, and the consumer of the probe event. */
+export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) => EventBusModule.register({ isGlobal: true, ...eventBusOptionsOf(w, "probe"), connection: ORDER_ENTITY_MANAGER }),
+    () => InboxModule.register({ isGlobal: true }),
+    () => ProbeConsumerModule,
 ]
 
 /** The realtime hub of one app instance: the push channel of the realtime kind. */

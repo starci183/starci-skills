@@ -19,9 +19,15 @@ import {
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
+import { BILLING_ENTITY_MANAGER, DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
-import { EVENT_BUS_ERROR_KINDS, EVENT_BUS_MESSAGES, EventBusModule } from "@modules/platform/event-bus"
+import {
+    EVENT_BUS_ERROR_KINDS,
+    EVENT_BUS_MESSAGES,
+    EventBusModule,
+    eventBusEntities,
+    eventBusMigrations,
+} from "@modules/platform/event-bus"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
 import {
     HTTP_SECURITY_ERROR_KINDS,
@@ -33,7 +39,6 @@ import {
 import { I18nModule } from "@modules/platform/i18n"
 import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { LoggingModule } from "@modules/platform/logging"
-import { MESSAGING_ERROR_KINDS, MESSAGING_MESSAGES, MessagingModule } from "@modules/platform/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { HealthHttpModule } from "@features/health"
 import { InvoicingMessageModule } from "@features/invoicing"
@@ -63,7 +68,6 @@ export class AppModule {
                         PROBES_MESSAGES,
                         IDENTITY_API_MESSAGES,
                         IDENTITY_MESSAGES,
-                        MESSAGING_MESSAGES,
                         EVENT_BUS_MESSAGES,
                         INVOICE_MESSAGES,
                     ],
@@ -78,7 +82,6 @@ export class AppModule {
                         PROBES_ERROR_KINDS,
                         IDENTITY_API_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
-                        MESSAGING_ERROR_KINDS,
                         EVENT_BUS_ERROR_KINDS,
                         INVOICE_ERROR_KINDS,
                     ],
@@ -90,16 +93,15 @@ export class AppModule {
                     connections: [
                         {
                             ...options.database,
-                            entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities],
-                            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations],
+                            entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
+                            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
                         },
                     ],
                 }),
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 InboxModule.register({ isGlobal: true }),
-                MessagingModule.register({ isGlobal: true, ...options.messaging }),
-                EventBusModule.register({ isGlobal: true }),
+                EventBusModule.register({ isGlobal: true, ...options.eventBus, connection: BILLING_ENTITY_MANAGER }),
                 InvoiceModule.register({ isGlobal: true, ...options.invoice }),
                 PaymentModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),

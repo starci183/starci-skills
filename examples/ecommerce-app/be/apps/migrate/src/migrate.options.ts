@@ -12,6 +12,7 @@ import {
     parseOrderDatabaseConfig,
 } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
@@ -28,7 +29,16 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
         { ...parseIdentityDatabaseConfig(env), entities: accountEntities, migrations: accountMigrations },
         {
             ...parseOrderDatabaseConfig(env),
-            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...loyaltyEntities, ...orderSummaryEntities, ...inboxEntities, ...sagaEntities],
+            entities: [
+                ...catalogEntities,
+                ...cartEntities,
+                ...orderEntities,
+                ...loyaltyEntities,
+                ...orderSummaryEntities,
+                ...inboxEntities,
+                ...sagaEntities,
+                ...eventBusEntities,
+            ],
             migrations: [
                 ...catalogMigrations,
                 ...cartMigrations,
@@ -37,12 +47,13 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
                 ...orderSummaryMigrations,
                 ...inboxMigrations,
                 ...sagaMigrations,
+                ...eventBusMigrations,
             ],
         },
         {
             ...parseBillingDatabaseConfig(env),
-            entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities],
-            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations],
+            entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
+            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
         },
     ],
 })

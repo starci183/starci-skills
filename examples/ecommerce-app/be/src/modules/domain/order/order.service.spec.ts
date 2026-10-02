@@ -5,9 +5,7 @@ import type { CartService } from "@modules/domain/cart"
 import { CATALOG_SERVICE } from "@modules/domain/catalog"
 import type { CatalogService } from "@modules/domain/catalog"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
-import { LOGGER } from "@modules/platform/logging"
 import { SAGA_SERVICE } from "@modules/platform/saga"
-import type { Logger } from "@modules/platform/logging"
 import type { SagaService } from "@modules/platform/saga"
 import { OrderPlacedEvent } from "@modules/events/order"
 import { EVENT_BUS } from "@modules/platform/event-bus"
@@ -17,7 +15,6 @@ import { orderLineRow, orderRow, placedOrder } from "@tests/fixtures/builders/or
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
 import { PLACE_ORDER_SAGA } from "./order.contracts"
-import { OrderLogEvent } from "./order.log-events"
 import { OrderService } from "./order.service"
 import { ReceiptService } from "./receipt.service"
 import { OrderEntity } from "./persistence/entities/order.entity"
@@ -32,7 +29,6 @@ const build = async (entityManager: MockEntityManager) => {
     const catalog = mock<CatalogService>()
     const receipts = mock<ReceiptService>()
     const bus = mock<EventBus>()
-    const logger = mock<Logger>()
     const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
@@ -42,11 +38,10 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: CATALOG_SERVICE, useValue: catalog },
             { provide: ReceiptService, useValue: receipts },
             { provide: EVENT_BUS, useValue: bus },
-            { provide: LOGGER, useValue: logger },
             { provide: SAGA_SERVICE, useValue: sagas },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, receipts, bus, logger, sagas }
+    return { orders: moduleRef.get(OrderService), cart, catalog, receipts, bus, sagas }
 }
 
 describe("OrderService", () => {
@@ -97,10 +92,7 @@ describe("OrderService", () => {
             expect(em.findOneBy).toHaveBeenCalledWith(OrderEntity, { personId: "p-1", idempotencyKey: "key-1" })
             expect(cart.list).not.toHaveBeenCalled()
             expect(em.transaction).not.toHaveBeenCalled()
-            expect(bus.publish).toHaveBeenCalledWith(
-                OrderPlacedEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1250 }),
-                expect.anything(),
-            )
+            expect(bus.publish).not.toHaveBeenCalled()
         })
 
         it("places the order with every write inside one committed transaction", async () => {
@@ -153,22 +145,22 @@ describe("OrderService", () => {
             )
         })
 
-        it("logs a failed announcement and still answers the placed order", async () => {
+        it("rolls the whole placement back when the announcement cannot be written, so no order exists that billing never hears of", async () => {
             const tx = fakeTransaction(
                 mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-6" }]], insert: [OrderLineEntity, {}] }),
             )
-            const { orders, cart, catalog, bus, logger } = await build(tx.em)
+            const { orders, cart, catalog, bus, receipts } = await build(tx.em)
             cart.list.mockResolvedValue([{ productId: "sku-2", quantity: 4 }])
             catalog.byIds.mockResolvedValue({ "sku-2": mug })
             catalog.reserveStock.mockResolvedValue(true)
-            const failure = new Error("stream down")
+            const failure = new Error("outbox down")
             bus.publish.mockRejectedValueOnce(failure)
 
-            expect(await orders.placeOrder({ personId: "p-1" })).toSucceedWith(
-                placedOrder({ orderId: "o-6", totalMinorUnits: 1000 }),
-            )
+            await expect(orders.placeOrder({ personId: "p-1" })).rejects.toBe(failure)
 
-            expect(logger.error).toHaveBeenCalledWith(OrderLogEvent.EventPublishFailed, failure, { orderId: "o-6" })
+            expect(tx.rollbacks).toBe(1)
+            expect(tx.commits).toBe(0)
+            expect(receipts.archive).not.toHaveBeenCalled()
         })
 
         it("places an order without a replay key and claims no key", async () => {

@@ -2,7 +2,7 @@
  * The declaration of the ecommerce test world: selection and overrides only. The service list and the image versions come
  * from the stack definition (`.starcistacks/dev`); the library runs Postgres (one database per connection, seeded with the
  * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the three real apps
- * in process: identity and order are wired to each other and talk to billing over Redis streams, and billing serves the signed webhook door of the bank transfer notifier, which is the one fake at the network edge (the SePay fake of the library, delivering to billing).
+ * in process: identity and order are wired to each other and talk to billing over Kafka, and billing serves the signed webhook door of the bank transfer notifier, which is the one fake at the network edge (the SePay fake of the library, delivering to billing).
  */
 import { defineTestWorld } from "@starci/test-world"
 import type { IdentityWorld, TestApi } from "@starci/test-world"
@@ -13,6 +13,7 @@ import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
 import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
+import { EVENT_TOPICS } from "./test-apps.options"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
     BILLING_ENTITIES,
@@ -50,6 +51,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
             ],
         },
         redis: {},
+        kafka: { topics: EVENT_TOPICS },
         minio: { buckets: [RECEIPTS_BUCKET] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_SIGN_IN_CLIENT },
     },

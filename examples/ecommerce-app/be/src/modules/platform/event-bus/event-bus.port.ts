@@ -3,9 +3,9 @@ import type { BaseEvent, EventClass, EventDeadLetter, EventDelivery } from "./ev
 
 /** The event bus of a service: events leave it through `publish`, called by a domain service in the transaction of the change they report. */
 export interface EventBus {
-    /** Publishes the event of the change `tx` carries. */
+    /** Writes the event in the outbox of the transaction `tx` carries; the relay hands it to the broker once the transaction commits. */
     publish(event: BaseEvent, tx: EntityManager): Promise<void>
-    /** How many events of the class wait for the backoff of a failed delivery to pass. */
+    /** How many deliveries of the class wait on the retry topic for their backoff to pass. */
     pendingRetries(event: EventClass<BaseEvent>): Promise<number>
     /** The events of the class that ran out of attempts. */
     deadLetters(event: EventClass<BaseEvent>): Promise<ReadonlyArray<EventDeadLetter>>

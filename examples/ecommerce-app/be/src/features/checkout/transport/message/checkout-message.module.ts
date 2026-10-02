@@ -3,8 +3,8 @@ import type { OnModuleInit } from "@nestjs/common"
 import { InjectEventConsumerRegistry } from "@modules/platform/event-bus"
 import type { EventConsumerRegistry } from "@modules/platform/event-bus"
 import { CheckoutModule } from "../../checkout.module"
-import { InvoiceIssuedConsumer } from "./invoice-issued.consumer"
-import { InvoiceRejectedConsumer } from "./invoice-rejected.consumer"
+import { InvoiceIssuedConsumer } from "./billing-invoice-issued.consumer"
+import { InvoiceRejectedConsumer } from "./billing-invoice-rejected.consumer"
 
 @Module({ imports: [CheckoutModule], providers: [InvoiceIssuedConsumer, InvoiceRejectedConsumer] })
 /** The message transport of the checkout feature: registers its consumers with the messaging capability. */
