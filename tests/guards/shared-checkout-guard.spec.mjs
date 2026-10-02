@@ -26,9 +26,11 @@ const boundOp = (t, file, tag) => {
   return { ORCA_TERMINAL_HANDLE: handle };
 };
 // An agent's shell call: the command guard decides first, and only an allowed command reaches git.
+// This spec judges the shared-checkout git policy; the role rights (R223: an op uses `starci git commit`, never a raw git write) are a later layer and resolve no role here.
+const NO_ROLE = { role: null, handle: null, lockOwner: () => null, policy: null };
 const guarded = (repo, file) => async (args, input) => {
   const quote = (a) => `'${String(a).replace(/'/g, `'\\''`)}'`;
-  const verdict = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard: JSON.parse(fs.readFileSync(file, 'utf8')), env: process.env });
+  const verdict = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard: JSON.parse(fs.readFileSync(file, 'utf8')), env: process.env, rights: NO_ROLE });
   if (verdict) return { status: 2, stderr: `starci guard: refused \`git ${verdict.command}\` [${verdict.code}] ${verdict.reason}`, verdict };
   return spawnSync('git', args, { cwd: repo, encoding: 'utf8', ...(input == null ? {} : { input }) });
 };
