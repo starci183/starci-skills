@@ -50,7 +50,7 @@
     "@nestjs/platform-express": "11.2.5",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.3",
-    "@starci/grammar": "0.8.1",
+    "@starci/grammar": "0.8.2",
     "bullmq": "6.3.11",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
