@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { INVOICE_SERVICE } from "@modules/domain/invoice"
 import type { InvoiceService } from "@modules/domain/invoice"
@@ -7,7 +7,6 @@ import { PaymentConfirmedEvent, PaymentFailedEvent } from "@modules/events/billi
 import { CLOCK } from "@modules/platform/clock"
 import { BILLING_ENTITY_MANAGER } from "@modules/platform/database"
 import { EVENT_BUS } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
 import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { LOGGER } from "@modules/platform/logging"
@@ -33,7 +32,7 @@ const openInvoice = { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", total
 const build = async (entityManager: MockEntityManager, claimed = true) => {
     const inbox = mock<Inbox>()
     inbox.claim.mockResolvedValue(claimed)
-    const bus = mock<EventBus>()
+    const bus = recordingEventBus()
     const logger = mock<Logger>()
     const invoices = mock<InvoiceService>()
     const moduleRef = await Test.createTestingModule({
@@ -74,10 +73,10 @@ describe("PaymentService", () => {
                 providerReference: "FT0000092704",
                 createdAt: new Date(AT),
             })
-            expect(bus.publish).toHaveBeenCalledWith(
+            expect(bus.writes).toEqual([
                 PaymentConfirmedEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
         })
 
@@ -88,15 +87,15 @@ describe("PaymentService", () => {
 
             await service.acceptBankTransfer({ ...notice, transferAmount: 1000 })
 
-            expect(bus.publish).toHaveBeenCalledWith(
+            expect(bus.writes).toEqual([
                 PaymentFailedEvent.create({
                     orderId: "o-1",
                     reason: "amount-mismatch",
                     expectedMinorUnits: 1500,
                     receivedMinorUnits: 1000,
                 }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
             expect(invoices.markPaid).not.toHaveBeenCalled()
             expect(tx.em.save).not.toHaveBeenCalled()
         })
@@ -109,7 +108,7 @@ describe("PaymentService", () => {
 
             expect(tx.em.transaction).not.toHaveBeenCalled()
             expect(invoices.findOpen).not.toHaveBeenCalled()
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("acknowledges and ignores a transfer that is not money received", async () => {
@@ -120,7 +119,7 @@ describe("PaymentService", () => {
 
             expect(logger.info).toHaveBeenCalledWith(PaymentLogEvent.TransferIgnored, { transferId: "92704" })
             expect(invoices.findOpen).not.toHaveBeenCalled()
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("acknowledges and ignores a transfer that names no open invoice", async () => {
@@ -134,7 +133,7 @@ describe("PaymentService", () => {
                 transferId: "92704",
                 code: "o-1",
             })
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("gives the claim back and rethrows when the transaction fails, so the redelivery is processed again", async () => {

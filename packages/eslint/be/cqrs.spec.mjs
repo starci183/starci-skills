@@ -249,6 +249,9 @@ test("no-event-bus: no EventBus, @EventsHandler, IEventHandler or @nestjs/event-
     tester.run("no-event-bus", noEventBus, {
         valid: [
             { filename: HANDLER, code: `import { CommandBus, CommandHandler, QueryBus } from "@nestjs/cqrs"\nexport const x = [CommandBus, CommandHandler, QueryBus]` },
+            // the event bus port of platform/event-bus shares the name and is the one allowed way to announce a change
+            { filename: DOMAIN, code: `import { EventBus } from "@modules/platform/event-bus"
+export const x = EventBus` },
             // a local class with the same name is not the package's
             { filename: HANDLER, code: "class EventBus {}\nexport const x = new EventBus()" },
             { filename: DOMAIN, code: `import { Module } from "@nestjs/common"\nexport const x = Module` },

@@ -9,8 +9,8 @@ import { BE_DECLARATION, at, typedTester } from "./fixtures/typed/tester.mjs"
 import { realtimeReadOnly, realtimeShape, realtimeTopicScope, rules } from "./realtime.mjs"
 
 const tester = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
-const GATEWAY = at("src/features/realtime/order-status/order-status.gateway.ts")
-const SUBSCRIPTION = at("src/features/realtime/order-status/order-status.subscription.ts")
+const GATEWAY = at("src/features/realtime/order-status/transport/websocket/order-status.gateway.ts")
+const SUBSCRIPTION = at("src/features/realtime/order-status/transport/graphql/order-status.subscription.ts")
 const OTHER_SLOT = at("src/features/plan/transport/graphql/order-status.subscription.ts")
 
 const SOCKET_HEAD = `import { SubscribeMessage, WebSocketGateway } from "@nestjs/websockets"
@@ -58,7 +58,7 @@ test("realtime-shape: a file is the one door its role names, with no route, quer
             { filename: GATEWAY, code: gateway() },
             { filename: SUBSCRIPTION, code: subscription() },
             // the module and the dto of the kind are not doors
-            { filename: at("src/features/realtime/order-status/order-status-realtime.module.ts"), code: "export class M {}" },
+            { filename: at("src/features/realtime/order-status/transport/graphql/order-status-graphql.module.ts"), code: "export class M {}" },
             // outside the realtime slot nothing is judged
             { filename: OTHER_SLOT, code: "export class NotADoor {}" },
         ],

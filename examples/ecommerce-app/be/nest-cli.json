@@ -17,6 +17,12 @@
       "entryFile": "main",
       "sourceRoot": "apps/order/src"
     },
+    "billing": {
+      "type": "application",
+      "root": "apps/billing",
+      "entryFile": "main",
+      "sourceRoot": "apps/billing/src"
+    },
     "cli": {
       "type": "application",
       "root": "apps/cli",

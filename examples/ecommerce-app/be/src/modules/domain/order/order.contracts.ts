@@ -27,7 +27,7 @@ export interface CheckoutPlan {
 export interface PlacedOrder {
     /** The order id. */
     readonly orderId: string
-    /** The lifecycle state: an order that confirmed and was later cancelled keeps answering as a replay with `cancelled`, an unpaid one past its window with `expired`. */
+    /** The lifecycle state: an order that confirmed and later was cancelled or expired keeps answering as a replay with that state. */
     readonly status: OrderStatus
     /** The order total in minor units. */
     readonly totalMinorUnits: number

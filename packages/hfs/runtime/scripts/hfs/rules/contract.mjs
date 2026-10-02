@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { found } from './read.mjs';
+import { found, readText } from './read.mjs';
 import { safeRemove } from '../../api/fs/safe-remove.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
@@ -23,7 +23,7 @@ export function contractHash(file) {
 }
 
 /** The findings of R23 for the be side at `repoRoot` (a side of another profile has none). */
-export function contractFindings({ files, repo, resolver }) {
+export function contractFindings({ repoRoot, files, repo, resolver }) {
   const findings = [];
   if (repo.profile !== 'be') return findings;
   const serves = files.some((file) => resolver.classifyPath(file).slot === GRAPHQL_TRANSPORT_SLOT);
@@ -31,7 +31,8 @@ export function contractFindings({ files, repo, resolver }) {
   for (const app of repo.apps.filter((a) => a.kind === 'api')) {
     const operations = `contracts/${app.name}/${SNAPSHOT_OF.json}`;
     if (tracked.has(`apps/${app.name}/src/operations.ts`) && !tracked.has(operations)) findings.push(found(CONTRACT_SNAPSHOT_DRIFT, operations, `${app.name} declares an operation table (apps/${app.name}/src/operations.ts) but ${operations} is not committed; declare be.contract.openapi in hfs.json sides.be.optionalSlots, run \`npm run contract:emit\` and commit the snapshot`, { app: app.name }));
-    if (!serves) continue;
+    // An app serves GraphQL when its root module composes the platform graphql capability; a repository with a GraphQL transport slot does not make every api app one.
+    if (!serves || !(readText(repoRoot, `apps/${app.name}/src/app.module.ts`) ?? '').includes('platform/graphql')) continue;
     const snapshot = `contracts/${app.name}/${SNAPSHOT_OF.graphql}`;
     if (!tracked.has(snapshot)) findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${app.name} serves GraphQL but ${snapshot} is not committed; declare be.contract.graphql in hfs.json sides.be.optionalSlots, run \`npm run contract:emit\` and commit the snapshot`, { app: app.name }));
   }

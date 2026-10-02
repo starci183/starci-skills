@@ -9,6 +9,6 @@ export interface QueueOutbox {
 
 /** Where a processor registers the handler of its queue; the workers start when the app has registered every handler. */
 export interface QueueWorkerRegistry {
-    /** Registers the handler of the queue. */
-    add(queue: string, handler: QueueHandler): void
+    /** Registers the handler under the queue it names; a second handler for the same queue replaces the first. */
+    add(handler: QueueHandler): void
 }

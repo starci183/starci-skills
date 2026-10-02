@@ -8,7 +8,10 @@ import type { RecomputeOrderSummaryResult } from "./recompute-order-summary.cont
 
 @CommandHandler(RecomputeOrderSummaryCommand)
 /** Recomputes the summary of one order; the order placed, order paid and order expired consumers send it for every delivered event. */
-export class RecomputeOrderSummaryHandler extends ICQRSHandler<RecomputeOrderSummaryCommand, RecomputeOrderSummaryResult> {
+export class RecomputeOrderSummaryHandler extends ICQRSHandler<
+    RecomputeOrderSummaryCommand,
+    RecomputeOrderSummaryResult
+> {
     constructor(
         @InjectLogger() logger: Logger,
         private readonly projection: OrderSummaryProjection,

@@ -1,7 +1,7 @@
 /**
  * The rules that hold the webhook kind (R167 `BE_WEBHOOK_SHAPE`, R168 `BE_WEBHOOK_UNVERIFIED`).
  *
- * A provider webhook (`src/features/webhooks/<provider>/<provider>.webhook.ts`, slot `be.feature.webhooks`) is a signed intake door. It
+ * A provider webhook (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`, slot `be.feature.webhooks.http`) is a signed intake door. It
  * proves the delivery came from the provider, then hands it to exactly ONE domain intake method, which records it and
  * publishes the event inside its own transaction (`eventBus.publish(event, tx)` is called only from `modules/domain`). The door
  * writes nothing and decides nothing:
@@ -24,7 +24,7 @@ import { baseName, enumMemberOf, isOwnedType } from "./lib/ports.mjs"
 import { typeOrigins } from "./lib/types.mjs"
 
 /** The slot of provider webhook doors. */
-const SLOT = "be.feature.webhooks"
+const SLOT = "be.feature.webhooks.http"
 
 /** The HTTP verbs of `@nestjs/common`; only `Post` is a webhook method. */
 const HTTP_VERBS = ["Get", "Post", "Put", "Patch", "Delete", "All", "Options", "Head"]

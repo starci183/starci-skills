@@ -22,7 +22,7 @@ import {
 const tester = typedTester()
 /** The fixture with the feature kinds enabled (a webhook door has its own slot). */
 const kinds = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
-const WEBHOOK = at("src/features/webhooks/payment/payment.webhook.ts")
+const WEBHOOK = at("src/features/webhooks/payment/transport/http/payment.webhook.ts")
 const T = "src/features/api/plan/transport"
 const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)
 const DTO = at(`${T}/graphql/dto/place-order.input.ts`)
@@ -190,7 +190,7 @@ test("door-lives-in-features: a provider webhook door lives in the webhooks slot
 `
     kinds.run("door-lives-in-features", doorLivesInFeatures, {
         valid: [{ filename: WEBHOOK, code: `${head}@Controller() export class C {}` }],
-        invalid: [{ filename: at("src/features/realtime/orders/orders.gateway.ts"), code: `${head}@Controller() export class C {}`, errors: [{ messageId: "wrongSlot" }] }],
+        invalid: [{ filename: at("src/features/realtime/orders/transport/websocket/orders.gateway.ts"), code: `${head}@Controller() export class C {}`, errors: [{ messageId: "wrongSlot" }] }],
     })
 })
 

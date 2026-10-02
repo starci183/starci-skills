@@ -7,7 +7,10 @@ import { OrderPlacedConsumer } from "./order-placed.consumer"
 import { OrderPaidConsumer } from "./order-paid.consumer"
 import { OrderExpiredConsumer } from "./order-expired.consumer"
 
-@Module({ imports: [OrderSummaryProjectionModule], providers: [OrderPlacedConsumer, OrderPaidConsumer, OrderExpiredConsumer] })
+@Module({
+    imports: [OrderSummaryProjectionModule],
+    providers: [OrderPlacedConsumer, OrderPaidConsumer, OrderExpiredConsumer],
+})
 /** The message transport of the order-summary-projection reactor: registers its consumers with the event bus; an api or worker app composes it. */
 export class OrderSummaryProjectionMessageModule implements OnModuleInit {
     constructor(

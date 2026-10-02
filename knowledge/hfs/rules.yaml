@@ -1420,7 +1420,7 @@ rules:
       - {kind: eslint-be, id: job-run-key}
   - id: R145
     code: "BE_JOB_SHAPE"
-    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
+    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/transport/queue/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_SHAPE"]
@@ -1468,7 +1468,7 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R151
     code: "HFS_EVENT_CONTRACT"
-    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and every queue a consumer defines with `defineQueue` of `platform/messaging` must be listed in a consumes table; a missing or stale snapshot, an unknown event, a version mismatch or an unlisted consumer queue is a finding."
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]
@@ -1596,7 +1596,7 @@ rules:
       - {kind: eslint-be, id: sql-returning}
   - id: R167
     code: "BE_WEBHOOK_SHAPE"
-    law: "A provider webhook door (`src/features/webhooks/<provider>/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
+    law: "A provider webhook door (`src/features/webhooks/<provider>/transport/http/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_WEBHOOK_SHAPE"]

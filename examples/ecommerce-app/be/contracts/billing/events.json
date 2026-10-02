@@ -15,6 +15,23 @@
         "totalMinorUnits": "number"
       },
       "version": 1
+    },
+    "billing.payment-confirmed": {
+      "payload": {
+        "orderId": "string",
+        "personId": "string",
+        "totalMinorUnits": "number"
+      },
+      "version": 1
+    },
+    "billing.payment-failed": {
+      "payload": {
+        "expectedMinorUnits": "number",
+        "orderId": "string",
+        "reason": "string",
+        "receivedMinorUnits": "number"
+      },
+      "version": 1
     }
   },
   "schema": "starci/event-contract@1",

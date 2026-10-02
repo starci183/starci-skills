@@ -1,1 +1,1 @@
-export { SepayWebhookModule } from "./sepay-webhook.module"
+export { SepayHttpModule } from "./transport/http/sepay-http.module"

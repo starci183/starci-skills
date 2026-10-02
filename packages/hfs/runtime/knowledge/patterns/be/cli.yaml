@@ -9,6 +9,7 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+pattern: cli
 provenance:
   reviewedAt: 2026-10-02
   sources:

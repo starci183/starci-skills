@@ -19,7 +19,7 @@ const OWNER_PORT = at("src/modules/platform/jobs/jobs.claims.ts")
 const DOMAIN = at("src/modules/domain/order/placing.service.ts")
 const HANDLER = at("src/features/checkout/application/place-order.handler.ts")
 const STEP = at("src/features/jobs/send/steps/mail.step.ts")
-const PROCESSOR = at("src/features/jobs/send/send.processor.ts")
+const PROCESSOR = at("src/features/jobs/send/transport/queue/send.processor.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -105,7 +105,7 @@ test("job-shape: a processor extends the fenced base in its job folder and a ste
         ],
         invalid: [
             { filename: PROCESSOR, code: `export class SendProcessor { async process(): Promise<void> {} }`, errors: [{ messageId: "notFenced" }] },
-            { filename: at("src/features/jobs/send/other.processor.ts"), code: `${SHAPE_HEAD}export class OtherProcessor extends FencedProcessor { async process(job: ClaimedJob): Promise<void> { void job } }`, errors: [{ messageId: "processorStem" }] },
+            { filename: at("src/features/jobs/send/transport/queue/other.processor.ts"), code: `${SHAPE_HEAD}export class OtherProcessor extends FencedProcessor { async process(job: ClaimedJob): Promise<void> { void job } }`, errors: [{ messageId: "processorStem" }] },
             { filename: at("src/features/checkout/application/send.processor.ts"), code: `${SHAPE_HEAD}export class SendProcessor extends FencedProcessor { async process(job: ClaimedJob): Promise<void> { void job } }`, errors: [{ messageId: "processorPlacement" }] },
             { filename: STEP, code: `export class MailStep { async run(): Promise<void> {} }`, errors: [{ messageId: "notStep" }] },
             { filename: at("src/features/checkout/application/mail.step.ts"), code: `${SHAPE_HEAD}export class MailStep implements JobStep { async run(job: ClaimedJob): Promise<void> { void job } }`, errors: [{ messageId: "stepPlacement" }] },

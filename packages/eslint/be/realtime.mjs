@@ -1,7 +1,7 @@
 /**
  * The rules that hold the realtime kind (R169 `BE_REALTIME_SHAPE`, R170 `BE_REALTIME_WRITES`, R171 `BE_REALTIME_TOPIC_SCOPE`).
  *
- * A realtime door (`src/features/realtime/<channel>/<channel>.gateway.ts` for a socket, `<x>.subscription.ts` for a GraphQL
+ * A realtime door (`src/features/realtime/<channel>/transport/websocket/<channel>.gateway.ts` for a socket, `transport/graphql/<x>.subscription.ts` for a GraphQL
  * subscription, slot `be.feature.realtime`) READS and PUSHES. It never writes: the push is fed by a reactor that calls the `RealtimeHub`
  * of `platform/realtime`, and the door only subscribes a client to a topic of that hub.
  *
@@ -23,7 +23,7 @@ import { decoratorCallee } from "./lib/import-source.mjs"
 import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
 
 /** The slot of realtime doors. */
-const SLOT = "be.feature.realtime"
+const DOOR_SLOTS = new Set(["be.feature.realtime.graphql", "be.feature.realtime.websocket"])
 
 /** The `RealtimeHub` port of `platform/realtime`. */
 const isHubType = (context, node) => isOwnedType(context, node, { name: "RealtimeHub", capability: "realtime", tier: "platform" })
@@ -61,7 +61,7 @@ export const realtimeShape = {
     create(context) {
         const hfs = hfsOf(context)
         const role = roleOf(context.filename)
-        if (hfs.slotOf(context.filename) !== SLOT || role === null) return {}
+        if (!DOOR_SLOTS.has(hfs.slotOf(context.filename) ?? "") || role === null) return {}
         const spec = ROLES[role]
         return {
             "Program:exit"(program) {
@@ -98,7 +98,7 @@ export const realtimeReadOnly = {
     },
     create(context) {
         const hfs = hfsOf(context)
-        if (hfs.slotOf(context.filename) !== SLOT || roleOf(context.filename) === null) return {}
+        if (!DOOR_SLOTS.has(hfs.slotOf(context.filename) ?? "") || roleOf(context.filename) === null) return {}
         return {
             ClassDeclaration(node) {
                 for (const { node: member, annotation } of injectedMembers(context, node)) {
@@ -141,7 +141,7 @@ export const realtimeTopicScope = {
     create(context) {
         const hfs = hfsOf(context)
         const role = roleOf(context.filename)
-        if (hfs.slotOf(context.filename) !== SLOT || role === null) return {}
+        if (!DOOR_SLOTS.has(hfs.slotOf(context.filename) ?? "") || role === null) return {}
         const [source, name] = ROLES[role].operation
         return {
             ClassDeclaration(node) {

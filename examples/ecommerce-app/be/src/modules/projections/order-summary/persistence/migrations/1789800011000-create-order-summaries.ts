@@ -16,7 +16,9 @@ export class CreateOrderSummaries1789800011000 implements MigrationInterface {
     placed_at timestamptz NOT NULL,
     paid_at timestamptz
 )`)
-        await queryRunner.query(`CREATE INDEX order_summaries_person_idx ON order_summaries (person_id, placed_at DESC)`)
+        await queryRunner.query(
+            `CREATE INDEX order_summaries_person_idx ON order_summaries (person_id, placed_at DESC)`,
+        )
     }
 
     /** Drops the table. */

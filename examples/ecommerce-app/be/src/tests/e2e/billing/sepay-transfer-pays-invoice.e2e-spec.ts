@@ -31,9 +31,12 @@ describe("sepay transfer pays an invoice", () => {
         const session = await world.signedInPerson(name)
         const buyer = world.apps.order.api.bearing(session.sessionToken)
         expect(
-            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-desk", quantity: 1 } } })).errorCode,
+            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-desk", quantity: 1 } } }))
+                .errorCode,
         ).toBeNull()
-        const placed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey: `${name}-1` } } })
+        const placed = await buyer.mutate<PlaceOrderData>("placeOrder", {
+            variables: { input: { idempotencyKey: `${name}-1` } },
+        })
         const order = present(placed.data, "placeOrder data").placeOrder
         await world.waitFor(`billing issues the invoice of ${name}`, async () => {
             const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [order.orderId])

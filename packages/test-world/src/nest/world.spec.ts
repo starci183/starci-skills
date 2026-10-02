@@ -6,10 +6,11 @@ import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { Controller, Get, Module } from "@nestjs/common"
+import { Controller, Get, Module, Post, Req } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import type { AnyTestWorldConfig } from "../config/types"
 import { FakesHost } from "../fakes/framework/host"
+import { sepayFake } from "../fakes/shared/sepay"
 import { SLOT_ENV, STATE_FILE_ENV, writeRunState, removeRunState } from "../jest/context"
 import type { RunContext } from "../jest/context"
 import { World } from "./world"
@@ -34,6 +35,39 @@ class ApiApp {
     static register(options: ApiOptions): DynamicModule {
         HelloController.greeting = options.greeting
         return { module: ApiApp, controllers: [HelloController] }
+    }
+}
+
+@Controller()
+class RawBodyController {
+    @Post("raw")
+    raw(@Req() request: { readonly rawBody?: Buffer }): { raw: string | null } {
+        return { raw: Buffer.isBuffer(request.rawBody) ? request.rawBody.toString("utf8") : null }
+    }
+}
+
+@Module({})
+class RawBodyApp {
+    static register(): DynamicModule {
+        return { module: RawBodyApp, controllers: [RawBodyController] }
+    }
+}
+
+/** A webhook door that records which app received each delivery. */
+const webhookHits: Array<string> = []
+
+@Module({})
+class WebhookDoorApp {
+    static register(options: { readonly name: string }): DynamicModule {
+        @Controller()
+        class DoorController {
+            @Post("webhooks/sepay")
+            receive(): { ok: true } {
+                webhookHits.push(options.name)
+                return { ok: true }
+            }
+        }
+        return { module: WebhookDoorApp, controllers: [DoorController] }
     }
 }
 
@@ -83,8 +117,8 @@ const declaration = (order: Array<string>): AnyTestWorldConfig =>
         logger: ["error"],
     }) as unknown as AnyTestWorldConfig
 
-const publish = async (): Promise<RunContext> => {
-    const fakes = new FakesHost({}, { runId: "t", secret: (label) => label, now: () => new Date() })
+const publish = async (declared: ConstructorParameters<typeof FakesHost>[0] = {}): Promise<RunContext> => {
+    const fakes = new FakesHost(declared, { runId: "t", secret: (label) => label, now: () => new Date() })
     const { controlUrl, fakes: entries } = await fakes.start()
     started.push(() => fakes.close())
     const context: RunContext = {
@@ -377,7 +411,7 @@ test("an outage takes the run's outage lock itself: it waits for another file's 
     const toxiproxy = await fakeToxiproxy()
     const outageContext = {
         ...context,
-        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {} } },
+        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {}, schemas: {} } },
     } as RunContext
     removeRunState()
     publishSlot(outageContext)
@@ -437,7 +471,7 @@ test("one connection's database outage takes the outage lock like any outage, to
         ...context,
         infra: {
             toxiproxyApi: "http://127.0.0.1:1",
-            postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" } },
+            postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" }, schemas: {} },
         },
     } as RunContext
     removeRunState()
@@ -539,5 +573,49 @@ test("a client-secret rotation takes the outage lock too and, never undone, hold
     } finally {
         await other.stop()
         await rotating.stop()
+    }
+})
+
+test("an app declared with rawBody is created with Nest's rawBody, so a signed webhook can be verified over the exact bytes", async () => {
+    await publish()
+    const config = {
+        ...declaration([]),
+        apps: { signed: { module: RawBodyApp, rawBody: true, options: () => ({}) }, plain: { module: RawBodyApp, options: () => ({}) } },
+    } as unknown as AnyTestWorldConfig
+    const world = new World(config, { apps: ["signed", "plain"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        const exact = '{"id": 1,  "amount":2}'
+        const apps = world.apps as unknown as Record<string, { api: { post<T>(path: string, body?: unknown, options?: { headers?: Record<string, string> }): Promise<{ body: T }> } }>
+        const signed = await apps["signed"]?.api.post<{ raw: string | null }>("/raw", Buffer.from(exact), { headers: { "content-type": "application/json" } })
+        assert.equal(signed?.body.raw, exact)
+        const plain = await apps["plain"]?.api.post<{ raw: string | null }>("/raw", Buffer.from(exact), { headers: { "content-type": "application/json" } })
+        assert.equal(plain?.body.raw, null)
+    } finally {
+        await world.stop()
+    }
+})
+
+test("a payment fake declared with webhookApp delivers to that app, not to the first listening one", async () => {
+    const fakes = { sepay: sepayFake({ webhookApp: "billing" }), plainSepay: sepayFake() }
+    await publish(fakes)
+    const config = {
+        ...declaration([]),
+        fakes,
+        apps: {
+            identity: { module: WebhookDoorApp, options: () => ({ name: "identity" }) },
+            billing: { module: WebhookDoorApp, options: () => ({ name: "billing" }) },
+        },
+    } as unknown as AnyTestWorldConfig
+    const world = new World(config, { apps: ["identity", "billing"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        webhookHits.length = 0
+        const handles = world.fake as unknown as Record<string, { settle(params: { reference: string }): Promise<{ status: number } | null> }>
+        assert.equal((await handles["sepay"]?.settle({ reference: "SUB-1" }))?.status, 201)
+        assert.equal((await handles["plainSepay"]?.settle({ reference: "SUB-2" }))?.status, 201)
+        assert.deepEqual(webhookHits, ["billing", "identity"])
+    } finally {
+        await world.stop()
     }
 })

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
 import { test } from "node:test"
-import { sepayApiKeyHeader, sepayBearerHeader, sepayBodySignature, sepayVerifyApiKey, sepayVerifyBearer, sepayVerifyBody } from "./signature"
+import { sepayApiKeyHeader, sepayBearerHeader, sepaySignature, sepayVerifyApiKey, sepayVerifyBearer, sepayVerifySignature } from "./signature"
 import { sepayCreateResponse, sepayIntentWebhook, sepayTransactionPending, sepayTransactionSettled, sepayTransactionWebhook } from "./payloads"
 import { SEPAY_ERROR_NOT_FOUND, SEPAY_ERROR_UNAUTHORIZED } from "./fixtures"
 
@@ -16,13 +16,16 @@ test("sepay authorization headers", () => {
     assert.equal(sepayVerifyBearer("Apikey k", "k"), false)
 })
 
-test("sepay body signature is HMAC-SHA256 of the exact body", () => {
+test("sepay signature is HMAC-SHA256 of <timestamp>.<exact body>, so neither the body nor the time can change", () => {
     const body = '{"id":1}'
-    const expected = `sha256=${createHmac("sha256", "s").update(body).digest("hex")}`
-    assert.equal(sepayBodySignature(body, "s"), expected)
-    assert.equal(sepayVerifyBody(body, expected, "s"), true)
-    assert.equal(sepayVerifyBody(body, expected, "wrong"), false)
-    assert.equal(sepayVerifyBody(`${body} `, expected, "s"), false)
+    const expected = `sha256=${createHmac("sha256", "s").update(`1700000000000.${body}`).digest("hex")}`
+    assert.equal(sepaySignature(1700000000000, body, "s"), expected)
+    assert.equal(sepayVerifySignature(body, "1700000000000", expected, "s"), true)
+    assert.equal(sepayVerifySignature(body, "1700000000000", expected, "wrong"), false)
+    assert.equal(sepayVerifySignature(`${body} `, "1700000000000", expected, "s"), false)
+    assert.equal(sepayVerifySignature(body, "1700000000001", expected, "s"), false, "a moved timestamp breaks the signature")
+    assert.equal(sepayVerifySignature(body, undefined, expected, "s"), false)
+    assert.equal(sepayVerifySignature(body, "17e11", expected, "s"), false)
 })
 
 test("sepay payload shapes", () => {

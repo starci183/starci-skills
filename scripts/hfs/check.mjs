@@ -277,7 +277,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );
   } else if (repo.profile === 'be') {
-    findings.push(...contractFindings({ files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
+    findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
   } else {
     findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
   }

@@ -9,10 +9,10 @@ const CONTROLLER = at("src/features/api/checkout/transport/http/order.controller
 const RESOLVER = at("src/features/api/checkout/transport/graphql/order.resolver.ts")
 const PRELUDE = [
     'import type { MailerClient } from "@modules/integrations/mailer/mailer.client"',
-    'import type { MessagePublisher } from "@modules/platform/messaging/message-publisher.port"',
+    'import type { EventBus } from "@modules/platform/event-bus/event-bus.port"',
     'import type { Sender } from "@modules/domain/order/lookalike.service"',
     "declare const mailer: MailerClient",
-    "declare const publisher: MessagePublisher",
+    "declare const publisher: EventBus",
     "declare const sender: Sender",
     "declare const messages: { get(key: string, params?: object): string }",
     "class PlanNotFoundError extends Error {}",

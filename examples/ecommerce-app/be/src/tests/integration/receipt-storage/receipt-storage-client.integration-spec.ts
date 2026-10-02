@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { RECEIPT_STORAGE, ReceiptStorageErrorCode } from "@modules/integrations/receipt-storage"
 import type { ReceiptStorage } from "@modules/integrations/receipt-storage"
-import { RECEIPT_STORAGE_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
+import type { RunKey } from "@modules/platform/jobs"
+import { JOBS_CAPABILITY_MODULES, RECEIPT_STORAGE_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
+import { ProbeJobBehavior } from "../../world/probe-job.module"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -11,9 +13,23 @@ import { useTestWorld } from "../../world/use-test-world"
  * reached is the declared storage-unavailable error, with the client storing again once MinIO is back.
  */
 describe("receipt-storage: receipt archive client (integration)", () => {
-    const world = useTestWorld({ modules: RECEIPT_STORAGE_CAPABILITY_MODULES })
+    const world = useTestWorld({ modules: [...JOBS_CAPABILITY_MODULES, ...RECEIPT_STORAGE_CAPABILITY_MODULES] })
 
     const archive = (): ReceiptStorage => world.resolve<ReceiptStorage>(RECEIPT_STORAGE)
+    /** The run key a storing job step passes: only a real claim of the job row makes one. */
+    const runKeyOf = async (): Promise<RunKey> => {
+        const claims = world.resolve(ProbeJobBehavior).claims
+        const job = await world.waitFor("a job is claimed", () =>
+            claims.claim({
+                kind: "receipt-storage-spec",
+                jobKey: randomUUID(),
+                payload: {},
+                workerId: "spec",
+                leaseMs: 30_000,
+            }),
+        )
+        return claims.runKey(job, "store")
+    }
     const download = (url: string) => {
         const link = new URL(url)
         return world.http(link.origin).get<unknown>(`${link.pathname}${link.search}`)
@@ -23,7 +39,7 @@ describe("receipt-storage: receipt archive client (integration)", () => {
         const key = `receipts/${randomUUID()}.json`
         const document = { orderId: randomUUID(), totalMinorUnits: 1250, currency: "USD" }
 
-        await archive().store({ key, content: Buffer.from(JSON.stringify(document)) })
+        await archive().store({ key, content: Buffer.from(JSON.stringify(document)) }, await runKeyOf())
         const link = archive().linkOf(key)
 
         const downloaded = await download(link.url)
@@ -36,14 +52,15 @@ describe("receipt-storage: receipt archive client (integration)", () => {
 
     it("an unreachable storage is the declared storage-unavailable error, and the client stores again once MinIO is back", async () => {
         const key = `receipts/${randomUUID()}.json`
+        const runKey = await runKeyOf()
 
         await world.infra.minio.during(async () => {
-            await expect(archive().store({ key, content: Buffer.from("{}") })).rejects.toMatchObject({
+            await expect(archive().store({ key, content: Buffer.from("{}") }, runKey)).rejects.toMatchObject({
                 code: ReceiptStorageErrorCode.Unavailable,
             })
         })
 
-        await archive().store({ key, content: Buffer.from("{}") })
+        await archive().store({ key, content: Buffer.from("{}") }, runKey)
         expect((await download(archive().linkOf(key).url)).status).toBe(200)
     })
 })

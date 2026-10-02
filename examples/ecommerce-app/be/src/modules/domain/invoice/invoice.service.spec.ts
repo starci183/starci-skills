@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { builder, FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { BILLING_ENTITY_MANAGER } from "@modules/platform/database"
@@ -7,7 +7,6 @@ import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { InvoiceIssuedEvent, InvoiceRejectedEvent } from "@modules/events/billing"
 import { EVENT_BUS } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
 import { invoiceRow } from "@tests/fixtures/builders/invoice.builder"
 import { InvoiceErrorCode } from "./errors/invoice.error"
 import { INVOICE_OPTIONS } from "./invoice.decorators"
@@ -24,7 +23,7 @@ const request = { eventId: "o-1", orderId: "o-1", personId: "p-1", totalMinorUni
 const build = async (entityManager: MockEntityManager, claimed = true) => {
     const inbox = mock<Inbox>()
     inbox.claim.mockResolvedValue(claimed)
-    const bus = mock<EventBus>()
+    const bus = recordingEventBus()
     const moduleRef = await Test.createTestingModule({
         providers: [
             InvoiceService,
@@ -58,10 +57,8 @@ describe("InvoiceService", () => {
                 status: "issued",
                 createdAt: new Date(AT),
             })
-            expect(bus.publish).toHaveBeenCalledWith(
-                InvoiceIssuedEvent.create({ orderId: "o-1", totalMinorUnits: 1500 }),
-                expect.anything(),
-            )
+            expect(bus.writes).toEqual([InvoiceIssuedEvent.create({ orderId: "o-1", totalMinorUnits: 1500 })])
+            expect(bus.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
         })
 
@@ -81,14 +78,14 @@ describe("InvoiceService", () => {
                 params: { orderId: "o-1" },
             })
             expect(tx.em.save).toHaveBeenCalledWith(InvoiceEntity, expect.objectContaining({ status: "rejected" }))
-            expect(bus.publish).toHaveBeenCalledWith(
+            expect(bus.writes).toEqual([
                 InvoiceRejectedEvent.create({
                     orderId: "o-1",
                     reason: InvoiceErrorCode.OverLimit,
                     totalMinorUnits: 20_000,
                 }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
         })
 
@@ -104,7 +101,7 @@ describe("InvoiceService", () => {
             })
             expect(manager.findOneByOrFail).toHaveBeenCalledWith(InvoiceEntity, { orderId: "o-1" })
             expect(manager.save).not.toHaveBeenCalled()
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("refuses a redelivered event of a rejected invoice without announcing it again", async () => {
@@ -116,7 +113,7 @@ describe("InvoiceService", () => {
             const outcome = await service.issue({ ...request, totalMinorUnits: 20_000 })
 
             expect(outcome.kind).toBe("refused")
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("gives the claim back, rolls the transaction back and rethrows when the invoice cannot be written", async () => {
@@ -127,7 +124,7 @@ describe("InvoiceService", () => {
 
             await expect(service.issue(request)).rejects.toBe(failure)
             expect(inbox.release).toHaveBeenCalledWith("order", "o-1")
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
             expect(tx.rollbacks).toBe(1)
         })
     })

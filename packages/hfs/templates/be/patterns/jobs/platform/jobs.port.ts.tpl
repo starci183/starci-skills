@@ -1,10 +1,18 @@
-import type { AdvanceWrite, ClaimedJob, ClaimParams, FailWrite, GuardedWrite, RunKey } from "./jobs.contracts"
+import type {
+    AdvanceWrite,
+    ClaimedJob,
+    ClaimParams,
+    ClaimResult,
+    FailWrite,
+    GuardedWrite,
+    RunKey,
+} from "./jobs.contracts"
 import type { FencedProcessor } from "./fenced.processor"
 
 /** The one door to the job row; `platform/jobs` implements it and nothing else writes the table. */
 export interface JobClaims {
     /** Claims the delivery in one atomic statement and bumps the fencing token; null when the job is done or another worker holds a live claim. */
-    claim(params: ClaimParams): Promise<ClaimedJob | null>
+    claim(params: ClaimParams): Promise<ClaimResult>
     /** Records a finished step; throws `JobFencedOut` when the token is stale. */
     advance(write: AdvanceWrite): Promise<void>
     /** Completes the job; throws `JobFencedOut` when the token is stale. */

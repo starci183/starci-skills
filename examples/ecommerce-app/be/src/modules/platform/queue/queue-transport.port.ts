@@ -6,8 +6,8 @@ export interface QueueTransport {
     add(queue: string, jobId: string, payload: object): Promise<void>
     /** Creates or updates a job scheduler by its id. */
     upsertScheduler(scheduler: QueueSchedulerDefinition): Promise<void>
-    /** Starts a worker of the queue that runs `handler` for every job, `concurrency` at a time. */
-    work(queue: string, handler: QueueHandler, concurrency: number): Promise<void>
+    /** Starts a worker of the queue the handler names that runs it for every job, `concurrency` at a time. */
+    work(handler: QueueHandler, concurrency: number): Promise<void>
     /** Resolves after `ms` milliseconds: the only clock of the relay loop. */
     wait(ms: number): Promise<void>
     /** Closes every queue and worker. */

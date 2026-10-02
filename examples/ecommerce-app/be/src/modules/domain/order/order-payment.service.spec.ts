@@ -1,12 +1,11 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { OrderExpiredEvent, OrderPaidEvent } from "@modules/events/order"
 import { ReceiptQueue } from "@modules/queues/receipt"
 import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { EVENT_BUS } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
 import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { LOGGER } from "@modules/platform/logging"
@@ -20,7 +19,7 @@ const AT = "2026-02-03T04:05:06.000Z"
 const build = async (entityManager: MockEntityManager, claimed = true) => {
     const inbox = mock<Inbox>()
     inbox.claim.mockResolvedValue(claimed)
-    const bus = mock<EventBus>()
+    const bus = recordingEventBus()
     const logger = mock<Logger>()
     const receipts = mock<ReceiptQueue>()
     const moduleRef = await Test.createTestingModule({
@@ -41,7 +40,9 @@ describe("OrderPaymentService", () => {
     describe("recordPayment", () => {
         it("claims the event first, then moves the pending order to paid, publishes order.paid and enqueues the receipt in one committed transaction", async () => {
             const tx = fakeTransaction(
-                mockEntityManager({ query: [MARK_ORDER_PAID_IF_PENDING, [{ person_id: "p-1", total_minor_units: 1250 }]] }),
+                mockEntityManager({
+                    query: [MARK_ORDER_PAID_IF_PENDING, [{ person_id: "p-1", total_minor_units: 1250 }]],
+                }),
             )
             const { service, inbox, bus, receipts } = await build(tx.em)
 
@@ -50,10 +51,10 @@ describe("OrderPaymentService", () => {
             expect(inbox.claim).toHaveBeenCalledWith("billing-payment-confirmed", "o-1")
             expect(receipts.enqueueSendReceipt).toHaveBeenCalledWith({ orderId: "o-1" }, expect.anything())
             expect(tx.em.query).toHaveBeenCalledWith(MARK_ORDER_PAID_IF_PENDING, ["o-1", new Date(AT)])
-            expect(bus.publish).toHaveBeenCalledWith(
+            expect(bus.writes).toEqual([
                 OrderPaidEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1250, paidAt: AT }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
         })
 
@@ -64,7 +65,7 @@ describe("OrderPaymentService", () => {
             await service.recordPayment({ eventId: "o-1", orderId: "o-1" })
 
             expect(tx.em.transaction).not.toHaveBeenCalled()
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("logs and leaves the order alone when it is not pending any more", async () => {
@@ -74,7 +75,7 @@ describe("OrderPaymentService", () => {
             await service.recordPayment({ eventId: "o-1", orderId: "o-1" })
 
             expect(logger.warn).toHaveBeenCalledWith(OrderLogEvent.PaymentForClosedOrder, { orderId: "o-1" })
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
             expect(receipts.enqueueSendReceipt).not.toHaveBeenCalled()
         })
 
@@ -110,16 +111,11 @@ describe("OrderPaymentService", () => {
 
             expect(result).toEqual({ expired: 2 })
             expect(tx.em.query).toHaveBeenCalledWith(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [cutoff, 100])
-            expect(bus.publish).toHaveBeenNthCalledWith(
-                1,
+            expect(bus.writes).toEqual([
                 OrderExpiredEvent.create({ orderId: "o-1", personId: "p-1", expiredAt: AT }),
-                expect.anything(),
-            )
-            expect(bus.publish).toHaveBeenNthCalledWith(
-                2,
                 OrderExpiredEvent.create({ orderId: "o-2", personId: "p-2", expiredAt: AT }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
             expect(tx.commits).toBe(1)
         })
 
@@ -128,7 +124,7 @@ describe("OrderPaymentService", () => {
             const { service, bus } = await build(tx.em)
 
             expect(await service.expireOverdue({ olderThanMs: 3_600_000, limit: 100 })).toEqual({ expired: 0 })
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
     })
 })

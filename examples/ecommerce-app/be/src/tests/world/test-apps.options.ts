@@ -79,7 +79,12 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [
+    ...invoiceEntities,
+    ...paymentEntities,
+    ...inboxEntities,
+    ...eventBusEntities,
+]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -195,6 +200,8 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     eventBus: eventBusOptionsOf(w, "order"),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
+    queue: queueOptionsOf(w, `order${w.kafka.topicPrefix.replace(/\W/g, "")}`),
+    jobs: { workerId: "order-test", leaseMs: 30_000 },
     orderExpiry: { everyMs: ORDER_EXPIRY_TICK_MS, olderThanMs: ORDER_PAYMENT_WINDOW_TEST_MS },
 })
 
@@ -212,7 +219,10 @@ export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     httpSecurity: {
         ...httpSecurity,
         webhooks: {
-            sepay: { secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")), toleranceMs: WEBHOOK_TOLERANCE_MS },
+            sepay: {
+                secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
+                toleranceMs: WEBHOOK_TOLERANCE_MS,
+            },
         },
     },
     eventBus: eventBusOptionsOf(w, "billing"),

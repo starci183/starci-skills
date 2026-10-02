@@ -41,6 +41,16 @@ type OrderReceiptType {
   url: String!
 }
 
+type OrderStatusChangedType {
+  changedAt: String!
+  orderId: String!
+  status: String!
+}
+
+input OrderStatusInput {
+  orderId: ID!
+}
+
 input PlaceOrderInput {
   idempotencyKey: String
 }
@@ -64,4 +74,8 @@ type Query {
   buyerStatus: BuyerStatusType!
   cart: CartType!
   orderReceipt(input: OrderReceiptInput!): OrderReceiptType!
+}
+
+type Subscription {
+  orderStatusChanged(input: OrderStatusInput!): OrderStatusChangedType!
 }

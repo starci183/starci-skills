@@ -18,6 +18,7 @@ import { JobsModule } from "@modules/platform/jobs"
 import { QueueModule } from "@modules/platform/queue"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { OrderSummaryModule } from "@modules/projections/order-summary"
+import type { QueueSchedulerDefinition } from "@modules/platform/queue"
 import {
     cacheOptionsOf,
     eventBusOptionsOf,
@@ -56,7 +57,9 @@ export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 ]
 
 /** The realtime hub of one app instance: the push channel of the realtime kind. */
-export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => RealtimeModule.register({ isGlobal: true })]
+export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    () => RealtimeModule.register({ isGlobal: true }),
+]
 
 /** The order-summary projection over the order database. */
 export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => ({ module: OrderSummaryModule })]
@@ -86,6 +89,14 @@ export const RECEIPT_STORAGE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = 
     (w) => ReceiptStorageModule.register({ isGlobal: true, ...receiptStorageOptionsOf(w) }),
 ]
 
+/** The scheduler of the probe queue, declared twice under one id on purpose: BullMQ upserts it by id, so it still ticks once per interval. */
+const TICK: QueueSchedulerDefinition = {
+    queue: PROBE_QUEUE,
+    id: "probe-tick",
+    everyMs: 1000,
+    payload: { note: "tick" },
+}
+
 /** The queue capability over the run's Redis and the outbox of the order database, with the probe queue's worker and producer, and a scheduler that ticks the probe queue. */
 export const QUEUE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) =>
@@ -93,7 +104,7 @@ export const QUEUE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
             isGlobal: true,
             ...queueOptionsOf(w, `q${w.kafka.topicPrefix.replace(/\W/g, "")}`),
             connections: [ORDER_ENTITY_MANAGER],
-            schedulers: [{ queue: PROBE_QUEUE, id: "probe-tick", everyMs: 1000, payload: { note: "tick" } }],
+            schedulers: [TICK, TICK],
         }),
     () => ({ module: ProbeQueueModule, providers: [ProbeQueue], exports: [ProbeQueue] }),
 ]

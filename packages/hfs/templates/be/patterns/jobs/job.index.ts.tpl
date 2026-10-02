@@ -1,1 +1,1 @@
-export { @@Job@@Module } from "./@@job@@.module"
+export { @@Job@@QueueModule } from "./transport/queue/@@job@@-queue.module"

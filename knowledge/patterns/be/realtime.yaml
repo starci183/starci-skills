@@ -31,10 +31,10 @@ rules:
     hfsRules: [R01, R02, R47, R169]
     requirement: |-
       A push channel lives in `be/src/features/realtime/<channel>/` (slot `be.feature.realtime`), enabled by declaring the pattern
-      `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `<channel>-realtime.module.ts`, ONE door and its spec: either
-      `<channel>.gateway.ts` (one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`) with
-      `<channel>.gateway.spec.ts`, or `<x>.subscription.ts` (one `@Resolver` class whose operations are `@Subscription`) with
-      `<x>.subscription.spec.ts`, plus optional `dto/` (`<name>.{input,type,args}.ts`). A door carries no query, mutation, field
+      `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `transport/<protocol>/<channel>-<protocol>.module.ts`, ONE door and its spec: either
+      `transport/websocket/<channel>.gateway.ts` (one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`) with
+      `<channel>.gateway.spec.ts`, or `transport/graphql/<channel>.subscription.ts` (one `@Resolver` class whose operations are `@Subscription`) with
+      `<channel>.subscription.spec.ts`, plus optional `dto/` (`<name>.{input,type,args}.ts`). A door carries no query, mutation, field
       resolver or REST route. The kind imports only `modules/*`, never another kind, and only an api-kind app composes its module.
     rationale: |-
       One file per door keeps a protocol's machinery in one place, and keeping queries and mutations out guarantees that what a
@@ -42,10 +42,10 @@ rules:
     cases:
       - id: case-1
         when: A GraphQL subscription of order status
-        write: 'features/realtime/order-status/index.ts, order-status-realtime.module.ts, order-status.subscription.ts and order-status.subscription.spec.ts.'
+        write: 'features/realtime/order-status/index.ts, transport/graphql/order-status-graphql.module.ts, transport/graphql/order-status.subscription.ts and transport/graphql/order-status.subscription.spec.ts.'
       - id: case-2
         when: A socket gateway
-        write: 'features/realtime/chat/chat-realtime.module.ts, chat.gateway.ts and chat.gateway.spec.ts.'
+        write: 'features/realtime/chat/transport/websocket/chat-websocket.module.ts, transport/websocket/chat.gateway.ts and transport/websocket/chat.gateway.spec.ts.'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
@@ -140,44 +140,57 @@ rules:
 files:
   - path: src/features/realtime/<channel>/index.ts
     slot: be.feature.realtime
+    template: realtime/channel.index.ts.tpl
     role: The public surface of the kind folder, the module class an api-kind app composes.
-  - path: src/features/realtime/<channel>/<channel>-realtime.module.ts
-    slot: be.feature.realtime
-    role: Nest module of the door, composed only by an api-kind app.
-  - path: src/features/realtime/<channel>/<channel>.gateway.ts
-    slot: be.feature.realtime
+  - path: src/features/realtime/<channel>/transport/graphql/<channel>-graphql.module.ts
+    slot: be.feature.realtime.graphql
+    template: realtime/channel.graphql.module.ts.tpl
+    role: Nest module of the subscription door, composed only by an api-kind app.
+  - path: src/features/realtime/<channel>/transport/websocket/<channel>-websocket.module.ts
+    slot: be.feature.realtime.websocket
+    role: Nest module of the gateway door, composed only by an api-kind app.
+    optional: true
+  - path: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.ts
+    slot: be.feature.realtime.websocket
     role: A socket door (one WebSocketGateway class); exactly one of gateway or subscription per channel file name.
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
-    spec: src/features/realtime/<channel>/<channel>.gateway.spec.ts
+    spec: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.spec.ts
     optional: true
-  - path: src/features/realtime/<channel>/<channel>.gateway.spec.ts
-    slot: be.feature.realtime
+  - path: src/features/realtime/<channel>/transport/websocket/<channel>.gateway.spec.ts
+    slot: be.feature.realtime.websocket
     role: Unit spec of the gateway beside it.
     optional: true
-  - path: src/features/realtime/<channel>/<x>.subscription.ts
-    slot: be.feature.realtime
+  - path: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.ts
+    slot: be.feature.realtime.graphql
+    template: realtime/channel.subscription.ts.tpl
     role: A GraphQL subscription door (one Resolver class).
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
-    spec: src/features/realtime/<channel>/<x>.subscription.spec.ts
-    optional: true
-  - path: src/features/realtime/<channel>/<x>.subscription.spec.ts
-    slot: be.feature.realtime
+    spec: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.spec.ts
+  - path: src/features/realtime/<channel>/transport/graphql/<channel>.subscription.spec.ts
+    slot: be.feature.realtime.graphql
+    template: realtime/channel.subscription.spec.ts.tpl
     role: Unit spec of the subscription beside it.
-    optional: true
-  - path: src/features/realtime/<channel>/dto/<name>.type.ts
+  - path: src/features/realtime/<channel>/transport/graphql/dto/<channel>-changed.type.ts
     slot: be.feature.realtime.dto
-    role: The typed frame or the typed arguments of the door.
+    template: realtime/channel.type.ts.tpl
+    role: "The typed frame of the door, what the subscriber may see of a change."
+  - path: src/features/realtime/<channel>/transport/graphql/dto/<channel>.input.ts
+    slot: be.feature.realtime.dto
+    template: realtime/channel.input.ts.tpl
+    role: The typed, bounded arguments of the door.
     rules: [BE_INPUT_BOUNDED]
-    optional: true
   - path: src/modules/platform/realtime/realtime.hub.ts
     slot: be.platform
     role: RealtimeHub, the one owner of the socket and subscription engine (publish and subscribe).
     spec: src/modules/platform/realtime/realtime.service.spec.ts
+    optional: true
   - path: src/features/reactors/<name>/transport/message/<event>.consumer.ts
     slot: be.transport.message
     role: The reactor consumer that receives the domain event and pushes the frame through the hub.
+    optional: true
   - path: src/tests/e2e/<area>/<channel>-push.e2e-spec.ts
     slot: be.tests.e2e
     role: "Titles realtime/<scenario>: ... prove the pattern against a real client."
     spec: realtime/subscriber-receives-push, realtime/foreign-topic-is-isolated, realtime/disconnect-releases-subscription
     rules: [BE_PATTERN_SPEC_MISSING]
+    optional: true

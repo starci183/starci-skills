@@ -8,6 +8,10 @@ export const connectionRequestOf = (extra: ConnectionExtra | undefined): Operati
     ip: extra?.request.socket.remoteAddress,
 })
 
+/** True when the extras of a subscription connection are the ones this app keeps: they carry the upgrade request. */
+export const isConnectionExtra = (value: unknown): value is ConnectionExtra =>
+    typeof value === "object" && value !== null && "request" in value
+
 /** Keeps the Authorization connection param on the connection when a subscription client initialises it. */
 export const rememberAuthorization = (params: ConnectionParams | undefined, extra: ConnectionExtra): void => {
     extra.authorization = typeof params?.authorization === "string" ? params.authorization : undefined

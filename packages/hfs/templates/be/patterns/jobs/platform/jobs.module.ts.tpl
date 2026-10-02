@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { JOB_CLAIMS, JOB_PROCESSOR_REGISTRY, JOBS_MANAGER } from "./jobs.decorators"
+import type { EntityManager } from "typeorm"
+import { JOB_CLAIMS, JOB_PROCESSOR_REGISTRY, JOBS_MANAGERS } from "./jobs.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./jobs.module-definition"
 import { JobClaimService } from "./job-claim.service"
 import { JobRunnerService } from "./job-runner.service"
@@ -15,7 +16,11 @@ export class JobsModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
-                { provide: JOBS_MANAGER, useExisting: options.connection },
+                {
+                    provide: JOBS_MANAGERS,
+                    useFactory: (manager: EntityManager) => [manager],
+                    inject: [options.connection],
+                },
                 JobClaimService,
                 JobRunnerService,
                 { provide: JOB_CLAIMS, useExisting: JobClaimService },

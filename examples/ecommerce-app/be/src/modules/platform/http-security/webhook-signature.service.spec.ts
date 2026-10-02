@@ -49,7 +49,12 @@ describe("WebhookSignatureService", () => {
             const timestamp = String(Date.parse(NOW) - 60_000)
 
             const refusal = refusalOf(() =>
-                service.verify({ provider: "payment-gateway", rawBody: BODY, signature: sign(timestamp, BODY), timestamp }),
+                service.verify({
+                    provider: "payment-gateway",
+                    rawBody: BODY,
+                    signature: sign(timestamp, BODY),
+                    timestamp,
+                }),
             )
 
             expect(refusal).toBeUndefined()
@@ -92,11 +97,15 @@ describe("WebhookSignatureService", () => {
             const timestamp = String(Date.parse(NOW))
             const bare = sign(timestamp, BODY).slice("sha256=".length)
 
-            expect(refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature: bare, timestamp }))).toBe(
-                HttpSecurityErrorCode.WebhookSignatureInvalid,
-            )
             expect(
-                refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature: "sha256=ab", timestamp })),
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: BODY, signature: bare, timestamp }),
+                ),
+            ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
+            expect(
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: BODY, signature: "sha256=ab", timestamp }),
+                ),
             ).toBe(HttpSecurityErrorCode.WebhookSignatureInvalid)
         })
 
@@ -106,10 +115,26 @@ describe("WebhookSignatureService", () => {
             const signature = sign(timestamp, BODY)
             const invalid = HttpSecurityErrorCode.WebhookSignatureInvalid
 
-            expect(refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: undefined, signature, timestamp }))).toBe(invalid)
-            expect(refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature: undefined, timestamp }))).toBe(invalid)
-            expect(refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature, timestamp: undefined }))).toBe(invalid)
-            expect(refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature, timestamp: "yesterday" }))).toBe(invalid)
+            expect(
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: undefined, signature, timestamp }),
+                ),
+            ).toBe(invalid)
+            expect(
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: BODY, signature: undefined, timestamp }),
+                ),
+            ).toBe(invalid)
+            expect(
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: BODY, signature, timestamp: undefined }),
+                ),
+            ).toBe(invalid)
+            expect(
+                refusalOf(() =>
+                    service.verify({ provider: "payment-gateway", rawBody: BODY, signature, timestamp: "yesterday" }),
+                ),
+            ).toBe(invalid)
         })
 
         it("refuses a correctly signed delivery whose timestamp is older or newer than the replay window", async () => {
@@ -118,10 +143,24 @@ describe("WebhookSignatureService", () => {
             const early = String(Date.parse(NOW) + 300_001)
 
             expect(
-                refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature: sign(stale, BODY), timestamp: stale })),
+                refusalOf(() =>
+                    service.verify({
+                        provider: "payment-gateway",
+                        rawBody: BODY,
+                        signature: sign(stale, BODY),
+                        timestamp: stale,
+                    }),
+                ),
             ).toBe(HttpSecurityErrorCode.WebhookReplayed)
             expect(
-                refusalOf(() => service.verify({ provider: "payment-gateway", rawBody: BODY, signature: sign(early, BODY), timestamp: early })),
+                refusalOf(() =>
+                    service.verify({
+                        provider: "payment-gateway",
+                        rawBody: BODY,
+                        signature: sign(early, BODY),
+                        timestamp: early,
+                    }),
+                ),
             ).toBe(HttpSecurityErrorCode.WebhookReplayed)
         })
 

@@ -2,9 +2,10 @@ id: exkinds-webhook-realtime-kinds
 effectiveAt: '2026-10-02T10:00:00+07:00'
 summary: >-
   Lane EX-KINDS (lead C1), owner decision: the webhook and the realtime feature kinds. Slots be.feature.webhooks
-  (src/features/webhooks/<provider>/: <provider>-webhook.module.ts, <provider>.webhook.ts, <provider>.webhook.spec.ts, dto/) and
-  be.feature.realtime (src/features/realtime/<channel>/: <channel>-realtime.module.ts, <channel>.gateway.ts or <x>.subscription.ts with its
-  spec, dto/), each opt-in through the declared pattern webhooks or realtime (hfs.json sides.be.patterns) with the proof scenarios
+  (src/features/webhooks/<provider>/ with its door slot be.feature.webhooks.http under transport/http/: <provider>-http.module.ts,
+  <provider>.webhook.ts, <provider>.webhook.spec.ts, dto/) and be.feature.realtime (src/features/realtime/<channel>/ with the door
+  slots be.feature.realtime.graphql and be.feature.realtime.websocket under transport/<protocol>/: <channel>-<protocol>.module.ts,
+  <channel>.subscription.ts or <channel>.gateway.ts with its spec, dto/), every kind laid out by the feature layers rules, each opt-in through the declared pattern webhooks or realtime (hfs.json sides.be.patterns) with the proof scenarios
   of ruleParams.be.patternScenarios. The slot be.transport.websocket is deleted (a socket is the realtime kind). New rules R167
   BE_WEBHOOK_SHAPE, R168 BE_WEBHOOK_UNVERIFIED, R169 BE_REALTIME_SHAPE, R170 BE_REALTIME_WRITES and R171 BE_REALTIME_TOPIC_SCOPE
   (eslint-be webhook-shape, webhook-verify-first, realtime-shape, realtime-read-only, realtime-topic-scope). R47 now also accepts the spec of a webhook or realtime door beside its door. The door

@@ -9,7 +9,7 @@ import { Docker } from "./docker"
 import type { ExecResult } from "./exec"
 import type { PgClient } from "./pg"
 import { createStack } from "./index"
-import { containerName } from "./naming"
+import { KAFKA_IMAGE, containerName, kafkaProxyName, serviceContainerName } from "./naming"
 
 const scratch = mkdtempSync(join(tmpdir(), "starci-tw-stack-"))
 let counter = 0
@@ -66,6 +66,8 @@ const fakeFetch = (log: Array<string>) =>
         log.push(`${init?.method ?? "GET"} ${path}`)
         if (path === "/version") return new Response('"2.9.0"', { status: 200 })
         if (path === "/proxies" && (init?.method ?? "GET") === "GET") return new Response("{}", { status: 200 })
+        if (path.endsWith("/toxics") && (init?.method ?? "GET") === "GET") return new Response("[]", { status: 200 })
+        if (/^\/proxies\/[^/]+$/.test(path) && init?.method === "POST") return new Response("{}", { status: 200 })
         if (path === "/proxies") return new Response("{}", { status: 201 })
         return new Response(null, { status: 204 })
     }) as typeof fetch
@@ -82,14 +84,14 @@ const fakePg = (queries: Array<string>) => (): PgClient => ({
 
 const namespace = (snake: string): Namespace => ({ snake, kebab: snake.replace(/_/g, "-"), root: `/repo/${snake}` })
 
-const harness = () => {
-    const docker = fakeDocker()
+const harness = (probed: Array<number> = [], process: { readonly home?: string; readonly pid?: number; readonly isAlive?: (pid: number) => boolean; readonly docker?: ReturnType<typeof fakeDocker> } = {}) => {
+    const docker = process.docker ?? fakeDocker()
     const http: Array<string> = []
     const queries: Array<string> = []
     const redisCalls: Array<string> = []
     const stack = createStack({
         docker: docker.docker,
-        home: join(scratch, `home${(counter += 1)}`),
+        home: process.home ?? join(scratch, `home${(counter += 1)}`),
         pause: async () => undefined,
         fetch: fakeFetch(http),
         pg: fakePg(queries),
@@ -107,8 +109,12 @@ const harness = () => {
             status: async () => [],
             down: async () => undefined,
         },
-        isAlive: () => true,
-        pid: 4321,
+        isAlive: process.isAlive ?? (() => true),
+        pid: process.pid ?? 4321,
+        kafkaProbe: async (_host, port) => {
+            probed.push(port)
+            return true
+        },
     })
     return { docker, http, queries, redisCalls, stack }
 }
@@ -177,6 +183,66 @@ describe("stack attach", () => {
         const again = await stack.attach(request(ns, "run3"))
         assert.equal(again.redis?.db, 0)
         assert.equal(again.postgresql?.port, 30100)
+    })
+
+    it("kafka: one broker of the pinned image with a proxy per slot listener; each slot leases its own listener, probed through its proxy", async () => {
+        const probed: Array<number> = []
+        const { docker, stack, http } = harness(probed)
+        const kafkaRequest = (ns: Namespace, runId: string): AttachRequest => ({ namespace: ns, runId, services: [{ service: "kafka", image: KAFKA_IMAGE }], kafka: { topics: ["orders"] } })
+        const one = namespace("shop_aaaaaa_w1")
+        const two = namespace("shop_aaaaaa_w2")
+        const first = await stack.attach(kafkaRequest(one, "run1-w1"))
+        assert.equal(http.filter((call) => call === "POST /proxies").length, 8, "one proxy per slot listener")
+        const second = await stack.attach(kafkaRequest(two, "run1-w2"))
+        assert.ok(docker.containers.has(serviceContainerName("kafka", KAFKA_IMAGE)))
+        assert.notEqual(serviceContainerName("kafka", KAFKA_IMAGE), containerName("kafka", KAFKA_IMAGE), "a broker of another listener shape is another container")
+        assert.equal(docker.runCount(), 2, "toxiproxy and one broker")
+        assert.equal(first.kafka?.listener, 1)
+        assert.equal(second.kafka?.listener, 2)
+        assert.equal(first.kafka?.proxy, kafkaProxyName(KAFKA_IMAGE, 1))
+        assert.equal(second.kafka?.proxy, kafkaProxyName(KAFKA_IMAGE, 2))
+        assert.notEqual(first.kafka?.port, second.kafka?.port)
+        assert.deepEqual(probed, [first.kafka?.port, second.kafka?.port])
+        assert.equal(first.kafka?.groupPrefix, "shop-aaaaaa-w1.")
+        const broker = docker.calls.find((call) => call.startsWith("run ") && call.includes("starci-ts-kafka"))
+        assert.ok(broker?.includes(`S1://127.0.0.1:${first.kafka?.port}`), broker)
+        assert.ok(broker?.includes(`S2://127.0.0.1:${second.kafka?.port}`), broker)
+        await stack.detach({ namespace: one, runId: "run1-w1", infra: first })
+        assert.equal(http.some((call) => call.startsWith("DELETE /proxies/kafka-")), false, "listener proxies belong to the broker")
+        const again = await stack.attach(kafkaRequest(namespace("blog_bbbbbb_w1"), "run2-w1"))
+        assert.equal(again.kafka?.listener, 1, "the freed listener is leased again")
+        assert.equal(again.kafka?.port, first.kafka?.port)
+    })
+
+    it("a run whose process died is reclaimed by the next attach through the same teardown, and its namespace is free again", async () => {
+        const home = join(scratch, `home${(counter += 1)}`)
+        const docker = fakeDocker()
+        const dead = new Set<number>()
+        const crashed = harness([], { home, pid: 1111, isAlive: (pid) => !dead.has(pid), docker })
+        const ns = namespace("shop_aaaaaa_w1")
+        await crashed.stack.attach(request(ns, "crashed-w1"))
+        dead.add(1111) // the jest process died: no detach ran
+        const next = harness([], { home, pid: 2222, isAlive: (pid) => !dead.has(pid), docker })
+        await next.stack.attach(request(namespace("blog_bbbbbb_w1"), "next-w1"))
+        assert.ok(next.queries.includes('DROP DATABASE IF EXISTS "shop_aaaaaa_w1_primary" WITH (FORCE)'), "the crashed run's database is dropped")
+        assert.ok(next.redisCalls.includes("SELECT 0 | FLUSHDB"), "its redis db is flushed")
+        assert.ok(next.http.includes("DELETE /proxies/crashed-w1-postgresql"), "its proxies are removed")
+        const leases = (await next.stack.status()).leases.map((lease) => lease.runId)
+        assert.deepEqual(leases, ["next-w1"])
+        const again = await next.stack.attach(request(ns, "rerun-w1"))
+        assert.deepEqual(again.postgresql?.databases, { primary: "shop_aaaaaa_w1_primary" }, "the namespace attaches again")
+    })
+
+    it("a dead run that provisioned nothing is dropped without a teardown", async () => {
+        const home = join(scratch, `home${(counter += 1)}`)
+        const docker = fakeDocker()
+        const dead = new Set<number>([3333])
+        const live = harness([], { home, pid: 4444, isAlive: (pid) => !dead.has(pid), docker })
+        const { Registry } = await import("./registry")
+        await new Registry({ dir: home }).update((data) => void data.leases.push({ namespace: "ghost_w1", runId: "ghost", pid: 3333, since: "2026-01-01T00:00:00.000Z", containers: [] }))
+        await live.stack.attach(request(namespace("shop_aaaaaa_w1"), "live-w1"))
+        assert.equal(live.queries.some((query) => query.includes("ghost")), false)
+        assert.deepEqual((await live.stack.status()).leases.map((lease) => lease.runId), ["live-w1"])
     })
 
     it("reset empties the namespace's databases and redis db", async () => {

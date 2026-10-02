@@ -20,6 +20,8 @@ const options: QueueOptions = {
     schedulers: [{ queue: "sweep", id: "sweep-every-minute", everyMs: 60000 }],
 }
 
+const handlerOf = (queue: string): QueueHandler => ({ queue, handle: () => Promise.resolve() })
+
 const build = async () => {
     const transport = mock<QueueTransport>()
     transport.upsertScheduler.mockResolvedValue(undefined)
@@ -39,29 +41,29 @@ describe("QueueWorkerService", () => {
     describe("onApplicationBootstrap", () => {
         it("starts one worker per registered queue with the configured concurrency and registers the schedulers", async () => {
             const { workers, transport } = await build()
-            const mailHandler: QueueHandler = () => Promise.resolve()
-            const sweepHandler: QueueHandler = () => Promise.resolve()
-            workers.add("mail", mailHandler)
-            workers.add("sweep", sweepHandler)
+            const mailHandler = handlerOf("mail")
+            const sweepHandler = handlerOf("sweep")
+            workers.add(mailHandler)
+            workers.add(sweepHandler)
 
             await workers.onApplicationBootstrap()
 
-            expect(transport.work).toHaveBeenCalledWith("mail", mailHandler, 3)
-            expect(transport.work).toHaveBeenCalledWith("sweep", sweepHandler, 3)
+            expect(transport.work).toHaveBeenCalledWith(mailHandler, 3)
+            expect(transport.work).toHaveBeenCalledWith(sweepHandler, 3)
             expect(transport.upsertScheduler).toHaveBeenCalledWith(options.schedulers[0])
         })
 
         it("keeps the last handler registered for a queue", async () => {
             const { workers, transport } = await build()
-            const first: QueueHandler = () => Promise.resolve()
-            const second: QueueHandler = () => Promise.resolve()
-            workers.add("mail", first)
-            workers.add("mail", second)
+            const first = handlerOf("mail")
+            const second = handlerOf("mail")
+            workers.add(first)
+            workers.add(second)
 
             await workers.onApplicationBootstrap()
 
             expect(transport.work).toHaveBeenCalledTimes(1)
-            expect(transport.work).toHaveBeenCalledWith("mail", second, 3)
+            expect(transport.work).toHaveBeenCalledWith(second, 3)
         })
 
         it("logs a scheduler that cannot be registered and still starts the app", async () => {

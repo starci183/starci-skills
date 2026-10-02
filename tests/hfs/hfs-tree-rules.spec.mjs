@@ -223,14 +223,20 @@ const GRAPHQL = 'be/src/features/api/orders/transport/graphql/orders-graphql.mod
 const WITH_CONTRACT = appOf({ be: { apps: [{ name: 'core', kind: 'api' }], optionalSlots: ['be.contract.graphql'] }, fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] } });
 const SCHEMA = 'type Query {\n  ping: String\n}\n';
 const SNAPSHOT = 'be/contracts/core/schema.graphql';
+const COMPOSES_GRAPHQL = (dir) => put(dir, 'be/apps/core/src/app.module.ts', 'import { GraphqlModule } from "@modules/platform/graphql";\nexport const modules = [GraphqlModule];\n');
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: a back end that serves GraphQL without a committed snapshot is refused', () => {
-  const result = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => put(dir, GRAPHQL)) });
+  const result = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => { put(dir, GRAPHQL); COMPOSES_GRAPHQL(dir); }) });
   assert.deepEqual(only(result, 'HFS_CONTRACT_SNAPSHOT_DRIFT').map((f) => f.path), [SNAPSHOT]);
 });
 
+test('HFS_CONTRACT_SNAPSHOT_DRIFT: an api app whose root module composes no GraphQL needs no snapshot, whatever the repository carries', () => {
+  const result = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => { put(dir, GRAPHQL); put(dir, 'be/apps/core/src/app.module.ts'); }) });
+  assert.deepEqual(only(result, 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
+});
+
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: a committed snapshot, and a back end with no GraphQL, are clean', () => {
-  const committed = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => { put(dir, GRAPHQL); put(dir, SNAPSHOT, SCHEMA); }) });
+  const committed = checkRepo({ repoRoot: repoOf(WITH_CONTRACT, (dir) => { put(dir, GRAPHQL); COMPOSES_GRAPHQL(dir); put(dir, SNAPSHOT, SCHEMA); }) });
   assert.deepEqual(only(committed, 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP) }), 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
 });

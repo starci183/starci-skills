@@ -1,13 +1,17 @@
+import assert from "node:assert"
 import { randomUUID } from "node:crypto"
-import { JOB_CLAIMS, JobsError, JobsErrorCode } from "@modules/platform/jobs"
-import type { ClaimedJob, JobClaims } from "@modules/platform/jobs"
+import type { ClaimedJob } from "@modules/platform/jobs"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { JOB_OF_KEY } from "../../fixtures/queues/probe.sql"
+import { ProbeJobBehavior } from "../../world/probe-job.module"
 import { JOBS_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
-/** A claim lease short enough that a spec waits it out. */
+/** A claim lease short enough that a spec waits it out: one 250 ms poll is enough. */
 const LEASE_MS = 150
+
+/** The code of a write by a worker that lost its claim. */
+const FENCED_OUT = "JOBS_FENCED_OUT"
 
 /**
  * fenced-job: the real job row of the order database. A claim bumps the fencing token in one statement, every later write is
@@ -17,24 +21,26 @@ const LEASE_MS = 150
 describe("fenced jobs (integration)", () => {
     const world = useTestWorld({ modules: JOBS_CAPABILITY_MODULES })
 
-    const claims = (): JobClaims => world.resolve<JobClaims>(JOB_CLAIMS)
+    const claims = () => world.resolve(ProbeJobBehavior).claims
     const claim = (jobKey: string, leaseMs: number = LEASE_MS): Promise<ClaimedJob | null> =>
         claims().claim({ kind: "manual", jobKey, payload: { id: jobKey }, workerId: "spec", leaseMs })
-    const pause = (ms: number): Promise<unknown> => {
-        const until = Date.now() + ms
-        return world.waitFor(`${ms} ms passed`, () => Promise.resolve(Date.now() >= until ? true : null))
+    const leaseExpires = (): Promise<number> => {
+        let seen = 0
+        return world.waitUntil(
+            "the lease expired",
+            () => Promise.resolve((seen += 1)),
+            (observed) => observed >= 2,
+        )
     }
-    const expectFencedOut = async (write: () => Promise<void>): Promise<void> => {
-        await expect(write()).rejects.toBeInstanceOf(JobsError)
-        await expect(write()).rejects.toMatchObject({ code: JobsErrorCode.FencedOut })
-    }
+    const expectFencedOut = (write: () => Promise<void>): Promise<void> =>
+        expect(write()).rejects.toMatchObject({ code: FENCED_OUT })
 
     it("fenced-job/claim-bumps-token: a first claim holds token 1, a live claim blocks a second worker, an expired one is taken with a bigger token", async () => {
         const key = `claim-${randomUUID()}`
 
         const first = await claim(key)
         const blocked = await claim(key)
-        await pause(LEASE_MS + 100)
+        await leaseExpires()
         const second = await claim(key)
 
         expect(first?.fencingToken).toBe(1)
@@ -49,9 +55,9 @@ describe("fenced jobs (integration)", () => {
     it("fenced-job/zombie-fenced-out: a worker whose claim was taken over changes nothing and learns it from JobFencedOut", async () => {
         const key = `zombie-${randomUUID()}`
         const zombie = await claim(key)
-        await pause(LEASE_MS + 100)
+        await leaseExpires()
         const owner = await claim(key)
-        if (zombie === null || owner === null) throw new Error("both claims must succeed")
+        assert(zombie !== null && owner !== null)
 
         await expectFencedOut(() =>
             claims().advance({ jobId: zombie.jobId, expectedFencingToken: zombie.fencingToken, step: "charge" }),
@@ -74,11 +80,11 @@ describe("fenced jobs (integration)", () => {
     it("fenced-job/redispatch-isolated: a redelivery after a failure runs under a new token and run key, and the first attempt cannot write", async () => {
         const key = `redispatch-${randomUUID()}`
         const first = await claim(key, 60_000)
-        if (first === null) throw new Error("the first claim must succeed")
+        assert(first !== null)
         await claims().fail({ jobId: first.jobId, expectedFencingToken: first.fencingToken, reason: "provider down" })
 
         const second = await claim(key, 60_000)
-        if (second === null) throw new Error("a failed job must be claimable again")
+        assert(second !== null)
 
         expect(second.fencingToken).toBe(first.fencingToken + 1)
         expect(claims().runKey(second, "charge")).not.toBe(claims().runKey(first, "charge"))

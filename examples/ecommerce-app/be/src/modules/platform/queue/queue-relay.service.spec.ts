@@ -5,7 +5,7 @@ import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { QUEUE_OPTIONS, QUEUE_RELAY_MANAGERS, QUEUE_TRANSPORT } from "./queue.decorators"
-import { QueueLogEvent } from "./queue.log-events"
+import { OutboxLogEvent } from "@modules/platform/outbox"
 import type { QueueOptions } from "./queue.options"
 import { QueueRelayService } from "./queue-relay.service"
 import type { QueueTransport } from "./queue-transport.port"
@@ -122,7 +122,7 @@ describe("QueueRelayService", () => {
 
             expect(transport.add).toHaveBeenCalledTimes(1)
             expect(transport.wait).toHaveBeenCalledWith(100)
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.RelayFailed, failure)
+            expect(logger.error).toHaveBeenCalledWith(OutboxLogEvent.RelayFailed, failure, { outbox: "queue" })
         })
     })
 })

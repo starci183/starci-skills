@@ -13810,7 +13810,7 @@ BE_JOB_SHAPE:
   causes_vi:
     - "Vi phạm luật R145: lớp cơ sở `FencedProcessor` claim job với token được tăng và kết thúc job qua các lệnh ghi có guard; một processor không kế thừa nó không có fence."
     - "Processor hoặc step được đặt cạnh handler hay nơi khác, làm loại jobs không còn một chỗ duy nhất."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `<job>.processor.ts` trong `features/jobs/<job>/` với class extends `FencedProcessor`, và mỗi step trong `steps/<step>.step.ts` implements `JobStep`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `<job>.processor.ts` trong `features/jobs/<job>/transport/queue/` với class extends `FencedProcessor`, và mỗi step trong `steps/<step>.step.ts` implements `JobStep`."
   owner: op-retry
   kind: check-finding
 

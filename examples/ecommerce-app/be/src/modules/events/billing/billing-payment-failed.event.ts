@@ -1,5 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
+import { BaseEvent, readEventOf } from "@modules/platform/event-bus"
+import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `billing.payment-failed` (the contract `be/contracts/billing/events.json`). */
 export interface PaymentFailedPayload {
@@ -12,6 +12,15 @@ export interface PaymentFailedPayload {
     /** The amount that was transferred in minor units. */
     readonly receivedMinorUnits: number
 }
+
+/** True when the payload record has the fields and types of the payload. */
+const isPaymentFailedPayload = (
+    payload: Record<string, unknown>,
+): payload is Record<string, unknown> & PaymentFailedPayload =>
+    typeof payload.orderId === "string" &&
+    typeof payload.reason === "string" &&
+    typeof payload.expectedMinorUnits === "number" &&
+    typeof payload.receivedMinorUnits === "number"
 
 /** A bank transfer did not pay an invoice: version 1 of the billing service's contract; the invoice stays open. */
 export class PaymentFailedEvent extends BaseEvent {
@@ -33,11 +42,11 @@ export class PaymentFailedEvent extends BaseEvent {
     }
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    static parse(envelope: unknown): PaymentFailedEvent | null {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, reason, expectedMinorUnits, receivedMinorUnits } = envelope.payload
-        return typeof orderId === "string" && typeof reason === "string" && typeof expectedMinorUnits === "number" && typeof receivedMinorUnits === "number"
-            ? new PaymentFailedEvent(envelope.eventId, { orderId, reason, expectedMinorUnits, receivedMinorUnits })
-            : null
+    static parse(envelope: unknown): ParsedEvent<PaymentFailedEvent> {
+        return readEventOf(
+            envelope,
+            isPaymentFailedPayload,
+            (eventId, payload) => new PaymentFailedEvent(eventId, payload),
+        )
     }
 }

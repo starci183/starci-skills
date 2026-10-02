@@ -42,7 +42,7 @@ import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { HealthHttpModule } from "@features/api/health"
 import { InvoicingMessageModule } from "@features/api/invoicing"
-import { SepayWebhookModule } from "@features/webhooks/sepay"
+import { SepayHttpModule } from "@features/webhooks/sepay"
 import type { BillingAppOptions } from "./billing.options"
 
 @Module({})
@@ -94,7 +94,12 @@ export class AppModule {
                         {
                             ...options.database,
                             entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
-                            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
+                            migrations: [
+                                ...invoiceMigrations,
+                                ...paymentMigrations,
+                                ...inboxMigrations,
+                                ...eventBusMigrations,
+                            ],
                         },
                     ],
                 }),
@@ -112,7 +117,7 @@ export class AppModule {
                 }),
                 HealthHttpModule,
                 InvoicingMessageModule,
-                SepayWebhookModule,
+                SepayHttpModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

@@ -148,6 +148,22 @@ rules:
       manual: []
     relatedExamples: [event-bus]
 files:
+  - path: src/modules/platform/outbox/index.ts
+    slot: be.platform
+    role: "The public surface of the shared outbox relay."
+    template: outbox/platform/index.ts.tpl
+  - path: src/modules/platform/outbox/outbox.log-events.ts
+    slot: be.platform
+    role: "The log event of a failed relay pass."
+    template: outbox/platform/outbox.log-events.ts.tpl
+  - path: src/modules/platform/outbox/outbox-relay.service.ts
+    slot: be.platform
+    role: "The one relay loop the event bus and the queues share: read, deliver and mark in one transaction."
+    template: outbox/platform/outbox-relay.service.ts.tpl
+  - path: src/modules/platform/outbox/outbox-relay.service.spec.ts
+    slot: be.platform
+    role: "The unit spec of the relay loop through a concrete relay."
+    template: outbox/platform/outbox-relay.service.spec.ts.tpl
   - path: src/modules/platform/event-bus/errors/event-bus.error.ts
     slot: be.platform.event-bus
     template: event-bus/platform/errors/event-bus.error.ts.tpl

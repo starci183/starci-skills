@@ -651,3 +651,27 @@ test("background-unowned: a processor with no worker app declared is refused", (
         invalid: [...bad(f, [["src/features/jobs/sweep/sweep.processor.ts", [1, /declares no worker app/]]])],
     })
 })
+
+test("schema-owner: the table of a projection is declared by the projection entity beside its projection", (t) => {
+    const PROJECTION = "src/modules/projections/summary"
+    const entry = "{ name: PRIMARY_CONNECTION, entities: [...billingEntities, ...summaryEntities], migrations: billingMigrations }"
+    const f = repo(t, {
+        declaration: {
+            patterns: ["projection"],
+            connections: [{ name: "primary", envPrefix: "PRIMARY", owner: "core", isolation: "database" }, { name: "agentos", envPrefix: "AGENTOS", owner: "core", isolation: "database" }],
+        },
+        apps: [{ name: "core", kind: "api" }, { name: "migrate", kind: "migrate" }],
+        files: {
+            ...SCHEMA_GOOD,
+            "apps/migrate/src/main.ts": "void 0;\n",
+            [CORE_APP]: REGISTER(entry, "import { summaryEntities } from '../../../src/modules/projections/summary';"),
+            [`${PROJECTION}/index.ts`]: "export { summaryEntities } from './persistence/connection';\n",
+            [`${PROJECTION}/persistence/connection.ts`]: "import { SummaryProjectionEntity } from '../summary.projection-entity';\nexport const summaryEntities = [SummaryProjectionEntity];\n",
+            [`${PROJECTION}/summary.projection-entity.ts`]: ENTITY("SummaryProjectionEntity", "summaries"),
+        },
+    })
+    f.tester.run("schema-owner", rules["schema-owner"], {
+        valid: ok(f, [`${PROJECTION}/summary.projection-entity.ts`, `${PROJECTION}/persistence/connection.ts`]),
+        invalid: [],
+    })
+})

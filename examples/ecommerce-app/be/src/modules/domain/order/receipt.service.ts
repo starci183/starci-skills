@@ -7,7 +7,7 @@ import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { OrderErrorCode } from "./errors/order.error"
 import type { ReceiptDocument, ReceiptLinkParams } from "./order.contracts"
-import type { PreparedReceipt, RecordReceiptArchivedParams } from "./receipt.contracts"
+import type { PrepareReceiptResult, RecordReceiptArchivedParams } from "./receipt.contracts"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 
@@ -24,7 +24,7 @@ export class ReceiptService {
     ) {}
 
     /** The receipt document of a paid order, or null when the order does not exist or is not paid. */
-    async prepareReceipt(orderId: string): Promise<PreparedReceipt | null> {
+    async prepareReceipt(orderId: string): Promise<PrepareReceiptResult> {
         const order = await this.entityManager.findOneBy(OrderEntity, { id: orderId, status: "paid" })
         if (order === null) return null
         const document = await this.documentOf(order)

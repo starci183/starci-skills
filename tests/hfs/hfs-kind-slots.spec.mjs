@@ -17,19 +17,19 @@ const classify = (patterns, file) => {
 
 const WEBHOOK_FILES = {
   'src/features/webhooks/sepay/index.ts': 'be.feature.webhooks',
-  'src/features/webhooks/sepay/sepay-webhook.module.ts': 'be.feature.webhooks',
-  'src/features/webhooks/sepay/sepay.webhook.ts': 'be.feature.webhooks',
-  'src/features/webhooks/sepay/sepay.webhook.spec.ts': 'be.feature.webhooks',
-  'src/features/webhooks/sepay/dto/sepay-transfer.request.ts': 'be.feature.webhooks.dto',
+  'src/features/webhooks/sepay/transport/http/sepay-http.module.ts': 'be.feature.webhooks.http',
+  'src/features/webhooks/sepay/transport/http/sepay.webhook.ts': 'be.feature.webhooks.http',
+  'src/features/webhooks/sepay/transport/http/sepay.webhook.spec.ts': 'be.feature.webhooks.http',
+  'src/features/webhooks/sepay/transport/http/dto/sepay-transfer.request.ts': 'be.feature.webhooks.dto',
 };
 const REALTIME_FILES = {
   'src/features/realtime/order-status/index.ts': 'be.feature.realtime',
-  'src/features/realtime/order-status/order-status-realtime.module.ts': 'be.feature.realtime',
-  'src/features/realtime/order-status/order-status.subscription.ts': 'be.feature.realtime',
-  'src/features/realtime/order-status/order-status.subscription.spec.ts': 'be.feature.realtime',
-  'src/features/realtime/chat/chat.gateway.ts': 'be.feature.realtime',
-  'src/features/realtime/chat/chat.gateway.spec.ts': 'be.feature.realtime',
-  'src/features/realtime/order-status/dto/order-status-changed.type.ts': 'be.feature.realtime.dto',
+  'src/features/realtime/order-status/transport/graphql/order-status-graphql.module.ts': 'be.feature.realtime.graphql',
+  'src/features/realtime/order-status/transport/graphql/order-status.subscription.ts': 'be.feature.realtime.graphql',
+  'src/features/realtime/order-status/transport/graphql/order-status.subscription.spec.ts': 'be.feature.realtime.graphql',
+  'src/features/realtime/chat/transport/websocket/chat.gateway.ts': 'be.feature.realtime.websocket',
+  'src/features/realtime/chat/transport/websocket/chat.gateway.spec.ts': 'be.feature.realtime.websocket',
+  'src/features/realtime/order-status/transport/graphql/dto/order-status-changed.type.ts': 'be.feature.realtime.dto',
 };
 
 test('a webhook folder is owned by the webhooks slot once the pattern is declared', () => {
@@ -37,10 +37,10 @@ test('a webhook folder is owned by the webhooks slot once the pattern is declare
 });
 
 test('a webhook or realtime folder is HFS_SLOT_NOT_ENABLED while its pattern is undeclared, and each pattern enables only its kind', () => {
-  assert.equal(classify(undefined, 'src/features/webhooks/sepay/sepay.webhook.ts'), 'not-enabled:be.feature.webhooks');
-  assert.equal(classify(['realtime'], 'src/features/webhooks/sepay/sepay.webhook.ts'), 'not-enabled:be.feature.webhooks');
-  assert.equal(classify(undefined, 'src/features/realtime/chat/chat.gateway.ts'), 'not-enabled:be.feature.realtime');
-  assert.equal(classify(['webhooks'], 'src/features/realtime/chat/chat.gateway.ts'), 'not-enabled:be.feature.realtime');
+  assert.equal(classify(undefined, 'src/features/webhooks/sepay/transport/http/sepay.webhook.ts'), 'not-enabled:be.feature.webhooks.http');
+  assert.equal(classify(['realtime'], 'src/features/webhooks/sepay/transport/http/sepay.webhook.ts'), 'not-enabled:be.feature.webhooks.http');
+  assert.equal(classify(undefined, 'src/features/realtime/chat/transport/websocket/chat.gateway.ts'), 'not-enabled:be.feature.realtime.websocket');
+  assert.equal(classify(['webhooks'], 'src/features/realtime/chat/transport/websocket/chat.gateway.ts'), 'not-enabled:be.feature.realtime.websocket');
 });
 
 test('a realtime folder is owned by the realtime slot once the pattern is declared', () => {
@@ -52,12 +52,12 @@ test('a kind folder admits only the files of its kind: no service, handler, cons
   for (const file of Object.keys({ ...WEBHOOK_FILES, ...REALTIME_FILES })) assert.equal(allowsFile(resolver, file).allowed, true, file);
   for (const file of [
     'src/features/webhooks/sepay/sepay.service.ts',
-    'src/features/webhooks/sepay/sepay.controller.ts',
-    'src/features/webhooks/sepay/sepay.mapper.ts',
-    'src/features/webhooks/sepay/dto/sepay-transfer.response.ts',
-    'src/features/realtime/chat/chat.resolver.ts',
+    'src/features/webhooks/sepay/transport/http/sepay.controller.ts',
+    'src/features/webhooks/sepay/transport/http/sepay.mapper.ts',
+    'src/features/webhooks/sepay/transport/http/dto/sepay-transfer.response.ts',
+    'src/features/realtime/chat/transport/graphql/chat.resolver.ts',
     'src/features/realtime/chat/chat.service.ts',
-    'src/features/realtime/chat/dto/chat.request.ts',
+    'src/features/realtime/chat/transport/graphql/dto/chat.request.ts',
   ]) assert.equal(allowsFile(resolver, file).allowed, false, file);
   for (const file of [
     'src/features/webhooks/sepay/application/accept.handler.ts',

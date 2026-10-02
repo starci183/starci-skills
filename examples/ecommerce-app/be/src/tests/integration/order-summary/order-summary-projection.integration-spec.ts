@@ -20,14 +20,23 @@ describe("order-summary: projection (integration)", () => {
     const projection = (): OrderSummaryProjection => world.resolve(OrderSummaryProjection)
 
     it("projection/recompute-is-idempotent: recomputing the same order twice leaves one identical row", async () => {
-        const order = await orderBuilder(world.db.order).build({ status: "paid", totalMinorUnits: 3000, paidAt: new Date("2026-02-03T04:05:06.000Z") }, 2)
+        const order = await orderBuilder(world.db.order).build(
+            { status: "paid", totalMinorUnits: 3000, paidAt: new Date("2026-02-03T04:05:06.000Z") },
+            2,
+        )
 
         await projection().recomputeOrderSummary(order.id)
         const first = await projection().getOrderSummary(order.id)
         await projection().recomputeOrderSummary(order.id)
         const second = await projection().getOrderSummary(order.id)
 
-        expect(first).toMatchObject({ orderId: order.id, status: "paid", totalMinorUnits: 3000, lineCount: 2, loyaltyPoints: 0 })
+        expect(first).toMatchObject({
+            orderId: order.id,
+            status: "paid",
+            totalMinorUnits: 3000,
+            lineCount: 2,
+            loyaltyPoints: 0,
+        })
         expect(second).toEqual(first)
         expect(await readCount(world.db.order, ORDER_SUMMARY_COUNT_OF_PERSON, order.personId)).toBe(1)
     })
@@ -36,7 +45,10 @@ describe("order-summary: projection (integration)", () => {
         const personId = "6d0e8b9a-3f0b-4f6b-9a39-0b1d2e3f4a5b"
         const builder = orderBuilder(world.db.order)
         await builder.build({ personId, status: "pending", totalMinorUnits: 1000 }, 1)
-        await builder.build({ personId, status: "paid", totalMinorUnits: 2000, paidAt: new Date("2026-02-03T04:05:06.000Z") }, 2)
+        await builder.build(
+            { personId, status: "paid", totalMinorUnits: 2000, paidAt: new Date("2026-02-03T04:05:06.000Z") },
+            2,
+        )
         await builder.build({ personId, status: "expired", totalMinorUnits: 3000 }, 3)
 
         const recomputed = await projection().recomputeAllOrderSummaries()

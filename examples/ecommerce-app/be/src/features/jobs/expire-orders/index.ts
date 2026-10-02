@@ -1,1 +1,1 @@
-export { ExpireOrdersModule } from "./expire-orders.module"
+export { ExpireOrdersQueueModule } from "./transport/queue/expire-orders-queue.module"

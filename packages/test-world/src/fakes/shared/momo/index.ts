@@ -12,7 +12,7 @@ import { FakeControlRejected } from "../../framework/failures"
 import { defineHttpFake } from "../../framework/http-fake"
 import type { FakeHttpReply, FakeHttpRequest, HttpFakeContext } from "../../framework/http-fake"
 import { DeliveryBook, appUrl, controlNumber, controlRecord, controlString, normalizePath, paymentClient, secretFor } from "../payment-kit"
-import type { PaymentClient } from "../payment-kit"
+import type { PaymentClient, PaymentWebhookOptions } from "../payment-kit"
 import {
     MOMO_ERROR_BAD_REQUEST,
     MOMO_ERROR_DUPLICATED_ORDER,
@@ -31,7 +31,7 @@ export * from "./payloads"
 export * from "./signature"
 
 /** What `momoFake` is declared with. */
-export interface MomoOptions {
+export interface MomoOptions extends PaymentWebhookOptions {
     /** The partner code (default: random, `values.partnerCode`). */
     readonly partnerCode?: string
     /** The access key (default: random, `values.accessKey`). */
@@ -319,5 +319,5 @@ export const momoFake = defineHttpFake<MomoClient, MomoOptions | undefined, Momo
             return delivery
         },
     },
-    client: (bridge: FakeBridge, base: FakeClient): MomoClient => paymentClient(bridge, base),
+    client: (bridge: FakeBridge, base: FakeClient, options: MomoOptions | undefined): MomoClient => paymentClient(bridge, base, options),
 })

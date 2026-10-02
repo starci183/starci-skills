@@ -11,7 +11,9 @@ export class AddOrderPaymentLifecycle1789800010000 implements MigrationInterface
             `ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'expired', 'cancelled'))`,
         )
         await queryRunner.query(`ALTER TABLE orders ADD COLUMN paid_at timestamptz`)
-        await queryRunner.query(`CREATE INDEX orders_pending_created_idx ON orders (created_at) WHERE status = 'pending'`)
+        await queryRunner.query(
+            `CREATE INDEX orders_pending_created_idx ON orders (created_at) WHERE status = 'pending'`,
+        )
     }
 
     /** Removes the column and restores the previous check. */
@@ -19,6 +21,8 @@ export class AddOrderPaymentLifecycle1789800010000 implements MigrationInterface
         await queryRunner.query(`DROP INDEX orders_pending_created_idx`)
         await queryRunner.query(`ALTER TABLE orders DROP COLUMN paid_at`)
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
-        await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'cancelled'))`)
+        await queryRunner.query(
+            `ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'cancelled'))`,
+        )
     }
 }

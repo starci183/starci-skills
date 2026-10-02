@@ -1,3 +1,4 @@
+import { fakeIds } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
 import type { PlacedOrder } from "@modules/domain/order"
 
@@ -71,12 +72,9 @@ export const placedOrder = (overrides: Partial<PlacedOrder> = {}): PlacedOrder =
     ...overrides,
 })
 
-/** The next id of a row this builder arranges: a UUID counted from one, so a failing spec reproduces. */
-let sequence = 0
-const nextId = (): string => {
-    sequence += 1
-    return `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`
-}
+/** The ids of the rows this builder arranges: deterministic UUIDs counted from one, so a failing spec reproduces. */
+const ids = fakeIds()
+const nextId = (): string => ids.next()
 
 /** The table the order rows live in. */
 const ORDERS = "orders"
@@ -91,7 +89,10 @@ export const orderBuilder = (manager: EntityManager) => ({
         const row = orderRow({ id: nextId(), personId: nextId(), ...overrides })
         await manager.insert(ORDERS, row)
         for (let index = 1; index <= lineCount; index += 1) {
-            await manager.insert(ORDER_LINES, orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }))
+            await manager.insert(
+                ORDER_LINES,
+                orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }),
+            )
         }
         return row
     },

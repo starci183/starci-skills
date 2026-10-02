@@ -1,7 +1,4 @@
-import { Injectable } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { InjectQueueOutbox } from "@modules/platform/queue"
-import type { QueueOutbox, QueueSchedulerDefinition } from "@modules/platform/queue"
+import type { QueueSchedulerDefinition } from "@modules/platform/queue"
 import type { ExpireOrdersPayload, OrderExpiryOptions } from "./order-expiry.contracts"
 
 /** The queue name: the contract between this producer, its scheduler and the processor of the expire-orders job. */
@@ -21,14 +18,3 @@ export const orderExpirySchedulerOf = (options: OrderExpiryOptions): QueueSchedu
     everyMs: options.everyMs,
     payload: { olderThanMs: options.olderThanMs } satisfies ExpireOrdersPayload,
 })
-
-@Injectable()
-/** The typed producer of the order-expiry queue, for a sweep an operator starts by hand; the scheduler starts the regular one. */
-export class OrderExpiryQueue {
-    constructor(@InjectQueueOutbox() private readonly outbox: QueueOutbox) {}
-
-    /** Enqueues one expiry sweep in the caller's transaction. */
-    enqueueExpireOverdue(payload: ExpireOrdersPayload, tx: EntityManager): Promise<void> {
-        return this.outbox.write(tx, ORDER_EXPIRY_QUEUE, payload)
-    }
-}

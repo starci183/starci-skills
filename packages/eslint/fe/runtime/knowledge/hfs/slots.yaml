@@ -132,8 +132,8 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/queue, platform/messaging]   # platform/messaging: interim BullMQ transport of the ecommerce example until platform/event-bus lands; pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
-      "@nestjs/bullmq": [platform/queue, platform/messaging]
+      bullmq: [platform/queue]               # pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
+      "@nestjs/bullmq": [platform/queue]
       kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
       "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
       eventemitter2: []
@@ -211,7 +211,10 @@ ruleParams:
       job: {topic: jobs, variable: job, trigger: jobs, patterns: [fenced-job, queue], also: [queue], defaults: {step: "@name"}}
       reactor: {topic: reactors, variable: reactor, trigger: reactors, patterns: [event-bus], needs: [event, from, service], defaults: {action: "@name"}}
       queue: {topic: queues, variable: queue, patterns: [queue]}
+      webhook: {topic: webhooks, variable: provider, trigger: webhooks, patterns: [webhooks], needs: [service], defaults: {event: "@name"}}
+      realtime: {topic: realtime, variable: channel, trigger: realtime, patterns: [realtime], needs: [service]}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
+      api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -838,15 +841,27 @@ slots:
     tracked: tracked
     tier: feature
     owner: true
-    requires: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
-    allows: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
+    requires: [index.ts, transport/]
+    allows: [index.ts, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+    since: 1.0.0
+  - id: be.feature.webhooks.http
+    profiles: [be]
+    path: "src/features/webhooks/<provider>/transport/http/"
+    presence: opt-in              # the one door of the provider: its module, the signed webhook and the door's own spec
+    pattern: webhooks
+    tracked: tracked
+    tier: feature
+    requires: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
+    allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
     tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
     composedBy: [api]
-    rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_FEATURE_NOT_COMPOSED]
+    rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
     since: 1.0.0
   - id: be.feature.webhooks.dto
     profiles: [be]
-    path: "src/features/webhooks/<provider>/dto/"
+    path: "src/features/webhooks/<provider>/transport/http/dto/"
     presence: opt-in
     pattern: webhooks
     tracked: tracked
@@ -865,15 +880,27 @@ slots:
     tracked: tracked
     tier: feature
     owner: true
-    requires: [index.ts, "<channel>-realtime.module.ts"]
-    allows: [index.ts, "<channel>-realtime.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
-    tests: unit-beside            # the door's own spec beside the door (a gateway or a subscription has no service of its own)
+    requires: [index.ts, transport/]
+    allows: [index.ts, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+    since: 1.0.0
+  - id: be.feature.realtime.graphql
+    profiles: [be]
+    path: "src/features/realtime/<channel>/transport/graphql/"
+    presence: opt-in              # a GraphQL subscription over graphql-ws
+    pattern: realtime
+    tracked: tracked
+    tier: feature
+    requires: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
+    allows: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
+    tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
     composedBy: [api]
-    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY, BE_FEATURE_NOT_COMPOSED]
+    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
   - id: be.feature.realtime.dto
     profiles: [be]
-    path: "src/features/realtime/<channel>/dto/"
+    path: "src/features/realtime/<channel>/transport/graphql/dto/"
     presence: opt-in
     pattern: realtime
     tracked: tracked
@@ -882,6 +909,19 @@ slots:
     tests: none
     composedBy: [api]
     rules: [BE_INPUT_BOUNDED]
+    since: 1.0.0
+  - id: be.feature.realtime.websocket
+    profiles: [be]
+    path: "src/features/realtime/<channel>/transport/websocket/"
+    presence: opt-in              # a socket gateway
+    pattern: realtime
+    tracked: tracked
+    tier: feature
+    requires: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
+    allows: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
+    tests: unit-beside            # the door's own spec beside the door (a gateway has no service of its own)
+    composedBy: [api]
+    rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
   - id: be.cli
     profiles: [be]
@@ -951,9 +991,9 @@ slots:
   - id: be.persistence
     profiles: [be]
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
-    # R163: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # R163: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the inbox of every service, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
-    perConnection: [event-bus, jobs]
+    perConnection: [event-bus, inbox, jobs]
     presence: optional
     tracked: tracked
     tier: inherit
@@ -1027,7 +1067,7 @@ slots:
     tracked: tracked
     tier: queues
     owner: true
-    requires: [index.ts, "<queue>.queue.ts", "<queue>.module.ts"]
+    requires: [index.ts, "<queue>.queue.ts"]   # the module exists when a domain module imports the producer; a scheduler-only queue has none
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
@@ -1053,10 +1093,22 @@ slots:
     tracked: tracked
     tier: feature
     owner: true
-    requires: [index.ts, "<job>.module.ts", "<job>.processor.ts", steps/]
-    allows: [index.ts, "<job>.module.ts", "<job>.processor.ts", application/, steps/]
+    requires: [index.ts, "<job>.module.ts", steps/, transport/]
+    allows: [index.ts, "<job>.module.ts", application/, steps/, transport/]
     tests: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.feature.jobs.queue
+    profiles: [be]
+    path: "src/features/jobs/<job>/transport/queue/"
+    presence: opt-in              # the queue transport of the job: its module and the processor the job runner hands the fenced claim to
+    pattern: fenced-job
+    tracked: tracked
+    tier: feature
+    requires: ["<job>-queue.module.ts", "<job>.processor.ts"]
+    allows: ["<job>-queue.module.ts", "<job>.processor.ts"]
+    tests: none
+    composedBy: [api, worker]
+    rules: [BE_BACKGROUND_UNOWNED]
   - id: be.jobs.steps
     profiles: [be]
     path: "src/features/jobs/<job>/steps/"

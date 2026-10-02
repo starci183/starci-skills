@@ -147,14 +147,14 @@ test("R47: a webhook or realtime door carries its own spec beside it, and only i
   kinds.run("unit-test-colocated", unitTestColocated, {
     valid: [
       // the door's spec beside its real door
-      { filename: at("src/features/webhooks/payment/payment.webhook.spec.ts"), code: "export {}" },
+      { filename: at("src/features/webhooks/payment/transport/http/payment.webhook.spec.ts"), code: "export {}" },
       // the door itself needs no service spec
-      { filename: at("src/features/webhooks/payment/payment.webhook.ts"), code: "export class PaymentWebhook {}" },
+      { filename: at("src/features/webhooks/payment/transport/http/payment.webhook.ts"), code: "export class PaymentWebhook {}" },
     ],
     invalid: [
       // a door spec with no door beside it
-      { filename: at("src/features/webhooks/ghost/ghost.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
-      { filename: at("src/features/realtime/orders/orders.gateway.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/features/webhooks/ghost/transport/http/ghost.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/features/realtime/orders/transport/websocket/orders.gateway.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the same name outside the slot of the kind is an ordinary non-service unit spec
       { filename: at("src/features/plan/transport/http/pay.webhook.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // the kind's slot holds door specs only: a controller spec of another role is still refused

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 import { afterEach, describe, test } from "node:test"
 import { TestWorldError, TestWorldErrorCode } from "../errors"
 import { readStackDefinition, resolveImageString, resolveInfraImages, resolveSiblingImage, selectedInfraServices } from "./stack-file"
+import { KAFKA_IMAGE } from "../stack/naming"
 
 const roots: string[] = []
 
@@ -77,7 +78,7 @@ describe("resolveInfraImages", () => {
             objects: "minio/minio:RELEASE.2024-06-13T22-53-53Z",
             mc: "minio/mc:RELEASE.2024-06-12T14-34-03Z",
             vectors: "qdrant/qdrant:v1.10.1",
-            broker: "confluentinc/cp-kafka:7.6.0",
+            broker: KAFKA_IMAGE,
             idp: "quay.io/keycloak/keycloak:26.0",
         })
         const images = resolveInfraImages({ postgresql: { connections: [] }, redis: {}, minio: {}, qdrant: {}, kafka: {}, keycloak: { realm: "r.json" } }, definition)
@@ -86,7 +87,7 @@ describe("resolveInfraImages", () => {
             { service: "redis", image: "redis:7-alpine" },
             { service: "minio", image: "minio/minio:RELEASE.2024-06-13T22-53-53Z" },
             { service: "qdrant", image: "qdrant/qdrant:v1.10.1" },
-            { service: "kafka", image: "confluentinc/cp-kafka:7.6.0" },
+            { service: "kafka", image: KAFKA_IMAGE },
             { service: "keycloak", image: "quay.io/keycloak/keycloak:26.0" },
         ])
     })
@@ -102,6 +103,17 @@ describe("resolveInfraImages", () => {
         const stacks = { redis: {}, qdrant: { fakedBy: "qdrant", reason: "no image" } }
         assert.deepEqual(selectedInfraServices(stacks), ["redis"])
         assert.deepEqual(resolveInfraImages(stacks, definitionOf({ redis: "redis:7" })), [{ service: "redis", image: "redis:7" }])
+    })
+    test("kafka is the ONE pinned Apache Kafka KRaft image: redpanda, cp-kafka and an undigested tag are refused", () => {
+        for (const image of ["redpandadata/redpanda:v24.1.1", "confluentinc/cp-kafka:7.6.0", "apache/kafka:4.2.2", "apache/kafka:4.1.0@sha256:" + "0".repeat(64)]) {
+            assert.throws(
+                () => resolveInfraImages({ kafka: {} }, definitionOf({ kafka: image })),
+                (error: unknown) => error instanceof TestWorldError && error.code === TestWorldErrorCode.StackDefinition && error.message.includes(KAFKA_IMAGE) && error.message.includes(image),
+                image,
+            )
+        }
+        assert.throws(() => resolveInfraImages({ kafka: { image: "apache/kafka:latest" } }, definitionOf({ kafka: KAFKA_IMAGE })), /pinned by digest/)
+        assert.match(KAFKA_IMAGE, /^apache\/kafka:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$/)
     })
     test("a missing service names the key, the stack dir and what was found", () => {
         assert.throws(

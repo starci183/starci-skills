@@ -32,8 +32,8 @@ src/
   features/cli/                     # the cli feature root: index.ts, cli.module.ts, cli.module-definition.ts
     <group>/<group>.cli.ts          # group @Command with subCommands, plus <group>.module.ts and <group>.module-definition.ts
     <group>/subs/<name>.cli.ts      # @SubCommand extending CommandRunner, with <name>.cli.spec.ts beside it
-  features/webhooks/<provider>/     # opt-in kind (pattern webhooks): index.ts, <provider>-webhook.module.ts, <provider>.webhook.ts + spec, dto/<event>.request.ts; verifies the signature, then ONE domain intake call
-  features/realtime/<channel>/      # opt-in kind (pattern realtime): index.ts, <channel>-realtime.module.ts, <channel>.gateway.ts or <x>.subscription.ts + spec; reads and pushes only through the RealtimeHub
+  features/webhooks/<provider>/     # opt-in kind (pattern webhooks): index.ts, transport/http/{<provider>-http.module.ts, <provider>.webhook.ts + spec, dto/<event>.request.ts}; verifies the signature, then ONE domain intake call
+  features/realtime/<channel>/      # opt-in kind (pattern realtime): index.ts, transport/graphql/{<channel>-graphql.module.ts, <channel>.subscription.ts + spec} or transport/websocket/{<channel>-websocket.module.ts, <channel>.gateway.ts + spec}; reads and pushes only through the RealtimeHub
   modules/
     domain/<capability>/            # business invariants, owned state: index.ts, module, module-definition, options, config, decorators, errors/, persistence/, services
     platform/<capability>/          # composition, config, errors, logging, clock, cqrs, database, ... each with its port and injector

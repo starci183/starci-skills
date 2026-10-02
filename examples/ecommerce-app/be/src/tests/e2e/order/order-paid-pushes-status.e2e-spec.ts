@@ -2,7 +2,11 @@ import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { OrderStatusChangedData, PlaceOrderData } from "../../fixtures/e2e-views.contracts"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
-import { INVOICES_OF_ORDER, LOYALTY_POINTS_OF_ORDER, ORDER_SUMMARY } from "../../fixtures/persistence/e2e-verification.sql"
+import {
+    INVOICES_OF_ORDER,
+    LOYALTY_POINTS_OF_ORDER,
+    ORDER_SUMMARY,
+} from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -26,9 +30,12 @@ describe("order paid pushes its status", () => {
         const session = await world.signedInPerson(name)
         const buyer = world.apps.order.api.bearing(session.sessionToken)
         expect(
-            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-chair", quantity: 1 } } })).errorCode,
+            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-chair", quantity: 1 } } }))
+                .errorCode,
         ).toBeNull()
-        const placed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey: `${name}-1` } } })
+        const placed = await buyer.mutate<PlaceOrderData>("placeOrder", {
+            variables: { input: { idempotencyKey: `${name}-1` } },
+        })
         const order = present(placed.data, "placeOrder data").placeOrder
         await world.waitFor(`billing issues the invoice of ${name}`, async () => {
             const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [order.orderId])
@@ -40,7 +47,9 @@ describe("order paid pushes its status", () => {
     it("realtime/subscriber-receives-push: the buyer's open subscription receives the paid frame once the transfer is confirmed", async () => {
         const { buyer, orderId } = await placedOrder("push-owner")
         expect((await readRows(world.db.order, ORDER_SUMMARY, [orderId]))[0]?.status).toBe("pending")
-        const subscription = await buyer.subscribe<OrderStatusChangedData>("orderStatusChanged", { variables: { input: { orderId } } })
+        const subscription = await buyer.subscribe<OrderStatusChangedData>("orderStatusChanged", {
+            variables: { input: { orderId } },
+        })
 
         const delivery = await world.fake.sepay.settle({ reference: orderId, amount: 12_500 })
 
@@ -64,11 +73,16 @@ describe("order paid pushes its status", () => {
         })
         const strangerSubscription = await world.apps.order.api
             .bearing(stranger.sessionToken)
-            .subscribe<OrderStatusChangedData>("orderStatusChanged", { variables: { input: { orderId: owner.orderId } } })
+            .subscribe<OrderStatusChangedData>("orderStatusChanged", {
+                variables: { input: { orderId: owner.orderId } },
+            })
 
         await world.fake.sepay.settle({ reference: owner.orderId, amount: 12_500 })
 
-        expect((await ownerSubscription.next()).orderStatusChanged).toMatchObject({ orderId: owner.orderId, status: "paid" })
+        expect((await ownerSubscription.next()).orderStatusChanged).toMatchObject({
+            orderId: owner.orderId,
+            status: "paid",
+        })
         expect(strangerSubscription.frames()).toEqual([])
         await ownerSubscription.close()
         await strangerSubscription.close()

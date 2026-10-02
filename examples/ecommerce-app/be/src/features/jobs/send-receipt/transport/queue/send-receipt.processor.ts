@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common"
 import { FencedProcessor } from "@modules/platform/jobs"
 import type { ClaimedJob } from "@modules/platform/jobs"
 import { RECEIPT_QUEUE } from "@modules/queues/receipt"
-import { StoreReceiptStep } from "./steps/store-receipt.step"
+import { StoreReceiptStep } from "../../steps/store-receipt.step"
 
 @Injectable()
 /** The processor of the send-receipt job: the base class claims the job with its fencing token and settles it, `process` runs the one step. */

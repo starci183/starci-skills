@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common"
 import { FencedProcessor } from "@modules/platform/jobs"
 import type { ClaimedJob } from "@modules/platform/jobs"
 import { @@jobUpper@@_QUEUE } from "@modules/queues/@@job@@"
-import { @@Step@@Step } from "./steps/@@step@@.step"
+import { @@Step@@Step } from "../../steps/@@step@@.step"
 
 @Injectable()
 /** The processor of the @@job@@ job: the runner claims and settles, `process` runs the steps in order. */

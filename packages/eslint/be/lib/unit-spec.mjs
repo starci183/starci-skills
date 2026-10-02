@@ -73,7 +73,7 @@ export const unitRoleOfSubject = (hfs, filename) => {
 export const serviceNameOfSpec = (filename) => baseOf(filename).replace(/\.service\.spec\.ts$/, "")
 
 /** The slots of the feature kinds whose door carries its own unit spec beside it. */
-const DOOR_SPEC_SLOTS = new Set(["be.feature.webhooks", "be.feature.realtime"])
+const DOOR_SPEC_SLOTS = new Set(["be.feature.webhooks.http", "be.feature.realtime.graphql", "be.feature.realtime.websocket"])
 
 /** The door a `<name>.<role>.spec.ts` of a feature kind tests, or null: `payment.webhook.spec.ts` gives `payment.webhook.ts`. */
 export const doorOfSpec = (hfs, filename) => {

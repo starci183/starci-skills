@@ -1,5 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
+import { BaseEvent, readEventOf } from "@modules/platform/event-bus"
+import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `billing.payment-confirmed` (the contract `be/contracts/billing/events.json`). */
 export interface PaymentConfirmedPayload {
@@ -10,6 +10,14 @@ export interface PaymentConfirmedPayload {
     /** The paid amount in minor units. */
     readonly totalMinorUnits: number
 }
+
+/** True when the payload record has the fields and types of the payload. */
+const isPaymentConfirmedPayload = (
+    payload: Record<string, unknown>,
+): payload is Record<string, unknown> & PaymentConfirmedPayload =>
+    typeof payload.orderId === "string" &&
+    typeof payload.personId === "string" &&
+    typeof payload.totalMinorUnits === "number"
 
 /** A bank transfer paid an invoice in full: version 1 of the billing service's contract; the order service marks the order paid. */
 export class PaymentConfirmedEvent extends BaseEvent {
@@ -31,11 +39,11 @@ export class PaymentConfirmedEvent extends BaseEvent {
     }
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    static parse(envelope: unknown): PaymentConfirmedEvent | null {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, personId, totalMinorUnits } = envelope.payload
-        return typeof orderId === "string" && typeof personId === "string" && typeof totalMinorUnits === "number"
-            ? new PaymentConfirmedEvent(envelope.eventId, { orderId, personId, totalMinorUnits })
-            : null
+    static parse(envelope: unknown): ParsedEvent<PaymentConfirmedEvent> {
+        return readEventOf(
+            envelope,
+            isPaymentConfirmedPayload,
+            (eventId, payload) => new PaymentConfirmedEvent(eventId, payload),
+        )
     }
 }

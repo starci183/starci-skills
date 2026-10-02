@@ -278,130 +278,67 @@ rules:
         - Confirm each refusal code is one the operation's owner can actually answer.
     relatedExamples: [api]
 files:
-  - path: src/features/api/checkout/index.ts
+  - path: src/features/api/<feature>/index.ts
     slot: be.feature
-    role: the one public entry of the feature; exports what an app composes
-    rules:
-      - BE_PUBLIC_SURFACE
-  - path: src/features/api/checkout/checkout.module.ts
+    role: The public surface of the feature; only apps import it.
+    rules: [BE_PUBLIC_SURFACE]
+    template: api/feature.index.ts.tpl
+  - path: src/features/api/<feature>/<feature>.module.ts
     slot: be.feature
-    role: registers the handlers once; static, no module-definition
-    rules:
-      - BE_FEATURE_SHAPE
-      - BE_MODULE_SHAPE
-  - path: src/features/api/checkout/application/add-cart-item.command.ts
+    role: Composes the application handlers.
+    template: api/feature.module.ts.tpl
+  - path: src/features/api/<feature>/application/<action>.command.ts
     slot: be.feature.application
-    role: the typed write message with one readonly params field
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_ENTITY_IN_CONTRACT
-  - path: src/features/api/checkout/application/add-cart-item.contracts.ts
+    role: One command (or `.query.ts`) carrying one `params` field.
+    template: api/application.command.ts.tpl
+  - path: src/features/api/<feature>/application/<action>.handler.ts
     slot: be.feature.application
-    role: the plain request and result types; no entity, no transport type
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_ENTITY_IN_CONTRACT
-  - path: src/features/api/checkout/application/add-cart-item.handler.ts
+    role: Overrides `process` and calls the domain service of its context.
+    template: api/application.handler.ts.tpl
+  - path: src/features/api/<feature>/application/<action>.contracts.ts
     slot: be.feature.application
-    role: opens one transaction and calls CartService.addItem; thin, proved through the service spec
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_RETURN_TYPE
-  - path: src/features/api/checkout/application/get-cart.query.ts
-    slot: be.feature.application
-    role: the typed read message
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_ENTITY_IN_CONTRACT
-  - path: src/features/api/checkout/application/get-cart.contracts.ts
-    slot: be.feature.application
-    role: the plain request and projection types of the read
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_ENTITY_IN_CONTRACT
-  - path: src/features/api/checkout/application/get-cart.handler.ts
-    slot: be.feature.application
-    role: calls one service method and returns its projection
-    rules:
-      - BE_CQRS_SHAPE
-      - BE_RETURN_TYPE
-  - path: src/features/api/checkout/application/support/cart-line.mapper.ts
-    slot: be.feature.application.support
-    role: a helper local to this feature; covered through the service spec of its caller
-    rules:
-      - BE_FEATURE_IMPORTS_FEATURE
-      - BE_FEATURE_SHAPE
-  - path: src/features/api/checkout/transport/graphql/checkout-graphql.module.ts
+    role: The plain request and result types of the action.
+    template: api/application.contracts.ts.tpl
+  - path: src/features/api/<feature>/transport/graphql/<action>.resolver.ts
     slot: be.transport.graphql
-    role: the one GraphQL module of the feature, composed by an api app
-    rules:
-      - BE_MODULE_SHAPE
-      - BE_FEATURE_NOT_COMPOSED
-  - path: src/features/api/checkout/transport/graphql/add-cart-item.resolver.ts
+    role: The GraphQL door of one operation; dispatches one message.
+    rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
+    template: api/graphql.resolver.ts.tpl
+  - path: src/features/api/<feature>/transport/graphql/dto/<action>.input.ts
     slot: be.transport.graphql
-    role: maps the input, dispatches AddCartItemCommand on the bus, maps the result
-    rules:
-      - BE_TRANSPORT_SHAPE
-      - BE_DEFAULT_DENY
-  - path: src/features/api/checkout/transport/graphql/add-cart-item.mapper.ts
+    role: The bounded input of the operation.
+    rules: [BE_INPUT_BOUNDED]
+    template: api/graphql.input.ts.tpl
+  - path: src/features/api/<feature>/transport/graphql/dto/<action>.type.ts
     slot: be.transport.graphql
-    role: pure toAddCartItemRequest and toAddCartItemType
-    rules:
-      - BE_TRANSPORT_SHAPE
-  - path: src/features/api/checkout/transport/graphql/dto/add-cart-item.input.ts
+    role: The typed output of the operation.
+    template: api/graphql.type.ts.tpl
+  - path: src/features/api/<feature>/transport/graphql/<action>.mapper.ts
     slot: be.transport.graphql
-    role: the bounded, validated GraphQL input
-    rules:
-      - BE_INPUT_BOUNDED
-  - path: src/features/api/checkout/transport/graphql/dto/add-cart-item.type.ts
+    role: Maps the input to the request and the result to the type.
+    template: api/graphql.mapper.ts.tpl
+  - path: src/features/api/<feature>/transport/graphql/<feature>-graphql.module.ts
     slot: be.transport.graphql
-    role: the GraphQL output type
-    rules:
-      - BE_TRANSPORT_SHAPE
-  - path: src/features/api/checkout/transport/http/checkout-http.module.ts
+    role: One module for the whole GraphQL transport of the feature.
+    template: api/graphql.module.ts.tpl
+  - path: src/features/api/<feature>/transport/http/<action>.controller.ts
     slot: be.transport.http
-    role: the one HTTP module, for the signed webhook only
-    rules:
-      - BE_MODULE_SHAPE
-      - BE_FEATURE_NOT_COMPOSED
-  - path: src/features/api/checkout/transport/http/payment-webhook.controller.ts
+    role: A REST door, only where GraphQL cannot serve (health, byte streams, the operation route).
+    optional: true
+    rules: [BE_TRANSPORT_SHAPE, BE_DEFAULT_DENY]
+  - path: src/features/api/<feature>/transport/http/<feature>-http.module.ts
     slot: be.transport.http
-    role: a signed webhook door that dispatches one command whose service claims the event
-    rules:
-      - BE_TRANSPORT_SHAPE
-      - BE_DEFAULT_DENY
-      - BE_INBOX_DEDUPE_MISSING
-  - path: src/features/api/checkout/transport/http/dto/payment-webhook.request.ts
-    slot: be.transport.http
-    role: the validated webhook body
-    rules:
-      - BE_INPUT_BOUNDED
-  - path: src/features/api/checkout/transport/message/checkout-message.module.ts
-    slot: be.transport.message
-    role: composed by the owning api app or a worker app
-    rules:
-      - BE_BACKGROUND_UNOWNED
-      - BE_MODULE_SHAPE
-  - path: src/features/api/checkout/transport/message/payment-settled.consumer.ts
-    slot: be.transport.message
-    role: receives the payment context's event and dispatches one command; the only way payment facts reach checkout
-    rules:
-      - BE_TRANSPORT_SHAPE
-      - BE_INBOX_DEDUPE_MISSING
-  - path: src/features/api/checkout/transport/schedule/checkout-schedule.module.ts
-    slot: be.transport.schedule
-    role: composed by the owning api app or a worker app
-    rules:
-      - BE_BACKGROUND_UNOWNED
-      - BE_MODULE_SHAPE
-  - path: src/features/api/checkout/transport/schedule/expire-carts.job.ts
-    slot: be.transport.schedule
-    role: a sweep with a runner; dispatches one command per tick
-    rules:
-      - BE_BACKGROUND_UNOWNED
-      - BE_TRANSPORT_SHAPE
-  - path: src/features/api/checkout/messages/checkout.messages.ts
+    role: One module for the whole HTTP transport of the feature.
+    optional: true
+  - path: src/features/api/<feature>/messages/<feature>.messages.ts
     slot: be.feature.messages
-    role: the vi and en copy of the feature
-    rules:
-      - BE_USER_COPY_LITERAL
+    role: The keyed vi and en text of the feature.
+    optional: true
+  - path: contracts/<app>/schema.graphql
+    slot: be.contract.graphql
+    role: The emitted GraphQL snapshot of the app; a stale file fails the full check.
+    optional: true
+  - path: src/tests/e2e/<area>/<action>.e2e-spec.ts
+    slot: be.tests.e2e
+    role: The operation on the booted app, refusal and unauthenticated call included.
+    optional: true

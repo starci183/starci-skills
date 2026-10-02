@@ -123,6 +123,16 @@ export { axios }`, errors: [{ messageId: "foreign" }] },
 export { EventEmitter2 }`, errors: [{ messageId: "nowhere" }] },
             { filename: QUEUE, code: `import { Cron } from "@nestjs/schedule"
 export { Cron }`, errors: [{ messageId: "nowhere" }] },
+            // the decorators of the schedule package are refused everywhere, a schedule is a BullMQ job scheduler
+            { filename: DOMAIN, code: `import { Interval } from "@nestjs/schedule"
+export { Interval }`, errors: [{ messageId: "nowhere" }] },
+            { filename: DOMAIN, code: `import { Timeout } from "@nestjs/schedule"
+export { Timeout }`, errors: [{ messageId: "nowhere" }] },
+            { filename: DOMAIN, code: `import { ScheduleModule } from "@nestjs/schedule"
+export { ScheduleModule }`, errors: [{ messageId: "nowhere" }] },
+            // bullmq and its nest wrapper belong to platform/queue alone
+            { filename: DOMAIN, code: `import { BullModule } from "@nestjs/bullmq"
+export { BullModule }`, errors: [{ messageId: "foreign" }] },
             { filename: QUEUE, code: `import { Kafka } from "kafkajs"
 export { Kafka }`, errors: [{ messageId: "foreign" }] },
             { filename: EVENT_BUS, code: `import { Worker } from "bullmq"
