@@ -43,15 +43,17 @@ function cutWorkflow(t,wf,{maxOps=null}={}){
   const repo=tempRepo(t);
   const owner=ownerConfig(t,{budgets:{maxOps}});
   seedGoal(repo,wf);
-  const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:owner,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
+  let statusCache=null;
+  const api=(...args)=>{const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:owner,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});if(args[0]!=='status')statusCache=null;return r;};
   const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
   const cut=(ordinal,paths)=>enq('--op','docs.author','--paths',paths,'--cut-id','chat-impl','--cut-ordinal',String(ordinal),'--cut-total','3');
   const seam=cut(1,'src/features/chat/composition,apps/core/src');
   const a=cut(2,'src/features/chat/a');
   const b=cut(3,'src/features/chat/b');
-  const status=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r);};
+  const status=()=>{if(statusCache)return statusCache;const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);statusCache=out(r);return statusCache;};
   const q=(jobId)=>status().frontier.queued.find(x=>x.jobId===jobId);
-  return {repo,api,enq,seam,a,b,status,q};
+  const invalidateStatus=()=>{statusCache=null;};
+  return {repo,api,enq,seam,a,b,status,q,invalidateStatus};
 }
 const setRow=(repo,sql,...args)=>seed(repo,ledger=>ledger.db.prepare(sql).run(...args));
 const settleJob=(repo,jobId,status,result=null)=>seed(repo,ledger=>{
@@ -76,7 +78,7 @@ test('the seam is enqueued with cut-seam priority, ranks first and reads "dispat
 });
 
 test('a sibling waits on a queued seam at most maxSiblingWaitMs, then runs on a stub',t=>{
-  const {repo,seam,a,b,q,status}=cutWorkflow(t,'wf-seam-timeout');
+  const {repo,seam,a,b,q,status,invalidateStatus}=cutWorkflow(t,'wf-seam-timeout');
   const {maxSiblingWaitMs}=cutSeamSettings();
   assert.equal(maxSiblingWaitMs,30*60_000,'runtimes.yaml allocation.cutSeam.maxSiblingWaitMs is 30 min');
   const held=q(a);
@@ -85,6 +87,7 @@ test('a sibling waits on a queued seam at most maxSiblingWaitMs, then runs on a 
   assert.match(held.detail,/at most until .*maxSiblingWaitMs/);
   // The seam sat queued (behind a wait, a full pool) past the window: the sibling proceeds with a stub.
   setRow(repo,'UPDATE jobs SET created_at=? WHERE job_id=?',Date.now()-maxSiblingWaitMs-60_000,a);
+  invalidateStatus();
   const released=q(a);
   assert.equal(released.queuedBecause,'ready');
   assert.equal(released.seamStub.mode,'timeout');
@@ -98,8 +101,9 @@ test('a sibling waits on a queued seam at most maxSiblingWaitMs, then runs on a 
 });
 
 test('a seam that fails or slips releases its siblings to a stub and owes a re-cut plan',t=>{
-  const {repo,enq,seam,a,b,q,status}=cutWorkflow(t,'wf-seam-recut');
+  const {repo,enq,seam,a,b,q,status,invalidateStatus}=cutWorkflow(t,'wf-seam-recut');
   settleJob(repo,seam,'failed',{verdict:'fail'});
+  invalidateStatus();
   assert.equal(q(a).queuedBecause,'ready','a dead seam never holds its siblings');
   assert.equal(q(a).seamStub.mode,'seam-failed');
   // One failure then a live retry: the retry is a live wait again (under the recut threshold).
@@ -108,6 +112,7 @@ test('a seam that fails or slips releases its siblings to a stub and owes a re-c
   assert.equal(q(b).blockedBy.job,retry1);
   // A second failure: the seam slipped (allocation.cutSeam.recutAfterFailures 2) - even its queued retry holds nobody.
   settleJob(repo,retry1,'failed',{verdict:'blocked'});
+  invalidateStatus();
   const retry2=enq('--op','docs.author','--paths','src/features/chat/composition,apps/core/src','--cut-id','chat-impl','--cut-ordinal','1','--cut-total','3');
   assert.equal(q(b).queuedBecause,'ready');
   assert.equal(q(b).seamStub.mode,'seam-slipped');
@@ -180,7 +185,7 @@ test('the Kernel releases a stuck cut; a sibling dispatched on a stub is told st
 });
 
 test('a stub sibling that passed before its seam landed owes one light reconcile, not a redo',t=>{
-  const {repo,api,seam,a,b,status}=cutWorkflow(t,'wf-seam-reconcile');
+  const {repo,api,seam,a,b,status,invalidateStatus}=cutWorkflow(t,'wf-seam-reconcile');
   // Sibling a ran on a stub and passed while the seam was still open.
   seed(repo,l=>{
     const row=l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(a);
@@ -195,6 +200,7 @@ test('a stub sibling that passed before its seam landed owes one light reconcile
   assert.equal(s.nextActions.some(x=>x.seamDuty==='reconcile'),false,'nothing to reconcile against before the seam lands');
   // The seam lands: a owes cut-seam-reconcile.
   settleJob(repo,seam,'succeeded');
+  invalidateStatus();
   s=status();
   assert.deepEqual(s.cutSets[0].seam.reconcile.owed.map(x=>x.jobId),[a]);
   const owed=s.nextActions.find(x=>x.seamDuty==='reconcile');
