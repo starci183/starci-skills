@@ -51,7 +51,7 @@ function appRoot({ edition = "lite", provider = "supabase" } = {}) {
   fs.mkdirSync(path.dirname(appModule), { recursive: true });
   fs.writeFileSync(
     appModule,
-    'import { Module } from "@nestjs/common"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n            ],\n        }\n    }\n}\n',
+    'import { Module } from "@nestjs/common"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n                ErrorsModule.register({\n                    kinds: [\n                    ],\n                }),\n            ],\n        }\n    }\n}\n',
   );
   return root;
 }
@@ -69,13 +69,13 @@ const generatedTypes = (table) =>
   `export type Database = { public: { Tables: { ${table}: { Row: { id: string } } } } }\n`;
 
 test("addTable accepts kebab, snake-case, plural, and reserved names and every accepted migration is database-clean", async () => {
-  for (const [name, feature, table, delivery, quoted = false] of [
-    ["orders", "orders", "orders", "Order"],
-    ["audit-events", "audit-events", "audit_events", "AuditEvent"],
-    ["audit_events", "audit-events", "audit_events", "AuditEvent"],
-    ["select", "select", "select", "Select", true],
-    ["order", "order", "order", "Order", true],
-    ["user", "user", "user", "User", true],
+  for (const [name, feature, table, quoted = false] of [
+    ["orders", "orders", "orders"],
+    ["audit-events", "audit-events", "audit_events"],
+    ["audit_events", "audit-events", "audit_events"],
+    ["select", "select", "select", true],
+    ["order", "order", "order", true],
+    ["user", "user", "user", true],
   ]) {
     const root = appRoot();
     const result = addTable({
@@ -117,9 +117,16 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to authenticated`),
       "table-level update is not granted",
     );
+    const service = read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`);
+    assert.match(service, /\(principalId: string, id: string\)/);
+    assert.match(service, /\[id, principalId\]/);
     assert.match(
-      read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`),
-      new RegExp(`accept${delivery}Delivery`),
+      read(root, `be/src/modules/domain/${feature}/persistence/${feature}.sql.ts`),
+      /WHERE id = \$1 AND owner_id = \$2 LIMIT 1/,
+    );
+    assert.match(
+      read(root, `be/src/modules/domain/${feature}/errors/${feature}.error.ts`),
+      /NotFound = "[A-Z0-9_]+_NOT_FOUND"/,
     );
     assert.deepEqual(
       await checkDatabase({

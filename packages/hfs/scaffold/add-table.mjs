@@ -163,17 +163,22 @@ function wireApiModule(root, app, name) {
   if (!fs.existsSync(file))
     throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in ${relative}, which does not exist`);
   const symbol = `${pascalOf(name)}Module`;
-  const importLine = `import { ${symbol} } from "@modules/domain/${name}"`;
+  const errorKinds = `${snakeOf(name).toUpperCase()}_ERROR_KINDS`;
+  const importLine = `import { ${errorKinds}, ${symbol} } from "@modules/domain/${name}"`;
   const lines = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
   const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
   const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
-  if (lastImport < 0 || imports < 0)
-    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports array in ${relative}`);
+  const kinds = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
+  if (lastImport < 0 || imports < 0 || kinds < 0)
+    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports and error kinds arrays in ${relative}`);
   if (!lines.includes(importLine)) {
     lines.splice(lastImport + 1, 0, importLine);
-    const shiftedImports = imports > lastImport ? imports + 1 : imports;
+    const shiftedImports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
     const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? "";
     lines.splice(shiftedImports + 1, 0, `${indent}    ${symbol}.register({ isGlobal: true }),`);
+    const shiftedKinds = lines.findIndex((line) => /^\s*kinds: \[$/.test(line));
+    const kindsIndent = /^(\s*)/.exec(lines[shiftedKinds])?.[1] ?? "";
+    lines.splice(shiftedKinds + 1, 0, `${kindsIndent}    ${errorKinds},`);
   }
   fs.writeFileSync(file, `${lines.join("\n").replace(/\n+$/, "")}\n`);
 }
@@ -243,6 +248,7 @@ export function addTable({
       body: template("be/table/migration.sql.tpl", values),
     },
     { relative: `be/src/modules/domain/${feature}/index.ts`, body: template("be/table/index.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/errors/${feature}.error.ts`, body: template("be/table/error.ts.tpl", values) },
     { relative: `be/src/modules/domain/${feature}/${feature}.module.ts`, body: template("be/table/module.ts.tpl", values) },
     { relative: `be/src/modules/domain/${feature}/${feature}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
     { relative: `be/src/modules/domain/${feature}/${feature}.options.ts`, body: template("be/table/options.ts.tpl", values) },
