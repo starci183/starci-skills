@@ -99,7 +99,7 @@ export async function seedConnections(
 /** `cli seed run [--env <name>]`: seeds every connection of the back end from `.starcistacks/<env>/seeds` and logs what it ran. */
 export class RunSeedsCli extends CommandRunner {
     constructor(
-        @InjectDatabaseOptions() private readonly database: DatabaseOptions,
+        @InjectDatabaseOptions() private readonly options: DatabaseOptions,
         @InjectConnectionSource() private readonly open: OpenConnection,
         @InjectReadSeedFiles() private readonly read: ReadSeedFiles,
         @InjectLogger() private readonly logger: Logger,
@@ -121,7 +121,7 @@ export class RunSeedsCli extends CommandRunner {
     async run(_passed: Array<string>, options?: SeedRunOptions): Promise<void> {
         const env = options?.env ?? DEFAULT_SEED_ENV
         const files = await this.read(seedDirectoryOf(env))
-        const report = await seedConnections(this.database.connections, files, this.open)
+        const report = await seedConnections(this.options.connections, files, this.open)
         this.logger.info(LoggingLogEvent.SeedsApplied, {
             env,
             applied: report.applied,

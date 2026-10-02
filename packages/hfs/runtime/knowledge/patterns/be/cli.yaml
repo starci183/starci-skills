@@ -96,7 +96,7 @@ rules:
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
-        - cli-command-shape
+        - BE_CLI_COMMAND_SHAPE
       manual: []
     relatedExamples: []
   - id: BE-CLI-3
@@ -123,7 +123,7 @@ rules:
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
-        - unit-test-colocated
+        - BE_SPEC_PLACEMENT
         - BE_TEST_TOPOLOGY
       manual:
         - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
@@ -177,40 +177,47 @@ rules:
 files:
   - path: apps/cli/Dockerfile
     slot: repo.app-image
+    optional: true
     role: the one cli image, run as `cli <group> <command>`
     rules:
       - BE_CLI_REQUIRED
   - path: apps/cli/src/main.ts
     slot: be.app.cli
+    optional: true
     role: CommandFactory.run(AppModule, logger); never serves
     rules:
       - BE_CLI_BOOTSTRAP
       - BE_ENTRYPOINT_ONLY_IN_APPS
   - path: apps/cli/src/app.module.ts
     slot: be.app.cli
+    optional: true
     role: composes the platform modules and CliModule; no business code
     rules:
       - BE_APP_COMPOSITION_ONLY
       - BE_CLI_BOOTSTRAP
   - path: apps/cli/src/cli.options.ts
     slot: be.app.cli
+    optional: true
     role: what the cli reads from the environment, the connection list it migrates among them
     rules:
       - BE_CLI_REQUIRED
       - BE_SCHEMA_AUTHORITY
   - path: src/features/cli/index.ts
     slot: be.cli
+    optional: true
     role: exports CliModule to the cli app
     rules:
       - BE_PUBLIC_SURFACE
   - path: src/features/cli/cli.module.ts
     slot: be.cli
+    optional: true
     role: the static cli feature root module; imports each group module
     rules:
       - BE_CLI_COMMAND_SHAPE
       - BE_MODULE_SHAPE
   - path: src/features/cli/migrate/migrate.cli.ts
     slot: be.cli
+    optional: true
     role: the migrate group @Command and its subCommands
     rules:
       - BE_CLI_COMMAND_SHAPE
@@ -218,12 +225,14 @@ files:
     spec: src/features/cli/migrate/migrate.cli.spec.ts
   - path: src/features/cli/migrate/migrate.module.ts
     slot: be.cli
+    optional: true
     role: "the static migrate group module: provides its command and sub-commands"
     rules:
       - BE_CLI_COMMAND_SHAPE
       - BE_MODULE_SHAPE
   - path: src/features/cli/migrate/subs/run.cli.ts
     slot: be.cli
+    optional: true
     role: "`cli migrate run`: runs the migrations of every connection; the only migration runner"
     rules:
       - BE_CLI_COMMAND_SHAPE
@@ -231,6 +240,7 @@ files:
     spec: src/features/cli/migrate/subs/run.cli.spec.ts
   - path: src/features/cli/seed/seed.cli.ts
     slot: be.cli
+    optional: true
     role: the seed group @Command and its subCommands
     rules:
       - BE_CLI_COMMAND_SHAPE
@@ -238,13 +248,43 @@ files:
     spec: src/features/cli/seed/seed.cli.spec.ts
   - path: src/features/cli/seed/seed.module.ts
     slot: be.cli
+    optional: true
     role: "the static seed group module: provides its command and sub-commands"
     rules:
       - BE_CLI_COMMAND_SHAPE
       - BE_MODULE_SHAPE
   - path: src/features/cli/seed/subs/run.cli.ts
     slot: be.cli
+    optional: true
     role: "`cli seed run [--env <name>]`: runs the seed files of .starcistacks/<env>/seeds on the connection each names"
     rules:
       - BE_CLI_COMMAND_SHAPE
     spec: src/features/cli/seed/subs/run.cli.spec.ts
+  - path: src/features/cli/<group>/<group>.cli.ts
+    slot: be.cli
+    role: the group @Command and its subCommands
+    template: cli/group.cli.ts.tpl
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_CLI_OWNER
+  - path: src/features/cli/<group>/<group>.cli.spec.ts
+    slot: be.cli
+    role: the unit spec of the group, beside it
+    template: cli/group.cli.spec.ts.tpl
+  - path: src/features/cli/<group>/<group>.module.ts
+    slot: be.cli
+    role: "the static group module: provides its command and sub-commands"
+    template: cli/group.module.ts.tpl
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/<group>/subs/run.cli.ts
+    slot: be.cli
+    role: the first sub-command of the group; it calls the domain service
+    template: cli/sub.run.cli.ts.tpl
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+  - path: src/features/cli/<group>/subs/run.cli.spec.ts
+    slot: be.cli
+    role: the unit spec of the sub-command, beside it
+    template: cli/sub.run.cli.spec.ts.tpl

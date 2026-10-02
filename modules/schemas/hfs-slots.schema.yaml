@@ -144,6 +144,12 @@ $defs:
                     needs: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
                     also: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
                     defaults: {type: object}
+                    wire:
+                      type: object
+                      description: The static module that lists the members of the kind; the generated member is registered in it (an import line and an entry of its imports array).
+                      required: [file, import, symbol]
+                      additionalProperties: false
+                      properties: {file: {type: string}, import: {type: string}, symbol: {type: string}}
               patternScenarios:
                 type: object
                 description: 'BE_PATTERN_SPEC_MISSING. Declared pattern -> the scenario ids an e2e or integration spec must prove (a test titled <pattern>/<scenario>: ...).'

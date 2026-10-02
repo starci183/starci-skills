@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { kindFindings } from '../../scripts/hfs/rules/kinds.mjs';
 
-const API = ['be/src/features/orders/index.ts', 'be/src/features/orders/orders.module.ts'];
+const API = ['be/src/features/api/orders/index.ts', 'be/src/features/api/orders/orders.module.ts'];
 const JOB = ['be/src/features/jobs/send/index.ts', 'be/src/features/jobs/send/transport/queue/send.processor.ts'];
 const PLATFORM = (...capabilities) => capabilities.map((capability) => `be/src/modules/platform/${capability}/index.ts`);
 const run = (files, be) => kindFindings({ files, repo: { sides: { be } } });

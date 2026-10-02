@@ -22,7 +22,7 @@ const put = (dir, relative, text = 'export {};\n') => {
   fs.writeFileSync(target, text);
 };
 const only = (result, code) => result.findings.filter((f) => f.code === code);
-const PRIMARY = [{ name: 'primary', envPrefix: 'PRIMARY_DB' }];
+const PRIMARY = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }];
 const WITH_CLI = appOf({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: PRIMARY } });
 /** The cli image and a migrate group with its run sub-command and their specs. */
 const cliTree = () => (dir) => {

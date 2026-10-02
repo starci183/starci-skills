@@ -106,7 +106,7 @@ reads and (back end only) the database connections.
         { "name": "core", "kind": "api" },
         { "name": "cli", "kind": "cli" }
       ],
-      "optionalSlots": ["be.transport.message", "be.transport.schedule", "be.contract.graphql", "repo.docs"],
+      "optionalSlots": ["be.transport.message", "be.contract.graphql", "repo.docs"],
       "connections": [
         { "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "core", "isolation": "database" },
         { "name": "agentos", "envPrefix": "AGENTOS_DB", "owner": "core", "isolation": "database" }
