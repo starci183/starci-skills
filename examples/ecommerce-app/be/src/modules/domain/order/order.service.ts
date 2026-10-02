@@ -11,13 +11,14 @@ import { InjectSagaService } from "@modules/platform/saga"
 import type { SagaService } from "@modules/platform/saga"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { InjectMessagePublisher } from "@modules/integrations/messaging"
-import type { MessagePublisher } from "@modules/integrations/messaging"
+import { OrderPlacedEvent } from "@modules/events/order"
+import { InjectEventBus } from "@modules/platform/event-bus"
+import type { EventBus } from "@modules/platform/event-bus"
 import { ok } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
-import { ORDER_PLACED_QUEUE, PLACE_ORDER_SAGA } from "./order.contracts"
+import { PLACE_ORDER_SAGA } from "./order.contracts"
 import { OrderLogEvent } from "./order.log-events"
 import type {
     GetBuyerStatusResult,
@@ -51,7 +52,7 @@ export class OrderService {
         @InjectCatalogService() private readonly catalog: CatalogService,
         @InjectPaymentService() private readonly payments: PaymentService,
         private readonly receipts: ReceiptService,
-        @InjectMessagePublisher() private readonly messages: MessagePublisher,
+        @InjectEventBus() private readonly bus: EventBus,
         @InjectLogger() private readonly logger: Logger,
         @InjectSagaService() private readonly sagas: SagaService,
     ) {}
@@ -89,11 +90,10 @@ export class OrderService {
      */
     private async announce(placed: PlacedOrder, personId: string): Promise<void> {
         try {
-            await this.messages.publish({
-                queue: ORDER_PLACED_QUEUE,
-                eventId: placed.orderId,
-                payload: { orderId: placed.orderId, personId, totalMinorUnits: placed.totalMinorUnits },
-            })
+            await this.bus.publish(
+                OrderPlacedEvent.create({ orderId: placed.orderId, personId, totalMinorUnits: placed.totalMinorUnits }),
+                this.entityManager,
+            )
         } catch (cause) {
             this.logger.error(OrderLogEvent.EventPublishFailed, cause, { orderId: placed.orderId })
         }

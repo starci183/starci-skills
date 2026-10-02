@@ -1,5 +1,5 @@
-export type { ConsumedMessage, QueueSpec } from "./messaging.contracts"
-export { MESSAGING_ERROR_KINDS, MessagingErrorCode } from "./errors/messaging.error"
+export type { ConsumedMessage, QueueDefinition, QueueSpec } from "./messaging.contracts"
+export { MESSAGING_ERROR_KINDS } from "./errors/messaging.error"
 export { parseMessagingConfig } from "./messaging.config"
 export {
     CONSUMER_REGISTRY,

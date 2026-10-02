@@ -125,14 +125,14 @@ export function serviceStackFindings({ repoRoot, repo }) {
 
 // ------------------------------------------------------------------------------------------------ R131 event contract
 
-/** The queue names a source file defines for its consumers: the `name` of each `defineQueue({ ... })` call, `defineQueue` being the one imported from a `messaging` module (by import origin, not by spelling). */
+/** The event names a source file defines: the `name` of each `defineEvent({ ... })` or `defineQueue({ ... })` call, imported from an `event-bus` or `messaging` module (by import origin, not by spelling). */
 function queueNamesOf(ts, text) {
   const sourceFile = ts.createSourceFile('queue.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const locals = new Set();
   for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !/(?:^|\/)messaging$/.test(statement.moduleSpecifier.text)) continue;
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !/(?:^|\/)(?:messaging|event-bus)$/.test(statement.moduleSpecifier.text)) continue;
     const named = statement.importClause?.namedBindings;
-    if (named && ts.isNamedImports(named)) for (const element of named.elements) if ((element.propertyName ?? element.name).text === 'defineQueue') locals.add(element.name.text);
+    if (named && ts.isNamedImports(named)) for (const element of named.elements) if (['defineEvent', 'defineQueue'].includes((element.propertyName ?? element.name).text)) locals.add(element.name.text);
   }
   const names = [];
   const visit = (node) => {
@@ -200,9 +200,9 @@ export function eventContractFindings({ repoRoot, files }) {
   const declared = new Set(consumedEvents({ repoRoot, files, ts }).map((entry) => entry.event));
   for (const file of files.filter((candidate) => candidate.startsWith('be/src/') && candidate.endsWith('.ts') && !SPEC_FILE.test(candidate))) {
     const text = readText(repoRoot, file);
-    if (text === null || !text.includes('defineQueue')) continue;
+    if (text === null || !/define(?:Event|Queue)/.test(text)) continue;
     for (const name of queueNamesOf(ts, text)) {
-      if (!declared.has(name)) findings.push(found(EVENT_CONTRACT, file, `${file} defines the consumer queue "${name}", but no be/apps/<app>/src/consumes.ts lists that event; a service reads only what its consumes table declares and the vendored contract judges (add it, or delete the queue).`, { event: name }));
+      if (!declared.has(name)) findings.push(found(EVENT_CONTRACT, file, `${file} defines the event "${name}", but no be/apps/<app>/src/consumes.ts lists that event; a service reads only what its consumes table declares and the vendored contract judges (add it, or delete the queue).`, { event: name }));
     }
   }
   const known = new Set([...provided.values()].flatMap((events) => Object.keys(events)));

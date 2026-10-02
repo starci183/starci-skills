@@ -5,12 +5,12 @@ import type { Clock } from "@modules/platform/clock"
 import { InjectBillingEntityManager } from "@modules/platform/database"
 import { InjectInbox } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
-import { InjectMessagePublisher } from "@modules/integrations/messaging"
-import type { MessagePublisher } from "@modules/integrations/messaging"
+import { InvoiceIssuedEvent, InvoiceRejectedEvent } from "@modules/events/billing"
+import { InjectEventBus } from "@modules/platform/event-bus"
+import type { EventBus } from "@modules/platform/event-bus"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { InvoiceErrorCode } from "./errors/invoice.error"
-import { INVOICE_ISSUED_QUEUE, INVOICE_REJECTED_QUEUE } from "./invoice.contracts"
 import type { InvoiceView, IssueInvoiceParams } from "./invoice.contracts"
 import { InjectInvoiceOptions } from "./invoice.decorators"
 import type { InvoiceOptions } from "./invoice.options"
@@ -37,7 +37,7 @@ export class InvoiceService {
         @InjectBillingEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
         @InjectInbox() private readonly inbox: Inbox,
-        @InjectMessagePublisher() private readonly messages: MessagePublisher,
+        @InjectEventBus() private readonly bus: EventBus,
         @InjectInvoiceOptions() private readonly options: InvoiceOptions,
     ) {}
 
@@ -71,18 +71,20 @@ export class InvoiceService {
     /** The outcome of a recorded invoice; an issued and a rejected one are each announced to the order service. */
     private async outcomeOf(row: InvoiceEntity): Promise<Outcome<InvoiceView, InvoiceErrorCode.OverLimit>> {
         if (row.status === "issued") {
-            await this.messages.publish({
-                queue: INVOICE_ISSUED_QUEUE,
-                eventId: row.orderId,
-                payload: { orderId: row.orderId, totalMinorUnits: row.totalMinorUnits },
-            })
+            await this.bus.publish(
+                InvoiceIssuedEvent.create({ orderId: row.orderId, totalMinorUnits: row.totalMinorUnits }),
+                this.entityManager,
+            )
             return ok(toView(row))
         }
-        await this.messages.publish({
-            queue: INVOICE_REJECTED_QUEUE,
-            eventId: row.orderId,
-            payload: { orderId: row.orderId, reason: InvoiceErrorCode.OverLimit, totalMinorUnits: row.totalMinorUnits },
-        })
+        await this.bus.publish(
+            InvoiceRejectedEvent.create({
+                orderId: row.orderId,
+                reason: InvoiceErrorCode.OverLimit,
+                totalMinorUnits: row.totalMinorUnits,
+            }),
+            this.entityManager,
+        )
         return refused(InvoiceErrorCode.OverLimit, { orderId: row.orderId })
     }
 }

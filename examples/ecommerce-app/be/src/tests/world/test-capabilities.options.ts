@@ -11,7 +11,7 @@ import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
-import { MessagingModule } from "@modules/integrations/messaging"
+import { MessagingModule } from "@modules/platform/messaging"
 import {
     cacheOptionsOf,
     messagingOptionsOf,

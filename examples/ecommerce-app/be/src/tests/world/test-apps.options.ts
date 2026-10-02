@@ -24,7 +24,7 @@ import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modul
 import { HttpModule } from "@modules/platform/http"
 import { inboxEntities } from "@modules/platform/inbox"
 import { sagaEntities } from "@modules/platform/saga"
-import type { MessagingOptions } from "@modules/integrations/messaging"
+import type { MessagingOptions } from "@modules/platform/messaging"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"

@@ -99,6 +99,8 @@ export const inboxDedupeRequired = {
         const filename = context.filename || context.getFilename()
         const slot = hfs.slotOf(filename)
         if (!baseName(filename).endsWith(".service.ts") || !slot || slot.startsWith("be.tests.")) return {}
+        // The event bus publishes events (their shape carries an `eventId`) and its runtime claims the inbox before a consumer runs: no delivery method here.
+        if (slot === "be.platform" && hfs.classify(filename).bindings?.capability === "event-bus") return {}
         return {
             MethodDefinition(node) {
                 if (node.kind !== "method" || node.static || node.key.type === "PrivateIdentifier" || !node.value.body) return

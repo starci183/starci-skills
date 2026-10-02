@@ -1,22 +1,24 @@
 import { Injectable } from "@nestjs/common"
 import type { CommandBus } from "@nestjs/cqrs"
-import { ISSUED_INVOICE_QUEUE } from "@modules/domain/order"
-import type { IssuedInvoiceNotice } from "@modules/domain/order"
-import type { ConsumedMessage, MessageConsumer } from "@modules/integrations/messaging"
+import { InvoiceIssuedEvent } from "@modules/events/billing"
+import type { InvoiceIssuedPayload } from "@modules/events/billing"
 import { InjectCommandBus } from "@modules/platform/cqrs"
+import type { EventConsumer, EventDelivery } from "@modules/platform/event-bus"
 import { CompletePlaceOrderCommand } from "../../application/complete-place-order.command"
 
 @Injectable()
 /** Consumer of `billing.invoice-issued`, the last event of the place-order saga: hands each delivery to the complete command. */
-export class InvoiceIssuedConsumer implements MessageConsumer<IssuedInvoiceNotice> {
-    readonly queue = ISSUED_INVOICE_QUEUE
+export class InvoiceIssuedConsumer implements EventConsumer<InvoiceIssuedPayload> {
+    readonly event = InvoiceIssuedEvent.definition
 
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Dispatches one complete command; the saga takes the delivery through the inbox, so a redelivery is a no-op. */
-    async handle(message: ConsumedMessage<IssuedInvoiceNotice>): Promise<void> {
+    async handle(delivery: EventDelivery<InvoiceIssuedPayload>): Promise<void> {
         await this.commandBus.execute(
-            new CompletePlaceOrderCommand({ request: { orderId: message.payload.orderId, eventId: message.eventId } }),
+            new CompletePlaceOrderCommand({
+                request: { orderId: delivery.payload.orderId, eventId: delivery.eventId },
+            }),
         )
     }
 }

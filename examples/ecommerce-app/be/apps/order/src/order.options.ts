@@ -5,8 +5,8 @@ import { parseReceiptStorageConfig } from "@modules/integrations/receipt-storage
 import type { EnvSource } from "@modules/platform/config"
 import { parseOrderDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
-import { parseMessagingConfig } from "@modules/integrations/messaging"
-import type { MessagingOptions } from "@modules/integrations/messaging"
+import { parseMessagingConfig } from "@modules/platform/messaging"
+import type { MessagingOptions } from "@modules/platform/messaging"
 import { parseHttpSecurityConfig } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 

@@ -3,8 +3,8 @@ import type { InvoiceOptions } from "@modules/domain/invoice"
 import type { EnvSource } from "@modules/platform/config"
 import { parseBillingDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
-import { parseMessagingConfig } from "@modules/integrations/messaging"
-import type { MessagingOptions } from "@modules/integrations/messaging"
+import { parseMessagingConfig } from "@modules/platform/messaging"
+import type { MessagingOptions } from "@modules/platform/messaging"
 
 /** Everything the billing worker needs from its environment, parsed once in main.ts. */
 export interface BillingAppOptions {

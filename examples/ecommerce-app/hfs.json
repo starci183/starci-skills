@@ -16,7 +16,7 @@
         { "name": "billing", "envPrefix": "BILLING_DB" }
       ],
       "optionalSlots": ["repo.docs", "be.contract.graphql", "be.contract.events", "be.transport.message"],
-      "patterns": ["saga"]
+      "patterns": ["saga", "event-bus"]
     },
     "fe": {
       "apps": [

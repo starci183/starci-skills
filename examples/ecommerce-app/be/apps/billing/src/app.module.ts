@@ -13,9 +13,10 @@ import { CqrsModule } from "@modules/platform/cqrs"
 import { DATABASE_ERROR_KINDS, DatabaseModule } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
 import { I18nModule } from "@modules/platform/i18n"
+import { EventBusModule } from "@modules/platform/event-bus"
 import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { LoggingModule } from "@modules/platform/logging"
-import { MESSAGING_ERROR_KINDS, MESSAGING_MESSAGES, MessagingModule } from "@modules/integrations/messaging"
+import { MESSAGING_ERROR_KINDS, MESSAGING_MESSAGES, MessagingModule } from "@modules/platform/messaging"
 import { InvoicingMessageModule } from "@features/invoicing"
 import type { BillingAppOptions } from "./billing.options"
 
@@ -50,6 +51,7 @@ export class AppModule {
                 }),
                 InboxModule.register({ isGlobal: true }),
                 MessagingModule.register({ isGlobal: true, ...options.messaging }),
+                EventBusModule.register({ isGlobal: true }),
                 InvoiceModule.register({ isGlobal: true, ...options.invoice }),
                 InvoicingMessageModule,
             ],

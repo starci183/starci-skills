@@ -11,13 +11,14 @@ import { LOGGER } from "@modules/platform/logging"
 import { SAGA_SERVICE } from "@modules/platform/saga"
 import type { Logger } from "@modules/platform/logging"
 import type { SagaService } from "@modules/platform/saga"
-import { MESSAGE_PUBLISHER } from "@modules/integrations/messaging"
-import type { MessagePublisher } from "@modules/integrations/messaging"
+import { OrderPlacedEvent } from "@modules/events/order"
+import { EVENT_BUS } from "@modules/platform/event-bus"
+import type { EventBus } from "@modules/platform/event-bus"
 import { Test } from "@nestjs/testing"
 import { orderLineRow, orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
-import { ORDER_PLACED_QUEUE, PLACE_ORDER_SAGA } from "./order.contracts"
+import { PLACE_ORDER_SAGA } from "./order.contracts"
 import { OrderLogEvent } from "./order.log-events"
 import { OrderService } from "./order.service"
 import { ReceiptService } from "./receipt.service"
@@ -33,7 +34,7 @@ const build = async (entityManager: MockEntityManager) => {
     const catalog = mock<CatalogService>()
     const payments = mock<PaymentService>()
     const receipts = mock<ReceiptService>()
-    const messages = mock<MessagePublisher>()
+    const bus = mock<EventBus>()
     const logger = mock<Logger>()
     const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
@@ -44,12 +45,12 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: CATALOG_SERVICE, useValue: catalog },
             { provide: PAYMENT_SERVICE, useValue: payments },
             { provide: ReceiptService, useValue: receipts },
-            { provide: MESSAGE_PUBLISHER, useValue: messages },
+            { provide: EVENT_BUS, useValue: bus },
             { provide: LOGGER, useValue: logger },
             { provide: SAGA_SERVICE, useValue: sagas },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts, messages, logger, sagas }
+    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts, bus, logger, sagas }
 }
 
 describe("OrderService", () => {
@@ -92,7 +93,7 @@ describe("OrderService", () => {
 
         it("returns the first order of a replayed key and writes nothing", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ idempotencyKey: "key-1" })] })
-            const { orders, cart, payments, messages } = await build(em)
+            const { orders, cart, payments, bus } = await build(em)
             payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
 
             expect(await orders.placeOrder({ personId: "p-1", idempotencyKey: "key-1" })).toSucceedWith(
@@ -104,11 +105,10 @@ describe("OrderService", () => {
             expect(cart.list).not.toHaveBeenCalled()
             expect(payments.capture).not.toHaveBeenCalled()
             expect(em.transaction).not.toHaveBeenCalled()
-            expect(messages.publish).toHaveBeenCalledWith({
-                queue: ORDER_PLACED_QUEUE,
-                eventId: "o-1",
-                payload: { orderId: "o-1", personId: "p-1", totalMinorUnits: 1250 },
-            })
+            expect(bus.publish).toHaveBeenCalledWith(
+                OrderPlacedEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1250 }),
+                expect.anything(),
+            )
         })
 
         it("fails with the payment missing error when a replayed order has no payment", async () => {
@@ -129,7 +129,7 @@ describe("OrderService", () => {
                     insert: [OrderLineEntity, {}],
                 }),
             )
-            const { orders, cart, catalog, payments, receipts, messages, sagas } = await build(tx.em)
+            const { orders, cart, catalog, payments, receipts, bus, sagas } = await build(tx.em)
             cart.list.mockResolvedValue([
                 { productId: "sku-1", quantity: 2 },
                 { productId: "sku-2", quantity: 1 },
@@ -172,24 +172,23 @@ describe("OrderService", () => {
                 saga: PLACE_ORDER_SAGA,
                 correlationId: "o-7",
             })
-            expect(messages.publish).toHaveBeenCalledWith({
-                queue: ORDER_PLACED_QUEUE,
-                eventId: "o-7",
-                payload: { orderId: "o-7", personId: "p-1", totalMinorUnits: 1250 },
-            })
+            expect(bus.publish).toHaveBeenCalledWith(
+                OrderPlacedEvent.create({ orderId: "o-7", personId: "p-1", totalMinorUnits: 1250 }),
+                expect.anything(),
+            )
         })
 
         it("logs a failed announcement and still answers the placed order", async () => {
             const tx = fakeTransaction(
                 mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-6" }]], insert: [OrderLineEntity, {}] }),
             )
-            const { orders, cart, catalog, payments, messages, logger } = await build(tx.em)
+            const { orders, cart, catalog, payments, bus, logger } = await build(tx.em)
             cart.list.mockResolvedValue([{ productId: "sku-2", quantity: 4 }])
             catalog.byIds.mockResolvedValue({ "sku-2": mug })
             catalog.reserveStock.mockResolvedValue(true)
             payments.capture.mockResolvedValue({ paymentId: "pay-6", amountMinorUnits: 1000 })
             const failure = new Error("stream down")
-            messages.publish.mockRejectedValueOnce(failure)
+            bus.publish.mockRejectedValueOnce(failure)
 
             expect(await orders.placeOrder({ personId: "p-1" })).toSucceedWith(
                 placedOrder({ orderId: "o-6", totalMinorUnits: 1000, paymentId: "pay-6" }),

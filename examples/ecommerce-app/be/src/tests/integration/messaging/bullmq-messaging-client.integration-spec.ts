@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { CONSUMER_REGISTRY, MESSAGE_PUBLISHER, MessagingErrorCode, defineQueue } from "@modules/integrations/messaging"
-import type { ConsumedMessage, ConsumerRegistry, MessagePublisher } from "@modules/integrations/messaging"
+import { CONSUMER_REGISTRY, MESSAGE_PUBLISHER, defineQueue } from "@modules/platform/messaging"
+import type { ConsumedMessage, ConsumerRegistry, MessagePublisher } from "@modules/platform/messaging"
 import { isRecord } from "@modules/platform/primitives"
 import { MESSAGING_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
@@ -79,7 +79,7 @@ describe("messaging: bullmq client (integration)", () => {
             await expect(
                 publisher().publish({ queue, eventId: "e-3", payload: { note: "lost" } }),
             ).rejects.toMatchObject({
-                code: MessagingErrorCode.Unavailable,
+                code: "MESSAGING_UNAVAILABLE",
             })
         })
 

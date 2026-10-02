@@ -1,9 +1,6 @@
 import type { EntityManager } from "typeorm"
 import type { CartLine } from "@modules/domain/cart"
 import type { ProductView } from "@modules/domain/catalog"
-import { defineQueue } from "@modules/integrations/messaging"
-import type { QueueSpec } from "@modules/integrations/messaging"
-import { isRecord } from "@modules/platform/primitives"
 
 /** One priced line of a checkout plan: the catalog unit price captured at evaluation time. */
 export interface CheckoutLine {
@@ -166,38 +163,6 @@ export interface EmptiedCart {
 /** The saga that orchestrates an order from its placement to its invoice: the name of `place-order.saga.ts` of the checkout feature. */
 export const PLACE_ORDER_SAGA = "place-order"
 
-/** The payload of `order.placed`, as published on its queue (the contract `be/contracts/order/events.json`). */
-export interface OrderPlacedPayload {
-    /** The placed order. */
-    readonly orderId: string
-    /** The buyer. */
-    readonly personId: string
-    /** The total of the order in minor units. */
-    readonly totalMinorUnits: number
-}
-
-/** The queue of placed orders: three deliveries, one second of backoff doubling. */
-export const ORDER_PLACED_QUEUE: QueueSpec = { name: "order.placed", attempts: 3, backoffMs: 1000 }
-
-/** The payload of `billing.invoice-rejected` as this service reads it (version 1 of the billing service's contract, `be/contracts/billing/events.json`). */
-export interface RejectedInvoiceNotice {
-    /** The order whose invoice was rejected. */
-    readonly orderId: string
-    /** Why the invoice was rejected. */
-    readonly reason: string
-}
-
-/** The queue of the rejected invoices this service compensates: three deliveries, one second of backoff doubling. */
-export const REJECTED_INVOICE_QUEUE = defineQueue<RejectedInvoiceNotice>({
-    name: "billing.invoice-rejected",
-    attempts: 3,
-    backoffMs: 1000,
-    parse: (value) =>
-        isRecord(value) && typeof value.orderId === "string" && typeof value.reason === "string"
-            ? { orderId: value.orderId, reason: value.reason }
-            : null,
-})
-
 /** What cancelling an order takes. */
 export interface CancelOrderParams {
     /** The order to cancel. */
@@ -211,17 +176,3 @@ export interface CancelledOrder {
     /** Whether this call cancelled it. */
     readonly cancelled: boolean
 }
-
-/** The payload of `billing.invoice-issued` as this service reads it (version 1 of the billing service's contract, `be/contracts/billing/events.json`). */
-export interface IssuedInvoiceNotice {
-    /** The order whose invoice was issued. */
-    readonly orderId: string
-}
-
-/** The queue of the issued invoices this service completes its saga on: three deliveries, one second of backoff doubling. */
-export const ISSUED_INVOICE_QUEUE = defineQueue<IssuedInvoiceNotice>({
-    name: "billing.invoice-issued",
-    attempts: 3,
-    backoffMs: 1000,
-    parse: (value) => (isRecord(value) && typeof value.orderId === "string" ? { orderId: value.orderId } : null),
-})

@@ -209,10 +209,18 @@ const r131queues = (source, consumesFile) => only(MULTI, (dir) => {
 test('HFS_EVENT_CONTRACT: a queue a consumer defines with defineQueue must be listed in a consumes table', () => {
   const findings = r131queues(queueSource('@modules/platform/messaging', 'order.shipped'));
   assert.equal(findings.length, 1);
-  assert.match(findings[0].message, /defines the consumer queue "order.shipped", but no be\/apps\/<app>\/src\/consumes.ts lists that event/);
+  assert.match(findings[0].message, /defines the event "order.shipped", but no be\/apps\/<app>\/src\/consumes.ts lists that event/);
 });
 
 test('HFS_EVENT_CONTRACT: a defined queue that a consumes table lists passes, and a defineQueue of another module is not a consumer queue', () => {
   assert.deepEqual(r131queues(queueSource('@modules/platform/messaging', 'order.placed')), []);
   assert.deepEqual(r131queues(queueSource('./local-helper', 'order.shipped')), []);
+});
+
+test('HFS_EVENT_CONTRACT: an event declared with defineEvent of platform/event-bus is judged like a queue: unlisted is refused, listed passes', () => {
+  const eventSource = (name) => `import { defineEvent } from '@modules/platform/event-bus';\nexport const SHIPPED = defineEvent({ name: '${name}', version: 1, attempts: 3, backoffMs: 1000, parse: () => null });\n`;
+  const refused = r131queues(eventSource('order.shipped'));
+  assert.equal(refused.length, 1);
+  assert.match(refused[0].message, /defines the event "order.shipped"/);
+  assert.deepEqual(r131queues(eventSource('order.placed')), []);
 });

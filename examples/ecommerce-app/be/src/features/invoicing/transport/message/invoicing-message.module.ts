@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { OnModuleInit } from "@nestjs/common"
-import { InjectConsumerRegistry } from "@modules/integrations/messaging"
-import type { ConsumerRegistry } from "@modules/integrations/messaging"
+import { InjectEventConsumerRegistry } from "@modules/platform/event-bus"
+import type { EventConsumerRegistry } from "@modules/platform/event-bus"
 import { InvoicingModule } from "../../invoicing.module"
 import { OrderPlacedConsumer } from "./order-placed.consumer"
 
@@ -9,7 +9,7 @@ import { OrderPlacedConsumer } from "./order-placed.consumer"
 /** The message transport of the invoicing feature: registers its consumers with the messaging capability; only a worker composes it. */
 export class InvoicingMessageModule implements OnModuleInit {
     constructor(
-        @InjectConsumerRegistry() private readonly registry: ConsumerRegistry,
+        @InjectEventConsumerRegistry() private readonly registry: EventConsumerRegistry,
         private readonly orderPlacedConsumer: OrderPlacedConsumer,
     ) {}
 

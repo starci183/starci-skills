@@ -32,13 +32,14 @@ import {
     RateLimitGuard,
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
+import { EventBusModule } from "@modules/platform/event-bus"
 import { LoggingModule } from "@modules/platform/logging"
 import {
     MESSAGE_PUBLISHER,
     MESSAGING_ERROR_KINDS,
     MESSAGING_MESSAGES,
     MessagingModule,
-} from "@modules/integrations/messaging"
+} from "@modules/platform/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
@@ -113,6 +114,7 @@ export class AppModule {
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
                 MessagingModule.register({ isGlobal: true, ...options.messaging }),
+                EventBusModule.register({ isGlobal: true }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),

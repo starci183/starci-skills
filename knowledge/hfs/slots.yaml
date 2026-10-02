@@ -155,7 +155,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, saga, saga-state, step, compensation, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, saga, saga-state, step, compensation, event, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -792,6 +792,19 @@ slots:
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
+  - id: be.events
+    profiles: [be]
+    path: "src/modules/events/<service>/"
+    pattern: event-bus            # typed events of a service, published and consumed through platform/event-bus (enabled by `patterns: ["event-bus"]`)
+    presence: opt-in
+    tracked: tracked
+    tier: domain
+    owner: true
+    requires: [index.ts]
+    allows: ["<event>.event.ts"]  # one class per event of be/contracts/<service>/events.json: its declaration (name, version) and create()
+    tests: none
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE]
   - id: be.errors
     profiles: [be]
     path: "src/modules/{domain,integrations}/<capability>/errors/"

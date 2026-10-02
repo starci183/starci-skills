@@ -1,23 +1,23 @@
 import { Injectable } from "@nestjs/common"
 import type { CommandBus } from "@nestjs/cqrs"
-import { REJECTED_INVOICE_QUEUE } from "@modules/domain/order"
-import type { RejectedInvoiceNotice } from "@modules/domain/order"
-import type { ConsumedMessage, MessageConsumer } from "@modules/integrations/messaging"
+import { InvoiceRejectedEvent } from "@modules/events/billing"
+import type { InvoiceRejectedPayload } from "@modules/events/billing"
 import { InjectCommandBus } from "@modules/platform/cqrs"
+import type { EventConsumer, EventDelivery } from "@modules/platform/event-bus"
 import { CompensatePlaceOrderCommand } from "../../application/compensate-place-order.command"
 
 @Injectable()
 /** Consumer of `billing.invoice-rejected`, the failure event of the place-order saga: hands each delivery to the compensate command. */
-export class InvoiceRejectedConsumer implements MessageConsumer<RejectedInvoiceNotice> {
-    readonly queue = REJECTED_INVOICE_QUEUE
+export class InvoiceRejectedConsumer implements EventConsumer<InvoiceRejectedPayload> {
+    readonly event = InvoiceRejectedEvent.definition
 
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Dispatches one compensate command; the saga takes the delivery through the inbox, so a redelivery is a no-op. */
-    async handle(message: ConsumedMessage<RejectedInvoiceNotice>): Promise<void> {
+    async handle(delivery: EventDelivery<InvoiceRejectedPayload>): Promise<void> {
         await this.commandBus.execute(
             new CompensatePlaceOrderCommand({
-                request: { orderId: message.payload.orderId, eventId: message.eventId },
+                request: { orderId: delivery.payload.orderId, eventId: delivery.eventId },
             }),
         )
     }
