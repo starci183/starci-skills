@@ -186,10 +186,11 @@ export const kernelVerbModules = (root) => {
   const out = new Map();
   for (const f of filesIn(dir, /^[a-z][a-z0-9-]*\.mjs$/)) {
     const t = read(path.join(dir, f));
-    const m = /\bverb:\s*'([^']+)'/.exec(t);
+    const m = /\b(?:verb:\s*|workflowVerb\(\s*)'([^']+)'/.exec(t);
     if (!m) continue;
     const usage = /\busage:\s*'((?:[^'\\]|\\.)*)'/s.exec(t)?.[1] ?? /\busage:\s*`([\s\S]*?)`/.exec(t)?.[1] ?? null;
-    const required = [...(t.match(/\brequired:\s*\[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    const viaWorkflowVerb = /\bworkflowVerb\(\s*'/.test(t);
+    const required = viaWorkflowVerb ? ['workflow'] : [...(t.match(/\brequired:\s*\[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((x) => x[1]);
     out.set(m[1], { file: `scripts/kernel/verbs/${f}`, usage, required });
   }
   return out;

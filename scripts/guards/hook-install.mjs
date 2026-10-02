@@ -241,7 +241,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
  * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
  * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
  */
-function workHookBody({ check, nodePath = process.execPath }) {
+export function workHookBody({ root, nodePath = process.execPath }) {
   const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
   return `#!/bin/sh
 # ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.

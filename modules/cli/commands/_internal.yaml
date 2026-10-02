@@ -48,6 +48,10 @@ internal:
   - {path: scripts/checks/check-helper-once.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-hfs-rules.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-host-boundary.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-clones.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-env.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-export-used.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-specs.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-i18n-catalog.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-json-exceptions.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-module-yaml.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
