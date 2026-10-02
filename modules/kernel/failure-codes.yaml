@@ -13940,6 +13940,26 @@ HFS_DOCKER_SECRETS:
   owner: op-retry
   kind: check-finding
 
+RT_RETIRED_CLI_CALL:
+  title: "A removed CLI command is still invoked"
+  title_vi: "Một lệnh CLI đã bị gỡ vẫn được gọi"
+  meaning_vi: "Một file được theo dõi gọi lệnh đã bị CLI thống nhất gỡ (starci api, node scripts/kernel/cli.mjs, hfs, starci-test-stack, starci init/update/doctor/version/validate/check/start/goal ở cấp cao nhất); chỉ được gọi starci <group> <verb> mới."
+  causes_vi:
+    - "Vi phạm luật R197: tài liệu, prompt hoặc code còn chép cách gọi cũ."
+  nextStep_vi: "Đổi lời gọi sang lệnh thay thế mà bộ kiểm tra in ra (dòng use starci <group> <verb>) rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+CLI_ONLY_ENTRY:
+  title: "A tracked file runs a runtime script directly"
+  title_vi: "Một file được theo dõi chạy trực tiếp script của runtime"
+  meaning_vi: "Một prompt, tài liệu, skill, file knowledge, cấu hình, CI, hook hoặc đăng ký tác vụ chạy node scripts/..., node ui/start.mjs hoặc npm run bọc script runtime thay vì starci <group> <verb>."
+  causes_vi:
+    - "Vi phạm luật R201: mọi hành động phải đi qua starci <group> <verb>."
+  nextStep_vi: "Đổi lời gọi thành lệnh starci mà bộ kiểm tra gợi ý; nếu script chưa có verb thì thêm file catalog hoặc khai báo nội bộ trong modules/cli/commands/_internal.yaml."
+  owner: op-retry
+  kind: check-finding
+
 RT_CLI_CATALOG_DRIFT:
   title: "Generated CLI catalog outputs drifted"
   title_vi: "Các đầu ra catalog CLI sinh tự động bị lệch"

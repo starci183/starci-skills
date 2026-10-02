@@ -1691,7 +1691,14 @@ rules:
     failureCodes: ["HFS_DOCKER_SECRETS"]
     enforcers:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
-  # R192-R197 belong to sibling chunks of lane/dv-c3-cli; this chunk owns R198 and R199.
+  - id: R197
+    code: "RT_RETIRED_CLI_CALL"
+    law: "No tracked file invokes a command the unified CLI removed: `starci api <verb>`, `node scripts/kernel/cli.mjs`, `node bin/starci.mjs`, `hfs <verb>`, `npx hfs`, `starci-test-stack`, and the top-level `starci init|update|doctor|version|validate|check|start|goal`; the catalog `removed` lists, changelogs and contract-change history are exempt."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RETIRED_CLI_CALL"]
+    enforcers:
+      - {kind: runtime, id: retired-cli, at: scripts/checks/check-retired-cli.mjs}
   - id: R198
     code: "RT_CLI_CATALOG_DRIFT"
     law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
@@ -1716,3 +1723,11 @@ rules:
     failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]
     enforcers:
       - {kind: runtime, id: cli-app-only-templates, at: scripts/hfs/runtime-rules/app-cli-templates.mjs}
+  - id: R201
+    code: "CLI_ONLY_ENTRY"
+    law: "Every action enters runtime code through `starci <group> <verb>`: no tracked prompt, doc, skill, knowledge file, config, CI file, hook or scheduled-task registration runs `node scripts/...`, `node ui/start.mjs`, `node bin/...` or an `npm run` wrapper of a runtime script; the dispatcher and the specs' own spawn helpers are the declared exceptions."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CLI_ONLY_ENTRY"]
+    enforcers:
+      - {kind: runtime, id: cli-only-entry, at: scripts/checks/check-cli-only-entry.mjs}

@@ -55,6 +55,7 @@ const scan = (values, options = {}) => {
 };
 
 test('direct node calls to catalog and internal entries have failing and passing forms', () => {
+  assert.equal(CODE, 'CLI_ONLY_ENTRY');
   const bad = scan({
     'docs/actions.md': [
       'node scripts/tools/public.mjs',
@@ -150,6 +151,7 @@ const capture = () => {
 };
 
 test('main emits the JSON envelope and returns 0, 1, or 2', () => {
+  assert.equal(CODE, 'CLI_ONLY_ENTRY');
   const redReport = { schema: 'starci/cli-only-entry-check@1', ok: false, code: CODE, files: 1, findings: [{ file: 'docs/x.md', line: 1, spelling: 'node scripts/private.mjs', internal: true }] };
   const red = capture();
   assert.equal(main(['--json'], red.io, { scan: () => redReport }), 1);

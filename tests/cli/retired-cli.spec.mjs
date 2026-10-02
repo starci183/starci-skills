@@ -33,6 +33,7 @@ const matchers = retiredMatchers(catalog);
 const calls = (text, file = 'docs/commands.md') => retiredCallsInText(text, file, matchers);
 
 test('each retired spelling family has a failing and passing fixture', async (t) => {
+  assert.equal(CODE, 'RT_RETIRED_CLI_CALL');
   const pairs = [
     { name: 'catalog spelling and renamed replacement', bad: 'Run `starci api check --repo .`.', good: 'Run `starci kernel record-checks --repo .`.', use: 'starci kernel record-checks' },
     { name: 'starci api group', bad: 'Run `starci api custom-verb`.', good: 'Run `starci kernel custom-verb`.', use: 'starci kernel custom-verb' },
@@ -180,6 +181,7 @@ const capture = () => {
 };
 
 test('main emits the JSON envelope and returns 0/1/2', () => {
+  assert.equal(CODE, 'RT_RETIRED_CLI_CALL');
   const red = { schema: 'starci/retired-cli-check@1', ok: false, code: CODE, files: 1, findings: [{ file: 'docs/x.md', line: 3, spelling: 'hfs lint', use: 'starci app lint' }] };
   const first = capture();
   assert.equal(main(['--json'], first.io, { scan: () => red }), 1);

@@ -123,6 +123,8 @@ ruleParams:
       - {id: providers, run: scripts/checks/check-providers.mjs}
       - {id: cli-catalog-drift, run: scripts/cli/gen-catalog.mjs, args: [--check]}
       - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
+      - {id: retired-cli, run: scripts/checks/check-retired-cli.mjs}
+      - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
       - {id: work-deep, run: scripts/work/validate/check-work-deep.mjs}
