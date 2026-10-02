@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// owed.mjs — what the running workflows wait on the SUPERVISOR for.
+// starci supervisor owed — what the running workflows wait on the SUPERVISOR for.
 //
 // Owner, 2026-09-24: "the supervisor must handle the conflicts, fix grammar, fix lint, identify the
 // out-of-scope workflow problems ... are they all to be fixed? ... because leaving workflows
@@ -37,10 +37,10 @@
 // verifies the fix and tells the owning Kernel to resolve the incident; `open` means the supervisor
 // fixes it now (modules/supervisor/supervise.yaml step owed).
 //
-//   node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]
-//   node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--force] [--json]
-//   node scripts/supervisor/owed.mjs unack --item <key> [--json]
-//   node scripts/supervisor/owed.mjs acks [--json]
+//   starci supervisor owed [--repo <path>]... [--workflow <id>]... [--all] [--json]
+//   starci supervisor owed ack --item <key> --commits <sha,...> --reason <text> [--force] [--json]
+//   starci supervisor owed unack --item <key> [--json]
+//   starci supervisor owed acks [--json]
 //
 // Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
 // poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
@@ -636,10 +636,10 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
 /* ------------------------------------------------------------ CLI */
 
 const USAGE = [
-  'use: node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]',
-  '     node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--repo <path>]... [--force] [--json]',
-  '     node scripts/supervisor/owed.mjs unack --item <key> [--json]',
-  '     node scripts/supervisor/owed.mjs acks [--json]',
+  'use: starci supervisor owed [--repo <path>]... [--workflow <id>]... [--all] [--json]',
+  '     starci supervisor owed ack --item <key> --commits <sha,...> --reason <text> [--repo <path>]... [--force] [--json]',
+  '     starci supervisor owed unack --item <key> [--json]',
+  '     starci supervisor owed acks [--json]',
 ].join('\n');
 
 /** Every classified item across `repos` (read-only handles): {repos, items}. */

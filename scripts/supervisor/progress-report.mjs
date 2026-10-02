@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// progress-report.mjs — the supervisor's periodic progress report, sent to the
+// starci supervisor report — the supervisor's periodic progress report, sent to the
 // owner's Telegram.
-//   node scripts/supervisor/progress-report.mjs [--repo <path>]... [--send] [--json]
+//   starci supervisor report [--repo <path>]... [--send] [--json]
 // Owner, 2026-09-23: "every 10 minutes the supervisor draws a progress table with the
 // estimate of what is left and sends it over telegram", then, on the first terse table:
 // "too simple, write everything out clearly". So each workflow gets a readable section in

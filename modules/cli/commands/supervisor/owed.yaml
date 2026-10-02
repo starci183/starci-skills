@@ -1,0 +1,26 @@
+group: supervisor
+verb: owed
+owner: runtime
+summary: inspect and acknowledge work that running workflows owe the Supervisor
+impl:
+  script: scripts/supervisor/owed.mjs
+positional:
+  - {name: action, enum: [ack, unack, acks], required: false, variadic: false}
+flags:
+  - {name: repo, type: list, summary: product ledger owner path}
+  - {name: workflow, type: list, summary: workflow id to include}
+  - {name: all, type: boolean, summary: include non-Supervisor classifications}
+  - {name: item, type: string, summary: owed item key}
+  - {name: commits, type: string, summary: comma-separated fixing commit shas}
+  - {name: reason, type: string, summary: acknowledgement reason}
+  - {name: force, type: boolean, summary: store an acknowledgement without a current item}
+exit: {"0": inspection or acknowledgement completed, "1": finding or acknowledgement refusal, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor owed --repo <path>
+  - starci supervisor owed ack --item <key> --commits <sha> --reason <text>
+  - starci supervisor owed acks --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/owed.mjs

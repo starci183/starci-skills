@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-hfs-rules.mjs - holds knowledge/hfs/rules.yaml (the HFS rule catalog) to what exists, in both directions (part of
 // `npm run check`).
-//   node scripts/checks/check-hfs-rules.mjs [--json] [--unbuilt]
+//   starci runtime check --only hfs-rules -- [--json] [--unbuilt]
 //
 // The catalog is loaded through scripts/hfs/slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema
 // (HFS_RULES_INVALID). On top of that this check refuses:

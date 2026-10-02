@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// build-ops-registry.mjs — regenerate modules/ops/registry.yaml from the per-op
+// starci runtime gen-ops — regenerate modules/ops/registry.yaml from the per-op
 // yamls. The registry is GENERATED (see its header); never hand-edit it.
 //
 // CLI:
-//   node scripts/route/build-ops-registry.mjs            # rewrite registry.yaml
-//   node scripts/route/build-ops-registry.mjs --check    # diff only, no write (CI)
-//   node scripts/route/build-ops-registry.mjs --opsDir <dir> [--out <file>]
+//   starci runtime gen-ops                         # rewrite registry.yaml
+//   starci runtime gen-ops --check                 # diff only, no write (CI)
+//   starci runtime gen-ops --ops-dir <dir> [--out <file>]
 //
 // Entry shape: {id, family, goal one-liner, params {default, setBy},
 // nodeKinds, completionProfile, sideEffects summary, reads/writes scope, route keys,
@@ -46,7 +46,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--check') args.check = true;
-    else if (a === '--opsDir') args.opsDir = argv[++i];
+    else if (a === '--ops-dir') args.opsDir = argv[++i];
     else if (a === '--out') args.out = argv[++i];
     else { console.error(`unknown arg ${a}`); process.exit(2); }
   }
@@ -141,8 +141,8 @@ function main() {
   const body = stringifyYaml(doc);
   const header = [
     '# GENERATED FILE — do not hand-edit.',
-    '# regenerate: node scripts/route/build-ops-registry.mjs',
-    '# check only: node scripts/route/build-ops-registry.mjs --check',
+    '# regenerate: starci runtime gen-ops',
+    '# check only: starci runtime gen-ops --check',
     '',
   ].join('\n');
   const next = header + body;

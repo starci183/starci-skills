@@ -15,7 +15,7 @@
 //     once CLI-HFS lands it; until the file exists the group is skipped with an
 //     explicit skipped line
 //
-//   node scripts/checks/check-cli-parity.mjs [--root <tree>] [--json]
+//   starci runtime check --only cli-parity -- [--root <tree>] [--json]
 // Exit 0 when catalog and code agree, 1 with the findings, 2 on bad arguments
 // or an unreadable source.
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ import { loadCatalog } from '../cli/catalog.mjs';
 const RULE = 'RT_CLI_VERB_PARITY';
 const GLOBAL_FLAGS = new Set(['json', 'cwd', 'quiet', 'help', 'edition']);
 
-const HELP = `Usage: node scripts/checks/check-cli-parity.mjs [--root <tree>] [--json]
+const HELP = `Usage: starci runtime check --only cli-parity -- [--root <tree>] [--json]
 
 ${RULE}: catalog <-> implementation parity of modules/cli/commands.
 Exit 0 agrees, 1 reports findings, 2 is a bad argument or unreadable source.`;
@@ -156,7 +156,7 @@ const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx
 /** --flag names of a usage string (the global five are the dispatcher's, never a verb's;
  * parenthesized prose and flag-family placeholders like --until-<type> are not flags). */
 export const flagsOfUsage = (text) => [...new Set(
-    [...String(text ?? '').replace(/\([^)]*\)/g, ' ').matchAll(/--([a-z][a-z0-9-]*)/g)].map((m) => m[1]))]
+    [...String(text ?? '').split(/\s--(?=\s|$)/, 1)[0].replace(/\([^)]*\)/g, ' ').matchAll(/--([a-z][a-z0-9-]*)/g)].map((m) => m[1]))]
   .filter((f) => !GLOBAL_FLAGS.has(f) && !f.endsWith('-'));
 
 /** The verbs cli.mjs's main() dispatch switch can run. */
@@ -252,7 +252,7 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
     for (const v of g.verbs) {
       if (typeof v.summary !== 'string' || !v.summary.trim()) bad(`docs:${g.group}/${v.verb}`, 'catalog verb has no summary');
       if (v.impl?.script && !fs.existsSync(path.join(root, v.impl.script))) bad(`handler:${g.group}/${v.verb}`, `impl script ${v.impl.script} does not exist`);
-      if (g.group === 'kernel' && !modules.has(v.verb) && !switchVerbs.includes(v.verb)) {
+      if (g.group === 'kernel' && v.impl?.script === 'scripts/kernel/cli.mjs' && !modules.has(v.verb) && !switchVerbs.includes(v.verb)) {
         bad(`handler:kernel/${v.verb}`, 'no verb module and no cli.mjs dispatch case');
       }
     }

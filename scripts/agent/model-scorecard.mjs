@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// scripts/agent/model-scorecard.mjs — how each routed pool performs, per op kind, read from the ledgers.
+// starci debug run model-scorecard — how each routed pool performs, per op kind, read from the ledgers.
 //
-//   node scripts/agent/model-scorecard.mjs --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]
+//   starci debug run model-scorecard --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]
 //
 // Reads each repo's runtime ledger READ-ONLY at the file machine.ledgers names for it (decision Q1,
 // ledgerFileFor(repo): %LOCALAPPDATA%/StarCi/projects/<ledger id>/runtime.sqlite — never the pre-Q1 in-repo
@@ -192,7 +192,7 @@ function main(argv = process.argv.slice(2)) {
     if (argv[i] === '--repo') repos.push(argv[++i]);
     else if (argv[i] === '--since-hours') sinceHours = Number(argv[++i]);
   }
-  if (!repos.length) { console.error('usage: model-scorecard.mjs --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]'); process.exitCode = 2; return; }
+  if (!repos.length) { console.error('usage: starci debug run model-scorecard --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]'); process.exitCode = 2; return; }
   if (sinceHours != null && !(sinceHours > 0)) { console.error('--since-hours needs a positive number'); process.exitCode = 2; return; }
   const sc = scorecardFor({ repos, sinceHours });
   console.log(argv.includes('--json') ? JSON.stringify(sc) : formatTable(sc));

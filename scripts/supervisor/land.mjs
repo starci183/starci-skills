@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// land.mjs — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
+// starci supervisor land — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
 // Serialized by a host lock; a change reaches live main only through all of it, or not at all.
 //
-//   node scripts/supervisor/land.mjs --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --status [--json]
+//   starci supervisor land --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
+//   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
+//   starci supervisor land --status [--json]
 //
 // 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
@@ -424,7 +424,7 @@ export function specBaselineVerdict({ candidate, base, changed = [] }) {
 
 /** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
 export const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
-export const MIRROR_FIX = 'run node scripts/hfs/sync-runtime.mjs and include the refreshed mirror in the change';
+export const MIRROR_FIX = 'run starci release sync-runtime and include the refreshed mirror in the change';
 
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
@@ -940,7 +940,7 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });

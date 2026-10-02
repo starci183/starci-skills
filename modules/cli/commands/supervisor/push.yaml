@@ -1,0 +1,19 @@
+group: supervisor
+verb: push
+owner: runtime
+summary: run full repository suites and push clean main branches
+impl:
+  script: scripts/supervisor/push-git.mjs
+flags:
+  - {name: repo, type: list, summary: repository path to test and push}
+  - {name: check, type: boolean, summary: run every pre-push step without pushing}
+exit: {"0": every selected repository is green, "1": suite or push refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor push
+  - starci supervisor push --repo <path> --check
+  - starci supervisor push --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/push-git.mjs

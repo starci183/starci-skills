@@ -19,7 +19,7 @@
 //
 // RT_CITED_PATH_MISSING (rule R122, gate runtime): citedPathFindings() runs the same reading over the runtime's live prose
 // (runtimeCiteScan: the runtime contracts, docs/*.md, skills, init, CONTEXT.md, README.md, CONTRIBUTING.md and the ui docs)
-// and returns each dead cite as a finding; scripts/checks/check-runtime.mjs (`starci check`) judges it with the runtime check.
+// and returns each dead cite as a finding; `starci runtime check` judges it with the runtime check.
 // knowledge/, modules/schemas/ and docs/examples/ describe product repositories, whose paths are not this tree's.
 // Exit 0 clean, 1 lists every dead cite as file:line, 2 bad arguments.
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { movedTo } from '../hfs/runtime-rules/retired.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
+const HELP = `Usage: starci runtime check --only contract-cites -- [--root <tree>] [--scan <rel-path> ...] [--json]
 
 Verifies every cited file and symbol under modules/kernel/, modules/goal/ and
 modules/ops/ exists. Exit 0 clean, 1 lists the dead cites, 2 is a bad argument.`;

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// housekeeping.mjs — the ONE host housekeeping run of the live runtime (item 1 of the storage spec): keeps C:
+// starci runtime housekeeping — the ONE host housekeeping run of the live runtime (item 1 of the storage spec): keeps C:
 // and RAM bounded by sweeping the things nobody else removes — %TEMP% fixtures, agent session archives, Claude
 // Code transcripts, Devin data, StarCi logs, finished-workflow ledgers, orphan ledgers (a debug probe's throwaway
 // repo left registered in the live state root).
 //
-//   node scripts/housekeeping/housekeeping.mjs [--dry-run] [--apply] [--json] [--only tmp,sessions,...]
+//   starci runtime housekeeping [--dry-run] [--apply] [--json] [--only tmp,sessions,...]
 //
 // Default is a dry run: every sweep reports what it WOULD free or move and mutates nothing; --apply performs
 // the removals and archive moves. --only restricts the run to the named areas (default: all of them). The
@@ -159,7 +159,7 @@ export function describe(report) {
 if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   if (!args.ok) {
-    console.error(`use: housekeeping.mjs [--dry-run] [--apply] [--json] [--only <${AREA_NAMES.join(',')}>] (${args.error})`);
+    console.error(`use: starci runtime housekeeping [--dry-run] [--apply] [--json] [--only <${AREA_NAMES.join(',')}>] (${args.error})`);
     process.exitCode = 2;
   } else {
     const report = await runHousekeeping({ apply: args.apply, only: args.only });

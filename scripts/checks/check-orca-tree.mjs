@@ -27,7 +27,7 @@
 // (scripts/supervisor/workers.mjs) and its job lives in machine.sqlite
 // (sup_jobs), not in the ledger checked here.
 //
-//   node scripts/checks/check-orca-tree.mjs --repo <ledger owner>
+//   starci runtime check --only orca-tree -- --repo <ledger owner>
 //        (--terminals <terminal-list --json receipt> [--workers <worker-list --json receipt>] | --live) [--json]
 //
 // --live lists the terminals and, Run by Run, the workers of every Orca Run the
@@ -47,7 +47,7 @@ import { SCHEMA, readTerminals, readWorkers, ledgerRuns, orcaTreeFindings, forma
 
 /* ------------------------------------------------------------------- cli */
 const usage = (message) => {
-  process.stderr.write(`${message}\n\nUsage: node scripts/checks/check-orca-tree.mjs --repo <ledger owner> (--terminals <json> | --live) [--json]\n`);
+  process.stderr.write(`${message}\n\nUsage: starci runtime check --only orca-tree -- --repo <ledger owner> (--terminals <json> | --live) [--json]\n`);
   process.exit(2);
 };
 

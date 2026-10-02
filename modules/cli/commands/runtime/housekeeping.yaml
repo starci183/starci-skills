@@ -1,0 +1,19 @@
+group: runtime
+verb: housekeeping
+owner: runtime
+summary: inspect or apply the host housekeeping sweeps
+impl:
+  script: scripts/housekeeping/housekeeping.mjs
+flags:
+  - {name: dry-run, type: boolean, summary: explicitly select the default non-mutating sweep}
+  - {name: apply, type: boolean, summary: apply archive moves and removals}
+  - {name: only, type: string, summary: comma-separated housekeeping area names}
+exit: {"0": every selected sweep passed, "1": one or more sweeps failed, "2": bad usage}
+json: always
+examples:
+  - starci runtime housekeeping --dry-run
+  - starci runtime housekeeping --apply --only tmp,logs
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/housekeeping/housekeeping.mjs

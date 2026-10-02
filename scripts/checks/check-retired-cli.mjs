@@ -2,7 +2,7 @@
 // RT_RETIRED_CLI_CALL: tracked text must invoke the unified CLI, never one of
 // the command spellings retired by the CLI catalog or dispatcher.
 //
-// Usage: node scripts/checks/check-retired-cli.mjs [--root <tree>] [--json]
+// Usage: starci runtime check --only retired-cli -- [--root <tree>] [--json]
 // Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,7 +27,7 @@ const TOP_LEVEL = Object.freeze({
   goal: 'starci workflow define',
 });
 const RETIREMENT_WORD = /\b(?:removed|retired|replaced)\b/i;
-const HELP = `Usage: node scripts/checks/check-retired-cli.mjs [--root <tree>] [--json]
+const HELP = `Usage: starci runtime check --only retired-cli -- [--root <tree>] [--json]
 
 ${CODE}: no tracked text invokes a retired CLI command.
 Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.`;

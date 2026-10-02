@@ -1,0 +1,19 @@
+group: supervisor
+verb: report
+owner: runtime
+summary: render or send the owner's detailed workflow progress report
+impl:
+  script: scripts/supervisor/progress-report.mjs
+flags:
+  - {name: repo, type: list, summary: product ledger owner path}
+  - {name: send, type: boolean, summary: send the report through the configured owner channel}
+exit: {"0": report rendered or sent, "1": delivery failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor report
+  - starci supervisor report --repo <path> --send
+  - starci supervisor report --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/progress-report.mjs

@@ -4,7 +4,7 @@
 // "Opus lane (git worktree add ...)" while the guard refuses every raw `git worktree add`: the text and the enforcer
 // disagreed. The refusal matcher is the guard's own (scripts/guards/command-guard.mjs commandVerdict, one home); this
 // check only finds the commands and decides whether the text TELLS an agent to run them.
-//   node scripts/checks/check-guidance-commands.mjs [--root <tree>] [--json]
+//   starci runtime check --only guidance-commands -- [--root <tree>] [--json]
 //
 // Read: every tracked string field of modules/**/*.yaml (the failure-code catalog, which is the refusal-message catalog
 // itself, and the modules/kernel/contract-changes/ history excepted), the agent prompts modules/**/*.md, and

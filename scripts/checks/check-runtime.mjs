@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-runtime.mjs - `starci check` (bin/starci.mjs check, `npm run check`): the one entry point that judges the StarCi
+// check-runtime.mjs - `starci runtime check` (`npm run check`): the one entry point that judges the StarCi
 // runtime repository. In order:
 //   1. node --check over every .mjs of engine/, scripts/, modules/ and bin/ (scripts/api/node/syntax-check.mjs);
 //   2. the runtime HFS check, scripts/hfs/runtime-check.mjs, with knowledge/hfs/runtime-slots.yaml, and the
@@ -7,7 +7,8 @@
 //      together against the manifest's pending list;
 //   3. every retained self-check of ruleParams.runtime.selfChecks, in order (scripts/api/node/run-script.mjs).
 // Every step runs; the exit status is 1 when any failed.
-//   node scripts/checks/check-runtime.mjs [--json]      --json prints the runtime check's report instead of its lines
+//   starci runtime check [--json]                       run the complete runtime check
+//   starci runtime check --only <name> [-- <arguments>] run one named check and pass its arguments through unchanged
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -31,7 +32,52 @@ export function syntaxFiles(root = skillRoot) {
 /** One line of a runtime finding. */
 const line = (f) => `${f.code} ${f.message}`;
 
-/** The whole `starci check` of the runtime at `root`: {ok, syntax, runtime, selfChecks}. Prints as it goes (the runtime report as JSON with `json`). */
+const writeTo = (target, text) => {
+  if (typeof target === 'function') target(text);
+  else target.write(text);
+};
+
+/**
+ * The checks addressable by `starci runtime check --only <name>`, sorted by
+ * name. Check scripts are discovered from disk so this list cannot drift; the
+ * retained self-check ids add configured scripts outside scripts/checks/.
+ * The driver itself is excluded because it represents the complete suite, not
+ * one check.
+ */
+export function runtimeOnlyChecks(root = skillRoot) {
+  const checks = new Map();
+  const checksDir = path.join(root, 'scripts', 'checks');
+  for (const entry of fs.readdirSync(checksDir, { withFileTypes: true })) {
+    const match = entry.isFile() ? /^check-([a-z0-9-]+)\.mjs$/.exec(entry.name) : null;
+    if (!match || match[1] === 'runtime') continue;
+    checks.set(match[1], { name: match[1], run: `scripts/checks/${entry.name}`, args: [] });
+  }
+
+  const manifest = loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) });
+  const { selfChecks } = ruleParams(manifest, 'runtime');
+  for (const check of selfChecks) {
+    checks.set(check.id, { name: check.id, run: check.run, args: [...(check.args ?? [])] });
+  }
+  return [...checks.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Run exactly one dynamically discovered check, returning its child exit code. */
+export function runRuntimeOnly(name, args = [], {
+  root = skillRoot,
+  runner = runScript,
+  stderr = process.stderr,
+} = {}) {
+  const checks = runtimeOnlyChecks(root);
+  const selected = checks.find((check) => check.name === name);
+  if (!selected) {
+    const reason = name ? `unknown check "${name}"` : '--only needs a check name';
+    writeTo(stderr, `check-runtime: ${reason}\nValid --only names: ${checks.map((check) => check.name).join(', ')}\n`);
+    return 2;
+  }
+  return runner(path.join(root, selected.run), [...selected.args, ...args], { cwd: root });
+}
+
+/** The whole `starci runtime check` at `root`: {ok, syntax, runtime, selfChecks}. Prints as it goes (the runtime report as JSON with `json`). */
 export function checkRuntime({ root = skillRoot, json = false } = {}) {
   const out = (text) => { if (!json) process.stdout.write(`${text}\n`); };
   const err = (text) => { if (!json) process.stderr.write(`${text}\n`); };
@@ -64,7 +110,20 @@ export function checkRuntime({ root = skillRoot, json = false } = {}) {
   return { ok: bad.length === 0 && runtime.ok && failed.length === 0, syntax: { files: files.length, failed: bad.length }, runtime, selfChecks: { run: selfChecks.length, failed } };
 }
 
+/** CLI branch; without --only this calls the complete suite exactly as before. */
+export function checkRuntimeMain(argv = process.argv.slice(2), deps = {}) {
+  const onlyAt = argv.findIndex((arg) => arg === '--only' || arg.startsWith('--only='));
+  if (onlyAt >= 0) {
+    const joined = argv[onlyAt].startsWith('--only=');
+    const name = joined ? argv[onlyAt].slice('--only='.length) : argv[onlyAt + 1];
+    const passThrough = argv.slice(onlyAt + (joined ? 1 : 2));
+    if (passThrough[0] === '--') passThrough.shift();
+    return runRuntimeOnly(name, passThrough, deps);
+  }
+  const result = checkRuntime({ root: deps.root ?? skillRoot, json: argv.includes('--json') });
+  return result.ok ? 0 : 1;
+}
+
 if (isMain(import.meta.url)) {
-  const result = checkRuntime({ json: process.argv.includes('--json') });
-  process.exitCode = result.ok ? 0 : 1;
+  process.exitCode = checkRuntimeMain(process.argv.slice(2));
 }

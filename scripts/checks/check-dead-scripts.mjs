@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-dead-scripts.mjs - no runtime script lives without a reader (redundancy RED18; part of `npm run check`).
-//   node scripts/checks/check-dead-scripts.mjs [--json]
+//   starci runtime check --only dead-scripts -- [--json]
 //
 // A tracked `.mjs` under scripts/, engine/, modules/, bin/ or ext/ is alive only when something EXECUTABLE names it:
 //   - code: an import or dynamic import (by relative specifier), a spawn argument or a path literal in another code file

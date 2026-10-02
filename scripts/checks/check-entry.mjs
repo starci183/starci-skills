@@ -18,6 +18,6 @@ export function checkEntry(host,{claimedEntry}={}) {
 }
 if(isMain(import.meta.url)) {
  const [host,claimedEntry]=process.argv.slice(2);
- if(!host){process.stderr.write('Usage: node scripts/checks/check-entry.mjs <explicit-host> [claimed-entry]\n');process.exitCode=1;}
+ if(!host){process.stderr.write('Usage: starci runtime check --only entry -- <explicit-host> [claimed-entry]\n');process.exitCode=1;}
  else {const result=checkEntry(host,{claimedEntry});process.stdout.write(JSON.stringify(result)+'\n');if(!['ready','context-refresh-required'].includes(result.status))process.exitCode=1;}
 }

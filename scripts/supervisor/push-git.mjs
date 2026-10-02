@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// push-git.mjs — /push-git: the ONE place the full test suites run (owner 2026-09-29), then the push of main.
+// starci supervisor push — the ONE place the full test suites run (owner 2026-09-29), then the push of main.
 //
-//   node scripts/supervisor/push-git.mjs [--repo <path>]... [--check] [--json]
+//   starci supervisor push [--repo <path>]... [--check] [--json]
 //       default repositories: the runtime (.claude) and every product repository a project binding names
 //       (.workspaces/projects/*/work.json, the push-mains default set) that has unpushed main commits;
 //       an explicit --repo runs whether or not it is ahead.
@@ -263,14 +263,14 @@ export function describeRun(run) {
     }
   }
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
-  out.push(run.ok ? `PUSH-GIT ${run.check ? 'CHECK ' : ''}GREEN${run.check ? '' : `: ${run.pushed} commit(s) pushed`}` : 'PUSH-GIT RED: fix the failing groups, land the fixes (land.mjs --specs touching), run /push-git again');
+  out.push(run.ok ? `PUSH-GIT ${run.check ? 'CHECK ' : ''}GREEN${run.check ? '' : `: ${run.pushed} commit(s) pushed`}` : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
   return out.join('\n');
 }
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const bad = argv.filter((a, i) => a.startsWith('--') && !['--repo', '--check', '--json'].includes(a) && !(argv[i - 1] === '--repo'));
-  if (bad.length) { console.error(`unknown option ${bad.join(' ')}; use: push-git.mjs [--repo <path>]... [--check] [--json]`); process.exit(2); }
+  if (bad.length) { console.error(`unknown option ${bad.join(' ')}; use: starci supervisor push [--repo <path>]... [--check] [--json]`); process.exit(2); }
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
   const run = pushGit({ repos: repos.length ? repos : null, check: argv.includes('--check') });
   try { supervisorLog('push-git', `${run.ok ? 'green' : 'red'} ${run.repos.map((r) => `${r.name}:${r.verdict}`).join(' ')}${run.check ? ' (check)' : ''}`); } catch { /* the printed record is the run */ }

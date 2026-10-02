@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// actions.mjs — the OWED ACTIONS list: every stuck item of every running workflow, classified, with the one action
+// starci supervisor actions — the OWED ACTIONS list: every stuck item of every running workflow, classified, with the one action
 // the [Supervisor] takes on it and an SLA clock (modules/supervisor/supervise.yaml mission; owner, 2026-09-28:
 // "the supervisor must watch, manage, send mail in, and adjust" - autopilot, the owner is asked only for the final
 // credentials step and the handover).
@@ -14,9 +14,9 @@
 // The tick records one `supervisor-owed-actions` event per run; `list` prints the newest. Every event here is a
 // machine.sqlite sup_events row (home.mjs supervisorEvent / newestEvent).
 //
-//   node scripts/supervisor/actions.mjs list [--json] [--open]
-//   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
-//   node scripts/supervisor/actions.mjs digest [--json]                       read-only preview of the owner digest
+//   starci supervisor actions list [--json] [--open]
+//   starci supervisor actions record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
+//   starci supervisor actions digest [--json]                       read-only preview of the owner digest
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
@@ -47,7 +47,7 @@ export const CLASSES = Object.freeze({
   'unread-peer': 'notify the Kernel to read api inbox and act on the message',
   undispatched: 'ready work is not dispatched: wake the Kernel (notify.mjs, [supervisor] dispatch <job>); a repeat is a wake defect - open a lane fix',
   'dead-worker': 'notify the Kernel to reconcile (api reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead or gated: run that reconcile yourself',
-  'dead-kernel': 'the Host controller replaces a dead Kernel seat (watchdog.mjs --once --repair); if it is quarantined, node scripts/kernel/start-workflow.mjs --goal',
+  'dead-kernel': 'the Host controller replaces a dead Kernel seat; if it is quarantined, starci workflow start --goal <id>',
   orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
   stalled: 'read api status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
   'contract-stale': 'notify the Kernel to re-read the changed runtime files and api kernel-ack-rev --rev <sha>',
@@ -282,7 +282,7 @@ if (isMain(import.meta.url)) {
       const r = await ownerDigest();
       console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- preview only; the Fleet Notifier sends the owner digest`);
     } else {
-      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
+      console.error('use: starci supervisor actions list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
       process.exitCode = 2;
     }
   } catch (error) {

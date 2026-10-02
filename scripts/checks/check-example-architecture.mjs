@@ -6,7 +6,7 @@
 // could not run. `hfs check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
 // ...) sit on the lint surface (scripts/hfs/architecture/surface.mjs) and reach an app only through `hfs lint`.
 //
-//   node scripts/checks/check-example-architecture.mjs [--examples <dir>] [--only <name>]
+//   starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]
 //
 // It is deliberately NOT part of `npm run check`: run it by hand, after `npm ci` in each example app, before landing an
 // example change. It is heavy (one TypeScript program per side of each example): run it once, never in a loop.

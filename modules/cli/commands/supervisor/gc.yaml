@@ -1,0 +1,23 @@
+group: supervisor
+verb: gc
+owner: runtime
+summary: inspect or collect leftover workers, shells, lanes, temp data, leases, and logs
+impl:
+  script: scripts/supervisor/gc.mjs
+flags:
+  - {name: dry-run, type: boolean, summary: explicitly select the default non-mutating sweep}
+  - {name: apply, type: boolean, summary: apply the collection plan}
+  - {name: only, type: string, summary: comma-separated collector names}
+  - {name: plan, type: boolean, summary: run a dry plan without recording sweep state}
+  - {name: holder, type: string, summary: host-lock holder name}
+  - {name: trigger, type: string, summary: trigger name recorded with an apply run}
+exit: {"0": sweep completed cleanly, "1": sweep reported errors or a busy lock, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor gc --dry-run
+  - starci supervisor gc --apply --only agents,shells
+  - starci supervisor gc --plan --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/gc.mjs

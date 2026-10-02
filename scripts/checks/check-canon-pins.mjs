@@ -16,8 +16,8 @@
 //
 // So a canon change without a version bump and a rebinding of the profile fails `npm run check`.
 //
-//   node scripts/checks/check-canon-pins.mjs [--json]
-//   node scripts/checks/check-canon-pins.mjs --repo <app root> [--json]
+//   starci runtime check --only canon-pins -- [--json]
+//   starci runtime check --only canon-pins -- --repo <app root> [--json]
 //
 // With --repo the same pins judge the one package.json at an app root (it carries the dependencies of both sides): every
 // pinned dependency it declares must be that exact version (every pin, @starci packages included, is installed from the

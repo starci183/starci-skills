@@ -1,0 +1,22 @@
+group: supervisor
+verb: notify
+owner: runtime
+summary: deliver a durable Supervisor ruling to one workflow Kernel
+impl:
+  script: scripts/supervisor/notify.mjs
+flags:
+  - {name: repo, type: string, required: true, summary: product ledger owner path}
+  - {name: workflow, type: string, required: true, summary: target workflow id}
+  - {name: text, type: string, summary: notice text}
+  - {name: text-file, type: string, summary: file containing notice text}
+  - {name: item, type: string, summary: owed-action key satisfied by the notice}
+  - {name: entity, type: string, summary: decision entity as type:id}
+exit: {"0": notice delivered or durably queued, "1": decision delivery failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor notify --repo <path> --workflow <id> --text <text>
+  - starci supervisor notify --repo <path> --workflow <id> --text-file <file> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/notify.mjs

@@ -5,7 +5,7 @@
 // (`moduleLocalDocumentKinds[]` — a contract document that stamps its own kind
 // and has no schema file).
 //
-//   node scripts/checks/check-schema-catalog.mjs [--json]
+//   starci runtime check --only schema-catalog -- [--json]
 //
 // modules/ops/ops/*.yaml is excluded: those manifests all stamp the one op
 // kind the generated modules/ops/registry.yaml indexes.
@@ -106,7 +106,7 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
 
 export function schemaCatalogMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h'))
-    return { exitCode: 0, text: 'Usage: node scripts/checks/check-schema-catalog.mjs [--json]\n\nEvery `schema:` const under modules/ (excluding modules/ops/ops/) must be catalogued in modules/schemas/index.yaml exactly once. Exit 0 is clean, 1 reports gaps.\n' };
+    return { exitCode: 0, text: 'Usage: starci runtime check --only schema-catalog -- [--json]\n\nEvery `schema:` const under modules/ (excluding modules/ops/ops/) must be catalogued in modules/schemas/index.yaml exactly once. Exit 0 is clean, 1 reports gaps.\n' };
   const result = checkSchemaCatalog();
   if (argv.includes('--json'))
     return { exitCode: result.ok ? 0 : 1, text: `${JSON.stringify({ schema: 'starci/schema-catalog-check@1', ok: result.ok, errors: result.errors, stampCount: result.stamps.length }, null, 2)}\n` };

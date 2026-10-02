@@ -6,10 +6,15 @@ impl:
   script: scripts/cli/lib/debug-run.mjs
 positional:
   - name: inspector
-    enum: [orca-status, runtime-status, supervisor-status]
+    enum: [orca-status, runtime-status, supervisor-status, model-scorecard, core-watch]
     required: true
     variadic: false
-flags: []
+flags:
+  - {name: repo, type: list, summary: product ledger owner path for model-scorecard}
+  - {name: since-hours, type: number, summary: positive model-scorecard window in hours}
+  - {name: child-timeout, type: number, summary: core-watch child call timeout in seconds}
+  - {name: token-window, type: number, summary: core-watch token-spike window in minutes}
+  - {name: token-spike, type: number, summary: core-watch token count that raises an alert}
 exit:
   "0": inspector completed cleanly
   "1": inspector found a problem or could not read its source
@@ -19,6 +24,10 @@ examples:
   - starci debug run orca-status
   - starci debug run runtime-status --json
   - starci debug run supervisor-status
+  - starci debug run model-scorecard --repo <path>
+  - starci debug run core-watch
 editions: [full]
 since: 1.0.0-alpha.4
-removed: []
+removed:
+  - node scripts/agent/model-scorecard.mjs
+  - node scripts/reconciler/core-watch.mjs

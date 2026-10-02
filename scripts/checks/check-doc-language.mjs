@@ -3,7 +3,7 @@
 // `npm run check`. It is the same law and the same detection (scripts/lib/language.mjs) the architecture machine applies to a
 // product repository's knowledge/, docs/, src/ and apps/; the runtime is not a slot repository, so its own scope is spelled here:
 // every Markdown and YAML document of knowledge/, docs/, modules/, packages/, examples/, skills/, ui/ and the repository root.
-//   node scripts/checks/check-doc-language.mjs [--json]
+//   starci runtime check --only doc-language -- [--json]
 //
 // The only exceptions are the declared field-level ones of scripts/lib/language.mjs (DECLARED_VIETNAMESE_FIELDS): the Vietnamese
 // operator fields of the failure-code catalog (modules/kernel/failure-codes.yaml), the `vi` field of the op-label catalogue
