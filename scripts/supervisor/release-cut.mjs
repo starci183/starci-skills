@@ -57,10 +57,10 @@ const heldWhy = (o) => `the host lock is held by ${o.role ?? 'another heavy run'
 const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
 
 /**
- * Cut the release `tag` (v<version>) of `repo`: see the header. {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
+ * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
  */
-export function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, deps = {} } = {}) {
+export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, deps = {} } = {}) {
   const run = deps.git ?? git;
   const out = { ok: false, repo: path.basename(repo), verdict: null, why: null, tag, head: null, suite: [], pushed: false, tagCreated: false };
   const refuse = (verdict, why, extra = {}) => ({ ...out, ...extra, verdict, why });
@@ -89,7 +89,7 @@ export function cutRelease({ repo, remote = 'origin', branch = 'main', tag = nul
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
   const lock = deps.lock ?? withHostLock;
-  const ran = lock(() => (deps.suite ?? defaultSuite)(repo, deps));
+  const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, deps));
   if (heldBy(ran)) return refuse('host-lock-held', heldWhy(heldBy(ran)));
   const steps = ran;
   out.suite = steps;
@@ -117,7 +117,7 @@ export function cutRelease({ repo, remote = 'origin', branch = 'main', tag = nul
   const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent) });
   if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
   out.l4Record = recorded.file ?? null;
-  const pushed = lock(() => (deps.push ?? push)(['--atomic', remote, ...refs], { cwd, timeout: 600_000 }));
+  const pushed = await lock(() => (deps.push ?? push)(['--atomic', remote, ...refs], { cwd, timeout: 600_000 }));
   if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
   return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push`, pushed: true };

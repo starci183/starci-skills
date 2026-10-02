@@ -500,6 +500,12 @@ function downMessage(cfg,server,docker){
   return `${where}; container ${cfg.container} is ${docker.state}. Start it: docker start ${cfg.container}-postgres ${cfg.container}`;
 }
 
+/** Whether the configured SonarQube server answers UP: a plain status read, no custody, no token (the release flow waits on it after starting the stack). */
+export async function sonarUp(cfg){
+  const server=await call(cfg,'GET','/api/system/status');
+  return Boolean(server.reachable&&server.status===200&&server.json?.status==='UP');
+}
+
 export async function status(cfg){
   const server=await call(cfg,'GET','/api/system/status');
   const up=server.reachable&&server.status===200&&server.json?.status==='UP';

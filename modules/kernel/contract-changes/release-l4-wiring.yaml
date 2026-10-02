@@ -2,7 +2,7 @@ id: release-l4-wiring
 effectiveAt: '2026-10-03T05:30:00+07:00'
 summary: >-
   THE L4 ROW IS WIRED FOR THE RELEASE CUT (coordinator 2026-10-03). Before L4's steps, a real `npm ci` runs in every example app (a node_modules link into another checkout is removed as a link first, a missing lockfile is
-  absent and fails). The Sonar proof is supplied by the existing gate (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`): per example, `scan --project-gate --wait` then `dashboard`, both must pass;
+  absent and fails). The Sonar proof is supplied by the existing gate (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`): per example, `scan --project-gate --wait` then `dashboard`, both must PASS, called in-process from the gate's exported functions (no child `node <script>`; so `runL4` and `cutRelease` are async and a caller awaits them);
   the local SonarQube stack (server container and its database container) is started by exact name through scripts/api/docker when stopped, waited for until UP, and stopped again afterwards, leaving it as found;
   no other container is named. A new last L4 step, `linux-parity`, runs the CI-equivalent LIGHT jobs once in a Linux container on this host before the push: the node image of the workflows' node-version, HEAD handed
   over as a read-only tar (git archive) and extracted to a copy inside the container, then every `run` step of .github/workflows derived (installs, the full check set, package clean installs, the scaffold against

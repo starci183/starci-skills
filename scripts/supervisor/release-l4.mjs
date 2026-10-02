@@ -80,10 +80,10 @@ export function planL4(repo, { runtimeRoot } = {}) {
 }
 
 /**
- * Run the L4 plan once: [{name, ok, log, ms, skips, absent?}]. `proofs` supplies the {ok, log} of each proof by name (default: the Sonar gate of every example, the stack
+ * Run the L4 plan once (async: the Sonar gate is): a Promise of [{name, ok, log, ms, skips, absent?}]. `proofs` supplies the {ok, log} of each proof by name (default: the Sonar gate of every example, the stack
  * brought up and put back by `supplier.close`); a missing one is absent and fails. `parity` runs the Linux step (default runParity); `parity: null` leaves it out of a stand-in run.
  */
-export function runL4(repo, { proofs, parity = runParity, step = runStep, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {} } = {}) {
+export async function runL4(repo, { proofs, parity = runParity, step = runStep, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {} } = {}) {
   const sup = proofs === undefined ? (supplier ?? sonarSupplier(apps)) : { proofs, close: () => {} };
   try {
     const ran = plan.steps.map((s) => {
@@ -93,11 +93,12 @@ export function runL4(repo, { proofs, parity = runParity, step = runStep, plan =
       const r = step(s, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release' });
       return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text) };
     });
-    const proved = plan.proofs.map((name) => {
-      const p = sup.proofs[name]?.();
-      return p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] };
-    });
-    const linux = plan.linux && parity ? [parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps })] : [];
+    const proved = [];
+    for (const name of plan.proofs) {
+      const p = await sup.proofs[name]?.();
+      proved.push(p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] });
+    }
+    const linux = plan.linux && parity ? [await parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps })] : [];
     return [...ran, ...proved, ...linux];
   } finally { sup.close?.(); }
 }
