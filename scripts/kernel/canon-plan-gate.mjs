@@ -9,9 +9,9 @@
 // moves all landed on another slice (no fix target: it is cut again, never enqueued to block).
 import fs from 'node:fs';
 import { canonCutPlanOf } from './seam-policy.mjs';
-import { sameOrUnder } from '../lib/path-key.mjs';
+import { sameOrUnder, normPath } from '../lib/path-key.mjs';
 
-const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
+const norm = (p) => normPath(p, { glob: 'double' });
 /** An owned path `q` (maybe repository-prefixed, e.g. todo-app-fe/apps/...) covers the scan-relative path `p`. */
 const covers = (q, p) => { const a = norm(q), b = norm(p); return sameOrUnder(b, a) || a.endsWith(`/${b}`) || [...a.split('/').keys()].some((i) => sameOrUnder(b, a.split('/').slice(i).join('/'))); };
 

@@ -8,10 +8,10 @@
 // The redirect of `core.hooksPath` away from husky is the architecture machine's (HFS_HOOKS_PATH_REDIRECTED).
 import { found, readJson, readText } from './read.mjs';
 
-export const CI_MISSING_CANON = 'HFS_CI_MISSING_CANON';
-export const CI_FILE = '.github/workflows/ci.yml';
-export const PRE_PUSH_FILE = '.husky/pre-push';
-export const hfsPackage = '@starci/cli';
+const CI_MISSING_CANON = 'HFS_CI_MISSING_CANON';
+const CI_FILE = '.github/workflows/ci.yml';
+const PRE_PUSH_FILE = '.husky/pre-push';
+const hfsPackage = '@starci/cli';
 const RUN_LINE = /^\s*(?:-\s+)?run:\s*(.+?)\s*$/;
 const HFS_LINT = /^(?:npx\s+(?:--no-install\s+|-y\s+)?)?(?:@starci\/cli(?:@(\S+))?|starci)\s+app\s+lint(\s.*)?$/;
 const NPM_RUN = /^npm run ([\w:.-]+)(?:\s+--\s+(.*))?$/;

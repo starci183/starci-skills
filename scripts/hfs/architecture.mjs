@@ -13,7 +13,7 @@ export {checkArchitecture};
 
 const USAGE = 'usage: starci runtime architecture <repo-root> [--base <commit>]';
 
-export function parseArchitectureArgs(argv) {
+function parseArchitectureArgs(argv) {
   let root = null, base;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];

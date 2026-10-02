@@ -11,7 +11,7 @@ const opOfLabel = (label) => String(label).split('#')[0];
 const legOp = (leg) => (typeof leg === 'string' ? opOfLabel(leg) : leg?.op ? String(leg.op) : null);
 
 /** Ordered, de-duplicated op ids of a leg list. */
-export const legOpsOf = (legs) => (Array.isArray(legs) ? [...new Set(legs.map(legOp).filter(Boolean))] : []);
+const legOpsOf = (legs) => (Array.isArray(legs) ? [...new Set(legs.map(legOp).filter(Boolean))] : []);
 
 /** Op-level edges from label edges over exactly `ops`; null when malformed, partial or cyclic. */
 function collapseEdges(raw, ops) {

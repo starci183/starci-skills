@@ -32,7 +32,7 @@ export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modul
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', 'coverage']);
 
 /** The document files of a runtime checkout (repository-relative POSIX paths). */
-export function runtimeDocuments(root = skillRoot) {
+function runtimeDocuments(root = skillRoot) {
   const bundles = new Set(Object.keys(BUNDLES));
   const out = [];
   // A git-ignored file is not a document of the repository (the owner's local config.yaml, scratch files): only tracked
@@ -54,7 +54,7 @@ export function runtimeDocuments(root = skillRoot) {
 }
 
 /** The source folders whose code files are read, and the file kinds. */
-export const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'tests']);
+const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'tests']);
 export const SOURCE_EXTENSIONS = Object.freeze(['.mjs', '.cjs', '.js', '.ts', '.tsx', '.sql', '.ps1', '.sh', '.html', '.css']);
 /** Source that IS declared Vietnamese: the UI catalog directory (ui/src/i18n/t.ts reads ui/src/i18n/messages/*.ts, keyed from the English source) and the Vietnamese-letter detector itself. */
 export const DECLARED_SOURCE_CATALOGS = Object.freeze(['ui/src/i18n/', 'scripts/lib/language.mjs']);
@@ -62,7 +62,7 @@ export const DECLARED_SOURCE_CATALOGS = Object.freeze(['ui/src/i18n/', 'scripts/
  * Functional Vietnamese: source that MATCHES owner text (a phrase or mark the owner types) and so cannot be translated. One
  * entry per file with the reason; the file is exempt from HFS_SOURCE_NOT_ENGLISH, nothing else is.
  */
-export const FUNCTIONAL_VIETNAMESE = Object.freeze({
+const FUNCTIONAL_VIETNAMESE = Object.freeze({
   'scripts/machine/ask-recommendation.mjs': 'matches the recommendation mark the owner types in a question option (khuyen nghi, de xuat)',
 });
 /** A bundle's own runtime/ copy directory (a byte copy of a runtime source, kept by sync-runtime). */
@@ -70,14 +70,14 @@ const BUNDLE_RUNTIME = /^packages\/(?:[^/]+|eslint\/[^/]+)\/runtime(?:\/|$)/;
 export const SOURCE_PENDING_FILE = 'scripts/checks/source-language.pending';
 
 /** The pending list: one repository-relative path per line (`#` lines and blanks skipped). */
-export function readSourcePending(root = skillRoot) {
+function readSourcePending(root = skillRoot) {
   try {
     return new Set(fs.readFileSync(path.join(root, SOURCE_PENDING_FILE), 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')));
   } catch { return new Set(); }
 }
 
 /** The tracked source files of a runtime checkout (repository-relative POSIX paths). */
-export function runtimeSourceFiles(root = skillRoot) {
+function runtimeSourceFiles(root = skillRoot) {
   const bundles = new Set(Object.keys(BUNDLES));
   const listed = gitResultOf(lsFiles(['--cached', '--others', '--exclude-standard', '-z'], { cwd: root }));
   const inRepository = listed.ok ? new Set(listed.stdout.split('\0').filter(Boolean)) : null;

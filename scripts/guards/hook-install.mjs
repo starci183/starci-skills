@@ -31,10 +31,10 @@ import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export { guardsRoot };
-export const HOOK_MARKER = 'starci-history-guard';
+const HOOK_MARKER = 'starci-history-guard';
 export const HOOK_VERSION = 6;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
-export const WORK_HOOK_VERSION = 1;
+const WORK_HOOK_VERSION = 1;
 
 const normOwned = (p) => path.resolve(p).replace(/\\/g, '/');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -94,7 +94,7 @@ export function bindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), 
  * SEAT_DENIED_TOOLS) is enforced by the project PreToolUse hook (.claude/settings.json -> scripts/guards/seat-tools.mjs),
  * which denies a tool only for the terminal bound here.
  */
-export const seatsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'seats');
+const seatsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'seats');
 export function bindSeatGuard({ skillRoot = path.resolve(here, '..', '..'), handle, role, deniedTools }) {
   return writeGuardFile(seatsDir(skillRoot), handle, { schema: 'starci/seat-guard@1', role, terminal: handle,
     deniedTools: [...new Set((deniedTools ?? []).map(String))], boundAt: new Date().toISOString() });
@@ -241,7 +241,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
  * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
  * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
  */
-export function workHookBody({ root, nodePath = process.execPath }) {
+function workHookBody({ check, nodePath = process.execPath }) {
   const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
   return `#!/bin/sh
 # ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.

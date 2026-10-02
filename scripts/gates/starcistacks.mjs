@@ -39,17 +39,18 @@ import { loadSonarGate } from './sonar-gate.mjs';
 import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from './runtime-host.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
+import { readProperties } from '../lib/properties.mjs';
 
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
-export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
-export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
-export const CONTRACT_CHANGE = 'starcistacks-services';
-export const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
+const RESULT_SCHEMA = 'starci/starcistacks-check@1';
+const DECLARATION_SCHEMA = 'starci/application-stacks@1';
+const CONTRACT_CHANGE = 'starcistacks-services';
+const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: 'author the services block of the repository stack declaration (sonar and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
 
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
-export const SERVICE_CATALOG = {
+const SERVICE_CATALOG = {
   sonar: { providers: ['sonarqube', 'sonarcloud'], words: ['sonar', 'sonarqube', 'sonarcloud'],
     ci: [/SonarSource\/sonar(?:qube|cloud)-[a-z-]+-action/i, /\bsonar-scanner\b/i, /\bSONAR_TOKEN\b/] },
   'container-registry': { providers: ['ghcr', 'dockerhub', 'ecr', 'gar'], words: ['ghcr', 'registry', 'docker hub', 'dockerhub'],
@@ -222,16 +223,7 @@ function workflowTexts(repo) {
   return entries.map((name) => ({ file: `.github/workflows/${name}`, text: readText(path.join(dir, name)) ?? '' }));
 }
 
-function readProperties(file) {
-  const out = {};
-  for (const raw of String(readText(file) ?? '').split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith('!')) continue;
-    const at = line.search(/[=:]/);
-    if (at > 0) out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
-  }
-  return out;
-}
+
 
 function git(call, repo, args) {
   try {

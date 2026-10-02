@@ -8,7 +8,9 @@ import { JOB_ARTIFACT_SUBKINDS, ledgerFileFor, openLedger } from '../../engine/d
 import { clearManifestCache, manifestToolOf, subkindOf, subkindOfTool } from '../../scripts/kernel/artifact-subkind.mjs';
 import { collectJobFiles } from '../../scripts/kernel/job-artifacts.mjs';
 import { RECORDINGS_ROOT_ENV, defaultRecordRoot, recordingsRootOf } from '../../scripts/uat/playwright-recording.mjs';
-import { LOG_TYPED_MISSING, openLogs, readLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../../scripts/kernel/typed-logs.mjs';
+import { LOG_TYPED_MISSING, openLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../../scripts/kernel/typed-logs.mjs';
+import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -21,11 +23,12 @@ for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE
 // LOG_TYPED_MISSING warning when an op logged nothing of its own.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+const DEFINE_GOAL = path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs');
+const START_WORKFLOW = path.join(ROOT, 'scripts', 'kernel', 'start-workflow.mjs');
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000002000154a24f5d0000000049454e44ae426082', 'hex');
 const json = (v) => JSON.stringify(v ?? null);
 const tmp = (t, prefix = 'starci-subkind-') => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 const write = (root, rel, body) => { const abs = path.join(root, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return abs; };
-const git = (cwd, ...args) => { const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`); return r.stdout.trim(); };
 
 test('subkind rules: name conventions, op ids and paths; unknown stays null', () => {
   const sk = (kind, p, opId = null, origin = null) => subkindOf({ kind, path: p, opId, origin });
@@ -154,36 +157,68 @@ test('typedLogGaps: step.start, step.end and a cmd.run per reported check are ow
   } finally { logs.close(); }
 });
 
-// --------------------------------------------------------------------------------- settle, end to end
-const checkout = (t) => {
-  const dir = tmp(t, 'starci-subkind-settle-');
-  const origin = path.join(dir, 'origin.git'), repo = path.join(dir, 'work');
-  git(dir, 'init', '--quiet', '--bare', origin);
-  git(dir, 'clone', '--quiet', origin, repo);
-  git(repo, 'config', 'user.email', 'lane@starci.test'); git(repo, 'config', 'user.name', 'lane'); git(repo, 'config', 'core.autocrlf', 'false');
-  git(repo, 'checkout', '--quiet', '-b', 'main');
-  write(repo, 'src/a.ts', 'export const a = 1;\n');
-  write(repo, '.gitignore', '.starciwork/\n');
-  git(repo, 'add', '.'); git(repo, 'commit', '--quiet', '-m', 'init');
-  write(repo, 'src/a.ts', 'export const a = 2;\n');
-  git(repo, 'add', 'src/a.ts'); git(repo, 'commit', '--quiet', '-m', 'edit');
-  return { repo, head: git(repo, 'rev-parse', 'HEAD') };
+// --------------------------------------------------------------------------------- prompts delivered through their real launchers
+const promptWorld = (t) => {
+  const root = tmp(t, 'starci-prompt-delivery-'), repo = path.join(root, 'repo'), ownerRoot = path.join(root, 'owner');
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'),
+    { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
+  fs.mkdirSync(ownerRoot, { recursive: true });
+  const fake = path.join(root, 'fake-orca.mjs');
+  fs.writeFileSync(fake, FAKE_ORCA);
+  const example = fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8');
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), example.replace(/^kernel:.*$/m, 'kernel: {agent: codex, model: gpt-6-sol, effort: high}'));
+  const stateFile = path.join(root, 'orca-state.json');
+  const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
+    STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
+    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_OWNER_ROOT: ownerRoot };
+  for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];
+  const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
+  const state = () => JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  return { root, repo, env, run, state };
 };
-const seedJob = (repo, { jobId, op = 'backend.implement', wf = 'wf-s', report }) => {
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
-  try {
-    ledger.ensureWorkflow({ workflowId: wf, title: 'subkind' });
-    ledger.enqueueJob({ jobId, workflowId: wf, opId: op, kind: 'op', payload: { opId: op, owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } });
-    ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run('running', jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf, op, 1, `ctx-${jobId}`, '# contract', json({ worktree: repo }), Date.now());
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf, `ctx-${jobId}`, op, 1, 0, 'done', json({ outcome: 'done', summary: 'subkind', ...report }), null, Date.now());
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(wf, op, 1, json({ checks: report.checks }), Date.now());
-  } finally { ledger.close(); }
+const deliveredPrompt = (state) => {
+  const spec = Object.values(state.taskSpecs).at(-1);
+  if (typeof spec !== 'string' || !spec.includes('PACKET FILE:')) return spec;
+  const lines = spec.split(/\r?\n/), marker = lines.findIndex((line) => line.startsWith('PACKET FILE:'));
+  const packet = lines[marker + 1]?.trim();
+  return packet && fs.existsSync(packet) ? fs.readFileSync(packet, 'utf8') : spec;
 };
-const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...process.env, ORCA_TERMINAL_HANDLE: '' } }); let body = null; try { body = JSON.parse(r.stdout); } catch { body = null; } return { r, body }; };
 
-test('the typed-log rules reach every new dispatch and every kernel boot', async () => {
+test('starci kernel dispatch delivers the typed-log block to the operation worker', (t) => {
+  const w = promptWorld(t), workflowId = 'wf-typed-prompt', jobId = 'op-code.refactor-typed-prompt';
+  const ledger = openLedger({ file: ledgerFileFor(w.repo) });
+  try {
+    seedWorkflow(ledger, { id: workflowId, goal: { revision: 1, markdown: '# Typed prompt' }, jobs: [
+      { jobId: `kernel-${workflowId}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: 'term-kernel', payload: {} },
+      { jobId, opId: 'code.refactor', status: 'queued', payload: { opId: 'code.refactor', owned_paths: ['docs/'] } },
+    ] });
+  } finally { ledger.close(); }
+  const dispatched = w.run(API, 'dispatch', '--repo', w.repo, '--job', jobId, '--model', 'codex-agent', '--spawn', '--json');
+  assert.equal(dispatched.status, 0, dispatched.stderr || dispatched.stdout);
+  const prompt = deliveredPrompt(w.state());
+  assert.equal(typeof prompt, 'string', 'worker-start stores the operation prompt it delivered');
+  assert.ok(prompt.includes(LOG_TYPED_MISSING), 'the delivered prompt includes the missing typed-log warning');
+  assert.match(prompt, new RegExp(`cli\\.mjs log --repo \\S+ --workflow ${workflowId} --job ${jobId} --kind`),
+    'the delivered prompt includes this worker\'s typed-log command');
+});
+
+test('start-workflow delivers kernel-prompt.md to every new Kernel', (t) => {
+  const w = promptWorld(t);
+  const defined = w.run(DEFINE_GOAL, '--repo', w.repo, '--text', 'prove the Kernel boot prompt', '--json');
+  assert.equal(defined.status, 0, defined.stderr || defined.stdout);
+  const workflowId = JSON.parse(defined.stdout).workflowId;
+  const started = w.run(START_WORKFLOW, '--repo', w.repo, '--goal', workflowId, '--json');
+  assert.equal(started.status, 0, started.stderr || started.stdout);
+  const templateLines = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8').split(/\r?\n/)
+    .filter((line) => line.trim().length > 80 && !/[{}]/.test(line));
+  const distinctive = templateLines.sort((a, b) => b.length - a.length)[0];
+  assert.ok(distinctive, 'kernel-prompt.md has a distinctive non-template line');
+  const prompt = Object.values(w.state().taskSpecs).at(-1);
+  assert.ok(prompt.includes(distinctive), `the boot prompt omitted this kernel-prompt.md line: ${distinctive}`);
+});
+
+test('the operation and kernel prompt contracts both require typed logs', async () => {
   const { buildOpPrompt } = await import('../../scripts/kernel/op-prompt.mjs');
   const packet = { op: 'backend.implement', brief: 'modules/ops/ops/backend.implement.yaml', context: { records: [], owned_paths: [], attempt: 1, workflow: { id: 'wf-p' } }, constraints: { model: 'm' } };
   const prompt = buildOpPrompt({ skillRoot: ROOT, packet, jobId: 'op-p-1', repo: 'repo/p' });
@@ -191,11 +226,8 @@ test('the typed-log rules reach every new dispatch and every kernel boot', async
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);
   assert.match(prompt, /cli\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
-  const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
-  assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'starci kernel dispatch renders the op prompt with the logging block');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);
   assert.match(kernelPrompt, /\[boundary\.typedLogs\]/);
   assert.match(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'driver-loop.yaml'), 'utf8'), /^\s+typedLogs: >-/m);
-  assert.match(fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'start-workflow.mjs'), 'utf8'), /readFileSync\(path\.join\(skillRoot, 'modules', 'kernel', 'kernel-prompt\.md'\)/, 'every kernel boot reads kernel-prompt.md');
 });

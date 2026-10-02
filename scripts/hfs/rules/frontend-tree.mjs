@@ -14,16 +14,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { found, readJson } from './read.mjs';
 
-export const WIRE_GENERATED = 'FE_WIRE_GENERATED';
-export const I18N_PLACEMENT = 'FE_I18N_PLACEMENT';
-export const I18N_CATALOG = 'FE_I18N_CATALOG';
+const WIRE_GENERATED = 'FE_WIRE_GENERATED';
+const I18N_PLACEMENT = 'FE_I18N_PLACEMENT';
+const I18N_CATALOG = 'FE_I18N_CATALOG';
 export const DEFAULT_LOCALE = 'vi';
 const ROUTE_FILE = /\/(?:page|layout|template|loading|error|not-found)\.[jt]sx?$/;
 const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/;
 const STALE_MS = 1000;
 
 /** Every leaf key of a parsed catalog as a dotted path. */
-export function catalogKeys(value, prefix = '') {
+function catalogKeys(value, prefix = '') {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return [prefix];
   const entries = Object.entries(value);
   return entries.length ? entries.flatMap(([key, child]) => catalogKeys(child, prefix ? `${prefix}.${key}` : key)) : [prefix];

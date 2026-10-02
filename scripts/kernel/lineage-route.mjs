@@ -43,7 +43,7 @@ const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const resultOf = (row) => parse(row?.result_json ?? '{}');
 
 /** The pool an attempt ran on: its persisted route, else the runtime pool its hierarchy recorded. */
-export const attemptPoolOf = (row) => {
+const attemptPoolOf = (row) => {
   const p = payloadOf(row);
   return p.model ?? p.hierarchy?.runtime?.runtimePool ?? null;
 };

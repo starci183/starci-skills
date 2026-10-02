@@ -14,7 +14,7 @@ import path from 'node:path';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from './secret-patterns.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
-export const REDACTION_VERSION = 'v1';
+const REDACTION_VERSION = 'v1';
 export const MARK = '[redacted]';
 
 const withGlobal = (re) => new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
@@ -22,7 +22,7 @@ const PATTERNS = SECRET_PATTERNS.filter((rule) => rule.name !== 'private-key-blo
 // Words that make an env-style key a secret, matched per `_`-separated segment of the name (FOO_API_KEY,
 // KEYCLOAK_ADMIN_PASSWORD, GH_TOKEN, MINIO_SECRET_KEY, DATABASE_URL is not; TESTS_PASSED is not).
 const SECRET_SEGMENTS = new Set(['PASSWORD', 'PASSWD', 'PWD', 'PASS', 'SECRET', 'SECRETS', 'TOKEN', 'APIKEY', 'KEY', 'CREDENTIAL', 'CREDENTIALS', 'COOKIE', 'OTP', 'DSN', 'PAT']);
-export const isSecretEnvName = (name) => String(name).replace(/^export\s+/, '').replace(/_FILE$/, '').split('_').some((seg) => SECRET_SEGMENTS.has(seg));
+const isSecretEnvName = (name) => String(name).replace(/^export\s+/, '').replace(/_FILE$/, '').split('_').some((seg) => SECRET_SEGMENTS.has(seg));
 const PEM_BLOCK = /-----BEGIN ((?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?)-----[\s\S]*?(?:-----END \1-----|$)/g;
 const RULES = [
   { name: 'url-credentials', re: /\b([a-z][a-z0-9+.-]*:\/\/)([^\s:@/"'<>]+):([^\s@/"'<>]+)@/gi, to: (m, scheme, user) => `${scheme}${user}:${MARK}@` },
@@ -50,7 +50,7 @@ const readSafe = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch
 const listSafe = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } };
 
 /** A value this process must never write out (a secret it resolved itself). Values under 6 chars are ignored. */
-export function addSecretValue(value) {
+function addSecretValue(value) {
   const v = typeof value === 'string' ? value.trim() : '';
   if (v.length >= 6 && !/^\[redacted/.test(v)) secretValues.add(v);
 }

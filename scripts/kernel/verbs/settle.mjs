@@ -25,6 +25,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { recordWhy } from '../why-record.mjs';
 import { recordSonarJudgment, refusalText } from '../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../gate-settle.mjs';
+import { isSpecRun, readEnv } from '../../lib/env.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -289,7 +290,7 @@ export default {
     recordJobResult(db, { jobId, result, at });
     if (settledAttemptId != null) {
       updateAttempt(db, { attemptId: settledAttemptId, settledAt: at, verdict, endState: 'settled',
-        settledBy: process.env.STARCI_CALLER === 'runtime-settler' ? 'settler' : 'kernel', ...(reportOutcome ? { reportOutcome } : {}), at });
+        settledBy: readEnv('STARCI_CALLER') === 'runtime-settler' ? 'settler' : 'kernel', ...(reportOutcome ? { reportOutcome } : {}), at });
     }
     // Integrating the verdict consumes the attempt's reports row - the durable
     // worker->kernel signal is spent exactly once.
@@ -415,7 +416,7 @@ export default {
   // settle-tail/ dir: it can neither block nor fail the settle, and a failed run is logged and retried by the
   // settler (scripts/kernel/settle/job-settle.mjs retryDueTails). Under the test runner, or with --sync-tail, it runs inline.
   let tail, sessionReleased = null, artifacts = null;
-  if (process.env.NODE_TEST_CONTEXT || args['sync-tail']) {
+  if (isSpecRun() || args['sync-tail']) {
     tail = await runSettleTail(ledger, jobRowOf(db, jobId) ?? job, repo, { verdict });
     ({ sessionReleased, artifacts } = tail);
     tail = { mode: 'sync', ok: tail.ok };

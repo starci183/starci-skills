@@ -9,7 +9,7 @@ import { FORBIDDEN_FILES, secretHits } from '../../lib/secret-patterns.mjs';
 import { isSopsEnvelope } from '../../lib/sops-envelope.mjs';
 import { found, readText } from './read.mjs';
 
-export const PLAINTEXT_SECRET = 'HFS_PLAINTEXT_SECRET';
+const PLAINTEXT_SECRET = 'HFS_PLAINTEXT_SECRET';
 /** Files whose lines are not secrets: a lockfile carries integrity hashes, never a credential. */
 const NOT_SCANNED = /(^|\/)package-lock\.json$/;
 

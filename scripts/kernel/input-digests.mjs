@@ -50,7 +50,7 @@ import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
-export const INPUT_KINDS = ['source', 'work'];
+const INPUT_KINDS = ['source', 'work'];
 const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
 const SOURCE_FILES = ['modules/models/code-patterns.yaml'];
 export const WORK_PREFIX = '.starciwork/';
@@ -63,7 +63,7 @@ const WORK_FILE_MAP_MAX = 600;
 const SKIP_DIRS = new Set(['node_modules', '.git']);
 
 const special = (segment) => /[*{<]/.test(segment);
-export const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
+const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
   && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.includes(rel));
 export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
   && !rel.split('/').some(special) && !WORK_EXCLUDED.includes(rel) && !/^[.]starciwork[/]logs[.]sqlite[.]migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));

@@ -8,7 +8,7 @@
 import { withMachine } from '../../engine/db/machine.mjs';
 import { slash } from '../lib/path-key.mjs';
 
-export const SUP_ACTOR = 'supervisor';
+const SUP_ACTOR = 'supervisor';
 const LEVELS = new Set(['debug', 'info', 'warn', 'error']);
 
 /** refs for a row: workflow/job/repo/commit/item/experiment, deduped, strings only. Pure. */
@@ -35,7 +35,7 @@ export const machineRow = (r) => ({
  * Append rows ({kind, msg, data?, refs?, level?, at?}) to machine_logs. Returns {ok, written} or {ok: false, error};
  * never throws. One bad row never blocks the rest.
  */
-export function supLogRows(rows, { env = process.env } = {}) {
+function supLogRows(rows, { env = process.env } = {}) {
   const list = (Array.isArray(rows) ? rows : [rows]).filter((r) => r && r.kind);
   if (!list.length) return { ok: true, written: 0 };
   try {

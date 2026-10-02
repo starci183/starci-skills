@@ -6,7 +6,9 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from './ui/render.mjs';
 import {readWorkspace, loadRecords} from './record-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {objectList} from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { walkFiles } from '../lib/walk.mjs';
 
 /**
  * Grit item 55: scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
@@ -35,10 +37,6 @@ import { isMain } from '../lib/is-main.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
-  .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
-
-const listOf = value => (Array.isArray(value) ? value : []).filter(item => item && typeof item === 'object');
 
 /** The checks whose `skip` is a refusal: the canon's own core set from renderChecksFor. */
 const CORE_CHECKS = new Set(['palette-off-brand', 'primary-absent', 'entity-list-in-card']);
@@ -170,7 +168,7 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
       problems.push(`the ui node at ${rel} could not be read for the mascot-slot rule (${String(error.message ?? error)}) [RENDER_PROOF_INCOMPLETE]`);
       continue;
     }
-    for (const surface of listOf(uiRecord?.ui?.surfaces)) {
+    for (const surface of objectList(uiRecord?.ui?.surfaces)) {
       const result = checkMascotSlot({record: uiRecord, brand: brand.brand, screen: surface});
       if (result.outcome === 'fail') problems.push(`${result.id} fails on ${rel}: ${result.detail} [RENDER_CHECK_FAILED]`);
     }
@@ -188,7 +186,7 @@ if (isMain(import.meta.url)) {
   }
   if (!args.work || !args.record) { console.error('REFUSED --work <path-to-.starciwork> and --record <id> are both required'); process.exit(1); }
   const workRoot = path.resolve(root, args.work);
-  const records = loadRecords(workRoot, walk);
+  const records = loadRecords(workRoot, walkFiles);
   const workspaceDoc = readWorkspace(workRoot);
   const rec = records.get(args.record);
   if (!rec) { console.error(`REFUSED no record with id ${args.record} was found under ${workRoot}`); process.exit(1); }

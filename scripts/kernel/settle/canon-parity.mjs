@@ -32,9 +32,9 @@ import { sameOrUnder } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export const PARITY_OPS = Object.freeze(['code.refactor']);
+const PARITY_OPS = Object.freeze(['code.refactor']);
 export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red', 'cut-postcondition-red']);
-export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
+const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
 const norm = (p) => String(p ?? '').replace(/\\/g, '/');
 const keyOf = (p) => { const k = norm(path.resolve(p)).replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
 const trimOwned = (p) => norm(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/, '');
@@ -76,7 +76,7 @@ export function checkFamilyOf(check) {
   return null;
 }
 /** The contract's record of a gate the owner switched off (code.refactor: specs.unit, exit 0, evidence "skipped: ..."): not a claim. */
-export const isSkipRecord = (check) => /^specs\./.test(String(check?.name ?? '')) && check?.exitCode === 0 && /^skipped:/i.test(String(check?.evidence ?? '').trim());
+const isSkipRecord = (check) => /^specs\./.test(String(check?.name ?? '')) && check?.exitCode === 0 && /^skipped:/i.test(String(check?.evidence ?? '').trim());
 
 /** tsconfig projects a declared typecheck named: `cd <dir> && ... tsc`, `tsc -p|--project <path>`. Absolute paths only. */
 export function declaredProjectsOf(checks, root) {
@@ -131,7 +131,7 @@ export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
 }
 
 /** Every file sameOrUnder the owned paths in the working tree (root-relative posix), links never followed. */
-export function ownedFilesOf(root, ownedRels) {
+function ownedFilesOf(root, ownedRels) {
   const out = [];
   const walk = (rel) => {
     let st;
@@ -152,7 +152,7 @@ export function ownedFilesOf(root, ownedRels) {
 
 const TS_SOURCE = /\.(?:[cm]?tsx?|[cm]?jsx?)$/i;
 /** The nearest tsconfig.json above each file, inside root. */
-export function projectsOf(root, rels) {
+function projectsOf(root, rels) {
   const out = new Set();
   const rootKey = keyOf(root);
   for (const rel of rels) {
@@ -263,7 +263,7 @@ export async function lintParity({ root, files, base, checker = null, timeoutMs 
  * the target's eslint.config would then hold the canon plugin module canon-scan imported. The file list goes through a temp
  * file (never a command line). Resolves to runLintGate's {exit, findings, preexisting, errors}.
  */
-export function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = process.env } = {}) {
+function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = process.env } = {}) {
   const dir = path.join(os.tmpdir(), 'starci-settler');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `parity-lint-${process.pid}-${Date.now()}.json`);
@@ -410,7 +410,7 @@ const relOf = (p, root) => { const n = norm(p).replace(/\/+$/, ''); const head =
  * (2) held by a canon-wire leg of the workflow that is queued or running and owns its path - or a queued leg, which
  * settle widens with the owed paths - and (3) present at base at least as often as now (canonBase at base).
  */
-export async function owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs = [], canonBase = canonBaseFindings }) {
+async function owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs = [], canonBase = canonBaseFindings }) {
   const owed = Array.isArray(item.report?.owedToWire) ? item.report.owedToWire : [];
   const list = Array.isArray(slice.list) ? slice.list : [];
   if (!owed.length) return { ok: false, why: 'the report declares no owedToWire' };
@@ -441,7 +441,7 @@ export async function owedToWireAccept(item, slice, { root, base, ownedRels, wir
  * the checkout's own install and flat config (scripts/gates/gate.mjs baseEslintFindings) - no base tree, no worktree, no
  * link. {ok, findings: [{file, ruleId}]} or {ok: false, reason}.
  */
-export async function canonBaseFindings({ root, base, ownedRels }) {
+async function canonBaseFindings({ root, base, ownedRels }) {
   try {
     const blobs = baseBlobsOf(root, base, ownedRels);
     if (!blobs.ok) return { ok: false, reason: blobs.reason };

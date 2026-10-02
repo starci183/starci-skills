@@ -28,7 +28,7 @@ import { KERNEL_ONLY_OPS } from './reported-jobs.mjs';
 export const AUTO_ACCEPTED_BY = 'auto-recommended';
 export const AUTO_ACCEPT_CONFIG_KEY = 'asks.autoAcceptRecommended';
 /** The review of drawn parts (scripts/work/draw-review.mjs DRAW_REVIEW_KIND): auto-accepted unless the owner asked for it. */
-export const DRAW_REVIEW_ASK_KIND = 'draw-review';
+const DRAW_REVIEW_ASK_KIND = 'draw-review';
 export const CREDENTIAL_ASK_KINDS = Object.freeze(['credential', 'account', 'access', 'consent']);
 
 const RECOMMENDATION_MARK = /\((?:khuyến nghị|recommended|đề xuất)\)/iu;

@@ -18,8 +18,8 @@ name: examples
 #                         `browser`, runs each app's one Playwright journey against a stack it provisions itself.
 # The local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
 #
-# Secrets: CODECOV_TOKEN once for this repository (the owner adds it: Codecov, then GitHub Settings > Secrets and variables >
-# Actions); without it the upload step is skipped and the log says so.
+# Coverage upload: Codecov authenticates the job with GitHub's OIDC token (use_oidc, permissions id-token: write), so there is no
+# repository secret and no step that skips silently without one; a failed upload fails the job.
 
 on:
   push:
@@ -105,9 +105,11 @@ jobs:
       fail-fast: false
       matrix:
         app: ${{ fromJSON(needs.apps.outputs.apps) }}
+    permissions:
+      contents: read
+      id-token: write
     env:
       APP_DIR: examples/${{ matrix.app }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
     defaults:
@@ -137,17 +139,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm test -- --ci
       - name: Coverage upload (Codecov, flag ${{ matrix.app }})
-        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
+        if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ env.CODECOV_TOKEN }}
+          use_oidc: true
           files: ${{ env.APP_DIR }}/be/coverage/lcov.info
           flags: ${{ matrix.app }}
           disable_search: true
           fail_ci_if_error: true
-      - name: Coverage upload skipped (no CODECOV_TOKEN)
-        if: ${{ env.CODECOV_TOKEN == '' }}
-        run: echo "::notice title=Codecov skipped::CODECOV_TOKEN is not set for this repository, so the coverage of ${{ matrix.app }} was not uploaded (the unit run still enforced per-file 100)."
       - name: Back-end build (tsc, tsc-alias)
         run: npm run build:be
       # turbo builds the fe packages first, then every Next app; its cache is restored between runs.

@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { workCli } from '../lib/work-cli.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
+import { readWorkTree } from '../lib/work-tree.mjs';
 import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from '../work/record-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
@@ -43,32 +45,10 @@ const LEFTOVER_GAP_TEXT_RE = /\bunbuilt\b|\bnot built\b/i;
 
 /**
  * Reads every record and evidence file under `workRoot`, same filtering rules as example-derive.mjs's own
- * (private) `readTree`: `_derived/**` is never walked, non-object YAML is skipped, an evidence.yaml is kept
+ * `readTree`: `_derived/**` is never walked, non-object YAML is skipped, an evidence.yaml is kept
  * separate from records. Returns the raw `data` and `dir` per record/evidence that this module's checks need
  * and that `computeDerived`'s public shape does not expose.
  */
-function readRawTree(workRoot) {
-  const records = new Map(); // id -> {id, schema, state, feature, dir, file, data}
-  const evidenceByDir = new Map(); // dir (posix, relative to workRoot) -> {data, file, dir}
-  const derivedPrefix = '_derived/';
-  for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
-    const relPath = path.relative(workRoot, file).replaceAll('\\', '/');
-    if (relPath === '_derived' || relPath.startsWith(derivedPrefix)) continue;
-    let data;
-    try { data = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    if (!isPlainObject(data)) continue;
-    const dir = path.dirname(relPath).replaceAll('\\', '/');
-    if (relPath.endsWith('/evidence.yaml') || relPath === 'evidence.yaml') {
-      evidenceByDir.set(dir, {data, file, dir});
-      continue;
-    }
-    if (typeof data.id !== 'string' || !data.id) continue;
-    const segments = relPath.split('/');
-    const feature = segments[0] === 'features' && segments.length > 1 ? segments[1] : null;
-    records.set(data.id, {id: data.id, schema: data.schema ?? null, state: Object.hasOwn(data, 'state') ? data.state : null, feature, dir, file, data});
-  }
-  return {records, evidenceByDir};
-}
 
 /**
  * The app a Work tree belongs to: its root (where every owner path, app-relative, resolves) and the sides workspace.yaml
@@ -566,7 +546,7 @@ const SECTIONS = [
  * same facts. */
 export function computeCritique(workRoot) {
   const derived = computeDerived(workRoot);
-  const {records: rawRecords, evidenceByDir} = readRawTree(workRoot);
+  const {records: rawRecords, evidenceByDir} = readWorkTree(workRoot);
   const repos = resolveRepositories(workRoot);
 
   const findings = [
@@ -639,25 +619,16 @@ export function runCritique(workRoot, {write} = {}) {
 }
 
 if (isMain(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const workFlagIndex = args.indexOf('--work');
-  const workArg = workFlagIndex >= 0 ? args[workFlagIndex + 1] : null;
-  const write = args.includes('--write');
-  if (!workArg) {
-    console.error('Usage: starci work example-critique --work <path-to-.starciwork> [--write]');
-    process.exitCode = 2;
-  } else {
-    const workRoot = path.resolve(workArg);
-    const result = runCritique(workRoot, {write});
-    for (const section of SECTIONS) {
-      const count = result.critique.findings.filter(f => section.kind.includes(f.kind)).length;
-      console.log(`${section.title}: ${count}`);
-    }
-    if (write) {
-      console.log(`wrote ${path.relative(workRoot, path.join(workRoot, CRITIQUE_YAML_REL))} and ${path.relative(workRoot, path.join(workRoot, CRITIQUE_MD_REL))}`);
-    } else if (!result.ok) {
-      console.log(`REFUSED: ${CRITIQUE_YAML_REL}/${CRITIQUE_MD_REL} missing or stale; run with --write to refresh them.`);
-      process.exitCode = 1;
-    }
-  }
+  workCli({
+    usage: 'Usage: starci work example-critique --work <path-to-.starciwork> [--write]',
+    run: (workRoot, { write }) => runCritique(workRoot, { write }),
+    report: (result) => {
+      for (const section of SECTIONS) {
+        const count = result.critique.findings.filter(f => section.kind.includes(f.kind)).length;
+        console.log(`${section.title}: ${count}`);
+      }
+    },
+    wrote: (workRoot) => `wrote ${path.relative(workRoot, path.join(workRoot, CRITIQUE_YAML_REL))} and ${path.relative(workRoot, path.join(workRoot, CRITIQUE_MD_REL))}`,
+    stale: `REFUSED: ${CRITIQUE_YAML_REL}/${CRITIQUE_MD_REL} missing or stale; run with --write to refresh them.`,
+  });
 }

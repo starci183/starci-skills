@@ -17,8 +17,9 @@ import { isGlobSegment } from '../../engine/admission.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
+import { boundRecordPaths, segments } from './bound-records.mjs';
+import { normRel } from '../lib/path-key.mjs';
 
-const WORK_ROOT = '.starciwork';
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
 const PLACEHOLDER = /^<[^<>/]+>$/;
@@ -26,17 +27,13 @@ const PLACEHOLDER = /^<[^<>/]+>$/;
 // directory (engine/admission.mjs isGlobSegment), so an owned src/app/[lang] binds a placeholder.
 const GLOB = { test: isGlobSegment };
 
-const plainPath = (value) => String(typeof value === 'string' ? value : value?.path ?? '')
-  .trim().replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');
-const segments = (value) => value.split('/').filter((part) => part && part !== '.');
-
 /**
  * Where a manifest read path lands for this job. The path's placeholders must
  * all sit in a prefix that one bound record or owned path spells out in full;
  * the rest of the path is appended to it. Returns [] when nothing resolves.
  */
 export function resolveReadPath(pattern, bindings) {
-  const parts = segments(plainPath(pattern));
+  const parts = segments(normRel(pattern));
   const last = parts.map((part) => PLACEHOLDER.test(part)).lastIndexOf(true);
   if (parts.some((part) => !PLACEHOLDER.test(part) && (GLOB.test(part) || /[<>]/.test(part)))) return [];
   // A fixed path (no placeholder, no glob) is one file every job of the op needs - the product's one
@@ -45,7 +42,7 @@ export function resolveReadPath(pattern, bindings) {
   const prefix = parts.slice(0, last + 1), suffix = parts.slice(last + 1);
   const resolved = new Set();
   for (const binding of bindings) {
-    const candidate = segments(plainPath(binding));
+    const candidate = segments(normRel(binding));
     if (candidate.length !== prefix.length) continue;
     const fits = prefix.every((part, i) => (PLACEHOLDER.test(part)
       ? !GLOB.test(candidate[i]) && !/[<>]/.test(candidate[i])
@@ -61,7 +58,7 @@ export function resolveReadPath(pattern, bindings) {
  */
 export function checkPrerequisites({ brief, payload, repo }) {
   const unmet = [], unknown = [];
-  const records = (Array.isArray(payload?.records) ? payload.records : []).map(plainPath).filter(Boolean);
+  const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
 
   for (const read of Array.isArray(brief?.reads) ? brief.reads : []) {
@@ -115,10 +112,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
  */
 export function designVerdicts(repo, records) {
   const verdicts = [];
-  for (const binding of records) {
-    const parts = segments(plainPath(binding));
-    const at = parts.indexOf(WORK_ROOT);
-    if (at < 0 || !parts.slice(at + 1).includes('impl')) continue;
+  for (const { parts, workParts } of boundRecordPaths(records, 'impl', { unique: false })) {
     const file = path.join(repo, ...parts, 'index.yaml');
     if (!fs.existsSync(file)) continue;
     let impl = null;
@@ -126,7 +120,7 @@ export function designVerdicts(repo, records) {
     const uiIds = [...new Set([...(Array.isArray(impl?.proves) ? impl.proves : []), ...(Array.isArray(impl?.dependsOn) ? impl.dependsOn : [])]
       .filter((id) => typeof id === 'string' && /^ui\./.test(id)))];
     if (!uiIds.length) continue;
-    const uiRecords = loadUiRecords(path.join(repo, ...parts.slice(0, at + 1)));
+    const uiRecords = loadUiRecords(path.join(repo, ...workParts));
     for (const ui of uiIds) {
       const entry = uiRecords.get(ui);
       if (!entry) { verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: 'the ui record does not exist - nothing was drawn' }); continue; }
@@ -150,21 +144,14 @@ export function directionPrerequisiteOn() {
  */
 export function directionVerdicts(repo, bindings, { workflowId = null } = {}) {
   const verdicts = [];
-  const seen = new Set();
-  for (const binding of bindings) {
-    const parts = segments(plainPath(binding));
-    const at = parts.indexOf(WORK_ROOT);
-    if (at < 0 || !parts.slice(at + 1).includes('ui')) continue;
-    const record = parts.join('/');
-    if (seen.has(record)) continue;
-    seen.add(record);
+  for (const { record, parts, workParts } of boundRecordPaths(bindings, 'ui')) {
     const file = path.join(repo, ...parts, 'index.yaml');
     if (!fs.existsSync(file)) { verdicts.push({ record, unknown: 'the ui record does not exist yet' }); continue; }
     let ui = null;
     try { ui = parseYaml(fs.readFileSync(file, 'utf8')); } catch { verdicts.push({ record, unknown: 'the ui record does not parse' }); continue; }
     const { archetype, derived } = archetypeOf(ui);
     if (DIRECTION_EXEMPT.includes(archetype)) continue;
-    const readiness = directionReadiness(path.join(repo, ...parts.slice(0, at + 1)), archetype, { workflowId });
+    const readiness = directionReadiness(path.join(repo, ...workParts), archetype, { workflowId });
     verdicts.push({ record, archetype, derived, status: readiness.status, why: readiness.why, ...(readiness.provisional ? { provisional: true } : {}), ...(readiness.ready ? {} : { unaccepted: true }) });
   }
   return verdicts;

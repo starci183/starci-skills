@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
+import { verbCli } from '../lib/cli-arg.mjs';
 import { createScratchWorktree, removeScratchWorktree } from '../machine/worktree-git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { entryFileOf } from '../lib/contract-changes-path.mjs';
@@ -119,12 +120,7 @@ export async function propose({ title, evidence, options, recommendation, send =
 /* ------------------------------------------------------------ CLI */
 
 if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const verb = argv[0];
-  const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const asJson = argv.includes('--json');
-  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : human);
+  const { argv, verb, value, csv, print } = verbCli();
   try {
     if (verb === 'land') {
       const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), specs: csv(value('specs')), wronglyBlocked: value('wrongly-blocked'), reason: value('reason'), waitMs: Number(value('wait-ms')) || null });

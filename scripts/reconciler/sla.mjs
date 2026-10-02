@@ -28,21 +28,24 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { dotGet } from '../lib/dot-path.mjs';
+import { hasTable as sqliteHasTable } from '../lib/sqlite.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
 export const SLA_FILE = path.join(skillRoot, 'modules', 'reconciler', 'sla.yaml');
 export const VIOLATED_KIND = 'runtime-invariant-violated';
 export const CLEARED_KIND = 'runtime-invariant-cleared';
-export const TYPED_EVENT = 'invariant.violated';
+const TYPED_EVENT = 'invariant.violated';
 export const CRITICAL_SUFFIX = '/critical';
 /** A violated episode cleared within this window still gets its runtime-invariant-cleared event (the pass looks no further back). */
-export const CLEAR_REPORT_WINDOW_MS = 7 * 86_400_000;
+const CLEAR_REPORT_WINDOW_MS = 7 * 86_400_000;
 
 /* ------------------------------------------------------------------------------------------------ catalogue */
 
-const dotted = (root, key) => String(key).split('.').reduce((node, k) => (node == null ? node : node[k]), root);
-const positiveOrZero = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null);
+const dotted = dotGet;
+const positiveOrZero = (v) => positiveNumber(v, null, { orZero: true });
 
 /**
  * The catalogue with every number resolved: {passMs, codes: {CODE: {slaMs, criticalMs, severity, owner, autoAction,
@@ -89,10 +92,10 @@ export function entityOf(entity, ledgerId = null) {
   return { type, id: rest || String(entity ?? ''), ledger: ledgerId, workflowId: wf };
 }
 
-export const dedupeKeyOf = (code, entity, critical = false) => `${code}|${entity}${critical ? '|critical' : ''}`;
+const dedupeKeyOf = (code, entity, critical = false) => `${code}|${entity}${critical ? '|critical' : ''}`;
 
 /** The §8.8 violation event of one clock row. Pure. */
-export function violationEvent(row, { catalog = slaCatalog(), now = Date.now() } = {}) {
+function violationEvent(row, { catalog = slaCatalog(), now = Date.now() } = {}) {
   const { code, severity, spec, critical } = codeOf(row.state, catalog);
   const entity = entityOf(row.entity, row.ledger_id ?? null);
   return {
@@ -106,7 +109,7 @@ export function violationEvent(row, { catalog = slaCatalog(), now = Date.now() }
 }
 
 /** The runtime-defect DI a critical violation opens for the Supervisor (DESIGN §10.3). Pure. */
-export const runtimeDefectDecision = (ev, { now = Date.now() } = {}) => ({
+const runtimeDefectDecision = (ev, { now = Date.now() } = {}) => ({
   schema: 'starci/decision-item@1', idempotencyKey: `runtime-defect:${ev.dedupeKey}`, kind: 'runtime-defect', decider: 'supervisor',
   ledger: 'supervisor', workflowId: ev.entity.workflowId ?? null, entity: { type: ev.entity.type, id: ev.entity.id },
   summary: `${ev.code} ${ev.entity.type} ${ev.entity.id}: ${ev.state} for ${Math.round(ev.ageMs / 60_000)}m (SLA ${Math.round(ev.slaMs / 60_000)}m)${ev.autoAction ? `; auto: ${ev.autoAction}` : ''}`,
@@ -123,7 +126,7 @@ export const stateFileOf = (ctx = {}, env = ctx.env ?? process.env) => ctx.state
  * Run fn(m) over machine.sqlite: the engine's own handle when ctx exposes one (ctx.machine), else a short-lived handle
  * of our own (a writer when `write`, else a reader; a missing store reads as `fallback`). Never throws.
  */
-export function withStateDb(ctx, fn, fallback = null, { write = false } = {}) {
+function withStateDb(ctx, fn, fallback = null, { write = false } = {}) {
   const env = ctx?.env ?? process.env;
   const borrowed = ctx?.machine && typeof ctx.machine.openSlaEpisode === 'function' ? ctx.machine : null;
   try {
@@ -210,11 +213,11 @@ const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
 const LIVE_DECISION = new Set(['open', 'claimed', 'escalated']);
 const KEY_SEP = '\u0000';
 /** job clock code -> the job statuses in which its condition can still hold (null: any unsettled status). */
-export const JOB_TRUTH = Object.freeze({
+const JOB_TRUTH = Object.freeze({
   LEASE_STUCK: ['leased'], QUESTION_OVERDUE: ['answering'], EFFECT_UNKNOWN_STUCK: ['effect_unknown'],
   DEAD_WORKER_UNRECONCILED: ['running', 'answering', 'effect_unknown'], SETTLE_OVERDUE: null, DECISION_OVERDUE: null,
 });
-export const PROBE_CODES = new Set(['SERVICE_DOWN']);
+const PROBE_CODES = new Set(['SERVICE_DOWN']);
 
 /** Per-pass readers: product ledger handles by ledgerId, the service registry, the decisions module. */
 function truthSources(ctx) {
@@ -247,7 +250,7 @@ function truthSources(ctx) {
 }
 
 /** Whether one clock's condition still holds: {holds, why?} or null (unknown). Never throws. */
-export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
+async function clockTruth(row, code, src, { now = Date.now() } = {}) {
   try {
     const p = String(row.entity ?? '').split(':');
     if (code === 'SERVICE_DOWN' && p[0] === 'service') {
@@ -317,10 +320,10 @@ export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
 export const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
 const TRANSCRIPT_WINDOW_MS = 86_400_000;
 const TRANSCRIPT_LIMIT = 200;
-const hasTable = (db, name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name=?").get(name));
+const hasTable = (db, name) => sqliteHasTable(db, name, { views: true });
 
 /** The closed attempts of one ledger that lack a transcript: [{attemptId, workflowId, closedAt}]. Pure over the handle. */
-export function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
+function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
   if (!hasTable(db, 'op_attempts')) return [];
   const cols = new Set(db.prepare('PRAGMA table_info(op_attempts)').all().map((c) => c.name));
   if (!cols.has('transcript_sha') || !cols.has('terminal_closed_at')) return [];
@@ -329,7 +332,7 @@ export function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRA
 }
 
 /** The ended seat turns (machine.sqlite) with no transcript snapshot at or after their end: [{turnId, seatId, endedAt}]. */
-export function seatTurnsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
+function seatTurnsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
   if (!hasTable(db, 'seat_turns') || !hasTable(db, 'seat_transcript_snapshots')) return [];
   return db.prepare(`SELECT t.turn_id, t.seat_id, t.ended_at FROM seat_turns t WHERE t.ended_at IS NOT NULL AND t.ended_at > ?
       AND NOT EXISTS(SELECT 1 FROM seat_transcript_snapshots s WHERE s.seat_id=t.seat_id AND s.at >= t.ended_at) ORDER BY t.ended_at DESC LIMIT ?`)
@@ -357,7 +360,7 @@ export async function transcriptPass(ctx, { catalog, now }) {
 }
 
 /** The clear_reason of a truth check's `why`: the entity is gone, its workflow stopped, or the condition resolved. Pure. */
-export const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) ? 'entity-gone' : /^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) ? 'workflow-stopped' : 'resolved');
+const clearReasonOf = (why) => (/\bgone$/.test(String(why ?? '')) ? 'entity-gone' : /^workflow (?:archived|stopped|finished|paused|not running)|^workflow \w+$/.test(String(why ?? '')) ? 'workflow-stopped' : 'resolved');
 
 /** Clear every open clock whose condition is gone. Returns Map(entity KEY_SEP state -> why). */
 async function truthPass(ctx, { catalog, now }) {

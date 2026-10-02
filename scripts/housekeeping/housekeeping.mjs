@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -44,7 +45,7 @@ export const AREAS = Object.freeze({
 export const AREA_NAMES = Object.freeze(Object.keys(AREAS));
 
 const csv = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
-const number = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+const number = (v) => positiveNumber(v, 0);
 /** A sweep's errors list as strings: plain entries, Error-likes, and {path, error} records (hk-tmp). */
 const errorStrings = (v) => (Array.isArray(v) ? v.map((e) => {
   if (e == null) return '';
@@ -108,7 +109,7 @@ function areaResult(raw) {
 }
 
 /** How many entries `<root>/node_modules` holds (dot entries not counted); 0 when it is absent. */
-export const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { return 0; } };
+const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { return 0; } };
 
 /**
  * One housekeeping run. `only` (area names) restricts the run; `sweeps` replaces the lib modules in specs;

@@ -51,7 +51,7 @@ export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
 /** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
 export const readTransfers = (db) => db.prepare("SELECT detail_json FROM path_transfers WHERE state='applied' ORDER BY path").all()
   .map((row) => parseJson(row.detail_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
-export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
+const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
 export const RECORD_CHANGE_REACHES = Object.freeze(['follow-up', 'advisory']);
 const WORK_PREFIX = '.starciwork/';
 const REPO_OWNER_KINDS = ['baseline', 'scaffold', 'layout-tree', 'brand'];
@@ -60,7 +60,7 @@ const READ_ONLY_NODE_KINDS = new Set(['foundation-dependency']);
 const HISTORY_MAX = 20;
 
 /** A record path as its directory: `<dir>/index.yaml` and `<dir>/resource.yaml` are the record at <dir>. */
-export const recordDirOf = (p) => normWork(p).replace(/\/(?:index|resource)\.yaml$/, '');
+const recordDirOf = (p) => normWork(p).replace(/\/(?:index|resource)\.yaml$/, '');
 /** True when `file` is `dir` or sits under it. */
 export const inside = (file, dir) => Boolean(dir) && (file === dir || file.startsWith(`${dir}/`));
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
@@ -165,7 +165,7 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
 
 const sha16 = (buffer) => sha256(buffer).slice(0, 16);
 /** The digests a committed blob may show in a working tree: its bytes, and its bytes with CRLF line ends (core.autocrlf). */
-export const committedDigestsOf = (buffer) => {
+const committedDigestsOf = (buffer) => {
   if (!buffer) return [];
   const raw = sha16(buffer);
   const text = buffer.toString('latin1');

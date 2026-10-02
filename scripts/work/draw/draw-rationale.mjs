@@ -37,16 +37,17 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
 import { readContractChangesDoc } from '../../machine/contract-changes-store.mjs';
 import { list } from '../../lib/list.mjs';
+import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { isFile } from '../../lib/fs-kind.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
-export const RATIONALE_KINDS = Object.freeze(['element', 'layout', 'spacing', 'type', 'radius', 'colour', 'art']);
+const RATIONALE_KINDS = Object.freeze(['element', 'layout', 'spacing', 'type', 'radius', 'colour', 'art']);
 export const WHY_ATTR = 'data-why';
 export const REDLINE_ATTR = 'data-draw-redline';
 export const MEASURE_SCHEMA = 'starci/draw-rationale-measure@1';
-export const REQUIRED_FIELDS = Object.freeze(['id', 'selector', 'kind', 'decision', 'value', 'because', 'rules', 'alternativesRejected', 'source']);
+const REQUIRED_FIELDS = Object.freeze(['id', 'selector', 'kind', 'decision', 'value', 'because', 'rules', 'alternativesRejected', 'source']);
 /** Which decision kinds may state a measured value of each property class. */
-export const KINDS_OF_CLASS = Object.freeze({ spacing: ['spacing', 'layout'], radius: ['radius'], fontSize: ['type'], fontWeight: ['type'], lineHeight: ['type'] });
+const KINDS_OF_CLASS = Object.freeze({ spacing: ['spacing', 'layout'], radius: ['radius'], fontSize: ['type'], fontWeight: ['type'], lineHeight: ['type'] });
 const CLASS_LABEL = Object.freeze({ spacing: 'gap/padding/inset', radius: 'radius', fontSize: 'font-size', fontWeight: 'font-weight', lineHeight: 'line-height' });
 /** Components too small to label in the redline (they are named by their region's label). */
 export const REDLINE_LEAF_COMPONENTS = Object.freeze(['Text', 'Heading', 'Icon', 'Label', 'Description', 'Kbd', 'Badge', 'Chip', 'IconTile', 'TagGroup', 'Tag', 'StateMark', 'MediaFrame', 'Avatar']);
@@ -116,7 +117,7 @@ const NAMESPACES = ['knowledge', 'dna', 'grammar', 'direction', 'rubric', 'owner
 const REF_RX = /^\s*(?:([a-z]+):)?\s*([^\s,;()]+)(?:\s+(case-\d+))?/i;
 
 /** The id token of a rules[] entry (namespace dropped), for labels. */
-export function ruleTokenOf(ref) {
+function ruleTokenOf(ref) {
   const m = REF_RX.exec(str(ref));
   if (!m) return '';
   return `${m[2]}${m[3] ? ` ${m[3]}` : ''}`;
@@ -124,7 +125,7 @@ export function ruleTokenOf(ref) {
 
 let knowledgeCache = null;
 /** Every id knowledge/** declares: {ids:Set, cases:Map(ruleId -> Set(case ids))}. */
-export function knowledgeIndex(root = KNOWLEDGE) {
+function knowledgeIndex(root = KNOWLEDGE) {
   if (knowledgeCache?.root === root) return knowledgeCache;
   const ids = new Set(), cases = new Map();
   const visit = (node) => {
@@ -165,7 +166,7 @@ const idsUnder = (node, out = new Set()) => {
 };
 
 /** The product's brand.direction: {all:Set, rubric:Set} of its ids. */
-export function directionIds(workRoot) {
+function directionIds(workRoot) {
   const doc = workRoot ? readYamlOr(path.join(workRoot, 'brand', 'index.yaml')) : null;
   const direction = doc?.brand?.direction ?? doc?.direction ?? null;
   return { all: idsUnder(direction), rubric: new Set(list(direction?.rubric?.checks).map((c) => str(c?.id).trim()).filter(Boolean)) };
@@ -288,13 +289,12 @@ const refsOf = (record) => list(record?.refs).map((r) => (typeof r === 'string' 
 // ---------------------------------------------------------------------------------------------------------
 
 const PHRASING = new Set(['strong', 'em', 'b', 'i', 'u', 's', 'small', 'sub', 'sup', 'abbr', 'mark', 'time', 'code', 'bdi', 'bdo', 'q', 'cite', 'dfn', 'var', 'data', 'kbd', 'br', 'wbr', 'span']);
-const up = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 const describe = (el) => {
   const cls = classesOf(el).slice(0, 2).join('.');
   return `<${el.tag}${el.attrs.id ? `#${el.attrs.id}` : ''}${cls ? `.${cls}` : ''}>`;
 };
 const whysOf = (el) => str(el?.attrs?.[WHY_ATTR]).split(/\s+/).filter(Boolean);
-const inRedline = (el) => [el, ...up(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
+const inRedline = (el) => [el, ...ancestorsOf(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
 
 /** The region container of a render: the PageContainer root, else <main>, else <body>. */
 export function regionContainerOf(tree) {
@@ -332,7 +332,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
   const tree = parseHtml(html);
   const visible = walkElements(tree).filter((el) => visibleElement(el) && !inRedline(el));
   for (const el of visible) {
-    if (up(el).some((a) => a.tag === 'svg')) continue;
+    if (ancestorsOf(el).some((a) => a.tag === 'svg')) continue;
     const ids = whysOf(el);
     if (!ids.length) {
       if (PHRASING.has(el.tag) && (el.tag === 'br' || el.tag === 'wbr' || (!el.attrs.class && !el.attrs.style && !el.attrs.id)) && el.parent?.tag !== '#root') continue;
@@ -441,7 +441,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
 }
 
 const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
-export const colourClose = (a, b) => { const x = hexRgb(a), y = hexRgb(b); return x.every((v, i) => Math.abs(v - y[i]) <= 2); };
+const colourClose = (a, b) => { const x = hexRgb(a), y = hexRgb(b); return x.every((v, i) => Math.abs(v - y[i]) <= 2); };
 
 /** The measures of a render source's parts: the rationale block of each starci/draw-render@1 record given. */
 export const measuresOf = (records) => list(records).map((r) => r?.rationale ?? null).filter(Boolean);

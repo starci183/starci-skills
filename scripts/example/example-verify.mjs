@@ -6,6 +6,8 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
 import {loadRecords, resolveRecordRef} from '../work/record-ownership.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { findRecordFile } from '../lib/work-tree.mjs';
+import { parseExampleArgs } from '../lib/cli-arg.mjs';
 
 /**
  * Re-runs every assertion in one example record's evidence.yaml against a real --cwd and compares the
@@ -23,33 +25,13 @@ import { isMain } from '../lib/is-main.mjs';
  * treats it as a verification failure rather than duplicating that gate's own refusal wording).
  */
 
-function parseArgs(argv) {
-  const args = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (token === '--work') args.work = argv[++i];
-    else if (token === '--record') args.record = argv[++i];
-    else if (token === '--cwd') args.cwd = argv[++i];
-    else throw new Error(`unrecognized argument: ${token}`);
-  }
-  for (const required of ['work', 'record', 'cwd']) {
-    if (!args[required]) throw new Error(`--${required} is required`);
-  }
-  return args;
-}
 
-/** Finds the record's own directory under `workRoot` by matching its authored `id`, the same way
- * scripts/example/example-evidence.mjs's findRecordFile does (kept separate rather than imported: that function
- * returns the record *file*, this one needs the record's *directory* to find evidence.yaml beside it). */
-function findRecordDir(workRoot, recordId) {
-  for (const file of walk(workRoot)) {
-    if (!file.endsWith('index.yaml')) continue;
-    let parsed;
-    try { parsed = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    if (parsed && typeof parsed === 'object' && parsed.id === recordId) return path.dirname(file);
-  }
-  return null;
-}
+
+/** The record's own directory under `workRoot` (the record *file*'s parent: evidence.yaml sits beside it). */
+const findRecordDir = (workRoot, recordId) => {
+  const file = findRecordFile(workRoot, recordId);
+  return file ? path.dirname(file) : null;
+};
 
 /** Replays one assertion's `command` against `cwd` and reports whether the outcome it produces now
  * matches the outcome the evidence already claims. An assertion with no `command` cannot be replayed at
@@ -95,7 +77,7 @@ export function verifyRecord({workRoot, recordId, cwd}) {
 if (isMain(import.meta.url)) {
   let args;
   try {
-    args = parseArgs(process.argv.slice(2));
+    args = parseExampleArgs(process.argv.slice(2));
   } catch (error) {
     console.error(`REFUSED ${error.message}`);
     process.exit(1);

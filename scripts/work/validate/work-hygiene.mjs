@@ -53,7 +53,7 @@ const USER_KEYS = new Set(['username', 'user', 'userid', 'login', 'email']);
 /** Words of a key: camelCase, snake_case and kebab-case split, lower-cased. */
 const wordsOf = (key) => String(key).replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w.toLowerCase());
 /** 'password' | 'credential' | null: what kind of credential a key names by its LAST word (passwordHash, tokenRef, secretName are not it). */
-export function credentialKind(key) {
+function credentialKind(key) {
   const words = wordsOf(key);
   const last = words[words.length - 1];
   if (!last) return null;
@@ -63,7 +63,7 @@ export function credentialKind(key) {
   if (last === 'apikey' || last === 'privatekey') return 'credential';
   return null;
 }
-export function entropy(text) {
+function entropy(text) {
   const counts = new Map();
   for (const ch of text) counts.set(ch, (counts.get(ch) ?? 0) + 1);
   let bits = 0;
@@ -198,7 +198,7 @@ export function stagedFiles(repo) {
   if (out.status !== 0) throw new Error(`git diff --cached failed: ${(out.stderr || '').trim().slice(0, 200)}`);
   return out.stdout.split('\0').filter(Boolean).map(slashed);
 }
-export function stagedCheck(repo, options = {}) {
+function stagedCheck(repo, options = {}) {
   const root = path.resolve(repo);
   const files = stagedFiles(root).filter(inSecretScope);
   const read = (rel) => { const r = gitOut(gitShow, root, [`:${rel}`]); return r.status === 0 ? r.stdout : null; };

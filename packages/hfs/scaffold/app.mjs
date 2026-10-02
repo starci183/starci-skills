@@ -118,7 +118,7 @@ const FE_PACKAGES = Object.freeze({
 const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.json', lint: WORKSPACE_LINT, typecheck: 'tsc --noEmit -p tsconfig.json' });
 
 /** The app hfs.json of a new app called `name`. */
-export const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
+const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
 
 /** A dependency section at the canon pins (a null range takes the pin, which must exist). */
 function pinnedSection(entries, pins) {

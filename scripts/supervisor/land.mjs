@@ -73,6 +73,7 @@ import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-g
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
@@ -84,10 +85,10 @@ import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
-
-export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
+import { tailLines } from '../lib/clip.mjs';
+const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
-export const MAX_MAIN_RETRIES = 3;
+const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
 export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
@@ -142,7 +143,7 @@ export const invariantRootsOf = (text) => {
   return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1]).replace(/\/+$/, '')) : [];
 };
 /** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
-export const specsInvariant = (changed, { specs }) => {
+const specsInvariant = (changed, { specs }) => {
   const files = changed.map(normPath);
   return specs.filter(({ file, text }) => file && invariantRootsOf(text).some((r) => files.some((f) => f.startsWith(`${r}/`)))).map((s) => s.file);
 };
@@ -160,7 +161,7 @@ export function specsTouching(changed, { specs, root = null }) {
 
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
  *  (refused unless specs.harness is true or the push-git flow asks); `direct` = the specs that can see the change (hub files narrowed to the exports reached); `none` = no spec (needs an explicit --reason). */
-export const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
+const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
 /**
  * The gate's spec plan (owner rule 2026-09-29). The default mode is `touching`: the named specs (--specs csv, a job's) plus
  * every spec touching the change; red refuses. `all` needs `fullAllowed` (config.yaml `specs.harness: true`) or `fullByPushGit`,
@@ -200,7 +201,7 @@ export function conflictHunks(text) {
 }
 
 /** What a lane does about a conflict: one instruction, never a blind retry. */
-export const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
+const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
 
 /**
  * Lock-free preflight: apply `commits` in order onto `onto` with `git merge-tree --write-tree` (no worktree, no
@@ -246,9 +247,8 @@ const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => out
 export function specRunEnv(parent = process.env) {
   const env = withoutGitLocalEnv(parent);
   delete env.NODE_TEST_CONTEXT;
-  return env;
+  return withSwcCache(env);
 }
-const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
 
 /**
  * Remove ONE scratch this land made (never another land's: the name carries the pid and a per-attempt token) and drop
@@ -280,7 +280,7 @@ export function gitHealth({ root = SKILL_ROOT } = {}) {
   const why = /\btrue$/.test(bare) ? `core.bare=true (${bare.replace(/\s+true$/, '')})` : (inside.stderr || inside.error || `is-inside-work-tree: ${inside.stdout || 'unreadable'}`).slice(0, 200);
   return { ok: false, detail: why, bare: /\btrue$/.test(bare), hint: /\btrue$/.test(bare) ? `something set core.bare=true on ${root}; run \`git -C ${root} config core.bare false\` (the gate never edits the live repo config), then land again` : `git cannot run a work-tree operation in ${root}; fix that first, then land again` };
 }
-export const GIT_HEALTH_WAIT_MS = 20_000;
+const GIT_HEALTH_WAIT_MS = 20_000;
 /** gitHealth, retried for a transient value: {ok} or {ok:false, detail, hint, waitedMs}. Seams: check, sleep, now. */
 export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
   const start = now();
@@ -305,7 +305,7 @@ function treeCheck(dir, script) {
   if (!fs.existsSync(path.join(dir, script))) return { ok: true, skipped: true };
   const r = node([script], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
-  return { ok: r.ok, output: tail(full, 15), full };
+  return { ok: r.ok, output: tailLines(full, 15), full };
 }
 
 /**
@@ -387,7 +387,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
  * Rerun `files` once in a scratch worktree of `root` at `base`: {ok:true, failures, ran} or {ok:false, error} when the
  * base run cannot run (no base tree, no scratch, a crash or timeout, a red run naming no failed test).
  */
-export function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
+function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
   if (!root) return { ok: false, error: 'no base tree to rerun the failing specs at base' };
   let scratch;
   try { scratch = makeScratch({ root, base, env }); } catch (e) { return { ok: false, error: `base scratch failed: ${String(e?.message ?? e).slice(0, 300)}` }; }
@@ -397,8 +397,8 @@ export function specBaseRunAt({ root, base, files, concurrency, env = process.en
     if (!present.length) return { ok: true, failures: [], ran: [] };
     const r = runSpecFiles({ dir: scratch.dir, files: present, concurrency });
     if (r.error) return { ok: false, error: `base spec run did not finish: ${r.error}` };
-    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tail(r.stdout + r.stderr, 6)}` };
-    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tail(r.stdout + r.stderr, 6)}` };
+    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tailLines(r.stdout + r.stderr, 6)}` };
+    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tailLines(r.stdout + r.stderr, 6)}` };
     return { ok: true, failures: r.failures, ran: present };
   } finally { removeScratch(scratch.dir, { root }); }
 }
@@ -431,7 +431,7 @@ export function mirrorRun(dir) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return { ok: true, skipped: true };
   const r = node([MIRROR_CHECK, '--check'], { cwd: dir, timeout: 600_000 });
   const full = r.stdout + r.stderr;
-  return { ok: r.ok, output: tail(full, 15), full };
+  return { ok: r.ok, output: tailLines(full, 15), full };
 }
 
 /**
@@ -463,7 +463,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
 }
 
 export const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
-export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
+const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 /**
  * The clean-install proof of every published package the land changes: package-clean-test.mjs --base <base> in the scratch
  * (each changed package copied to a temp dir, installed from its own manifest and lock, its own tests run there). Red (1)
@@ -473,7 +473,7 @@ export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 export function packageProofCheck({ dir, base, runner = node }) {
   if (!fs.existsSync(path.join(dir, PACKAGE_PROOF))) return null;
   const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
-  return { name: 'package-clean-test', ok: r.ok, output: tail(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
+  return { name: 'package-clean-test', ok: r.ok, output: tailLines(`${r.stdout}${r.stderr}${r.error ? `\n${r.error}` : ''}`, r.ok ? 4 : 60) };
 }
 
 const readSpecs = (dir) => {
@@ -511,7 +511,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   for (const f of present.filter((x) => x.endsWith('.mjs'))) {
     const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
-    checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tail(r.stderr, 10) }) });
+    checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tailLines(r.stderr, 10) }) });
   }
   for (const f of present.filter((x) => /\.(ya?ml|json)$/i.test(x))) {
     let ok = true, error = null;
@@ -569,7 +569,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   if (runSpecs && allSpecs.length && gate?.ok !== false) {
     const concurrency = gate?.concurrency || specConcurrency();
     const r = runSpecFiles({ dir, files: allSpecs, concurrency });
-    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) };
+    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tailLines(r.stdout + r.stderr, r.ok ? 6 : 40) };
     // Red: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
     // failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses.
     if (!r.ok) {
@@ -592,12 +592,12 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
 /** The gate-stability report run from the candidate's own script (scripts/supervisor/gate-stability.mjs --base --head). */
 function spawnGateStability({ runner, base, head, family }) {
   const r = node([runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
-  if (!r.ok) return { error: tail(r.stderr || r.stdout, 6) };
+  if (!r.ok) return { error: tailLines(r.stderr || r.stdout, 6) };
   try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
 
 /** Refresh untracked dist only after main has advanced. Knowledge snapshots are tracked contract files, so drift is owed to a lane. */
-export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
+function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
   if (!changed.map(normPath).some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) return null;
   const packageRoot = path.join(root, 'packages', 'grammar');
   const fail = (step, detail) => ({ ok: false, step, detail, owed: ['grammar-dist-rebuild'] });
@@ -670,10 +670,10 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
           const again = (deps.gitHealth ?? gitHealth)({ root });
           if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
           result.attempts.push({ ...step, reason: 'git-failed' });
-          return { ...result, base, reason: 'git-failed', detail: tail(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
+          return { ...result, base, reason: 'git-failed', detail: tailLines(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
         }
         result.attempts.push({ ...step, reason: 'conflict' });
-        return { ...result, base, reason: 'conflict', detail: tail(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
+        return { ...result, base, reason: 'conflict', detail: tailLines(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
       }
       const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
       // The pick changes nothing: main already carries the change (a re-land of a landed commit).
@@ -718,7 +718,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
 }
 
 /** Push live main after a secret scan of origin/main..main. */
-export function pushLive({ root = SKILL_ROOT } = {}) {
+function pushLive({ root = SKILL_ROOT } = {}) {
   const hasRemote = git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'], { cwd: root }).ok;
   if (!hasRemote) return { pushed: false, skipped: 'no origin/main' };
   const scan = scanRange({ cwd: root, from: 'origin/main', to: 'main' });
@@ -764,7 +764,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
 
 const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable'].includes(r.reason) ? 'refused' : 'failed');
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
-export const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
+const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**
  * The core record of one land as ONE idempotent write (machine-db recordLandOutcome, keyed on spanId): the push row, the
  * land_runs row (full result as the stdout blob), the lane head and the log line. Plain data, so a refused write can wait
@@ -920,7 +920,7 @@ export function landStatus({ env = process.env } = {}) {
 }
 
 /** The "specs red on main (k)" advisory of a land result, or null. */
-export const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
+const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
 
 export function describe(r, { jobId = null } = {}) {
   const inherited = specsRedOnMainOf(r);

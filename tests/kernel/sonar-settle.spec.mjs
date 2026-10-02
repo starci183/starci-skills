@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileReport,inspectLedger,ledgerFileFor,openLedger,writeContract,recordCheckRun} from '../../engine/db/ledger.mjs';
-import {readProperties} from '../../scripts/gates/sonar-local.mjs';
+import {readProperties} from '../../scripts/lib/properties.mjs';
 import {coverageScopeOf,judgeCoverage,judgeDashboard,judgeSummary,loadSonarGate,serverConditions,thresholdsOf} from '../../scripts/gates/sonar-gate.mjs';
 import {enforcesOp,judgeJob,readSonarSummary,recordSonarJudgment,SONAR_CHECK,SONAR_ENFORCE_CHANGE,SONAR_INCIDENT_TAG} from '../../scripts/kernel/sonar-settle.mjs';
 import {independentChecksOf} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';

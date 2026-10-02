@@ -15,12 +15,13 @@
 // (scripts/agent/quota/orca-account.mjs, no tokens spent): ok while the account
 // answers auth ok under 100% used, quota-exhausted at 100%, auth for a missing
 // account or credential, inconclusive otherwise.
-import { agentCardOf, credentialFingerprintOf, providerKeyOf } from './credential-fingerprint.mjs';
+import { agentCardOf, credentialFingerprintOf } from './credential-fingerprint.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 import { probeQuota } from './quota/index.mjs';
 import { quotaSpecOf } from './provider-outage.mjs';
 
 export async function probeProviderCredential(provider, { accounts } = {}) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   const card = agentCardOf(key);
   if (!card) return { ok: false, provider: key, kind: null, detail: `no agent card modules/models/agents/${key}.yaml` };
   const quota = probeQuota(key);
@@ -44,7 +45,7 @@ export async function orcaAccountQuota(key, { quota = probeQuota } = {}) {
 }
 
 export async function probeProviderQuota(provider, { card: given, quota = probeQuota } = {}) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   const card = given ?? agentCardOf(key);
   const spec = card ? quotaSpecOf(key, { card }) : null;
   if (!spec?.probe) return { ok: false, provider: key, kind: null, state: 'inconclusive', detail: `no quotaExhausted.probe on modules/models/agents/${key}.yaml` };

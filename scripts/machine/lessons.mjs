@@ -46,10 +46,11 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { diffTree } from '../api/git/diff-tree.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
+import { SKILL_ROOT, supervisorRead, supervisorEvent, withSupervisor } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
 import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { verbCli } from '../lib/cli-arg.mjs';
 
 export { LESSONS_FILE, lessonsForChecks, parseLessonsFile };
 
@@ -57,7 +58,7 @@ export const KINDS = Object.freeze({
   hypothesis: 'supervisor-hypothesis', experiment: 'supervisor-experiment', result: 'supervisor-experiment-result',
   lesson: 'supervisor-lesson', proposal: 'supervisor-proposal',
 });
-export const one = (s, n = 300) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
+export const one = (s, n = 300) => clipLine(s, n);
 const norm = posixPath;
 
 /** allocation.supervisorLearning, every number checked. */
@@ -73,7 +74,7 @@ export function learningSettings(allocation = allocationSettings()) {
 export const signatureOf = (item) => (item.key?.startsWith('owed|') ? item.subject : `${item.class}:${String(item.subject ?? '').replace(/^wf-[^|]+$/, 'workflow')}`);
 
 /** The cause class of a signature from its words. Pure. */
-export function causeClassOf(text) {
+function causeClassOf(text) {
   const t = String(text ?? '').toLowerCase();
   if (/knowledge-churn|stale-input|contract|schema|re-?stale/.test(t)) return 'contract-churn';
   if (/host|tooling|enametoolong|spawn|timeout|provider|worker-died|repeat-reject|env|quota|orca/.test(t)) return 'env';
@@ -83,7 +84,7 @@ export function causeClassOf(text) {
 }
 
 /** How many times the item's signature repeated: its cluster size, 2 for a repeat pattern by definition. Pure. */
-export const repeatsOf = (item) => Math.max(Number(item.size ?? 1), item.class === 'retry-cap' ? 2 : 1);
+const repeatsOf = (item) => Math.max(Number(item.size ?? 1), item.class === 'retry-cap' ? 2 : 1);
 
 /**
  * The hypotheses to open this tick: one per signature repeated >= minRepeats with no open hypothesis or measuring
@@ -136,7 +137,7 @@ export function learningState(m) {
   }
   return { signatures, experiments, lessons, proposals };
 }
-export const readLearning = ({ env = process.env } = {}) => readSupervisor((m) => learningState(m), EMPTY_STATE(), { env });
+export const readLearning = supervisorRead((m) => learningState(m), EMPTY_STATE);
 
 /** The sup_learning row of one change: {itemId, kind, parentId, title, state}. Pure over `kind` and the payload. */
 function learningItem(kind, p) {
@@ -168,7 +169,7 @@ export const write = (env, kind, payload, now = Date.now()) => {
 };
 
 /** The typed log row of one learning event (sup-log.mjs). Pure. */
-export function learningRow(kind, p, at) {
+function learningRow(kind, p, at) {
   const refs = refsOf({ workflowId: (p.workflows ?? []).join(','), commits: p.commits ?? (p.revertCommit ? [p.revertCommit] : []), experiment: p.id?.startsWith('exp-') ? p.id : null,
     extra: [p.signature ? `signature:${p.signature}` : null, p.id?.startsWith('prop-') ? `proposal:${p.id}` : null] });
   if (kind === KINDS.hypothesis) return { kind: 'decision', at, msg: `hypothesis ${p.signature} [${p.causeClass}]: ${p.symptom}`, data: { markdown: `Hypothesis for **${p.signature}** (cause class ${p.causeClass}, source ${p.source}): ${p.symptom}
@@ -313,7 +314,7 @@ export function recordFeedback({ text, signature = null, via = 'chat', refs = []
  * gc-leftover:<klass>, naming the owner step at fault and examples; also the signature a hypothesis opens on.
  * Returns the lesson payload, or null when one was recorded within dedupeMs.
  */
-export const GC_LEFTOVER_OWNERS = Object.freeze({
+const GC_LEFTOVER_OWNERS = Object.freeze({
   'op-worker': 'the Kernel settle path (scripts/kernel/cli.mjs settle: quit + close + close-verify of the op worker terminal)',
   'kernel': 'starci kernel finish/archive (closeKernelTerminal -> close-verify.mjs closeSelfSafe) or the kernel replace in scripts/kernel/start-workflow.mjs',
   'sup-worker': 'the Supervisor worker lifecycle (scripts/supervisor/workers.mjs closeWorkerTerminal at report/cancel/land)',
@@ -372,12 +373,7 @@ export function learningDigest(state, { since = 0 } = {}) {
 /* ------------------------------------------------------------ CLI */
 
 if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const verb = argv[0];
-  const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const asJson = argv.includes('--json');
-  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : human);
+  const { argv, verb, value, csv, print } = verbCli();
   try {
     if (verb === 'list') {
       const s = readLearning();

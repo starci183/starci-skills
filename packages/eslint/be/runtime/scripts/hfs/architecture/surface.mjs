@@ -1,5 +1,5 @@
 /**
- * The lint surface: which architecture-machine findings an ESLint rule judges instead of `hfs check`.
+ * The lint surface: which architecture-machine findings an ESLint rule judges instead of `starci app check`.
  * Single source of truth. Each enforcer id is the rules.yaml enforcer; `codes` are the exact violation.ruleId strings its
  * check file emits on source files. plugins: 'be' = back-end profile repos, 'fe' = front-end profile, graph checks run for both.
  */
@@ -80,7 +80,7 @@ export const LINT_CODES = new Set(LINT_ENFORCERS.flatMap(e => e.codes));
 export const TS_SOURCE = /\.(?:[cm]?tsx?)$/;
 
 /** True when a finding sits on an existing TypeScript file of the repository: the only findings an editor can show on a line. */
-export function attachesToSource(repositoryRoot, violation) {
+function attachesToSource(repositoryRoot, violation) {
   const file = violation?.path;
   if (typeof file !== 'string' || !TS_SOURCE.test(file)) return false;
   return fs.existsSync(path.join(repositoryRoot, ...file.split('/')));
@@ -93,5 +93,5 @@ export const codeOf = (finding) => finding?.ruleId ?? finding?.code;
 export const belongsTo = (enforcer, finding) => enforcer.codes.includes(codeOf(finding))
   && (finding.origin ?? 'machine') === (enforcer.origin ?? 'machine') && (enforcer.via === undefined || finding.check === enforcer.via);
 
-/** True when some lint rule owns the finding and it sits on an existing TypeScript file: it is an ESLint report, not a `hfs check` finding. */
+/** True when some lint rule owns the finding and it sits on an existing TypeScript file: it is an ESLint report, not a `starci app check` finding. */
 export const onLintSurface = (repositoryRoot, finding) => LINT_ENFORCERS.some(enforcer => belongsTo(enforcer, finding)) && attachesToSource(repositoryRoot, finding);

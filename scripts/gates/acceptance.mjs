@@ -1,5 +1,5 @@
 export const EVIDENCE_PACKET='starci/evidence-packet@1';
-export const ACCEPTANCE_VERDICTS=Object.freeze(['pass','fail','inconclusive','unavailable']);
+const ACCEPTANCE_VERDICTS=Object.freeze(['pass','fail','inconclusive','unavailable']);
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +24,7 @@ export function requiredGatesFor({kind,policy={}}={}){
   return list(configured).map(item=>typeof item==='string'?{id:item,kind:item,required:true}:{required:true,...item});
 }
 
-export function validateEvidencePacket(packet,{requireIndependent=false}={}){
+function validateEvidencePacket(packet,{requireIndependent=false}={}){
   const errors=[];
   if(packet?.schema!==EVIDENCE_PACKET)errors.push('invalid evidence schema');
   for(const field of ['gateId','gateKind','candidateDigest','oracleDigest','environmentDigest','owner'])if(!nonempty(packet?.[field]))errors.push(`missing ${field}`);

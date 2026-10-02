@@ -36,7 +36,7 @@ const words = name => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z
 /** `member-profile` -> `MemberProfile`. */
 export const pascalOf = name => words(name).map(word => word[0].toUpperCase() + word.slice(1).toLowerCase()).join('');
 /** `InjectPrimaryEntityManager` -> `PRIMARY_ENTITY_MANAGER`. */
-export const tokenNameOf = decorator => words(decorator.replace(/^Inject/, '')).map(word => word.toUpperCase()).join('_');
+const tokenNameOf = decorator => words(decorator.replace(/^Inject/, '')).map(word => word.toUpperCase()).join('_');
 const camelOf = name => { const pascal = pascalOf(name); return pascal[0].toLowerCase() + pascal.slice(1); };
 
 const SERVICE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -49,7 +49,7 @@ const SERVICE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
  *   decorator (or `@Inject(TOKEN)`), or { kind: 'class', name, className, module } for a class-typed parameter.
  *   `type` is { text, imports: [{ name, module }] }, the parameter type and where each imported name of it comes from.
  */
-export function readServiceShape({ ts, fileName, text }) {
+function readServiceShape({ ts, fileName, text }) {
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const imported = new Map();
   for (const statement of source.statements) {
@@ -138,7 +138,7 @@ const compareModules = (a, b) => {
 };
 
 /** The spec skeleton of a service shape: text of `<name>.service.spec.ts`. */
-export function specSkeleton({ shape, serviceFile, manifest = loadSlotManifest() }) {
+function specSkeleton({ shape, serviceFile, manifest = loadSlotManifest() }) {
   const table = tableOf(manifest);
   const subject = `./${path.basename(serviceFile).replace(/\.ts$/, '')}`;
   const kit = new Set();
@@ -240,7 +240,7 @@ function uniqueName(name, taken) {
  * `--inject` entries: `InjectCache=@modules/integrations/cache:Cache` (a token dependency: decorator, the module that exports the
  * decorator and its token, the parameter type) or `ProbeCheckerService=@modules/platform/probes` (a class dependency).
  */
-export function parseInject(entry) {
+function parseInject(entry) {
   const match = /^([A-Za-z][A-Za-z0-9]*)=([^:\s]+)(?::([A-Za-z][A-Za-z0-9<>, ]*))?$/.exec(entry);
   if (!match) throw new ScaffoldError('HFS_NEW_INJECT_INVALID', `--inject ${entry}: expected InjectName=<module>:<Type> or ClassName=<module>`);
   const [, name, module, type] = match;
@@ -253,7 +253,7 @@ export function parseInject(entry) {
 }
 
 /** The text of a new `<name>.service.ts` with the given dependencies (parseInject results). */
-export function serviceSource({ name, dependencies = [] }) {
+function serviceSource({ name, dependencies = [] }) {
   const className = `${pascalOf(name)}Service`;
   const values = new Map();
   const types = new Map();

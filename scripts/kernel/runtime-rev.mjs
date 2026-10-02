@@ -38,21 +38,23 @@ import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
 import { isContractChangesPath } from '../lib/contract-changes-path.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { clipLine } from '../lib/clip.mjs';
+import { underAny } from '../lib/path-key.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';
 export const KERNEL_REV_STALE = 'kernel-rev-stale';
 export const KERNEL_REV_UNKNOWN = 'kernel-rev-unknown';
 export const OP_REV_DRIFT = 'op-rev-drift';
 /** The runtime paths a Kernel's contract is read from (a directory covers what is inside it). */
-export const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
+const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 /** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
-export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
+const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
 /** A re-read of op contracts / contract changes alone is asked at most once per this window after the last ack. */
-export const REV_ACK_COALESCE_MS = 30 * 60_000;
+const REV_ACK_COALESCE_MS = 30 * 60_000;
 /** Contract changes with these reaches can require a Kernel re-read. */
-export const REV_REACHES = Object.freeze(['new-legs', 'follow-up']);
-export const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
+const REV_REACHES = Object.freeze(['new-legs', 'follow-up']);
+const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 /** Past this many changed files the wake asks for the full re-read instead of a list. */
 export const REV_DIFF_MAX_FILES = 12;
 const WAKE_CHANGES_MAX = 5;
@@ -63,7 +65,7 @@ const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /** The runtime root whose HEAD is the current revision; STARCI_KERNEL_REV_ROOT is the spec seam. */
 export const revRootOf = (env = process.env) => (env.STARCI_KERNEL_REV_ROOT ? path.resolve(env.STARCI_KERNEL_REV_ROOT) : defaultRoot);
 export const shortRev = (sha) => (typeof sha === 'string' ? sha.slice(0, SHORT) : null);
-const clip = (text, max) => { const one = String(text ?? '').replace(/\s+/g, ' ').trim(); return one.length > max ? `${one.slice(0, max - 1)}…` : one; };
+
 
 const git = (call, root, args) => {
   try {
@@ -95,7 +97,7 @@ const changesAt = (root, rev) => {
         // An unscoped change reaches every op's contract only when it adds a check or code or is safety-critical.
         const everyOp = !ops.length && (Boolean(c.adds?.checks?.length || c.adds?.codes?.length) || c.safetyCritical === true);
         const paths = Array.isArray(c.paths) ? c.paths.filter((p) => typeof p === 'string') : [];
-        const out = { id: c.id, summary: clip(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
+        const out = { id: c.id, summary: clipLine(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
         // reach and paths ride non-enumerable: the wake and starci kernel status keep their shape.
         Object.defineProperty(out, 'reach', { value: typeof c.reach === 'string' ? c.reach : null, enumerable: false });
         Object.defineProperty(out, 'paths', { value: paths, enumerable: false });
@@ -110,7 +112,7 @@ const diffMemo = new Map();
  * changes[] ({id, summary, ops} of contract-change entry files present at `to` and absent at `from`)}.
  * known:false when git cannot compare the two (a revision it no longer has).
  */
-export function revDiff(root, from, to) {
+function revDiff(root, from, to) {
   const key = `${root}\0${from}\0${to}`;
   if (diffMemo.has(key)) return diffMemo.get(key);
   let result;
@@ -130,7 +132,7 @@ export function revDiff(root, from, to) {
 }
 
 /** The latest runtime-rev-acked event of a workflow: {rev, at, source, files, attempt} or null. */
-export function latestRevAck(db, workflowId) {
+function latestRevAck(db, workflowId) {
   const row = db.prepare('SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_REV_ACKED_EVENT);
   const payload = parseJson(row?.payload_json);
   if (!payload?.rev) return null;
@@ -143,9 +145,8 @@ export function latestRevAck(db, workflowId) {
  * in between (a revision git cannot compare is stale and full). `files` is capped at REV_DIFF_MAX_FILES;
  * the whole list rides as the non-enumerable `allFiles` for the gate.
  */
-const within = (file, list) => list.some((p) => file === p || file.startsWith(`${p}/`));
 /** The ops this workflow has enqueued or dispatched (jobs.op_id); [] when unreadable. */
-export function workflowOpsOf(db, workflowId) {
+function workflowOpsOf(db, workflowId) {
   try { return db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map((r) => r.op_id).filter(Boolean); } catch { return []; }
 }
 
@@ -155,13 +156,13 @@ export function workflowOpsOf(db, workflowId) {
  * whose paths touch that set (their registry file then counts too); contract: a KERNEL_CONTRACT_FILES file moved. Pure
  * but for opRevFiles.
  */
-export function kernelRelevantOf(diff, ops, { root = revRootOf() } = {}) {
+function kernelRelevantOf(diff, ops, { root = revRootOf() } = {}) {
   const opFiles = new Set(ops.flatMap((op) => { try { return opRevFiles(root, op); } catch { return []; } }));
-  const mine = (file) => within(file, KERNEL_CONTRACT_FILES) || opFiles.has(file);
+  const mine = (file) => underAny(file, KERNEL_CONTRACT_FILES) || opFiles.has(file);
   const changes = (diff.changes ?? []).filter((c) => REV_REACHES.includes(c.reach)
     && ((c.ops?.length ? c.ops.some((op) => ops.includes(op)) : c.everyOp === true) || (c.paths ?? []).some((p) => mine(p) && !isContractChangesPath(p))));
   const files = (diff.files ?? []).filter((file) => (isContractChangesPath(file) ? changes.length > 0 : mine(file)));
-  return { files, changes, contract: files.some((file) => within(file, KERNEL_CONTRACT_FILES)) };
+  return { files, changes, contract: files.some((file) => underAny(file, KERNEL_CONTRACT_FILES)) };
 }
 
 export function kernelRevState(db, workflowId, { root = revRootOf(), current = currentRuntimeRev(root), now = Date.now(), ops = null } = {}) {
@@ -194,7 +195,7 @@ export function kernelRevState(db, workflowId, { root = revRootOf(), current = c
 }
 
 /** The contract files one op's leg is built from: contractFilesOf plus the op prompt builder. */
-export const opRevFiles = (root, op) => [...new Set([...contractFilesOf(root, op), OP_PROMPT_FILE])];
+const opRevFiles = (root, op) => [...new Set([...contractFilesOf(root, op), OP_PROMPT_FILE])];
 
 /**
  * Whether a stale Kernel may not enqueue or dispatch `op`: null when it may, else {files, changes}

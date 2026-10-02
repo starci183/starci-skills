@@ -80,7 +80,7 @@ export const LINT_CODES = new Set(LINT_ENFORCERS.flatMap(e => e.codes));
 export const TS_SOURCE = /\.(?:[cm]?tsx?)$/;
 
 /** True when a finding sits on an existing TypeScript file of the repository: the only findings an editor can show on a line. */
-export function attachesToSource(repositoryRoot, violation) {
+function attachesToSource(repositoryRoot, violation) {
   const file = violation?.path;
   if (typeof file !== 'string' || !TS_SOURCE.test(file)) return false;
   return fs.existsSync(path.join(repositoryRoot, ...file.split('/')));

@@ -75,7 +75,7 @@ import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 
-export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
+const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /**
  * The codes `starci app check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
@@ -128,12 +128,6 @@ export function trackedFiles(repoRoot) {
 }
 
 const fill = (text, bindings) => String(text).replace(VAR, (whole, name) => bindings[name] ?? whole);
-
-/** hfs.json of `repoRoot` resolved against the manifest, or the single refusal finding when it is absent or invalid. */
-export function openRepo({ repoRoot, root = skillRoot, manifest = loadSlotManifest({ root }) }) {
-  const repo = readRepoDeclaration(manifest, repoRoot);
-  return { manifest, repo, resolver: createSlotResolver(manifest, repo) };
-}
 
 const pinnedSpec = (spec, pin) => (spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`);
 

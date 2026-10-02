@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnNode } from '../api/node/spawn-node.mjs';
-import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/db/ledger.mjs';
+import { inspectLedger, ledgerFileFor, isRuntimeRoot, hasLedger } from '../../engine/db/ledger.mjs';
 import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
@@ -23,7 +23,7 @@ import { sleep } from '../lib/sleep.mjs';
 
 
 /** When this host last booted (ms). */
-export const hostBootAt = () => Date.now() - os.uptime() * 1000;
+const hostBootAt = () => Date.now() - os.uptime() * 1000;
 /**
  * Whether the process a state record names ({pid, startedAt}) is still that process: its pid is
  * live AND it started in this boot. After a reboot the recorded pid may name an unrelated process,
@@ -42,8 +42,8 @@ export const recordAlive = (record) => {
  * unref'd timer, so an expired lock (v_leaks) is one whose holder stopped renewing. Who holds a lock is decided by its
  * holder pid (recordAlive: live and of this boot), never by the expiry: a busy holder that missed a renewal keeps it.
  */
-export const LOCK_TTL_MS = 10 * 60_000;
-export const LOCK_RENEW_MS = 3 * 60_000;
+const LOCK_TTL_MS = 10 * 60_000;
+const LOCK_RENEW_MS = 3 * 60_000;
 const holderLabel = () => (process.argv[1] ? path.basename(process.argv[1]) : 'node');
 /** A host_locks row as the record callers read: {pid, startedAt (ISO), at, handedOverFrom, state, holder}. */
 const lockRecord = (row) => (row ? { pid: row.holder_pid, startedAt: new Date(row.started_at).toISOString(), at: row.started_at,
@@ -144,7 +144,7 @@ export const lockHolder = (name, env = process.env) => {
  * spawn, and every liveness test counts it for STARTING_MS while that pid lives, so two starters in
  * that window do not both launch a manager. The launched manager's claim turns the row 'held'.
  */
-export const STARTING_MS = 30_000;
+const STARTING_MS = 30_000;
 export const markStarting = (name, pid, env = process.env) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   return withMachine((m) => m.transaction(() => {
@@ -219,9 +219,7 @@ export const spawnDetached = (script, args = [], { env = process.env } = {}) => 
 };
 
 
-const hasLedger = (root) => {
-  try { return !isRuntimeRoot(root) && fs.existsSync(ledgerFileFor(root)); } catch { return false; }
-};
+
 
 /**
  * The repositories whose ledgers the connectors read. `connectors.repos` when the owner listed any
@@ -255,15 +253,15 @@ export function askRepos(connectors, { env = process.env, extra = [] } = {}) {
 
 /** The nonce path segment serve-ask binds (`/a-<hex>`). */
 export const NONCE = /^a-[0-9a-f]{8,64}$/;
-export const nonceOf = (url) => {
+const nonceOf = (url) => {
   try { const first = new URL(url).pathname.split('/')[1] ?? ''; return NONCE.test(first) ? first : null; } catch { return null; }
 };
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
-export const isLoopbackUrl = (url) => {
+const isLoopbackUrl = (url) => {
   try { const u = new URL(url); return u.protocol === 'http:' && LOOPBACK.has(u.hostname); } catch { return false; }
 };
 /** A credential ask names custody files or env variables to fill (serve-ask payload.fields). */
-export const isCredentialAsk = (fields) => Boolean((fields?.files?.length ?? 0) + (fields?.vars?.length ?? 0));
+const isCredentialAsk = (fields) => Boolean((fields?.files?.length ?? 0) + (fields?.vars?.length ?? 0));
 
 const parse = parseJson;
 

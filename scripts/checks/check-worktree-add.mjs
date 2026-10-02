@@ -27,9 +27,9 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
+const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 /** The one function of WORKTREE_API that may run `git worktree add`. */
-export const WORKTREE_ADD_HOME = 'worktreeAdd';
+const WORKTREE_ADD_HOME = 'worktreeAdd';
 const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;
 const ARGV_FORM = /['"`]worktree['"`]\s*,\s*['"`]add['"`]/;
 const SHELL_FORM = /(?:^|['"`]|&&|;|\|\|)\s*git(?:\s+-C\s+(?:"[^"]*"|'[^']*'|\S+))?\s+worktree\s+add\b/;
@@ -42,7 +42,7 @@ const SHELL_CALL = /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*
 const SHELL_SCRIPT = /\.(?:ps1|sh)$/;
 
 /** The 1-based [first, last] lines of `export function <name>(` in a module's text (to its `}` at column 0), or null. */
-export function functionSpan(text, name) {
+function functionSpan(text, name) {
   const lines = String(text).split(/\r?\n/);
   const start = lines.findIndex((l) => l.startsWith(`export function ${name}(`));
   if (start < 0) return null;

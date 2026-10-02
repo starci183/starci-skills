@@ -14,7 +14,7 @@ import path from "node:path"
 import postcss from "postcss"
 
 /** The stylesheets that declare the theme roots, relative to the grammar package. */
-export const VALUE_CSS = ["common/styles.css", "core/styles.css", "heritage/styles.css", "offset-pop/styles.css"]
+const VALUE_CSS = ["common/styles.css", "core/styles.css", "heritage/styles.css", "offset-pop/styles.css"]
 
 const ROOT = /^\.grammar-common-root(?:\[data-grammar-family="([a-z][a-z0-9-]*)"\])?(\[data-grammar-theme="dark"\])?$/
 

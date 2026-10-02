@@ -25,7 +25,7 @@ import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
-export const NODE_MAJOR = 22;
+const NODE_MAJOR = 22;
 /** The scopes a target is rendered for: the app root, then each side. */
 export const SCOPES = Object.freeze([APP_SCOPE, ...SIDES]);
 export const BLOCK_BEGIN = '# >>> starci app sync (managed block; do not edit) >>>';
@@ -46,7 +46,7 @@ const MODE_OF_GROUP = Object.freeze({ 'package-scripts': 'scripts' });
 const LITERAL_FILE = /^[^*?<>{}[\]]+[^/*?<>{}[\]]$/;
 
 /** The targets no managedBy slot lists as a whole file (see the header of this module); both belong to the app root. */
-export const UNLISTED_TARGETS = Object.freeze([
+const UNLISTED_TARGETS = Object.freeze([
   { path: '.gitignore', template: 'app/gitignore', mode: 'block' },
   { path: '.starciwork/.gitignore', template: 'app/starciwork.gitignore', mode: 'file' },
 ].map(Object.freeze));
@@ -120,7 +120,7 @@ export async function loadPresets(root) {
 }
 
 /** Where the be unit run writes the lcov report (jest `coverageDirectory` coverage under be/, reporter lcov), from the app root. */
-export const LCOV_REPORT = 'be/coverage/lcov.info';
+const LCOV_REPORT = 'be/coverage/lcov.info';
 
 /**
  * THE coverage scope of an app, from the app root: the preset's coverage sources on the be side (`be/src/**` + `/*.service.ts`).
@@ -208,10 +208,10 @@ export function appScripts(app) {
 }
 
 /** The cli command that migrates every connection (src/features/cli/migrate/subs/run.cli.ts). */
-export const MIGRATE_COMMAND = 'migrate run';
+const MIGRATE_COMMAND = 'migrate run';
 
 /** True when the fe side opts into a workspace package (repo.packages or any fe.package.* slot): the sources then include fe/packages/. */
-export const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo.packages' || String(id).startsWith('fe.package.'));
+const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo.packages' || String(id).startsWith('fe.package.'));
 
 /** The stylesheets of the fe side the CSS canon judges, relative to fe/: every app and every workspace package (slot fe.route, fe.package.*). */
 export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';

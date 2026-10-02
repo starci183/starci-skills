@@ -7,7 +7,7 @@ import { ownedPathPlacements } from '../../target-repo.mjs';
 const memo = new WeakMap();
 
 /** Absolute owned paths of a job, or null when a path does not resolve into a bound repository (never guessed). */
-export const resolverFor = (repo) => (job) => {
+const resolverFor = (repo) => (job) => {
   const places = ownedPathPlacements({ op: job.op_id, payload: job.payload ?? {}, ownedPaths: job.payload?.owned_paths ?? [], repo });
   return places.some((p) => p.unresolved || !p.role) ? null : places.map((p) => path.join(p.base, p.path));
 };

@@ -30,7 +30,7 @@ const SPEC_RE = [
 ];
 
 /** Strip // and /* *\/ comments from JSON-with-comments, strings kept intact, then trailing commas. */
-export function parseJsonc(text) {
+function parseJsonc(text) {
   let out = '', i = 0, inStr = false;
   const s = String(text ?? '');
   while (i < s.length) {
@@ -60,7 +60,7 @@ const trackedList = (dir) => {
 };
 
 /** Tracked source files of `root` (posix, relative), never under the worktrees dir or node_modules. */
-export function trackedSources(root, { list = trackedList } = {}) {
+function trackedSources(root, { list = trackedList } = {}) {
   const r = list(root);
   if (!r.ok) throw Object.assign(Error(`git ls-files failed in ${root}: ${String(r.error ?? '').slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
   return r.files.map(posix)
@@ -68,7 +68,7 @@ export function trackedSources(root, { list = trackedList } = {}) {
 }
 
 /** tsconfig alias scopes: [{dir, baseUrl, paths: [{pattern, targets}]}] deepest dir first. */
-export function aliasScopes(root) {
+function aliasScopes(root) {
   const scopes = [];
   for (const rel of listTsconfigs(root)) {
     const resolved = tsconfigPaths(root, rel, new Set());
@@ -120,7 +120,7 @@ const within = (file, dir) => !dir || file === dir || file.startsWith(`${dir}/`)
  * Resolve one specifier from `fromFile` (posix, relative to root): {kind: 'external'} | {kind: 'file', file} |
  * {kind: 'broken', candidates}. `exists(rel)` answers whether a repository-relative path is a file (and `isDir`).
  */
-export function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
+function resolveSpecifier(fromFile, spec, { scopes, exists, isDir }) {
   const bases = [];
   if (spec.startsWith('./') || spec.startsWith('../') || spec === '.' || spec === '..') {
     bases.push(posix(path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), spec))));
@@ -158,7 +158,7 @@ export function matchAlias(pattern, spec) {
  * One pass over a repository working tree: {files, edges: [{from, spec, kind, file?}]}. `only` limits the files
  * READ (their imports) to that set; resolution still sees every file on disk. `readFile(rel)` is a seam.
  */
-export function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
+function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
   const files = trackedSources(root, { list });
   const onDisk = (rel) => { try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; } };
   const isDir = (rel) => { try { return fs.statSync(path.join(root, rel)).isDirectory(); } catch { return false; } };

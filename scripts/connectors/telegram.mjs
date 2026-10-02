@@ -55,6 +55,8 @@ import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { attemptSend, botPolite, redact } from './telegram-polite.mjs';
+import { isSpecRun, readEnv } from '../lib/env.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
@@ -80,17 +82,10 @@ const parse = parseJson;
 const optionLabel = (o) => (typeof o === 'string' ? o : o?.label ?? o?.id ?? '');
 const when = (ms, language) => new Date(ms).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false });
 
-/** Replace every occurrence of the secret (and anything shaped like a bot token) in `text`. */
-export const redact = (text, secret) => {
-  let out = String(text ?? '');
-  if (secret) out = out.split(secret).join('***');
-  return out.replace(/bot\d+:[A-Za-z0-9_-]{20,}/g, 'bot***');
-};
-
 /* ------------------------------------------------------------ ask keys and buttons */
 
 /** The store key of one ask (`<workflow>|<dispatch>`). */
-export const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
+const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
 /** The short key a "Generate URL" button carries: 16 hex chars of sha256(workflow|dispatch). */
 export const askKeyOf = (workflowId, dispatchId) => sha256(askStoreKey(workflowId, dispatchId)).slice(0, 16);
 export const ASK_CALLBACK = /^ask:([0-9a-f]{16})$/;
@@ -146,7 +141,7 @@ export function autoAcceptedMessage({ workflow, question, label, language }) {
   return clip([line, '', workflowLine(t, workflow)].join('\n'), TEXT_MAX);
 }
 /** The text a message is edited to when Telegram refuses to delete it (answered / retired). */
-export function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
+function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
   const t = textFor(language);
   const stamp = new Date(now).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? `, ${by}` : ''})`;
@@ -154,30 +149,14 @@ export function closedMessage({ reason, by = null, title, question, language, no
 }
 /* ------------------------------------------------------------ Bot API */
 
-const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
+export const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
 
 /**
- * One Bot API call with polite retries: 429 waits `retry_after` (capped at 60 s), 5xx and network
- * errors back off 1 s, 2 s, 4 s; any other 4xx fails at once. Returns {ok, status, result, error}
- * with the token scrubbed from the error.
+ * One Bot API call with polite retries (botPolite): a JSON POST to `method` under the 15 s read timeout.
  */
-export async function botCall({ token, method, payload, apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 4 }) {
+export function botCall({ token, method, payload, apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 4 }) {
   const body = JSON.stringify(payload);
-  let last = null;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const res = await fetchImpl(endpoint(apiBase, token, method), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(15000) });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.ok !== false) return { ok: true, status: res.status, result: json?.result ?? null };
-      last = { ok: false, status: res.status, error: redact(json?.description ?? `HTTP ${res.status}`, token) };
-      if (res.status === 429) { await sleepImpl(Math.min(Number(json?.parameters?.retry_after ?? 1), 60) * 1000); continue; }
-      if (res.status < 500) return last;
-    } catch (error) {
-      last = { ok: false, status: null, error: redact(error?.cause?.message ?? error?.message ?? error, token) };
-    }
-    if (attempt < attempts) await sleepImpl(1000 * 2 ** (attempt - 1));
-  }
-  return last;
+  return botPolite({ token, sleepImpl, attempts }, () => fetchImpl(endpoint(apiBase, token, method), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(15000) }));
 }
 
 export const sendMessage = ({ token, chatId, text, markup = null, ...rest }) =>
@@ -282,13 +261,13 @@ const withStore = (env, fn) => withHostMutex(SENT_LOCK, async () => {
 }, { env });
 
 /** The message ids that show one ask (a pre-button entry kept one `messageId`). */
-export const messageIdsOf = (entry) => [...new Set([
+const messageIdsOf = (entry) => [...new Set([
   ...(Array.isArray(entry?.messageIds) ? entry.messageIds : []), ...(Number.isInteger(entry?.messageId) ? [entry.messageId] : []),
 ].filter(Number.isInteger))];
 /** Read the store (no lock): a snapshot for lookups. */
 export const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
 /** Change the store under its lock; `fn(store)` mutates it and returns the result. */
-export const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
+const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
 /** The ask a button key names ({askKey, key, repo, ledgerFile, workflowId, dispatchId, ...}), or null. */
 export const askEntryByKey = (key, env = process.env) => {
   const store = readSentStore(env), askKey = store.keys[key];
@@ -321,7 +300,7 @@ const CAPTION_MAX = 1000;
 export const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
 
 /** The caption of a draw-review album: the shapes, the round and the notes this drawing answers. */
-export function drawAlbumCaption(question, language) {
+function drawAlbumCaption(question, language) {
   const tr = translator(language);
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
@@ -391,7 +370,30 @@ const readAsk = (ledgerFile, workflowId, dispatchId, now) => {
 const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children such as a serve-ask under
   // test inherit) never reaches the real Bot API, whatever the owner config says.
-  : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
+  : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
+
+/**
+ * The resolved context of one owner-facing send: every option defaulted, Telegram checked (a guarded-off
+ * environment, the settings ready). `skipped` names the reason nothing is sent; a not-ready warning is
+ * surfaced once through `warn`.
+ */
+function sendContext(over = {}) {
+  const env = over.env ?? process.env;
+  const o = {
+    config: ownerConfig(), env, root: configRoot, fetchImpl: fetch,
+    apiBase: env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
+    warn: (line) => process.stderr.write(`${line}\n`), sleepImpl: sleep, now: Date.now(),
+    ...Object.fromEntries(Object.entries(over).filter(([, value]) => value !== undefined)),
+  };
+  const off = guarded(o.env, o.apiBase, o.fetchImpl);
+  if (off) return { ...o, skipped: off };
+  const settings = telegramSettings({ config: o.config, env: o.env, root: o.root });
+  if (!settings.ready) {
+    if (settings.warning) o.warn(settings.warning);
+    return { ...o, skipped: settings.warning ?? 'telegram off' };
+  }
+  return { ...o, settings };
+}
 
 /**
  * Tell the owner about one parked ask: ONE message with the workflow, the question, its numbered
@@ -402,15 +404,10 @@ const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' 
  * credential ask, serve-ask.mjs askClassOf) sends nothing: {ok, listed:true, key} once Telegram is
  * ready and the ask open, and the owner finds it under the bridge's /creds.
  */
-export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId, push = true }, {
-  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
-  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
-} = {}) {
-  try {
-    const off = guarded(env, apiBase, fetchImpl);
-    if (off) return { ok: true, skipped: off };
-    const settings = telegramSettings({ config, env, root });
-    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
+export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId, push = true }, options = {}) {
+  const { env, fetchImpl, apiBase, warn, sleepImpl, now, settings, skipped } = sendContext(options);
+  return attemptSend(warn, 'ask notification', async () => {
+    if (skipped) return { ok: true, skipped };
     let view;
     try { view = readAsk(ledgerFile, workflowId, dispatchId, now); } catch (error) { warn(`telegram: ask not sent: ledger unreadable (${error.message})`); return { ok: false, error: 'ledger unreadable' }; }
     if (!view) return { ok: true, skipped: 'no ask report' };
@@ -434,11 +431,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       texts[askKey] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
-  } catch (error) {
-    const line = `telegram: ask notification failed: ${redact(error?.message ?? error)}`;
-    try { warn(line); } catch { /* nothing left to do */ }
-    return { ok: false, error: line };
-  }
+  });
 }
 
 /**
@@ -546,15 +539,10 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
  * per ask (`ask-auto-accepted|<workflow>|<dispatch>`), no form link. Never throws; the same guards as
  * notifyAsk (STARCI_CONNECTORS_OFF, a spec run never reaches the real Bot API, Telegram off = no-op).
  */
-export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, label }, {
-  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
-  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
-} = {}) {
-  try {
-    const off = guarded(env, apiBase, fetchImpl);
-    if (off) return { ok: true, skipped: off };
-    const settings = telegramSettings({ config, env, root });
-    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
+export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, label }, options = {}) {
+  const { env, fetchImpl, apiBase, warn, sleepImpl, now, settings, skipped } = sendContext(options);
+  return attemptSend(warn, 'auto-accept notification', async () => {
+    if (skipped) return { ok: true, skipped };
     return await withStore(env, async (store, texts) => {
       const key = `ask-auto-accepted|${workflowId}|${dispatchId}`;
       if (store.events[key]) return { ok: true, skipped: 'already sent', key };
@@ -575,18 +563,14 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
       texts[key] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
-  } catch (error) {
-    const line = `telegram: auto-accept notification failed: ${redact(error?.message ?? error)}`;
-    try { warn(line); } catch { /* nothing left to do */ }
-    return { ok: false, error: line };
-  }
+  });
 }
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0] ?? (args['discover-chat'] ? 'discover-chat' : null);
   const out = (value) => console.log(JSON.stringify(value));
-  const apiBase = process.env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE;
+  const apiBase = readEnv('STARCI_TELEGRAM_API_BASE') || DEFAULT_API_BASE;
   if (verb === 'notify') {
     if (!args.ledger || !args.workflow || !args.dispatch) { out({ ok: false, error: 'notify needs --ledger <file> --workflow <id> --dispatch <id> [--repo <path>]' }); process.exit(2); }
     out(await notifyAsk({ ledgerFile: args.ledger, repo: typeof args.repo === 'string' ? args.repo : null, workflowId: args.workflow, dispatchId: args.dispatch })); return;
@@ -621,7 +605,7 @@ if (isMain(import.meta.url)) main();
 export async function ownerPush(text, { env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined } = {}) {
   const s = settings ?? telegramSettings({ env });
   const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
-    : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
+    : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
     : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
   if (skipped) return { ok: true, skipped };
   try {

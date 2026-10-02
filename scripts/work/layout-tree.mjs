@@ -40,16 +40,16 @@ import {
 export { REQUIRED_BREAKPOINTS, REQUIRED_THEMES };
 
 export const TREE_SCHEMA = 'work/layout-tree@1';
-export const SCANNER = 'scripts/work/layout-tree.mjs';
-export const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
-export const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
+const SCANNER = 'scripts/work/layout-tree.mjs';
+const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
+const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
 export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
 // How a planned layout's drawing gets accepted (mia inc-a4b5b1abdd90): nothing else writes its ui record done
 // before the final reconciliation, so interface.draw parks one owner draw-review ask of its parts and applies the
 // accept answer onto the record - the owner's, or auto-accepted when the owner did not ask for the drawing
 // (scripts/work/draw-review.mjs).
-export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (starci work draw-review question) and, on its accept answer (the owner answer, or an auto-accept when the owner did not ask for the drawing), writes the record done (starci work draw-review apply --receipt <answer receipt> --write)';
+const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (scripts/work/draw-review.mjs question) and, on its accept answer (the owner answer, or an auto-accept when the owner did not ask for the drawing), writes the record done (draw-review.mjs apply --receipt <answer receipt> --write)';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);
@@ -154,7 +154,7 @@ function importClosure(entry, aliases, repoRoot, { maxDepth = 4, maxFiles = 150 
 }
 
 /** The chrome component a layout file renders, and whether it can only be a passthrough (document + providers). */
-export function layoutComponentOf(text) {
+function layoutComponentOf(text) {
   const imported = new Set();
   for (const m of text.matchAll(/import\s+(?:type\s+)?([^'"]*?)\s+from\s+['"][^'"]+['"]/g)) {
     for (const name of m[1].replace(/[{}]/g, ',').split(',').map((s) => s.trim().split(/\s+as\s+/).pop()).filter(Boolean)) if (/^[A-Z]/.test(name)) imported.add(name);
@@ -166,7 +166,7 @@ export function layoutComponentOf(text) {
 }
 
 /** Objects with a key and a route in one source file: the navigation registry, in source order. */
-export function registryIn(text) {
+function registryIn(text) {
   const items = [];
   for (const m of text.matchAll(/\{[^{}]*\}/g)) {
     const body = m[0];
@@ -200,7 +200,7 @@ const keyPathsEndingIn = (obj, suffix, trail = []) => Object.entries(obj ?? {}).
 const LOCALE_FILE = /^([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)\.json$/;
 
 /** The message catalogs under the app root: messages/<locale>.json or locales/<locale>.json (or a dir of namespaces). */
-export function catalogsOf(appRoot) {
+function catalogsOf(appRoot) {
   const found = [];
   const walk = (dir, depth) => {
     if (depth > 4) return;
@@ -234,7 +234,7 @@ export function catalogsOf(appRoot) {
 }
 
 /** defaultLocale and the locale list as the app's i18n config spells them, when it does. */
-export function localeConfigOf(appRoot) {
+function localeConfigOf(appRoot) {
   const texts = [];
   const walk = (dir, depth) => {
     if (depth > 3) return;
@@ -431,7 +431,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
 }
 
 /** The app's name when nothing declares one: the last segment of its root (fe/apps/landing -> landing). */
-export const appNameOf = (root) => {
+const appNameOf = (root) => {
   const last = String(root ?? '').split('/').filter((p) => p && p !== '.').pop();
   return (last ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
 };
@@ -468,7 +468,7 @@ export function usedI18nKeys(record) {
 }
 
 /** One digest of the used keys' values in a catalog: key and value per line, an absent key marked absent. */
-export function keyedDigest(messages, keys) {
+function keyedDigest(messages, keys) {
   return sha256Of(list(keys).map((k) => {
     const v = getPath(messages ?? {}, k);
     return `${k}\0${v === undefined ? '\u0001absent' : typeof v === 'string' ? v : JSON.stringify(v)}`;
@@ -543,7 +543,7 @@ export function sourceDrift(record, scan) {
 // Reading the record, resolving routes and layout chains
 // ---------------------------------------------------------------------------------------------------------
 
-export const shellFileOf = (workRoot) => path.join(workRoot, 'shell', 'index.yaml');
+const shellFileOf = (workRoot) => path.join(workRoot, 'shell', 'index.yaml');
 
 /** The tree's shell record: {file, dir, record} when it exists, {error} when it does not parse, null when absent. */
 export function readShellRecord(workRoot) {
@@ -639,7 +639,7 @@ export function layoutChainOf(record, id, { self = true } = {}) {
 }
 
 /** The nearest existing ancestor id of a route path that is not (yet) in the tree, walking up by segment. */
-export function nearestExisting(record, route) {
+function nearestExisting(record, route) {
   const parts = String(route).split('/').filter(Boolean);
   for (let n = parts.length; n >= 0; n -= 1) {
     const id = n ? `/${parts.slice(0, n).join('/')}` : '/';
@@ -742,7 +742,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
 }
 
 /** A design ui record's accepted layout composite at bp/theme: {path (relative to the ui dir), sha256, slot}. */
-export function designCaptureOf(design, bp, theme) {
+function designCaptureOf(design, bp, theme) {
   const assets = [...list(design?.record?.assets), ...list(design?.record?.ui?.assets)];
   const hit = assets.find((a) => a?.composite?.breakpoint === bp && a.composite.theme === theme && a.composite.presentation === 'page' && a.composite.childSlot && a.selected !== false);
   return hit ? { path: hit.path, sha256: hit.sha256, slot: hit.composite.childSlot, width: hit.width, height: hit.height, dir: path.dirname(design.file) } : null;
@@ -1003,7 +1003,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
 }
 
 /** Parents before children, siblings in id order. */
-export function orderNodes(nodes) {
+function orderNodes(nodes) {
   const children = new Map();
   for (const n of nodes) { const k = n.parent ?? ''; if (!children.has(k)) children.set(k, []); children.get(k).push(n); }
   const out = [];
@@ -1052,7 +1052,7 @@ function readCaptureFile(file) {
  * layout, or a tab key), active for the node ids in `routes` (required when the destination is new and is not
  * a nav item with a target). Mutates `record`; a changed capture bumps the layout rev.
  */
-export function addDestinationCapture(record, shellDir, { node: id, destination, routes = [], breakpoint, theme, file, url = null, provenance = null, locale = null }) {
+function addDestinationCapture(record, shellDir, { node: id, destination, routes = [], breakpoint, theme, file, url = null, provenance = null, locale = null }) {
   const node = nodeById(record, id);
   if (!node?.layout) throw new Error(`${id}: not a layout node of the tree`);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(destination))) throw new Error(`${destination}: a destination key is a slug`);
@@ -1131,7 +1131,7 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
  * theme, with `source` naming the image, its digest and the rectangle so the crop is re-derivable. Mutates
  * `record`; the crop is a blob (+ the job scratch copy) the lockup cites as name assets/lockups/lockup--<theme>.png.
  */
-export function addLockup(record, workRoot, { from, rect, theme = null, provenance = null, uiLoader = null }) {
+function addLockup(record, workRoot, { from, rect, theme = null, provenance = null, uiLoader = null }) {
   const source = lockupSourceOf(record, workRoot, from, uiLoader);
   if (source.error) throw new Error(source.error);
   const r = typeof rect === 'string' ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(rect.split(',')[i])])) : rect;
@@ -1151,7 +1151,7 @@ export function addLockup(record, workRoot, { from, rect, theme = null, provenan
   return lockup;
 }
 
-export const nodeSlug = (id) => (id === '/' ? 'root' : id.replace(/^\//, '').replace(/[()[\]@.]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'root');
+const nodeSlug = (id) => (id === '/' ? 'root' : id.replace(/^\//, '').replace(/[()[\]@.]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'root');
 
 /** Add a planned node (and any missing planned ancestors). Mutates `record`. */
 export function addPlanned(record, { node: id, files = [], design = null }) {

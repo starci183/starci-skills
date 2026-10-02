@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
+import { cardLivenessPatterns, classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
 import { parseYaml } from '../../engine/yaml.mjs'; import os from 'node:os'; import path from 'node:path';
 
 // The busy frames status still read turn-idle after 0856299e6, so the frontier asked for a nudge
@@ -62,6 +62,6 @@ test('Devin trusts a frozen spinner frame for an hour: its card sets liveness.ac
   assert.ok(Number(card.liveness?.activeStaleMs) >= 3_600_000, 'Devin redraws nothing during a long tool call');
   const runtimes = parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
   assert.ok(Number(runtimes.allocation.liveness.quietMs) > Number(runtimes.allocation.liveness.activeStaleMs), 'quiet outlasts a stale frame');
-  const api = fs.readFileSync(new URL('../../scripts/kernel/cli.mjs', import.meta.url), 'utf8');
-  assert.match(api, /livenessMsOf\(job, 'activeStaleMs', ACTIVE_STALE_MS\)/, 'observeOperationWorker reads the card override');
+  const loaded = cardLivenessPatterns({ refresh: true }).get('devin');
+  assert.equal(loaded.liveness.activeStaleMs, card.liveness.activeStaleMs, 'the liveness resolver exposes the provider override used by worker observation');
 });

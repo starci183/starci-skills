@@ -35,6 +35,14 @@ test('the gate spec env has no GIT_DIR (nor any repository-local git var) when t
   for (const key of local) assert.ok(GIT_LOCAL_ENV_VARS.includes(key), `${key} missing from GIT_LOCAL_ENV_VARS`);
 });
 
+test('the gate spec env names the managed SWC cache, so next build never depends on a hand-set ACL', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'land-swc-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const cache = path.join(dir, 'swc');
+  assert.equal(specRunEnv({ PATH: '/bin', STARCI_SWC_CACHE: cache }).SWC_NATIVE_BINDING_CACHE, cache);
+  assert.ok(fs.statSync(cache).isDirectory());
+});
+
 test('the shared spec preload drops a leaked GIT_DIR for every spec process', () => {
   const preload = pathToFileURL(path.join(ROOT, 'tests', 'setup', 'isolated-registry.mjs')).href;
   const r = spawnSync(process.execPath, ['--import', preload, '-e', `process.stdout.write(JSON.stringify(Object.keys(process.env).filter((k) => k.startsWith('GIT_'))))`],

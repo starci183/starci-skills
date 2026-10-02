@@ -30,7 +30,7 @@ export const EXIT = Object.freeze({ done: 0, failed: 1, usage: 2, unbound: 3, bl
 const POLL_STEP_MS = 20_000;
 
 /** The plan as printed lines. */
-export function planLines(plan) {
+function planLines(plan) {
   const lines = ['== publish set, in publish order'];
   plan.rows.forEach((row, i) => lines.push(`  ${i + 1}. ${row.name}@${row.version} (pin ${row.pin}, ${row.last ? 'last' : 'leaf'}): registry ${row.registry.state}; ${row.action}${row.note ? ` - ${row.note}` : ''}`));
   for (const row of plan.others) lines.push(`  skip ${row.name} (${row.dir}): ${row.kind}`);

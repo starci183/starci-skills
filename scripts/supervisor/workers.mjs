@@ -61,6 +61,8 @@ import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { slugify } from '../lib/slug.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -84,19 +86,17 @@ export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = 
 }
 
 export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
-export const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
-export const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
-export const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
+const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
+const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
+const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
 const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
-export const MAX_SPAWN_ATTEMPTS = 3;
+const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
-
 const parse = parseJsonOr;
 const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
-const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'fix';
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
@@ -162,7 +162,7 @@ function attemptIdOf(m, jobId) {
 // Neither is the directory itself: every brief names the bare path, and a lease on it serialized every contract
 // job behind its holder (worker-lease-contract-changes-dir, 2026-09-30). A row a finished job left there no
 // longer matches leaseConflicts either, since the asking job's files are filtered the same way.
-export const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
+const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
 const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !sameOrUnder(f, CONTRACT_CHANGES_DIR));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
@@ -179,7 +179,7 @@ export function createJob(m, { cluster, title, files = [], incidents = [], specs
   if (!files.length) throw Error('a job needs --files <csv>: the explicit file leases');
   const open = jobsOf(m, OPEN_STATUSES).find((j) => j.payload.cluster === cluster);
   if (open) return { created: false, job: open };
-  const jobId = `fix-${slug(cluster)}-${crypto.randomBytes(3).toString('hex')}`;
+  const jobId = `fix-${slugify(cluster, { max: 40, fallback: 'fix' })}-${crypto.randomBytes(3).toString('hex')}`;
   const payload = { cluster, title: title ?? cluster, files: files.map(normPath), incidents, specs, brief, agent, self, spawnAttempts: 0 };
   m.transaction(() => {
     m.upsertSupJob({ jobId, kind: FIX_KIND, role: self ? 'supervisor' : 'worker', cluster, title: payload.title, status: 'queued', files: payload.files, brief: brief || null, payload });
@@ -227,7 +227,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
 }
 
 /** The payload.staging record of a created checkout. */
-export const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
+const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
  * Remove a job's staging checkout (`staging`: its payload.staging record) through Orca: removeOrcaWorktree unlinks every
@@ -321,7 +321,7 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
 }
 
 /** Providers whose [Worker] spawn failed readiness or on a provider outage at least `min` times since `since` (sup_events worker-spawn-failed). */
-export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
+function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
   const counts = {};
   for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
@@ -332,7 +332,7 @@ export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_H
 
 /* ------------------------------------------------------------ spawn */
 
-export function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_ROOT } = {}) {
+function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_ROOT } = {}) {
   const p = job.payload;
   return (template ?? fs.readFileSync(PROMPT_FILE, 'utf8'))
     .replaceAll('{jobId}', job.job_id).replaceAll('{cluster}', p.cluster).replaceAll('{title}', p.title ?? p.cluster)
@@ -430,7 +430,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
 
 /** The Supervisor's own staging checkout: a self job (no terminal) holding leases, landed through land.mjs. */
 export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now(), orca = orcaWorktreeClient }) {
-  const created = createJob(m, { cluster: `self-${slug(name)}`, title: name, files, self: true, now });
+  const created = createJob(m, { cluster: `self-${slugify(name, { max: 40, fallback: 'fix' })}`, title: name, files, self: true, now });
   const job = created.job;
   if (job.status === 'running' && job.payload.staging?.path && fs.existsSync(job.payload.staging.path)) return { ok: true, reused: true, jobId: job.job_id, ...job.payload.staging };
   const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
@@ -600,7 +600,7 @@ export function selfJobsLandedBy(m, commits, { root = SKILL_ROOT } = {}) {
 }
 
 /** Remove the checkouts of every finished job that still has one. */
-export function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient } = {}) {
+function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient } = {}) {
   const done = jobsOf(m, FINAL_STATUSES).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging?.path && fs.existsSync(j.payload.staging.path));
   return done.map((j) => removeStaging({ jobId: j.job_id, staging: j.payload.staging, root, env, landed: j.status === 'succeeded', orca }));
 }
@@ -666,7 +666,7 @@ async function main() {
     if (verb === 'report') {
       const summary = value('summary-file') ? fs.readFileSync(value('summary-file'), 'utf8') : value('summary') ?? '';
       const r = fileReport(m, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
-        needs: csv(value('needs')), terminal: process.env.ORCA_TERMINAL_HANDLE ?? null });
+        needs: csv(value('needs')), terminal: readEnv('ORCA_TERMINAL_HANDLE') ?? null });
       supervisorLog('workers', `report ${value('job')}: ${r.ok ? r.outcome : r.error}`, { level: r.ok ? 'info' : 'warn', data: r });
       return out(r);
     }

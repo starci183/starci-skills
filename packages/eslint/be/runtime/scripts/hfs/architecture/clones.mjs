@@ -30,7 +30,7 @@ const APP_ENTRY = 'main.ts';
 const ID = -1;
 const LIT = -2;
 
-function tokenize(ts, sourceFile) {
+export function tokenize(ts, sourceFile) {
   const { SyntaxKind } = ts;
   const literalKinds = new Set([SyntaxKind.StringLiteral, SyntaxKind.NumericLiteral, SyntaxKind.BigIntLiteral, SyntaxKind.RegularExpressionLiteral,
     SyntaxKind.NoSubstitutionTemplateLiteral, SyntaxKind.TemplateHead, SyntaxKind.TemplateMiddle, SyntaxKind.TemplateTail, SyntaxKind.JsxText]);

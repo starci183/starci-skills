@@ -9,6 +9,9 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {normalizeHostPaths} from '../lib/host-path.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from '../work/record-ownership.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { walkFiles } from '../lib/walk.mjs';
+import { findRecordFile } from '../lib/work-tree.mjs';
+import { argThrow, needArgs, parseOpts, workRecordSpec } from '../lib/cli-arg.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
@@ -55,19 +58,12 @@ import { isMain } from '../lib/is-main.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 function parseArgs(argv) {
-  const args = {assert: []};
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (token === '--work') args.work = argv[++i];
-    else if (token === '--record') args.record = argv[++i];
-    else if (token === '--cwd') args.cwd = argv[++i];
-    else if (token === '--assert') args.assert.push(argv[++i]);
-    else throw new Error(`unrecognized argument: ${token}`);
-  }
-  for (const required of ['work', 'record', 'cwd']) {
-    if (!args[required]) throw new Error(`--${required} is required`);
-  }
-  if (!args.assert.length) throw new Error('at least one --assert <ac-id>=<command> is required');
+  const args = parseOpts(argv, {
+    ...workRecordSpec,
+    '--assert': (o, take) => (o.assert ??= []).push(take()),
+  }, argThrow);
+  needArgs(args, ['work', 'record', 'cwd']);
+  if (!args.assert?.length) throw new Error('at least one --assert <ac-id>=<command> is required');
   return args;
 }
 
@@ -77,19 +73,7 @@ function splitAssertion(raw) {
   return {id: raw.slice(0, at), command: raw.slice(at + 1)};
 }
 
-const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
-  .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
 
-/** Finds the record's own index.yaml under `workRoot` by matching its authored `id`. */
-function findRecordFile(workRoot, recordId) {
-  for (const file of walk(workRoot)) {
-    if (!file.endsWith('index.yaml')) continue;
-    let parsed;
-    try { parsed = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    if (parsed && typeof parsed === 'object' && parsed.id === recordId) return file;
-  }
-  return null;
-}
 
 /** Runs one assertion command; never throws - failure is reported as an outcome, not a script crash.
  * Always returns both `command` (the exact string run) and `exit` (its numeric exit code), so the written
@@ -107,7 +91,7 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
   // Compact format: a collapsed criterion's id (`ac.x.y` inlined, or `parent#frag`) resolves to the
   // record that now carries it - evidence is written beside that record and `record:` names the
   // record's own id, which is what check-example-work.mjs's sibling rule demands.
-  const recordsById = loadRecords(workRoot, walk);
+  const recordsById = loadRecords(workRoot, walkFiles);
   const canonicalId = resolveRecordRef(recordsById, recordId) ?? recordId;
   const recordFile = findRecordFile(workRoot, canonicalId);
   if (!recordFile) throw new Error(`no record with id ${recordId} was found under ${workRoot}`);

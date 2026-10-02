@@ -14,7 +14,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const GATE_FILE = 'knowledge/sonar-gate.yaml';
+const GATE_FILE = 'knowledge/sonar-gate.yaml';
 export const GATE_SCHEMA = 'starci/sonar-gate@1';
 export const SCAN_SCHEMA_PREFIX = 'starci/sonar-local-scan@';
 

@@ -26,11 +26,11 @@ import { translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const JUDGEMENT_KIND = 'supervisor-judgement';
-export const DIGEST_SENT_KIND = 'notifier-digest-sent';
-export const URGENT_SENT_KIND = 'notifier-urgent-sent';
+const JUDGEMENT_KIND = 'supervisor-judgement';
+const DIGEST_SENT_KIND = 'notifier-digest-sent';
+const URGENT_SENT_KIND = 'notifier-urgent-sent';
 export const URGENT_KEY_MS = 6 * 3_600_000;
-export const URGENT_CLASSES = Object.freeze(['service-quarantined', 'crash-loop', 'ram-critical', 'ledger-corrupt', 'supervisor-di-overdue']);
+const URGENT_CLASSES = Object.freeze(['service-quarantined', 'crash-loop', 'ram-critical', 'ledger-corrupt', 'supervisor-di-overdue']);
 const DAY = 86_400_000;
 
 /* ------------------------------------------------------------ pure planners */
@@ -58,7 +58,7 @@ export function planUrgent(items, sent = {}, { now, perKeyMs = URGENT_KEY_MS } =
 const T = (tr) => ({ judge: tr('Supervisor judgement'), viol: tr('Open invariant violations'), lands: tr('AUTO lands today'), owner: tr('Waiting on the owner'), none: tr('none'), slow: tr('Why slow') });
 
 /** One progress line per workflow (starci/progress@1 + rca.why). Pure. */
-export function progressLines(rows, language = 'vi') {
+function progressLines(rows, language = 'vi') {
   const tr = translator(language);
   const t = T(tr);
   return rows.map((r) => {
@@ -94,12 +94,12 @@ async function supervisorRead(fn, fallback, env) {
 }
 
 /** The land_runs of the last day as the digest's lands: [{kind: land-passed|land-failed, id, at}], newest first. Pure over `m`. */
-export const landsOf = (m, { now = Date.now(), limit = 60 } = {}) => m.landRuns({ limit })
+const landsOf = (m, { now = Date.now(), limit = 60 } = {}) => m.landRuns({ limit })
   .map((r) => ({ kind: r.result === 'passed' ? 'land-passed' : 'land-failed', id: r.lane ?? r.commit_sha, at: Number(r.finished_at ?? r.started_at) }))
   .filter((l) => l.at >= now - DAY);
 
 /** {lastDigestAt, urgentSent: {key: at}, judgements: [{text, at}], lands: [{kind, id, at}]} since `sinceMs`. */
-export async function notifierState({ env = process.env, now = Date.now(), sinceMs = DAY } = {}) {
+async function notifierState({ env = process.env, now = Date.now(), sinceMs = DAY } = {}) {
   return supervisorRead((m) => {
     const lastDigestAt = m.db.prepare('SELECT created_at FROM sup_events WHERE kind=? ORDER BY seq DESC LIMIT 1').get(DIGEST_SENT_KIND)?.created_at ?? null;
     const urgentSent = {};

@@ -1,4 +1,4 @@
-// app-root.mjs - the tree checks of `hfs check` that read the WHOLE app from its root (app-relative paths over every tracked
+// app-root.mjs - the tree checks of `starci app check` that read the WHOLE app from its root (app-relative paths over every tracked
 // file of both sides): one list of the rule modules of the app root, so scripts/hfs/check.mjs runs them as one step.
 //   HFS_DEP_VERSION_SKEW (R14, deps.mjs), HFS_PEER_INTEGRATION_MISSING (R111, peer-integrations.mjs), the monorepo shape
 //   (HFS_MONO_*, monorepo.mjs), the one cli app (BE_CLI_REQUIRED, cli.mjs), BE_INTEGRATION_SPEC_MISSING (R112,

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 
 /** Diagnose the explicitly supplied host, not the current FE directory. Read-only. */
-export function checkEntry(host,{claimedEntry}={}) {
+function checkEntry(host,{claimedEntry}={}) {
  const source=path.resolve(host),entry=path.join(source,'.claude','CONTEXT.md');
  const bootstraps=['AGENTS.md','CLAUDE.md','DEVIN.md'].map(name=>{
   const file=path.join(source,name);

@@ -24,8 +24,8 @@ import { STATUS_TONES } from "./lib/vocabulary.generated.mjs"
 import { FAMILY_PREFIXES } from "./lib/vocabulary.mjs"
 
 /** The lowest contrast of a soft foreground on its tint and on the page, of a solid tone as text, and of body text. */
-export const MIN_SOFT = 3
-export const MIN_TEXT = 4.5
+const MIN_SOFT = 3
+const MIN_TEXT = 4.5
 
 const THEMES = ["light", "dark"]
 const ratio = (value) => value.toFixed(2)

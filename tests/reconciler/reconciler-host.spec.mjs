@@ -23,6 +23,7 @@ const { DatabaseSync } = require('node:sqlite');
 const S = hostSettings();
 const T0 = Date.UTC(2026, 8, 28, 1, 0, 0);
 const GOAL = '# Goal\nShip the canon refactor.';
+const observedClockCodes = new Set();
 
 function ledgerDb({ workflows = [], jobs = [] } = {}) {
   const db = new DatabaseSync(':memory:');
@@ -47,7 +48,11 @@ function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } =
     read: (id, fn) => fn(dbs[id]),
     run: async (cmd, args, o) => { calls.run.push({ cmd, args, o }); return mode === 'shadow' ? { ok: true, shadow: true } : (runAnswer?.(cmd, args) ?? { ok: true, stdout: '{}' }); },
     api: async (id, verb, argv) => { calls.api.push({ id, verb, argv }); return { ok: true, shadow: mode === 'shadow' }; },
-    clock: (entity, state, slaMs, meta) => { calls.clock.push({ entity, state, slaMs, ...meta }); },
+    clock: (entity, state, slaMs, meta) => {
+      const code = meta?.code ?? state;
+      observedClockCodes.add(code);
+      calls.clock.push({ entity, state, slaMs, ...meta });
+    },
     clear: (entity, state) => { calls.clear.push({ entity, state }); },
     openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; },
     log: (kind, msg, data) => { calls.log.push({ kind, msg, data }); },
@@ -125,6 +130,7 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
   assert.equal(ctx.calls.decisions.length, 0);
   const r4 = await c.reconcile(SEAT, ctx);
   assert.equal(r4.seat, 'quarantined');
+  assert.ok(ctx.calls.clock.some((entry) => entry.code === 'SEAT_QUARANTINED'));
   assert.equal(ctx.calls.decisions.length, 1);
   assert.equal(ctx.calls.decisions[0].kind, 'seat-unrecoverable');
   assert.equal(ctx.calls.decisions[0].decider, 'supervisor');
@@ -395,13 +401,20 @@ test('the Supervisor seat has its own 30-minute budget and interrupts with --sup
   assert.equal(ctx.calls.clock.find((x) => x.state === 'KERNEL_TURN_OVERDUE').slaMs, 30 * 60_000);
 });
 
-test('every clock state the host controller sets is a code of the SLA catalogue', () => {
+test('every clock state emitted by exercised host-controller scenarios is in the SLA catalogue', async () => {
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
+  for (const action of ['interactive-gate', 'host-unavailable', 'queued-input']) {
+    const ctx = hostCtx({ dbs });
+    await booted(controller({ probeSeat: async () => ({ ok: true, action }) })).reconcile(SEAT, ctx);
+    assert.equal(ctx.calls.clock.length, 1, `${action} emits its host-controller clock`);
+  }
+  const supervisor = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"busy","inputFailures":2,"terminal":"term-s"}' }) });
+  await booted(controller()).reconcile('seat:supervisor', supervisor);
+  assert.equal(supervisor.calls.clock.length, 1, 'refused Supervisor input emits its host-controller clock');
+
   const codes = parseYaml(fs.readFileSync(new URL('../../modules/reconciler/sla.yaml', import.meta.url), 'utf8')).codes;
-  const src = fs.readFileSync(new URL('../../scripts/reconciler/controllers/host.mjs', import.meta.url), 'utf8');
-  const used = [...src.matchAll(/await clock\(ctx, [^,]+, '([A-Z_]+)'/g)].map((m) => m[1]);
-  used.push('SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK', 'SEAT_QUARANTINED');
-  assert.ok(used.includes('KERNEL_TURN_OVERDUE') && used.includes('SERVICE_DOWN') && used.includes('LEDGER_CORRUPT'));
-  for (const code of used) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
+  for (const required of ['KERNEL_TURN_OVERDUE', 'SERVICE_DOWN', 'LEDGER_CORRUPT']) assert.ok(observedClockCodes.has(required), `${required} was emitted by its scenario`);
+  for (const code of [...observedClockCodes].sort()) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
 });
 
 test('a service whose port still answers is never restarted, and a degraded pass starts no SERVICE_DOWN clock', async () => {

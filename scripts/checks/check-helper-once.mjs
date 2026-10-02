@@ -14,6 +14,8 @@ import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { runCheckCli } from '../lib/check-cli.mjs';
+import { boundNames } from '../lib/ast-names.mjs';
 
 // acorn lives in packages/node_modules (a dev dependency of the packages workspace); no other path is tried.
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
@@ -28,15 +30,8 @@ const GENERATED = /^packages\/[^/]+\/runtime\//;
 
 const parse = (text) => acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true, allowReturnOutsideFunction: true });
 
-/** Names a pattern binds (identifiers, destructuring, defaults, rest). */
-function bound(pattern, into) {
-  if (!pattern) return;
-  if (pattern.type === 'Identifier') into.add(pattern.name);
-  else if (pattern.type === 'ObjectPattern') pattern.properties.forEach((p) => bound(p.value ?? p.argument, into));
-  else if (pattern.type === 'ArrayPattern') pattern.elements.forEach((p) => bound(p, into));
-  else if (pattern.type === 'AssignmentPattern') bound(pattern.left, into);
-  else if (pattern.type === 'RestElement') bound(pattern.argument, into);
-}
+/** Names a pattern binds (identifiers, destructuring, defaults, rest), added into `into` (a Set). */
+const bound = (pattern, into) => boundNames(pattern).forEach((name) => into.add(name));
 
 /** Every name declared anywhere inside `node` (params, var/let/const, functions, classes, catch parameters). */
 function declaredNames(node) {
@@ -175,21 +170,80 @@ export function helperOnceFindings({ tracked, read }) {
       }
     }
   }
+  findings.push(...nearCopyFindings(parsed, findings));
+  return findings;
+}
+
+/** Shortest function (normalised tokens) the near-copy comparison looks at: below it two functions agree by accident. */
+const NEAR_MIN_TOKENS = 30;
+/** Token 3-gram Dice similarity at or above which two helpers in different files are one helper copied. */
+const NEAR_COPY_SIMILARITY = 0.8;
+
+const trigrams = (tokens) => {
+  const grams = new Map();
+  for (let i = 0; i + 3 <= tokens.length; i += 1) {
+    const key = tokens.slice(i, i + 3).join(' ');
+    grams.set(key, (grams.get(key) ?? 0) + 1);
+  }
+  return grams;
+};
+const dice = (a, b) => {
+  let shared = 0;
+  for (const [key, count] of a.grams) shared += Math.min(count, b.grams.get(key) ?? 0);
+  return (2 * shared) / (a.tokens.length - 2 + (b.tokens.length - 2));
+};
+
+/**
+ * RT_HELPER_NEAR_COPY: a top-level function of one file whose normalised tokens are at least NEAR_COPY_SIMILARITY alike
+ * (token 3-gram Dice) to one of another file is the same helper written twice, whatever its names or small edits.
+ * The members of a cluster agree on one home: the exported lib helper when there is one, else the first path. Every
+ * other member is a finding. A copy RT_HELPER_REDEFINED already reported is not reported twice.
+ */
+function nearCopyFindings(parsed, reported) {
+  const rows = [];
+  for (const file of parsed) {
+    for (const row of file.rows) {
+      if (!/Function/.test(row.node.type) && row.node.type !== 'ArrowFunctionExpression') continue;
+      const tokens = normalise(file.source, row.node).split(' ');
+      if (tokens.length >= NEAR_MIN_TOKENS) rows.push({ file, row, tokens, grams: trigrams(tokens), id: rows.length });
+    }
+  }
+  const parent = rows.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let i = 0; i < rows.length; i += 1) {
+    for (let j = i + 1; j < rows.length; j += 1) {
+      const [a, b] = [rows[i], rows[j]];
+      if (a.file.rel === b.file.rel) continue;
+      if (Math.abs(a.tokens.length - b.tokens.length) > Math.max(a.tokens.length, b.tokens.length) * 0.3) continue;
+      if (dice(a, b) >= NEAR_COPY_SIMILARITY) parent[find(i)] = find(j);
+    }
+  }
+  const clusters = new Map();
+  for (const r of rows) {
+    const root = find(r.id);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root).push(r);
+  }
+  const findings = [];
+  for (const members of clusters.values()) {
+    if (new Set(members.map((m) => m.file.rel)).size < 2) continue;
+    const byPath = [...members].sort((a, b) => (a.file.rel < b.file.rel ? -1 : a.file.rel > b.file.rel ? 1 : 0));
+    const home = byPath.find((m) => isLib(m.file.rel) && m.row.exported) ?? byPath[0];
+    for (const m of members) {
+      if (m.file.rel === home.file.rel) continue;
+      const line = lineOf(m.file.source, m.row.node.start);
+      if (reported.some((f) => f.path === m.file.rel && f.line === line)) continue;
+      findings.push({ code: 'RT_HELPER_NEAR_COPY', path: m.file.rel, line,
+        message: `${m.row.name} is a near copy of ${home.row.name} in ${home.file.rel}: keep one definition in a scripts/lib module and import it` });
+    }
+  }
   return findings;
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkHelperOnce(root = skillRoot) {
+function checkHelperOnce(root = skillRoot) {
   const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
   return helperOnceFindings({ tracked, read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkHelperOnce();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: every shared helper has one home.');
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) runCheckCli(checkHelperOnce(), 'OK: every shared helper has one home.');

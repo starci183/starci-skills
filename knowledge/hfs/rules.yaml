@@ -1771,6 +1771,14 @@ rules:
     failureCodes: ["CLI_ONLY_ENTRY"]
     enforcers:
       - {kind: runtime, id: cli-only-entry, at: scripts/checks/check-cli-only-entry.mjs}
+  - id: R202
+    code: "CI_UPLOAD_NOT_SILENT"
+    law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CI_UPLOAD_NOT_SILENT"]
+    enforcers:
+      - {kind: runtime, id: ci-upload, at: scripts/hfs/runtime-rules/ci-upload.mjs}
 retired:
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}

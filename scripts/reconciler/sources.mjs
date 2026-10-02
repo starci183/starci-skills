@@ -18,7 +18,7 @@ import path from 'node:path';
 import { openLedgerReader, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { supervisorSettings } from '../machine/home.mjs';
 
-export const EVENT_BATCH = 1000;
+const EVENT_BATCH = 1000;
 
 /**
  * [{ledgerId, repo, file}]: the product ledgers of config.yaml supervisor.repos, then the Supervisor (file null:
@@ -46,7 +46,7 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
 }
 
 /** The keys one route resolves `event` to: [] on null, a thrown error or a bad value. */
-export function keysOfRoute(route, event) {
+function keysOfRoute(route, event) {
   let value;
   try { value = typeof route === 'function' ? route(event) : route; } catch { return []; }
   const list = Array.isArray(value) ? value : value == null ? [] : [value];
@@ -54,7 +54,7 @@ export function keysOfRoute(route, event) {
 }
 
 /** The routes of `routes` matching `kind`: the exact one, then every 'prefix*' one. */
-export function routesFor(routes, kind) {
+function routesFor(routes, kind) {
   const out = [];
   if (!routes || typeof routes !== 'object') return out;
   if (Object.hasOwn(routes, kind)) out.push(routes[kind]);

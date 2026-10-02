@@ -9,7 +9,7 @@ import { latestCheckRuns, recordCheck } from '../../../machine/evidence-store.mj
 import { parseJson } from '../../../lib/json.mjs';
 
 /** Runners whose checks are independent evidence (never the op's own). */
-export const INDEPENDENT_RUNNERS = Object.freeze(['kernel', 'settler', 'parity', 'integrate']);
+const INDEPENDENT_RUNNERS = Object.freeze(['kernel', 'settler', 'parity', 'integrate']);
 
 /** The latest op_attempts row id of a job, or null. */
 export const latestAttemptIdOf = (db, jobId) => db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(jobId)?.id ?? null;

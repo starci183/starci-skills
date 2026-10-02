@@ -46,8 +46,8 @@ export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => op
 
 const pad = (n) => String(n).padStart(2, '0');
 /** yyyymmdd of a local date. */
-export const dayStamp = (at) => { const d = new Date(at); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`; };
-export const backupFileOf = ({ dir, ledgerId, at }) => path.join(dir, `${ledgerId}-${dayStamp(at)}.sqlite`);
+const dayStamp = (at) => { const d = new Date(at); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`; };
+const backupFileOf = ({ dir, ledgerId, at }) => path.join(dir, `${ledgerId}-${dayStamp(at)}.sqlite`);
 const safeId = (id) => String(id).replace(/[^\w.-]+/g, '_');
 
 /** The nightly backup is due: local hour >= backupHour and today's file is absent. */
@@ -57,14 +57,14 @@ export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSy
 }
 
 /** The backups of one ledger beyond the newest `keep`, oldest first to delete. Pure over a file list. */
-export function prunePlan(files, { ledgerId, keep }) {
+function prunePlan(files, { ledgerId, keep }) {
   const re = new RegExp(`^${safeId(ledgerId).replace(/[.]/g, '\\.')}-(\\d{8})\\.sqlite$`);
   const mine = files.filter((f) => re.test(f)).sort();
   return mine.slice(0, Math.max(0, mine.length - keep));
 }
 
 /** VACUUM INTO today's file (a temp name renamed into place), then prune to `keep`. {ok, file, bytes, pruned}. */
-export function backupLedger({ ledgerId, file, dir, keep, now = Date.now(), open = openReadOnly }) {
+function backupLedger({ ledgerId, file, dir, keep, now = Date.now(), open = openReadOnly }) {
   fs.mkdirSync(dir, { recursive: true });
   const target = backupFileOf({ dir, ledgerId: safeId(ledgerId), at: now });
   const temp = `${target}.partial`;

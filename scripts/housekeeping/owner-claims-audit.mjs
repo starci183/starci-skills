@@ -12,7 +12,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../machine/owner-claim.mjs';
 
-export async function auditLedger(file, { workflowId = null } = {}) {
+async function auditLedger(file, { workflowId = null } = {}) {
   const { openLedgerReader } = await import('../../engine/db/ledger.mjs');
   const db = openLedgerReader(file);
   try {

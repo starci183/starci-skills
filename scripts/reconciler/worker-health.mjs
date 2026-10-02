@@ -21,8 +21,8 @@
 // Nudges are staggered: at most one send per staggerMs (15 s) across all workers. The memory of each job (last output
 // seen, nudges, backoff) lives in the engine process (a restart only re-arms the clocks). planHealth is pure.
 
-export const RATE_LIMITED = /rate[- ]?limit|Send a message to retry|Upgrade to .* for higher limits/i;
-export const DONE_NO_REPORT = /Worked for .* done|Press enter to continue/i;
+const RATE_LIMITED = /rate[- ]?limit|Send a message to retry|Upgrade to .* for higher limits/i;
+const DONE_NO_REPORT = /Worked for .* done|Press enter to continue/i;
 export const NUDGE = Object.freeze({
   retry: 'Retry: continue your task from where you stopped.',
   idle: 'Continue your task, or file your report with starci kernel report if done.',

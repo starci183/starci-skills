@@ -2,7 +2,7 @@
 // It is DBTREE workflow_transitions (engine/db/migrations/runtime/0001-init.sql): the phases, the allowed
 // moves and who may take them. A stopped workflow comes back only through the owner (Q14, MB-08);
 // a paused one is resumed by the owner or the Supervisor. `archived_at` is the archived phase.
-export const WORKFLOW_TRANSITIONS = Object.freeze([
+const WORKFLOW_TRANSITIONS = Object.freeze([
   ['awaiting-approval', 'queued'], ['awaiting-approval', 'stopped'],
   ['queued', 'running'], ['queued', 'stopped'],
   ['running', 'paused'], ['running', 'stopped'], ['running', 'finished'],

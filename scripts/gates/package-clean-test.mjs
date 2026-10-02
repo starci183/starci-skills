@@ -39,6 +39,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
+import { tailLines } from '../lib/clip.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -51,7 +52,7 @@ const NETWORK = /\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUN
 const USAGE = 'usage: starci release clean-test [--changed <file>... | --base <rev>]';
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
-const tail = (text, n = 30) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
+const tail = (text, n = 30) => tailLines(text, n);
 
 /** The published packages: [{name, dir}] with `dir` runtime-relative (posix), from the starci pins that name a source. */
 export function publishSet(root = runtimeRoot) {
@@ -61,7 +62,7 @@ export function publishSet(root = runtimeRoot) {
 }
 
 /** The member folders (absolute) a workspace root's `workspaces` names: `x/*` is every child holding a package.json, else the folder itself. */
-export function workspaceMembers(wsRoot) {
+function workspaceMembers(wsRoot) {
   const patterns = [readJson(path.join(wsRoot, 'package.json')).workspaces ?? []].flat().flatMap((w) => (typeof w === 'string' ? [w] : w?.packages ?? []));
   const out = [];
   for (const pattern of patterns) {
@@ -76,7 +77,7 @@ export function workspaceMembers(wsRoot) {
 }
 
 /** The workspace root (absolute) whose `workspaces` lists `dir`, searching the folders above it up to `root`; null for a standalone package. */
-export function workspaceRootOf(dir, root) {
+function workspaceRootOf(dir, root) {
   const target = path.resolve(dir);
   for (let up = path.dirname(target); up.length >= path.resolve(root).length; up = path.dirname(up)) {
     if (fs.existsSync(path.join(up, 'package.json')) && workspaceMembers(up).some((m) => path.resolve(m) === target)) return up;
@@ -114,7 +115,7 @@ export function packagesChanged(changed, packages, root = runtimeRoot) {
 }
 
 /** A folder above `dir` (or `dir` itself) that holds a node_modules: Node would resolve a missing dependency from it. */
-export function nodeModulesAbove(dir) {
+function nodeModulesAbove(dir) {
   for (let up = path.resolve(dir); ; up = path.dirname(up)) {
     if (fs.existsSync(path.join(up, 'node_modules'))) return up;
     if (path.dirname(up) === up) return null;
@@ -132,7 +133,7 @@ export function gitTrackedUnder(dir) {
  * installed node_modules or a junction to a hoisted install, a build's dist, a local .env. What it tracks always does,
  * a lint fixture's committed type stubs under fixtures/typed/node_modules included. A tracked link is not copied.
  */
-export function copyTracked(from, to) {
+function copyTracked(from, to) {
   const files = gitTrackedUnder(from);
   if (!files) throw new Error(`${from} is not inside a git work tree: the proof copies tracked files only`);
   for (const rel of files) {
@@ -164,7 +165,7 @@ const npmRun = (args, { cwd, env, timeout }) => {
  * Prove one install unit in a fresh temp directory. Returns one result per published package:
  * {name, dir, status: 'green'|'red'|'unrun', code, install, ms, output}.
  */
-export function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, sources = [] } = {}) {
+function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, sources = [] } = {}) {
   const started = Date.now();
   const result = (pkg, status, code, extra = {}) => ({ name: pkg.name, dir: pkg.dir, status, code, ms: Date.now() - started, ...extra });
   const every = (status, code, extra) => unit.packages.map((pkg) => result(pkg, status, code, extra));
@@ -223,7 +224,7 @@ export function provePackages(packages, { root = runtimeRoot, env = process.env,
 
 const line = (r) => `package-clean-test: ${r.name} ${r.status.toUpperCase()}${r.code ? ` ${r.code}` : ''} (${r.install ?? 'not installed'}, ${Math.round(r.ms / 1000)}s)${r.status === 'green' ? '' : `\n${String(r.output ?? '').split(/\r?\n/).map((l) => `    ${l}`).join('\n')}`}`;
 
-export function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) => process.stdout.write(s) } = {}) {
+function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) => process.stdout.write(s) } = {}) {
   let changed = null;
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--changed') { changed = [...(changed ?? [])]; while (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) changed.push(argv[(i += 1)]); }

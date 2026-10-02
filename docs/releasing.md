@@ -21,8 +21,7 @@ builds the Docker image of every be and fe app of every example (its matrix is `
 and the cli commands under `be/src` (the jest preset's `COVERAGE_SOURCES`), shared by every be app, so one flag per example covers identity, order, billing and cli; the fe has no tests. The root flag, each
 example's own `codecov.yml` and the complement in its `sonar-project.properties` are all rendered from the source preset by `starci runtime check --only examples-ci -- --write` (`npm run check` refuses drift);
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
-only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
-Actions); each product monorepo adds its own for its app-repository `codecov.yml`. Before a release, run the local dashboard gate
+only. The coverage upload authenticates with GitHub's OIDC token (`use_oidc: true`, job permission `id-token: write`), so no repository secret exists to forget and no upload step skips silently (rule CI_UPLOAD_NOT_SILENT); the owner activates the repository on Codecov once. Before a release, run the local dashboard gate
 per example app against the local SonarQube after `npm test` and a project scan:
 
 ```sh

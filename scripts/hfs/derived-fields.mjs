@@ -14,7 +14,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 
-export const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
+const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
 export const WHY_FILES = Object.freeze([
   { file: 'packages/eslint/fe/lib/why.mjs', kind: 'eslint-fe' },
   { file: 'packages/stylelint/lib/why.mjs', kind: 'stylelint' },

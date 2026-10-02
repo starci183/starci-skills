@@ -24,14 +24,14 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { hfsEntry } from './gate.mjs';
 
 export const DIGEST_SCHEMA = 'starci/read-digest@1';
-export const OP_GATE_SCHEMA = 'starci/op-gate@1';
-export const OP_GATE_FILE = 'knowledge/op-gate.yaml';
-export const PATTERN_ROOT = 'knowledge/patterns';
+const OP_GATE_SCHEMA = 'starci/op-gate@1';
+const OP_GATE_FILE = 'knowledge/op-gate.yaml';
+const PATTERN_ROOT = 'knowledge/patterns';
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const EXAMPLES_PER_SLOT = 2;
 const firstLine = (text) => String(text ?? '').trim().split(/\r?\n/)[0];
-const USAGE = 'usage: starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
-export const KNOWLEDGE_ROOT = 'knowledge';
+const USAGE = 'usage: read-digest.mjs --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]';
+const KNOWLEDGE_ROOT = 'knowledge';
 
 let cache = null;
 /** The op-gate document, read once per process; `file` bypasses the cache (a spec's own document). */
@@ -52,7 +52,7 @@ export const loopOps = (doc = loadOpGate()) => new Set(doc.enforcedOps);
  * longest dotted prefix listed under `slots`. A null slot (hfs could not explain the path) owes no named file; its judgment
  * asks for any pattern file instead.
  */
-export function patternsForSlot(slot, doc = loadOpGate()) {
+function patternsForSlot(slot, doc = loadOpGate()) {
   if (!slot) return [];
   const family = doc.kinds[String(slot).split('.')[0]];
   if (!family) return [];
@@ -107,7 +107,7 @@ export function judgeKnowledgeDigest(digest) {
  * `starci app explain` of each path through the app's own hfs: in-process through its hfs-check library when it loads, else one
  * `starci app explain <path> --json` per path. A path hfs cannot explain answers {path, status: 'unexplained'} (slot null).
  */
-export async function explainPaths(root, files, hfs = hfsEntry(root)) {
+async function explainPaths(root, files, hfs = hfsEntry(root)) {
   let explainPath = null;
   try { ({ explainPath } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'hfs', 'check.mjs')).href)); } catch { explainPath = null; }
   return files.map((file) => {
@@ -126,7 +126,7 @@ export async function kindsOf(root, files, hfs = hfsEntry(root)) {
 }
 
 /** The example files of a slot: files of the example side its explain pattern matches (`<name>` spans one segment). */
-export function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
+function examplesForSlot(explained, doc = loadOpGate(), base = runtimeRoot) {
   const family = String(explained?.slot ?? '').split('.')[0];
   const side = doc.examples?.[family];
   if (!side || !explained?.pattern) return [];
@@ -165,7 +165,7 @@ export async function buildReadDigest({ root, touch, read = [], knowledge = [], 
   return { schema: DIGEST_SCHEMA, at: new Date().toISOString(), root: posixPath(path.resolve(root)), touched, slotMap, files: [...files.values()] };
 }
 
-export function parseDigestArgs(argv) {
+function parseDigestArgs(argv) {
   const opts = { root: null, touch: [], read: [], knowledge: [], out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];

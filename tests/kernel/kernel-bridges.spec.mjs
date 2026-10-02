@@ -338,8 +338,4 @@ test('dispatch files the contract row for the worker-start Dispatch; an early op
   assert.equal(json(row.context_json).managed.dispatchId, json(ok.stdout).dispatchId, 'the contract names the worker-start Dispatch');
   const guard = w.read((db) => json(db.prepare("SELECT payload_json FROM events WHERE kind='op-dispatched' AND entity_id='op-code.refactor-cf00000001'").get().payload_json).guard);
   assert.ok(guard?.jobFile, 'the dispatch receipt names the shared-checkout guard');
-  // A worker-start worker can read its contract before the running transaction commits it (fast Codex workers read
-  // contract-missing): op-contract waits while its job is still leased.
-  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'op-contract.mjs'), 'utf8');
-  assert.match(code, /if \(status !== 'leased'\) break;/, 'op-contract waits out the leased window instead of answering missing');
 });

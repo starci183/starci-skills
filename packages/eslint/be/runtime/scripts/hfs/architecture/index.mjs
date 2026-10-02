@@ -135,8 +135,8 @@ const FRONTEND_RULE_IDS = [
   'FE_SOURCE_LAYOUT_INVALID',
   'FE_WORLD_OWNER_RENDER_BOUNDARY',
 ];
-export const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
-export const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
+const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
+const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
 
 /**
  * Every code the machine reports as an error because it cannot judge (a check that cannot run is an error, never a pass).
@@ -162,7 +162,7 @@ export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
   return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort();
 })());
 
-/** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
+/** Every code the machine can emit, derived from the rule id lists of its checks (`starci app check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
   ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
@@ -263,7 +263,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   const asViolation = item => LINT_CODES.has(item.ruleId);
   const allErrors = context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item));
   const obligations = surface === 'all' ? violations : [...violations, ...context.errors.filter(asViolation).filter(inScope)];
-  // The lint surface is what an editor can show on a line of a TypeScript file; `hfs check` keeps every other finding of the machine.
+  // The lint surface is what an editor can show on a line of a TypeScript file; `starci app check` keeps every other finding of the machine.
   const onSurface = item => surface === 'all' || onLintSurface(config.root, item) === (surface === 'lint');
   const errors = stable(surface === 'all' ? allErrors : allErrors.filter(item => !asViolation(item)));
   const scopedViolations = stable(obligations.filter(inScope).filter(onSurface));

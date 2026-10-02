@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {openLedger,projectsRootFor,PROJECTS_ROOT_ENV} from '../../engine/db/ledger.mjs';
 import {TEST_REGISTRY_ENV,isUnderTempDir,LOCAL_ROOT_ENV,machineFileFor,openMachine,starciLocalRoot} from '../../engine/db/machine.mjs';
+import {runSpecFiles} from '../../scripts/supervisor/land.mjs';
 
 /**
  * The host's machine registry (%LOCALAPPDATA%/StarCi/runtime/machine.sqlite `ledgers`) once held 7,829 rows,
@@ -51,10 +52,13 @@ test('this spec, and a process it spawns with the inherited env, resolve a regis
   assert.ok(isUnderTempDir(child.stdout),`spawned ${child.stdout}`);
 });
 
-test('npm test and the land gate load the per-run registry preload',()=>{
+test('npm test and the land gate load the per-run registry preload',t=>{
   const pkg=JSON.parse(fs.readFileSync(path.join(runtimeRoot,'package.json'),'utf8'));
   assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --test /,'the temp-root guard loads first so the per-run registry lands inside it');
-  assert.match(fs.readFileSync(path.join(runtimeRoot,'scripts','supervisor','land.mjs'),'utf8'),/'tests', 'setup', 'isolated-registry\.mjs'/);
+  const probeRoot=tempWorld(t),landProbe=path.join(probeRoot,'land-registry.spec.mjs');
+  fs.writeFileSync(landProbe,`import assert from 'node:assert/strict';import test from 'node:test';test('land preload',()=>assert.ok(process.env.${TEST_REGISTRY_ENV}?.endsWith('machine.sqlite')));\n`);
+  const landed=runSpecFiles({dir:runtimeRoot,files:[landProbe],concurrency:1});
+  assert.equal(landed.ok,true,landed.stderr||landed.stdout);
   const probe=spawnSync(process.execPath,['--import',pathToFileURL(path.join(runtimeRoot,'tests','setup','isolated-registry.mjs')).href,'-e',`process.stdout.write(process.env.${TEST_REGISTRY_ENV})`],
     {encoding:'utf8',env:Object.fromEntries(Object.entries(process.env).filter(([key])=>key!==TEST_REGISTRY_ENV&&key!=='NODE_TEST_CONTEXT'))});
   assert.equal(probe.status,0,probe.stderr);

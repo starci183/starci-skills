@@ -45,15 +45,18 @@ import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { normPath } from '../lib/path-key.mjs';
 
-export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
-export const EXIT_READY = 0, EXIT_NOT_READY = 3, EXIT_USAGE = 2;
+const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
+const EXIT_READY = 0, EXIT_NOT_READY = 3;
+export const EXIT_USAGE = 2;
 // STARCI_ENV_PROBE_TIMEOUT_MS bounds one probe (specs); a first Next compile can take ~15s, so the default waits 20s.
-export const DEFAULT_PROBE_TIMEOUT_MS = Number(process.env.STARCI_ENV_PROBE_TIMEOUT_MS) > 0 ? Number(process.env.STARCI_ENV_PROBE_TIMEOUT_MS) : 20_000;
-export const DEFAULT_READY_TIMEOUT_MS = 120_000;
+const DEFAULT_PROBE_TIMEOUT_MS = Number(readEnv('STARCI_ENV_PROBE_TIMEOUT_MS')) > 0 ? Number(readEnv('STARCI_ENV_PROBE_TIMEOUT_MS')) : 20_000;
+const DEFAULT_READY_TIMEOUT_MS = 120_000;
 // Discovery order: the conventional liveness/readiness paths, then a GraphQL typename query (a Nest
 // GraphQL API answers it without auth), then the origin root.
-export const HEALTH_CANDIDATES = [
+const HEALTH_CANDIDATES = [
   { method: 'GET', path: '/health/live' }, { method: 'GET', path: '/health/ready' }, { method: 'GET', path: '/health' },
   { method: 'GET', path: '/healthz' }, { method: 'GET', path: '/livez' }, { method: 'GET', path: '/readyz' },
   { method: 'GET', path: '/api/health' }, { method: 'GET', path: '/status' },
@@ -77,7 +80,7 @@ export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HE
 
 /* ---------------------------------------------------------------- listeners, processes */
 
-export function stopListener(pid, { platform = process.platform } = {}) {
+function stopListener(pid, { platform = process.platform } = {}) {
   try {
     if (platform === 'win32') return killTree(pid, { platform, timeoutMs: 20000 }).ok;
     try { process.kill(-pid, 'SIGTERM'); } catch { process.kill(pid, 'SIGTERM'); }
@@ -85,15 +88,15 @@ export function stopListener(pid, { platform = process.platform } = {}) {
   } catch { return false; }
 }
 
-const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const norm = (p) => normPath(p, { fold: true });
 /** Whether a listener is one of this workspace's servers: its command line runs inside a repository root. */
-export const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.some((root) => root && norm(commandLine).includes(norm(root)));
+const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.some((root) => root && norm(commandLine).includes(norm(root)));
 
 /* ------------------------------------------------------------------------ registry (machine.sqlite env_servers) */
 
 // One env_servers row per <environment>__<service>. The server's output goes to a scratch file under the OS temp
 // directory while it runs; the registry keeps it as a blob (log_sha), captured when a start is judged.
-export const serverIdOf = (envId, service) => `${envId}__${service}`;
+const serverIdOf = (envId, service) => `${envId}__${service}`;
 const serverLogFile = (serverId) => path.join(os.tmpdir(), 'starci-env-servers', `${serverId.replace(/[^A-Za-z0-9._@-]/g, '_')}.log`);
 const commandOf = (text) => { try { const v = JSON.parse(text ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; } };
 const recordOf = (row) => (row ? { env: row.env, service: row.service, port: row.port ?? null, url: row.url ?? null, command: commandOf(row.command), cwd: row.cwd ?? null,
@@ -109,7 +112,7 @@ function writeRegistered(record, env = process.env) {
     state: record.state, startedAt: record.startedAt ?? undefined, stoppedAt: record.state === 'stopped' || record.state === 'failed' ? m.now() : null }), { env });
 }
 /** Keep a server's output so far as a blob (log_sha of its row); the sha, or null when it wrote nothing. */
-export function captureServerLog(envId, service, env = process.env) {
+function captureServerLog(envId, service, env = process.env) {
   const serverId = serverIdOf(envId, service);
   let text = '';
   try { text = fs.readFileSync(serverLogFile(serverId), 'utf8'); } catch { return null; }
@@ -121,12 +124,12 @@ function judgeServer(envId, service, ready, env) {
   try { withMachine((m) => m.update('env_servers', { state: ready ? 'ready' : 'failed', stopped_at: ready ? null : m.now() }, { server_id: serverIdOf(envId, service) }), { env }); } catch { /* the store is gone */ }
   try { return captureServerLog(envId, service, env); } catch { return null; }
 }
-export function listRegistered(env = process.env) {
+function listRegistered(env = process.env) {
   return readMachine((m) => m.envServers().map(recordOf), [], { env });
 }
 
 /** Start one server detached with its output in its scratch log; returns its pid. */
-export function startServer({ command, cwd, envId, service, env = process.env }) {
+function startServer({ command, cwd, envId, service, env = process.env }) {
   const log = serverLogFile(serverIdOf(envId, service));
   fs.mkdirSync(path.dirname(log), { recursive: true });
   const fd = fs.openSync(log, 'w');
@@ -158,7 +161,7 @@ const collectEnvIds = (value, out) => {
 };
 
 /** The resource file of an environment id under <repo>/.starciwork/_resources, or null. */
-export function environmentFile(repo, id) {
+function environmentFile(repo, id) {
   if (/\.ya?ml$/i.test(id) && fs.existsSync(path.resolve(repo, id))) return path.resolve(repo, id);
   const resources = path.join(repo, '.starciwork', '_resources');
   const name = String(id).split('.').pop();
@@ -193,7 +196,7 @@ export function environmentIdsOfPaths(repo, paths) {
 }
 
 /** The local checkouts of the workspace's repositories: the ledger repo and its named siblings. */
-export function workspaceRoots(repo) {
+function workspaceRoots(repo) {
   const roots = [path.resolve(repo)];
   const ws = readYaml(path.join(repo, '.starciwork', 'workspace.yaml'));
   for (const r of Array.isArray(ws?.repositories) ? ws.repositories : []) {
@@ -219,7 +222,7 @@ const serviceOfUrl = (doc, url) => {
 
 
 /** Check one environment resource. */
-export async function checkEnvironment(doc, { restart = false, roots = [], probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS, env = process.env, repo = null } = {}) {
+async function checkEnvironment(doc, { restart = false, roots = [], probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS, env = process.env, repo = null } = {}) {
   const services = [];
   for (const probe of Array.isArray(doc?.probes) ? doc.probes : []) {
     if (probe?.method && probe.method !== 'http-get') { services.push({ service: probe.id, url: probe.target, state: 'unsupported', ready: true, remedy: `probe method ${probe.method} is not run by env-health; the walk checks it` }); continue; }

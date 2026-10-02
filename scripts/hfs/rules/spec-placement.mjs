@@ -7,7 +7,7 @@
 // finding names the rule rather than only the missing slot. Which folder is a layer is read from the slot manifest, never spelled here.
 import { found } from './read.mjs';
 
-export const SPEC_PLACEMENT = 'BE_SPEC_PLACEMENT';
+const SPEC_PLACEMENT = 'BE_SPEC_PLACEMENT';
 const SPEC_FILE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/;
 const TEST_SLOT_TESTS = new Set(['unit-beside', 'e2e']);
 

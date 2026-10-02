@@ -850,6 +850,9 @@ moduleLocalDocumentKinds:
   - id: starci/cli-global-flags@1
     governs: "The global flags every starci command accepts (modules/cli/commands/_global.yaml)."
     files: [modules/cli/commands/_global.yaml]
+  - id: starci/env-catalog@1
+    governs: "The catalog of every environment variable the runtime reads or sets (purpose and kind); scripts/checks/check-env.mjs holds the source to it."
+    files: [modules/schemas/env.yaml]
 
   - id: starci/document@1
     governs: "A sectioned prose policy document (title/blocks)."

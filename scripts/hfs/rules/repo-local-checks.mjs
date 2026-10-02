@@ -9,7 +9,7 @@
 // included (HFS_RULE_OFF_WITHOUT_REPLACEMENT, R17). This rule adds the forbidden roles by name: what a check or a rule file is called.
 import { found, readJson } from './read.mjs';
 
-export const REPO_LOCAL_CHECK = 'HFS_REPO_LOCAL_CHECK';
+const REPO_LOCAL_CHECK = 'HFS_REPO_LOCAL_CHECK';
 const LOCAL_RULE_FILE = /(?:^|\/)(?:eslint-local-rules|eslint-plugin|eslint-local-plugin)[^/]*(?:\/|$)|(?:^|\/)(?:eslint-rules|lint-rules)\//;
 const CHECK_SCRIPT = /(?:^|\/)(?:scripts|tools)\/check-[^/]+$/;
 const RUNS_CHECK = /(?:^|[\s&|;(])(?:\.\/)?(?:scripts|tools)\/check-[^\s&|;)]+/;

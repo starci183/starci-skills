@@ -73,9 +73,10 @@ import {
   reassertManager, recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
 } from '../connectors/lib.mjs';
 import {
-  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
+  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage,
   removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
 } from '../connectors/telegram.mjs';
+import { redact } from '../connectors/telegram-polite.mjs';
 import { ensureAskConnectors, publicBase } from '../connectors/tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from './progress-report.mjs';
 import { answerDrawReviewByReply, askClassOf } from '../kernel/ask-server.mjs';
@@ -84,17 +85,16 @@ import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
-
-export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
-
+import { isSpecRun } from '../lib/env.mjs';
+const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
 export const BRIDGE_NAME = 'telegram-bridge';
 export const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;
 export const POLL_TIMEOUT_S = 50;
-export const ALLOWED_UPDATES = ['message', 'callback_query'];
+const ALLOWED_UPDATES = ['message', 'callback_query'];
 const MAX_PENDING = 20;
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
-export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
+const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
 
 // The bridge's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
 export const bridgeText = (language) => {
@@ -144,7 +144,7 @@ const CHANNEL_PREFIX = 'supervisor-channel:';
 const channelRow = (id) => `${CHANNEL_PREFIX}${needSupervisorId(id)}`;
 
 /** A live bridge: its connectors row names a live process of this boot, or a bridge holds the lock. */
-export const bridgeAlive = (env = process.env) => {
+const bridgeAlive = (env = process.env) => {
   const state = bridgeState(env);
   return recordAlive(state) ? state : lockHolder(BRIDGE_NAME, env);
 };
@@ -660,7 +660,7 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
   try {
     if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
     const apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE;
-    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE) return { ok: true, skipped: 'test context' };
+    if (isSpecRun(env) && apiBase === DEFAULT_API_BASE) return { ok: true, skipped: 'test context' };
     const live = bridgeAlive(env);
     if (live) return { ok: true, already: true, pid: live.pid };
     if (requireRegistered && !listSupervisors({ env }).length) return { ok: true, skipped: 'no supervisor registered' };
@@ -679,7 +679,7 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
  * MB-11: a new runtime HEAD reloads the bridge only when it changed a file under these (the bridge re-exec'd on every
  * land: 198 takeovers, 8-12 an hour). Its own files below reload it by mtime as before.
  */
-export const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'engine/']);
+const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'engine/']);
 
 /** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
 export const bridgeReloadFiles = (root = configRoot) => [
@@ -697,7 +697,7 @@ async function runMain() {
   const env = process.env;
   const log = bridgeLog(env, process.stderr.isTTY === true);
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children inherit) never polls the real bot.
-  if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
+  if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
   const first = telegramSettings({ env });
   if (!first.ready) { console.log(JSON.stringify({ ok: true, skipped: first.warning ?? 'telegram off' })); return; }
   // A replacement the running bridge spawned (self-reload) takes its lock over; nothing else may.

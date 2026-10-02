@@ -9,7 +9,7 @@
 //     dedupe of the workspace can move it, so it is the parent's, not a second copy the workspace keeps.
 import { found, readJson } from './read.mjs';
 
-export const DEP_VERSION_SKEW = 'HFS_DEP_VERSION_SKEW';
+const DEP_VERSION_SKEW = 'HFS_DEP_VERSION_SKEW';
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const LINK = /^(?:file|link|workspace|portal):/;
 const NESTED = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)$/;

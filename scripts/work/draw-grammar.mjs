@@ -26,24 +26,24 @@ import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
+const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
 export const PREFERENCES = Object.freeze(['auto', ...GRAMMAR_SOURCES]);
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** The product's declared range for the grammar (dependencies/devDependencies/peerDependencies), or null. */
-export function productRangeOf(productDir) {
+function productRangeOf(productDir) {
   const pkg = readJsonFile(path.join(productDir, 'package.json'));
   return pkg?.dependencies?.[GRAMMAR_PACKAGE] ?? pkg?.devDependencies?.[GRAMMAR_PACKAGE] ?? pkg?.peerDependencies?.[GRAMMAR_PACKAGE] ?? null;
 }
 
 /** A built grammar package root: its package.json plus dist/<family>/index.d.ts and .js. */
-export const builtGrammar = (root) => isFile(path.join(root, 'package.json')) && isFile(path.join(root, 'dist', 'core', 'index.d.ts')) && isFile(path.join(root, 'dist', 'core', 'index.js'));
+const builtGrammar = (root) => isFile(path.join(root, 'package.json')) && isFile(path.join(root, 'dist', 'core', 'index.d.ts')) && isFile(path.join(root, 'dist', 'core', 'index.js'));
 
 /**
  * The main worktree of the git checkout `dir` lives in (a lane worktree's live runtime), or null: a lane checkout never
  * builds packages/grammar/dist (dist/ is untracked), so its drawings resolve the live runtime's build.
  */
-export function mainWorktreeOf(dir) {
+function mainWorktreeOf(dir) {
   try {
     const r = revParseQuery(['--path-format=absolute', '--git-common-dir'], { dir, timeout: 10_000 });
     const common = r.status === 0 ? r.stdout.trim() : '';
@@ -69,7 +69,7 @@ export function claudeDistRoots({ skillRoot = SKILL_ROOT, grammarDist = null, en
   return fresh.length ? [fresh[0]] : tried.slice(0, 1);
 }
 
-export function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarDist = null, claudeRoots = null }) {
+function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarDist = null, claudeRoots = null }) {
   const out = [];
   const installed = productDir ? findPackage([productDir], [GRAMMAR_PACKAGE]) : null;
   if (installed && builtGrammar(installed.root)) out.push({ source: 'product', root: installed.root, version: installed.version });

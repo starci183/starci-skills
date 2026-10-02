@@ -3,7 +3,7 @@ import { withSupervisor } from './home.mjs';
 import { pidAlive } from '../../engine/db/machine.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 
-export const GC_LOCK = 'gc';
+const GC_LOCK = 'gc';
 /**
  * The host lock `gc` (machine.sqlite host_locks, ttl staleMs): an apply run (the tick, a hand-run `gc.mjs --apply`,
  * blob-gc, the reconciler GC controller) holds it so two never overlap. {ok, release()} | {ok:false, holder: {holder,

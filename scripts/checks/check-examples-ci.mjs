@@ -29,6 +29,7 @@ import { coverageScope, renderTargets } from '../../packages/hfs/sync/index.mjs'
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW = '.github/workflows/examples.yml';
@@ -119,7 +120,7 @@ ${flags.join('\n')}
 `;
 }
 
-const read = (root, rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return null; } };
+const read = readTextFile;
 
 /** Every finding of the examples CI contract at `root`: [{code, path, message}]. */
 export function checkExamplesCi(root = ROOT) {

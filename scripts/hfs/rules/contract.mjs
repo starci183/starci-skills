@@ -14,11 +14,11 @@ import { found, readText } from './read.mjs';
 import { safeRemove } from '../../api/fs/safe-remove.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
-export const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
+const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
 const SNAPSHOT_OF = { graphql: 'schema.graphql', json: 'openapi.json' };
 
 /** sha256 of a file's text with line endings folded, or null when it cannot be read. */
-export function contractHash(file) {
+function contractHash(file) {
   try { return createHash('sha256').update(fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex'); } catch { return null; }
 }
 

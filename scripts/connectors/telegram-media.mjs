@@ -29,7 +29,8 @@ import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot } from '../../engine/config.mjs';
-import { DEFAULT_API_BASE, botCall, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { DEFAULT_API_BASE, botCall, endpoint, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { botPolite, redact } from './telegram-polite.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
@@ -41,11 +42,12 @@ import { pathKey, slash } from '../lib/path-key.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify', 'e2e.verify']);
-export const LIMITS = {
+const LIMITS = {
   photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: TEXT_MAX,
   screenshots: 20, walkFiles: 2000, walkDepth: 6,
 };
@@ -155,7 +157,7 @@ const uiLabelOf = (dir) => {
   return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : path.basename(dir);
 };
 
-export const bandOf = (value) => {
+const bandOf = (value) => {
   const v = String(value ?? '').toLowerCase();
   if (!v) return null;
   const n = Number(v.match(/\d{3,4}/)?.[0] ?? NaN);
@@ -226,7 +228,7 @@ export function collectDrawings({ files, repo }) {
 }
 
 /** Screens, states, width bands and themes the ui records (and the drawn picks) cover. */
-export function drawingCounts(nodes, picks) {
+function drawingCounts(nodes, picks) {
   const screens = new Set(), states = new Set(), bands = new Set(), themes = new Set();
   const addBand = (v) => { const b = bandOf(v); if (b) bands.add(b); };
   const addTheme = (v) => { const t = themeOf(v); if (t) themes.add(t); };
@@ -253,7 +255,7 @@ export function drawingCounts(nodes, picks) {
 }
 
 /** The album caption for a settled draw. */
-export function drawCaption({ workflow, nodes, picks, counts, summary, oversize = [], language }) {
+function drawCaption({ workflow, nodes, picks, counts, summary, oversize = [], language }) {
   const t = textFor(language);
   const title = workflow.title || workflow.id;
   const names = nodes.length ? nodes.map((n) => n.label).join(', ') : [...new Set(picks.map((p) => p.screen).filter(Boolean))].join(', ') || '?';
@@ -338,7 +340,7 @@ function runFlowsOf(file) {
  * The UAT media one report produced: its videos (with their flows) and, for the album, its
  * screenshots. The run folders of the uat records it names are searched too.
  */
-export function collectUat({ files, repo }) {
+function collectUat({ files, repo }) {
   const seen = expand(files);
   const records = [...seen.values()].filter((f) => /\/uat\/[^/]+\/index\.yaml$/.test(posix(f)) && !/\/uat\/runs\//.test(posix(f)));
   const runDirs = records.map((r) => { const ev = readYaml(r)?.evidence; return typeof ev === 'string' ? path.resolve(path.dirname(r), ev) : null; }).filter((d) => d && isDir(d));
@@ -352,7 +354,7 @@ export function collectUat({ files, repo }) {
 const featureOf = (file) => posix(file).match(/\/features\/([^/]+)\//)?.[1] ?? null;
 
 /** The caption for one UAT video (or a screenshot album when `shots` is set). */
-export function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
+function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
   const t = textFor(language);
   const name = `${clipLine(flow?.name ?? fallbackName ?? workflow.title ?? workflow.id, 140)}${prepare ? ` (${t.prepare})` : ''}`;
   const head = [`${t.uat(name, verdictText(t, verdict))}${total > 1 ? ` (${t.video} ${index}/${total})` : ''}`, `${t.workflow}: ${workflow.title || workflow.id}`];
@@ -369,7 +371,6 @@ export function uatCaption({ workflow, flow, verdict, summary, language, index =
 
 /* ------------------------------------------------------------ Bot API uploads */
 
-const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
 const blobOf = async (file) => {
   const type = MIME[extOf(file)] ?? 'application/octet-stream';
   if (typeof fs.openAsBlob === 'function') return fs.openAsBlob(file, { type });
@@ -383,24 +384,12 @@ const blobOf = async (file) => {
  * scrubbed from every error.
  */
 export async function botUpload({ token, method, fields = {}, files = [], apiBase = DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = sleep, attempts = 3, timeoutMs = 180000 }) {
-  let last = null;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const form = new FormData();
-      for (const [key, value] of Object.entries(fields)) if (value !== undefined && value !== null) form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
-      for (const { field, file } of files) form.append(field, await blobOf(file), path.basename(file));
-      const res = await fetchImpl(endpoint(apiBase, token, method), { method: 'POST', body: form, signal: AbortSignal.timeout(timeoutMs) });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.ok !== false) return { ok: true, status: res.status, result: json?.result ?? null };
-      last = { ok: false, status: res.status, error: redact(json?.description ?? `HTTP ${res.status}`, token) };
-      if (res.status === 429) { await sleepImpl(Math.min(Number(json?.parameters?.retry_after ?? 1), 60) * 1000); continue; }
-      if (res.status < 500) return last;
-    } catch (error) {
-      last = { ok: false, status: null, error: redact(error?.cause?.message ?? error?.message ?? error, token) };
-    }
-    if (attempt < attempts) await sleepImpl(1000 * 2 ** (attempt - 1));
-  }
-  return last;
+  return botPolite({ token, sleepImpl, attempts }, async () => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) if (value !== undefined && value !== null) form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+    for (const { field, file } of files) form.append(field, await blobOf(file), path.basename(file));
+    return fetchImpl(endpoint(apiBase, token, method), { method: 'POST', body: form, signal: AbortSignal.timeout(timeoutMs) });
+  });
 }
 
 /**
@@ -436,7 +425,7 @@ const chunk = (list, n) => { const out = []; for (let i = 0; i < list.length; i 
 // One send per workflow|job|attempt: a machine.sqlite notifications row (kind 'media', dedupe_key
 // `media|<workflow>|<job>|<attempt>`) claimed before the upload (delivery 'sending') and settled after it
 // (sent | partial, ref {op, verdict, sent, failed}); a send that delivered nothing gives its claim up.
-export const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
+const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
 /** The dedupe row of one settle ({delivery, sent_at, ref: {...}}), or null. */
 export const mediaSent = (key, env = process.env) => readMachine((m) => {
   const row = m.db.prepare("SELECT delivery, sent_at, ref FROM notifications WHERE dedupe_key=? AND kind='media'").get(key);
@@ -464,7 +453,7 @@ function readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }) {
 }
 
 /** What a settle has to send: {kind, sends:[{type, files|file, caption|text}]} or {skip}. */
-export function planSettleMedia({ op, verdict, report, workflow, repo, language }) {
+function planSettleMedia({ op, verdict, report, workflow, repo, language }) {
   const kind = mediaKindOf(op);
   if (!kind) return { skip: 'not a media op' };
   if (!report) return { skip: 'no report filed' };
@@ -519,7 +508,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
 } = {}) {
   try {
     if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
-    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
+    if (isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
     if (!mediaKindOf(op)) return { ok: true, skipped: 'not a media op' };
     const settings = telegramSettings({ config, env, root });
     if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
@@ -559,7 +548,7 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     if (env.STARCI_CONNECTORS_OFF === '1') return { queued: false, skipped: 'STARCI_CONNECTORS_OFF' };
     // A spec run (node --test sets NODE_TEST_CONTEXT, which a spawned cli.mjs inherits) never
     // reaches the real Bot API: only a spec that points STARCI_TELEGRAM_API_BASE at a fake queues.
-    if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
+    if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
     const settings = telegramSettings({ config: config === undefined ? ownerConfig() : config, env });
     if (!settings.ready) return { queued: false, skipped: 'telegram off' };
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,

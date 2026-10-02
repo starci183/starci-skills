@@ -99,7 +99,7 @@ const ASK_IDS = /\bctx_[0-9a-z]{6,}\b/gi;
  * The owner-answer proof for a resolution: the named --owner-answer ids first, then every ask id the text
  * cites. {proven, proof|null, tried[]}.
  */
-export function provenOwnerAnswer(db, { ownerAnswer = [], detail = '' } = {}) {
+function provenOwnerAnswer(db, { ownerAnswer = [], detail = '' } = {}) {
   const ids = [...new Set([...(Array.isArray(ownerAnswer) ? ownerAnswer : [ownerAnswer]).map((x) => String(x ?? '').trim()).filter(Boolean), ...(String(detail ?? '').match(ASK_IDS) ?? [])])];
   const tried = [];
   for (const id of ids) {
@@ -139,7 +139,7 @@ export function resolutionOf(db, workflowId, incidentId) {
  * when it claims nothing). A resolution recorded with a verified ownerAnswer, or whose text cites an ask
  * the owner answered, is proven. A runtime release (by until-conditions) claims nothing of the owner.
  */
-export function resolutionClaimOf(db, resolution) {
+function resolutionClaimOf(db, resolution) {
   const payload = resolution?.payload ?? {};
   if (payload.by === 'until-conditions') return { unproven: false, claim: null, by: payload.by, reason: null };
   const claim = ownerClaimOf(payload.detail);

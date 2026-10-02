@@ -37,13 +37,14 @@ import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, REFUSAL_CODES } from '../hfs/check.mjs';
+import { INFRASTRUCTURE_CODES } from '../hfs/infrastructure-codes.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
-export const EMITTER_ROOTS = Object.freeze({
+const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
   hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
@@ -54,7 +55,7 @@ export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowle
 const RULE_CODE = /\b(?:HFS|BE|FE|ARCH)_[A-Z0-9]+(?:_[A-Z0-9]+)*\b/g;
 export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs', stylelint: 'packages/stylelint/index.mjs' });
 /** The stylelint canon's "why" map: the finding code of each rule. */
-export const STYLELINT_WHY = 'packages/stylelint/lib/why.mjs';
+const STYLELINT_WHY = 'packages/stylelint/lib/why.mjs';
 const LINT_PLUGINS = Object.keys(PLUGIN_ENTRY);
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
 const CHECK_FAMILY = ['machine', 'hfs', 'work-validate', 'runtime'];
@@ -62,7 +63,7 @@ const CHECK_FAMILY = ['machine', 'hfs', 'work-validate', 'runtime'];
 const quoted = (code) => new RegExp(`['"\`]${code}['"\`]|\\[${code}\\]`);
 
 /** The emitter files of every family under `root`, as {family: [{rel, text}]}. */
-export function readEmitters(root) {
+function readEmitters(root) {
   const out = {};
   const walk = (rel) => {
     const abs = path.join(root, rel);
@@ -76,7 +77,7 @@ export function readEmitters(root) {
 }
 
 /** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, stylelint: [text], specs: [text]}. */
-export function readTests(root) {
+function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
   // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
   const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => /\.spec\.mjs$/.test(name), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
@@ -170,7 +171,7 @@ export async function pluginRuleIds(root, kind) {
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
  * codes: {machine, hfs, refusals}, every code the architecture machine and `starci app check` can emit and the refusal codes among them.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -253,6 +254,18 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       }
     }
   }
+  if (infrastructure !== undefined) {
+    // S7-02: every HFS_/BE_/FE_/ARCH_ code of the failure catalog is a code of a rule, a "cannot judge" refusal, or declared
+    // infrastructure (the harness's own tools reporting about themselves, scripts/hfs/infrastructure-codes.mjs).
+    const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
+    const exempt = new Set([...(codes?.refusals ?? []), ...Object.keys(infrastructure)]);
+    for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort()) {
+      if (!owned.has(code) && !exempt.has(code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is in ${FAILURE_CODES_FILE} but no rule of knowledge/hfs/rules.yaml lists it in failureCodes and it is not declared infrastructure (scripts/hfs/infrastructure-codes.mjs): list it under the one rule whose law it serves, declare it infrastructure with its emitter, or delete it`);
+    }
+    for (const code of Object.keys(infrastructure).sort()) {
+      if (owned.has(code) || !Object.hasOwn(failureCodes ?? {}, code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is declared infrastructure but ${owned.has(code) ? 'a rule owns it' : `${FAILURE_CODES_FILE} has no entry for it`}: delete it from scripts/hfs/infrastructure-codes.mjs`);
+    }
+  }
   if (knowledge !== undefined) {
     // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
     const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
@@ -276,7 +289,7 @@ export async function checkHfsRules(root = skillRoot) {
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), tests: readTests(root), knowledge: readKnowledgeFiles(root),
-    codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] } }) };
+    codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] }, infrastructure: INFRASTRUCTURE_CODES }) };
 }
 
 if (isMain(import.meta.url)) {

@@ -35,13 +35,14 @@ import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 import { emitCheckOutput } from './output.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { splitList } from '../lib/list.mjs';
 
-export const CANON_FINDINGS = 'starci/canon-findings@1';
+const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MACHINES = ['eslint', 'architecture'];
 const USAGE = 'usage: starci gate canon-scan --root <repo> [--stack-kind next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
 
-const csv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+const csv = splitList;
 const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
 const under = sameOrUnder;
 const count = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
@@ -391,7 +392,7 @@ function human(report) {
   return lines.join('\n');
 }
 
-export async function canonScanMain(argv, { write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text) } = {}) {
+async function canonScanMain(argv, { write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text) } = {}) {
   let options;
   try { options = parseCanonScanArgs(argv); } catch (error) { fail(`${error.message}\n`); return 2; }
   let report;

@@ -6,11 +6,11 @@
 //     static readonly compensates = "order.placed"            // only an event that reports the failure of a step
 //     static create(payload: OrderPlacedPayload): OrderPlacedEvent { ... }
 //   }
-// `hfs emit-contracts` writes `be/contracts/<service>/events.json` from them (name, version, compensates, and the payload fields of the
-// interface `create` takes); `hfs check` compares the committed file with the same reader. Nothing is executed: both walk the TypeScript
+// `starci app emit` writes `be/contracts/<service>/events.json` from them (name, version, compensates, and the payload fields of the
+// interface `create` takes); `starci app check` compares the committed file with the same reader. Nothing is executed: both walk the TypeScript
 // syntax tree. The functions take the `ts` module the caller loaded (the repository's own, else the runtime's); this file imports nothing.
 
-export const EVENT_CONTRACT_SCHEMA = 'starci/event-contract@1';
+const EVENT_CONTRACT_SCHEMA = 'starci/event-contract@1';
 const FIELD_TYPE = /^(?:string|number|boolean|string\[\]|number\[\])\??$/;
 
 const hasStatic = (ts, member) => member.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword) === true;

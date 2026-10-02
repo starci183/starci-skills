@@ -53,14 +53,15 @@ import { draftText } from '../lib/orca-terminal.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
-  collapse, clipDraft, DEFAULT_STAGED_PATTERN, WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
+  clipDraft, DEFAULT_STAGED_PATTERN, WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
+import { squash } from '../lib/clip.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { kernelRevWakeLine } from './runtime-rev.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
-export const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
+const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
 
 const sendCodeOf = (sent) => sent?.errorCode ?? sent?.enterRetry?.after ?? null;
 
@@ -265,14 +266,14 @@ export function sendEnterWithProof({ terminal, sentText = null, stagedPattern = 
 // Frames read after an Enter: submitted once the frame no longer waits for Enter and the draft that
 // was in the box (if any) has left it. Returns {submitted, screenState, draftLeft}.
 function draftSubmitProof({ draft, stagedPattern, sentText, reads, intervalMs, readFrame, sleep }) {
-  const was = draft ? collapse(draft) : null;
+  const was = draft ? squash(draft) : null;
   let screenState = null, draftLeft = null;
   for (let i = 0; i < Math.max(1, reads); i += 1) {
     if (i > 0 || draft) sleep(intervalMs);
     const after = readFrame();
     if (after == null) continue;
     screenState = classifyAgentScreen(after.frame, { stagedPattern, sentText }).state;
-    draftLeft = was && after.draft && collapse(after.draft) === was ? after.draft : null;
+    draftLeft = was && after.draft && squash(after.draft) === was ? after.draft : null;
     if (!WAITING_FOR_ENTER.has(screenState) && !draftLeft) break;
   }
   return { submitted: screenState != null && !WAITING_FOR_ENTER.has(screenState) && !draftLeft, screenState, draftLeft };
@@ -298,8 +299,8 @@ function submitDraft({ terminal, draft, stagedPattern, sentText, reads, interval
 // lastOutputAt is older than activeStaleMs) the watchdog never types into it again - the terminal
 // is closed directly (a typed quit and an Orca interrupt are refused the same way) and
 // start-workflow replaces the seat.
-export const KERNEL_WAKE_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
-export const KERNEL_WAKE_NOT_WRITABLE = 'terminal_not_writable';
+const KERNEL_WAKE_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
+const KERNEL_WAKE_NOT_WRITABLE = 'terminal_not_writable';
 // A wake send Orca refused terminal_not_writable: the refusal is read off the receipt's error code,
 // its typed error, or the proof's sendErrorCode.
 export const wakeSendRefused = (proof) => [proof?.sendErrorCode, proof?.sent?.errorCode, proof?.sent?.error]

@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeText, phraseHits } from './phrase-match.mjs';
+import { phraseHits } from './phrase-match.mjs';
+import { normalizeText } from '../lib/normalize.mjs';
 
 const HERE = path.resolve(import.meta.dirname, '..', '..');
 const cache = new Map();

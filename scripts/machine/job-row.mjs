@@ -9,3 +9,14 @@ export const jobResultSql = (alias = 'jobs') => `COALESCE((SELECT a.settle_json 
  * `result_json` = the job's settle result. `SELECT ${JOB_ROW} FROM jobs WHERE ...` (the table itself, not an alias).
  */
 export const JOB_ROW = `jobs.*, jobs.try_no AS attempt, ${jobResultSql('jobs')} AS result_json`;
+
+/** The workflow's newest kernel jobs row (updated_at order), or undefined. The handle is the caller's. */
+export const latestKernelJobOf = (db, workflowId) =>
+  db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1`).get(workflowId);
+
+/**
+ * The job's newest op_attempts row (`order` column, latest first — attempt_id the row order, dispatch_seq the
+ * dispatch order), or null. `job` is the jobs row or its job_id; the handle is the caller's.
+ */
+export const latestAttemptOf = (db, job, { order = 'attempt_id' } = {}) =>
+  db.prepare(`SELECT * FROM op_attempts WHERE job_id=? ORDER BY ${order} DESC LIMIT 1`).get(job && typeof job === 'object' ? job.job_id : job) ?? null;

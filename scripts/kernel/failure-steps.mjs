@@ -14,7 +14,7 @@ const resultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 export const isAwaitingOwner = (db, row) => row?.status === AWAITING_OWNER_STATUS;
 
 /** Two jobs are tries of one work unit (scripts/kernel/units.mjs). */
-export const sameUnitOfWork = sameUnit;
+const sameUnitOfWork = sameUnit;
 
 /**
  * The failed jobs nothing follows: no retry names them, the step their settle recorded enqueued nothing, and no

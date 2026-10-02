@@ -53,7 +53,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
 // job's scratch folder; the prompt names the file, the count and the first few.
 export const OWNED_INLINE_MAX = 60;
-export const OWNED_INLINE_CHARS = 6000;
+const OWNED_INLINE_CHARS = 6000;
 // THE SCRATCH CONTRACT: every job owns one directory outside every repository, under the OS temp directory; op
 // contracts call it STARCI_JOB_SCRATCH. Dispatch creates it fresh (ensureJobScratch), records it as
 // op_attempts.scratch_dir and writes its path into the prompt (worker-start owns the agent's environment); the op writes its report, raw check output, screenshots, videos, traces and patches
@@ -89,7 +89,7 @@ export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = 
 // contextPack: a resolved scripts/context/pack.mjs context; when given, the mandatory-reads block
 // enumerates its resolved file list instead of the fixed load order.
 /** The Kernel's local override of this op for this workflow (starci kernel op-override / graph-edit / redesign): additive only. */
-export function kernelOverrideLines(o) {
+function kernelOverrideLines(o) {
   if (!o || typeof o !== 'object') return [];
   const out = [`kernel_override: your Kernel adapted this op for its workflow (additive; your brief and every gate still hold):`];
   if (Number.isInteger(o.commandTimeoutMs)) out.push(`  commandTimeoutMs=${o.commandTimeoutMs} - a command may run this long. When your tool window is shorter, start a long validator (starci gate canon-scan, starci gate run, starci app lint) in the background writing to a file and poll that file until it is complete; a tool timeout is never a blocker by itself.`);

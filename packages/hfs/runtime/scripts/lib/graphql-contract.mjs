@@ -1,5 +1,5 @@
 // graphql-contract.mjs - the GraphQL a back-end contract snapshot holds and the checks a front-end document must pass
-// against it. It reads the SDL `hfs emit-contracts` writes (`be/contracts/<service>/schema.graphql`: object, input, enum,
+// against it. It reads the SDL `starci app emit` writes (`be/contracts/<service>/schema.graphql`: object, input, enum,
 // scalar, interface and union types, descriptions and directives) and the executable documents a front end keeps in
 // `.graphql` files (operations with variables, field arguments, object literals, inline fragments), with no dependency:
 // the runtime ships no GraphQL library, and an app's own install is not always resolvable from where hfs runs.

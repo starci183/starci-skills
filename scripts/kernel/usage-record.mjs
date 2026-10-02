@@ -23,12 +23,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { extractUsage, costOfRow, loadPrices, sumRows, promptTokens, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
-import { sessionHomes, sessionAgentOf } from './op-session.mjs';
+import { sessionHomes } from './op-session.mjs';
+import { agentOfJob } from '../lib/job-agent.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
-export const SESSION_HEAD_BYTES = 256 * 1024;
+const SESSION_HEAD_BYTES = 256 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const DEFAULT_LOOKBACK_MS = 3 * DAY_MS;
+const DEFAULT_LOOKBACK_MS = 3 * DAY_MS;
 /** A session file is created a little before its op's dispatch row lands (the terminal launches first). */
 export const SESSION_LEAD_MS = 30 * 60 * 1000;
 
@@ -50,7 +51,7 @@ const textOf = (content) => (typeof content === 'string' ? content
   : Array.isArray(content) ? content.map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join('\n') : '');
 
 /** {startMs, firstUser} of a session file's head: the first timestamp and the first real user message text. */
-export function readSessionHead(agent, head) {
+function readSessionHead(agent, head) {
   let startMs = null, firstUser = null;
   const lines = head.split('\n');
   lines.pop(); // the last line of a bounded read may be cut
@@ -71,7 +72,7 @@ export function readSessionHead(agent, head) {
 }
 
 /** What a session is: {role:'kernel', workflowId} | {role:'supervisor'} | {role:'op', dispatchId, taskId} | {role:'other'}. */
-export function classifySession(firstUser) {
+function classifySession(firstUser) {
   const text = String(firstUser ?? '');
   const top = text.slice(0, 800);
   const kernel = /You are \[Kernel\]\s+(wf-[A-Za-z0-9_-]+)/.exec(top);
@@ -96,7 +97,7 @@ const jsonlIn = (dir, sinceMs, out, where, agent, depth = 0) => {
 };
 
 /** Every session file of `agents` touched since `sinceMs`: the live session homes plus the archive root. */
-export function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process.env, home = os.homedir(), archiveRoot = null } = {}) {
+function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process.env, home = os.homedir(), archiveRoot = null } = {}) {
   const homes = sessionHomes({ env, home });
   const out = [];
   const root = archiveRoot ?? env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRootOf({ env });
@@ -125,14 +126,14 @@ export function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 /** The CLI's own session id: the last UUID of the file name (`rollout-<time>-<uuid>.jsonl`, `<uuid>.jsonl`, an archive's `<slug>__<uuid>.jsonl`), else the path. */
-export const sessionKeyOf = (file) => (path.basename(file).match(UUID)?.pop() ?? path.resolve(file)).toLowerCase();
+const sessionKeyOf = (file) => (path.basename(file).match(UUID)?.pop() ?? path.resolve(file)).toLowerCase();
 
 /**
  * One entry per session. The session archive can hold the same session under two names (a Codex rollout as `<DD>__rollout-...` and
  * `rollout-...`, a Claude file with and without its `<slug>__` prefix) and a session can sit live and archived at once; counting each
  * file would count that session twice. The live copy wins, then the larger (later) one.
  */
-export function dedupeSessions(files) {
+function dedupeSessions(files) {
   const best = new Map();
   for (const f of files) {
     const k = `${f.agent}:${sessionKeyOf(f.file)}`;
@@ -143,7 +144,7 @@ export function dedupeSessions(files) {
 }
 
 /** listSessionFiles with each file's head classified: [{file, agent, where, startMs, ...classification}]. */
-export function indexSessions(options = {}) {
+function indexSessions(options = {}) {
   return listSessionFiles(options).map((f) => {
     const { startMs, firstUser } = readSessionHead(f.agent, readHead(f.file));
     return { ...f, startMs: startMs ?? f.mtimeMs, ...classifySession(firstUser) };
@@ -153,14 +154,14 @@ export function indexSessions(options = {}) {
 /* ------------------------------------------------------------------------------------------------- op attempts */
 
 /** The agent adapter of an attempt row (op_attempts.agent is a legacy column; provider carries the family). */
-export const attemptAgent = (a) => sessionAgentOf({ agent: a?.agent, provider: a?.provider, model: a?.model });
+export const attemptAgent = (a) => agentOfJob({ agent: a?.agent, provider: a?.provider, model: a?.model });
 
 /**
  * The session entries of one attempt, by EXACT id only: the entry whose first user message names this attempt's dispatch id
  * (op_attempts.dispatch_id, the Orca worker preamble's --dispatch-id) or task id. Both are unique per attempt, so a sibling that
  * shares the checkout, the job or the time window never matches; nothing is matched by cwd, time window or job id.
  */
-export function entriesOfAttempt(index, attempt) {
+function entriesOfAttempt(index, attempt) {
   const agent = attemptAgent(attempt);
   return index.filter((e) => e.role === 'op' && e.agent === agent
     && ((e.dispatchId && e.dispatchId === attempt.dispatch_id) || (e.taskId && attempt.task_id && e.taskId === attempt.task_id)));
@@ -184,7 +185,7 @@ const mergeRows = (lists) => {
  * The usage plan of one attempt: {attemptId, agent, ok:true, source, rows (priced), files} or {ok:false, source:'unavailable',
  * reason}. Pure over the index; nothing is written.
  */
-export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extract = extractUsage } = {}) {
+function planAttemptUsage(attempt, entries, { prices = loadPrices(), extract = extractUsage } = {}) {
   const agent = attemptAgent(attempt);
   const base = { attemptId: attempt.attempt_id, workflowId: attempt.workflow_id, opId: attempt.op_id, agent, provider: attempt.provider ?? agent, endedAt: attempt.settled_at ?? attempt.dispatched_at ?? null };
   if (!agent || !USAGE_AGENTS.includes(agent)) return { ...base, ok: false, source: USAGE_UNAVAILABLE, definitive: true, ...extract(agent, null) };
@@ -198,14 +199,14 @@ export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extr
 }
 
 /** How long after an attempt ended a missing session file stays 'not found yet' (the file may still be archived) before it is recorded unavailable. */
-export const UNAVAILABLE_GRACE_MS = 30 * 60 * 1000;
+const UNAVAILABLE_GRACE_MS = 30 * 60 * 1000;
 
 /**
  * Write one plan through the ledger's typed writers (idempotent). An ok plan records the measured usage; a plan that cannot be
  * measured records usage_source 'unavailable' with its reason - at once when the agent has no adapter, else once the attempt has
  * been over for UNAVAILABLE_GRACE_MS (until then it stays undecided and the sweep looks again).
  */
-export function applyAttemptUsage(ledger, plan, { at = Date.now() } = {}) {
+function applyAttemptUsage(ledger, plan, { at = Date.now() } = {}) {
   if (!plan.ok) {
     const settled = plan.endedAt != null && at - plan.endedAt > UNAVAILABLE_GRACE_MS;
     if (!plan.definitive && !settled) return { recorded: false, reason: plan.reason, pending: true };
@@ -222,7 +223,7 @@ const ARCHIVED_WORKFLOW = `(w.archived_at IS NOT NULL OR w.phase='archived')`;
 const archivedRefusal = (error) => message(error).includes('workflow-archived: no further writes');
 
 /** Settled attempts with no usage yet in workflows that still accept usage writes. */
-export function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
+function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
   return db.prepare(`SELECT a.* ${MISSING_ATTEMPT_USAGE} AND NOT ${ARCHIVED_WORKFLOW} ORDER BY a.attempt_id`).all(sinceMs);
 }
 
@@ -258,7 +259,7 @@ const USAGE_SUMS = `response_model AS model, sum(input_tokens) AS inputTokens, s
   sum(turns) AS turns, sum(tool_calls) AS toolCalls, sum(tool_errors) AS toolErrors`;
 
 /** The rows already recorded for one session (`prefix` = '<seat>:<session>@'), summed per model. */
-export function recordedSession(db, { subjectType, prefix, workflowId = null }) {
+function recordedSession(db, { subjectType, prefix, workflowId = null }) {
   const sql = `SELECT ${USAGE_SUMS} FROM llm_usage WHERE subject_type=? ${workflowId === null ? '' : 'AND workflow_id=?'} AND substr(turn_ref,1,length(?))=? GROUP BY response_model`;
   const args = workflowId === null ? [subjectType, prefix, prefix] : [subjectType, workflowId, prefix, prefix];
   return db.prepare(sql).all(...args).map((r) => ({ ...r }));
@@ -268,7 +269,7 @@ export function recordedSession(db, { subjectType, prefix, workflowId = null }) 
  * What a Kernel/Supervisor session added since the rows already recorded: {ok, turnRef, rows} (rows priced deltas) or
  * {ok:false, reason} / {ok:true, rows:[]} when nothing is new. `db` is the ledger (kernel) or machine (supervisor) database.
  */
-export function planSeatUsage(db, { role, workflowId = null, entry, prices = loadPrices(), extract = extractUsage }) {
+function planSeatUsage(db, { role, workflowId = null, entry, prices = loadPrices(), extract = extractUsage }) {
   const got = extract(entry.agent, entry.file);
   if (!got.ok) return { ok: false, source: USAGE_UNAVAILABLE, reason: got.reason, file: entry.file };
   const session = got.sessionId ?? path.basename(entry.file, '.jsonl');

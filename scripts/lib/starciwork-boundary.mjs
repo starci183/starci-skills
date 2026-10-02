@@ -12,7 +12,7 @@ import path from 'node:path';
 const TEMPLATE = path.join(import.meta.dirname, '..', '..', 'packages', 'hfs', 'templates', 'app', 'starciwork.gitignore');
 
 // The record families that hold nothing but index.yaml and evidence.yaml (ui, impl, uat and ac have their own rows).
-export const PLAIN_FAMILIES = Object.freeze(['br', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'contract', 'integration', 'gap', 'event']);
+const PLAIN_FAMILIES = Object.freeze(['br', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'contract', 'integration', 'gap', 'event']);
 const RECORD_FILE = /^(index|evidence)\.yaml$/;
 const UAT_FILE = /^(index\.yaml|evidence\.yaml|accounts\.yaml|fixtures\.yaml|seed\.sql|cleanup\.sql)$/;
 const PLAIN = new RegExp(`^(${PLAIN_FAMILIES.join('|')})$`);
@@ -26,7 +26,7 @@ const NEST_SEGMENT = /^(?!assets$).+$/;
 
 // Each pattern is a list of segment matchers: a string (exact), a RegExp (one segment), '+' (one or more record-name
 // folders) or '**' (one or more segments of anything). Order follows §5.1.
-export const PRODUCT_PATTERNS = Object.freeze([
+const PRODUCT_PATTERNS = Object.freeze([
   ['.gitignore'], ['.gitattributes'], ['workspace.yaml'], ['index.yaml'],
   ['brand', RECORD_FILE], ['brand', 'assets', REST],
   ['shell', RECORD_FILE],

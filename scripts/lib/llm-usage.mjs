@@ -19,14 +19,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readYamlFile } from './read-yaml.mjs';
+import { positiveNumber } from './number.mjs';
 
 export const USAGE_SOURCE = 'cli-transcript';
 export const USAGE_UNAVAILABLE = 'unavailable';
 export const USAGE_AGENTS = Object.freeze(['claude', 'codex']);
-export const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'prices.yaml');
+const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'prices.yaml');
 
 const COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'];
-const int = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.trunc(Number(v)) : 0);
+const int = (v) => positiveNumber(v, 0, { int: true });
 const emptyRow = (model, { reasoning = true, toolErrors = true } = {}) => ({
   model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
   reasoningTokens: reasoning ? 0 : null, turns: 0, toolCalls: 0, toolErrors: toolErrors ? 0 : null,
@@ -58,7 +59,7 @@ export function* fileLines(file, { chunkBytes = 8 << 20 } = {}) {
 const parse = (line) => { try { return JSON.parse(line); } catch { return null; } };
 
 /** Claude Code session lines -> {agent, models:[row], turns, sessionId}. A message counts once; sub-agent (sidechain) messages count too. */
-export function claudeUsage(lines) {
+function claudeUsage(lines) {
   const byId = new Map();
   const toolModel = new Map();
   const errSeen = new Set();
@@ -107,7 +108,7 @@ export function claudeUsage(lines) {
 const CODEX_TOOL_CALLS = new Set(['function_call', 'custom_tool_call', 'local_shell_call', 'tool_search_call']);
 
 /** Codex rollout lines -> {agent, models:[row], turns, sessionId}: cumulative token_count deltas attributed to the model of the latest turn_context. */
-export function codexUsage(lines) {
+function codexUsage(lines) {
   const rows = new Map();
   let model = 'unknown', sessionId = null, prev = null, turns = 0;
   const rowOf = (m) => { if (!rows.has(m)) rows.set(m, emptyRow(m, { toolErrors: false })); return rows.get(m); };

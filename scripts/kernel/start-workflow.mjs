@@ -51,10 +51,13 @@ import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { arg as argvValue } from '../lib/cli-arg.mjs';
+import { foldCase, realPath } from '../lib/path-key.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
-const arg = (n, d = null) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
+const arg = (n, d = null) => argvValue(process.argv, n, d);
 const repo = path.resolve(arg('repo', process.cwd()));
 const agentOverride = arg('agent');
 const goalId = arg('goal'); // explicit <workflow_id> — per modules/kernel/start-workflow.yaml
@@ -83,7 +86,7 @@ const KERNEL_START_RESERVATION_MS = 240000;
 // never fatal — routing falls through to route-model and says why.
 // STARCI_OWNER_ROOT points the reader at a different directory holding a
 // config.yaml (test and tooling seam).
-const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
+const ownerRoot = readEnv('STARCI_OWNER_ROOT') ? path.resolve(readEnv('STARCI_OWNER_ROOT')) : skillRoot;
 const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
 
 // Provider liveness probe: scripts/agent/quota/index.mjs exports
@@ -298,13 +301,7 @@ async function resolveKernelRoute(db) {
 // its own entry Run (the launching terminal coordinates it), attested from worker-show. No caller assembles a provider
 // command: Orca composes it, with the owner's per-agent default args.
 
-const canonicalPath = (value) => {
-  const resolved = path.resolve(value);
-  try { return fs.realpathSync.native(resolved); } catch { return resolved; }
-};
-const samePath = (left, right) => process.platform === 'win32'
-  ? canonicalPath(left).toLowerCase() === canonicalPath(right).toLowerCase()
-  : canonicalPath(left) === canonicalPath(right);
+const samePath = (left, right) => foldCase(realPath(left)) === foldCase(realPath(right));
 
 function projectContext() {
   const projects = path.join(sourceRoot, '.workspaces', 'projects');
@@ -683,7 +680,7 @@ try {
   // The Kernel is a worker of its own entry Run (scripts/agent/lib.mjs startAgent; the launching terminal is its
   // coordinator). worker-start blocks until the agent is ready, so the reservation is stretched past its timeout first.
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
-  const entry = process.env.ORCA_TERMINAL_HANDLE || null;
+  const entry = readEnv('ORCA_TERMINAL_HANDLE') || null;
   const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
   for (const [index, member] of members.entries()) {
     updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + KERNEL_START_RESERVATION_MS });

@@ -102,7 +102,7 @@ const shown = (workRoot, file) => slash(path.relative(path.dirname(workRoot), fi
 // ---------------------------------------------------------------------------------------------------------
 
 /** Findings about the shell record itself. `verifySource` re-scans app/ and compares the recorded digest. */
-export function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = 'refuse', uiRecords = null, requireAll = true, lockupDeferredFor = null } = {}) {
+function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = 'refuse', uiRecords = null, requireAll = true, lockupDeferredFor = null } = {}) {
   const out = [];
   const at = shown(workRoot, shell.file);
   if (shell.error) return [finding('refuse', 'SHELL_RECORD_INVALID', at, `the shell record ${shell.error}`)];
@@ -228,7 +228,7 @@ function checkBinding(ctx, at, record) {
 }
 
 /** Findings about one ui record. `mode` 'op' re-derives composite pixels and refuses; 'validate' lists. */
-export function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords = null } = {}) {
+function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords = null } = {}) {
   const level = LEVELS[mode];
   const at = shown(workRoot, uiFile);
   const ctx = { shell, level };
@@ -467,7 +467,7 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
 // ---------------------------------------------------------------------------------------------------------
 
 /** Findings about one implementation record: each routed ui record it builds has its app/ files. */
-export function checkImplementationRecord(workRoot, implFile, record, shell) {
+function checkImplementationRecord(workRoot, implFile, record, shell) {
   const at = shown(workRoot, implFile);
   if (!shell) return [finding('refuse', 'SHELL_RECORD_MISSING', at, 'the tree has no shell/index.yaml layout tree to build routes into')];
   if (shell.error) return [];
@@ -531,7 +531,7 @@ const imageFindings = (workRoot, ctx, at, file, subject, extra = {}) => (fs.exis
   : []);
 
 /** Every drawn part and composite a ui record declares. */
-export function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRoot)) {
+function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRoot)) {
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, uiFile);
   return assetsOf(record).flatMap((a) => {
@@ -541,7 +541,7 @@ export function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext
 }
 
 /** Every layout capture (and destination render) the shell record holds - what brand.decide captured. */
-export function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
+function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
   if (!shell || shell.error || !isLayoutTree(shell.record)) return [];
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, shell.file);
@@ -557,7 +557,7 @@ export function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workR
 }
 
 /** Every running-page capture an implementation record cites (blobs, scripts/work/impl-captures.mjs). */
-export function implementationPaletteFindings(workRoot, implFile, ctx = paletteContext(workRoot)) {
+function implementationPaletteFindings(workRoot, implFile, ctx = paletteContext(workRoot)) {
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, implFile);
   return capturesOf(path.dirname(implFile), readRecord(implFile)).filter((c) => c.png).flatMap((c) => imageFindings(workRoot, ctx, at, c.png, `running-page capture ${c.name}`));

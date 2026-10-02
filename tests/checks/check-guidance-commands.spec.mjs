@@ -73,7 +73,7 @@ test('allowed commands are never findings, whatever the sentence', async () => {
     'Land with `starci supervisor land --commit <sha> --lane <lane> --specs touching --json`.',
     'Remove one junction with `cmd /c rmdir <path>` and one file with `rm <file>`.',
     'Start it with `orca orchestration worker-start --agent claude --worktree path:<dir> --spec "<brief>"`.',
-    'Run `node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>`, then end only your own PID (`taskkill /PID <pid>`).',
+    'Run `starci supervisor workers stage --self --name <slug> --files <csv>`, then end only your own PID (`taskkill /PID <pid>`).',
   ]) assert.deepEqual(await textFindings(text), [], text);
 });
 

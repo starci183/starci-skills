@@ -14,7 +14,7 @@ const slash = (p) => String(p).replace(/\\/g, '/');
 const isGlobOrDir = (p) => /(^|\/)\*{1,2}$/.test(p) || /\/$/.test(p);
 const tidy = (p) => slash(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '').replace(/^\.\//, '') || '.';
 
-export const newModulesOf = (payload) => (Array.isArray(payload?.new_modules) ? payload.new_modules : []);
+const newModulesOf = (payload) => (Array.isArray(payload?.new_modules) ? payload.new_modules : []);
 
 /** The closest existing directory at or above `rel` inside `base`, as a repo-relative path ('.' is the repo root). */
 function closestExisting(base, rel) {
@@ -27,7 +27,7 @@ function closestExisting(base, rel) {
  * Violations of the grant-parent rule for placed owned paths (target-repo.mjs ownedPathPlacements output).
  * Each is {owned, base, dir, closest, atRoot, newModule?} - `dir` the repo-relative directory that must exist.
  */
-export function grantParentViolations({ placements, newModules = [], workDir = '.starciwork' }) {
+function grantParentViolations({ placements, newModules = [], workDir = '.starciwork' }) {
   const modules = newModules.map(tidy).filter((m) => m !== '.');
   const out = [];
   for (const place of placements) {
@@ -51,7 +51,7 @@ export function grantParentViolations({ placements, newModules = [], workDir = '
 }
 
 /** One refusal detail naming each missing directory and the closest existing one. */
-export function grantParentDetail(violations) {
+function grantParentDetail(violations) {
   const shown = violations.slice(0, 4).map((v) => `${v.owned}: ${v.newModule ? `the new module ${v.newModule} needs its parent directory ${v.dir}, which does not exist` : `directory ${v.dir} does not exist`}; closest existing directory is ${v.closest === '.' ? 'the repository root' : v.closest}${v.atRoot ? ' (only the repository root exists on that path)' : ''}`);
   return `${violations.length} owned path(s) could never be satisfied: ${shown.join('; ')}. Fix the path to the real directory, or declare a new module with --new-module <repository-relative dir>`;
 }

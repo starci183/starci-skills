@@ -1,7 +1,9 @@
-import { treeOf } from './required-files.mjs';
+import { checkerScope } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
 import { locateDeclaration } from '../slots.mjs';
 import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, namesOfService, readStack } from '../../lib/stack-services.mjs';
+import { unwrapEach } from './ast-walks.mjs';
+import { nameText, sourceLocation } from '../../lib/ts-ast.mjs';
 
 /**
  * R47 `test-world-files` (BE_TEST_TOPOLOGY). Judgements over the test world, read through slots, the repository's own
@@ -40,18 +42,9 @@ const NAMED_FORM = `export const { useTestWorld, useSandbox } = ${DEFINE}({ ... 
 const defaultEnvironment = DEFAULT_ENVIRONMENT;
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-const nameOf = (ts, name) => (name && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) ? name.text : null);
-const unwrap = (ts, node) => {
-  let current = node;
-  while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression?.(current))) current = current.expression;
-  return current;
-};
-const propertyOf = (ts, literal, key) => literal.properties.find(property => ts.isPropertyAssignment(property) && nameOf(ts, property.name) === key)?.initializer ?? null;
+const unwrap = (ts, node) => unwrapEach(ts, node, [ts.isParenthesizedExpression, ts.isAsExpression, ts.isSatisfiesExpression]);
+const propertyOf = (ts, literal, key) => literal.properties.find(property => ts.isPropertyAssignment(property) && nameText(ts, property.name) === key)?.initializer ?? null;
 const isExported = (ts, statement) => (statement.modifiers ?? []).some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
-const positionOf = (sourceFile, node) => {
-  const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-  return { line: position.line + 1, column: position.character + 1 };
-};
 
 /** The object literal of `defineTestWorld(<object literal>)`, or null. */
 function defineLiteral(ts, expression) {
@@ -89,7 +82,7 @@ function fakeEntriesOf(ts, sourceFile, literal) {
   const value = node ? unwrap(ts, node) : null;
   if (!value || !ts.isObjectLiteralExpression(value)) return [];
   return value.properties
-    .map(property => ({ name: nameOf(ts, property.name), ...positionOf(sourceFile, property) }))
+    .map(property => ({ name: nameText(ts, property.name), ...sourceLocation(sourceFile, property) }))
     .filter(entry => entry.name);
 }
 
@@ -107,21 +100,18 @@ function fakedByOf(ts, sourceFile, literal) {
     if (!fake) continue;
     const reason = propertyOf(ts, body, 'reason');
     entries.push({
-      service: nameOf(ts, property.name),
+      service: nameText(ts, property.name),
       fake: ts.isStringLiteralLike(fake) ? fake.text : '',
       reason: reason && ts.isStringLiteralLike(reason) ? reason.text.trim() : '',
-      ...positionOf(sourceFile, property),
+      ...sourceLocation(sourceFile, property),
     });
   }
   return entries;
 }
 
 export function checkTestWorldFiles(input) {
-  const { config, graph, context } = input;
-  const ts = context.ts;
-  const resolver = graph.resolver;
+  const { config, graph, ts, resolver, tree } = checkerScope(input);
   const { suffixes } = resolver.ruleParams();
-  const tree = treeOf(config.root);
   const violations = [];
   const fakeProviders = new Map();
   let worldRoot = null;

@@ -12,13 +12,14 @@
 import { changeWorkflowPhase } from '../../../engine/db/ledger.mjs';
 import { getWorkflow } from './shared/rows.mjs';
 import { canTransition, phaseOf } from './shared/workflow-transitions.mjs';
+import { refuse } from '../../../engine/refuse.mjs';
 
 const MOVES = Object.freeze({
   pause: { from: ['running'], to: 'paused', by: ['owner', 'supervisor', 'kernel'] },
   stop: { from: ['awaiting-approval', 'queued', 'running', 'paused'], to: 'stopped', by: ['owner', 'supervisor'] },
   resume: { from: ['paused', 'stopped'], by: ['owner', 'supervisor'] },
 });
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 
 export default {
   verb: 'lifecycle',

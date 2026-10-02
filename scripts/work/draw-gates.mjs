@@ -40,7 +40,7 @@ import { slash } from './work-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
-export const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
+const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const rel = (repo, p) => slash(path.relative(repo, p));
 const uniq = (xs) => [...new Set(xs.filter(Boolean))];

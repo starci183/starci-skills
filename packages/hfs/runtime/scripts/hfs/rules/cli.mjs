@@ -7,7 +7,7 @@
 // Paths are app-relative; the cli app and the cli feature root are read from the slot manifest through the resolver.
 import { found } from './read.mjs';
 
-export const CLI_REQUIRED = 'BE_CLI_REQUIRED';
+const CLI_REQUIRED = 'BE_CLI_REQUIRED';
 
 /** The one name of the cli app, its kind, and what its image is called below it. */
 export const CLI_APP = 'cli';

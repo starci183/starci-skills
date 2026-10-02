@@ -64,18 +64,18 @@ import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, r
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-export const RECORD_SCHEMA = 'starci/draw-render@1';
-export const DEVICE_SCALE_FACTOR = 2;
+const RECORD_SCHEMA = 'starci/draw-render@1';
+const DEVICE_SCALE_FACTOR = 2;
 export const SETTLE_MS = allocationMs('drawRender.settleMs');
 export const THEMES = Object.freeze(['light', 'dark']);
 /** Root hooks of the grammar components that emitted no data-component before @starci/grammar 0.6.0 (their DNA name for
  * the rendered DOM). 0.6.0 stamps data-component on every renderer root; the map stays for a product still on 0.5.x. */
-export const GRAMMAR_ROOT_MARKERS = Object.freeze([['.starci-core-page-container', 'PageContainer'], ['[data-grammar-section-header]', 'SectionHeader'],
+const GRAMMAR_ROOT_MARKERS = Object.freeze([['.starci-core-page-container', 'PageContainer'], ['[data-grammar-section-header]', 'SectionHeader'],
   ['[data-grammar-surface-card]', 'SurfaceCard'], ['.starci-core-media-frame', 'MediaFrame'], ['.starci-core-surface-copy-group', 'SurfaceCopyGroup'],
   ['.starci-core-rank-artwork', 'RankArtwork'], ['[data-grammar-label]', 'Label'], ['.starci-core-horizontal-scroll-region', 'HorizontalScrollRegion'],
   ['[data-grammar-scroll-region]', 'VerticalScrollRegion'], ['.starci-core-subnav', 'Subnav'], ['.starci-core-rail', 'Rail'], ['.starci-core-tabs', 'Tabs'],
   ['.starci-core-markdown-article', 'MarkdownArticle'], ['[data-grammar-included-mark]', 'IncludedMark'], ['[data-grammar-tooltip]', 'Tooltip']]);
-export const FUNCTION_FIXTURE = '[Function]';
+const FUNCTION_FIXTURE = '[Function]';
 export const EXIT = Object.freeze({ ok: 0, red: 1, usage: 2 });
 const GENERIC_FAMILIES = Object.freeze(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif',
   'ui-monospace', 'ui-rounded', 'math', 'emoji', 'fangsong', 'inherit', 'initial', 'unset']);
@@ -90,7 +90,7 @@ export function preflightDrawGrammarDist(packageRoot) {
   return status;
 }
 /** A red result before any capture (a draw file that does not type-check): exit 1, with its finding code. */
-export class RedError extends Error { constructor(message, code) { super(message); this.code = code; } }
+class RedError extends Error { constructor(message, code) { super(message); this.code = code; } }
 
 const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css', '--state', '--base', '--rationale',
   '--product', '--grammar', '--grammar-dist', '--harness-out']);
@@ -152,7 +152,7 @@ export function parseViewports(text) {
 export const captureBase = (name, { width, height }, theme) => `${name}--${width}x${height}--${theme}`;
 
 export const splitFontStack = (stack) => String(stack).split(',').map((f) => f.trim().replace(/^(["'])(.*)\1$/, '$2')).filter(Boolean);
-export const isGenericFamily = (family) => GENERIC_FAMILIES.includes(family.toLowerCase());
+const isGenericFamily = (family) => GENERIC_FAMILIES.includes(family.toLowerCase());
 
 /**
  * Which family each rendered font stack used, and which named families before it did not render.
@@ -543,7 +543,7 @@ const inside = (file, dir) => { if (!file || !dir) return false; const rel = pat
  * the harness, the claude-dist grammar) resolves from the product app dir - one React, one HeroUI, the product's own.
  * A .draw.tsx is loaded with its layout elements stamped data-draw-layout (rendered-DOM ownership).
  */
-export const drawResolvePlugin = ({ productDir, grammarRoot }) => ({
+const drawResolvePlugin = ({ productDir, grammarRoot }) => ({
   name: 'starci-draw-resolve',
   setup(build) {
     if (grammarRoot) build.onResolve({ filter: /^@starci\/grammar(?:\/.*)?$/ }, (args) => {
@@ -562,7 +562,7 @@ export const drawResolvePlugin = ({ productDir, grammarRoot }) => ({
 });
 
 /** The product app dir of a draw file: the nearest package.json above it that depends on @starci/grammar. */
-export function productDirOf(file) {
+function productDirOf(file) {
   for (let d = path.dirname(path.resolve(file)); ; d = path.dirname(d)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8'));
@@ -573,7 +573,7 @@ export function productDirOf(file) {
 }
 
 /** The render provenance of the grammar a drawing rendered against (owner ruling 2026-09-27). */
-export function grammarProvenance(grammar) {
+function grammarProvenance(grammar) {
   return { grammarSource: grammar.grammarSource, source: grammar.pick?.source ?? null, version: grammar.pick?.version ?? null, root: grammar.pick?.root ?? null,
     productVersion: grammar.productVersion ?? null, productRange: grammar.productRange ?? null, upgradeOwed: grammar.upgradeOwed ?? null,
     typecheck: (grammar.attempts ?? []).map((a) => ({ source: a.source, version: a.version, ok: a.ok, errors: a.errors.length })) };

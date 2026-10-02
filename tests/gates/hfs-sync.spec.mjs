@@ -159,8 +159,9 @@ describe('.github/workflows', () => {
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
     const upload = doc.jobs.ci.steps.find(step => String(step.uses ?? '').startsWith('codecov/'));
-    assert.deepEqual(upload.with, { token: '${{ env.CODECOV_TOKEN }}', files: 'be/coverage/lcov.info', disable_search: true, fail_ci_if_error: true }, 'the one upload: the be lcov, with the CODECOV_TOKEN secret');
-    assert.equal(doc.jobs.ci.env.CODECOV_TOKEN, '${{ secrets.CODECOV_TOKEN }}');
+    assert.deepEqual(upload.with, { use_oidc: true, files: 'be/coverage/lcov.info', disable_search: true, fail_ci_if_error: true }, 'the one upload: the be lcov, authenticated with the OIDC token');
+    assert.equal(doc.jobs.ci.env.CODECOV_TOKEN, undefined);
+    assert.equal(doc.jobs.ci.permissions['id-token'], 'write');
     assert.ok(doc.jobs.ci.steps.findIndex(step => step === upload) > doc.jobs.ci.steps.findIndex(step => step.run === 'npm test -- --ci'), 'the upload follows the unit run');
     assert.equal(doc.permissions['id-token'], undefined);
     assert.doesNotMatch(text, /vitest|e2e/);

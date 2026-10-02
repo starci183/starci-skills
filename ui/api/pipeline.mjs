@@ -55,7 +55,7 @@ function legStatus(leg, units, attempts) {
   return 'queued';
 }
 
-export function attemptBrief(a, project, db = null) {
+function attemptBrief(a, project, db = null) {
   return { id: a.attempt_id, why: db ? whyFor(db, a) : null, usageSource: a.usage_source ?? null, unit: a.unit_id, job: a.job_id, try: a.try_no, status: attemptStatus(a),
     open: attemptOpen(a), endState: a.end_state ?? null, reportOutcome: a.report_outcome, verdict: a.verdict, model: a.model, agent: a.agent, pool: a.pool,
     dispatchedAt: a.dispatched_at, reportedAt: a.reported_at, settledAt: a.settled_at,

@@ -34,12 +34,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { asList, routeFields } from './route-fields.mjs';
+import { routeFields, stringItems } from './route-fields.mjs';
+import { asList } from '../lib/list.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
 } from '../work/record-ownership.mjs';
 import { ownerSpecs, planLegDeferral } from './spec-deferral.mjs';
-import { normalizeText, phraseHits } from './phrase-match.mjs';
+import { phraseHits } from './phrase-match.mjs';
+import { normalizeText } from '../lib/normalize.mjs';
+import { walkFiles } from '../lib/walk.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -110,7 +113,7 @@ function loadProducesTable(goalDir) {
   if (!table || typeof table !== 'object') throw Error(`no producesVocabulary.opProduces in ${file}`);
   const byVar = []; // [{family, suffix, state, qualifier, op, raw}]
   for (const [op, vars] of Object.entries(table)) {
-    for (const raw of asList(vars)) {
+    for (const raw of stringItems(vars)) {
       const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(.+)$/.exec(String(raw).trim());
       if (!m) continue;
       const varPart = m[1];
@@ -135,7 +138,7 @@ function loadProducesTable(goalDir) {
 function loadSettledOutOfBand(goalDir, workRoot) {
   const doc = parseYaml(fs.readFileSync(path.join(goalDir, 'legality.yaml'), 'utf8'));
   const out = [];
-  for (const entry of asArray(doc?.producesVocabulary?.settledOutOfBand)) {
+  for (const entry of asList(doc?.producesVocabulary?.settledOutOfBand)) {
     const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(entry?.var ?? '').trim());
     if (!m || !entry.record) continue;
     let recordState;
@@ -195,7 +198,7 @@ const ARCHETYPE_STAR = {
   'greenfield-scaffold': {
     vars: (a, arch, text) => {
       const surfaces = arch.extra?.surfaces ?? {};
-      const hit = key => asArray(surfaces[key]).some(p => phraseHits(text, p));
+      const hit = key => asList(surfaces[key]).some(p => phraseHits(text, p));
       const named = ['backend', 'frontend', 'package'].filter(hit);
       const picked = named.length ? named : ['backend', 'frontend'];
       return picked.map(q => ({ family: 'impl', suffix: q, state: 'scaffolded', _qual: q, strictQualifier: true }));
@@ -252,13 +255,11 @@ const ARCHETYPE_STAR = {
   },
 };
 
-const asArray = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
-
 function alternativeMatches(text, alt) {
-  const phrases = asArray(alt?.phrases);
+  const phrases = asList(alt?.phrases);
   if (!phrases.length || !phrases.some(p => phraseHits(text, p))) return false;
-  if (!asArray(alt.requires).every(group => asArray(group).some(p => phraseHits(text, p)))) return false;
-  return !asArray(alt.excludes).some(p => phraseHits(text, p));
+  if (!asList(alt.requires).every(group => asList(group).some(p => phraseHits(text, p)))) return false;
+  return !asList(alt.excludes).some(p => phraseHits(text, p));
 }
 
 /** Load archetypes.yaml signalMatching into ordered matchers. Every sequenced
@@ -267,7 +268,7 @@ function loadArchetypeSignals(goalDir) {
   const file = path.join(goalDir, 'archetypes.yaml');
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
   const sets = doc?.signalMatching?.phraseSets ?? {};
-  const expand = list => asArray(list).flatMap(p => {
+  const expand = list => asList(list).flatMap(p => {
     if (typeof p !== 'string' || !p.startsWith('$')) return [p];
     const set = sets[p.slice(1)];
     if (!Array.isArray(set)) throw Error(`${file}: phrase set '${p}' is not declared in signalMatching.phraseSets`);
@@ -276,29 +277,29 @@ function loadArchetypeSignals(goalDir) {
   const expandAlt = alt => (alt && typeof alt === 'object' ? {
     ...alt,
     phrases: expand(alt.phrases),
-    requires: asArray(alt.requires).map(expand),
+    requires: asList(alt.requires).map(expand),
     excludes: expand(alt.excludes),
   } : alt);
   // conditionalLegs.entries: a leg's variable joins S* only when a `when`
   // phrase hits the prompt ("brand: settled" -> {family:'brand', state:'settled'}).
-  const conditionalOf = entry => asArray(entry?.conditionalLegs?.entries).map(c => {
+  const conditionalOf = entry => asList(entry?.conditionalLegs?.entries).map(c => {
     const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(c?.var ?? '').trim());
     if (!m) throw Error(`${file}: archetype '${entry.id}' conditionalLegs entry for '${c?.op}' has no parseable var`);
     const dot = m[1].indexOf('.');
     return { op: String(c.op), when: expand(c.when), var: { family: dot < 0 ? m[1] : m[1].slice(0, dot), suffix: dot < 0 ? '' : m[1].slice(dot + 1), state: m[2] } };
   });
   const byId = new Map();
-  for (const arch of asArray(doc?.archetypes)) {
-    for (const entry of arch?.variants ? asArray(arch.variants) : [arch]) {
-      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals).map(expandAlt), supersedes: asArray(entry.supersedes ?? arch.supersedes), conditional: conditionalOf(entry), extra: entry });
+  for (const arch of asList(doc?.archetypes)) {
+    for (const entry of arch?.variants ? asList(arch.variants) : [arch]) {
+      byId.set(String(entry.id), { id: String(entry.id), signals: asList(entry.signals).map(expandAlt), supersedes: asList(entry.supersedes ?? arch.supersedes), conditional: conditionalOf(entry), extra: entry });
     }
   }
-  const sequence = asArray(doc?.signalMatching?.sequence).map(String);
+  const sequence = asList(doc?.signalMatching?.sequence).map(String);
   if (!sequence.length) throw Error(`${file}: signalMatching.sequence is empty`);
   const matchers = sequence.map(id => {
     const entry = byId.get(id);
     if (!entry) throw Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
-    if (!entry.signals.some(alt => asArray(alt?.phrases).length)) throw Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
+    if (!entry.signals.some(alt => asList(alt?.phrases).length)) throw Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
     if (!ARCHETYPE_STAR[id]) throw Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
@@ -320,7 +321,7 @@ const INTEGRATION_SCOPES = new Set([...PROOF_SCOPES, 'external-integration']);
 
 /** E2E runs manually only (owner ruling 2026-09-29): the e2e/UAT proof legs are explicit asks, never defaults. */
 function explicitProofAsk(text, archetypes) {
-  const hit = list => asArray(list).some(p => phraseHits(text, p));
+  const hit = list => asList(list).some(p => phraseHits(text, p));
   const negated = hit(archetypes.proofNegation);
   const integrationNegated = hit(archetypes.integrationNegation);
   return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated, integration: hit(archetypes.integrationIntent) && !integrationNegated };
@@ -360,7 +361,7 @@ function intentToStar(text, args, archetypes) {
     vars.push(...arch.vars(a, arch, normalizeText(text)));
     Object.assign(hints, arch.hints);
   }
-  if (hints.archetypes.includes('refactor') && asArray(archetypes.canonIntent).some(p => phraseHits(normalizeText(text), p))) {
+  if (hints.archetypes.includes('refactor') && asList(archetypes.canonIntent).some(p => phraseHits(normalizeText(text), p))) {
     Object.assign(hints, { canonConformance: true, scopeKind: 'canon-conformance' });
   }
   // Only a build or verify scope can carry a proof leg; a specification, scaffold, canonicalization or assisted
@@ -432,8 +433,7 @@ const SCHEMA_FAMILY = {
 const SETTLED = new Set(['done']);           // a record whose proof stands
 const UNSETTLED = new Set(['todo', 'inprogress', 'proposed', 'blocked']);
 
-const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
-  .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
+const walk = dir => (fs.existsSync(dir) ? walkFiles(dir) : []);
 
 /** features/<feature>/... -> <feature>; null for a record outside a feature folder. */
 function featureOf(dir, stateDir) {

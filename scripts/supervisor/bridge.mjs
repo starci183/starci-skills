@@ -39,7 +39,8 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { list } from '../lib/list.mjs';
+import { list, splitList } from '../lib/list.mjs';
+import { fail } from '../../engine/refuse.mjs';
 import {
   BRIDGE_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
 } from '../kernel/dependency-graph.mjs';
@@ -50,6 +51,7 @@ import { TRANSFER_SCHEMA, createOwnership } from '../kernel/work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 const DEFINE_GOAL = path.join(SKILL_ROOT, 'scripts', 'goal', 'define-goal.mjs');
@@ -57,9 +59,8 @@ const START_WORKFLOW = path.join(SKILL_ROOT, 'scripts', 'kernel', 'start-workflo
 export const ACTION_KIND = 'supervisor-action';
 export const TAG = '[supervisor-bridge]';
 const BOOLEAN_FLAGS = new Set(['json', 'start', 'dry-run', 'no-notify', 'request-only', 'owner-ok']);
-const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-const clip = (s, n = 400) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
-const fail = (message, code, extra = {}) => { throw Object.assign(new Error(message), { code, ...extra }); };
+const csv = (v) => splitList(v);
+const clip = (s, n = 400) => clipLine(s, n);
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -88,7 +89,7 @@ const runRuntime = (script, argv, { env = process.env, timeout = 180_000 } = {})
   { cwd: SKILL_ROOT, timeout, env });
 const lastJson = (text) => { const t = String(text ?? '').trim(); return parseJson(t) ?? parseJson(t.split('\n').at(-1)) ?? null; };
 /** One cli.mjs call: {ok, body, error, code}. */
-export function apiCall(repo, argv, opts) {
+function apiCall(repo, argv, opts) {
   const r = runRuntime(API, [...argv, '--repo', repo, '--json'], opts);
   const body = lastJson(r.stdout) ?? lastJson(r.stderr);
   if (r.status === 0 && body?.ok !== false) return { ok: true, body };
@@ -142,7 +143,7 @@ const updateBridge = (repo, id, patch) => withWrite(repo, (ledger) => {
  * the new wait holds what the old one held, then the old one is resolved --by supervisor naming the new.
  * A foundation that already landed resolves the old wait only.
  */
-export function retypeWait(repo, { workflowId, incidentId, foundation, bridgeId, reason, env }) {
+function retypeWait(repo, { workflowId, incidentId, foundation, bridgeId, reason, env }) {
   const raised = withRead(repo, (db) => raisedOf(db, workflowId, incidentId));
   if (!raised) return { workflowId, from: incidentId, error: 'incident-unknown' };
   if (raised.status !== 'open') return { workflowId, from: incidentId, skipped: `already ${raised.status}` };
@@ -178,7 +179,7 @@ export function commandFor(repo, f) {
 }
 
 /* -------------------------------------------------------------------- (a) bridge */
-export async function cmdBridge(args, { env = process.env } = {}) {
+async function cmdBridge(args, { env = process.env } = {}) {
   const repo = path.resolve(args.repo ?? fail('--repo <ledger-owner> is required', 'arg-missing'));
   const reason = String(args.reason ?? '').trim() || fail('a bridge states its --reason', 'reason-missing');
   const goal = String(args.goal ?? '').trim() || fail('a bridge states its --goal (the shared part the bridging workflow owns)', 'goal-missing');
@@ -254,7 +255,7 @@ export async function cmdBridge(args, { env = process.env } = {}) {
 }
 
 /** Finish (or redo) a bridge's re-typing: only once the bridging workflow runs can a wait name it. */
-export async function rewireBridge(repo, bridgeId, { env = process.env, args = {}, quiet = false } = {}) {
+async function rewireBridge(repo, bridgeId, { env = process.env, args = {}, quiet = false } = {}) {
   const bridge = withRead(repo, (db) => readBridge(db, bridgeId)) ?? fail(`no bridging record ${bridgeId}`, 'bridge-unknown');
   if (bridge.action !== 'bridge') fail(`${bridgeId} is a ${bridge.action}, not a bridge`, 'bridge-kind');
   const running = withRead(repo, (db) => isRunning(workflowOf(db, bridge.workflowId)));
@@ -282,7 +283,7 @@ export async function rewireBridge(repo, bridgeId, { env = process.env, args = {
 }
 
 /* -------------------------------------------------------------------- (b) transfer */
-export async function cmdTransfer(args, { env = process.env } = {}) {
+async function cmdTransfer(args, { env = process.env } = {}) {
   const repo = path.resolve(args.repo ?? fail('--repo <ledger-owner> is required', 'arg-missing'));
   const reason = String(args.reason ?? '').trim() || fail('a transfer states its --reason', 'reason-missing');
   const approval = approvalOf(args);
@@ -361,7 +362,7 @@ export async function cmdTransfer(args, { env = process.env } = {}) {
 }
 
 /* -------------------------------------------------------------------- (c) revise */
-export async function cmdRevise(args, { env = process.env } = {}) {
+async function cmdRevise(args, { env = process.env } = {}) {
   const repo = path.resolve(args.repo ?? fail('--repo <ledger-owner> is required', 'arg-missing'));
   const workflowId = args.workflow ?? fail('--workflow <id> names the workflow whose legs change', 'arg-missing');
   const text = String(args.text ?? '').trim() || fail('--text <the revised goal text> says which legs are merged, split or parked', 'arg-missing');
@@ -396,7 +397,7 @@ export async function cmdRevise(args, { env = process.env } = {}) {
 }
 
 /* -------------------------------------------------------------------- (d) designate */
-export async function cmdDesignate(args, { env = process.env } = {}) {
+async function cmdDesignate(args, { env = process.env } = {}) {
   const repo = path.resolve(args.repo ?? fail('--repo <ledger-owner> is required', 'arg-missing'));
   const lead = args.lead ?? fail('--lead <wf> names the side that builds the shared part', 'arg-missing');
   const waiter = args.waiter ?? fail('--waiter <wf> names the side that keeps waiting', 'arg-missing');

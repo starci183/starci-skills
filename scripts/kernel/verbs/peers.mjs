@@ -1,18 +1,11 @@
 // starci kernel peers: split from cli.mjs; output and validation remain stable.
-import { getWorkflow } from './shared/rows.mjs';
+import { verbWorkflow, workflowVerb } from './shared/rows.mjs';
 import { currentLegOf, peerMessageOf, peerMessageRows, peerOpenJobsOf, peerWorkflowsOf } from './shared/peer-waits.mjs';
 import { dependenciesOf, dependencyGraph, shortWorkflow } from '../dependency-graph.mjs';
 const PEER_RULE = 'every other running, unarchived workflow of this ledger that shares a source root (source_roots_json; unrecorded roots share all)';
 
-export default {
-  verb: 'peers',
-  required: ['workflow'],
-  kernelOnly: true,
-  usageInCore: true,
-  run({ ledger, args, repo, emit }) {
-    const db = ledger.db, workflowId = args.workflow;
-    const self = getWorkflow(db, workflowId);
-    if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+export default workflowVerb('peers', ({ ledger, args, repo, emit }) => {
+    const { db, workflowId, workflow: self } = verbWorkflow(ledger, args);
     const pendingRows = peerMessageRows(db).filter((row) => row.status === 'pending').map(peerMessageOf);
     const peers = peerWorkflowsOf(db, self).map((wf) => {
       const jobs = peerOpenJobsOf(db, wf.workflow_id);
@@ -48,5 +41,4 @@ export default {
         ...dependencies.bridges.map((b) => `  bridge ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''}${b.workflowId ? ` ${b.workflowId}` : ''}${b.foundation ? ` owns ${b.foundation}` : ''}: ${b.reason.slice(0, 160)}`)]
         : dependencies?.error ? [`dependencies: unavailable (${dependencies.error})`] : []),
     ].join('\n'), args.json);
-  },
-};
+});

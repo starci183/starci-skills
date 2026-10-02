@@ -13,6 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { rebaseMilestone } from '../../scripts/lib/rebase-milestone.mjs';
 import { milestoneRebase, milestoneRefOf, settleCheckpoint } from '../../scripts/kernel/workflow-settle.mjs';
 import { DI_KINDS } from '../../scripts/machine/decisions.mjs';
+import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
+import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
+import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
+import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { writeGreenProofs } from '../helpers/sonar-scan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const WF = 'wf-nivo-milestone-k1';
@@ -129,7 +135,7 @@ test('a conflict: the branch stays, its head is preserved, one rebase-conflict D
   assert.equal(fx.escalations.length, 2);
 });
 
-test('starci kernel settle is the caller (settleCheckpoint), after a green checkpoint only; rebase-conflict is a Decision Item kind', (t) => {
+test('settleCheckpoint rebases only after a green checkpoint; rebase-conflict is a Decision Item kind', (t) => {
   const fx = fixture(t, { behindLimit: 1 });
   commit(fx.repo, 'fe/x1.ts', '1\n');
   write(fx.dir, 'be/d.ts', 'export const d = 1;\n');
@@ -141,9 +147,65 @@ test('starci kernel settle is the caller (settleCheckpoint), after a green check
   assert.equal(green.kind, 'workflow-checkpoint');
   assert.deepEqual([green.milestone.due, green.milestone.why, green.milestone.rebased], [true, 'behind', true]);
   assert.equal(fx.registry.get(WF).checkpoint, green.milestone.head, 'the checkpoint follows the milestone rebase');
-  const settle = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'settle.mjs'), 'utf8');
-  assert.match(settle, /checkpoint = settleCheckpoint\(wfCtx, \{ workflowId: settlingJob\.workflow_id, opId: jobId, pass: verdict === 'pass' \}\);/);
   assert.ok(DI_KINDS.includes('rebase-conflict'));
   const codes = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'failure-codes.yaml'), 'utf8');
   assert.match(codes, /^rebase-conflict:\n/m, 'the DI kind has its failure-code entry');
+});
+
+test('starci kernel settle records a workflow checkpoint only for a green op', (t) => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-wf-settle-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const repo = path.join(base, 'app'), tree = path.join(base, 'workflow');
+  fs.mkdirSync(repo);
+  git(repo, 'init', '-q', '-b', 'main');
+  for (const [key, value] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false']]) git(repo, 'config', key, value);
+  write(repo, '.gitignore', '.starciwork/\n');
+  write(repo, 'docs/base.md', 'base\n');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'init');
+  const workflowId = 'wf-settle-caller', branch = `wf-${workflowId}`;
+  git(repo, 'worktree', 'add', '-q', '-b', branch, tree, 'main');
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), LOCALAPPDATA: path.join(base, 'localappdata'),
+    STARCI_OWNER_ROOT: path.join(base, 'owner') };
+  registerWorkflowWorktree({ env }, { workflowId, orcaWorktreeId: 'repo-settle::workflow', path: tree, branch });
+  const runApi = (args, extraEnv = {}) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), ...args, '--repo', repo, '--json'],
+    { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...env, ...extraEnv } });
+  const seed = (job) => {
+    const ledger = openLedger({ file: ledgerFileFor(repo) });
+    try {
+      const exists = ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId) != null;
+      seedWorkflow(ledger, { id: workflowId, ...(exists ? {} : { goal: { revision: 1, markdown: '# Settle caller' } }), jobs: [job] });
+      const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(job.jobId).attempt_id;
+      ledger.write.writeContract({ attemptId, markdown: '# contract', context: { worktree: tree } });
+      return { ledger, attemptId };
+    } catch (error) { ledger.close(); throw error; }
+  };
+  const read = (fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger.db); } finally { ledger.close(); } };
+
+  const passJob = 'op-docs.author-checkpoint';
+  const pass = seed({ jobId: passJob, opId: 'docs.author', status: 'running', dispatchId: 'ctx-pass', payload: { opId: 'docs.author', owned_paths: ['docs/'] } });
+  try {
+    write(tree, 'docs/pass.md', 'settled green\n');
+    const proofFiles = writeGreenProofs(path.join(tree, 'docs', 'proofs')).map((file) => path.relative(tree, file).replace(/\\/g, '/'));
+    pass.ledger.write.fileReport({ attemptId: pass.attemptId, outcome: 'done', report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'green', files: ['docs/pass.md', ...proofFiles], checks: [{ name: 'unit', command: 'true', exitCode: 0 }] } });
+  } finally { pass.ledger.close(); }
+  const checked = runApi(['check', '--job', passJob, '--checks', JSON.stringify({ checks: [{ name: 'unit', command: 'true', exitCode: 0, evidence: 'green' }] })], { STARCI_CALLER: 'runtime-settler' });
+  assert.equal(checked.status, 0, checked.stderr || checked.stdout);
+  const settled = runApi(['settle', '--job', passJob, '--verdict', 'pass']);
+  assert.equal(settled.status, 0, settled.stderr || settled.stdout);
+  const checkpoint = read((db) => db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='workflow-checkpoint'").get(passJob));
+  assert.ok(checkpoint, 'starci kernel settle writes the workflow-checkpoint event');
+  const passHead = JSON.parse(checkpoint.payload_json).sha;
+  assert.equal(workflowWorktreeOf({ env }, workflowId).checkpoint, passHead, 'starci kernel settle advances the workflow checkpoint head');
+
+  const failJob = 'op-docs.author-failed';
+  const failed = seed({ jobId: failJob, opId: 'docs.author', status: 'running', dispatchId: 'ctx-fail', payload: { opId: 'docs.author', owned_paths: ['failed/'] } });
+  failed.ledger.close();
+  write(tree, 'failed/work.md', 'not accepted\n');
+  const rejected = runApi(['settle', '--job', failJob, '--verdict', 'fail']);
+  assert.equal(rejected.status, 0, rejected.stderr || rejected.stdout);
+  assert.equal(read((db) => db.prepare("SELECT count(*) AS n FROM events WHERE entity_id=? AND kind='workflow-checkpoint'").get(failJob).n), 0,
+    'a failed verdict produces no workflow checkpoint');
+  assert.equal(read((db) => db.prepare("SELECT count(*) AS n FROM events WHERE entity_id=? AND kind='workflow-op-preserved'").get(failJob).n), 1);
+  assert.equal(workflowWorktreeOf({ env }, workflowId).checkpoint, passHead, 'the failed verdict leaves the checkpoint head unchanged');
 });

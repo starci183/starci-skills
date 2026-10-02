@@ -8,7 +8,7 @@
 // `contract`, diagnostics off) is the managed-file check's (HFS_MANAGED_FILE_DRIFT); a spec whose suffix disagrees with its src/tests folder has no slot (HFS_SLOT_UNDECLARED).
 import { found, readJson } from './read.mjs';
 
-export const TEST_TOPOLOGY = 'BE_TEST_TOPOLOGY';
+const TEST_TOPOLOGY = 'BE_TEST_TOPOLOGY';
 const DOT_TEST = /\.test\.[cm]?[jt]sx?$/;
 const JEST_CONFIG = /(?:^|\/)jest(?:\.[^/]+)*\.config(?:\.[^/]+)*\.(?:[cm]?[jt]s|json)$|(?:^|\/)jest\.config\.[^/]+$/;
 const ROOT_JEST_CONFIG = 'jest.config.js';

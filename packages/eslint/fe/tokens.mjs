@@ -16,6 +16,7 @@ import { join } from "node:path"
  * license one.
  */
 
+import { isClassAttribute, staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { classOf, isProductSource } from "./lib/scope.mjs"
 
@@ -41,23 +42,14 @@ const LARGE_TEXT = /\btext-(?:xl|2xl|3xl|4xl|5xl)\b/
 /** A heavy weight. */
 const HEAVY_WEIGHT = /\bfont-(?:bold|extrabold|black)\b/
 
-/** True for a `className` / `class` JSX attribute. */
-const isClassAttribute = (node) =>
-  node.type === "JSXAttribute" && node.name && (node.name.name === "className" || node.name.name === "class")
-
-/** Static string carried by a JSX attribute, a module constant, or an array member. */
-const staticText = (value) => {
-  if (!value) return null
-  if (value.type === "Literal" && typeof value.value === "string") return value.value
-  if (value.type === "TemplateLiteral" && value.expressions.length === 0) {
-    return value.quasis.map((quasi) => quasi.value.cooked).join(" ")
-  }
-  if (value.type === "JSXExpressionContainer") return staticText(value.expression)
-  if (value.type === "ArrayExpression") {
-    const members = value.elements.map((element) => staticText(element)).filter(Boolean)
+/** Static string carried by a JSX attribute, a module constant, or an array of class strings. */
+const classText = (value) => {
+  if (value?.type === "JSXExpressionContainer") return classText(value.expression)
+  if (value?.type === "ArrayExpression") {
+    const members = value.elements.map((element) => classText(element)).filter(Boolean)
     return members.length > 0 ? members.join(" ") : null
   }
-  return null
+  return staticText(value)
 }
 
 /** Walk every place a class string can be written: markup, a constant, or an entry's array. */
@@ -67,16 +59,16 @@ const classTextVisitors = (context, report) => {
   return {
     JSXAttribute(node) {
       if (!isClassAttribute(node)) return
-      report(node, staticText(node.value))
+      report(node, classText(node.value))
     },
     VariableDeclarator(node) {
-      report(node, staticText(node.init))
+      report(node, classText(node.init))
     },
     Property(node) {
       if (node.computed) return
       const key = node.key.type === "Identifier" ? node.key.name : null
       if (key !== "classes") return
-      report(node, staticText(node.value))
+      report(node, classText(node.value))
     },
   }
 }

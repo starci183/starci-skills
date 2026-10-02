@@ -72,7 +72,7 @@ const TERMINAL_LAUNCH=[
 // first program word of a shell string / a cmd|sh|powershell argv - names an agent CLI (or its .cmd/.exe shim).
 // Prose, comments and messages that mention `claude -p` are not calls; git, node and npm spawns pass.
 export const AGENT_CLI_SPAWN='AGENT_CLI_SPAWN';
-export const AGENT_CLIS=Object.freeze(['codex','claude','cursor-agent','devin','gemini','opencode']);
+const AGENT_CLIS=Object.freeze(['codex','claude','cursor-agent','devin','gemini','opencode']);
 const AGENT_SPAWN_ROOTS=['scripts','engine','modules','bin'];
 const AGENT_SPAWN_EXT=/\.(?:mjs|cjs|js|ts)$/;
 /** The agent-CLI spawns in one source text: [{line, callee, program}]. Pure. */
@@ -167,8 +167,8 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
   return {ok:found.length===0,violations:found};
 }
 
-export function hostBoundaryMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: starci runtime check --only host-boundary -- [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run raw orca instead of \`starci orca <verb>\`, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
+function hostBoundaryMain(argv=[]){
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: starci runtime check --only host-boundary [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
   const result=findHostBoundaryViolations({root});

@@ -60,7 +60,7 @@ import { envDumpVerdict } from './env-dump-verdict.mjs';
 import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
-
+import { readEnv } from '../lib/env.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -474,7 +474,7 @@ export async function unguardedVerdict({ command, cwd, env = process.env, dialec
 }
 
 /** The shell text of one hook input: Claude's Bash/PowerShell, Codex's Bash and Devin's exec all carry `command`. */
-export function shellCallOf(input) {
+function shellCallOf(input) {
   const command = input?.tool_input?.command;
   if (typeof command !== 'string' || !command.trim()) return null;
   const cwd = input.tool_input.workdir || input.cwd || process.cwd();
@@ -486,7 +486,7 @@ const NAMES_PACKAGE_MANAGER = /\b(?:npm|pnpm|yarn)\b/i;
 
 /** The hook's decision for one input: {verdict, guard} to refuse (guard null for an unguarded session), else null. */
 export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null } = {}) {
-  const guard = boundGuard(env.ORCA_TERMINAL_HANDLE, { root });
+  const guard = boundGuard(readEnv('ORCA_TERMINAL_HANDLE', env), { root });
   const call = shellCallOf(input);
   if (!call) return null;
   if (!guard) {
@@ -511,7 +511,7 @@ export async function main({ stdin = process.stdin, stderr = process.stderr, env
   try {
     const raw = await readInput(stdin);
     // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
-    if (!boundGuard(env.ORCA_TERMINAL_HANDLE, { root }) && !NAMES_PACKAGE_MANAGER.test(raw)) return 0;
+    if (!boundGuard(readEnv('ORCA_TERMINAL_HANDLE', env), { root }) && !NAMES_PACKAGE_MANAGER.test(raw)) return 0;
     const decision = await hookDecision(JSON.parse(raw), { env, root });
     if (!decision) return 0;
     const { refusalLines, logRefusal } = await import('./refusals.mjs');

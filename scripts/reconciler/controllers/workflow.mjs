@@ -29,6 +29,8 @@ import { openLedgerReader, ledgerFileFor } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { positiveNumber } from '../../lib/number.mjs';
+import { productLedgers } from '../../lib/ledgers.mjs';
 import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, apiFrontier } from '../../supervisor/stall.mjs';
 import { openAsks } from '../../supervisor/poll.mjs';
 import { progressSettings } from '../../kernel/progress-rca.mjs';
@@ -38,15 +40,14 @@ import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';
 import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
-
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
-export const WORKFLOW_FILE = path.join(skillRoot, 'modules', 'reconciler', 'workflow.yaml');
+const WORKFLOW_FILE = path.join(skillRoot, 'modules', 'reconciler', 'workflow.yaml');
 export const DI_SCHEMA = 'starci/decision-item@1';
 export const OPENED_BY = 'workflow-controller';
 export const SUPERVISOR_LEDGER = 'supervisor';
 /** starci kernel status stuck[] kind -> violation code (DESIGN Appendix A; a supervisor-gate is SUPERVISOR_GATE_OVERDUE). */
-export const STUCK_CODES = Object.freeze({
+const STUCK_CODES = Object.freeze({
   'owner-gate': 'WAIT_OVERDUE', 'peer-wait': 'PEER_WAIT_OVERDUE', dependency: 'WAIT_OVERDUE', 'retry-cap': 'WAIT_OVERDUE',
   'deferred-settle': 'WAIT_OVERDUE', 'queued-ready': 'READY_UNDISPATCHED', throttled: 'WAIT_OVERDUE',
 });
@@ -57,7 +58,7 @@ const DEFAULT_ROUTES = ['incident-raised', 'incident-resolved', 'ask-serving', '
 
 /* ------------------------------------------------------------------------------------------------ settings */
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+const num = (v, d) => positiveNumber(v, d, { orZero: true });
 
 /** modules/reconciler/workflow.yaml + the runtimes.yaml numbers it cites. Never throws (defaults on a bad file). */
 export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, catalog = null } = {}) {
@@ -91,9 +92,8 @@ export function parseKey(key) {
   const m = /^workflow:([^:]+):(.+)$/.exec(String(key ?? ''));
   return m ? { ledgerId: m[1], workflowId: m[2] } : null;
 }
-export const workflowEntity = (ledgerId, workflowId) => `workflow:${ledgerId}:${workflowId}`;
-export const stuckPrefix = (ledgerId, workflowId) => `stuck:${ledgerId}:${workflowId}:`;
-const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l && l.ledgerId !== SUPERVISOR_LEDGER && l.file);
+const workflowEntity = (ledgerId, workflowId) => `workflow:${ledgerId}:${workflowId}`;
+const stuckPrefix = (ledgerId, workflowId) => `stuck:${ledgerId}:${workflowId}:`;
 const evWorkflow = (ev) => ev?.workflowId ?? ev?.workflow_id ?? null;
 const evLedger = (ev) => ev?.ledgerId ?? ev?.ledger_id ?? null;
 
@@ -270,7 +270,7 @@ function openReaders(ctx) {
 const closeAll = (readers) => { for (const r of readers.values()) { try { r.db.close(); } catch { /* closed */ } } };
 
 /** The goal-text invariant of one workflow: {missing, why}. */
-export function goalOf(db, workflowId) {
+function goalOf(db, workflowId) {
   const row = db.prepare('SELECT markdown FROM goals WHERE workflow_id=? ORDER BY revision DESC, goal_seq DESC LIMIT 1').get(workflowId);
   if (!row) return { missing: true, why: 'no goal revision' };
   const text = String(row.markdown ?? '').trim();
@@ -468,7 +468,7 @@ export default {
 /* ------------------------------------------------------------------------------------------------ --dry */
 
 /** A ctx that writes nothing: statuses through starci kernel status (read-only), every action recorded. */
-export function dryCtx({ repos = productRepos(), now = Date.now() } = {}) {
+function dryCtx({ repos = productRepos(), now = Date.now() } = {}) {
   const would = [];
   const cache = new Map();
   const ledgers = repos.map((repo) => ({ ledgerId: path.basename(repo), repo, file: ledgerFileFor(repo) }));

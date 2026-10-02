@@ -1,6 +1,6 @@
 // docker.mjs - every app builds its own image: be/apps/<app>/Dockerfile and fe/apps/<app>/Dockerfile (slot repo.app-image, required per declared
 // app; a Dockerfile anywhere else is owned by no slot) built from the APP ROOT, which holds the one package.json and the managed .dockerignore.
-// The Dockerfile is app-owned (hfs scaffold writes it once from templates/<side>/image) and judged here, structurally, from its parsed
+// The Dockerfile is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged here, structurally, from its parsed
 // instructions (scripts/lib/dockerfile.mjs), never by matching the text:
 //   HFS_DOCKER_BUILD_CONTEXT  the header comment states the app's own build command (`docker build -f <side>/apps/<app>/Dockerfile ... .`, the
 //                             context the app root) and no COPY or ADD source leaves the context (`..`, an absolute path)
@@ -14,21 +14,22 @@
 //                             URL, no ARG or ENV whose name is a credential (NEXT_PUBLIC_* are published by design and are the one exception)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
+import { propertyText } from '../../lib/ts-ast.mjs';
 import { execForm, parseDockerfile, shellCommands, words } from '../../lib/dockerfile.mjs';
 import { found, readText } from './read.mjs';
 
-export const DOCKER_BUILD_CONTEXT = 'HFS_DOCKER_BUILD_CONTEXT';
-export const DOCKER_STAGES = 'HFS_DOCKER_STAGES';
-export const DOCKER_ENTRY = 'HFS_DOCKER_ENTRY';
-export const DOCKER_BASE_PIN = 'HFS_DOCKER_BASE_PIN';
-export const DOCKER_SECRETS = 'HFS_DOCKER_SECRETS';
+const DOCKER_BUILD_CONTEXT = 'HFS_DOCKER_BUILD_CONTEXT';
+const DOCKER_STAGES = 'HFS_DOCKER_STAGES';
+const DOCKER_ENTRY = 'HFS_DOCKER_ENTRY';
+const DOCKER_BASE_PIN = 'HFS_DOCKER_BASE_PIN';
+const DOCKER_SECRETS = 'HFS_DOCKER_SECRETS';
 
 /** The one node base image of every Dockerfile of the canon: an exact node version on an exact alpine release. */
 export const NODE_IMAGE = 'node:22.14.0-alpine3.21';
 /** The two stages every Dockerfile has: the build, then the runtime that ships. */
-export const BUILD_STAGE = 'build';
-export const RUNTIME_STAGE = 'runtime';
+const BUILD_STAGE = 'build';
+const RUNTIME_STAGE = 'runtime';
 /** The port a listening app serves unless its environment says otherwise (ENV PORT of the runtime stage). */
 export const DEFAULT_PORT = '3000';
 
@@ -44,9 +45,9 @@ const DIGEST = /@sha256:[0-9a-f]{64}$/;
 /** The path of the Dockerfile of a be or fe app, app-relative. */
 export const dockerfilePath = (side, app) => `${side}/apps/${app}/Dockerfile`;
 /** The entry a built be app starts (from the app root). */
-export const beEntry = (app) => `be/dist/apps/${app}/src/main.js`;
+const beEntry = (app) => `be/dist/apps/${app}/src/main.js`;
 /** The entry a Next standalone fe app starts (from the app root: the standalone tree keeps the workspace layout). */
-export const feEntry = (app) => `fe/apps/${app}/server.js`;
+const feEntry = (app) => `fe/apps/${app}/server.js`;
 
 const instructionsOf = (stage, keyword) => stage.instructions.filter((item) => item.keyword === keyword);
 /** The commands a stage's RUN instructions run, each as its words (shell form; an exec-form RUN is one command). */
@@ -133,14 +134,7 @@ function stageFindings(file, parsed, side, kind) {
 
 /** The Next config's `output` property, read with TypeScript's parser: the string literal assigned to `output` in an object literal. */
 function nextOutput(ts, text) {
-  const source = ts.createSourceFile('next.config.ts', text, ts.ScriptTarget.Latest, true);
-  let output = null;
-  const visit = (node) => {
-    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === 'output' && ts.isStringLiteralLike(node.initializer)) output = node.initializer.text;
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return output;
+  return propertyText(ts, text, { file: 'next.config.ts', key: 'output' });
 }
 
 /** R189: the entry, the port and the health of the runtime. */
@@ -237,10 +231,7 @@ function secretFindings(file, parsed) {
 }
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The findings of the docker rules over the tracked paths `files` (app-relative) of the app at `repoRoot`. */
 export function dockerFindings({ repoRoot, files, repo }) {

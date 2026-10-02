@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { refuse } from './refuse.mjs';
 
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;
@@ -247,7 +248,7 @@ export function unitSubjectKey({cut=null,params=null,records=[],ownedPaths=[]}={
 export const sameUnit=(a,b)=>Boolean(a?.unit_id&&a.unit_id===b?.unit_id);
 
 const OPEN_TRY=['queued','ready','leased','running','answering','reported','deciding','effect_unknown'];
-const refuseUnit=(message,code,extra={})=>Object.assign(new Error(message),{code,...extra});
+
 /** The jobs.retry_class of a successor of `last` (DBTREE: business | infra | resume | follow-up). */
 const retryClassOf=(last,disposition)=>last.status==='cancelled'?'resume'
   :disposition?.retryClass==='business'?'business'
@@ -266,17 +267,17 @@ export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
   const ordered=[...tries].sort((a,b)=>Number(a.try_no)-Number(b.try_no));
   const last=ordered.at(-1)??null;
   if(!unit||!last){
-    if(retryOf)throw refuseUnit(`--retry-of ${retryOf} names no earlier try of this unit`,'retry-lineage-invalid');
+    if(retryOf)throw refuse(`--retry-of ${retryOf} names no earlier try of this unit`,'retry-lineage-invalid');
     return {tryNo:1,retryOf:null,resumeOf:null,retryClass:null,reopen:null};
   }
   const open=ordered.filter(job=>OPEN_TRY.includes(job.status));
-  if(open.length)throw refuseUnit(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (starci kernel graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
-  if(retryOf&&retryOf!==last.job_id)throw refuseUnit(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
+  if(open.length)throw refuse(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (starci kernel graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
+  if(retryOf&&retryOf!==last.job_id)throw refuse(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
   const done=unit.state==='done'||last.status==='succeeded';
-  if(done&&!(reopen?.reason&&reopen?.by))throw refuseUnit(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
-  if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuseUnit(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
+  if(done&&!(reopen?.reason&&reopen?.by))throw refuse(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
+  if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuse(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
   const tryNo=Number(last.try_no)+1;
-  if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (starci kernel unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
+  if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuse(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (starci kernel unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
   if(done)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopen.reason),by:String(reopen.by)}};
   const disposition=RETRYABLE_JOB_STATUSES.includes(last.status)?retryDisposition(last):null;
   const resume=last.status==='cancelled';

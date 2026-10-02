@@ -22,17 +22,13 @@ import { isMain } from '../../lib/is-main.mjs';
 import { probe as probeClaude } from './claude.mjs';
 import { probe as probeCodex } from './codex.mjs';
 import { probe as probeDevin } from './devin.mjs';
+import { normalizeProvider } from '../../lib/provider.mjs';
 
 const PROBES = {
   claude: probeClaude,
   codex: probeCodex,
   devin: probeDevin,
 };
-
-export function normalizeProvider(provider) {
-  const p = String(provider ?? '').trim().toLowerCase();
-  return p.replace(/-agent$/, '');
-}
 
 export function probeQuota(provider, opts = {}) {
   const key = normalizeProvider(provider);

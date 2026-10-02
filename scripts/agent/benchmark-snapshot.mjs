@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
-import { isRuntimeRoot, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { isRuntimeRoot, ledgerFileFor, hasLedger } from '../../engine/db/ledger.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { scorecardFor, UNROUTED, localDay, shortPool, pctText } from './model-scorecard.mjs';
 import { readJsonFile as readJson } from '../lib/json.mjs';
@@ -23,10 +23,10 @@ export const SNAPSHOTS_DIR = path.join(skillRoot, 'benchmark', 'snapshots');
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 
-const hasLedger = (root) => { try { return !isRuntimeRoot(root) && fs.existsSync(ledgerFileFor(root)); } catch { return false; } };
+
 
 /** YYYY-MM-DD of `ms` in the host's local time zone (the day the owner reads). */
-export const localDate = localDay;
+const localDate = localDay;
 
 /** The snapshot file name for one date and window. */
 export const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;

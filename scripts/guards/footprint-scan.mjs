@@ -28,14 +28,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const SKILL_ROOT = path.resolve(here, '..', '..');
 export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
 export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
-export const DEFAULT_DEPTH = 4;
+const DEFAULT_DEPTH = 4;
 const fold = foldCase;
 /** The repositories root: the directory that holds the source host repository (its .claude is the runtime). */
 export const defaultRoot = (skillRoot = SKILL_ROOT) => path.resolve(skillRoot, '..', '..');
 const topOf = (root, p) => { const relative = path.relative(root, p); return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? relative.split(path.sep)[0] : null; };
 
 /** Links under root to depth, never entered; inside node_modules only lstat is asked (a package dir is not walked). */
-export function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
+function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
   const found = [];
   const record = (p, stat) => {
     let target = null, real = null;
@@ -59,7 +59,7 @@ export function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
 }
 
 /** Linked worktrees (not the main checkout) of every repository directly under root, that live under root. */
-export function worktreesUnderRoot(root, { git = (cwd, args) => worktreeListQuery(args, { cwd, timeout: 20_000 }) } = {}) {
+function worktreesUnderRoot(root, { git = (cwd, args) => worktreeListQuery(args, { cwd, timeout: 20_000 }) } = {}) {
   const found = [];
   let names; try { names = fs.readdirSync(root); } catch { return found; }
   for (const name of names) {
@@ -92,7 +92,7 @@ export function scanFootprint({ root = defaultRoot(), depth = DEFAULT_DEPTH, sta
 }
 
 /** Scan and record it (machine.sqlite host_samples kind worker-footprint). The first scan only records a baseline. */
-export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultRoot(skillRoot), depth = DEFAULT_DEPTH, env = process.env } = {}) {
+async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultRoot(skillRoot), depth = DEFAULT_DEPTH, env = process.env } = {}) {
   const { withMachine } = await import('../../engine/db/machine.mjs');
   return withMachine((m) => {
     const last = m.db.prepare("SELECT detail_json FROM host_samples WHERE kind='worker-footprint' AND subject=? ORDER BY seq DESC LIMIT 1").get(path.resolve(root));

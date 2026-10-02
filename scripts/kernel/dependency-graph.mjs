@@ -43,8 +43,10 @@ import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { recordPathTransfer } from '../../engine/db/ledger.mjs';
 import { list } from '../lib/list.mjs';
+import { pathsOverlap } from '../lib/path-key.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
-export const BRIDGE_SCOPE = 'supervisor-bridge';
+const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
 export const FINDING_KINDS = Object.freeze(['circular-wait', 'unowned-need', 'hub-blocker', 'duplicate-work']);
 export const RECORD_CHANGE_REFUSED = 'record-change-refused';
@@ -62,9 +64,9 @@ const FOUNDATION_SYNONYMS = { shell: 'layout-tree', layout: 'layout-tree', 'layo
 const SHARED_WIRING = /(?:^|\/)(?:app\.module\.ts|package\.json|package-lock\.json|pnpm-lock\.yaml|architecture\.json|\.starciwork\/index\.yaml)$/;
 
 const kindOf = (text) => /^\[([^\]]+)\]/.exec(String(text ?? ''))?.[1] ?? null;
-const clip = (s, n = 200) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+const clip = (s, n = 200) => clipLine(s, n);
 const pathForm = (p) => normWork(typeof p === 'string' ? p : p?.path).toLowerCase();
-const within = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+const within = pathsOverlap;
 export const shortWorkflow = (wf) => String(wf ?? '').replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '');
 
 /** The alias key of a foundation name: `nivo.brand` and `brand` are one foundation, `shell` is `layout-tree`. */
@@ -85,7 +87,7 @@ export const writeTransfer = (db, record, now = Date.now()) => recordPathTransfe
   toWorkflow: record.to ?? null, bridgeId: record.bridgeId ?? null, state: 'applied', detail: record, at: now });
 
 /** One bridge record as a status/peers row. */
-export const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),
+const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),
   ...(b.workflowId ? { workflowId: b.workflowId } : {}), ...(b.foundation ? { foundation: b.foundation } : {}), ...(b.blocker ? { blocker: b.blocker } : {}),
   ...(b.dependents ? { dependents: b.dependents } : {}), ...(b.owner ? { owner: b.owner } : {}), ...(b.waiter ? { waiter: b.waiter } : {}),
   ...(b.to ? { to: b.to } : {}), ...(b.from ? { from: b.from } : {}), ...(b.target ? { target: b.target } : {}), at: b.at ?? null });

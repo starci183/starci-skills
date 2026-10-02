@@ -28,6 +28,7 @@ import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
 import { appCliTemplateFindings } from './runtime-rules/app-cli-templates.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
+import { ciUploadFindings } from './runtime-rules/ci-upload.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { prosePathFindings } from './runtime-rules/prose-path.mjs';
 import { proseRestateFindings } from './runtime-rules/prose-restates.mjs';
@@ -41,13 +42,14 @@ import { RETIRED_PATHS_FILE, movedFrom, pinnedFindings, retiredFindings } from '
 import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 import { sourceNameFindings } from './runtime-rules/source-name.mjs';
 import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
 import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
 const SOURCE = /\.(?:mjs|cjs|js)$/;
 /** The codes only an extra emitter reports (scripts/checks/check-contract-cites.mjs, passed in by the `starci runtime check` driver). */
-export const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
+const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
 
 /** The merge-base of HEAD with main (else origin/main) in `repoRoot` and a reader of files at it; null when none resolves. */
 export function baseRevision(repoRoot) {
@@ -59,7 +61,7 @@ export function baseRevision(repoRoot) {
 }
 
 /** The `pending` list of the runtime manifest at the base revision, or null when the base has none (or no base). */
-export function basePendingOf(base) {
+function basePendingOf(base) {
   if (!base) return null;
   const text = base.show(RUNTIME_MANIFEST_FILE);
   if (text === null) return null;
@@ -67,7 +69,7 @@ export function basePendingOf(base) {
 }
 
 /** The production sources of the runtime: tracked .mjs/.cjs/.js under ruleParams.runtime.sourceRoots, generated copies excluded. */
-export function runtimeSources(files, params) {
+function runtimeSources(files, params) {
   const roots = params.sourceRoots;
   const generated = params.generated.map((g) => `${g.root}/`);
   return files.filter((f) => SOURCE.test(f) && roots.some((r) => f === r || f.startsWith(`${r}/`)) && !generated.some((g) => f.startsWith(g)));
@@ -87,7 +89,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   const params = ruleParams(runtimeManifest, 'runtime');
   const tracked = files ?? trackedFiles(repoRoot);
   const fileSet = new Set(tracked);
-  const read = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel), 'utf8'); } catch { return null; } };
+  const read = (rel) => readTextFile(repoRoot, rel);
   const readBytes = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel)); } catch { return null; } };
   const sourcePaths = runtimeSources(tracked, params);
   const sources = sourcePaths.map((p) => ({ path: p, text: read(p) ?? '' }));
@@ -123,6 +125,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...generatedBlockFindings(ctx),
     ...prosePathFindings(ctx),
     ...proseRestateFindings(ctx),
+    ...ciUploadFindings(ctx),
   );
   const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });

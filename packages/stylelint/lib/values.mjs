@@ -87,7 +87,7 @@ const isRawBrand = (node) => {
 }
 
 /** Every `var()` in a value, recursively, as `{ name, node }`. */
-export function varReferences(value) {
+function varReferences(value) {
   const found = []
   const walk = (nodes) => {
     for (const node of nodes) {

@@ -37,6 +37,7 @@ import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { pathKey } from '../lib/path-key.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
@@ -46,7 +47,7 @@ export const REGISTERED_DIR_MISSING_REASON = 'registered-dir-missing';
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 /** Case-insensitive, separator-normalized directory identity, for comparing a disk path against a DB-recorded one. */
-const dirKey = (p) => path.resolve(String(p)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const dirKey = (p) => pathKey(p, { fold: true });
 /**
  * A repo root in the forward-slash form machine.sqlite `repositories.repo_root` already stores (engine/db/machine.mjs
  * repoKey), so a root discovered on disk (native, backslash on Windows) and one read back from the registry dedupe

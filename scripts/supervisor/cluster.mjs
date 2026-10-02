@@ -8,9 +8,10 @@
 // across ticks while its lead label and token stay the same: <label>-<token>.
 import crypto from 'node:crypto';
 import { fixTokens, citedIncidents } from './owed.mjs';
+import { slugify } from '../lib/slug.mjs';
 
 const GENERIC_LABEL = 'addressed-to-supervisor';
-const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+
 
 /** Cluster `items`; returns [{id, label, token, items, workflows, incidents, fixedBy, summary}] largest first. */
 export function clusterOwed(items) {
@@ -46,7 +47,7 @@ export function clusterOwed(items) {
     const keySeed = token ?? its.map((x) => x.incidentId ?? x.key).sort()[0] ?? crypto.randomUUID();
     const fixes = [...new Set(its.map((x) => x.fixedBy?.sha).filter(Boolean))];
     return {
-      id: `${slug(label)}-${slug(keySeed)}`.replace(/-+$/, ''),
+      id: `${slugify(label)}-${slugify(keySeed)}`.replace(/-+$/, ''),
       label, token, size: its.length,
       workflows: [...new Set(its.map((x) => x.workflowId))],
       incidents: its.map((x) => x.incidentId).filter(Boolean),

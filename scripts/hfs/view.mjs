@@ -16,7 +16,7 @@ const isAbsoluteAny = (text) => path.isAbsolute(text) || /^[A-Za-z]:\//.test(tex
  * @param {string} repoRoot - The absolute repository root.
  * @returns {object} The frozen view: profile, apps, connections, ruleParams, relative, classify, slotOf, tierOf, ownerOf, slot.
  */
-export function hfsView(opened, repoRoot) {
+function hfsView(opened, repoRoot) {
   const rel = (file) => {
     const text = posix(file);
     if (!isAbsoluteAny(text)) return text.replace(/^\.\//, '');
