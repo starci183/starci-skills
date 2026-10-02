@@ -18,7 +18,7 @@ import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
 import { workerRelease } from '../../scripts/api/orca/worker-release.mjs';
-import { orcaRun, jsonOf } from '../../scripts/api/orca/lib.mjs';
+import { taskList } from '../../scripts/api/orca/task-list.mjs';
 import { processList as listHostProcesses } from '../../scripts/api/process/process-list.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -68,8 +68,8 @@ test('E3: worker_done settles the Dispatch and Orca completes its Task', { skip,
   try {
     const shown = await until(() => workerShow({ dispatch: a.dispatchId }), (r) => SETTLED.includes(r.state));
     diagnose('e3', a);
-    const listed = jsonOf(orcaRun(['orchestration', 'task-list', '--run', a.runId, '--json']).stdout);
-    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, taskStatusAfterWorkerDone: (listed?.result?.tasks ?? []).find((t) => t.id === a.taskId)?.status ?? null };
+    const listed = taskList({ run: a.runId });
+    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, taskStatusAfterWorkerDone: listed.tasks.find((t) => t.id === a.taskId)?.status ?? null };
     console.log(`SMOKE-E3 ${JSON.stringify(out)}`);
     assert.equal(out.dispatchStateAfterOrchSend, 'succeeded', 'send.mjs worker_done did not settle the Dispatch');
     assert.equal(out.taskStatusAfterWorkerDone, 'completed', 'Orca did not complete the Task when the worker_done settled the Dispatch');
