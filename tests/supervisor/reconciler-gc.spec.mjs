@@ -272,8 +272,8 @@ test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (script
     if (args[0] === 'rev-parse' || args[0] === 'merge-base') return { ok: true, stdout: 'bbbbbbb' };
     return { ok: true, stdout: '' };
   };
-  const allocation = { housekeeping: { lanesRoot: lanes, laneGraceMs: 86_400_000 } };
-  const run = (owners) => sweepLanes({ apply: false, now, env: {}, allocation, root, git, owners });
+  const allocation = { housekeeping: { laneGraceMs: 86_400_000 } };
+  const run = (owners) => sweepLanes({ apply: false, now, env: { STARCI_LANES_ROOT: lanes }, allocation, root, git, owners });
   const owned = run({ workers: [activeIn('ctx_api', dir)], sup: { jobs: [] } });
   assert.deepEqual(owned.wouldRemove, []);
   assert.equal(owned.skipped.find((x) => x.path === dir)?.reason, 'live-owner');

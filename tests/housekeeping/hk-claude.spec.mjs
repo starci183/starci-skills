@@ -22,8 +22,8 @@ function sandbox(t) {
   const projects = path.join(root, 'projects');
   const archive = path.join(root, 'archive');
   fs.mkdirSync(projects, { recursive: true });
-  const env = { STARCI_CLAUDE_PROJECTS_ROOT: projects };
-  const allocation = { housekeeping: { claudeTranscriptArchiveAfterMs: WEEK, archiveRoot: archive } };
+  const env = { STARCI_CLAUDE_PROJECTS_ROOT: projects, STARCI_ARCHIVE_ROOT: archive };
+  const allocation = { housekeeping: { claudeTranscriptArchiveAfterMs: WEEK } };
   return { root, projects, archive, env, allocation };
 }
 
