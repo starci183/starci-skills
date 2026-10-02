@@ -9,6 +9,3 @@ export interface GrantLoyaltyPointsRequest {
     /** What the buyer paid, in minor units. */
     readonly totalMinorUnits: number
 }
-
-/** The command answers nothing: its effect is the state the domain service wrote. */
-export type GrantLoyaltyPointsResult = void

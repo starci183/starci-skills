@@ -6,7 +6,9 @@ const contract = readContractFile("billing", "events.json")
 
 describe("billing event contract", () => {
     it("publishes exactly the events the billing event classes declare, at the same version", () => {
-        expect(classes.map((event) => event.eventName).sort()).toEqual(Object.keys(contract.events).sort())
+        expect(classes.map((event) => event.eventName).sort((a, b) => a.localeCompare(b))).toEqual(
+            Object.keys(contract.events).sort((a, b) => a.localeCompare(b)),
+        )
         for (const event of classes) expect(event.version).toBe(contract.events[event.eventName]?.version)
     })
 
