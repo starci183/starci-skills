@@ -1,18 +1,20 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { hfsReadme } from '../helpers/hfs-tree-fixture.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
 import { checkArchitecture } from '../../scripts/hfs/architecture.mjs';
 import { HFS_MACHINE_RULE_IDS as MACHINE_RULE_IDS } from '../../scripts/hfs/architecture/index.mjs';
 import { loadArchitectureConfig } from '../../scripts/hfs/architecture/config.mjs';
 import { appDeclaration } from '../helpers/hfs-arch-fixture.mjs';
+import { hfsArchitectureFixture } from '../helpers/hfs-architecture-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
+const archFixture = hfsArchitectureFixture();
+after(() => archFixture.cleanup());
+const fullReportOf = new WeakMap();
 
 // The architecture rules exercised through hfs.json fixtures. The declaration is hfs.json (profile be|fe plus
 // apps); owners, roots, registration and the Grammar contract are derived, so a rule is exercised by shaping the tree.
@@ -42,84 +44,81 @@ function appShaped(side, files) {
   return out;
 }
 
-function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core', kind: 'api' }] : [{ name: 'web', kind: 'next' }]) {
-  const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
-  t.after(() => fs.rmSync(appRoot, { recursive: true, force: true }));
+function fixture(_t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core', kind: 'api' }] : [{ name: 'web', kind: 'next' }]) {
   const side = kind === 'backend' ? 'be' : 'fe';
-  const root = path.join(appRoot, side);
   const app = apps[0].name;
   const declaration = appDeclaration(side, { apps });
-  const tsconfig = `${JSON.stringify({
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'Bundler',
-      jsx: 'preserve',
-      baseUrl: '.',
-      paths: {
-        '@modules/*': ['src/modules/domain/*'],
-        '@features/*': ['src/features/*'],
-        '@/*': [kind === 'frontend' ? `apps/${app}/src/*` : 'src/*'],
+  return archFixture.reset(side, declaration, appRoot => {
+    const tsconfig = `${JSON.stringify({
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        jsx: 'preserve',
+        baseUrl: '.',
+        paths: {
+          '@modules/*': ['src/modules/domain/*'],
+          '@features/*': ['src/features/*'],
+          '@/*': [kind === 'frontend' ? `apps/${app}/src/*` : 'src/*'],
+        },
+        allowJs: true,
+        skipLibCheck: true,
+        noEmit: true,
       },
-      allowJs: true,
-      skipLibCheck: true,
-      noEmit: true,
-    },
-    include: ['src/**/*', 'apps/**/*'],
-  }, null, 2)}\n`;
-  const baseline = {
-    '../.gitattributes': '* text=auto eol=lf\n',
-    '../.github/workflows/check.yml': 'name: check\n',
-    '../.gitignore': 'node_modules/\n',
-    '../.husky/pre-commit': 'exit 0\n',
-    '../README.md': hfsReadme(appRoot),
-    'eslint.config.mjs': 'export default [];\n',
-    '../package-lock.json': '{}\n',
-    'package.json': JSON.stringify({ private: true }),
-    '../sonar-project.properties': 'sonar.projectKey=fixture\n',
-    '../hfs.json': `${JSON.stringify(declaration, null, 2)}
-`,
-    'tsconfig.json': tsconfig,
-    ...(kind === 'backend' ? {
-      '../.sops.yaml': 'creation_rules: []\n',
-      '../.starcistacks/application-stacks.yaml': 'environments: []\n',
-      '../.starciwork/.gitignore': 'runtime.sqlite\n',
-      'tsconfig.build.json': '{}\n',
-      'jest.config.js': 'module.exports = {};\n',
-      'nest-cli.json': '{}\n',
-      'src/tests/fixtures/.keep': '',
-      [`apps/${app}/src/main.ts`]: 'void 0\n',
-      [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
-    } : {
-      'stylelint.config.mjs': 'export default {};\n',
-      [`apps/${app}/next.config.ts`]: 'export default {};\n',
-      [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
-      [`apps/${app}/tsconfig.json`]: JSON.stringify({ extends: '../../tsconfig.json', include: ['src/**/*'] }),
-      [`apps/${app}/src/.keep`]: '',
-      // every fe app is an npm workspace with its own manifest (HFS_MONO_FE_WORKSPACE)
-      ...Object.fromEntries(apps.map((entry) => [`apps/${entry.name}/package.json`, JSON.stringify({ name: `@fixture/${entry.name}`, private: true })])),
-    }),
-  };
-  // A null entry removes a baseline file (a test that needs the tree without it).
-  const fixtureFiles = appShaped(side, Object.fromEntries(Object.entries({ ...baseline, ...files }).filter(([, content]) => content !== null)));
-  writeFiles(root, fixtureFiles);
-  execFileSync('git', ['init', '-q'], { cwd: appRoot });
-  execFileSync('git', ['add', '-A'], { cwd: appRoot });
-  return root;
+      include: ['src/**/*', 'apps/**/*'],
+    }, null, 2)}\n`;
+    const baseline = {
+      '../.gitattributes': '* text=auto eol=lf\n',
+      '../.github/workflows/check.yml': 'name: check\n',
+      '../.gitignore': 'node_modules/\n',
+      '../.husky/pre-commit': 'exit 0\n',
+      '../README.md': hfsReadme(appRoot),
+      'eslint.config.mjs': 'export default [];\n',
+      '../package-lock.json': '{}\n',
+      'package.json': JSON.stringify({ private: true }),
+      '../sonar-project.properties': 'sonar.projectKey=fixture\n',
+      '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+      'tsconfig.json': tsconfig,
+      ...(kind === 'backend' ? {
+        '../.sops.yaml': 'creation_rules: []\n',
+        '../.starcistacks/application-stacks.yaml': 'environments: []\n',
+        '../.starciwork/.gitignore': 'runtime.sqlite\n',
+        'tsconfig.build.json': '{}\n',
+        'jest.config.js': 'module.exports = {};\n',
+        'nest-cli.json': '{}\n',
+        'src/tests/fixtures/.keep': '',
+        [`apps/${app}/src/main.ts`]: 'void 0\n',
+        [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
+      } : {
+        'stylelint.config.mjs': 'export default {};\n',
+        [`apps/${app}/next.config.ts`]: 'export default {};\n',
+        [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
+        [`apps/${app}/tsconfig.json`]: JSON.stringify({ extends: '../../tsconfig.json', include: ['src/**/*'] }),
+        [`apps/${app}/src/.keep`]: '',
+        // every fe app is an npm workspace with its own manifest (HFS_MONO_FE_WORKSPACE)
+        ...Object.fromEntries(apps.map((entry) => [`apps/${entry.name}/package.json`, JSON.stringify({ name: `@fixture/${entry.name}`, private: true })])),
+      }),
+    };
+    // A null entry removes a baseline file (a test that needs the tree without it).
+    return appShaped(side, Object.fromEntries(Object.entries({ ...baseline, ...files }).filter(([, content]) => content !== null)));
+  });
 }
 
 function check(root) {
-  return scoped(checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts }));
+  const full = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts, hfs: archFixture.openedHfs(root) });
+  const report = scoped(full);
+  fullReportOf.set(report, full);
+  return report;
 }
 
 /** The unfiltered report, tier-direction findings included (check() drops them). */
-function checkAll(root) {
-  return checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
+function checkAll(root, prior) {
+  return fullReportOf.get(prior) ?? checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts, hfs: archFixture.openedHfs(root) });
 }
 
 /** The derived owner ids of a fixture (slot id and root), the way the loader lists them. */
 function ownerIds(root) {
-  return loadArchitectureConfig(root).owners.map(owner => owner.id);
+  return loadArchitectureConfig(root, { hfs: archFixture.openedHfs(root) }).owners.map(owner => owner.id);
 }
 
 function writeFiles(root, files) {
@@ -198,7 +197,7 @@ test('backend resolves aliases, relative imports, and re-export barrels before e
   const rules = new Set(result.violations.map(item => item.ruleId));
   assert.ok(rules.has('BE_APP_BUSINESS_ROLE'));
   assert.ok(rules.has('BE_APP_COMPOSITION_ONLY'));
-  const all = checkAll(root);
+  const all = checkAll(root, result);
   const barrel = all.violations.find(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('barrel.ts'));
   assert.ok(barrel, JSON.stringify(all, null, 2));
   assert.ok(barrel.line > 0 && barrel.column > 0);
@@ -233,12 +232,13 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
     'apps/web/src/modules/api/query.ts': 'export const query=()=>1\n',
   });
   const result = check(root);
+  const all = checkAll(root, result);
   const rules = new Set(result.violations.map(item => item.ruleId));
-  assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TIER_DIRECTION' && item.path.endsWith('Leaf/index.tsx')), JSON.stringify(result, null, 2));
+  assert.ok(all.violations.some(item => item.ruleId === 'FE_TIER_DIRECTION' && item.path.endsWith('Leaf/index.tsx')), JSON.stringify(result, null, 2));
   for (const expected of ['FE_ROUTE_ONE_PAGE', 'FE_COMPONENT_DEEP_HOOK_IMPORT',
     'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
   // FE_TRANSPORT_OWNER belongs to the frontend repository machine (check() drops it): read it from the unfiltered report.
-  assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TRANSPORT_OWNER' && item.path.endsWith('Pure/component.tsx')), 'raw fetch outside the transport client');
+  assert.ok(all.violations.some(item => item.ruleId === 'FE_TRANSPORT_OWNER' && item.path.endsWith('Pure/component.tsx')), 'raw fetch outside the transport client');
   assert.ok(result.violations.find(item => item.ruleId === 'FE_PURE_REACHES_DATA').dependencyChain.some(item => item.endsWith('bridge.ts')));
 });
 
@@ -346,7 +346,7 @@ test('hfs.json has no waiver or baseline field: an unknown key is refused as an 
   const declaration = JSON.parse(fs.readFileSync(file, 'utf8'));
   declaration.waivers = ['apps/web/src/app/home/page.tsx'];
   fs.writeFileSync(file, JSON.stringify(declaration));
-  const result = check(root);
+  const result = scoped(checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts }));
   assert.equal(result.ok, false);
   assert.equal(result.errors[0].ruleId, 'HFS_DECLARATION_INVALID');
   assert.match(result.errors[0].message, /unknown key waivers/);
@@ -478,7 +478,7 @@ test('single-application layout derives its composition root from apps/<app>/src
   });
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('/leaky.service.ts')), JSON.stringify(result, null, 2));
-  assert.equal(checkAll(root).violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('apps/core/src/app.module.ts')), false, JSON.stringify(result, null, 2));
+  assert.equal(checkAll(root, result).violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('apps/core/src/app.module.ts')), false, JSON.stringify(result, null, 2));
 });
 
 test('backend workspace packages cannot reach executable app packages through type exports', t => {
