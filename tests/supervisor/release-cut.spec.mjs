@@ -172,7 +172,7 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
   assert.deepEqual(plan.proofs, ['shop: sonar']);
   const ran = [];
-  const out = runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {} });
+  const out = runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {}, parity: null });
   assert.ok(ran.some(([n, cwd]) => n === 'shop: npm run lint' && cwd === app), 'an example step runs in its own folder');
   const sonar = out.find((s) => s.name === 'shop: sonar');
   assert.deepEqual([sonar.ok, sonar.absent], [false, true], 'a proof nothing supplies is absent and fails');
