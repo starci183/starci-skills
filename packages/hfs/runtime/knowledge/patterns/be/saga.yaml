@@ -175,7 +175,7 @@ rules:
         - HFS_STACKS_IN_SIDE
       manual:
         - Check the compensation undoes every effect of the step, including the ones another service made.
-    relatedExamples: [examples/ecommerce-app/be/src/features/saga]
+    relatedExamples: [saga]
   - id: BE-SAGA-2
     title: The state of a run is typed, versioned and moved only through the fenced store
     kind: mandatory
@@ -198,7 +198,7 @@ rules:
         - BE_SAGA_CONSUMER_DEDUPE
       manual:
         - Check a failing compensation gives the event back so the redelivery resumes the run.
-    relatedExamples: [examples/ecommerce-app/be/src/features/saga]
+    relatedExamples: [saga]
   - id: BE-SAGA-3
     title: Every event of a step or compensation is in a vendored contract
     kind: mandatory
@@ -220,7 +220,7 @@ rules:
         - HFS_EVENT_CONTRACT
       manual:
         - Review the payload of a new failure event for what the compensation needs.
-    relatedExamples: [examples/ecommerce-app/be/src/features/saga]
+    relatedExamples: [saga]
   - id: BE-SAGA-4
     title: Every compensation path has an e2e spec that injects a failure
     kind: mandatory
@@ -243,4 +243,4 @@ rules:
         - BE_ASYNC_SPEC_MISSING
       manual:
         - Check the injected fault hits the compensation, not only the step before it.
-    relatedExamples: [examples/ecommerce-app/be/src/features/saga]
+    relatedExamples: [saga]

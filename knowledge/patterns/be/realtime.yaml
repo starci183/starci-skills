@@ -79,7 +79,7 @@ rules:
         - BE_REALTIME_SHAPE
       manual:
         - Confirm a query or mutation an old subscription door carried now lives in an api feature.
-    relatedExamples: [examples/ecommerce-app/be/src/features/realtime]
+    relatedExamples: [realtime]
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
     kind: mandatory
@@ -113,7 +113,7 @@ rules:
         - BE_INFRA_OWNER
       manual:
         - Confirm the frame type carries only what the principal may see.
-    relatedExamples: [examples/ecommerce-app/be/src/features/realtime]
+    relatedExamples: [realtime]
   - id: BE-REALTIME-3
     title: The topic is built from the principal
     kind: mandatory
@@ -136,7 +136,7 @@ rules:
         - BE_DEFAULT_DENY
       manual:
         - Review that the topic builder shared with the reactor lives in the domain contract and is used by both sides.
-    relatedExamples: [examples/ecommerce-app/be/src/features/realtime]
+    relatedExamples: [realtime]
   - id: BE-REALTIME-4
     title: Three behaviours are proven on the test world
     kind: mandatory
@@ -160,7 +160,7 @@ rules:
         - BE_PATTERN_SPEC_MISSING
       manual:
         - Confirm the e2e client waits with the world's waitFor and never sleeps.
-    relatedExamples: [examples/ecommerce-app/be/src/features/realtime]
+    relatedExamples: [realtime]
 files:
   - path: src/features/realtime/<channel>/index.ts
     slot: be.feature.realtime

@@ -44,7 +44,8 @@ function assertMultiFileExample(exampleDir, exampleId) {
 // handler) and R88 (a resolver that does more than dispatch): they are deleted, and the app examples (examples/<app>/be) are the
 // backend reference. Every catalogued example is a folder, and every relatedExamples id in the knowledge names one.
 const REMOVED = ['graphql-command', 'transactional-service'];
-const catalogIds = () => parseYaml(fs.readFileSync(path.join(examplesRoot, 'index.yaml'), 'utf8')).examples.map(e => e.id);
+// The ids of every catalog (the root one and the backend and frontend lanes' own): the topic yaml files cite examples of all three.
+const catalogIds = () => ['index.yaml', 'backend/index.yaml', 'frontend/index.yaml'].flatMap(catalog => parseYaml(fs.readFileSync(path.join(examplesRoot, catalog), 'utf8')).examples.map(e => e.id));
 
 test('the code-example catalog resolves; the examples that contradicted R47, R87 and R88 are gone', () => {
   for (const catalog of ['index.yaml', 'backend/index.yaml', 'frontend/index.yaml']) {

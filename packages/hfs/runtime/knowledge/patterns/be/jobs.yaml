@@ -50,7 +50,7 @@ rules:
         - BE_SQL_TABLE_OWNER
       manual:
         - Confirm the claim SQL is a single statement and the lease length fits the longest step.
-    relatedExamples: [examples/ecommerce-app/be/src/features/jobs]
+    relatedExamples: [fenced-job]
   - id: BE-JOBS-2
     title: Every write to a claimed job carries expectedFencingToken, required in the type
     kind: mandatory
@@ -71,7 +71,7 @@ rules:
       automated:
         - BE_JOB_FENCE_REQUIRED
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/features/jobs]
+    relatedExamples: [fenced-job]
   - id: BE-JOBS-3
     title: An external effect carries a run key that includes the token
     kind: mandatory
@@ -92,7 +92,7 @@ rules:
         - BE_JOB_RUN_KEY
       manual:
         - Confirm the provider documents idempotent handling of its key.
-    relatedExamples: [examples/ecommerce-app/be/src/features/jobs]
+    relatedExamples: [fenced-job]
   - id: BE-JOBS-4
     title: A job is a processor plus steps, started by a producer and run by a worker or api app
     kind: mandatory
@@ -117,7 +117,7 @@ rules:
         - BE_BACKGROUND_UNOWNED
       manual:
         - Confirm each step is one external effect that is safe to repeat under the same run key.
-    relatedExamples: [examples/ecommerce-app/be/src/features/jobs]
+    relatedExamples: [fenced-job]
   - id: BE-JOBS-5
     title: A declared fenced-job is proven on the test world
     kind: mandatory
@@ -137,7 +137,7 @@ rules:
       automated:
         - BE_PATTERN_SPEC_MISSING
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/features/jobs]
+    relatedExamples: [fenced-job]
 files:
   - path: src/modules/platform/jobs/index.ts
     slot: be.platform.jobs

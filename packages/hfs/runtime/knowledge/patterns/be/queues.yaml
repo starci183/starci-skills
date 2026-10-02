@@ -47,7 +47,7 @@ rules:
         - BE_QUEUE_PRODUCER_SHAPE
       manual:
         - Confirm the payload carries ids, not entities, and the queue name is the contract between producer and processor.
-    relatedExamples: [examples/ecommerce-app/be/src/modules/queues]
+    relatedExamples: [queue]
   - id: BE-QUEUES-2
     title: platform/queue is the only BullMQ owner and the relay keeps jobId equal to the outbox id
     kind: mandatory
@@ -67,7 +67,7 @@ rules:
       automated:
         - BE_INFRA_OWNER
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/modules/queues]
+    relatedExamples: [queue]
   - id: BE-QUEUES-3
     title: A schedule is a BullMQ job scheduler declared with its queue
     kind: mandatory
@@ -87,7 +87,7 @@ rules:
         - BE_INFRA_OWNER
       manual:
         - Confirm the cadence and the job's idempotence.
-    relatedExamples: [examples/ecommerce-app/be/src/modules/queues]
+    relatedExamples: [queue]
   - id: BE-QUEUES-4
     title: A declared queue pattern is proven on the test world
     kind: mandatory
@@ -105,7 +105,7 @@ rules:
       automated:
         - BE_PATTERN_SPEC_MISSING
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/modules/queues]
+    relatedExamples: [queue]
 files:
   - path: src/modules/platform/outbox/index.ts
     slot: be.platform

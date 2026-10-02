@@ -40,7 +40,7 @@ rules:
         - BE_EVENT_CONSUMER_SHAPE
         - BE_INBOX_DEDUPE_MISSING
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
+    relatedExamples: [event-bus]
   - id: BE-REACTORS-2
     title: A reactor never imports another kind and never reads another context
     kind: mandatory
@@ -64,7 +64,7 @@ rules:
         - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm the event carries every field the copy needs.
-    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
+    relatedExamples: [event-bus]
   - id: BE-REACTORS-3
     title: The local copy lives in the reactor's own context and is replayable
     kind: mandatory
@@ -85,7 +85,7 @@ rules:
         - BE_INBOX_DEDUPE_MISSING
       manual:
         - Confirm a replay from the start of the topic gives the same rows.
-    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
+    relatedExamples: [event-bus]
   - id: BE-REACTORS-4
     title: A reactor is composed by a worker or api app
     kind: mandatory
@@ -104,7 +104,7 @@ rules:
         - BE_BACKGROUND_UNOWNED
         - BE_FEATURE_NOT_COMPOSED
       manual: []
-    relatedExamples: [examples/ecommerce-app/be/src/modules/platform/event-bus]
+    relatedExamples: [event-bus]
 files:
   - path: src/features/reactors/<reactor>/index.ts
     slot: be.feature.reactors

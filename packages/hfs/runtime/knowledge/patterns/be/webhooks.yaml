@@ -74,7 +74,7 @@ rules:
         - BE_CONTRACT_UNGUARDED
       manual:
         - Confirm the provider endpoint is one door and that a second endpoint of the same provider is a second door only when it has a different proof.
-    relatedExamples: [examples/ecommerce-app/be/src/features/webhooks]
+    relatedExamples: [webhooks]
   - id: BE-WEBHOOK-2
     title: The door verifies first, then makes one domain call
     kind: mandatory
@@ -121,7 +121,7 @@ rules:
         - BE_INPUT_BOUNDED
       manual:
         - Review that the raw body, not a re-serialized one, is verified, and that the replay window matches the provider's tolerance.
-    relatedExamples: [examples/ecommerce-app/be/src/features/webhooks]
+    relatedExamples: [webhooks]
   - id: BE-WEBHOOK-3
     title: The intake publishes the event inside its own transaction
     kind: mandatory
@@ -147,7 +147,7 @@ rules:
         - BE_EVENT_CLASS_CONTRACT
       manual:
         - Confirm each provider event kind maps to exactly one published event and that an unknown kind is acknowledged and ignored, not published.
-    relatedExamples: [examples/ecommerce-app/be/src/features/webhooks]
+    relatedExamples: [webhooks]
   - id: BE-WEBHOOK-4
     title: Three behaviours are proven on the test world
     kind: mandatory
@@ -172,7 +172,7 @@ rules:
         - BE_PATTERN_SPEC_MISSING
       manual:
         - Confirm the fake signs exactly as the provider documents and that a contract spec guards its payload fixtures.
-    relatedExamples: [examples/ecommerce-app/be/src/features/webhooks]
+    relatedExamples: [webhooks]
 files:
   - path: src/features/webhooks/<provider>/index.ts
     slot: be.feature.webhooks
