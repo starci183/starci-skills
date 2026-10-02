@@ -94,6 +94,11 @@ describe("billing.invoice-rejected compensates order.placed", () => {
         const buyer = world.apps.order.api.bearing(session.sessionToken)
         const placed = await placeYacht(buyer, "saga-outage-1")
         let polls = 0
+        await world.waitUntil(
+            "the order database relays order.placed before it goes down",
+            () => readRows(world.db.order, OUTBOX_OF_EVENT, [placed.orderId]),
+            (rows) => rows.length === 1 && rows.every((row) => row.sent),
+        )
 
         await world.infra.postgresql.connection("order").during(async () => {
             await world.waitFor("billing records the rejected invoice", async () => {
