@@ -22,7 +22,7 @@ const OUTAGE_POLLS = 10
  * delivered, the compensation fails on its first deliveries, the queue retries them with its backoff and the run settles once
  * the database is back.
  *
- * Run: npm run test:e2e -- order/invoice-rejected
+ * Run: npm run test:e2e -- order/billing-invoice-rejected
  */
 describe("billing.invoice-rejected compensates order.placed", () => {
     const world = useTestWorld({ apps: ["identity", "order", "billing"] })

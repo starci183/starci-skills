@@ -11,6 +11,7 @@ import {
     parseOrderDatabaseConfig,
 } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
 
@@ -26,19 +27,27 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
         { ...parseIdentityDatabaseConfig(env), entities: accountEntities, migrations: accountMigrations },
         {
             ...parseOrderDatabaseConfig(env),
-            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities, ...sagaEntities],
+            entities: [
+                ...catalogEntities,
+                ...cartEntities,
+                ...orderEntities,
+                ...paymentEntities,
+                ...sagaEntities,
+                ...eventBusEntities,
+            ],
             migrations: [
                 ...catalogMigrations,
                 ...cartMigrations,
                 ...orderMigrations,
                 ...paymentMigrations,
                 ...sagaMigrations,
+                ...eventBusMigrations,
             ],
         },
         {
             ...parseBillingDatabaseConfig(env),
-            entities: [...invoiceEntities, ...inboxEntities],
-            migrations: [...invoiceMigrations, ...inboxMigrations],
+            entities: [...invoiceEntities, ...inboxEntities, ...eventBusEntities],
+            migrations: [...invoiceMigrations, ...inboxMigrations, ...eventBusMigrations],
         },
     ],
 })

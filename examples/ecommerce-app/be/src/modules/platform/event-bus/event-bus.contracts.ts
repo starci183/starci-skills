@@ -10,14 +10,17 @@ export abstract class BaseEvent {
     abstract readonly payload: object
 }
 
-/** The class side of a typed event: its name and version (the vendored contract), the event it compensates when it reports a failure, and how a received envelope is read back. */
+/** What reading a received envelope answers: the event, or null when the envelope does not have the shape of the event. */
+export type ParsedEvent<Event extends BaseEvent> = Event | null
+
+/** The class side of a typed event: its name and version (the vendored contract), and how a received envelope is read back. */
 export interface EventClass<Event extends BaseEvent> {
     /** The event name. */
     readonly eventName: string
     /** The contract version of the payload. */
     readonly version: number
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    parse(envelope: unknown): Event | null
+    parse(envelope: unknown): ParsedEvent<Event>
 }
 
 /** An event as a consumer receives it. */
@@ -42,4 +45,14 @@ export interface EventDeadLetter {
     readonly reason: string
     /** How many deliveries were tried. */
     readonly attempts: number
+}
+
+/** The envelope of an event on the wire: what the outbox row stores and a consumer reads back. */
+export interface EventEnvelope {
+    /** The stable event id. */
+    readonly eventId: string
+    /** The event name. */
+    readonly eventName: string
+    /** The data of the event. */
+    readonly payload: object
 }

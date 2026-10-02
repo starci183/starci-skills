@@ -1,11 +1,19 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { EVENT_BUS, EVENT_CONSUMER_REGISTRY } from "./event-bus.decorators"
+import {
+    EVENT_BUS,
+    EVENT_BUS_MANAGER,
+    EVENT_CONSUMER_REGISTRY,
+    EVENT_TRANSPORT,
+} from "./event-bus.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./event-bus.module-definition"
 import { EventBusService } from "./event-bus.service"
+import { EventRelayService } from "./event-relay.service"
+import { EventRunnerService } from "./event-runner.service"
+import { KafkaEventTransportClient } from "./kafka-event-transport.client"
 
 @Module({})
-/** The event bus of a service: publishing and consumer registration over the messaging capability the app registers. */
+/** The event bus of a service: the outbox writer, its relay, the consumer runner and the Kafka transport, registered once per app over the connection that holds its outbox. */
 export class EventBusModule extends ConfigurableModuleClass {
     /** Registers the capability once per app that publishes or consumes events. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
@@ -14,11 +22,16 @@ export class EventBusModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
+                { provide: EVENT_BUS_MANAGER, useExisting: options.connection },
+                KafkaEventTransportClient,
+                { provide: EVENT_TRANSPORT, useExisting: KafkaEventTransportClient },
                 EventBusService,
+                EventRelayService,
+                EventRunnerService,
                 { provide: EVENT_BUS, useExisting: EventBusService },
-                { provide: EVENT_CONSUMER_REGISTRY, useExisting: EventBusService },
+                { provide: EVENT_CONSUMER_REGISTRY, useExisting: EventRunnerService },
             ],
-            exports: [EVENT_BUS, EVENT_CONSUMER_REGISTRY],
+            exports: [EVENT_BUS, EVENT_CONSUMER_REGISTRY, EVENT_TRANSPORT],
         }
     }
 }

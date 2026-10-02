@@ -7,7 +7,7 @@ import { InjectInbox } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { InvoiceIssuedEvent, InvoiceRejectedEvent } from "@modules/events/billing"
 import { InjectEventBus } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
+import type { BaseEvent, EventBus } from "@modules/platform/event-bus"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { InvoiceErrorCode } from "./errors/invoice.error"
@@ -28,9 +28,10 @@ const toView = (row: InvoiceEntity): InvoiceView => ({
 @Injectable()
 /**
  * Issues one invoice per placed order. `issue` takes a delivery: it claims the event in the inbox first, so a redelivery
- * answers the invoice already recorded instead of billing twice. A total above the limit is recorded as a rejected
- * invoice and announced as `billing.invoice-rejected`, which the order service compensates; a replay of a rejected
- * delivery announces it again, so a failed announcement is repaired by the retry.
+ * answers the invoice already recorded instead of billing twice. The invoice and its announcement are written in one
+ * transaction (the announcement is an outbox row, so it cannot be lost or sent for a rolled-back invoice): an issued
+ * invoice is announced as `billing.invoice-issued`, a total above the limit is recorded as a rejected invoice and
+ * announced as `billing.invoice-rejected`, which the order service compensates.
  */
 export class InvoiceService {
     constructor(
@@ -49,42 +50,44 @@ export class InvoiceService {
         return this.outcomeOf(await this.record(params))
     }
 
-    /** Writes the invoice row; a failed write gives the claim back so the redelivery is processed again. */
+    /** Writes the invoice row and the outbox row of its announcement in one transaction; a failed write gives the claim back so the redelivery is processed again. */
     private async record(params: IssueInvoiceParams): Promise<InvoiceEntity> {
         try {
-            return await this.entityManager.save(
-                InvoiceEntity,
-                this.entityManager.create(InvoiceEntity, {
-                    orderId: params.orderId,
-                    personId: params.personId,
-                    totalMinorUnits: params.totalMinorUnits,
-                    status: params.totalMinorUnits > this.options.maxTotalMinorUnits ? "rejected" : "issued",
-                    createdAt: this.clock.now(),
-                }),
-            )
+            return await this.entityManager.transaction(async (manager) => {
+                const row = await manager.save(
+                    InvoiceEntity,
+                    manager.create(InvoiceEntity, {
+                        orderId: params.orderId,
+                        personId: params.personId,
+                        totalMinorUnits: params.totalMinorUnits,
+                        status: params.totalMinorUnits > this.options.maxTotalMinorUnits ? "rejected" : "issued",
+                        createdAt: this.clock.now(),
+                    }),
+                )
+                await this.bus.publish(this.announcementOf(row), manager)
+                return row
+            })
         } catch (error) {
             await this.inbox.release(ORDER_SOURCE, params.eventId)
             throw error
         }
     }
 
-    /** The outcome of a recorded invoice; an issued and a rejected one are each announced to the order service. */
-    private async outcomeOf(row: InvoiceEntity): Promise<Outcome<InvoiceView, InvoiceErrorCode.OverLimit>> {
-        if (row.status === "issued") {
-            await this.bus.publish(
-                InvoiceIssuedEvent.create({ orderId: row.orderId, totalMinorUnits: row.totalMinorUnits }),
-                this.entityManager,
-            )
-            return ok(toView(row))
-        }
-        await this.bus.publish(
-            InvoiceRejectedEvent.create({
-                orderId: row.orderId,
-                reason: InvoiceErrorCode.OverLimit,
-                totalMinorUnits: row.totalMinorUnits,
-            }),
-            this.entityManager,
-        )
-        return refused(InvoiceErrorCode.OverLimit, { orderId: row.orderId })
+    /** The event that tells the order service what became of the invoice: issued, or rejected (which compensates the order). */
+    private announcementOf(row: InvoiceEntity): BaseEvent {
+        return row.status === "issued"
+            ? InvoiceIssuedEvent.create({ orderId: row.orderId, totalMinorUnits: row.totalMinorUnits })
+            : InvoiceRejectedEvent.create({
+                  orderId: row.orderId,
+                  reason: InvoiceErrorCode.OverLimit,
+                  totalMinorUnits: row.totalMinorUnits,
+              })
+    }
+
+    /** The outcome of a recorded invoice. */
+    private outcomeOf(row: InvoiceEntity): Outcome<InvoiceView, InvoiceErrorCode.OverLimit> {
+        return row.status === "issued"
+            ? ok(toView(row))
+            : refused(InvoiceErrorCode.OverLimit, { orderId: row.orderId })
     }
 }

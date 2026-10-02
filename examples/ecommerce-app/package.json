@@ -59,6 +59,7 @@
     "class-validator": "^0.14.4",
     "graphql": "16.14.2",
     "ioredis": "^5.4.1",
+    "kafkajs": "2.2.4",
     "next": "16.1.6",
     "next-intl": "4.13.6",
     "pg": "^8.12.0",

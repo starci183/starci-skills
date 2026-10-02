@@ -86,6 +86,16 @@ export interface TableRow {
     table_name: string
 }
 
+/** One outbox row as the verification reads it: which event, and whether the relay has handed it to the broker. */
+export interface OutboxStateRow {
+    /** The event name. */
+    event_name: string
+    /** The topic the event travels on. */
+    topic: string
+    /** True once the relay marked the row sent. */
+    sent: boolean
+}
+
 /** One verification statement and the shape of the rows it answers. */
 export interface RowQuery<TRow> {
     /** The SQL text, built with the `sql` tag. */

@@ -20,7 +20,7 @@ import {
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
+import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
@@ -32,14 +32,15 @@ import {
     RateLimitGuard,
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
-import { EVENT_BUS_ERROR_KINDS, EVENT_BUS_MESSAGES, EventBusModule } from "@modules/platform/event-bus"
-import { LoggingModule } from "@modules/platform/logging"
 import {
-    MESSAGE_PUBLISHER,
-    MESSAGING_ERROR_KINDS,
-    MESSAGING_MESSAGES,
-    MessagingModule,
-} from "@modules/platform/messaging"
+    EVENT_BUS_ERROR_KINDS,
+    EVENT_BUS_MESSAGES,
+    EVENT_TRANSPORT,
+    EventBusModule,
+    eventBusEntities,
+    eventBusMigrations,
+} from "@modules/platform/event-bus"
+import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
@@ -66,7 +67,6 @@ export class AppModule {
                         IDENTITY_API_MESSAGES,
                         ORDER_MESSAGES,
                         RECEIPT_STORAGE_MESSAGES,
-                        MESSAGING_MESSAGES,
                         EVENT_BUS_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
@@ -83,7 +83,6 @@ export class AppModule {
                         CART_ERROR_KINDS,
                         ORDER_ERROR_KINDS,
                         RECEIPT_STORAGE_ERROR_KINDS,
-                        MESSAGING_ERROR_KINDS,
                         EVENT_BUS_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
@@ -101,6 +100,7 @@ export class AppModule {
                                 ...orderEntities,
                                 ...paymentEntities,
                                 ...sagaEntities,
+                                ...eventBusEntities,
                             ],
                             migrations: [
                                 ...catalogMigrations,
@@ -108,6 +108,7 @@ export class AppModule {
                                 ...orderMigrations,
                                 ...paymentMigrations,
                                 ...sagaMigrations,
+                                ...eventBusMigrations,
                             ],
                         },
                     ],
@@ -115,8 +116,7 @@ export class AppModule {
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
-                MessagingModule.register({ isGlobal: true, ...options.messaging }),
-                EventBusModule.register({ isGlobal: true }),
+                EventBusModule.register({ isGlobal: true, ...options.eventBus, connection: ORDER_ENTITY_MANAGER }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),
@@ -126,7 +126,7 @@ export class AppModule {
                 ProbesModule.register({
                     isGlobal: true,
                     service: "order",
-                    probes: [DatabaseProbe, IDENTITY_API, MESSAGE_PUBLISHER],
+                    probes: [DatabaseProbe, IDENTITY_API, EVENT_TRANSPORT],
                 }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,

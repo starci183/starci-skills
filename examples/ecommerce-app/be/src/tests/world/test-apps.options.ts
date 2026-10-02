@@ -23,8 +23,9 @@ import {
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { HttpModule } from "@modules/platform/http"
 import { inboxEntities } from "@modules/platform/inbox"
+import { eventBusEntities } from "@modules/platform/event-bus"
+import type { EventBusConfig } from "@modules/platform/event-bus"
 import { sagaEntities } from "@modules/platform/saga"
-import type { MessagingOptions } from "@modules/platform/messaging"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
@@ -59,10 +60,11 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...orderEntities,
     ...paymentEntities,
     ...sagaEntities,
+    ...eventBusEntities,
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...inboxEntities]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...inboxEntities, ...eventBusEntities]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -110,11 +112,21 @@ export const identityApiOptionsOf = (w: EcommerceWiring): IdentityApiOptions => 
     timeoutMs: CALL_DEADLINE_MS,
 })
 
-/** The Redis queues of the run, on the run's own Redis DB, shared by the publishers and the workers of every app. */
-export const messagingOptionsOf = (w: EcommerceWiring): MessagingOptions => ({
-    url: new Secret(w.redis.url),
+/** The logical topics of the run: the events, retry and dead-letter topic of each service that publishes (`order`, `billing`) and of the probe the bus integration spec runs. */
+export const EVENT_TOPICS: ReadonlyArray<string> = ["order", "billing", "probe"].flatMap((service) => [
+    `events.${service}`,
+    `events.${service}.retry`,
+    `events.${service}.dlq`,
+])
+
+/** How the app of `service` reaches the broker of the run: its own consumer group, the topics of the run's prefix, a relay that polls fast. */
+export const eventBusOptionsOf = (w: EcommerceWiring, service: string): EventBusConfig => ({
+    brokers: w.kafka.brokers,
+    groupId: `${w.kafka.topicPrefix}${service}`,
+    topicPrefix: w.kafka.topicPrefix,
+    relayIntervalMs: 100,
+    relayBatch: 50,
     timeoutMs: CALL_DEADLINE_MS,
-    concurrency: 1,
 })
 
 /** The bucket of the run's MinIO that archives the receipts (declared in `stacks.minio.buckets`). */
@@ -152,7 +164,7 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     port: w.apps.order.port,
     database: orderDatabase(w),
     identityApi: identityApiOptionsOf(w),
-    messaging: messagingOptionsOf(w),
+    eventBus: eventBusOptionsOf(w, "order"),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
 })
@@ -163,7 +175,7 @@ export const BILLING_LIMIT_MINOR_UNITS = 100_000
 /** The options of the billing worker. */
 export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     database: billingDatabase(w),
-    messaging: messagingOptionsOf(w),
+    eventBus: eventBusOptionsOf(w, "billing"),
     invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },
 })
 

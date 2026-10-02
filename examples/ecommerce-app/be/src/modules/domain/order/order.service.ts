@@ -7,8 +7,6 @@ import type { CatalogService } from "@modules/domain/catalog"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
 import { InjectSagaService } from "@modules/platform/saga"
 import type { SagaService } from "@modules/platform/saga"
-import { InjectLogger } from "@modules/platform/logging"
-import type { Logger } from "@modules/platform/logging"
 import { OrderPlacedEvent } from "@modules/events/order"
 import { InjectEventBus } from "@modules/platform/event-bus"
 import type { EventBus } from "@modules/platform/event-bus"
@@ -17,7 +15,6 @@ import type { Outcome } from "@modules/platform/primitives"
 import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
 import { PLACE_ORDER_SAGA } from "./order.contracts"
-import { OrderLogEvent } from "./order.log-events"
 import type {
     GetBuyerStatusResult,
     BuyerStatusParams,
@@ -41,7 +38,8 @@ import { CANCEL_ORDER_IF_PENDING, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } fro
  * Confirms orders. `placeOrder` answers a replayed key with the first order, otherwise prices the cart against the
  * catalog and, when it can be placed, runs `confirm` in one transaction: it claims the idempotency key, takes the stock with
  * guarded decrements, writes the lines, clears the cart and begins the saga run, so a failure at any step rolls the
- * whole placement back and the buyer keeps the cart. The order stays pending: the payment arrives later as an event.
+ * whole placement back and the buyer keeps the cart. The `order.placed` event is an outbox row of the same transaction, so the
+ * billing service hears of exactly the orders that exist. The order stays pending: the payment arrives later as an event.
  */
 export class OrderService {
     constructor(
@@ -50,7 +48,6 @@ export class OrderService {
         @InjectCatalogService() private readonly catalog: CatalogService,
         private readonly receipts: ReceiptService,
         @InjectEventBus() private readonly bus: EventBus,
-        @InjectLogger() private readonly logger: Logger,
         @InjectSagaService() private readonly sagas: SagaService,
     ) {}
 
@@ -62,10 +59,7 @@ export class OrderService {
         const { personId, idempotencyKey } = request
         if (idempotencyKey !== undefined) {
             const replay = await this.findPlaced({ personId, idempotencyKey })
-            if (replay) {
-                await this.announce(replay, personId)
-                return ok(replay)
-            }
+            if (replay) return ok(replay)
         }
         const lines = await this.cart.list({ personId })
         const products = await this.catalog.byIds({ ids: lines.map((line) => line.productId) })
@@ -76,24 +70,7 @@ export class OrderService {
         )
         // The receipt is archived after the commit: the order never waits on, or fails with, the object storage.
         if (!placed.replayed) await this.receipts.archive(placed.orderId)
-        await this.announce(placed, personId)
         return ok(placed)
-    }
-
-    /**
-     * Tells the billing service about a placed order, after the commit. The event id is the order id, so billing dedupes a
-     * repeat; a replayed confirmation announces again, which repairs an announcement a failed publish lost. A failure is
-     * logged and never fails the order the buyer already holds.
-     */
-    private async announce(placed: PlacedOrder, personId: string): Promise<void> {
-        try {
-            await this.bus.publish(
-                OrderPlacedEvent.create({ orderId: placed.orderId, personId, totalMinorUnits: placed.totalMinorUnits }),
-                this.entityManager,
-            )
-        } catch (cause) {
-            this.logger.error(OrderLogEvent.EventPublishFailed, cause, { orderId: placed.orderId })
-        }
     }
 
     /**
@@ -168,6 +145,10 @@ export class OrderService {
         )
         await this.cart.clear({ manager, personId })
         await this.sagas.begin({ manager, saga: PLACE_ORDER_SAGA, correlationId: orderId })
+        await this.bus.publish(
+            OrderPlacedEvent.create({ orderId, personId, totalMinorUnits: plan.totalMinorUnits }),
+            manager,
+        )
         return {
             orderId,
             status: "pending",

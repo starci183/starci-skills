@@ -1,11 +1,26 @@
 import { Test } from "@nestjs/testing"
-import { mock, mockEntityManager } from "@starci/jest-preset"
-import { CONSUMER_REGISTRY, MESSAGE_PUBLISHER } from "@modules/platform/messaging"
-import type { ConsumerRegistry, MessageConsumer, MessagePublisher } from "@modules/platform/messaging"
+import { FakeClock, mock, mockEntityManager } from "@starci/jest-preset"
+import { CLOCK } from "@modules/platform/clock"
 import { EventBusErrorCode } from "./errors/event-bus.error"
 import { BaseEvent } from "./event-bus.contracts"
-import type { EventConsumer } from "./event-bus.port"
+import type { ParsedEvent } from "./event-bus.contracts"
+import { EVENT_BUS_OPTIONS, EVENT_TRANSPORT } from "./event-bus.decorators"
+import type { EventBusOptions } from "./event-bus.options"
 import { EventBusService } from "./event-bus.service"
+import type { EventTransport, InboundMessage } from "./event-transport.port"
+import { INSERT_OUTBOX_ROW } from "./persistence/event-bus.sql"
+
+const AT = "2026-02-03T04:05:06.000Z"
+
+const options: EventBusOptions = {
+    brokers: ["localhost:9094"],
+    groupId: "order",
+    topicPrefix: "run-1.",
+    relayIntervalMs: 100,
+    relayBatch: 50,
+    timeoutMs: 3000,
+    connection: Symbol("connection"),
+}
 
 class PingEvent extends BaseEvent {
     static readonly eventName = "probe.ping"
@@ -20,117 +35,127 @@ class PingEvent extends BaseEvent {
         super()
     }
 
-    static parse(envelope: unknown): PingEvent | null {
-        return typeof envelope === "object" &&
-            envelope !== null &&
-            "eventId" in envelope &&
-            typeof envelope.eventId === "string" &&
-            "payload" in envelope &&
-            typeof envelope.payload === "object" &&
-            envelope.payload !== null &&
-            "note" in envelope.payload &&
-            typeof envelope.payload.note === "string"
-            ? new PingEvent(envelope.eventId, { note: envelope.payload.note })
-            : null
+    static parse(): ParsedEvent<PingEvent> {
+        return null
     }
 }
 
-const QUEUE = { name: "probe.ping", attempts: 3, backoffMs: 1000 }
+const DLQ = "run-1.events.probe.dlq"
+
+const envelope = (eventName: string, eventId: string) => JSON.stringify({ eventId, eventName, payload: {} })
+
+const letter = (offset: string, eventName: string, headers: Record<string, string>): InboundMessage => ({
+    topic: DLQ,
+    partition: 0,
+    offset,
+    key: `id-${offset}`,
+    value: envelope(eventName, `id-${offset}`),
+    headers,
+})
 
 const build = async () => {
-    const messages = mock<MessagePublisher>()
-    const registry = mock<ConsumerRegistry>()
+    const transport = mock<EventTransport>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             EventBusService,
-            { provide: MESSAGE_PUBLISHER, useValue: messages },
-            { provide: CONSUMER_REGISTRY, useValue: registry },
+            { provide: EVENT_BUS_OPTIONS, useValue: options },
+            { provide: EVENT_TRANSPORT, useValue: transport },
+            { provide: CLOCK, useValue: new FakeClock(AT) },
         ],
     }).compile()
-    return { bus: moduleRef.get(EventBusService), messages, registry }
-}
-
-/** Registers a consumer of `PingEvent` and answers what the queue worker would be given. */
-const registered = async (handle: EventConsumer<PingEvent>["handle"]) => {
-    const { bus, registry } = await build()
-    let captured: MessageConsumer<object> | undefined
-    registry.add.mockImplementation((consumer) => {
-        captured = consumer
-    })
-    bus.add({ event: PingEvent, handle })
-    if (captured === undefined) throw new Error("the consumer was not registered")
-    return captured
+    return { bus: moduleRef.get(EventBusService), transport }
 }
 
 describe("EventBusService", () => {
     describe("publish", () => {
-        it("publishes the event on the queue named after it, with its event id as the dedupe key", async () => {
-            const { bus, messages } = await build()
+        it("writes the envelope as an outbox row of the caller transaction, keyed by the event id on the topic of the service", async () => {
+            const tx = mockEntityManager({ query: [INSERT_OUTBOX_ROW, []] })
+            const { bus, transport } = await build()
 
-            await bus.publish(new PingEvent("e-1", { note: "hi" }), mockEntityManager())
+            await bus.publish(new PingEvent("e-1", { note: "hi" }), tx)
 
-            expect(messages.publish).toHaveBeenCalledWith({ queue: QUEUE, eventId: "e-1", payload: { note: "hi" } })
+            expect(tx.query).toHaveBeenCalledWith(INSERT_OUTBOX_ROW, [
+                "e-1",
+                "probe.ping",
+                "run-1.events.probe",
+                "e-1",
+                JSON.stringify({ eventId: "e-1", eventName: "probe.ping", payload: { note: "hi" } }),
+                new Date(AT),
+            ])
+            expect(transport.send).not.toHaveBeenCalled()
         })
     })
 
-    describe("operator reads", () => {
-        it("counts the events of a class waiting for a retry", async () => {
-            const { bus, messages } = await build()
-            messages.pendingRetries.mockResolvedValue(2)
+    describe("pendingRetries", () => {
+        it("is the lag of the retry topic of the event", async () => {
+            const { bus, transport } = await build()
+            transport.lag.mockResolvedValue(2)
 
-            expect(await bus.pendingRetries(PingEvent)).toBe(2)
+            await expect(bus.pendingRetries(PingEvent)).resolves.toBe(2)
 
-            expect(messages.pendingRetries).toHaveBeenCalledWith(QUEUE)
+            expect(transport.lag).toHaveBeenCalledWith("run-1.events.probe.retry")
+        })
+    })
+
+    describe("deadLetters", () => {
+        it("lists the buried events of the class, not the other events of the topic, the markers, or the letters a marker closed", async () => {
+            const { bus, transport } = await build()
+            transport.read.mockResolvedValue([
+                letter("0", "probe.ping", { attempt: "5", reason: "refused", "origin-topic": "run-1.events.probe" }),
+                letter("1", "probe.other", { attempt: "5", reason: "other", "origin-topic": "run-1.events.probe" }),
+                letter("2", "probe.ping", { attempt: "5", reason: "closed", "origin-topic": "run-1.events.probe" }),
+                { ...letter("3", "probe.ping", { requeued: `${DLQ}|0|2` }), value: "{}" },
+                { ...letter("4", "probe.ping", {}), value: "not json" },
+                letter("5", "probe.ping", { "origin-topic": "run-1.events.probe" }),
+            ])
+
+            const letters = await bus.deadLetters(PingEvent)
+
+            expect(letters).toEqual([
+                { id: `${DLQ}|0|0`, eventName: "probe.ping", eventId: "id-0", reason: "refused", attempts: 5 },
+                { id: `${DLQ}|0|5`, eventName: "probe.ping", eventId: "id-5", reason: "", attempts: 0 },
+            ])
+            expect(transport.read).toHaveBeenCalledWith(DLQ)
         })
 
-        it("lists the dead letters of a class with ids that name the event", async () => {
-            const { bus, messages } = await build()
-            messages.deadLetters.mockResolvedValue([{ id: "7", eventId: "e-1", reason: "refused", attempts: 3 }])
+        it("treats a value that is a JSON text without an event name as no letter of the class", async () => {
+            const { bus, transport } = await build()
+            transport.read.mockResolvedValue([{ ...letter("0", "probe.ping", {}), value: "[1]" }])
 
-            expect(await bus.deadLetters(PingEvent)).toEqual([
-                { id: "probe.ping|7", eventName: "probe.ping", eventId: "e-1", reason: "refused", attempts: 3 },
+            await expect(bus.deadLetters(PingEvent)).resolves.toEqual([])
+        })
+    })
+
+    describe("requeue", () => {
+        it("puts the original message back on its main topic and closes the dead letter with a marker", async () => {
+            const { bus, transport } = await build()
+            const original = letter("7", "probe.ping", { "origin-topic": "run-1.events.probe", reason: "x" })
+            transport.read.mockResolvedValue([letter("6", "probe.ping", {}), original])
+
+            await bus.requeue(`${DLQ}|0|7`)
+
+            expect(transport.send).toHaveBeenCalledWith([
+                { topic: "run-1.events.probe", key: "id-7", value: original.value, headers: {} },
+                { topic: DLQ, key: "id-7", value: "{}", headers: { requeued: `${DLQ}|0|7` } },
             ])
         })
 
-        it("requeues a dead letter on the queue its id names", async () => {
-            const { bus, messages } = await build()
+        it("refuses an id the dead-letter topic does not hold", async () => {
+            const { bus, transport } = await build()
+            transport.read.mockResolvedValue([])
 
-            await bus.requeue("probe.ping|7")
-
-            expect(messages.requeue).toHaveBeenCalledWith(QUEUE, "7")
-        })
-    })
-
-    describe("add", () => {
-        it("registers the consumer on the queue named after its event and hands each message over as a delivery", async () => {
-            const handle = jest.fn(() => Promise.resolve())
-            const consumer = await registered(handle)
-
-            expect(consumer.queue.name).toBe("probe.ping")
-            await consumer.handle({ id: "j-1", eventId: "e-1", payload: { note: "hi" }, attempt: 2 })
-
-            expect(handle).toHaveBeenCalledWith({
-                eventId: "e-1",
-                event: new PingEvent("e-1", { note: "hi" }),
-                attempt: 2,
+            await expect(bus.requeue(`${DLQ}|0|9`)).rejects.toMatchObject({
+                code: EventBusErrorCode.DeadLetterUnknown,
+                params: { id: `${DLQ}|0|9` },
             })
+            expect(transport.send).not.toHaveBeenCalled()
         })
 
-        it("reads the queue payload only when it is an object", async () => {
-            const consumer = await registered(() => Promise.resolve())
+        it("refuses a letter that does not name the topic it came from", async () => {
+            const { bus, transport } = await build()
+            transport.read.mockResolvedValue([letter("8", "probe.ping", {})])
 
-            expect(consumer.queue.parse({ note: "hi" })).toEqual({ note: "hi" })
-            expect(consumer.queue.parse("text")).toBeNull()
-        })
-
-        it("refuses a delivery whose envelope is not the event the consumer reads, so it is retried and buried", async () => {
-            const handle = jest.fn(() => Promise.resolve())
-            const consumer = await registered(handle)
-
-            await expect(
-                consumer.handle({ id: "j-1", eventId: "e-1", payload: { note: 7 }, attempt: 1 }),
-            ).rejects.toMatchObject({ code: EventBusErrorCode.EnvelopeInvalid })
-            expect(handle).not.toHaveBeenCalled()
+            await expect(bus.requeue(`${DLQ}|0|8`)).rejects.toMatchObject({ code: EventBusErrorCode.DeadLetterUnknown })
         })
     })
 })
