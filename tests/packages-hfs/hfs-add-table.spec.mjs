@@ -68,10 +68,14 @@ const parses = (text) =>
 const generatedTypes = (table) =>
   `export type Database = { public: { Tables: { ${table}: { Row: { id: string } } } } }\n`;
 
-test("addTable accepts kebab and plural names, renders snake-case identifiers, and every accepted migration is database-clean", async () => {
-  for (const [name, table] of [
-    ["orders", "orders"],
-    ["audit-events", "audit_events"],
+test("addTable accepts kebab, snake-case, plural, and reserved names and every accepted migration is database-clean", async () => {
+  for (const [name, feature, table, delivery, quoted = false] of [
+    ["orders", "orders", "orders", "Order"],
+    ["audit-events", "audit-events", "audit_events", "AuditEvent"],
+    ["audit_events", "audit-events", "audit_events", "AuditEvent"],
+    ["select", "select", "select", "Select", true],
+    ["order", "order", "order", "Order", true],
+    ["user", "user", "user", "User", true],
   ]) {
     const root = appRoot();
     const result = addTable({
@@ -80,12 +84,16 @@ test("addTable accepts kebab and plural names, renders snake-case identifiers, a
       now: () => at,
       emitTypes: () => generatedTypes(table),
     });
-    const migration = `supabase/migrations/20261002123456_${name}.sql`;
+    const migration = `supabase/migrations/20261002123456_${feature}.sql`;
     assert.ok(result.created.includes(migration));
-    assert.match(read(root, migration), new RegExp(`create table public\\.${table} \\(`));
+    const sqlTable = quoted ? `"${table}"` : table;
     assert.match(
-      read(root, `be/src/modules/domain/${name}/${name}.service.ts`),
-      name === "orders" ? /acceptOrderDelivery/ : /acceptAuditEventDelivery/,
+      read(root, migration),
+      new RegExp(`create table public\\.${sqlTable} \\(`),
+    );
+    assert.match(
+      read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`),
+      new RegExp(`accept${delivery}Delivery`),
     );
     assert.deepEqual(
       await checkDatabase({
@@ -100,8 +108,8 @@ test("addTable accepts kebab and plural names, renders snake-case identifiers, a
   }
 });
 
-test("addTable refuses snake-case, PostgreSQL reserved words, uppercase, and a second non-increasing timestamp", () => {
-  for (const name of ["audit_events", "select", "Orders"]) {
+test("addTable refuses uppercase and a second non-increasing timestamp", () => {
+  for (const name of ["Orders"]) {
     const root = appRoot();
     assert.throws(
       () => addTable({ root, name, emitTypes: false, now: () => at }),

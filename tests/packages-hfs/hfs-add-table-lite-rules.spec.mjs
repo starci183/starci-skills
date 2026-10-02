@@ -188,6 +188,7 @@ test("add table --fe stays database- and architecture-clean for every accepted t
         fast: true,
       });
       const problems = problemsOf(report);
+      // Known pending T8: sql-owner must use the Supabase migration/type schema when schemaAuthority is supabase.
       const schemaAuthorityGap = problems.filter(
         (problem) =>
           problem.ruleId === "BE_SQL_TABLE_OWNER" &&
