@@ -30,6 +30,10 @@ export const validateDeclaration = (config: TestWorldConfig, root: string): Read
         problems.push(`stack: the directory ${config.stack} does not exist under ${root}`)
     }
 
+    if (config.workers !== undefined && (!Number.isInteger(config.workers) || config.workers < 1)) {
+        problems.push(`workers: the most data slots of a run is a positive integer, got ${String(config.workers)}`)
+    }
+
     const stacks = asRecord(config.stacks)
     if (stacks === undefined) problems.push("stacks: the block is required")
     for (const [key, entry] of Object.entries(stacks ?? {})) {
@@ -42,6 +46,10 @@ export const validateDeclaration = (config: TestWorldConfig, root: string): Read
             continue
         }
         if (!faked) continue
+        if (key === "kafka") {
+            problems.push("stacks.kafka: kafka is our own event bus and always runs real (Apache Kafka in KRaft mode); only third parties are faked at the network edge")
+            continue
+        }
         const { fakedBy, reason } = entry
         if (!isNonEmptyString(fakedBy)) problems.push(`stacks.${key}.fakedBy: must name an entry of \`fakes\``)
         else if (!fakeNames.includes(fakedBy)) {
@@ -66,9 +74,32 @@ export const validateDeclaration = (config: TestWorldConfig, root: string): Read
                 } else {
                     seen.add(name)
                 }
+                const database: unknown = connection?.database
+                const schema: unknown = connection?.schema
+                if (database !== undefined && (!isNonEmptyString(database) || !IDENTIFIER.test(database))) {
+                    problems.push(`stacks.postgresql.connections[${index}].database: "${String(database)}" must match ${IDENTIFIER.source}`)
+                }
+                if (schema !== undefined && (!isNonEmptyString(schema) || !IDENTIFIER.test(schema) || schema === "public" || schema.startsWith("pg_"))) {
+                    problems.push(`stacks.postgresql.connections[${index}].schema: "${String(schema)}" must match ${IDENTIFIER.source} and be neither public nor pg_*`)
+                }
                 for (const seed of connection?.seeds ?? []) {
                     if (!isFile(resolvePath(root, seed))) problems.push(`stacks.postgresql.connections[${index}].seeds: ${seed} does not exist under ${root}`)
                 }
+            }
+            // Contexts that share one database each live in a schema of their own: two in one database without distinct schemas would share tables.
+            const byDatabase = new Map<string, Array<{ readonly name: string; readonly schema: string | undefined }>>()
+            for (const connection of connections) {
+                const key = connection?.database ?? connection?.name
+                if (!isNonEmptyString(key)) continue
+                byDatabase.set(key, [...(byDatabase.get(key) ?? []), { name: String(connection.name), schema: connection.schema }])
+            }
+            for (const [database, members] of byDatabase) {
+                if (members.length < 2) continue
+                const unschemed = members.filter((member) => member.schema === undefined).map((member) => member.name)
+                if (unschemed.length > 0) problems.push(`stacks.postgresql.connections: ${unschemed.join(", ")} share the database ${database} with other contexts and must each declare a schema`)
+                const schemas = members.flatMap((member) => (member.schema === undefined ? [] : [member.schema]))
+                const twice = schemas.filter((schema, at) => schemas.indexOf(schema) !== at)
+                if (twice.length > 0) problems.push(`stacks.postgresql.connections: the schema ${[...new Set(twice)].join(", ")} is declared twice in the database ${database}`)
             }
         }
     }

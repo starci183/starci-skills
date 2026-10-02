@@ -4,6 +4,8 @@
  * resolves with the status, the body and, for GraphQL, the declared error code on `errors[0].extensions.code`.
  */
 
+import type { GraphqlSubscription } from "./subscription"
+
 /** What any HTTP call came back with. Refusals resolve rather than reject: a spec asserts the 4xx, never catches it. */
 export interface HttpResponse<TBody = unknown> {
     readonly status: number
@@ -62,6 +64,12 @@ export interface TestCaller extends HttpCaller {
     read<TData>(operation: string, options?: { readonly variables?: Record<string, unknown> }): Promise<GraphqlObserved<TData>>
     /** Sends a mutation document (registry key or string). */
     mutate<TData>(operation: string, options?: { readonly variables?: Record<string, unknown> }): Promise<GraphqlObserved<TData>>
+    /**
+     * Opens a GraphQL subscription (registry key or document) over graphql-ws at the app's GraphQL path, riding on this
+     * caller's bearer (`connectionParams.authorization`); resolves once the server acknowledged the connection. Trigger the
+     * push after it resolved; `close()` it when done (the world closes any left open when it stops).
+     */
+    subscribe<TData>(operation: string, options?: { readonly variables?: Record<string, unknown>; readonly timeoutMs?: number }): Promise<GraphqlSubscription<TData>>
 }
 
 /** The api of one listening app: an anonymous caller plus the way to act as a session. */

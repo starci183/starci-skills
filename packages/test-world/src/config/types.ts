@@ -20,10 +20,19 @@ export interface FakedService {
     readonly reason: string
 }
 
-/** One Postgres connection of the repository: one database per connection, named per repository. */
+/**
+ * One Postgres connection of the repository (one bounded context). By default it gets a database of its own; a context that
+ * starts as a SCHEMA of a shared database names that database (`database`) and its `schema`: the connections that name one
+ * `database` share it (each data slot still gets its own copy), each in its own schema with its own login role whose
+ * `search_path` is that schema.
+ */
 export interface PostgresConnectionDeclaration {
     /** The connection name; `world.db.<name>` and `w.db.<name>`. */
     readonly name: string
+    /** The logical database the connection lives in (default: its own `name`); connections that share one each declare a `schema`. */
+    readonly database?: string
+    /** The schema of the context inside its database (default: `public` of a database of its own). */
+    readonly schema?: string
     /** The entity classes the shared `EntityManager` of this connection maps; raw `query` needs none. */
     readonly entities?: ReadonlyArray<unknown>
     /** SQL files (relative to the app root) applied after the migrate step, in order. */
@@ -117,6 +126,11 @@ export interface AppDeclaration<TModule extends RegisterableModule<never> = Regi
     readonly options: (wiring: TWiring) => OptionsOf<TModule>
     /** Whether the app listens on an OS-reserved loopback port (default true). A worker has no listener. */
     readonly listen?: boolean
+    /**
+     * Whether the app is created with Nest's `rawBody` (default false), as its `main.ts` does when it verifies signed webhooks
+     * over the exact body (`request.rawBody`).
+     */
+    readonly rawBody?: boolean
     /** What `main.ts` does after `NestFactory.create` and before `listen` (CORS, pipes, prefixes). */
     readonly configure?: (app: INestApplication, options: OptionsOf<TModule>) => void | Promise<void>
     /** GraphQL documents by the name a spec uses (`caller.graphql("createTask", vars)`); a document string is always accepted too. */
@@ -232,6 +246,11 @@ export interface TestWorldConfig<
     readonly sandbox?: SandboxDeclaration
     /** The app root every declared path is relative to; default the directory of the app's hfs.json found from the jest rootDir (the rootDir itself or its parent). */
     readonly root?: string
+    /**
+     * The most data slots a run provisions (default 2): world spec files run up to `min(--maxWorkers, workers)` at once, each
+     * slot a complete set of databases, realm, Redis DB, buckets, fakes and proxies. Size it from the host's headroom.
+     */
+    readonly workers?: number
     /** Nest logger levels of the booted apps (default `["error", "warn"]`). */
     readonly logger?: ReadonlyArray<"log" | "error" | "warn" | "debug" | "verbose" | "fatal">
 }

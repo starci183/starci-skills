@@ -29,5 +29,20 @@ export const containerName = (service: string, image: string): string => `starci
 /** The name of the toxiproxy proxy of one run and service. */
 export const proxyNameOf = (runId: string, service: string): string => `${runId}-${service}`
 
-/** The name of the stack-wide Kafka proxy of one image. */
-export const kafkaProxyName = (image: string): string => `kafka-${imageKey(image)}`
+/**
+ * The ONE Kafka image of the StarCi stacks (dev, test world, prod): Apache Kafka in KRaft mode (Kafka 4 has no ZooKeeper
+ * mode), pinned by its multi-arch index digest. The stack definition must name exactly this reference.
+ */
+export const KAFKA_IMAGE = "apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69"
+
+/** How many slot listeners the broker has: one per concurrently attached data slot, machine-wide. */
+export const KAFKA_SLOT_LISTENERS = 8
+
+/** The broker's shape, part of its container identity: a container of another shape is another container, never reused. */
+const KAFKA_SHAPE = `slot-listeners-${KAFKA_SLOT_LISTENERS}`
+
+/** The container name of a service on an image; the Kafka broker's name also carries its listener shape. */
+export const serviceContainerName = (service: string, image: string): string => containerName(service, service === "kafka" ? `${image}#${KAFKA_SHAPE}` : image)
+
+/** The name of the toxiproxy proxy of one slot listener (1-based) of the Kafka broker of one image. */
+export const kafkaProxyName = (image: string, listener: number): string => `kafka-${imageKey(image)}-s${listener}`

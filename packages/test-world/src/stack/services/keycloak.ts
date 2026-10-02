@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { TestWorldErrorCode, worldError } from "../../errors"
 import type { RunKeycloak } from "../contracts"
@@ -23,7 +24,52 @@ export interface RealmFile {
     readonly seedUsers: ReadonlyArray<string>
     /** The secret the import gives every confidential client, by clientId: generated per run, never read from the file. */
     readonly clientSecrets: Readonly<Record<string, string>>
+    /** Each user id the file pins, to the id the namespace's realm stores it under (see {@link namespacedId}). */
+    readonly userIds: Readonly<Record<string, string>>
 }
+
+/**
+ * The id a user the realm file pins gets in one namespace's realm. Keycloak keys every user, client, role, group and scope by
+ * an id unique across the WHOLE server, so two realms imported from one file (two data slots of a run, or two checkouts)
+ * cannot both keep the file's ids. A user id is what the app stores (the token `sub`), so it is remapped deterministically
+ * (a UUID from sha256 of `<namespace>:<id>`) and the seeds of the slot are rewritten with the same map; every other entity id is
+ * dropped (the file references those by name, and Keycloak generates them).
+ */
+export const namespacedId = (kebab: string, id: string): string => {
+    const hex = createHash("sha256").update(`${kebab}:${id}`).digest("hex")
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+/** A copy of `value` without its own `id`. */
+const withoutId = (value: unknown): unknown => {
+    if (!isRecord(value)) return value
+    const { id: _dropped, ...rest } = value
+    return rest
+}
+
+/** Groups and their sub-groups without ids. */
+const groupsWithoutIds = (groups: unknown): unknown =>
+    Array.isArray(groups) ? groups.map((group) => (isRecord(group) ? { ...(withoutId(group) as Record<string, unknown>), ...(Array.isArray(group.subGroups) ? { subGroups: groupsWithoutIds(group.subGroups) } : {}) } : group)) : groups
+
+/** Roles (`{ realm: [...], client: { <clientId>: [...] } }`) without ids. */
+const rolesWithoutIds = (roles: unknown): unknown => {
+    if (!isRecord(roles)) return roles
+    const client = isRecord(roles.client)
+        ? Object.fromEntries(Object.entries(roles.client).map(([name, list]) => [name, Array.isArray(list) ? list.map(withoutId) : list]))
+        : roles.client
+    return { ...roles, ...(Array.isArray(roles.realm) ? { realm: roles.realm.map(withoutId) } : {}), ...(roles.client === undefined ? {} : { client }) }
+}
+
+/** Components (`{ <provider type>: [...] }`) and their sub-components without ids. */
+const componentsWithoutIds = (components: unknown): unknown =>
+    isRecord(components)
+        ? Object.fromEntries(
+              Object.entries(components).map(([type, list]) => [
+                  type,
+                  Array.isArray(list) ? list.map((entry) => (isRecord(entry) ? { ...(withoutId(entry) as Record<string, unknown>), ...(entry.subComponents === undefined ? {} : { subComponents: componentsWithoutIds(entry.subComponents) }) } : entry)) : list,
+              ]),
+          )
+        : components
 
 /** Whether a realm client is confidential: not public and not bearer-only, so it authenticates with a secret. */
 const isConfidential = (client: Record<string, unknown>): boolean => client.publicClient !== true && client.bearerOnly !== true
@@ -45,16 +91,30 @@ export const prepareRealm = (json: string, kebab: string, file: string, secret: 
     const users = Array.isArray(parsed.users) ? parsed.users.filter(isRecord) : []
     const clientSecrets: Record<string, string> = {}
     const preparedClients = (Array.isArray(parsed.clients) ? parsed.clients : []).map((client: unknown) => {
-        if (!isRecord(client) || typeof client.clientId !== "string" || !isConfidential(client)) return client
+        if (!isRecord(client) || typeof client.clientId !== "string" || !isConfidential(client)) return withoutId(client)
         const generated = secret()
         clientSecrets[client.clientId] = generated
-        return { ...client, secret: generated }
+        return { ...(withoutId(client) as Record<string, unknown>), secret: generated }
     })
+    const userIds: Record<string, string> = {}
+    const preparedUsers = (Array.isArray(parsed.users) ? parsed.users : []).map((user: unknown) => {
+        if (!isRecord(user) || typeof user.id !== "string") return user
+        userIds[user.id] = namespacedId(kebab, user.id)
+        return { ...user, id: userIds[user.id] }
+    })
+    const body: Record<string, unknown> = { ...rest, realm: stored }
+    if (Array.isArray(parsed.clients)) body.clients = preparedClients
+    if (Array.isArray(parsed.users)) body.users = preparedUsers
+    if (parsed.roles !== undefined) body.roles = rolesWithoutIds(parsed.roles)
+    if (parsed.groups !== undefined) body.groups = groupsWithoutIds(parsed.groups)
+    if (Array.isArray(parsed.clientScopes)) body.clientScopes = parsed.clientScopes.map(withoutId)
+    if (parsed.components !== undefined) body.components = componentsWithoutIds(parsed.components)
     return {
         realm: parsed.realm,
         stored,
         clientSecrets,
-        body: { ...rest, realm: stored, ...(Array.isArray(parsed.clients) ? { clients: preparedClients } : {}) },
+        userIds,
+        body,
         passwordClientId: typeof passwordClient?.clientId === "string" ? passwordClient.clientId : null,
         seedUsers: users.flatMap((user) => (typeof user.username === "string" ? [user.username.toLowerCase()] : [])),
     }
@@ -96,7 +156,10 @@ const deleteRealm = async (target: ServiceTarget, token: string, realm: string):
     if (removed.status !== 204 && removed.status !== 404) throw worldError(TestWorldErrorCode.InfrastructureFailed, `keycloak delete realm ${realm} answered ${removed.status}`)
 }
 
-/** Keycloak: one shared `start-dev` server per image; a namespace owns one realm imported from the repository file as `<namespace.kebab>-<realm>`. */
+/**
+ * Keycloak: one shared `start-dev` server per image; a namespace owns one realm imported from the repository file as
+ * `<namespace.kebab>-<realm>`, with the file's user ids remapped to the namespace and its other entity ids dropped.
+ */
 export const keycloakService: ServiceDefinition<RunKeycloak> = {
     name: "keycloak",
     port: 8080,
@@ -133,7 +196,7 @@ export const keycloakService: ServiceDefinition<RunKeycloak> = {
         const imported = await admin(target, token, "POST", "/realms", prepared.body)
         if (imported.status !== 201) throw worldError(TestWorldErrorCode.InfrastructureFailed, `keycloak realm import answered ${imported.status}: ${JSON.stringify(imported.json).slice(0, 500)}`)
         return {
-            run: { realm: prepared.stored, clientId, adminUser, adminPassword, clientSecrets: prepared.clientSecrets },
+            run: { realm: prepared.stored, clientId, adminUser, adminPassword, clientSecrets: prepared.clientSecrets, userIds: prepared.userIds },
             notes: { [seedNoteKey(prepared.stored)]: JSON.stringify(prepared.seedUsers) },
         }
     },

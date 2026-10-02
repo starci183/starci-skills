@@ -64,6 +64,7 @@ export type {
     TestCaller,
     TestHttp,
 } from "./nest/api"
+export type { GraphqlSubscription } from "./nest/subscription"
 export type {
     AppHandle,
     AppOverride,

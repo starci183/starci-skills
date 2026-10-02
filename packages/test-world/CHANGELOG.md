@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.2.0 - 2026-10-02
+
+- Added: Kafka as real own infrastructure, Apache Kafka in KRaft mode only. The stack definition must name exactly
+  `apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69` (`KAFKA_IMAGE`, the one pin
+  shared with the dev stacks); Redpanda, cp-kafka and an undigested tag fail with `TEST_WORLD_STACK_DEFINITION`, and
+  `stacks.kafka` can never be `fakedBy`.
+- Added: per-slot Kafka. The broker has 8 slot listeners, each advertising its own toxiproxy port; a slot leases one
+  (`RunKafka.listener`), so `world.infra.kafka.cut()` reaches its slot alone (the stack-wide Kafka proxy exception is gone).
+  Topics, consumer groups and client ids of a slot begin with `<namespace>.`: `w.kafka.group(name)`, `w.kafka.clientId(name)`.
+  Readiness is the topics script on the INTERNAL listener plus an ApiVersions round trip through the slot's proxy (no Kafka
+  client dependency). Before each file the slot's topics are emptied up to the high watermark and its idle groups deleted;
+  teardown deletes only the slot's groups (waiting out a dead member's session timeout, then failing by name) and topics.
+- Added: schema-per-context Postgres. A connection may name a shared `database` and its `schema`: the connections of one
+  database share it (one copy per slot), each in its own schema with its own login role (`search_path` = the schema).
+  `w.db.<name>.schema`; reset empties only the context's schema; `infra.postgresql.connection(name).cut()` of a schema context
+  stops its login only (`NOLOGIN`), so the contexts beside it keep serving. Contexts sharing a database must each declare a
+  distinct schema (never `public` or `pg_*`).
+- Changed: extensions are created in `public` of each database.
+- Added: `apps.<name>.rawBody` (default false): the world creates that app with Nest's `rawBody`, as a `main.ts` that verifies
+  signed webhooks over the exact body (`request.rawBody`) does.
+- Added: `webhookApp` on the four payment fakes (sepay, payos, momo, vnpay): the declared app whose listener receives their
+  webhooks, for a world with several listening apps (default unchanged: the first listening app). An HTTP fake's `client`
+  now receives the declared options.
+- Added: crash reclaim. A run records on its lease what it provisioned, service by service; when its process dies (a crash,
+  a killed jest) the lease is kept, and the next attach (or `down`) claims it and tears it down through the same detach as a
+  normal run: its databases, roles, realm, Redis DB, buckets, topics, consumer groups, namespaces and proxies. One live
+  process claims a dead lease at a time; a dead lease that provisioned nothing is dropped as before. A Kafka teardown waits up
+  to 60 s (the default session timeout is 45 s) for a group whose dead member has not expired.
+- Fixed: the Kafka probe answers false when a cut proxy closes the connection without a reply (it left the promise pending).
+- Added: GraphQL subscriptions in the test API. `api.subscribe(operation, { variables, timeoutMs })` (and on any bound caller,
+  `api.as(token).subscribe(...)`) opens a graphql-ws (`graphql-transport-ws`) subscription at the app's GraphQL path on
+  Node's own WebSocket (no new dependency), with the caller's bearer as `connectionParams.authorization`. The handle has
+  `next(timeoutMs)` (waits for the next unread frame, TEST_WORLD_TIMED_OUT at the deadline), `frames()`, `errors()`,
+  `closed()` and `close()`; a refused connection rejects with its close code, and the world closes any subscription a spec
+  left open before the apps stop. For EX-KINDS (ecommerce realtime scenarios).
+- Changed: the SePay fake signs every delivery with a timestamp: `x-sepay-timestamp: <epoch ms>` and `x-sepay-signature:
+  sha256=<hmac of "<timestamp>.<exact body>">` (`sepaySignature`, `sepayVerifySignature`; the body-only `sepayBodySignature`
+  and `sepayVerifyBody` are removed). `replayWebhook(reference, { ageMs })` and `delayWebhook({ ..., ageMs })` deliver the
+  captured body validly re-signed `ageMs` in the past, so a spec proves the app's replay window refuses a stale delivery
+  (`failNext({ badSignature })` still covers a tampered signature). For EX-KINDS (ecommerce webhook scenarios).
+
+## 1.1.0 - 2026-10-02
+
+- Added: per-worker data slots, so world spec files run in parallel. The globalSetup provisions N slots, N = min(jest
+  `maxWorkers`, the declaration's new `workers` cap, default 2). A slot is a complete, independent run: its own namespace
+  `<package>_<hash>_w<k>` and run token `<run>-w<k>`, so its own Postgres database per connection (migrated and seeded per slot),
+  its own Keycloak realm, its own leased Redis DB index, its own MinIO/Qdrant/Kafka/k3d prefixes, its own fakes host, its own
+  toxiproxy proxies and its own outage lock (in the slot's run directory). The teardown disposes every slot; a failed setup
+  disposes the slots already made.
+- Changed: the state file is protocol 2 (`{ version: 2, library, runId, slots }`); a spec process reads the slot named by
+  `STARCI_TEST_WORLD_SLOT`, which `@starci/jest-preset` 2.2.4's world runner sets per file. The pair is exact: a state file of
+  another protocol, or a process with no slot of the run, is the new `TEST_WORLD_PAIR_MISMATCH` naming both versions (re-pin
+  both per canon-pins). `RunContext.version` is replaced by `RunContext.slot`; `namespaceOf(root, slot)` takes the slot.
+- Fixed: a realm file that pins entity ids (a user `id` that a seed row names as the token `sub`) could be imported once per Keycloak server only: ids are unique server-wide, so a second slot (or a second checkout) failed with 409 Conflict. The import remaps each pinned user id to a per-namespace UUID (`namespacedId`, sha256 of `<namespace>:<id>`), drops the ids of clients, roles, groups, client scopes and components, and the slot's seeds are applied with the same user-id rewrite (`RunKeycloak.userIds`).
+- Fixed: the stack, namespace and registry specs built their fixtures under a host path; they use the OS temp directory.
+- Known limitation: Kafka's proxy is stack-wide (the broker advertises its proxied address), so a Kafka outage in one slot
+  reaches the others; Redis has 16 DB indexes machine-wide, so slots x concurrent repositories must stay within 16.
+
 ## 1.0.5
 
 - Added: a modules world boots real peer apps beside its modules: `useTestWorld({ modules, apps: ["order"] })` reserves the

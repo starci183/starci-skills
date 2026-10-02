@@ -39,8 +39,8 @@ export interface ServiceSpec {
 
 /** Per-start hints for {@link ServiceDefinition.spec}. */
 export interface SpecHints {
-    /** The stack-wide proxy port a broker must advertise (Kafka only). */
-    readonly advertisedPort: number | null
+    /** The proxy port each slot listener of the broker advertises, in listener order (Kafka only). */
+    readonly kafkaListenerPorts: ReadonlyArray<number> | null
 }
 
 /** What a service is asked to provision for one run. */
@@ -49,6 +49,8 @@ export interface ProvisionInput {
     readonly request: AttachRequest
     /** Leases a Redis DB index for the namespace from the registry. */
     leaseRedisDb(): Promise<number>
+    /** Leases a Kafka slot listener (1-based) for the namespace from the registry. */
+    leaseKafkaListener(): Promise<number>
 }
 
 /** The service-specific part of a run's infra (`RunX` without the endpoint), plus notes to keep for `reset`. */
