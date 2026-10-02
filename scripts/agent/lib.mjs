@@ -364,9 +364,8 @@ function sendPrompt(handle, text, adapter, io) {
 // <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).
 // Orca composes the launch (placement, the owner's per-agent default args, readiness, the Task from --spec) and owns
 // the worker's lifecycle; the runtime pre-trusts the directory, starts the worker with its spec (no task-create: a
-// failed start leaves no orphan Task), takes the agent terminal from the start receipt (result.worker.agentTerminalHandle)
-// or else from the attestation worker-show (result.dispatch.assigneeHandle) - there is no dispatch-show. Live (Orca 1.4.209,
-// 2026-10-02) the start receipt has NO `worker` key, so worker-show is the real source and the receipt field a bonus - gives it its
+// failed start leaves no orphan Task), takes the agent terminal from worker-show (result.dispatch.assigneeHandle; live Orca 1.4.209
+// has no result.worker in the start receipt, 2026-10-02) or from result.worker.agentTerminalHandle when present, gives it its
 // semantic title and attests the EFFECTIVE agent and model (worker-show) against what was routed. A card whose
 // `start.modelArgument` is false (devin) takes no model flag and is attested on its agent alone.
 // `request` is the launch's ledger identity (calls.yaml worker-start replay: request): the start's --retry-request id

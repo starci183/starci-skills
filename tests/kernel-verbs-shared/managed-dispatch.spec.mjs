@@ -285,7 +285,7 @@ test('managed settle: a Dispatch with no worker_done (the op filed no report) is
 // Two settled nivo business.decide ops kept their Claude terminals live:
 // worker-release answered release_unknown ("the agent terminal was closed but
 // its process could not be confirmed stopped") and settle recorded nothing.
-for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x repeats the release and never leaves the agent terminal live`,t=>{
+for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x repeats the release once and records its custody`,t=>{
   const fx=fixture(t);fx.env.STARCI_FAKE_ORCA_RELEASE_UNKNOWN=String(unknown);
   const jobId='job-managed-release';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
@@ -309,13 +309,14 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   const releases=fx.calls().filter(c=>c==='orchestration worker-release').length;
   assert.equal(releases,2,'an unknown release is repeated once, as Orca\'s recovery says');
   const worker=json(s.stdout)?.managedWorker;
-  assert.equal(worker?.agentTerminal?.handle,'fake-terminal-1');
-  assert.equal(worker?.agentTerminal?.connected,false,'the settled op leaves no connected agent terminal');
-  const closes=fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close');
-  // Either way the agent's own tab is closed once, so Orca cannot bring the
-  // session back under a new handle (tests/kernel/close-op-terminal.spec.mjs).
-  assert.deepEqual(closes.map(a=>[a[a.indexOf('--terminal')+1],a.includes('--tab')]),[['fake-terminal-1',true]],'only the exact agent terminal, with its tab');
-  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.agentTerminal?.connected,false,'the ledger keeps the worker receipt');
+  assert.equal(worker?.retryRelease?.state!==undefined,true,'the repeat is on the receipt');
+  // worker-release alone ends the agent: nothing is typed into the terminal and no tab is closed by hand.
+  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close').length,0,'no terminal close');
+  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal send').length,0,'no quit input');
+  // Orca\'s own recovery repeats the release once: the first unknown is settled by it; two unknowns leave the worker retained,
+  // which the receipt says (custody) and --release-worker retries later.
+  assert.equal(worker?.custody?.state,unknown===1?'released':'retained',JSON.stringify(worker?.custody));
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.custody?.state,worker?.custody?.state,'the ledger keeps the worker receipt');
 });
 
 test('finish closes the kernel terminal and never issues task-update (the Task of an op belongs to Orca)',t=>{
@@ -897,9 +898,3 @@ test('a dead managed worker settles with custody released from its disconnected 
   assert.notEqual(refused.status,0,'a job still running is settle\'s to release');
 });
 
-test('a managed worker quits with its own agent CLI, not always Claude\'s input',()=>{
-  const src=fs.readFileSync(API,'utf8');
-  assert.doesNotMatch(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: 'claude' \}\)/);
-  assert.match(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: agentOfJob\(settledPayload\) \?\? 'claude' \}\)/);
-  assert.match(src,/const agentOfJob = \(payload\) => \/\^\(claude\|codex\|devin\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
-});

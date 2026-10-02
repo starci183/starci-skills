@@ -65,7 +65,7 @@ export default {
   },
   async run({ ledger, args, repo, emit, internals }) {
     const { resolveJob, reportOwnedPaths, reportIdentityOf,
-      handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
+      handoverProofGate, skillRoot, reportFiledWake } = internals;
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
   const attempt = requireReportAttempt(db, job);
@@ -237,7 +237,6 @@ export default {
   // detached and outside the op's identity, so a green done report settles without waiting for the Kernel's turn and
   // anything else is handed to the Kernel as needs-kernel-decision (scripts/kernel/settle/job-settle.mjs).
   if (!process.env.NODE_TEST_CONTEXT) startSettlerFor(repo, { workflowId: job.workflow_id, jobId: job.job_id });
-  releaseWorkerOnReport(ledger, job, jobPayload, report);
 
   },
 };

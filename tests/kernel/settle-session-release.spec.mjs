@@ -78,7 +78,7 @@ const seedOpJob = (file, { wf, jobId, handle, worktree }) => {
       createUnit(db, { workflowId: wf, unitId, opId: 'docs.author', subjectKey: unitId, goalRevision: 1, createdAt: at });
       enqueueJob(db, { jobId, workflowId: wf, unitId, opId: 'docs.author', kind: 'op', role: 'op', payload: {
         opId: 'docs.author', owned_paths: ['docs/'], provider: 'claude', agent: 'claude',
-        orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: handle },
+        managed: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: handle },
       }, createdAt: at });
       setJobStatus(db, { jobId, to: 'ready', reason: 'dispatch', at });
       setJobStatus(db, { jobId, to: 'leased', reason: 'dispatch', at });
@@ -110,7 +110,7 @@ const seedOrcaTerminal = (stateFile, terminal) => {
 test('settle archives the settled op\'s own claude session file', t => {
   const fx = fixture(t), wf = 'wf-sess-archive', jobId = 'op-sess-archive-a1';
   seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess1', worktree: fx.repo });
-  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess1', connected: true, writable: true, command: 'claude', tabId: 'tab-1', title: '[Op] docs.author' });
+  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess1', connected: false, writable: true, command: 'claude', tabId: 'tab-1', title: '[Op] docs.author' });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jsonl', `[Op] docs.author — (job ${jobId}, attempt 1, dispatch ctx-${jobId})`);
   // The session's own usage record: settle reads it before the file moves (scripts/kernel/usage-record.mjs).
   fs.appendFileSync(session, json({ type: 'assistant', sessionId: 'aaaaaaaa', message: { id: 'msg_1', model: 'claude-opus-5-5', content: [], usage: { input_tokens: 7, output_tokens: 11, cache_read_input_tokens: 100, cache_creation_input_tokens: 13 } } }) + '\n');
@@ -155,7 +155,7 @@ test('a session whose worker terminal is still open is skipped with a recorded r
 test('the kernel\'s own session file in the same project dir is never moved', t => {
   const fx = fixture(t), wf = 'wf-sess-kernel', jobId = 'op-sess-kernel-a1';
   seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess3', worktree: fx.repo });
-  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess3', connected: true, writable: true, command: 'claude', tabId: 'tab-3', title: '[Op] docs.author' });
+  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess3', connected: false, writable: true, command: 'claude', tabId: 'tab-3', title: '[Op] docs.author' });
   const opSession = claudeSessionFile(fx.trustHome, fx.repo, 'cccccccc-3333-4333-8333-cccccccccccc.jsonl', `(job ${jobId}, attempt 1)`);
   // The live kernel's own session for the same checkout: it carries no op job id.
   const kernelSession = claudeSessionFile(fx.trustHome, fx.repo, 'dddddddd-4444-4444-8444-dddddddddddd.jsonl', '[Kernel] docs kernel workflow');
@@ -171,7 +171,7 @@ test('the kernel\'s own session file in the same project dir is never moved', t 
 test('settle succeeds when the op has no session file', t => {
   const fx = fixture(t), wf = 'wf-sess-none', jobId = 'op-sess-none-a1';
   seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess4', worktree: fx.repo });
-  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess4', connected: true, writable: true, command: 'claude', tabId: 'tab-4' });
+  seedOrcaTerminal(fx.stateFile, { handle: 'term-sess4', connected: false, writable: true, command: 'claude', tabId: 'tab-4' });
 
   const r = runApi(fx.env, 'settle', '--repo', fx.repo, '--job', jobId, '--verdict', 'fail', '--json');
   assert.equal(r.status, 0, r.stderr || r.stdout);

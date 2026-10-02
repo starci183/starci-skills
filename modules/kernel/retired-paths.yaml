@@ -208,6 +208,8 @@ retired:
   - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
   - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
   - {path: ui/run-cloudflared.ps1, retiredAt: 2026-10-02, removedIn: C2b, replacedBy: 'node ui/start.mjs --tunnel (the harness named tunnel through scripts/api/cloudflared/tunnel-run.mjs), registered as its scheduled task by scripts/reconciler/tunnel-task.mjs --install-task'}
+  - {path: scripts/kernel/reap-agent-process.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1: no claude, codex or devin process of the terminal remains 10 s after it)'}
+  - {path: tests/kernel/reap-agent-process.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'tests/kernel-verbs-shared/managed-dispatch.spec.mjs (settle releases with worker-release only)'}
 moved:
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
@@ -655,7 +657,6 @@ moved:
   - {from: tests/quit-agent.spec.mjs, to: tests/kernel/quit-agent.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/quota-devin.spec.mjs, to: tests/agent-quota/quota-devin.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/ram-throttle.spec.mjs, to: tests/machine/ram-throttle.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/reap-agent-process.spec.mjs, to: tests/kernel/reap-agent-process.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-boot.spec.mjs, to: tests/reconciler/reconciler-boot.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-engine.spec.mjs, to: tests/reconciler/reconciler-engine.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/reconciler-fleet.spec.mjs, to: tests/reconciler/reconciler-fleet.spec.mjs, movedIn: C7, quiesced: false}
@@ -973,6 +974,13 @@ moved:
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
+  - {symbol: reapAgentProcess, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: reapIfStillLive, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: quitWorkerTerminal, replacedBy: 'worker-release of the managed Dispatch (no command-terminal job is live any more)'}
+  - {symbol: custodyOf, replacedBy: 'custodyOfRelease: the release receipt state, not a terminal read-back'}
+  - {symbol: closeDeadWorkerTerminal, replacedBy: 'releaseDeadWorker: the dead worker Dispatch is released'}
+  - {symbol: releaseWorkerOnReport, replacedBy: 'nothing: the op worker_done and the settle worker-release end the worker'}
+  - {symbol: reconcileReap, replacedBy: 'nothing: reconcile --reap is deleted with the reaper'}
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}
   - {symbol: closeOperationTask, replacedBy: 'the op worker_done (api report -> scripts/api/orca/send.mjs send) settles its Task and Dispatch (REPLACE #9)'}
   - {symbol: TASK_CLOSED_STATUS, replacedBy: 'the op worker_done settles the Task (REPLACE #9)'}

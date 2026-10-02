@@ -2,7 +2,7 @@
 //
 // Every runtime path that stops a tree it owns calls this: the GC sweep (scripts/supervisor/gc.mjs), the verified
 // close (scripts/machine/close-verify.mjs reapOrphaned), the runaway-shim stop (scripts/supervisor/host-health.mjs
-// stopTree), the op agent reap (scripts/kernel/reap-agent-process.mjs) and the UAT listener restart
+// stopTree) and the UAT listener restart
 // (scripts/uat/env-health.mjs). Reconciler controllers do not import it: they go through ctx.run so shadow mode
 // can record the stop instead of doing it.
 //

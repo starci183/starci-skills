@@ -11,11 +11,11 @@ import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 // exited to a bare PowerShell prompt, some workers sat nudged and silent), and each became a
 // hand-written incident while its Kernel stalled. These specs pin the self-heal:
 //   - `reconcile --dead-worker --settle-failed` settles a dead worker's attempt failed-no-report
-//     when its effect evidence is bounded by the owned paths: lease released, terminal closed,
+//     when its effect evidence is bounded by the owned paths: lease released,
 //     ONE retry queued as attempt+1 through the retry lineage; a repeat writes nothing;
 //   - evidence outside the owned paths (an op risk hint) stays fenced for the Kernel;
 //   - a worker quiet past its provider's timeout after a nudge is dead to the frontier, nudge
-//     refuses it, and the recovery quits its agent before closing its terminal;
+//     refuses it, and its recovery releases the Dispatch;
 //   - the third failed-no-report death of one op raises ONE pattern incident;
 //   - a live worker's path leases are renewed by status;
 //   - the watchdog runs the recovery for every frontier deadWorkerJobs entry.
@@ -85,8 +85,6 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
   const result=JSON.parse(row.result_json);
   assert.deepEqual([result.verdict,result.reason,result.reportFiled,result.attemptConsumed],['fail','failed-no-report',false,true]);
   assert.equal(leases().length,0,'the lease is released');
-  assert.deepEqual([body.terminalClosed.closed,body.terminalClosed.proof],[true,'disconnected'],'the dead terminal is closed');
-  assert.deepEqual(orcaState().closed,[HANDLE]);
   // One retry: the same op, records, owned paths, as attempt 2 through the retry lineage.
   const retry=jobs().find(j=>j.job_id!==JOB);
   assert.equal(body.retry.jobId,retry.job_id);
@@ -232,7 +230,7 @@ test('a worker gone while its Kernel terminal lives is its own death: a spent bu
 
 // A worker nudged once, then silent at its prompt with a lease and no report.
 const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};
-test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery quits and closes it',t=>world(t,({ledger,repoRoot,run,job,orcaState})=>{
+test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery requeues it',t=>world(t,({ledger,repoRoot,run,job,orcaState})=>{
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-30*MIN});
   const worker=status(run).workers.find(w=>w.jobId===JOB);
   assert.equal(worker.liveness,'quiet');
@@ -245,8 +243,6 @@ test('a worker quiet past its provider timeout after a nudge is dead: nudge refu
   const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed',JSON.stringify(body));
   assert.equal(body.liveness,'quiet');
-  assert.deepEqual([body.terminalClosed.closed,body.terminalClosed.proof],[true,'quiet-quit']);
-  assert.ok((orcaState().closed??[]).includes(HANDLE));
   assert.equal(job().status,'failed');
 },{terminal:IDLE,dispatchedAgo:HOUR}));
 
@@ -261,9 +257,9 @@ test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,({
 // nudge cmdNudge has no branch for (it refused worker-state-unknown) and reconcile --dead-worker
 // refused worker-alive. A wedged worker is dead to its contract - the turn can never file the
 // report - but it is not a dead-liveness state: it recovers only through
-// `reconcile --dead-worker --settle-failed`, which quits the agent first like the quiet path.
+// `reconcile --dead-worker --settle-failed`, which settles it like the quiet path.
 const WEDGED={connected:true,writable:true,command:'codex',screen:['• Working (45m 12s • esc to interrupt)',' │ No output yet (still running)','› Ask Codex to do anything'].join('\n')};
-test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses, --settle-failed quits it and settles failed',t=>world(t,({repoRoot,run,job,jobs,events,orcaState})=>{
+test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses, --settle-failed settles failed',t=>world(t,({repoRoot,run,job,jobs,events,orcaState})=>{
   assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'wedged');
   assert.deepEqual(status(run).frontier.wedgedJobs,[JOB]);
   assert.deepEqual(status(run).frontier.deadWorkerJobs,[],'wedged is not a dead-liveness state');
@@ -280,9 +276,6 @@ test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses,
   const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed',JSON.stringify(body));
   assert.equal(body.liveness,'wedged');
-  assert.deepEqual([body.terminalClosed.closed,body.terminalClosed.proof],[true,'wedged-quit']);
-  assert.ok((orcaState().quits??[]).some(q=>q.handle===HANDLE),'the agent was quit before its terminal closed');
-  assert.ok((orcaState().closed??[]).includes(HANDLE));
   assert.equal(job().status,'failed');
   assert.equal(jobs().filter(j=>j.status==='queued').length,1,'one retry queued');
   const dead=events('worker-failed-no-report').map(e=>JSON.parse(e.payload_json));
