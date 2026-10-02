@@ -921,6 +921,20 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   assert.ok(made>0);
 });
 
+test('a server whose project still sits on the former gate name gets the renamed gate created and the project moved onto it',async t => {
+  const root=temporary(t,'gate-renamed');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const repo=fakeRepo(root);
+  const former=['starci','new','code'].join('-');
+  state.gateSelected.set('product-repo',former);
+  const run=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.equal(run.report.qualityGate.outcome,'ok',JSON.stringify(run.report.qualityGate));
+  assert.equal(state.gateSelected.get('product-repo'),'starci-quality','the project is selected onto the current gate');
+  assert.ok(state.gateConditions.size>0,'the current gate was created with its conditions');
+  assert.ok(!state.requests.some(r=>String(r.path+JSON.stringify(r.query??'')).includes(former)),'the former name is never asked for');
+});
+
 test('duplication on the changed lines fails the slice; lesser issues are listed and never block', async t => {
   const root=temporary(t,'gate-dup');
   const {host}=await fakeSonar(t,{duplications:{'src/app.js':[{from:10,size:12}]},issues:[{path:'src/app.js',line:12,severity:'MAJOR',type:'CODE_SMELL'}]});
