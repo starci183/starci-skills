@@ -20,14 +20,14 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 export const dbTypesPath = 'supabase/types/database.types.ts';
 
 /** The slot that owns the generated types; enabled by a connection declaring provider supabase. */
-export const DB_TYPES_SLOT = 'app.supabase.types';
+const DB_TYPES_SLOT = 'app.supabase.types';
 
 /** The config file whose [api] schemas narrow the generation. */
 const CONFIG_FILE = 'supabase/config.toml';
 const SUPABASE_CLI = 'supabase';
 
 /** A types emit that could not run: the code modules/kernel/failure-codes.yaml catalogues as HFS_EMIT_DB_TYPES_FAILED. */
-export class DbTypesError extends Error {
+class DbTypesError extends Error {
   constructor(message, details = {}) {
     super(`HFS_EMIT_DB_TYPES_FAILED: ${message}`);
     this.name = 'DbTypesError';

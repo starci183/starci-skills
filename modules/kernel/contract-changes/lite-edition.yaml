@@ -16,7 +16,7 @@ reach: new-legs
 paths:
   - knowledge/hfs/slots.yaml
   - knowledge/hfs/rules.yaml
-  - knowledge/hfs/sonar-gate.yaml
+  - knowledge/sonar-gate.yaml
   - modules/schemas/hfs-repo.schema.yaml
   - modules/schemas/hfs-rules.schema.yaml
   - modules/schemas/hfs-slots.schema.yaml

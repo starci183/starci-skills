@@ -79,7 +79,7 @@ export const STARTER_SIDES = Object.freeze({
 });
 
 /** The lite starter is the upgrade-safe subset: one API, one web app and one Supabase schema authority. */
-export const LITE_STARTER_SIDES = Object.freeze({
+const LITE_STARTER_SIDES = Object.freeze({
   be: Object.freeze({
     apps: [{ name: 'api', kind: 'api' }],
     kinds: ['api'],
@@ -158,7 +158,7 @@ const FE_PACKAGES = Object.freeze({
 const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.json', lint: WORKSPACE_LINT, typecheck: 'tsc --noEmit -p tsconfig.json' });
 
 /** The app hfs.json of a new app called `name`; full remains the byte-for-byte default declaration. */
-export const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full') => ({
+const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full') => ({
   hfs: manifest.major,
   kind: 'app',
   ...(edition === 'full' ? {} : { edition }),

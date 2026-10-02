@@ -360,7 +360,7 @@ slots:
     tier: hfs
     owner: true
     requires: [slots.mjs, check.mjs, runtime-check.mjs, sync-runtime.mjs, architecture.mjs, architecture/, rules/, runtime-rules/]
-    allows: ["<name>.mjs", "rules/<rule>.mjs", "runtime-rules/<rule>.mjs", "architecture/<check>.mjs"]
+    allows: ["<name>.mjs", "rules/<rule>.mjs", "runtime-rules/<rule>.mjs", "architecture/<check>.mjs", "sql/<module>.mjs"]
     tests: none
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
   - id: runtime.machine

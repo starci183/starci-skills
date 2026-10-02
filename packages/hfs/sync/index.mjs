@@ -26,7 +26,7 @@ import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 const NODE_MAJOR = 22;
-export const APP_BINARY = 'hfs';
+const APP_BINARY = 'hfs';
 /** The scopes a target is rendered for: the app root, then each side. */
 export const SCOPES = Object.freeze([APP_SCOPE, ...SIDES]);
 export const BLOCK_BEGIN = '# >>> hfs sync (managed block; do not edit) >>>';
@@ -230,7 +230,7 @@ const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo
 export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** The images a declaration renders commands and CI entries for. Lite's default deployable is the back-end API image. */
-export function imageEntries(app) {
+function imageEntries(app) {
   return [...app.sides.be.apps.map(entry => ({ side: 'be', entry })), ...(app.edition === 'lite' ? [] : app.sides.fe.apps.map(entry => ({ side: 'fe', entry })))];
 }
 
