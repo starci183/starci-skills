@@ -8,6 +8,7 @@ include:
   - redis.yaml
   - keycloak.yaml
   - minio.yaml
+  - kafka.yaml
   - identity.yaml
   - order.yaml
   - billing.yaml

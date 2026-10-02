@@ -18,6 +18,11 @@ components:
     image: cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
     role: stateful
     compose: infra/compose/minio.yaml
+  kafka:
+    image: apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69
+    role: stateful
+    compose: infra/compose/kafka.yaml
+    purpose: The event bus (Apache Kafka in KRaft mode, no ZooKeeper) the order and billing services publish to and consume from; healthchecked by kafka-topics.sh.
   identity:
     image: ecommerce-app/identity:1.0.0
     role: service
@@ -45,6 +50,8 @@ environments:
         port: 8149
       minio:
         port: 9069
+      kafka:
+        port: 9161
       identity:
         port: 5070
       order:
