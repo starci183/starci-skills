@@ -1,8 +1,7 @@
 import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { PaymentService } from "@modules/domain/payment"
-import { WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
-import type { WebhookSignatureService } from "@modules/platform/http-security"
+import { WebhookSignatureService } from "@modules/platform/http-security"
 import { PaymentGatewayWebhook } from "./payment-gateway.webhook"
 import type { PaymentNotificationRequest } from "./dto/payment-notification.request"
 
@@ -13,7 +12,7 @@ const build = async (signature: WebhookSignatureService, payments: PaymentServic
     const moduleRef = await Test.createTestingModule({
         controllers: [PaymentGatewayWebhook],
         providers: [
-            { provide: WEBHOOK_SIGNATURE, useValue: signature },
+            { provide: WebhookSignatureService, useValue: signature },
             { provide: PaymentService, useValue: payments },
         ],
     }).compile()
