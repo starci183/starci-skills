@@ -1,0 +1,27 @@
+id: release-l4-wiring
+effectiveAt: '2026-10-03T05:30:00+07:00'
+summary: >-
+  THE L4 ROW IS WIRED FOR THE RELEASE CUT (coordinator 2026-10-03). Before L4's steps, a real `npm ci` runs in every example app (a node_modules link into another checkout is removed as a link first, a missing lockfile is
+  absent and fails). The Sonar proof is supplied by the existing gate (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`): per example, `scan --project-gate --wait` then `dashboard`, both must PASS, called in-process from the gate's exported functions (no child `node <script>`; so `runL4` and `cutRelease` are async and a caller awaits them);
+  the local SonarQube stack (server container and its database container) is started by exact name through scripts/api/docker when stopped, waited for until UP, and stopped again afterwards, leaving it as found;
+  no other container is named. A new last L4 step, `linux-parity`, runs the CI-equivalent LIGHT jobs once in a Linux container on this host before the push: the node image of the workflows' node-version, HEAD handed
+  over as a read-only tar (git archive) and extracted to a copy inside the container, then every `run` step of .github/workflows derived (installs, the full check set, package clean installs, the scaffold against
+  registry installs, example records, and per example codegen, typecheck, hfs lint and the builds) minus the spec suites, manual and tag-upload steps, docker builds, browser runs and workflow plumbing, each left-out
+  step recorded with its reason. A red step, or no docker daemon, fails L4 and blocks the cut. Docker is spoken only through the scripts/api/docker call files (container-lifecycle, container-rm, run,
+  version beside container-inspect); no port is published and no container but the run's own named one is removed.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/release-l4-wiring.yaml
+  - scripts/supervisor/release-l4.mjs
+  - scripts/supervisor/release-l4-sonar.mjs
+  - scripts/supervisor/release-linux-parity.mjs
+  - scripts/supervisor/release-cut.mjs
+  - scripts/api/docker/lib.mjs
+  - scripts/api/docker/run.mjs
+  - scripts/api/docker/version.mjs
+  - scripts/api/docker/container-lifecycle.mjs
+  - scripts/api/docker/container-rm.mjs
+  - scripts/api/git/archive.mjs
+  - tests/supervisor/release-l4-wiring.spec.mjs
+  - docs/source-process.md
+  - docs/git-governance.md

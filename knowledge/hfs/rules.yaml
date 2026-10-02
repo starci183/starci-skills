@@ -144,7 +144,7 @@ rules:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
-    law: "CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
+    law: "CI runs the pinned `hfs lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
@@ -1830,6 +1830,51 @@ rules:
     failureCodes: ["RT_SLOT_ID_SHAPE"]
     enforcers:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
+  - id: R221
+    code: "CI_TRIGGERS_RELEASE_ONLY"
+    law: "The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CI_TRIGGERS_RELEASE_ONLY"]
+    enforcers:
+      - {kind: runtime, id: git-triggers, at: scripts/hfs/runtime-rules/git-triggers.mjs}
+  - id: R222
+    code: "RELEASE_NOTES"
+    law: "A release tag `v<version>` on HEAD has its CHANGELOG.md section `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark: the tag message and the GitHub Release are that section, so a tag is never cut over an unfinished or missing section."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RELEASE_NOTES"]
+    enforcers:
+      - {kind: runtime, id: release-notes, at: scripts/hfs/runtime-rules/release-notes.mjs}
+  - id: R223
+    code: "RIGHTS_ROLE_DENIED"
+    law: "By the caller's role, the command guard refuses git push, git tag, raw git commit/add/rm/mv, raw git synchronization writes, npm publish, a whole-suite run outside the release cut and unit.verify/e2e.verify, npm ci without the host lock, a release cut, and raw side-effecting tools; modules/kernel/command-policy.yaml is the one rule table read by both the PreToolUse guard and the PATH shim."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RIGHTS_ROLE_DENIED", "RIGHTS_GIT_PUSH", "RIGHTS_GIT_TAG", "RIGHTS_GIT_COMMIT", "RIGHTS_GIT_SYNC", "RIGHTS_NPM_PUBLISH", "RIGHTS_NPM_CI_UNLOCKED", "RIGHTS_SUITE_RUN", "RIGHTS_RELEASE_CUT", "RIGHTS_RAW_TOOL"]
+    enforcers:
+      - {kind: runtime, id: role-rights, at: scripts/hfs/runtime-rules/rights-policy.mjs}
+  - id: R224
+    code: "RIGHTS_PROTECTED_ZONE"
+    law: "The protected zone declared once in modules/kernel/protected-zone.yaml is edited only by the owner path; a supervisor self-upgrade files an owner proposal, and an op never writes the .claude runtime checkout."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RIGHTS_PROTECTED_ZONE", "RIGHTS_OP_RUNTIME_WRITE"]
+    enforcers:
+      - {kind: runtime, id: protected-zone, at: scripts/hfs/runtime-rules/rights-policy.mjs}
+  - id: R225
+    code: "RT_HOOK_SHAPE"
+    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags) and runs no npm test, jest, typecheck or lint."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_HOOK_SHAPE", "RIGHTS_PUSH_NOT_RELEASE"]
+    enforcers:
+      - {kind: runtime, id: hook-shape, at: scripts/hfs/runtime-rules/hook-shape.mjs}
   - id: R226
     code: "RT_SPEC_OVER_BUDGET"
     law: "Every recorded spec duration stays within the shared per-file land budget in modules/kernel/spec-durations.yaml, and every recorded spec path still exists. An over-budget spec is repaired without removing tests or assertions: share a per-process fixture, remove per-test install or boot, inject the clock and never lengthen a timeout; stale rows are refreshed from the current land record."
@@ -1849,6 +1894,15 @@ rules:
     enforcers:
       - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
 retired:
+  - {id: R212, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R213, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R214, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R215, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R216, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R217, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R218, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R219, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R220, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R199, reason: "reserved for the CLI lane (RT_CLI_VERB_PARITY); the id returns to the catalog when that lane lands, never a rule of this block"}

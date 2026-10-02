@@ -113,18 +113,18 @@ describe('the generated file set', () => {
 });
 
 describe('.husky/pre-commit', () => {
-  it('runs work hygiene, typecheck, the staged eslint of each side from its folder, stylelint over the staged fe css, prettier and the be unit specs of staged files, never integration, e2e or contract', () => {
+  it('is L0 only: work hygiene, the staged eslint of each side from its folder, stylelint over the staged fe css and prettier; no typecheck, no test run', () => {
     const hook = rendered()['.husky/pre-commit'];
-    for (const step of ['npx hfs work-hygiene', 'npm run typecheck', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted', 'npm run test:affected -- --findRelatedTests $specs']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright|vitest/);
+    for (const step of ['npx hfs work-hygiene', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook.split('\n').filter((line) => !line.startsWith('#')).join('\n'), /typecheck|test:|jest|lint-staged|playwright|vitest|specs/);
   });
 });
 
 describe('.husky/pre-push', () => {
-  it('runs typecheck, the one lint, format and the affected be unit specs, and never e2e', () => {
+  it('is the release gate check: backups, main and v tags by the release cut only, no typecheck, lint, format or test run', () => {
     const hook = rendered()['.husky/pre-push'];
-    for (const step of ['npm run typecheck', 'npm run lint', 'npm run format:check', 'npm run test:affected -- --changedSince=origin/main']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /test:(e2e|integration|contract)|typecheck:tests|playwright/);
+    for (const marker of ['starci-release', 'refs/backup/*', 'refs/heads/main | refs/tags/v*', "'v[0-9]*'", 'RIGHTS_PUSH_NOT_RELEASE', 'git cat-file -t']) assert.ok(hook.includes(marker), marker);
+    assert.doesNotMatch(hook.split('\n').filter((line) => !line.startsWith('#')).join('\n'), /npm |npx |typecheck|jest|playwright/);
   });
   it('a hook and a workflow call only scripts the managed package.json defines', () => {
     const scripts = scriptsOf();
@@ -138,8 +138,9 @@ describe('.github/workflows', () => {
   it('ci.yml runs the one lint, format, typecheck, unit, the coverage upload, both builds and Sonar, with no e2e', () => {
     const text = rendered()['.github/workflows/ci.yml'];
     const doc = parseYaml(text);
-    assert.deepEqual(Object.keys(doc.on).sort(), ['pull_request', 'push']);
-    assert.deepEqual(doc.on.push.branches, ['main']);
+    assert.deepEqual(Object.keys(doc.on).sort(), ['push', 'workflow_dispatch'], 'CI runs once per release (CI_TRIGGERS_RELEASE_ONLY)');
+    assert.deepEqual(doc.on.push, { tags: ['v*'] }, 'a release tag only, never a branch push');
+    assert.deepEqual(doc.concurrency, { group: 'ci-${{ github.ref }}', 'cancel-in-progress': false }, 'one group per ref');
     const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
     for (const command of ['npm ci', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(command), command);
     assert.ok(!runs.some(command => command.includes('hfs sync')), 'hfs check is the one drift gate; there is no second sync step');
@@ -148,6 +149,7 @@ describe('.github/workflows', () => {
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
     const upload = doc.jobs.ci.steps.find(step => String(step.uses ?? '').startsWith('codecov/'));
+    assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'uploads only from the release-tag run');
     assert.deepEqual(upload.with, { use_oidc: true, files: 'be/coverage/lcov.info', disable_search: true, fail_ci_if_error: true }, 'the one upload: the be lcov, authenticated with the OIDC token');
     assert.equal(doc.jobs.ci.env.CODECOV_TOKEN, undefined);
     assert.equal(doc.jobs.ci.permissions['id-token'], 'write');

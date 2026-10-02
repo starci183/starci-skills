@@ -8,23 +8,19 @@ name: grammar-package
 #   test:a11y         - every story, family x theme, axe via addon-a11y; fails on any violation not
 #                       waived in packages/grammar/.storybook/a11y-allowlist.json
 #   build-storybook   - the static Storybook still builds
+# It runs ONCE per release, on the push of a v* tag (and when a person dispatches it): never on a branch push or a pull request (rule CI_TRIGGERS_RELEASE_ONLY).
 
 on:
   push:
-    paths:
-      - 'packages/grammar/**'
-      - '.github/workflows/grammar-package.yml'
-  pull_request:
-    paths:
-      - 'packages/grammar/**'
-      - '.github/workflows/grammar-package.yml'
+    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: grammar-package-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   grammar:
