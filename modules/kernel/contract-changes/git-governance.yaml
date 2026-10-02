@@ -1,0 +1,26 @@
+id: git-governance
+effectiveAt: '2026-10-03T04:30:00+07:00'
+summary: >-
+  GIT GOVERNANCE (owner 2026-10-03): lands only fast-forward LOCAL main; the remote moves once per release, main and one annotated `v*` tag atomically; CI runs once, on that tag.
+  Every workflow of this repository, its examples and the hfs app templates (so every scaffolded app inherits it) starts only on `push: tags: ['v*']` or `workflow_dispatch`, one
+  concurrency group per ref, and Codecov and Sonar upload only in the tag run; the managed images workflow builds every image on the tag (the path filter is gone). R221
+  `CI_TRIGGERS_RELEASE_ONLY` refuses any other trigger; R222 `RELEASE_NOTES` refuses a release tag on HEAD whose CHANGELOG section is missing or unfinished. The release flow
+  (`cutRelease`, scripts/supervisor/release-cut.mjs, exposed by the CLI as `starci release cut`) is the only push of main: it refuses a push of main without a new annotated `v*` tag on HEAD,
+  a non-release tag, several tags, a dirty tree, an existing remote tag, unfinished notes, a red full suite (run once, log recorded), a moved main and a secret in the range, and
+  pushes with `--atomic`. docs/git-governance.md and docs/source-process.md carry the model, the test ladder and the rights by role.
+reach: new-legs
+adds:
+  codes: [CI_TRIGGERS_RELEASE_ONLY, RELEASE_NOTES]
+paths:
+  - modules/kernel/contract-changes/git-governance.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/rules.yaml
+  - scripts/hfs/runtime-rules/git-triggers.mjs
+  - scripts/hfs/runtime-rules/release-notes.mjs
+  - scripts/supervisor/release-cut.mjs
+  - scripts/supervisor/release-l4.mjs
+  - docs/git-governance.md
+  - docs/source-process.md
+  - .github/workflows/ci.yml
+  - packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml
+  - packages/hfs/templates/app/ci-workflows/github/workflows/images.yml
