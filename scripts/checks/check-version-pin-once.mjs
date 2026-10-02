@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -32,7 +33,6 @@ const OUT = /node_modules\/|(?:^|\/)package\.json$|(?:^|\/)package-lock\.json$|(
 const inScope = (rel) => EXT.test(rel) && rel !== PINS_FILE && !OUT.test(rel);
 
 const SEMVER = /\d+\.\d+\.\d+/g;
-const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const WINDOW = 4;
 
 /** pin name → version for every pin in the canon-pins document. */
@@ -67,7 +67,7 @@ export function isBindingLeaf(lines, i) {
 export function versionPinFindings(files, pins) {
   const findings = [];
   const names = [...pins.keys()];
-  const nameRe = new RegExp(String.raw`(?<![w@/-])(?:${names.map(escRe).join('|')})(?![w-])`, 'g');
+  const nameRe = new RegExp(String.raw`(?<![w@/-])(?:${names.map(escapeRegExp).join('|')})(?![w-])`, 'g');
   for (const [rel, text] of Object.entries(files)) {
     if (!inScope(rel)) continue;
     const lines = text.split('\n');

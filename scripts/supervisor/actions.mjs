@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
 import { hhmm, stampMinute } from '../lib/time.mjs';
-import { OWNER_ONLY } from './owed.mjs';
+import { OWNER_ONLY } from './owed-text.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';

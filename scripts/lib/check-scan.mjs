@@ -66,7 +66,7 @@ export function printFindings(findings, okMessage, { json = process.argv.include
 export const scopeFilter = ({ scope, ext, out, exclude = [] }) => (rel) => scope.test(rel) && ext.test(rel) && !out.test(rel) && !exclude.includes(rel);
 
 /** The `{ exitCode, text }` of a report-style scan main: the JSON report, the clean line, or a headline plus one row per hit. */
-export function reportResult(report, { json, okText, headline, rows }) {
+function reportResult(report, { json, okText, headline, rows }) {
   if (json) return { exitCode: report.ok ? 0 : 1, text: `${JSON.stringify(report, null, 2)}\n` };
   if (report.ok) return { exitCode: 0, text: `${okText}\n` };
   return { exitCode: 1, text: `${[headline, ...rows].join('\n')}\n` };

@@ -11,6 +11,7 @@
 // A placeholder is `{name}`; the English and the Vietnamese of one entry carry exactly the same placeholders
 // (scripts/checks/check-i18n-catalog.mjs). An English source with no entry is returned as is: a missing translation degrades
 // to English, never to a blank.
+import { escapeRegExp } from './regex.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -76,3 +77,10 @@ export function ownerLanguage(fallback = DEFAULT_OWNER_LANGUAGE) {
 /** A translator bound to one language: `tr(en, vars)`. */
 export const translator = (language = DEFAULT_OWNER_LANGUAGE, { root = skillRoot, scope = 'runtime' } = {}) =>
   (en, vars = {}) => translate(en, vars, { language, root, scope });
+
+/**
+ * A pattern source matching `en` in the owner's language or in English: each language's rendering of the English source,
+ * escaped, with the placeholder `slot` (a placeholder name of `en`) replaced by `slotPattern`. Never hardcodes a spelling.
+ */
+export const translatedPattern = (en, slot, slotPattern, languages = ['en', 'vi']) =>
+  `(?:${languages.map((language) => escapeRegExp(translate(en, { [slot]: '@@' }, { language })).replace('@@', slotPattern)).join('|')})`;

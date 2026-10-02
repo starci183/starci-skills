@@ -40,7 +40,7 @@ function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf
 }
 
 const ENTRY_ROOTS = '(?:scripts|engine|bin)';
-/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/a/b.mjs') or as path segments ('scripts', 'a', 'b.mjs'). */
+/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/kernel/cli.mjs') or as path segments ('scripts', 'kernel', 'cli.mjs'). */
 function spawnedEntriesOf(text) {
   const out = new Set();
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);

@@ -231,8 +231,6 @@ export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
-// The cause matchers (rca-matchers.mjs) read a report or blocker in whichever language it was written.
-
 /** The causes of one failed/blocked attempt, primary first. Pure. */
 export function causesOf({ status = 'failed', result = {}, report = null }) {
   const blocker = report?.blocker ?? {};
