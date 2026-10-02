@@ -859,7 +859,7 @@ rules:
       - {kind: eslint-be, id: connection-map}
   - id: R85
     code: "BE_RAW_INJECT"
-    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface."
+    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface; the parameter that injects a port of the table `ruleParams.be.paramNames` of `slots.yaml` (`Clock`, `Logger`, `Cache`, `CommandBus`, `QueryBus`, `EntityManager`, an `*Options`) carries the name that table gives it."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_RAW_INJECT"]
@@ -869,6 +869,7 @@ rules:
       - {kind: eslint-be, id: injector-type-match}
       - {kind: eslint-be, id: infra-needs-injector}
       - {kind: eslint-be, id: provider-param-token}
+      - {kind: eslint-be, id: injected-param-name}
       - {kind: eslint-be, id: no-module-ref}
       - {kind: eslint-be, id: no-forward-ref}
       - {kind: eslint-be, id: no-string-token}

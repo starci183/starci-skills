@@ -184,11 +184,17 @@ function manifestShapeProblems(m) {
   const rp = m.ruleParams;
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 7) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes and contractShape {helper}');
+    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 8) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes and contractShape {helper}');
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
     if (!isPlainObject(owners) || !Object.keys(owners).length || !Object.entries(owners).every(([key, list]) => key && Array.isArray(list) && list.every((o) => ownerId.test(String(o))) && new Set(list).size === list.length)) bad.push('ruleParams.be.infraOwners must map a non-empty specifier to a list of unique platform/<capability> or integrations/<provider> owners ([] means nowhere)');
+    const upperName = (v) => /^[A-Z][A-Za-z0-9]*$/.test(String(v));
+    const paramNameOk = (e) => isPlainObject(e) && ((e.type === undefined) !== (e.typeSuffix === undefined)) && upperName(e.type ?? e.typeSuffix)
+      && Array.isArray(e.names) && e.names.length > 0 && new Set(e.names).size === e.names.length && e.names.every((n) => /^[a-z][A-Za-z0-9]*$/.test(String(n)))
+      && (e.nameSuffix === undefined || upperName(e.nameSuffix)) && Object.keys(e).every((k) => ['type', 'typeSuffix', 'names', 'nameSuffix'].includes(k));
+    const paramKeys = Array.isArray(rp.be.paramNames) ? rp.be.paramNames.map((e) => `${e?.type !== undefined ? 'type' : 'typeSuffix'}:${e?.type ?? e?.typeSuffix}`) : [];
+    if (!Array.isArray(rp.be.paramNames) || !rp.be.paramNames.length || !rp.be.paramNames.every(paramNameOk) || new Set(paramKeys).size !== paramKeys.length) bad.push('ruleParams.be.paramNames must be a non-empty list of unique {type | typeSuffix, names, nameSuffix?} entries');
     const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
     if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
     if (!roleList(rp.be.bannedSuffixes)) bad.push('ruleParams.be.bannedSuffixes must be a non-empty list of unique kebab-case suffixes');

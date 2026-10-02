@@ -496,6 +496,7 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.equal('globalModules' in be, false, 'the @Global allowlist is retired: no module is global from inside itself');
   assert.deepEqual(be.fileLines, { soft: 500, hardGrowth: true });
   assert.deepEqual(be.duplicateBlock, { lines: 8, tokens: 60 });
+  assert.deepEqual(be.paramNames.find((entry) => entry.type === 'EntityManager'), { type: 'EntityManager', names: ['entityManager'], nameSuffix: 'EntityManager' }, 'R85: the port names the injected-param-name clause holds a parameter to');
   const fe = ruleParams(manifest, 'fe');
   assert.deepEqual(fe.fileLines, { soft: 500, hardGrowth: true });
   assert.deepEqual(fe.duplicateBlock, { lines: 8, tokens: 60 });
@@ -516,11 +517,14 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.equal(feHfs.classifyPath('packages/app-api/src/graphql.ts').slot, 'fe.package.api');
   assert.equal(feHfs.classifyPath('packages/app-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
-  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {
     const doc = parseYaml(manifestText); mutate(doc);
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
   }
+  // two entries for one type are a loader refusal (a schema cannot state uniqueness by a member)
+  const twice = parseYaml(manifestText); twice.ruleParams.be.paramNames.push({ type: 'Clock', names: ['now'] });
+  refusal(() => loadSlotManifest({ text: JSON.stringify(twice) }), 'HFS_MANIFEST_INVALID');
 });
 
 test('appRelativeMessages: a side finding message names its paths from the app root, like the finding path', (t) => {
