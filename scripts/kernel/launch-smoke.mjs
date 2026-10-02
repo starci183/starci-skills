@@ -124,12 +124,12 @@ export async function defaultClient() {
   const [lib, startWorker, critic, show, read, stop, release, update, list, wt, cp, tree] = await Promise.all([
     import('../agent/lib.mjs'), import('../agent/start-worker.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
-    import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'),
+    import('../machine/worker-close.mjs'), import('../api/orca/task-update.mjs'),
     import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs'), import('../machine/workflow-tree.mjs')]);
   return {
     startAgent: lib.startAgent, startWorkerAgent: startWorker.startWorkerAgent,
     criticWorkspace: critic.criticWorkspace, removeCriticWorkspace: critic.removeCriticWorkspace, launchCriticWorker: critic.launchCriticWorker,
-    workerShow: show.workerShow, workerRead: read.workerRead, workerStop: stop.workerStop, workerRelease: release.workerRelease,
+    workerShow: show.workerShow, workerRead: read.workerRead, workerStop: stop.workerStop, workerRelease: release.closeWorker,
     taskUpdate: update.taskUpdate, worktreeList: list.worktreeList,
     // The context of parts A and B. The smoke's ops are no-op agents, so no review.verify op runs: the smoke attests that
     // step itself through part B's `verify` seam, and the result says so (workflow.finish.steps).
@@ -507,14 +507,13 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
       const o = observe(bestEffortCall(() => orca.workerShow({ dispatch: a.dispatchId })));
       const settled = settledOf(o);
       const stop = settled ? null : bestEffortCall(() => orca.workerStop({ dispatch: a.dispatchId }));
-      // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
-      const first = bestEffortCall(() => orca.workerRelease({ dispatch: a.dispatchId }));
-      const release = first?.ok ? first : bestEffortCall(() => orca.workerRelease({ dispatch: a.dispatchId }));
+      // The one close path (scripts/machine/worker-close.mjs) repeats a refused release once itself and proves the terminal and its processes gone.
+      const release = bestEffortCall(() => orca.workerRelease({ dispatch: a.dispatchId, retryRelease: true }));
       // A worker that reported worker_done settled its Dispatch, and with it its own Task (worker-show status).
       const reported = SETTLED_STATUS.has(String(o.status));
       const task = reported || !a.taskId ? null : bestEffortCall(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
       const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : reported ? 'by-worker_done' : null,
-        ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
+        ...(release?.retryRelease ? { releaseRetried: true } : {}), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
       if (a.workspace) entryOut.workspaceRemoved = unplace();
       out.cleanup.push(entryOut);
     }

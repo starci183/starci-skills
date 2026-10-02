@@ -94,8 +94,8 @@ is), so such a worker reads unverified, never dead.
 | `kernel/transcripts.mjs` (was `readScrollback`/`captureTerminal`) | output | T1 | replaced by `worker-read` |
 | `kernel/api-verbs/observe.mjs` | output, and the frame for the turn state | T1, T2 | output replaced by `worker-read`; the frame stays |
 | `kernel/close-op-terminal.mjs` capture, `kernel/quit-agent.mjs` capture | output | T1 | deleted; settle reads by Dispatch |
-| `kernel/verbs/settle.mjs` (connected after close) | PTY state | T3 | done (alpha.5, lane ORCA): a worker's close is `worker-release`; the command-terminal path is deleted |
-| `kernel/cli.mjs` `quitWorkerTerminal`, the quit input, the tab close, the process reaper, `closeDeadWorkerTerminal` | PTY state | T3, T4, D2 | done (alpha.5, lane ORCA, live smoke E1): deleted. `custody` is the release receipt's state, with one terminal READ-back (disconnected or gone proves release) when Orca answers retained for a dead worker |
+| `kernel/verbs/settle.mjs` (connected after close) | PTY state | T3 | done (alpha.5, lane ORCA): a worker's close is `worker-release` followed by the runtime's terminal close and process-tree proof (`scripts/machine/worker-close.mjs`, the one close path); the command-terminal path is deleted |
+| `kernel/cli.mjs` `quitWorkerTerminal`, the quit input, the tab close, the process reaper, `closeDeadWorkerTerminal` | PTY state | T3, T4, D2 | done (alpha.5, lane ORCA): the quit input and the name-matching process reaper are deleted; the one close path (`scripts/machine/worker-close.mjs`) releases, closes the terminal and proves no process of that terminal's shell tree remains. `custody` is the release receipt's state, with one terminal READ-back (disconnected or gone proves release) when Orca answers retained for a dead worker |
 | `kernel/cli.mjs` status liveness and prefetch; `reconciler/controllers/job.mjs` worker-health; `reconciler/services.mjs` seat turn; `supervisor/poll.mjs` `kernelState`; `supervisor/stall.mjs` `kernelTurnState` | frame classification | T2 | WRAP: the frame stays for turn-idle and rate-limit; the death verdict moves to `worker-list` |
 | `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/kernel-watchdog.mjs`; `supervisor/supervisor-watchdog.mjs`; `kernel/cli.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
 | `kernel/close-op-terminal.mjs` `closeExitedTerminal` | exited-shell proof | T2, T3 | WRAP until lane SETTLED moves worker closes to `worker-release` |
@@ -109,10 +109,13 @@ is), so such a worker reads unverified, never dead.
 
 | ID | Was | Now |
 |---|---|---|
-| W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `api report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and releases. `worker-stop` is only the fallback for a Dispatch that did not settle. The close, quit and reap paths stay until smoke E1 (#10). |
+| W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `api report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and closes the worker through `scripts/machine/worker-close.mjs`: `worker-release`, the terminal close and a bounded proof that no process of the terminal's shell tree remains. `worker-stop` is only the fallback for a Dispatch that did not settle. |
 | D2 | One Task per op attempt, closed by hand (`closeOperationTask`, `staleTasks`, `reconcile --orca-tasks`, the gc tasks collector) | The `worker_done` settlement closes the Task. All four are deleted. |
 
 ### Known limits that stay (alpha.5)
-- close-verify `--tree` stays for terminals that are not released through `worker-release` (the Kernel's own close, the GC's leftover
-  sweep, the host controller's replaced Kernel): E1 proved the release path for claude, codex and devin workers, not a tab close.
+- `worker-release` alone does NOT end every agent: live smoke E1 proved it for claude, codex and devin, never for cursor, and a released cursor worker kept its
+  `cursor-agent` process running (about 11,200 CPU seconds, 2026-10-02 19:25 to 23:27). Every worker close therefore goes through `scripts/machine/worker-close.mjs`: release, terminal close, and a
+  bounded proof that no process of that terminal's shell tree remains (membership is proven by the `ORCA_TERMINAL_HANDLE` the process inherited, never by name); a survivor is stopped only on that
+  proof and raises the host-hygiene finding `worker-process-survived`, which never changes the worker's outcome. The Kernel's own close, the GC's leftover sweep and the host controller's
+  replaced Kernel close their terminals through `close-verify` (terminal-level proof).
 - The terminal of a worker is read from worker-show (`result.dispatch.assigneeHandle`): the live start receipt has no `result.worker`.

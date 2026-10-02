@@ -138,8 +138,9 @@ test('a frozen Working frame a nudge cannot reach reads disconnected and reconci
   assert.equal(fx.read(db=>db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(fx.jobId).n),0,'the lease is released');
   assert.deepEqual([r.managedWorker?.custody?.state,r.managedWorker?.custody?.proof],['released','release-ok'],'worker-release alone is the custody of the dead worker');
   assert.equal(fx.orcaState().refusedSends,refusedBefore,'no quit input is typed into a terminal Orca refuses');
-  assert.equal(fx.orcaState().workerStates?.[r.dispatchId],'released','the Dispatch is released, the terminal is not closed by hand');
-  assert.equal((fx.orcaState().closed??[]).length,0,'no tab close is issued');
+  assert.equal(fx.orcaState().workerStates?.[r.dispatchId],'released','the Dispatch is released');
+  // ...and its terminal is then closed by the runtime's one close path (scripts/machine/worker-close.mjs), proven by Orca: only that terminal.
+  assert.equal((fx.orcaState().closed??[]).length,1,'the released worker terminal is closed once');
 });
 
 test('output or a heartbeat after the refusal voids it',t=>{

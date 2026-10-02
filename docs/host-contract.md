@@ -61,7 +61,7 @@ start:                           # the one launch
   api: orchestration.worker-start
   agentArgument: devin           # worker-start --agent <agentArgument>
   modelArgument: false           # false: no --model/--effort (Orca takes them for Claude, Codex, Cursor only)
-release: {api: orchestration.worker-release}
+release: {api: orchestration.worker-release, closeTerminal: true, verify: terminal-process-tree}   # then the runtime closes the terminal and proves its process tree gone (scripts/machine/worker-close.mjs)
 
 readiness: …                     # screen patterns the liveness classifier and follow-up sends read
 delivery: …                      # how a follow-up prompt reaches a live agent (inline or file reference)

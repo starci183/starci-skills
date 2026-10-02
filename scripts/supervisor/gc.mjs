@@ -65,7 +65,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll, activeWorkersAllRuns } from '../machine/worker-list-all.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { closeAndVerify, isAgentProcess, processTable } from '../machine/close-verify.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
@@ -662,7 +662,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       if (!apply) { report.items.push({ ...it, ok: null }); }
       else {
         let r;
-        try { r = (deps.release ?? workerRelease)({ dispatch: d.dispatchId }); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
+        try { r = (deps.release ?? closeWorker)({ dispatch: d.dispatchId }); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
         report.items.push({ ...it, ok: r?.ok === true, state: r?.state ?? null, ...(r?.ok ? {} : { code: 'WORKER_RELEASE_FAILED', error: r?.error ?? r?.outcome ?? 'release failed' }) });
         if (!r?.ok) { report.errors.push(`WORKER_RELEASE_FAILED: worker-release --dispatch ${d.dispatchId}: ${r?.error ?? r?.outcome ?? 'failed'}`); continue; }
       }

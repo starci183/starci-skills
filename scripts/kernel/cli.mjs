@@ -149,7 +149,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { gitResu
 import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 import { workflowDisplayName } from '../lib/display-names.mjs';
 import {
   SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK, cutSeamSettings, isSeamCut, recutPlanOf, seamPriorityOf,
@@ -1973,8 +1973,10 @@ const closeRejectedLaunch = ({ terminal, settled, effectState }) => {
   if (!terminal) return { terminalClosed: null, closed: null };
   if (!settled && effectState === 'unknown')
     return { terminalClosed: false, closed: { kind: 'managed', dispatchId: terminal, deferred: 'reconcile-then-stop' } };
-  const stop = settled ? settled.stop : bestEffort(() => workerStop({ dispatch: terminal }));
-  const release = settled ? settled.release : bestEffort(() => workerRelease({ dispatch: terminal }));
+  // One close path (scripts/machine/worker-close.mjs): worker-stop, worker-release, the terminal close and the process verify.
+  const closedNow = settled ? null : bestEffort(() => closeWorker({ dispatch: terminal, stopFirst: true }));
+  const stop = settled ? settled.stop : closedNow?.stop;
+  const release = settled ? settled.release : closedNow;
   const provenNoEffect = settled?.provenNoEffect === true;
   return {
     terminalClosed: provenNoEffect || (stop?.ok === true && release?.ok === true),
@@ -2371,10 +2373,8 @@ const managedNoEffectProof = ({ shown, release }) => {
 const cleanupManagedWorker = (dispatchId) => {
   if (!dispatchId) return { effectState: 'partial', stop: null, release: null, observation: null };
   let stop = null, release = null, observation = null;
-  try { stop = workerStop({ dispatch: dispatchId }); }
-  catch (e) { stop = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
-  try { release = workerRelease({ dispatch: dispatchId }); }
-  catch (e) { release = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
+  try { release = closeWorker({ dispatch: dispatchId, stopFirst: true }); stop = release.stop ?? null; }
+  catch (e) { release = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; stop = release; }
   try { observation = workerShow({ dispatch: dispatchId }); }
   catch (e) { observation = { ok: false, error: String(e?.message ?? e) }; }
   const provenNoEffect = managedNoEffectProof({ shown: observation, release });
@@ -2630,9 +2630,8 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   // Orca no longer knows the Dispatch at all.
   let cleanup = null;
   if (recovery === 'requeued' && payload.managed?.dispatchId) {
-    const stop = bestEffort(() => workerStop({ dispatch: payload.managed.dispatchId }));
-    const release = bestEffort(() => workerRelease({ dispatch: payload.managed.dispatchId }));
-    cleanup = { dispatchId: payload.managed.dispatchId, stop: stop?.ok === true, release: release?.ok === true };
+    const closedNow = bestEffort(() => closeWorker({ dispatch: payload.managed.dispatchId, stopFirst: true }));
+    cleanup = { dispatchId: payload.managed.dispatchId, stop: closedNow?.stop?.ok === true, release: closedNow?.ok === true };
   }
 
   let machineRefs = [], leasesReleased = 0, result;
@@ -3277,14 +3276,11 @@ const releasedWhileHeldOf = (payload) => (payload?.workerReleased?.custody?.stat
  * settled with the op's own worker_done. Idempotent. One event 'worker-released-while-held'.
  */
 // ---- the release of a managed worker -------------------------------------------------------------------------
-// calls.yaml settle-dispatch: worker-release ALONE ends the agent (live smoke E1, Orca 1.4.209: no claude, codex or devin
-// process of the terminal remains 10 s after it, and the tab leaves `terminal list` with it). So there is no quit input, no tab
-// close, no process reaper and no terminal read-back. A Dispatch that settled itself (worker_done) is read first and only
-// released; one that did not (a dead op, a failed-no-report settle, an outcome_unknown, an unreadable answer) is fenced with
-// worker-stop before the release. A stop that classifies unknown is reconciled by a worker-show read and the residual state is
-// recorded (worker-abandon stays out of scope: it is legal only once the attempt's own terminal is proven closed). A release
-// that is not ok is repeated once: Orca's own recovery for release_unknown. A stop or release failure never un-settles the job.
-// `custody` is the release receipt's own state.
+// calls.yaml settle-dispatch: worker-release alone does NOT end every agent (a released cursor worker kept its cursor-agent running), so the release goes
+// through the one close path, scripts/machine/worker-close.mjs: worker-stop first for a Dispatch that did not settle itself (worker_done is read and only
+// released), worker-release (repeated once), the close of the worker's own terminal and a bounded proof that no process of that terminal's shell tree
+// remains; a survivor proven to belong to it is stopped and raises the host-hygiene finding worker-process-survived on the receipt (`hygiene`), never
+// changing the job's outcome. A stop that classifies unknown is reconciled by a worker-show read and the residual state recorded (worker-abandon is out of scope).
 const WORKER_SELF_SETTLED_STATES = new Set(['succeeded', 'failed', 'stopped', 'released']);
 // The Dispatch a job holds: the attested one (payload.managed), else the one a dispatch killed mid-launch recorded.
 const heldDispatchOf = (payload) => (payload?.managed?.dispatchId ? payload.managed
@@ -3310,17 +3306,17 @@ function releaseManagedWorker(settledPayload) {
   try { before = workerShow({ dispatch: managed.dispatchId }); } catch { before = null; }
   const dispatchState = before?.ok ? before.state : null;
   const workerDone = WORKER_SELF_SETTLED_STATES.has(dispatchState);
-  if (!workerDone) {
-    try { stop = workerStop({ dispatch: managed.dispatchId }); } catch (e) { stop = unknown(e); }
-  }
+  // The one close path: worker-stop only for a Dispatch that did not settle itself, worker-release (repeated once), the terminal close and the
+  // process verify (scripts/machine/worker-close.mjs). A survivor finding rides on the receipt as host hygiene and never changes the job's outcome.
+  let closed = null;
+  try { closed = closeWorker({ dispatch: managed.dispatchId, handle: managed.agentTerminalHandle ?? null, stopFirst: !workerDone, retryRelease: true }); } catch (e) { release = unknown(e); }
+  if (closed) { stop = closed.stop ?? null; release = { ok: closed.ok, outcome: closed.outcome, state: closed.state, ...(closed.error ? { error: closed.error } : {}) }; retry = closed.retryRelease ?? null; }
   if (stop && (stop.ok !== true || stop.outcome === 'unknown')) {
     try {
       const shown = workerShow({ dispatch: managed.dispatchId });
       residual = { ok: shown?.ok === true, state: shown?.state ?? null, effective: shown?.effective ?? null };
     } catch (e) { residual = { error: String(e?.message ?? e) }; }
   }
-  try { release = workerRelease({ dispatch: managed.dispatchId }); } catch (e) { release = unknown(e); }
-  if (release?.ok !== true) { try { retry = workerRelease({ dispatch: managed.dispatchId }); } catch (e) { retry = unknown(e); } }
   const last = retry ?? release;
   const shape = (r) => ({ ok: r?.ok === true, outcome: r?.outcome ?? null, state: r?.state ?? null, ...(r?.error ? { error: r.error } : {}) });
   return {
@@ -3331,6 +3327,8 @@ function releaseManagedWorker(settledPayload) {
     ...(retry ? { retryRelease: shape(retry) } : {}),
     ...(residual ? { residual } : {}),
     custody: custodyOfRelease(last, managed.agentTerminalHandle ?? null),
+    ...(closed ? { terminal: { closed: closed.closed?.ok === true ? closed.closed.proof ?? true : false, processes: closed.processes?.verdict ?? null } } : {}),
+    ...(closed?.hygiene ? { hygiene: closed.hygiene } : {}),
   };
 }
 // A dead worker's Dispatch is released once per attempt (a repeat of the recovery is a no-op, not a second release event).

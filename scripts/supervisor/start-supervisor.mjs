@@ -105,7 +105,7 @@ async function orcaDeps() {
     import('../api/orca/terminal-list.mjs'), import('../api/orca/terminal-read.mjs'),
     import('../lib/terminal-liveness.mjs'), import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'),
     import('../agent/lib.mjs'), import('../kernel/terminal-dedupe.mjs'), import('../api/orca/worker-show.mjs'),
-    import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs'), import('../guards/hook-install.mjs')]);
+    import('../api/orca/worker-stop.mjs'), import('../machine/worker-close.mjs'), import('../guards/hook-install.mjs')]);
   return {
     list: () => terminalList({ includeVisualLayouts: true }),
     tabTitles: dedupe.tabTitlesOf,
@@ -116,7 +116,7 @@ async function orcaDeps() {
     start: (opts) => agentLib.startAgent(opts),
     show: (dispatch) => workerMod.workerShow({ dispatch }),
     stop: (dispatch) => workerStopMod.workerStop({ dispatch }),
-    release: (dispatch) => workerReleaseMod.workerRelease({ dispatch }),
+    release: (dispatch) => workerReleaseMod.closeWorker({ dispatch }),
     bindSeat: (handle) => guards.bindSeatGuard({ handle, role: 'supervisor', deniedTools: SEAT_DENIED_TOOLS[supervisorSettings().agent] ?? [] }),
   };
 }

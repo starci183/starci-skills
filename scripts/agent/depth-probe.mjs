@@ -7,7 +7,7 @@
 // when `start --check` is asked for a live probe (STARCI_ORCA_LIVE=1); specs pass a fake `start`/`stop`/`release`.
 import { startAgent } from './lib.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 import { isOrcaDepthRefusal } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { MAX_WORKER_DEPTH_CEILING } from '../../engine/orca-config.mjs';
@@ -21,7 +21,7 @@ const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no co
  * unmeasured. `released` lists each started worker's cleanup: {dispatchId, stopped, released}.
  */
 export async function probeWorkerDepth({ entry = null, worktree, agent = DEFAULT_AGENT, ceiling = MAX_WORKER_DEPTH_CEILING,
-  start = startAgent, stop = workerStop, release = workerRelease } = {}) {
+  start = startAgent, stop = workerStop, release = closeWorker } = {}) {
   const started = [];
   let refusedAt = null;
   let error = null;

@@ -38,7 +38,7 @@ import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 import { check as orcaCheck } from '../api/orca/check.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -202,7 +202,7 @@ function clientOf(orca) {
       spawn: { trust: o.trust, start: o.workerStart, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,
-    release: o.workerRelease ?? workerRelease,
+    release: o.workerRelease ?? closeWorker,
     check: o.check ?? orcaCheck,
     taskUpdate: o.taskUpdate ?? taskUpdate,
   };
