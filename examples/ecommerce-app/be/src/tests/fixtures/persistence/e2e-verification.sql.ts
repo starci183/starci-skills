@@ -2,6 +2,7 @@ import { sql } from "@modules/platform/database"
 import type {
     BillingPaymentRow,
     CountRow,
+    PointsRow,
     InvoiceRow,
     OrderLineRow,
     OrderRow,
@@ -68,6 +69,11 @@ export const PAYMENT_COUNT: RowQuery<CountRow> = {
 /** The payment of one order in the billing database ($1 order id): at most one, whatever the deliveries. */
 export const BILLING_PAYMENTS_OF_ORDER: RowQuery<BillingPaymentRow> = {
     text: sql`SELECT order_id, amount_minor_units, provider_reference FROM payments WHERE order_id = $1 LIMIT 10`,
+}
+
+/** The loyalty points one order earned ($1 order id): a single row, zero when none were granted. */
+export const LOYALTY_POINTS_OF_ORDER: RowQuery<PointsRow> = {
+    text: sql`SELECT coalesce(sum(points), 0)::int AS points FROM loyalty_entries WHERE order_id = $1`,
 }
 
 /** The invoices of one order ($1 order id): at most one, whatever the redeliveries. */

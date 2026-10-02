@@ -60,6 +60,12 @@ export interface BillingPaymentRow {
     provider_reference: string
 }
 
+/** The loyalty points of one order. */
+export interface PointsRow {
+    /** The points the order earned; zero when nothing was granted. */
+    points: number
+}
+
 /** A persisted invoice of the billing database. */
 export interface InvoiceRow {
     /** The order the invoice bills. */

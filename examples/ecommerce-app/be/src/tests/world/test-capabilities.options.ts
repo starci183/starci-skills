@@ -12,6 +12,7 @@ import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
 import { MessagingModule } from "@modules/platform/messaging"
+import { RealtimeModule } from "@modules/platform/realtime"
 import {
     cacheOptionsOf,
     messagingOptionsOf,
@@ -36,6 +37,9 @@ export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 export const MESSAGING_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => MessagingModule.register({ isGlobal: true, ...messagingOptionsOf(w) }),
 ]
+
+/** The realtime hub of one app instance: the push channel of the realtime kind. */
+export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => RealtimeModule.register({ isGlobal: true })]
 
 /** The password-grant client over the run's realm. */
 export const KEYCLOAK_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
