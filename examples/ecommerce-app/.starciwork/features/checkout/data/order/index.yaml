@@ -1,0 +1,18 @@
+schema: work/data@1
+id: data.checkout.order
+title: Order
+state: todo
+fields:
+  - {name: orderId, type: text, required: true, note: "Opaque, issued by the order service."}
+  - {name: personId, type: text, required: true, note: "The buyer, as the identity service names them."}
+  - {name: lines, type: list, required: true, note: "Product id and quantity per line, copied from the cart at placement."}
+  - {name: total, type: number, required: true, note: "In minor units of the store currency."}
+  - {name: placedAt, type: timestamp, required: true}
+invariants:
+  - An order's lines and total never change after placement; a correction is a new order, never an edit.
+refs: [fr.checkout.place-order, br.checkout.place-order]
+change:
+  rev: 1
+  kind: initial
+  at: 2026-10-02T10:00:00.000Z
+  reason: The order the checkout places, the data its receipt and its order view read.

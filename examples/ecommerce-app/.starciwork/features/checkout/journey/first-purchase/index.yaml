@@ -1,0 +1,22 @@
+schema: work/customer-journey@1
+id: journey.checkout.first-purchase
+title: A new person signs in, fills a cart and places a first order
+state: todo
+crossesFeatures: [identity, checkout]
+steps:
+  - {actor: person, does: "Signs in, expects: a session and the shop."}
+  - {actor: person, does: "Adds two products to the cart and lists it, expects: both lines with their quantities."}
+  - {actor: person, does: "Places the order, expects: a confirmed order and a downloadable receipt."}
+requirements: [fr.identity.sign-in, fr.checkout.cart.add, fr.checkout.cart.list, fr.checkout.place-order, fr.checkout.download-receipt]
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+blockedBy:
+  - {record: gap.checkout.live-proof, because: "The journey needs the live uat run that gap.checkout.live-proof still owes."}
+change:
+  rev: 1
+  kind: initial
+  at: 2026-10-02T10:00:00.000Z
+  reason: The example's end-to-end path across its two features, the journey the uat run walks.

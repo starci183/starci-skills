@@ -1,0 +1,18 @@
+schema: work/event@1
+id: event.checkout.order-placed
+title: An order was placed
+state: todo
+producer: fr.checkout.place-order
+payload:
+  - {name: orderId, type: text}
+  - {name: personId, type: text}
+  - {name: total, type: number, note: "In minor units of the store currency."}
+  - {name: placedAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per placement, the key a consumer deduplicates on."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.checkout.place-order, data.checkout.order]
+change:
+  rev: 1
+  kind: initial
+  at: 2026-10-02T10:00:00.000Z
+  reason: The fact other services (billing) consume after a placement, raised through the outbox, never in process.

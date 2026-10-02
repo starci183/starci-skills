@@ -1,0 +1,21 @@
+schema: work/non-functional-requirement@1
+id: nfr.checkout.place-order-idempotent
+title: Placing the same order twice charges once and confirms one order
+quality: integrity
+state: todo
+observableCriterion: A person who submits the same checkout twice (a double click, a retried request after a timeout) sees one
+  confirmed order and one payment, never two.
+measurement:
+  how: The e2e world submits one cart's place-order twice with the same idempotency key and reads the order and payment tables
+    through world.db.order.
+  threshold: 1 order row and 1 payment row per idempotency key, 0 duplicates
+  environment: dev
+refs: [fr.checkout.place-order, br.checkout.place-order]
+requiresProof:
+  measurement:
+    required: true
+change:
+  rev: 1
+  kind: initial
+  at: 2026-10-02T10:00:00.000Z
+  reason: The checkout's duplicate-submit guarantee, stated as a measured quality so the e2e run proves it.
