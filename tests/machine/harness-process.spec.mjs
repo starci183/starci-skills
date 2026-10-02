@@ -124,7 +124,7 @@ test('stop refuses a recorded PID that belongs to another process', (t) => {
   const killed = [];
   const result = stopHarness({
     stateFile,
-    processes: () => [{ pid: 99, created: 3_001, cmd: 'node scripts/cli/main.mjs harness status' }],
+    processes: () => [{ pid: 99, created: 3_001, cmd: 'starci harness status' }],
     kill: (pid) => { killed.push(pid); return { ok: true }; },
   });
   assert.equal(result.ok, false);
