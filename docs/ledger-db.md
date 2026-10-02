@@ -130,7 +130,7 @@ machine.
 | Identity and registry | `machine_meta`, `schema_migrations`, `ui_states`, `ui_state_map`, `blob_ref_columns`, `ledgers` (the only ledger registry), `repositories`, `agents`, `models`, `blobs`, `archives`, `gc_marks` |
 | Supervisor | `sup_jobs`, `sup_leases`, `sup_attempts` (same column groups as `op_attempts`), `sup_reports`, `sup_events` (append-only), `sup_decision_items`, `sup_decisions`, `sup_owed`, `sup_learning`, `sup_owner_rulings`, `sup_bridges`, `sup_messages`, `sup_signals`, `llm_usage` |
 | Engine | `process_runs`, `engine_leader`, `leader_history`, `engine_cursors`, `engine_queue`, `schedules`, `engine_actions`, `action_steps`, `controller_modes`, `mode_changes`, `sla_episodes`, `invariant_violations` |
-| Host | `services`, `service_events`, `service_probes`, `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots`, `terminals`, `host_locks`, `claims`, `agent_sessions`, `inventory_snapshots` |
+| Host | `services`, `service_events`, `service_probes`, `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots`, `terminals`, `host_locks`, `claims`, `agent_sessions` |
 | Resources | `throttle_state`, `throttle_events`, `throttle_decisions`, `host_samples`, `provider_health`, `provider_health_events`, `pool_backoff`, `quotas`, `guard_jobs`, `guard_refusals`, `host_resources`, `host_leases`, `budgets`, `budget_reservations` |
 | GC, land, environments | `gc_runs`, `gc_items`, `lanes`, `land_queue`, `land_runs`, `pushes`, `worktrees`, `env_servers`, `uat_slots`, `connectors`, `ask_requests` |
 | Observation | `machine_logs`, `machine_logs_fts`, `metrics_snapshots`, `notifications` |

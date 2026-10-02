@@ -49,7 +49,7 @@ const fixture=(t,{deadline,launchTerminal=null})=>{
     const at=Date.now()-40*60000;
     ledger.db.prepare("INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES('path:docs/',1)").run();
     ledger.db.prepare("UPDATE jobs SET status='leased',deadline=?,updated_at=? WHERE job_id=?").run(deadline,at,jobId);
-    if(launchTerminal)ledger.db.prepare("UPDATE jobs SET payload_json=json_set(payload_json,'$.launchTerminal',json(?)) WHERE job_id=?").run(JSON.stringify({handle:launchTerminal,at}),jobId);
+    if(launchTerminal)ledger.db.prepare("UPDATE jobs SET payload_json=json_set(payload_json,'$.launchTerminal',json(?)) WHERE job_id=?").run(JSON.stringify({handle:launchTerminal,dispatchId:'ctx_killed',at}),jobId);
     const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     // leases_match_job: the row carries the job's identity (try_no, generation, token).
     ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,try_no,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
@@ -58,7 +58,8 @@ const fixture=(t,{deadline,launchTerminal=null})=>{
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const status=()=>{const out=json(api(['status','--workflow',workflowId]).stdout);return {out,worker:out.workers.find(w=>w.jobId===jobId)};};
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
-  return {api,jobId,read,status,orcaState};
+  const orcaCalls=()=>(fs.existsSync(path.join(root,'calls.jsonl'))?fs.readFileSync(path.join(root,'calls.jsonl'),'utf8').trim().split(/\r?\n/).filter(Boolean).map(l=>json(l).argv):[]);
+  return {api,jobId,read,status,orcaState,orcaCalls};
 };
 
 test('a leased job with no worker is a launch in flight until its lease deadline',t=>{
@@ -91,23 +92,28 @@ test('the driver loop forbids bounding an api call with a shell timeout',async()
   assert.match(rule,/Never wrap an api call \(`api dispatch --spawn` above all\) in a shell\s+`timeout`/);
 });
 
-// nivo inc-e523617a3c31: a job settled failed while the terminal its killed dispatch created was still
-// live, and nothing in the ledger named that terminal. Dispatch records the handle the moment the terminal
-// exists (payload.launchTerminal); reconcile --dead-worker and settle quit and close it.
-test('the terminal a killed dispatch created is closed by reconcile --dead-worker',t=>{
+// nivo inc-e523617a3c31: a job settled failed while the worker its killed dispatch created was still live, and nothing
+// in the ledger named it. Dispatch records the terminal AND the Dispatch the moment the worker exists
+// (payload.launchTerminal); reconcile --dead-worker and settle release that Dispatch (worker-release alone ends the agent).
+test('the Dispatch a killed launch created is released by reconcile --dead-worker, once',t=>{
   const fx=fixture(t,{deadline:Date.now()-10*60000,launchTerminal:'term-orphan'});
   assert.equal(fx.status().worker.launchTerminal,'term-orphan');
   const r=fx.api(['reconcile','--job',fx.jobId,'--dead-worker','--settle-failed']);
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([json(r.stdout).terminalClosed?.handle,json(r.stdout).terminalClosed?.closed],['term-orphan',true]);
-  assert.ok((fx.orcaState().closed??[]).includes('term-orphan'));
+  const body=json(r.stdout);
+  assert.deepEqual([body.managedWorker?.dispatchId,body.managedWorker?.release?.ok,body.managedWorker?.custody?.state],['ctx_killed',true,'released'],r.stdout);
+  const verbs=fx.orcaCalls().map(a=>a.slice(0,2).join(' '));
+  assert.ok(verbs.includes('orchestration worker-release'),verbs.join(', '));
+  assert.equal(verbs.filter(v=>v==='terminal close').length,0,'nothing is closed by hand');
 });
 
-test('settle of a leased job closes the terminal its dispatch created',t=>{
+test('settle of a leased job releases the Dispatch its launch created',t=>{
   const fx=fixture(t,{deadline:Date.now()+10*60000,launchTerminal:'term-orphan'});
   const r=fx.api(['settle','--job',fx.jobId,'--verdict','fail']);
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.ok((fx.orcaState().closed??[]).includes('term-orphan'),JSON.stringify(fx.orcaState()));
+  const verbs=fx.orcaCalls().map(a=>a.slice(0,2).join(' '));
+  assert.ok(verbs.includes('orchestration worker-release'),verbs.join(', '));
+  assert.equal(json(r.stdout)?.managedWorker?.dispatchId,'ctx_killed');
 });
 
 test('spawnAgent hands the caller the worker terminal before it attests the launch',()=>{

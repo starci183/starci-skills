@@ -65,10 +65,10 @@ verification:
     the shape-slot rules. Mock-only connected mapping is not browser UAT.
 provenance:
   sources:
-    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/index.tsx
-    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/component.tsx
-    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/classNames.ts
-    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SignOutAction/component.tsx
+    - examples/ecommerce-app/fe/apps/app/src/components/blocks/SessionForm/index.tsx
+    - examples/ecommerce-app/fe/apps/app/src/components/blocks/SessionForm/component.tsx
+    - examples/ecommerce-app/fe/apps/app/src/components/blocks/SessionForm/classNames.ts
+    - examples/ecommerce-app/fe/apps/app/src/components/blocks/SignOutAction/component.tsx
     - packages/grammar/src/common/renderers.ts
     - packages/grammar/src/core/primitive/Button/index.tsx
     - packages/grammar/package.json

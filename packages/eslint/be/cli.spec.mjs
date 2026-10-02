@@ -4,7 +4,7 @@ import { cliBootstrap, cliCommandShape, cliOwner } from "./cli.mjs"
 
 const declaration = {
     apps: [{ name: "api", kind: "api" }, { name: "cli", kind: "cli" }],
-    connections: [{ name: "primary", envPrefix: "PRIMARY_DB" }],
+    connections: [{ name: "primary", envPrefix: "PRIMARY_DB", owner: "api", isolation: "database" }],
 }
 const tester = typedTester({ declaration })
 const CLI_MAIN = at("apps/cli/src/main.ts")

@@ -15,7 +15,6 @@ records it. Read `host-contract.md` for the call contract (`modules/host/orca/ca
 
 | ID | Mechanism | Why it stays |
 |---|---|---|
-| T4 | `kernel/reap-agent-process.mjs`, `close-verify --tree` | `worker-release` has no proven tree-kill on Windows (`exitCause stop_unverified`). It stays until smoke E1 proves no agent process remains. |
 | T6 | Screen-proven wakes and nudges (`kernel/wake-delivery.mjs`, `api nudge`, `agent/lib.mjs` delivery, `terminal-send` Enter retry) | Orca proves `turn_started` only on hosts with prompt receipts, and a mailbox `send` is a durable enqueue with a best-effort wake. Only the frame proves that a turn began on Codex and Devin (the 2026-09-23/24 incidents). Smoke E6 (live, Orca 1.4.209, 2026-10-02) settled it: `orchestration send --to dispatch:<id>` to an idle worker that already sent worker_done is refused `dispatch_inactive` ("Dispatch <id> is completed; its worker will never read that mailbox. Send to run:<id> instead, or start a new Dispatch for follow-up work."). A worker is re-engaged only through the terminal (`terminal send` with Enter) or a new Dispatch, so this row stays. No runtime caller issues `send --to dispatch:`. |
 | T7 | `terminal-rename` with the `[Op]`/`[Kernel]` title | `--display-name` names the Task, not the tab. This is presentation; the handle comes from the start receipt. |
 | M3 | Decision Items plus the doorbell | DIs carry the decider, escalation and claims. Orca's `send` is transport only (the doorbell follows T6). |
@@ -94,9 +93,8 @@ is), so such a worker reads unverified, never dead.
 | `kernel/transcripts.mjs` (was `readScrollback`/`captureTerminal`) | output | T1 | replaced by `worker-read` |
 | `kernel/api-verbs/observe.mjs` | output, and the frame for the turn state | T1, T2 | output replaced by `worker-read`; the frame stays |
 | `kernel/close-op-terminal.mjs` capture, `kernel/quit-agent.mjs` capture | output | T1 | deleted; settle reads by Dispatch |
-| `kernel/api-verbs/settle.mjs` (connected after close) | PTY state | T3 | lane SETTLED (worker closes become `worker-release`) |
-| `kernel/cli.mjs` `custodyOf`, `quitWorkerTerminal`, release retry, task-update coordinator check | PTY state | T3, D2 | lane SETTLED |
-| `kernel/cli.mjs` reap before/after, `reapIfStillLive`; `kernel/reap-agent-process.mjs` | PTY state | T4 | KEEP until smoke E1 |
+| `kernel/verbs/settle.mjs` (connected after close) | PTY state | T3 | done (alpha.5, lane ORCA): a worker's close is `worker-release`; the command-terminal path is deleted |
+| `kernel/cli.mjs` `quitWorkerTerminal`, the quit input, the tab close, the process reaper, `closeDeadWorkerTerminal` | PTY state | T3, T4, D2 | done (alpha.5, lane ORCA, live smoke E1): deleted. `custody` is the release receipt's state, with one terminal READ-back (disconnected or gone proves release) when Orca answers retained for a dead worker |
 | `kernel/cli.mjs` status liveness and prefetch; `reconciler/controllers/job.mjs` worker-health; `reconciler/services.mjs` seat turn; `supervisor/poll.mjs` `kernelState`; `supervisor/stall.mjs` `kernelTurnState` | frame classification | T2 | WRAP: the frame stays for turn-idle and rate-limit; the death verdict moves to `worker-list` |
 | `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/watchdog.mjs`; `supervisor/watchdog.mjs`; `kernel/cli.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
 | `kernel/close-op-terminal.mjs` `closeExitedTerminal` | exited-shell proof | T2, T3 | WRAP until lane SETTLED moves worker closes to `worker-release` |
@@ -112,3 +110,8 @@ is), so such a worker reads unverified, never dead.
 |---|---|---|
 | W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `api report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and releases. `worker-stop` is only the fallback for a Dispatch that did not settle. The close, quit and reap paths stay until smoke E1 (#10). |
 | D2 | One Task per op attempt, closed by hand (`closeOperationTask`, `staleTasks`, `reconcile --orca-tasks`, the gc tasks collector) | The `worker_done` settlement closes the Task. All four are deleted. |
+
+### Known limits that stay (alpha.5)
+- close-verify `--tree` stays for terminals that are not released through `worker-release` (the Kernel's own close, the GC's leftover
+  sweep, the host controller's replaced Kernel): E1 proved the release path for claude, codex and devin workers, not a tab close.
+- The terminal of a worker is read from worker-show (`result.dispatch.assigneeHandle`): the live start receipt has no `result.worker`.

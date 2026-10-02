@@ -231,6 +231,7 @@ ruleParams:
       saga: {topic: saga, variable: saga, trigger: saga, patterns: [saga], needs: [owner, from, failed, done, service], defaults: {step: "@name"}}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
       api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
+      cli: {topic: cli, variable: group, trigger: cli, patterns: [], needs: [service], wire: {file: src/features/cli/cli.module.ts, import: "./@@group@@/@@group@@.module", symbol: "@@Group@@Module"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.

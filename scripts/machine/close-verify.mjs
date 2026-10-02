@@ -25,18 +25,18 @@
 // (`node close-verify.mjs --terminal <h> --delay-ms <ms> --owner <tag>`) that waits for the caller to finish writing,
 // closes, verifies and appends the result to the Supervisor's machine log as a gc.collect row.
 //
-//   node scripts/machine/close-verify.mjs --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--tree] [--log]
+//   node scripts/machine/close-verify.mjs --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log]
 //
-// --tree (tree: true): the close counts only when no agent process that ran inside an Orca terminal before the close
-// lingers outside Orca after it (orcaAgents / reapOrphaned: a lingering tree is killed and read back).
+// A worker's agent process needs no kill-and-read-back here: `worker-release` alone ends it (live smoke E1, 2026-10-02), so a close
+// is proven by the terminal alone.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalWait } from '../api/orca/terminal-wait.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { killTree } from '../api/process/kill-tree.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
@@ -87,12 +87,10 @@ export function closeOnce(handle, { list = terminalList, close = terminalClose, 
  * Close `handle` and prove it is gone. Seams: show, close, list, sleep, verifyMs. See the header for the result.
  */
 export function closeAndVerify(handle, { show = terminalShow, close = terminalClose, list = terminalList, sleep = sleepSync,
-  verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, tree = false, table = processTable, reap = reapOrphaned } = {}) {
+  verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, wait = terminalWait } = {}) {
   if (!handle) return null;
   const before = terminalState(handle, { show });
   if (before === 'gone') return { handle, ok: true, proof: 'gone', attempts: 0 };
-  // The agents inside Orca terminals right before the close: whichever of them lingers outside Orca afterwards ran here.
-  const agentsBefore = tree ? (() => { const t = table(); return t ? orcaAgents(t) : null; })() : null;
   if (before === 'unknown') return { handle, ok: false, proof: null, attempts: 0, reason: 'host-unavailable' };
   const out = { handle, ok: false, proof: null, attempts: 0 };
   for (const byPane of [false, true]) {
@@ -100,15 +98,17 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
     out.attempts += 1;
     if (r.tab) out.tab = r.tab;
     if (r.error) out.error = r.error;
-    for (let waited = 0; waited <= verifyMs; waited += intervalMs) {
+    // Orca proves the exit (terminal wait --for exit: an exited or closed handle answers at once); only an answer it cannot give
+    // (host down, the verb refused) falls back to polling terminal show.
+    let proven = null;
+    try { proven = wait({ terminal: handle, for: 'exit', timeoutMs: verifyMs }); } catch { proven = null; }
+    const viaWait = proven?.ok === true && !proven.hostUnavailable;
+    for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
       if (waited > 0) sleep(intervalMs);
-      const state = terminalState(handle, { show });
+      const state = viaWait ? (proven.satisfied ? 'disconnected' : 'connected') : terminalState(handle, { show });
       if (state === 'gone' || state === 'disconnected') {
         delete out.error;
-        // The process tree must be gone too (owner 2026-09-28): an agent that ran in it and lingers is killed.
-        const reaped = tree ? reap(agentsBefore, { table }) : null;
-        const treeOk = !reaped || !reaped.checked || reaped.remaining === 0;
-        return { ...out, ok: treeOk, proof: state, ...(reaped ? { tree: reaped } : {}), ...(treeOk ? {} : { reason: 'process-tree-lingers' }) };
+        return { ...out, ok: true, proof: state };
       }
       if (state === 'unknown') return { ...out, reason: 'host-unavailable' };
     }
@@ -122,47 +122,6 @@ export function processTable({ run, platform = process.platform } = {}) {
   return processList({ cmdMax: 300, run, platform });
 }
 
-const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
-/**
- * The agent processes running inside Orca terminals: every isAgentProcess whose parent chain reaches the Orca terminal
- * daemon. Map pid -> {pid, created, name}. Pure over the table.
- */
-export function orcaAgents(table) {
-  const byPid = new Map((table ?? []).map((p) => [p.pid, p]));
-  const underDaemon = (p) => {
-    for (let cur = byPid.get(p.ppid), hops = 0; cur && hops < 30; cur = byPid.get(cur.ppid), hops += 1) {
-      if (cur.created && p.created && cur.created > p.created) return false; // a reused pid is no parent
-      if (ORCA_DAEMON.test(String(cur.exe ?? ''))) return true;
-    }
-    return false;
-  };
-  return new Map((table ?? []).filter((p) => isAgentProcess(p) && underDaemon(p)).map((p) => [p.pid, { pid: p.pid, created: p.created, name: p.name }]));
-}
-
-/**
- * Owner 2026-09-28: a closed tab whose agent process lingers does not count. `before` is orcaAgents() taken before the
- * close; after it, every one of them still alive (same pid and start time) that no longer runs under the Orca daemon
- * was in a closed terminal and lingers: its tree is killed (taskkill /T /F) and the table read again.
- * {checked, lingering, killed, remaining} - remaining 0 is the proof.
- */
-export function reapOrphaned(before, { table = processTable, kill = (pid) => killTree(pid).ok, sleep = sleepSync } = {}) {
-  if (!before) return { checked: false };
-  const lingeringOf = (t) => {
-    const now = orcaAgents(t);
-    return (t ?? []).filter((p) => before.has(p.pid) && before.get(p.pid).created === p.created && !now.has(p.pid));
-  };
-  const t1 = table();
-  if (!t1) return { checked: false };
-  const lingering = lingeringOf(t1);
-  if (!lingering.length) return { checked: true, lingering: 0, killed: 0, remaining: 0 };
-  const pids = new Set(lingering.map((p) => p.pid));
-  let killed = 0;
-  for (const p of lingering.filter((x) => !pids.has(x.ppid))) if (kill(p.pid)) killed += 1;
-  sleep(750);
-  const t2 = table();
-  return { checked: Boolean(t2), lingering: lingering.length, killed, remaining: t2 ? lingeringOf(t2).length : null, pids: [...pids].slice(0, 20) };
-}
-
 /** True when this process runs inside `handle` (Orca exports the terminal's own handle to it). */
 export const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env.ORCA_TERMINAL_HANDLE === handle;
 
@@ -170,11 +129,11 @@ export const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && e
  * Close `handle` from a caller that may be running inside it: inline closeAndVerify when it is another terminal, a
  * detached verifier (this file's CLI) when it is the caller's own. {handle, ok, proof, detached?, pid?}.
  */
-export function closeSelfSafe(handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, verify = closeAndVerify, spawnFn = spawnDetached, tree = true } = {}) {
+export function closeSelfSafe(handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, verify = closeAndVerify, spawnFn = spawnDetached } = {}) {
   if (!handle) return null;
-  if (!isOwnTerminal(handle, env)) return { ...verify(handle, { tree }), owner };
+  if (!isOwnTerminal(handle, env)) return { ...verify(handle), owner };
   try {
-    const child = spawnFn(process.execPath, [selfFile, '--terminal', handle, '--delay-ms', String(delayMs), '--owner', owner, '--log', ...(tree ? ['--tree'] : [])],
+    const child = spawnFn(process.execPath, [selfFile, '--terminal', handle, '--delay-ms', String(delayMs), '--owner', owner, '--log'],
       { detached: true, stdio: 'ignore', windowsHide: true, env });
     child.unref?.();
     return { handle, ok: true, proof: null, detached: true, pid: child.pid ?? null, owner };
@@ -222,7 +181,7 @@ if (isMain(import.meta.url)) {
   if (!handle) { console.error('use: close-verify.mjs --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log] [--json]'); process.exit(2); }
   const delay = Number(value('delay-ms'));
   if (Number.isFinite(delay) && delay > 0) sleepSync(Math.min(delay, 60_000));
-  const out = { ...closeAndVerify(handle, { tree: argv.includes('--tree') }), owner: value('owner') ?? 'runtime' };
+  const out = { ...closeAndVerify(handle), owner: value('owner') ?? 'runtime' };
   if (argv.includes('--log')) {
     try {
       const { supLog } = await import('./sup-log.mjs');

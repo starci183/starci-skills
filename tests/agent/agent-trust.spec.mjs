@@ -246,20 +246,18 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   const pre=JSON.parse(fs.readFileSync(settings,'utf8')).hooks.PreToolUse;
   assert.deepEqual(pre,[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash|PowerShell',hooks:[{type:'command',command,timeout:30}]}],'the owner\'s hook stays; an older guard entry is replaced, never doubled');
   assert.deepEqual(ensureLaunchTrust({agent:'claude',cwd,env}).toolGuard,[{file:settings,state:'already'}]);
-  // Devin: its local project config, the model pinned, any other key kept.
+  // Devin: its local project config, the guard only (no model pin: Devin ignores one in a project config), any other key kept.
   fs.mkdirSync(path.dirname(devinFile),{recursive:true});
   fs.writeFileSync(devinFile,JSON.stringify({version:1,permissions:{allow:['Read']}},null,2));
-  const devin=ensureLaunchTrust({agent:'devin',cwd,env,model:'swe-2-max',platform:'win32'});
+  const devin=ensureLaunchTrust({agent:'devin',cwd,env,platform:'win32'});
   assert.equal(devin.status,'written',JSON.stringify(devin));
-  assert.deepEqual(devin.modelPin,{file:devinFile,model:'swe-2-max',state:'written'});
+  assert.equal(devin.modelPin,undefined,'no model pin is written for Devin');
   const doc=JSON.parse(fs.readFileSync(devinFile,'utf8'));
-  assert.equal(doc.agent.model,'swe-2-max');
+  assert.equal(doc.agent,undefined);
   assert.deepEqual(doc.permissions,{allow:['Read']});
   assert.deepEqual(doc.hooks.PreToolUse,[{hooks:[{type:'command',command,timeout:30}]}]);
-  assert.equal(ensureLaunchTrust({agent:'devin',cwd,env,model:'swe-2-max',platform:'win32'}).status,'already');
-  // The model moves with the route: a different pinned model is rewritten, the guard kept.
-  assert.equal(writeDevinProfile({file:devinFile,command,model:'swe-2-high'}).state,'written');
-  assert.equal(JSON.parse(fs.readFileSync(devinFile,'utf8')).agent.model,'swe-2-high');
+  assert.equal(ensureLaunchTrust({agent:'devin',cwd,env,platform:'win32'}).status,'already');
+  assert.equal(writeDevinProfile({file:devinFile,command}).state,'already','the guard is kept as it is');
   fs.writeFileSync(devinFile,'{"hooks":[]}');
   assert.equal(assertJsonToolGuard({file:devinFile,command}).ok,false,'a hooks value that is not an object is never rewritten');
 });
@@ -283,7 +281,7 @@ test('launch trust writes only under the op worktree and never touches a user-gl
   const homeBefore=snapshot(home);
   const codexServer=({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command:toolGuardCommand(),currentHash:'h',trustStatus:'trusted'}]}]});
   for(const agent of ['claude','codex','devin']){
-    const r=ensureLaunchTrust({agent,cwd,env,model:agent==='devin'?'swe-2-max':null,codexAppServer:codexServer});
+    const r=ensureLaunchTrust({agent,cwd,env,codexAppServer:codexServer});
     assert.notEqual(r.status,'failed',JSON.stringify(r));
     for(const g of r.toolGuard)assert.ok(path.resolve(g.file).startsWith(path.resolve(cwd)+path.sep),`${agent}: the guard hook lives under the worktree, not ${g.file}`);
   }

@@ -7,8 +7,10 @@
 //   - workerTerminalHandles: the terminals Orca accounts for as workers (the shells collector and the orca-tree check
 //     leave them to Orca's accounting);
 //   - worktreePathOf / activeWorkerOn: the lane-owner rule (an active worker whose worktree is the lane).
-// Absence is not death: a row whose liveness verdict is `unverifiable` is never acted on, and only Orca's own
-// nextAction argv decides the action (owner rule: never write ourselves what Orca has).
+// Only Orca's own nextAction argv decides the action (owner rule: never write ourselves what Orca has). A SETTLED worker
+// whose liveness Orca cannot verify (`unverifiable`) is released like any other: its terminal is Orca-reclaimable, and live
+// smoke E1 showed worker-release leaves no agent process of the terminal (alpha5 item 1.6); a row with NO liveness verdict
+// is still never acted on.
 import { pathKey, sameOrUnder } from './path-key.mjs';
 
 /** The terminal states that still hold a worker terminal Orca has not released. */
@@ -40,8 +42,8 @@ function isReleaseOf(argv, dispatchId) {
 /**
  * The GC decision for each worker row. Pure. Returns [{dispatchId, runId, terminalHandle, terminalState, liveness,
  * verdict: 'release'|'refuse'|'keep', reason}]:
- *   release  reclaimable, liveness live or exited, and Orca's nextAction is worker-release of this Dispatch;
- *   refuse   reclaimable or release_unknown that cannot be released as is (unverifiable liveness, another next
+ *   release  reclaimable, liveness live, exited or unverifiable, and Orca's nextAction is worker-release of this Dispatch;
+ *   refuse   reclaimable or release_unknown that cannot be released as is (no liveness verdict, another next
  *            action): reported every sweep, never touched;
  *   keep     every other state (active, retained, release_pending, released): Orca's own lifecycle.
  */
@@ -53,8 +55,8 @@ export function releasePlan(rows = []) {
     if (base.terminalState === 'release_unknown')
       return { ...base, verdict: 'refuse', reason: `Orca could not confirm the release of ${base.dispatchId} (release_unknown): ${next?.kind ?? 'no next action'}` };
     if (base.terminalState !== 'reclaimable') return { ...base, verdict: 'keep', reason: `terminal state ${base.terminalState ?? 'unknown'}` };
-    if (base.liveness !== 'live' && base.liveness !== 'exited')
-      return { ...base, verdict: 'refuse', reason: `liveness ${base.liveness ?? 'missing'}: Orca cannot verify the worker, so it is never acted on` };
+    if (!['live', 'exited', 'unverifiable'].includes(base.liveness))
+      return { ...base, verdict: 'refuse', reason: `liveness ${base.liveness ?? 'missing'}: Orca gave no liveness verdict, so it is never acted on` };
     if (!isReleaseOf(next?.argv, base.dispatchId))
       return { ...base, verdict: 'refuse', reason: `Orca's next action is ${next?.kind ?? 'none'}, not worker-release of ${base.dispatchId}` };
     return { ...base, verdict: 'release', reason: `settled worker (${row?.workerState ?? 'unknown'}) whose terminal Orca holds as reclaimable` };

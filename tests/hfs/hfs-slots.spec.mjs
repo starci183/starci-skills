@@ -431,7 +431,7 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
   assert.ok(slot, 'the support slot exists');
-  assert.equal(slot.path, 'src/features/{api/,jobs/,reactors/}<feature>/application/support/');
+  assert.equal(slot.path, 'src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/');
   assert.equal(slot.presence, 'optional');
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.tests, 'none');

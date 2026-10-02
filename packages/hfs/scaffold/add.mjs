@@ -136,8 +136,29 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
     fs.writeFileSync(file.absolute, file.body);
   }
+  if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
   return { created: planned.map((file) => `be/${file.target}`), registered };
+}
+
+/**
+ * Registers the generated member in the static module that lists its siblings (the cli feature root lists each group module): one import
+ * line after the last import and one more entry of the `imports` array of its `@Module`. Nothing happens when the member is already listed.
+ */
+function wire({ beRoot, wire: target, forms, noun, name }) {
+  const file = path.join(beRoot, ...target.file.split('/'));
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `hfs add ${noun} ${name} registers the member in ${target.file}, which does not exist`);
+  const fill = (text) => text.replace(PLACEHOLDER, (whole, key) => forms[key] ?? whole);
+  const symbol = fill(target.symbol);
+  let text = fs.readFileSync(file, 'utf8');
+  if (new RegExp(`\\b${symbol}\\b`).test(text)) return;
+  const array = /@Module\(\{ imports: \[([^\]]*)\] \}\)/.exec(text);
+  const lines = text.split('\n');
+  const lastImport = lines.map((line) => line.startsWith('import ')).lastIndexOf(true);
+  if (!array || lastImport < 0) throw new ScaffoldError('HFS_ADD_WIRE_FAILED', `${target.file} has no \`@Module({ imports: [...] })\` to register ${symbol} in`);
+  lines.splice(lastImport + 1, 0, `import { ${symbol} } from "${fill(target.import)}"`);
+  text = lines.join('\n').replace(array[0], `@Module({ imports: [${[array[1].trim(), symbol].filter(Boolean).join(', ')}] })`);
+  fs.writeFileSync(file, text);
 }
 
 /** The topics that carry the platform capability of each pattern: the topic whose `pattern` key names it. */

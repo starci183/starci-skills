@@ -25,6 +25,7 @@ export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(),
   const trees = new Map(); // id -> {id, path, branch, repo, comment}
   const terminals = new Map(); // id -> live terminal count
   const repos = new Set();
+  let refuseLiveTerminal = false; // `refuseRm(on)`: rm refuses while a terminal lives inside (the refusal the GC retries after closeKernelTerminal)
   const repoIdOf = (repo) => `repo-${path.basename(repo)}`;
   const repoOf = (selector) => path.resolve(String(selector).replace(/^path:/, ''));
   const client = {
@@ -32,6 +33,7 @@ export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(),
     calls,
     trees,
     terminals,
+    refuseRm(on = true) { refuseLiveTerminal = on; },
     names: () => calls.map((c) => c[0]),
     forget(id) { trees.delete(id); },
     create(args) {
@@ -53,6 +55,7 @@ export function fakeOrcaWorktrees({ root = fs.mkdtempSync(path.join(os.tmpdir(),
     remove(args) {
       calls.push(['remove', args]);
       if (failRemove) return { ok: false, outcome: 'failed', removed: false, errorCode: 'worktree_not_found', error: 'worktree_not_found' };
+      if (refuseLiveTerminal) return { ok: false, outcome: 'failed', removed: false, errorCode: 'worktree_has_live_terminals', error: 'the worktree still has a live terminal: close it, then remove the worktree' };
       const id = String(args.worktree).replace(/^id:/, '');
       const t = trees.get(id);
       if (!t) return { ok: false, outcome: 'failed', removed: false, errorCode: 'worktree_not_found', error: 'worktree_not_found' };

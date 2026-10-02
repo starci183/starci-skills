@@ -623,9 +623,9 @@ test("an exported const, type or interface that only renames another declaration
 test("no feature kind imports another kind: the kinds meet through the event bus", () => {
     const files = {
         "src/features/jobs/send/index.ts": "import { stock } from '../../reactors/stock';\nexport const send = stock;\n",
-        "src/features/jobs/send/steps/mail.step.ts": "import type { Order } from '../../../orders';\nexport type Step = Order;\n",
+        "src/features/jobs/send/steps/mail.step.ts": "import type { Order } from '../../../api/orders';\nexport type Step = Order;\n",
         "src/features/reactors/stock/index.ts": "export const stock = 1;\n",
-        "src/features/orders/index.ts": "export type Order = string;\n",
+        "src/features/api/orders/index.ts": "export type Order = string;\n",
         "src/features/jobs/clean/index.ts": "import { x } from '../../../modules/domain/x';\nimport { p } from '../../../modules/platform/config';\nexport const clean = [x, p];\n",
         "src/modules/domain/x/index.ts": "export const x = 1;\n",
         "src/modules/platform/config/index.ts": "export const p = 1;\n",
@@ -634,7 +634,7 @@ test("no feature kind imports another kind: the kinds meet through the event bus
     f.tester.run("kind-isolation", rules["kind-isolation"], {
         valid: [...ok(f, files, [
             "src/features/reactors/stock/index.ts",
-            "src/features/orders/index.ts",
+            "src/features/api/orders/index.ts",
             "src/features/jobs/clean/index.ts",
             "src/modules/domain/x/index.ts",
         ])],
