@@ -257,7 +257,7 @@ rules:
         - BE_DEFAULT_DENY
       manual:
         - Confirm the spec asserts the error code of each refusal, not only a status.
-    relatedExamples: [api]
+    relatedExamples: [examples/ecommerce-app/be/src/features/api]
   - id: BE-OPERATIONS-1
     title: A versioned operation is declared once in the app's typed operation table
     kind: mandatory
@@ -297,7 +297,7 @@ rules:
         - HFS_CONTRACT_SNAPSHOT_DRIFT
       manual:
         - Confirm each refusal code is one the operation's owner can actually answer.
-    relatedExamples: [api]
+    relatedExamples: [examples/ecommerce-app/be/src/features/api]
 files:
   - path: src/features/api/<feature>/index.ts
     slot: be.feature
