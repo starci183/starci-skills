@@ -53,7 +53,7 @@ const repo = () => {
   fs.mkdirSync(path.join(root, "be", "apps", "api", "src"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "be", "apps", "api", "src", "app.module.ts"),
-    'import { Module } from "@nestjs/common"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n            ],\n        }\n    }\n}\n',
+    'import { Module } from "@nestjs/common"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n                ErrorsModule.register({\n                    kinds: [\n                    ],\n                }),\n            ],\n        }\n    }\n}\n',
   );
   fs.writeFileSync(
     path.join(root, "be", "apps", "api", "src", "main.ts"),
@@ -71,6 +71,25 @@ const parses = (text) =>
     compilerOptions: { experimentalDecorators: true },
   }).diagnostics.length === 0;
 
+const prepareWebhookDependencies = (root) => {
+  const domain = path.join(root, "be", "src", "modules", "domain", "calendars");
+  fs.mkdirSync(domain, { recursive: true });
+  fs.writeFileSync(
+    path.join(domain, "calendars.service.ts"),
+    'import type { EntityManager } from "typeorm"\n\ninterface CalendarDelivery { readonly id: string }\n\nexport class CalendarsService {\n    constructor(private readonly entityManager: EntityManager) {}\n\n    async acceptCalendarDelivery(delivery: CalendarDelivery): Promise<void> {\n        await Promise.resolve(delivery.id)\n    }\n}\n',
+  );
+  const database = path.join(root, "be", "src", "modules", "platform", "database");
+  fs.mkdirSync(path.join(database, "errors"), { recursive: true });
+  fs.writeFileSync(
+    path.join(database, "index.ts"),
+    'export { sql } from "./database.sql"\nexport { InjectPrimaryEntityManager } from "./primary.decorators"\n',
+  );
+  fs.writeFileSync(
+    path.join(database, "errors", "database.error.ts"),
+    'export enum DatabaseErrorCode {\n    IdentifierRejected = "DATABASE_IDENTIFIER_REJECTED",\n}\n\nexport const DATABASE_ERROR_KINDS = {\n    [DatabaseErrorCode.IdentifierRejected]: "internal",\n}\n\nexport class DatabaseError extends Error {\n    readonly code: DatabaseErrorCode\n    constructor(init: { readonly code: DatabaseErrorCode }) {\n        super(init.code)\n        this.code = init.code\n    }\n}\n',
+  );
+};
+
 test("add table writes one policy-complete migration, FE db modules, and regenerated types", async () => {
   const root = repo();
   const generated =
@@ -86,6 +105,7 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   assert.deepEqual(result.created, [
     migration,
     "be/src/modules/domain/orders/index.ts",
+    "be/src/modules/domain/orders/errors/orders.error.ts",
     "be/src/modules/domain/orders/orders.module.ts",
     "be/src/modules/domain/orders/orders.module-definition.ts",
     "be/src/modules/domain/orders/orders.options.ts",
@@ -109,8 +129,20 @@ test("add table writes one policy-complete migration, FE db modules, and regener
     /const principal = await getPrincipal\(\)/,
   );
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /InjectPrimaryEntityManager/);
-  assert.match(read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"), /sql`SELECT id FROM public\.orders/);
+  assert.match(
+    read(root, "be/src/modules/domain/orders/orders.service.ts"),
+    /orders\(principalId: string, id: string\)/,
+  );
+  assert.match(
+    read(root, "be/src/modules/domain/orders/orders.service.ts"),
+    /\[id, principalId\]/,
+  );
+  assert.match(
+    read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"),
+    /sql`SELECT id FROM public\.orders WHERE id = \$1 AND owner_id = \$2 LIMIT 1`/,
+  );
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
+  assert.match(read(root, "be/apps/api/src/app.module.ts"), /ORDERS_ERROR_KINDS/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
@@ -320,15 +352,52 @@ test("lite add api emits HTTP, and api plus webhook transports are composed in t
   assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings-http.module.ts"));
   assert.equal(api.created.some(file => file.includes("/graphql/")), false);
   assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsHttpModule/);
+  assert.match(
+    read(root, "be/src/features/api/bookings/application/bookings.handler.ts"),
+    /bookings\(command\.params\.principal\.id, command\.params\.request\.id\)/,
+  );
+  prepareWebhookDependencies(root);
   const webhook = addKind({ repoRoot: root, noun: "webhook", name: "calendar", options: { service: "CalendarsService=@modules/domain/calendars" } });
   assert.ok(webhook.created.includes("be/src/features/webhooks/calendar/transport/http/calendar-http.module.ts"));
+  assert.ok(webhook.created.some(file => /supabase\/migrations\/\d{14}_calendar-inbox\.sql/.test(file)));
+  assert.ok(webhook.created.includes("be/src/modules/domain/calendar-inbox/calendar-inbox.service.ts"));
   assert.equal(webhook.created.some(file => file.endsWith(".spec.ts")), false);
   const app = read(root, "be/apps/api/src/app.module.ts");
   assert.match(app, /import \{ BookingsHttpModule \} from "@features\/api\/bookings"/);
   assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
-  assert.match(app, /imports: \[\s+CalendarHttpModule,\s+BookingsHttpModule,/);
+  assert.match(app, /imports: \[\s+CalendarInboxModule\.register\(\{ isGlobal: true \}\),\s+CalendarHttpModule,\s+BookingsHttpModule,/);
+  assert.match(
+    read(root, "be/src/features/webhooks/calendar/transport/http/calendar.webhook.ts"),
+    /@Headers\("x-calendar-delivery-id"\) deliveryId/,
+  );
+  assert.match(
+    read(root, "be/src/modules/domain/calendars/calendars.service.ts"),
+    /entityManager: EntityManager = this\.entityManager/,
+  );
   const main = read(root, "be/apps/api/src/main.ts");
   assert.match(main, /parseWebhookProviderConfig/);
   assert.match(main, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);
   assert.match(main, /rawBody: true/);
+});
+
+test("the lite API skeleton installs one typed global validation pipe", () => {
+  const main = fs.readFileSync(
+    new URL("../../packages/hfs/templates/be/skeleton-lite/apps/api/src/main.ts", import.meta.url),
+    "utf8",
+  );
+  const validation = fs.readFileSync(
+    new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/request-validation.service.ts", import.meta.url),
+    "utf8",
+  );
+  const errors = fs.readFileSync(
+    new URL("../../packages/hfs/templates/be/skeleton/src/modules/platform/http-security/errors/http-security.error.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(main, /app\.useGlobalPipes\(new RequestValidationService\(\)\)/);
+  assert.ok(main.indexOf("useGlobalPipes") < main.indexOf("await app.listen"));
+  assert.match(validation, /whitelist: true/);
+  assert.match(validation, /forbidNonWhitelisted: true/);
+  assert.match(validation, /transform: true/);
+  assert.match(validation, /HttpSecurityErrorCode\.RequestInvalid/);
+  assert.match(errors, /\[HttpSecurityErrorCode\.RequestInvalid\]: "invalid"/);
 });

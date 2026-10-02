@@ -24,6 +24,7 @@ import { refuseInEdition } from './edition-gate.mjs';
 import { addTable } from './add-table.mjs';
 import { addApp } from './add-app.mjs';
 import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
+import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
 import { jsonText } from './app.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -48,6 +49,7 @@ const selectLiteApiEntries = entries => [
   ...entries.filter(entry => !entry.path.includes('/transport/graphql/')).map(entry => {
     if (entry.path === 'src/features/api/<feature>/index.ts') return { ...entry, template: 'api/feature.index.http.ts.tpl' };
     if (entry.path === 'src/features/api/<feature>/application/<action>.command.ts') return { ...entry, template: 'api/application.command.http.ts.tpl' };
+    if (entry.path === 'src/features/api/<feature>/application/<action>.handler.ts') return { ...entry, template: 'api/application.handler.http.ts.tpl' };
     return entry;
   }),
   { path: 'src/features/api/<feature>/transport/http/<action>.controller.ts', slot: 'be.transport.http', template: 'api/http.controller.ts.tpl' },
@@ -56,6 +58,9 @@ const selectLiteApiEntries = entries => [
   { path: 'src/features/api/<feature>/transport/http/dto/<action>.response.ts', slot: 'be.transport.http', template: 'api/http.response.ts.tpl' },
   { path: 'src/features/api/<feature>/transport/http/<feature>-http.module.ts', slot: 'be.transport.http', template: 'api/http.module.ts.tpl' },
 ];
+
+/** The templates the lite api tree names beyond the pattern topic's own files tree (the HTTP door replaces the GraphQL one): the template set stays one set with the topics' (tests/packages-hfs/hfs-add.spec.mjs). */
+export const liteApiTemplates = () => selectLiteApiEntries(readTree('api')).map(entry => entry.template).filter(Boolean);
 
 /** Fills the `<name>` variables of a path; returns null when a variable has no value. */
 const fillPath = (text, values) => {
@@ -141,7 +146,7 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const liteCli = noun === 'cli' && repo.edition === 'lite';
   const liteApi = noun === 'api' && repo.edition === 'lite';
   const trees = new Map([...topics].map((topic) => {
-    const entries = repo.edition === 'lite' ? selectLiteCliEntries(readTree(topic)) : readTree(topic);
+    const entries = repo.edition === 'lite' ? selectLiteWebhookEntries(selectLiteCliEntries(readTree(topic))) : readTree(topic);
     return [topic, liteApi && topic === spec.topic ? selectLiteApiEntries(entries) : entries];
   }));
   // The slots the noun's trees name decide whether the edition has the noun (a slot lite does not carry or forbids
@@ -184,8 +189,9 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   }
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
   if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) wireLiteFeature({ repoRoot, repo, noun, name });
+  const inboxCreated = addLiteWebhookInbox({ root: repoRoot, repo, noun, provider: name, values, now });
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
-  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`)], registered };
+  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`), ...inboxCreated], registered };
 }
 
 /** Lite has one API app; compose each generated API or webhook transport into that app immediately. */

@@ -89,6 +89,14 @@ const LITE_STARTER_SIDES = Object.freeze({
   fe: Object.freeze({ apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/', 'supabase/types/'] }),
 });
 
+/** The checked local Supabase auth posture of every newly scaffolded lite app. */
+const LITE_STARTER_SUPABASE = Object.freeze({
+  enableSignup: false,
+  jwtExpiry: 3600,
+  siteUrl: 'http://127.0.0.1:3000',
+  redirectUrls: ['http://127.0.0.1:3000/auth/callback'],
+});
+
 /**
  * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. A name with a
  * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference app (examples/ecommerce-app)
@@ -164,6 +172,7 @@ const starterDeclaration = (name, manifest = loadSlotManifest(), edition = 'full
   kind: 'app',
   ...(edition === 'full' ? {} : { edition }),
   project: name,
+  ...(edition === 'lite' ? { supabase: structuredClone(LITE_STARTER_SUPABASE) } : {}),
   sides: structuredClone(edition === 'lite' ? LITE_STARTER_SIDES : STARTER_SIDES),
 });
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parse } from 'yaml';
 import { main } from '../../packages/hfs/bin/hfs.mjs';
-import { addKind } from '../../packages/hfs/scaffold/add.mjs';
+import { addKind, liteApiTemplates } from '../../packages/hfs/scaffold/add.mjs';
 import { APP, cleanup, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
 // `hfs add <noun> <name>`: exactly one kind's file tree, generated FROM the pattern knowledge files (the files: tree is the single
@@ -47,6 +47,7 @@ const withPlatform = (dir, ...topics) => {
 test('the files trees and the template bodies are one set: every named template exists and every template is named', () => {
   const named = new Set();
   for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus', 'api', 'cli', 'webhooks', 'realtime', 'saga']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
+  for (const template of liteApiTemplates()) named.add(template);
   const dir = path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'patterns');
   const walk = (folder, prefix) => fs.readdirSync(path.join(dir, folder), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${folder}/${entry.name}`, prefix) : [`${folder}/${entry.name}`]));
   const present = new Set(fs.readdirSync(dir).flatMap((topic) => walk(topic, topic)));

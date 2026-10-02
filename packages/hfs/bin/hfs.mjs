@@ -204,8 +204,8 @@ async function scaffoldPresets() {
   }
 }
 
-/** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
-export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
+/** `presets`, `prettier` and `run` are test seams for installed config, formatting and the Supabase types command runner. */
+export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, run } = {}) {
   const [verb, ...rest] = argv;
   if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new', 'add', 'secret', 'upgrade'].includes(verb)) { stderr(USAGE); return 2; }
   try {
@@ -226,7 +226,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');
       const be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be;
       if (!be) throw new Error('hfs emit-contracts runs at the app root (the folder of hfs.json)');
-      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be });
+      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be, run });
       for (const file of written) stdout(`wrote be/${file}
 `);
       stdout(`hfs emit-contracts: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : ''}
