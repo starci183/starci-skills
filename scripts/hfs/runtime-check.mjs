@@ -27,6 +27,8 @@ import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
 import { ciUploadFindings } from './runtime-rules/ci-upload.mjs';
+import { gitTriggerFindings } from './runtime-rules/git-triggers.mjs';
+import { releaseNotesRepoFindings } from './runtime-rules/release-notes.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { prosePathFindings } from './runtime-rules/prose-path.mjs';
 import { proseRestateFindings } from './runtime-rules/prose-restates.mjs';
@@ -123,6 +125,8 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...prosePathFindings(ctx),
     ...proseRestateFindings(ctx),
     ...ciUploadFindings(ctx),
+    ...gitTriggerFindings(ctx),
+    ...releaseNotesRepoFindings(ctx),
   );
   const driftList = drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot) ? driftOfRuntime() : drift;
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });

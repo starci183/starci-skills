@@ -137,8 +137,9 @@ describe('.github/workflows', () => {
   it('ci.yml runs the one lint, format, typecheck, unit, the coverage upload, both builds and Sonar, with no e2e', () => {
     const text = rendered()['.github/workflows/ci.yml'];
     const doc = parseYaml(text);
-    assert.deepEqual(Object.keys(doc.on).sort(), ['pull_request', 'push']);
-    assert.deepEqual(doc.on.push.branches, ['main']);
+    assert.deepEqual(Object.keys(doc.on).sort(), ['push', 'workflow_dispatch'], 'CI runs once per release (CI_TRIGGERS_RELEASE_ONLY)');
+    assert.deepEqual(doc.on.push, { tags: ['v*'] }, 'a release tag only, never a branch push');
+    assert.deepEqual(doc.concurrency, { group: 'ci-${{ github.ref }}', 'cancel-in-progress': false }, 'one group per ref');
     const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
     for (const command of ['npm ci', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(command), command);
     assert.ok(!runs.some(command => command.includes('hfs sync')), 'hfs check is the one drift gate; there is no second sync step');
@@ -147,6 +148,7 @@ describe('.github/workflows', () => {
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
     const upload = doc.jobs.ci.steps.find(step => String(step.uses ?? '').startsWith('codecov/'));
+    assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'uploads only from the release-tag run');
     assert.deepEqual(upload.with, { use_oidc: true, files: 'be/coverage/lcov.info', disable_search: true, fail_ci_if_error: true }, 'the one upload: the be lcov, authenticated with the OIDC token');
     assert.equal(doc.jobs.ci.env.CODECOV_TOKEN, undefined);
     assert.equal(doc.jobs.ci.permissions['id-token'], 'write');

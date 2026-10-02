@@ -15,3 +15,4 @@ scripts/route/route-op.mjs	routing CLI named by the op prompts (docs/ops.md); no
 scripts/uat/assisted-runner.mjs	UAT runner CLI named by the op prompts; specs read it
 scripts/work/validate/check-evidence-binding.mjs	validator CLI (docs/verify-proof.md); a spec reads it
 scripts/work/validate/work-change.mjs	validator CLI of work records (docs); a spec reads it
+scripts/supervisor/release-cut.mjs	release flow function (cutRelease) that the CLI exposes as `starci release cut` (docs/git-governance.md); the CLI lane wires it and removes this entry; a spec reads it

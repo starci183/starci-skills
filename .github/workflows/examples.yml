@@ -5,39 +5,27 @@ name: examples
 # kind app (scripts/checks/check-examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
 # list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/check-examples-ci.mjs).
 #
-# Two triggers, one workflow (owner ruling: e2e runs manually only):
-#   push / pull_request   per app: install, typecheck (tsc over be, then turbo over the fe workspaces), hfs lint (with the Sonar import file),
+# Two triggers, one workflow (owner ruling: e2e runs manually only; rule CI_TRIGGERS_RELEASE_ONLY: CI runs once per release):
+#   push of a v* tag      per app: install, typecheck (tsc over be, then turbo over the fe workspaces), hfs lint (with the Sonar import file),
 #                         the unit project with coverage (per-file 100 on the logic of be/src/modules/**; it writes be/coverage/lcov.info), the Codecov
 #                         upload under the app's flag, the be build (tsc and tsc-alias) and the fe build (turbo, the packages first, then
 #                         every Next app), and the Sonar scan and quality gate where a server is configured
 #                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip). A second job, `images`, builds the
 #                         Docker image of every be and fe app of every example (the matrix is `check-examples-ci.mjs --images`) and never pushes
 #   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
-#                         `layers` input: integration, e2e, or both. They never run on push or pull_request (npm run check
+#                         `layers` input: integration, e2e, or both. They never run on a tag push (npm run check
 #                         refuses an integration or e2e step that is not gated on workflow_dispatch). A third manual job,
 #                         `browser`, runs each app's one Playwright journey against a stack it provisions itself.
 # The local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
+#
+# Codecov and Sonar upload only in the tag run (startsWith(github.ref, refs/tags/v)): a manual dispatch checks the app but publishes no measurement.
 #
 # Coverage upload: Codecov authenticates the job with GitHub's OIDC token (use_oidc, permissions id-token: write), so there is no
 # repository secret and no step that skips silently without one; a failed upload fails the job.
 
 on:
   push:
-    paths:
-      - 'examples/**'
-      - 'packages/**'
-      - 'modules/schemas/**'
-      - 'scripts/checks/**'
-      - 'codecov.yml'
-      - '.github/workflows/examples.yml'
-  pull_request:
-    paths:
-      - 'examples/**'
-      - 'packages/**'
-      - 'modules/schemas/**'
-      - 'scripts/checks/**'
-      - 'codecov.yml'
-      - '.github/workflows/examples.yml'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       layers:
@@ -51,7 +39,7 @@ permissions:
 
 concurrency:
   group: examples-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '22'
@@ -137,7 +125,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm test -- --ci
       - name: Coverage upload (Codecov, flag ${{ matrix.app }})
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
@@ -156,7 +144,7 @@ jobs:
           restore-keys: turbo-${{ matrix.app }}-
       - name: Front-end build
         run: npm run build:fe
-      # Manual only: the docker-stack layers run on workflow_dispatch, never on push or pull_request.
+      # Manual only: the docker-stack layers run on workflow_dispatch, never on the tag push.
       - name: Integration tests (test world, manual)
         if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'integration') }}
         run: npm run test:integration -- --ci
@@ -164,18 +152,18 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
         run: npm run test:e2e -- --ci
       - name: Sonar scan
-        if: ${{ !cancelled() && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-scan-action@v7
         with:
           projectBaseDir: ${{ env.APP_DIR }}
       - name: Sonar quality gate
-        if: ${{ !cancelled() && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 10
         with:
           scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
       - name: Sonar skipped (no server configured)
-        if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '') }}
         run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so ${{ matrix.app }} was not scanned; the local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item."
 
   # The one Playwright journey of each example app (owner ruling: manual only, like the docker-stack layers). It
