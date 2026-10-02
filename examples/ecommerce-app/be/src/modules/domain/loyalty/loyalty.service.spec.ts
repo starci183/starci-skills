@@ -7,6 +7,7 @@ import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { LoyaltyService } from "./loyalty.service"
 import { LoyaltyEntryEntity } from "./persistence/entities/loyalty-entry.entity"
+import { SUM_PERSON_POINTS } from "./persistence/loyalty.sql"
 
 const AT = "2026-02-03T04:05:06.000Z"
 
@@ -82,12 +83,12 @@ describe("LoyaltyService", () => {
     })
 
     describe("pointsOf", () => {
-        it("sums the points of every entry of the buyer", async () => {
-            const manager = mockEntityManager({ findBy: [LoyaltyEntryEntity, [entry(12), entry(5)]] })
+        it("answers the points the ledger sums for the buyer, and zero when it has no entry", async () => {
+            const manager = mockEntityManager({ query: [SUM_PERSON_POINTS, [{ points: 17 }]] })
             const { service } = await build(manager)
 
             expect(await service.pointsOf("p-1")).toBe(17)
-            expect(manager.findBy).toHaveBeenCalledWith(LoyaltyEntryEntity, { personId: "p-1" })
+            expect(manager.query).toHaveBeenCalledWith(SUM_PERSON_POINTS, ["p-1"])
         })
     })
 })

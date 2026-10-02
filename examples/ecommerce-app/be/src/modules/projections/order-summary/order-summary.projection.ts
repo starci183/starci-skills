@@ -2,7 +2,11 @@ import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { REPLAY_BATCH } from "./order-summary.contracts"
-import type { GetOrderSummariesOfPersonParams, GetOrderSummaryResult, OrderSummaryView } from "./order-summary.contracts"
+import type {
+    GetOrderSummariesOfPersonParams,
+    GetOrderSummaryResult,
+    OrderSummaryView,
+} from "./order-summary.contracts"
 import { OrderSummaryProjectionEntity } from "./order-summary.projection-entity"
 import { LOAD_ORDER_SUMMARY_FACTS } from "./persistence/order-summary.sql"
 import type { OrderSummaryFactsRow } from "./persistence/order-summary.rows"
@@ -78,7 +82,11 @@ export class OrderSummaryProjection {
     }
 
     /** Reads the facts of one order, or of the next `limit` orders after the cursor. */
-    private loadFacts(orderId: string | null, cursor: string | null, limit: number): Promise<ReadonlyArray<OrderSummaryFactsRow>> {
+    private loadFacts(
+        orderId: string | null,
+        cursor: string | null,
+        limit: number,
+    ): Promise<ReadonlyArray<OrderSummaryFactsRow>> {
         return this.entityManager.query(LOAD_ORDER_SUMMARY_FACTS, [orderId, cursor, limit])
     }
 

@@ -1,5 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
+import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
+import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `order.expired` (the contract `be/contracts/order/events.json`). */
 export interface OrderExpiredPayload {
@@ -31,11 +31,12 @@ export class OrderExpiredEvent extends BaseEvent {
     }
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    static parse(envelope: unknown): OrderExpiredEvent | null {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, personId, expiredAt } = envelope.payload
+    static parse(envelope: unknown): ParsedEvent<OrderExpiredEvent> {
+        const read = readEnvelope(envelope)
+        if (read === null) return null
+        const { orderId, personId, expiredAt } = read.payload
         return typeof orderId === "string" && typeof personId === "string" && typeof expiredAt === "string"
-            ? new OrderExpiredEvent(envelope.eventId, { orderId, personId, expiredAt })
+            ? new OrderExpiredEvent(read.eventId, { orderId, personId, expiredAt })
             : null
     }
 }

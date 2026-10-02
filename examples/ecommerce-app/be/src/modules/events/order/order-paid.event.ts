@@ -1,5 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
+import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
+import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `order.paid` (the contract `be/contracts/order/events.json`). */
 export interface OrderPaidPayload {
@@ -33,11 +33,15 @@ export class OrderPaidEvent extends BaseEvent {
     }
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    static parse(envelope: unknown): OrderPaidEvent | null {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, personId, totalMinorUnits, paidAt } = envelope.payload
-        return typeof orderId === "string" && typeof personId === "string" && typeof totalMinorUnits === "number" && typeof paidAt === "string"
-            ? new OrderPaidEvent(envelope.eventId, { orderId, personId, totalMinorUnits, paidAt })
+    static parse(envelope: unknown): ParsedEvent<OrderPaidEvent> {
+        const read = readEnvelope(envelope)
+        if (read === null) return null
+        const { orderId, personId, totalMinorUnits, paidAt } = read.payload
+        return typeof orderId === "string" &&
+            typeof personId === "string" &&
+            typeof totalMinorUnits === "number" &&
+            typeof paidAt === "string"
+            ? new OrderPaidEvent(read.eventId, { orderId, personId, totalMinorUnits, paidAt })
             : null
     }
 }

@@ -75,7 +75,10 @@ export function checkSchemaOwner(input) {
       const isMigration = heritage(statement).some(expression => kit.isImportOf(checker, expression, 'MigrationInterface', 'typeorm'));
       if (isEntity) {
         entities += 1;
-        if (persistence?.folder !== 'entities') report(file, statement.name, `Entity ${statement.name.text} is declared outside persistence/entities/ of a domain or platform capability; an entity lives with the capability that owns its table, in src/modules/{domain,platform}/<capability>/persistence/entities/<table>.entity.ts.`, { class: statement.name.text });
+        // The table of a projection belongs to the projection that alone writes it: `<name>.projection-entity.ts` of slot be.projections.
+        const ownProjectionTable = resolver.classifyPath(file.rel).slot === 'be.projections' && file.rel.endsWith('.projection-entity.ts');
+        if (ownProjectionTable) note({ root: path.posix.join(path.posix.dirname(file.rel), 'persistence'), capability: path.posix.basename(path.posix.dirname(file.rel)) }, 'entities');
+        else if (persistence?.folder !== 'entities') report(file, statement.name, `Entity ${statement.name.text} is declared outside persistence/entities/ of a domain or platform capability; an entity lives with the capability that owns its table, in src/modules/{domain,platform}/<capability>/persistence/entities/<table>.entity.ts.`, { class: statement.name.text });
         else note(persistence, 'entities');
       }
       if (!isMigration) continue;

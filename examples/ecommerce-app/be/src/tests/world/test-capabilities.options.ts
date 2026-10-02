@@ -56,7 +56,9 @@ export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 ]
 
 /** The realtime hub of one app instance: the push channel of the realtime kind. */
-export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => RealtimeModule.register({ isGlobal: true })]
+export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    () => RealtimeModule.register({ isGlobal: true }),
+]
 
 /** The order-summary projection over the order database. */
 export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => ({ module: OrderSummaryModule })]

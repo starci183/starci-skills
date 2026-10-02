@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http"
 import type { Request, Response } from "express"
 import type { OperationRequest } from "@modules/platform/http-security"
 
@@ -20,10 +19,18 @@ export interface GraphqlContextInput {
     readonly extra?: ConnectionExtra
 }
 
+/** What the app reads of the upgrade request of a subscription connection. */
+export interface ConnectionRequest {
+    /** The request headers. */
+    readonly headers: Readonly<{ [name: string]: string | ReadonlyArray<string> | undefined; authorization?: string }>
+    /** The socket the connection came in on. */
+    readonly socket: { readonly remoteAddress?: string }
+}
+
 /** What a subscription connection keeps for its operations: its upgrade request and the Authorization the client sent as a connection param. */
 export interface ConnectionExtra {
-    /** The HTTP upgrade request of the connection. */
-    readonly request: IncomingMessage
+    /** The HTTP upgrade request of the connection: its headers and the address it came from. */
+    readonly request: ConnectionRequest
     /** The `authorization` connection param, set when the connection is initialised. */
     authorization?: string
 }

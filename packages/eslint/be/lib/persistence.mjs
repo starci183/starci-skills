@@ -130,6 +130,8 @@ export const mayHoldEntityManager = (hfs, file) => {
     if (found.slot === "be.feature.application") return base.endsWith(".handler.ts")
     if (found.slot === "be.domain") return base.endsWith(".service.ts")
     if (found.slot === "be.projections") return base.endsWith(".projection.ts")
+    // the typed producer of a queue writes the outbox row in the transaction its caller hands it: `enqueueX(payload, tx)`
+    if (found.slot === "be.queues") return base.endsWith(".queue.ts")
     return typeof found.slot === "string" && found.slot.startsWith("be.platform") && PERSISTENCE_CAPABILITIES.includes(ownerNameOf(hfs, file))
 }
 

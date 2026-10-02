@@ -79,7 +79,12 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [
+    ...invoiceEntities,
+    ...paymentEntities,
+    ...inboxEntities,
+    ...eventBusEntities,
+]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -214,7 +219,10 @@ export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     httpSecurity: {
         ...httpSecurity,
         webhooks: {
-            sepay: { secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")), toleranceMs: WEBHOOK_TOLERANCE_MS },
+            sepay: {
+                secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
+                toleranceMs: WEBHOOK_TOLERANCE_MS,
+            },
         },
     },
     eventBus: eventBusOptionsOf(w, "billing"),

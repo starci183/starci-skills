@@ -1,5 +1,3 @@
 export { loyaltyEntities, loyaltyMigrations } from "./persistence/connection"
-export type { GrantLoyaltyParams } from "./loyalty.contracts"
-export { LOYALTY_SERVICE, InjectLoyaltyService } from "./loyalty.decorators"
 export { LoyaltyModule } from "./loyalty.module"
 export { LoyaltyService } from "./loyalty.service"

@@ -3,7 +3,6 @@ import type { ApolloDriverConfig } from "@nestjs/apollo"
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { GraphQLModule as NestGraphQLModule } from "@nestjs/graphql"
-import type { Context } from "graphql-ws"
 import { ERRORS_SERVICE } from "@modules/platform/errors"
 import type { ErrorsService } from "@modules/platform/errors"
 import { REQUEST_LOCALE } from "@modules/platform/i18n"
@@ -36,7 +35,10 @@ export class GraphqlModule extends ConfigurableModuleClass {
                         introspection: true,
                         subscriptions: {
                             "graphql-ws": {
-                                onConnect: (connection: Context): void => {
+                                onConnect: (connection: {
+                                    readonly connectionParams?: Readonly<Record<string, unknown>>
+                                    readonly extra: unknown
+                                }): void => {
                                     if (isConnectionExtra(connection.extra)) {
                                         rememberAuthorization(connection.connectionParams, connection.extra)
                                     }

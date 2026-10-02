@@ -91,7 +91,10 @@ export const orderBuilder = (manager: EntityManager) => ({
         const row = orderRow({ id: nextId(), personId: nextId(), ...overrides })
         await manager.insert(ORDERS, row)
         for (let index = 1; index <= lineCount; index += 1) {
-            await manager.insert(ORDER_LINES, orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }))
+            await manager.insert(
+                ORDER_LINES,
+                orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }),
+            )
         }
         return row
     },

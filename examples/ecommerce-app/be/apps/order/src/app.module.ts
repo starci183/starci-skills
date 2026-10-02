@@ -49,9 +49,8 @@ import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
-import { orderExpirySchedulerOf } from "@modules/queues/order-expiry"
 import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
-import { ExpireOrdersQueueModule } from "@features/jobs/expire-orders"
+import { ExpireOrdersQueueModule, expireOrdersSchedulerOf } from "@features/jobs/expire-orders"
 import { SendReceiptQueueModule } from "@features/jobs/send-receipt"
 import { OrderPaidLoyaltyMessageModule } from "@features/reactors/order-paid-loyalty"
 import { OrderPaymentStatusMessageModule } from "@features/reactors/order-payment-status"
@@ -151,7 +150,7 @@ export class AppModule {
                     isGlobal: true,
                     ...options.queue,
                     connections: [ORDER_ENTITY_MANAGER],
-                    schedulers: [orderExpirySchedulerOf(options.orderExpiry)],
+                    schedulers: [expireOrdersSchedulerOf(options.orderExpiry)],
                 }),
                 JobsModule.register({ isGlobal: true, ...options.jobs, connection: ORDER_ENTITY_MANAGER }),
                 OrderModule.register({ isGlobal: true }),

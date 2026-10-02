@@ -13,11 +13,7 @@ const build = async (claimed = true) => {
     inbox.claim.mockResolvedValue(claimed)
     const hub = mock<RealtimeHub>()
     const moduleRef = await Test.createTestingModule({
-        providers: [
-            OrderStatusService,
-            { provide: INBOX, useValue: inbox },
-            { provide: REALTIME_HUB, useValue: hub },
-        ],
+        providers: [OrderStatusService, { provide: INBOX, useValue: inbox }, { provide: REALTIME_HUB, useValue: hub }],
     }).compile()
     return { service: moduleRef.get(OrderStatusService), inbox, hub }
 }

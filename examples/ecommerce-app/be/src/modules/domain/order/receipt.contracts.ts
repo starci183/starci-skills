@@ -6,6 +6,9 @@ export interface PreparedReceipt {
     readonly content: Buffer
 }
 
+/** The receipt of a paid order, or null when the order does not exist or is not paid. */
+export type PrepareReceiptResult = PreparedReceipt | null
+
 /** What recording an archived receipt takes. */
 export interface RecordReceiptArchivedParams {
     /** The order whose receipt was stored. */

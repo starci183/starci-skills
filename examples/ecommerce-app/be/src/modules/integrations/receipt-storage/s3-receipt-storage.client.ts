@@ -6,6 +6,7 @@ import type { HttpClient } from "@modules/platform/http"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ReceiptStorageError, ReceiptStorageErrorCode } from "./errors/receipt-storage.error"
+import type { RunKey } from "@modules/platform/jobs"
 import type { ReceiptLink, StoreReceiptParams } from "./receipt-storage.contracts"
 import { InjectReceiptStorageOptions } from "./receipt-storage.decorators"
 import { ReceiptStorageLogEvent } from "./receipt-storage.log-events"
@@ -38,7 +39,7 @@ export class S3ReceiptStorageClient implements ReceiptStorage {
     ) {}
 
     /** Stores the receipt document under its key (a repeat replaces it with the same bytes), creating the bucket on the first write. */
-    async store(params: StoreReceiptParams): Promise<void> {
+    async store(params: StoreReceiptParams, runKey: RunKey): Promise<void> {
         let written = await this.put(this.objectUrl(params.key), params.content, params.key)
         if (written.status === HTTP_NOT_FOUND) {
             const created = await this.put(this.bucketUrl(), EMPTY, params.key)
@@ -47,7 +48,7 @@ export class S3ReceiptStorageClient implements ReceiptStorage {
             written = await this.put(this.objectUrl(params.key), params.content, params.key)
         }
         if (!succeeded(written.status)) throw this.failure(`http-${written.status}`, params.key)
-        this.logger.info(ReceiptStorageLogEvent.Stored, { key: params.key, runKey: params.runKey })
+        this.logger.info(ReceiptStorageLogEvent.Stored, { key: params.key, runKey })
     }
 
     /** A presigned GET of the receipt, valid for the configured lifetime from now. */

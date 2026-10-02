@@ -94,7 +94,12 @@ export class AppModule {
                         {
                             ...options.database,
                             entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities, ...eventBusEntities],
-                            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations, ...eventBusMigrations],
+                            migrations: [
+                                ...invoiceMigrations,
+                                ...paymentMigrations,
+                                ...inboxMigrations,
+                                ...eventBusMigrations,
+                            ],
                         },
                     ],
                 }),

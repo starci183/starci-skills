@@ -50,7 +50,12 @@ export class WebhookSignatureService {
         }
         const signedAt = Number(delivery.timestamp)
         const { rawBody, signature } = delivery
-        if (rawBody === undefined || signature === undefined || delivery.timestamp === undefined || !Number.isFinite(signedAt)) {
+        if (
+            rawBody === undefined ||
+            signature === undefined ||
+            delivery.timestamp === undefined ||
+            !Number.isFinite(signedAt)
+        ) {
             throw new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
         }
         const expected = createHmac("sha256", provider.secret.reveal())

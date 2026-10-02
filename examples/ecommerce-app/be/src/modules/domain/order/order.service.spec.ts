@@ -1,4 +1,4 @@
-import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CART_SERVICE } from "@modules/domain/cart"
 import type { CartService } from "@modules/domain/cart"
@@ -9,7 +9,6 @@ import { SAGA_SERVICE } from "@modules/platform/saga"
 import type { SagaService } from "@modules/platform/saga"
 import { OrderPlacedEvent } from "@modules/events/order"
 import { EVENT_BUS } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
 import { Test } from "@nestjs/testing"
 import { orderLineRow, orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
@@ -26,7 +25,7 @@ const mug = productView({ id: "sku-2", name: "Mug", priceMinorUnits: 250, stock:
 const build = async (entityManager: MockEntityManager) => {
     const cart = mock<CartService>()
     const catalog = mock<CatalogService>()
-    const bus = mock<EventBus>()
+    const bus = recordingEventBus()
     const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
@@ -89,7 +88,7 @@ describe("OrderService", () => {
             expect(em.findOneBy).toHaveBeenCalledWith(OrderEntity, { personId: "p-1", idempotencyKey: "key-1" })
             expect(cart.list).not.toHaveBeenCalled()
             expect(em.transaction).not.toHaveBeenCalled()
-            expect(bus.publish).not.toHaveBeenCalled()
+            expect(bus.writes).toEqual([])
         })
 
         it("places the order with every write inside one committed transaction", async () => {
@@ -135,10 +134,10 @@ describe("OrderService", () => {
                 saga: PLACE_ORDER_SAGA,
                 correlationId: "o-7",
             })
-            expect(bus.publish).toHaveBeenCalledWith(
+            expect(bus.writes).toEqual([
                 OrderPlacedEvent.create({ orderId: "o-7", personId: "p-1", totalMinorUnits: 1250 }),
-                expect.anything(),
-            )
+            ])
+            expect(bus.allInTransaction).toBe(true)
         })
 
         it("rolls the whole placement back when the announcement cannot be written, so no order exists that billing never hears of", async () => {
@@ -150,7 +149,7 @@ describe("OrderService", () => {
             catalog.byIds.mockResolvedValue({ "sku-2": mug })
             catalog.reserveStock.mockResolvedValue(true)
             const failure = new Error("outbox down")
-            bus.publish.mockRejectedValueOnce(failure)
+            bus.failNext("publish", failure)
 
             await expect(orders.placeOrder({ personId: "p-1" })).rejects.toBe(failure)
 

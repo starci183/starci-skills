@@ -956,9 +956,9 @@ slots:
   - id: be.persistence
     profiles: [be]
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
-    # R158: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # R158: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the inbox of every service, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
-    perConnection: [event-bus, jobs]
+    perConnection: [event-bus, inbox, jobs]
     presence: optional
     tracked: tracked
     tier: inherit

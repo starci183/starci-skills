@@ -8,6 +8,9 @@ import type { Inbox } from "@modules/platform/inbox"
 import { MINOR_UNITS_PER_POINT } from "./loyalty.contracts"
 import type { GrantLoyaltyParams } from "./loyalty.contracts"
 import { LoyaltyEntryEntity } from "./persistence/entities/loyalty-entry.entity"
+import { SUM_PERSON_POINTS } from "./persistence/loyalty.sql"
+import { toPoints } from "./persistence/loyalty.rows"
+import type { PointsRow } from "./persistence/loyalty.rows"
 
 /** The inbox source of the paid-order events this service consumes. */
 const ORDER_SOURCE = "order-paid-loyalty"
@@ -48,7 +51,7 @@ export class LoyaltyService {
 
     /** The points a buyer has earned in total. */
     async pointsOf(personId: string): Promise<number> {
-        const rows = await this.entityManager.findBy(LoyaltyEntryEntity, { personId })
-        return rows.reduce((total, row) => total + row.points, 0)
+        const rows: Array<PointsRow> = await this.entityManager.query(SUM_PERSON_POINTS, [personId])
+        return toPoints(rows)
     }
 }

@@ -1,5 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
+import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
+import type { ParsedEvent } from "@modules/platform/event-bus"
 
 /** The payload of `billing.payment-failed` (the contract `be/contracts/billing/events.json`). */
 export interface PaymentFailedPayload {
@@ -33,11 +33,15 @@ export class PaymentFailedEvent extends BaseEvent {
     }
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
-    static parse(envelope: unknown): PaymentFailedEvent | null {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, reason, expectedMinorUnits, receivedMinorUnits } = envelope.payload
-        return typeof orderId === "string" && typeof reason === "string" && typeof expectedMinorUnits === "number" && typeof receivedMinorUnits === "number"
-            ? new PaymentFailedEvent(envelope.eventId, { orderId, reason, expectedMinorUnits, receivedMinorUnits })
+    static parse(envelope: unknown): ParsedEvent<PaymentFailedEvent> {
+        const read = readEnvelope(envelope)
+        if (read === null) return null
+        const { orderId, reason, expectedMinorUnits, receivedMinorUnits } = read.payload
+        return typeof orderId === "string" &&
+            typeof reason === "string" &&
+            typeof expectedMinorUnits === "number" &&
+            typeof receivedMinorUnits === "number"
+            ? new PaymentFailedEvent(read.eventId, { orderId, reason, expectedMinorUnits, receivedMinorUnits })
             : null
     }
 }

@@ -24,7 +24,7 @@ export class StoreReceiptStep implements JobStep {
         await this.claims.advance({ jobId: job.jobId, expectedFencingToken: job.fencingToken, step: "store" })
         const prepared = await this.receipts.prepareReceipt(job.payload.orderId)
         if (prepared === null) return
-        await this.storage.store({ key: prepared.key, content: prepared.content, runKey: this.claims.runKey(job, "store") })
+        await this.storage.store({ key: prepared.key, content: prepared.content }, this.claims.runKey(job, "store"))
         await this.receipts.recordArchived({ orderId: job.payload.orderId, key: prepared.key })
     }
 }
