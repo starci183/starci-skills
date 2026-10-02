@@ -8,19 +8,19 @@ import fs from 'node:fs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { found, readJson } from './read.mjs';
 
-export const PEER_INTEGRATION_MISSING = 'HFS_PEER_INTEGRATION_MISSING';
+const PEER_INTEGRATION_MISSING = 'HFS_PEER_INTEGRATION_MISSING';
 const MANIFEST = 'package.json';
 const CATALOG_FILE = new URL('../../../knowledge/hfs/peer-integrations.yaml', import.meta.url);
 
 /** The pairs of the catalog: [{ id, when: [{ package, major? }], requires, why }]. */
-export function peerIntegrationPairs() {
+function peerIntegrationPairs() {
   const catalog = parseYaml(fs.readFileSync(CATALOG_FILE, 'utf8'));
   if (catalog?.schema !== 'starci/hfs-peer-integrations@1' || !Array.isArray(catalog.pairs)) throw new Error('knowledge/hfs/peer-integrations.yaml is not a starci/hfs-peer-integrations@1 catalog');
   return catalog.pairs;
 }
 
 /** The major a dependency spec allows (`11.2.5`, `^11.0.0`, `~11.1`, `>=11 <12`), or null when the spec names none (a tag, a link, `*`). */
-export function majorOf(spec) {
+function majorOf(spec) {
   const match = /^\s*(?:[\^~]|>=?|=)?\s*v?(\d+)(?:\.|\s|$)/.exec(String(spec));
   return match ? Number(match[1]) : null;
 }

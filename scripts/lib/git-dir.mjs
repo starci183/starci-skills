@@ -33,6 +33,39 @@ export function checkoutOf(start) {
   }
 }
 
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * The commit the HEAD of the checkout at `root` names, read from .git with no spawn; null when it cannot be told that
+ * way (not a top level, reftable, an unreadable ref) and the read then runs live. `headsOnly` accepts only
+ * refs/heads/* symbolic refs; a loose ref reads from the common dir, as git does for a linked worktree — plus the git
+ * dir itself first unless `commonOnly`.
+ */
+export function headShaOf(root, { headsOnly = false, commonOnly = false } = {}) {
+  try {
+    let gitDir = path.join(root, '.git');
+    if (fs.statSync(gitDir).isFile()) {
+      const pointer = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
+      if (!pointer) return null;
+      gitDir = path.resolve(root, pointer.trim());
+    }
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    if (FULL_SHA.test(head)) return head;
+    const ref = headsOnly ? /^ref:\s*(refs\/heads\/\S+)$/.exec(head)?.[1] : /^ref:\s*(.+)$/.exec(head)?.[1]?.trim();
+    if (!ref) return null;
+    let common = gitDir;
+    try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }
+    for (const dir of commonOnly ? [common] : [gitDir, common]) {
+      try { const loose = fs.readFileSync(path.join(dir, ref), 'utf8').trim(); if (FULL_SHA.test(loose)) return loose; } catch { /* packed */ }
+    }
+    for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
+      const [sha, name] = line.trim().split(' ');
+      if (name === ref && FULL_SHA.test(sha)) return sha;
+    }
+  } catch { /* no git metadata */ }
+  return null;
+}
+
 /** Command-line words, double quotes grouping (Windows command lines quote paths with spaces). */
 const words = (line) => [...String(line ?? '').matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 

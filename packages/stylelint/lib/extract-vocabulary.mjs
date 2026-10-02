@@ -36,7 +36,7 @@ export const GRAMMAR_CSS = [
 export const STATUS_TONES = ["success", "warning", "danger", "info"]
 
 /** The soft-pair tokens of one tone. */
-export const softPairOf = (tone) => [`--${tone}-soft`, `--${tone}-soft-foreground`, `--${tone}-soft-hover`]
+const softPairOf = (tone) => [`--${tone}-soft`, `--${tone}-soft-foreground`, `--${tone}-soft-hover`]
 
 const inFamily = (name) => FAMILY_PREFIXES.some((prefix) => name.startsWith(prefix))
 

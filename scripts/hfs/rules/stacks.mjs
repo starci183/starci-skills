@@ -10,9 +10,9 @@ import { braceVariants, globExpression } from '../../lib/glob.mjs';
 import { declaredStack, findStackDeclaration, STACK_ROOT, text } from '../../lib/stack-declaration.mjs';
 import { found } from './read.mjs';
 
-export const STACKS_SHAPE = 'HFS_STACKS_SHAPE';
-export const STACKS_SLOT = 'app.starcistacks';
-export const HOST_SONAR_ROOT = '.claude/ext/sonar';
+const STACKS_SHAPE = 'HFS_STACKS_SHAPE';
+const STACKS_SLOT = 'app.starcistacks';
+const HOST_SONAR_ROOT = '.claude/ext/sonar';
 const SEALED = /\.enc$/;
 const INSIDE_SECRETS = /^[^/]+\/secrets\/[^/]+\.enc$/;
 const RETIRED_ROOT = /^\.?stacks(?:\/|$)/;

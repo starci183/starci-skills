@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
 
-export const REPORT_FILE = /^report(?:\.[A-Za-z0-9._-]+)?\.json$/;
+const REPORT_FILE = /^report(?:\.[A-Za-z0-9._-]+)?\.json$/;
 const MAX_ENTRIES = 4000;
 const SLACK_MS = 5_000;
 

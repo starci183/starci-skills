@@ -85,6 +85,21 @@ const offenceIn = (line) => {
   return null
 }
 
+/**
+ * Whether an exported declaration has a surface a caller documents: a data constant is already described by its name,
+ * and a kind outside DOCUMENTED_KINDS has no surface at all.
+ */
+const hasDocumentedSurface = (declaration) => {
+  if (declaration.type === "VariableDeclaration") {
+    // only a const bound to a function has a surface; a data constant is already described
+    const first = declaration.declarations[0]
+    const init = first && first.init
+    return Boolean(init)
+      && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
+  }
+  return DOCUMENTED_KINDS.has(declaration.type)
+}
+
 /** Whether a JSDoc block sits immediately before a node. */
 const hasJsdocBefore = (sourceCode, node) =>
   sourceCode
@@ -117,16 +132,7 @@ export const requireExportJsdoc = {
       const declaration = node.declaration
       // a re-export has nothing here to attach a doc to
       if (!declaration) return
-      if (declaration.type === "VariableDeclaration") {
-        // only a const bound to a function has a surface; a data constant is already described
-        const first = declaration.declarations[0]
-        const init = first && first.init
-        const isFunction = init
-          && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
-        if (!isFunction) return
-      } else if (!DOCUMENTED_KINDS.has(declaration.type)) {
-        return
-      }
+      if (!hasDocumentedSurface(declaration)) return
       if (hasJsdocBefore(sourceCode, node)) return
       context.report({
         node: declaration.id || declaration,
@@ -369,16 +375,7 @@ export const noRestatedNameJsdoc = {
       const declaration = node.declaration
       // a re-export has nothing here to attach a doc to
       if (!declaration) return
-      if (declaration.type === "VariableDeclaration") {
-        // only a const bound to a function has a surface; a data constant is already described
-        const first = declaration.declarations[0]
-        const init = first && first.init
-        const isFunction = init
-          && (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
-        if (!isFunction) return
-      } else if (!DOCUMENTED_KINDS.has(declaration.type)) {
-        return
-      }
+      if (!hasDocumentedSurface(declaration)) return
       const doc = jsdocBefore(sourceCode, node)
       if (!doc) return
       const name = nameOf(declaration)

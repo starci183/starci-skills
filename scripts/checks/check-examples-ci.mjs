@@ -30,14 +30,15 @@ import { coverageScope, renderTargets } from '../../packages/hfs/sync/index.mjs'
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW = '.github/workflows/examples.yml';
 export const CODECOV = 'codecov.yml';
 /** The step that prints the matrix, and the expression every matrix job reads it through. */
-export const MATRIX_COMMAND = 'node scripts/checks/check-examples-ci.mjs --matrix';
-export const MATRIX_JOB = 'apps';
-export const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
+const MATRIX_COMMAND = 'node scripts/checks/check-examples-ci.mjs --matrix';
+const MATRIX_JOB = 'apps';
+const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
 
 /** The example apps: every examples/<name>/hfs.json of kind app, sorted by name. */
 export function exampleApps(root = ROOT) {
@@ -92,8 +93,8 @@ export function exampleImages(root = ROOT) {
     return deployableSides.flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
   });
 }
-export const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
-export const IMAGES_JOB = 'images';
+const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
+const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
 export function renderCodecov(root = ROOT) {
@@ -129,7 +130,7 @@ ${flags.join('\n')}
 `;
 }
 
-const read = (root, rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return null; } };
+const read = readTextFile;
 
 /** Every finding of the examples CI contract at `root`: [{code, path, message}]. */
 export function checkExamplesCi(root = ROOT) {

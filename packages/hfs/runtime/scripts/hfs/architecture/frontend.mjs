@@ -3,7 +3,9 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { readJsonFile as readJson } from '../../lib/json.mjs';
 import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
-import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
+import { exportTargetStrings, isUnshadowedCommonJsRequire, reachableViolation, relativePath, unwrapExpression } from './typescript.mjs';
+import { normalizedSymbolValue, returnedExpressions as sharedReturnedExpressions } from './ast-walks.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);
 const COMPONENT_TIERS = new Set(['blocks', 'composites', 'branches', 'leaves']);
@@ -52,23 +54,16 @@ function violation(config, sourceFile, node, ruleId, message, extra = {}) {
   };
 }
 
-function exportTargets(value) {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(exportTargets);
-  if (value && typeof value === 'object' && !Array.isArray(value)) return Object.values(value).flatMap(exportTargets);
-  return [];
-}
-
 function grammarExport(manifest, packageName, specifier) {
   const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
   const value = manifest?.exports?.[key];
-  const targets = exportTargets(value);
+  const targets = exportTargetStrings(value);
   return targets.length > 0 && targets.every(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'));
 }
 
 function grammarExportTargets(manifest, packageRoot, packageName, specifier) {
   const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
-  return exportTargets(manifest?.exports?.[key]).filter(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'))
+  return exportTargetStrings(manifest?.exports?.[key]).filter(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'))
     .map(target => canonical(path.resolve(packageRoot, target)));
 }
 
@@ -391,7 +386,7 @@ function checkCustomHookLocations(config, context, sourceFile, roots) {
   const violations = [];
   const seen = new Set();
   const report = (symbol, node) => {
-    const identity = unaliasSymbol(ts, checker, symbol) ?? symbol;
+    const identity = normalizedSymbolValue(ts, checker, symbol) ?? symbol;
     if (!identity || seen.has(identity) || checker.getTypeOfSymbolAtLocation(identity, node).getCallSignatures().length === 0) return;
     seen.add(identity);
     violations.push(violation(config, sourceFile, node, 'FE_CUSTOM_HOOK_LOCATION',
@@ -411,7 +406,7 @@ function checkCustomHookLocations(config, context, sourceFile, roots) {
   const module = checker.getSymbolAtLocation(sourceFile);
   for (const exposed of module ? checker.getExportsOfModule(module) : []) {
     if (!/^use[A-Z0-9]/.test(exposed.name)) continue;
-    const identity = unaliasSymbol(ts, checker, exposed);
+    const identity = normalizedSymbolValue(ts, checker, exposed);
     for (const declaration of identity?.getDeclarations?.() ?? []) if (declaration.getSourceFile() === sourceFile) {
       const node = declarationName(ts, declaration) ?? declaration;
       report(identity, node);
@@ -473,17 +468,6 @@ function checkPureAndData(config, context, sourceFile, roots) {
   return violations;
 }
 
-function unaliasSymbol(ts, checker, value) {
-  let symbol = value ?? null;
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol);
-    const target = checker.getAliasedSymbol(symbol);
-    if (!target || target === symbol) break;
-    symbol = target;
-  }
-  return symbol;
-}
 
 function selectedSymbol(ts, checker, expression) {
   const selected = unwrapExpression(ts, expression);
@@ -498,19 +482,9 @@ function selectedSymbol(ts, checker, expression) {
   return null;
 }
 
-function returnedExpressions(ts, declaration) {
-  if ((ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) && !ts.isBlock(declaration.body)) return [declaration.body];
-  const body = ts.isFunctionLike(declaration) ? declaration.body : null;
-  if (!body || !ts.isBlock(body)) return [];
-  const returned = [];
-  const visit = node => {
-    if (node !== body && ts.isFunctionLike(node)) return;
-    if (ts.isReturnStatement(node) && node.expression) returned.push(node.expression);
-    else ts.forEachChild(node, visit);
-  };
-  visit(body);
-  return returned;
-}
+/* The wider boundary set: `ts.isFunctionLike` (includes call signatures' declarations) rather than the
+ * four default callable kinds. */
+const returnedExpressions = (ts, declaration) => sharedReturnedExpressions(ts, declaration, { functionLike: ts.isFunctionLike });
 
 function knownWorldImport(specifier, imported) {
   if (specifier === 'next-intl') return WORLD_INTL_CALLS.has(imported);
@@ -611,7 +585,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
   };
 
   const intrinsicUiHookSymbol = (symbol, checker) => {
-    const identity = unaliasSymbol(ts, checker, symbol);
+    const identity = normalizedSymbolValue(ts, checker, symbol);
     const declarations = identity?.getDeclarations?.() ?? [];
     return declarations.length > 0 && declarations.every(declaration => intrinsicUiHookFile(declaration.getSourceFile().fileName));
   };
@@ -668,7 +642,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
         : ts.isPropertyAccessExpression(selected) ? selected.name.text : null;
       if (['forwardRef', 'memo'].includes(name) && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker, seen);
     }
-    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, expression));
+    const symbol = normalizedSymbolValue(ts, checker, selectedSymbol(ts, checker, expression));
     if (!symbol || seen.has(symbol)) return [];
     const nextSeen = new Set(seen).add(symbol);
     const functions = [];
@@ -692,7 +666,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
     for (const [namespace, declaration] of info.namespaces) if (namespace === raw) {
       return declaration.worldEdge || knownWorldImport(declaration.specifier, propertyName ?? '');
     }
-    const identity = unaliasSymbol(ts, info.checker, raw);
+    const identity = normalizedSymbolValue(ts, info.checker, raw);
     return (identity?.getDeclarations?.() ?? []).some(declaration => {
       const fileName = declaration.getSourceFile().fileName;
       return insideAny(roots.hooks, fileName) || insideAny(roots.transport, fileName);
@@ -716,7 +690,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
       if (namespaceIsWorld(namespace, sourceFile, property)) return true;
       if (symbolIsWorld(selectedSymbol(ts, checker, expression), sourceFile)) return true;
     }
-    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, expression));
+    const symbol = normalizedSymbolValue(ts, checker, selectedSymbol(ts, checker, expression));
     if (!symbol || seen.has(symbol)) return false;
     const nextSeen = new Set(seen).add(symbol);
     const declarations = symbol.getDeclarations?.() ?? [];
@@ -763,7 +737,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
       if (name === 'map' && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker)
         .some(fn => functionHasRender(fn, checker, seen));
     }
-    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, ts.isCallExpression(expression) ? expression.expression : expression));
+    const symbol = normalizedSymbolValue(ts, checker, selectedSymbol(ts, checker, ts.isCallExpression(expression) ? expression.expression : expression));
     if (!symbol || seen.has(symbol)) return false;
     const nextSeen = new Set(seen).add(symbol);
     if (ts.isIdentifier(expression)) for (const declaration of symbol.getDeclarations?.() ?? []) {
@@ -839,7 +813,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
     if (ts.isArrayLiteralExpression(expression)) return expression.elements.length > 0
       && expression.elements.every(item => renderBoundary(item, checker, seen, allowEmpty, expectedFile));
     if (ts.isIdentifier(expression)) {
-      const symbol = unaliasSymbol(ts, checker, checker.getSymbolAtLocation(expression));
+      const symbol = normalizedSymbolValue(ts, checker, checker.getSymbolAtLocation(expression));
       if (!symbol || seen.has(symbol)) return false;
       const nextSeen = new Set(seen).add(symbol);
       const values = (symbol.getDeclarations?.() ?? []).flatMap(declaration => ts.isVariableDeclaration(declaration) && declaration.initializer

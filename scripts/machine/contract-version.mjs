@@ -42,46 +42,24 @@ import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-chan
 import {sha256} from '../../engine/digest.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
+import { asList } from '../lib/list.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { headShaOf } from '../lib/git-dir.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
-export const CHANGE_REACH = ['new-legs', 'follow-up'];
-export const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
-export const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
+const CHANGE_REACH = ['new-legs', 'follow-up'];
+const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
+const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
 export const CONTRACT_RELEASE_EVENT = 'contract-release';
 const ABSENT = 'absent';
 const ALWAYS_CITED = ['modules/ops/_common.yaml', 'modules/kernel/verdict-contract.yaml'];
 const CITE_RX = /(?:modules\/schemas|scripts\/(?:checks|gates|hfs|work))\/[A-Za-z0-9._/-]+\.(?:ya?ml|mjs|json)/g;
 const ID_RX = /^[a-z0-9][a-z0-9.-]{1,79}$/;
 
-const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
-const strings = (value) => list(value).filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
+const strings = (value) => asList(value).filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
 
 /** The commit the runtime root's HEAD names, read from .git without spawning git; null when unreadable. */
-export function runtimeShaOf(root) {
-  const isSha = (text) => /^[0-9a-f]{40}$/.test(text);
-  try {
-    let gitDir = path.join(root, '.git');
-    if (fs.statSync(gitDir).isFile()) {
-      const pointer = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
-      if (!pointer) return null;
-      gitDir = path.resolve(root, pointer.trim());
-    }
-    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
-    if (isSha(head)) return head;
-    const ref = /^ref:\s*(.+)$/.exec(head)?.[1]?.trim();
-    if (!ref) return null;
-    let common = gitDir;
-    try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }
-    for (const dir of [gitDir, common]) {
-      try { const value = fs.readFileSync(path.join(dir, ref), 'utf8').trim(); if (isSha(value)) return value; } catch { /* packed */ }
-    }
-    for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
-      const [sha, name] = line.trim().split(' ');
-      if (name === ref && isSha(sha)) return sha;
-    }
-  } catch { /* no git metadata */ }
-  return null;
-}
+export const runtimeShaOf = (root) => headShaOf(root);
 
 /** The runtime files an op's contract consists of: its brief, the shared documents, and what the brief cites. */
 export function contractFilesOf(root, op) {
@@ -157,7 +135,7 @@ const knownOpsOf = (root) => {
  * entry under modules/kernel/contract-changes/ (scripts/machine/contract-changes-store.mjs). A missing registry registers none. `file` (or
  * STARCI_CONTRACT_CHANGES, the spec seam) reads one fixture document `{schema, changes: [...]}` instead.
  */
-export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_CHANGES ? path.resolve(process.env.STARCI_CONTRACT_CHANGES) : null, freezeFile = defaultFreezeFile(root) } = {}) {
+export function loadContractChanges(root, { file = readEnv('STARCI_CONTRACT_CHANGES') ? path.resolve(readEnv('STARCI_CONTRACT_CHANGES')) : null, freezeFile = defaultFreezeFile(root) } = {}) {
   let doc = null;
   const problems = [];
   if (file) {
@@ -173,7 +151,7 @@ export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_C
   }
   const knownOps = knownOpsOf(root);
   const changes = [];
-  list(doc?.changes).forEach((raw, index) => {
+  asList(doc?.changes).forEach((raw, index) => {
     const change = normalizeChange(raw, index, problems, knownOps);
     if (!change) return;
     if (changes.some((other) => other.id === change.id)) { problems.push(`${change.id}: duplicate id`); return; }
@@ -205,21 +183,21 @@ export function loadContractFreeze(root, { file = defaultFreezeFile(root), known
   const problems = [];
   if (doc?.schema !== CONTRACT_FREEZE_SCHEMA) problems.push(`contract-freeze schema must be ${CONTRACT_FREEZE_SCHEMA}`);
   const families = [];
-  list(doc?.families).forEach((raw, index) => {
+  asList(doc?.families).forEach((raw, index) => {
     const family = typeof raw?.family === 'string' ? raw.family.trim() : '';
     if (!knownOps.has(family)) { problems.push(`contract-freeze families[${index}].family ${family || '(missing)'} is not an op`); return; }
     const since = Date.parse(String(raw.since ?? ''));
     if (!Number.isFinite(since)) { problems.push(`contract-freeze ${family}: since must be an ISO date-time`); return; }
     const batch = raw.batch == null ? family : String(raw.batch).trim();
     if (!ID_RX.test(batch)) { problems.push(`contract-freeze ${family}: batch must be a lowercase slug`); return; }
-    const gates = list(raw.gates).filter((g) => g && typeof g.module === 'string' && typeof g.export === 'string')
+    const gates = asList(raw.gates).filter((g) => g && typeof g.module === 'string' && typeof g.export === 'string')
       .map((g) => ({ module: normWork(g.module.trim()), export: g.export.trim() }));
     families.push({ family, since, batch, gatePaths: strings(raw.gatePaths).map(normWork), gates });
   });
   return { families, problems };
 }
-const defaultFreezeFile = (root) => (process.env.STARCI_CONTRACT_FREEZE ? path.resolve(process.env.STARCI_CONTRACT_FREEZE)
-  : process.env.STARCI_CONTRACT_CHANGES ? null : path.join(root, CONTRACT_FREEZE_FILE));
+const defaultFreezeFile = (root) => (readEnv('STARCI_CONTRACT_FREEZE') ? path.resolve(readEnv('STARCI_CONTRACT_FREEZE'))
+  : readEnv('STARCI_CONTRACT_CHANGES') ? null : path.join(root, CONTRACT_FREEZE_FILE));
 
 /** The contracts row of a job's newest attempt, or null. */
 export const latestContractOf = (db, jobId) => db.prepare('SELECT c.*, a.dispatch_id FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
@@ -297,7 +275,7 @@ export function laterChangesFor(registry, { admittedAt, op, withheld = [] }) {
  * code a later change added. Any caller-supplied `advisory` is dropped first - only the api decides.
  */
 export function classifyChecks(checks, later) {
-  return list(checks).map((check) => {
+  return asList(checks).map((check) => {
     if (!check || typeof check !== 'object') return check;
     const { advisory: _ignored, ...clean } = check;
     if (clean.exitCode === 0 || !later.length) return clean;

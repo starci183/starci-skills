@@ -26,12 +26,13 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
+import { openEventItems } from '../lib/event-items.mjs';
 import { isDir, isFile } from './work-io.mjs';
 
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
 export const PROPOSAL_FILE_NAMES = Object.freeze(['grammar-proposal.yaml', 'grammar-proposal.yml', 'grammar-proposal.md']);
-export const PROPOSAL_FIELDS = Object.freeze(['gap', 'anatomy', 'tokens', 'claims', 'render']);
+const PROPOSAL_FIELDS = Object.freeze(['gap', 'anatomy', 'tokens', 'claims', 'render']);
 /** A proposal is never accepted by the runtime: it stays proposed until the owner, through a grammar lane, decides. */
 export const PROPOSED = 'proposed';
 
@@ -47,7 +48,7 @@ const MD_FIELDS = {
 };
 
 /** The names a markdown heading declares for its proposal. */
-export function headingNames(raw) {
+function headingNames(raw) {
   const names = new Set();
   for (const q of String(raw).matchAll(/data-grammar-proposal=["']([^"']+)["']/g)) names.add(q[1].trim());
   const heading = String(raw).replace(/[`*]/g, '').trim().replace(/^\d+[.)]\s*/, '');
@@ -125,7 +126,7 @@ export function proposalFilesUnder(dir, depth = 6) {
 }
 
 /** The proposal files among `files` (files or directories). */
-export function proposalFilesIn(files) {
+function proposalFilesIn(files) {
   const out = new Map();
   for (const f of files ?? []) for (const p of proposalFilesUnder(f)) out.set(path.resolve(p).toLowerCase(), path.resolve(p));
   return [...out.values()];
@@ -163,19 +164,10 @@ export function recordGrammarProposals(ledger, { job, repo, files, now = Date.no
 
 /** The workflow's open grammar proposals (filed, not resolved): [{name, file, jobId, opId, filedAt, status, complete}]. */
 export function openGrammarProposals(db, workflowId) {
-  let rows = [];
-  try {
-    rows = db.prepare('SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId, GRAMMAR_PROPOSAL_FILED, GRAMMAR_PROPOSAL_RESOLVED);
-  } catch { return []; }
-  const open = new Map();
-  for (const row of rows) {
-    let p = {};
-    try { p = JSON.parse(row.payload_json ?? '{}') ?? {}; } catch { p = {}; }
-    if (!p.name) continue;
-    if (row.kind === GRAMMAR_PROPOSAL_RESOLVED) { open.delete(p.name); continue; }
-    open.set(p.name, { name: p.name, file: p.file ?? null, jobId: p.jobId ?? null, opId: p.opId ?? null, filedAt: row.created_at, status: PROPOSED, complete: p.complete !== false });
-  }
-  return [...open.values()];
+  return openEventItems(db, workflowId, {
+    owedKind: GRAMMAR_PROPOSAL_FILED, resolvedKind: GRAMMAR_PROPOSAL_RESOLVED, keyOf: (p) => p.name,
+    item: (p, row) => ({ name: p.name, file: p.file ?? null, jobId: p.jobId ?? null, opId: p.opId ?? null, filedAt: row.created_at, status: PROPOSED, complete: p.complete !== false }),
+  });
 }
 
 function main(argv) {

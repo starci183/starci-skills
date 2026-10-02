@@ -90,7 +90,7 @@ const detemplate = (token) => token.replace(/^\.claude\//, '');
 
 const yamlFilesUnder = (dir) => walkFiles(dir, {sorted: true, filter: name => /\.(?:yaml|yml|md)$/.test(name)});
 
-export function collectScanFiles(root, scan = DEFAULT_SCAN) {
+function collectScanFiles(root, scan = DEFAULT_SCAN) {
   const files = [];
   for (const rel of scan) {
     const full = path.join(root, rel);
@@ -195,7 +195,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
 
 export const CITED_PATH_MISSING = 'RT_CITED_PATH_MISSING';
 /** The runtime's live prose (rule R122): the runtime contracts and the human and agent docs of this tree. */
-export const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
+const RUNTIME_CITE_ROOTS = Object.freeze(['modules/kernel', 'modules/goal', 'modules/ops', 'modules/supervisor', 'modules/reconciler', 'modules/host', 'modules/models', 'skills', 'init', 'CONTEXT.md', 'README.md', 'CONTRIBUTING.md', 'ui/README.md', 'ui/CONTRACT.md']);
 
 /** The scan of rule R122 under `root`: RUNTIME_CITE_ROOTS that exist plus every docs/*.md (docs/examples/ describes product apps). */
 export function runtimeCiteScan(root = DEFAULT_ROOT) {

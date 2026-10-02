@@ -27,17 +27,18 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { reduceJest } from './test-world-run.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
 import { unitRolesOf } from '../hfs/manifest-shape.mjs';
+import { opGateRules } from '../lib/op-gate.mjs';
 
 export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
-export const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
+const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVICE_ROOT = 'be/src';
 const USAGE = 'usage: unit-run.mjs --root <app> [--out <file>]';
 
 /** op-gate.yaml unitKit: {required[], forbidden[]}. */
 export function unitKitRules(runtime = runtimeRoot) {
-  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
-  return { required: doc?.unitKit?.required ?? [], forbidden: doc?.unitKit?.forbidden ?? [] };
+  const rules = opGateRules(runtime, 'unitKit');
+  return { required: rules.required, forbidden: rules.forbidden };
 }
 
 /** The folder a role's coverage glob roots at, app-relative (`src/**\/*.service.ts` -> be/src/, `src/features/cli/**\/*.cli.ts` -> be/src/features/cli/). */
@@ -58,7 +59,7 @@ export function servicesOf(root, roles = unitRolesOf(loadSlotManifest())) {
 }
 
 /** The kit judgment of one service spec: the forbidden needles it uses, the required ones it lacks, a `new Subject(`. */
-export function judgeServiceSpec(text, serviceText, rules) {
+function judgeServiceSpec(text, serviceText, rules) {
   const code = String(text).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
   const subject = /export\s+class\s+([A-Za-z0-9_]+)/.exec(String(serviceText ?? ''))?.[1] ?? null;
   return { missing: rules.required.filter((needle) => !code.includes(needle)), forbidden: rules.forbidden.filter((needle) => code.includes(needle)),
@@ -100,7 +101,7 @@ export function unitFindings(summary) {
 }
 
 /** Run the managed `npm test` with jest's JSON report and a json-summary coverage report: {command, exit, ...totals, coverage, error}. */
-export function runUnit(root, { npm = runNpm } = {}) {
+function runUnit(root, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unit-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const covDir = path.join(outDir, 'coverage');
@@ -116,7 +117,7 @@ export function runUnit(root, { npm = runNpm } = {}) {
     error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
 }
 
-export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
+function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const abs = path.resolve(root);
   const { coverage, ...run } = runUnit(abs, { npm });
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };

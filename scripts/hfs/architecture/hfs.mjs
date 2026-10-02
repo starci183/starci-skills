@@ -5,6 +5,7 @@ import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
+import { readTextFile } from '../../lib/read-text.mjs';
 
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
@@ -325,9 +326,7 @@ const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test
 const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));
 const withoutComments = text => text.split('\n').filter(line => !/^\s*#/u.test(line)).join('\n');
 
-function readText(root, relative) {
-  try { return fs.readFileSync(path.join(root, ...relative.split('/')), 'utf8'); } catch { return null; }
-}
+const readText = readTextFile;
 
 // A repository-local core.hooksPath that points anywhere but husky's own directory switches the commit and push
 // hooks off for that clone (a lane once redirected it to skip husky), so the gate every other clone runs never ran.

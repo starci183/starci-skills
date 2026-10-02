@@ -21,7 +21,7 @@ const UI_KNOWLEDGE_AREAS = ['presentation', 'composition', 'proof'];
 const CAPTURES_DIR = path.join('_resources', 'grammar-captures');
 
 export const grammarContextRequired = (brief) => brief?.grammarContext === 'required';
-export const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
+const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
 export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.grammarInputs) ? brief.grammarInputs : 'reference');
 
 

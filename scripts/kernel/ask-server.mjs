@@ -101,7 +101,7 @@ export const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
 
 // What an ask report is about: the asking job's params.subject (report.from
 // names the job) and the question's refs.
-export const askSubjectOf = (db, row) => {
+const askSubjectOf = (db, row) => {
   const rj = parseJson(row?.report_json, {}) ?? {};
   let subject = null;
   if (rj.from) {
@@ -112,7 +112,7 @@ export const askSubjectOf = (db, row) => {
   const refs = (Array.isArray(rj.question?.refs) ? rj.question.refs : []).map(String).filter(Boolean);
   return { subject, refs };
 };
-export const sameAskSubject = (a, b) => {
+const sameAskSubject = (a, b) => {
   if (a.subject && b.subject) return a.subject === b.subject;
   if (a.refs.length && b.refs.length) return a.refs.some((ref) => b.refs.includes(ref));
   return !(a.subject || b.subject || a.refs.length || b.refs.length);
@@ -250,7 +250,7 @@ const assetsOf = (assets, repo) => {
 // Each draw names its image as a path or {path, sha256}; the owner-facing
 // one is `part`, then `content`, then `image` (drawImageRefs) — the composite
 // an older draws.yaml put in `image` is swapped for its part by ownerImages.
-export const drawsImages = (repo, drawsFile) => {
+const drawsImages = (repo, drawsFile) => {
   const root = path.join(repo, '.starciwork');
   const newest = drawsFile;
   if (!newest || !fs.existsSync(newest)) return [];
@@ -515,14 +515,14 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
 }
 
 /** The index in question.review.parts of the drawn part at `abs`, or -1. */
-export const reviewPartIndexOf = (review, abs, repo) => {
+const reviewPartIndexOf = (review, abs, repo) => {
   if (!abs || !review?.recordPath || !Array.isArray(review.parts)) return -1;
   const dir = path.dirname(path.resolve(repo, review.recordPath));
   return review.parts.findIndex((p) => p?.path && path.resolve(dir, p.path).toLowerCase() === path.resolve(abs).toLowerCase());
 };
 
 /** The draw-review receipt extras of a submitted form: partNotes [{path, shape, note}] and golden. */
-export const drawAnswerExtras = (review, params) => {
+const drawAnswerExtras = (review, params) => {
   const partNotes = (review.parts ?? []).map((p, k) => ({ path: p.path, shape: p.shape ?? null, note: String(params.get(`partnote:${k}`) ?? '').trim() })).filter((p) => p.note);
   return { ...(partNotes.length ? { partNotes } : {}), ...(params.get('golden') === '1' ? { golden: true } : {}) };
 };
@@ -647,7 +647,7 @@ export const supersedeEarlierAsks = (ledger, workflowId, report) => {
 
 // The owner's auto-accept policy, read fail-closed: a config that cannot be
 // read or validated never turns auto-accept on.
-export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig()); } catch { return null; } };
+const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig()); } catch { return null; } };
 
 /**
  * Why the owner asked for the drawing a draw-review ask shows, from ledger data - or null, when the owner did not

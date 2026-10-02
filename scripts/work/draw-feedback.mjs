@@ -40,24 +40,24 @@ import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
 import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
+const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 /** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes.yaml). */
 export const DRAW_FEEDBACK_CHANGE = 'owner-draw-feedback-golden';
 export const DRAW_FEEDBACK_UNADDRESSED = 'DRAW_FEEDBACK_UNADDRESSED';
 /** Ledger events (payloads are names, ids and digests; the note text is the owner's own words). */
 export const DRAW_OWNER_RULING = 'draw-owner-ruling';
-export const DRAW_OWNER_RULING_CLASSIFIED = 'draw-owner-ruling-classified';
+const DRAW_OWNER_RULING_CLASSIFIED = 'draw-owner-ruling-classified';
 export const DRAW_REDRAW_OWED = 'draw-redraw-owed';
 export const KNOWLEDGE_CHANGE_REQUESTED = 'knowledge-change-requested';
-export const KNOWLEDGE_CHANGE_RESOLVED = 'knowledge-change-resolved';
+const KNOWLEDGE_CHANGE_RESOLVED = 'knowledge-change-resolved';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
-export const NOTE_CLASSES = Object.freeze(['product-direction', 'grammar', 'knowledge', 'one-off']);
-export const LEARNED_KINDS = Object.freeze(['antiPattern', 'vocabulary', 'rubric']);
+const NOTE_CLASSES = Object.freeze(['product-direction', 'grammar', 'knowledge', 'one-off']);
+const LEARNED_KINDS = Object.freeze(['antiPattern', 'vocabulary', 'rubric']);
 /** Rubric check groups the critic gets from the owner. */
-export const OWNER_NOTE_GROUP = 'owner-note';
-export const OWNER_LEARNED_GROUP = 'owner-learned';
+const OWNER_NOTE_GROUP = 'owner-note';
+const OWNER_LEARNED_GROUP = 'owner-learned';
 /** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). */
-export const GOLDEN_WORDS = /\bgolden\b|mẫu chuẩn|ảnh chuẩn|hình chuẩn/i;
+const GOLDEN_WORDS = /\bgolden\b|mẫu chuẩn|ảnh chuẩn|hình chuẩn/i;
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
 const PRODUCT_WORDS = /\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\b|luôn|không bao giờ|mọi|tất cả|từ nay|màu|thương hiệu|phông|chữ|khoảng cách|bo góc|đổ bóng|biểu tượng/i;
 const GRAMMAR_WORDS = /\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\b|thành phần mới|biến thể|thiếu thành phần|không có thành phần/i;
@@ -94,7 +94,7 @@ export function classifyNote(words, { dnaNames = [] } = {}) {
  * Whether structure confirms a (re)classification: {ok, why}. grammar names a DNA component (or Component.variant);
  * knowledge names a knowledge rule id or an existing knowledge/ path; product-direction says which learned kind.
  */
-export function confirmClass({ cls, target = null, as = null, dnaNames = [], knowledgeRoot = null }) {
+function confirmClass({ cls, target = null, as = null, dnaNames = [], knowledgeRoot = null }) {
   if (!NOTE_CLASSES.includes(cls)) return { ok: false, why: `class must be one of ${NOTE_CLASSES.join(', ')}` };
   if (cls === 'grammar') {
     const root = /^([A-Z][A-Za-z0-9]*)(?:\.[\w-]+)?$/.exec(String(target ?? ''))?.[1];
@@ -239,7 +239,7 @@ function bestCritiqueOf(loopFile) {
  * brief (generation.promptPath) must carry the note id, and its draw loop's best round critique must pass the
  * note's check.
  */
-export function noteAddressed(dir, record, note) {
+function noteAddressed(dir, record, note) {
   const reasons = [];
   const { parts } = reviewShapesOf(record);
   const want = note.shape ? parts.filter((p) => stateKey(p.shape) === stateKey(note.shape)) : parts;
@@ -280,7 +280,7 @@ export function feedbackFindings(dir, record = null) {
 }
 
 /** The feedback state of a ui record: {id, rounds, open: [{..., addressed, reasons}], golden, awaitingOwner}. */
-export function feedbackStatus(dir) {
+function feedbackStatus(dir) {
   const record = readYaml(path.join(dir, 'index.yaml'));
   const rounds = feedbackOf(record).rounds;
   const open = openNotesOf(record).map((n) => ({ ...n, ...noteAddressed(dir, record, n) }));
@@ -453,7 +453,7 @@ export function drawReviewBoard(db, { workflowId, repo }) {
 }
 
 /** The ui record directories (work/ui-screen@1) a report's files sit in (the nearest index.yaml above each). */
-export function uiRecordDirsOf(repo, files) {
+function uiRecordDirsOf(repo, files) {
   const dirs = new Set();
   for (const spec of list(files)) {
     const rel = slash(String(spec ?? ''));
@@ -527,7 +527,7 @@ export function classifyNoteInRecord(dir, { noteId, cls, target = null, as = nul
   return { note: found, written: write };
 }
 
-export function drawFeedbackMain(argv = []) {
+function drawFeedbackMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');

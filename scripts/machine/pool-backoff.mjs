@@ -17,11 +17,12 @@
 //
 // Pure over its inputs except poolCapsNow (one machine.sqlite read, cached CACHE_MS).
 import { readMachine } from '../../engine/db/machine.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 export const DEFAULTS = Object.freeze({ floor: 2, decreaseCooldownMs: 120_000, increaseAfterMs: 900_000, increaseStepMs: 300_000, staleMs: 600_000 });
 const CACHE_MS = 5000;
 
-const int = (v, d) => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n > 0 ? n : d; };
+const int = (v, d) => positiveNumber(v, d, { int: true });
 
 /**
  * One AIMD step for one pool. `prev`: the published entry or null (= at max). `rateLimitAt`: the newest rate-limit
@@ -68,7 +69,7 @@ export const poolRowOf = (pool, entry, { now, staleMs = DEFAULTS.staleMs }) => (
     lastIncreaseAt: entry.lastIncreaseAt ?? null, floorSince: entry.floorSince ?? null, provider: entry.provider ?? null, reason: entry.reason ?? null }) });
 
 /** The AIMD entry of one pool_backoff row (halvings from strikes, the rest from reason); null when unreadable. Pure. */
-export function entryOfRow(row) {
+function entryOfRow(row) {
   let e = null;
   try { e = JSON.parse(row?.reason ?? 'null'); } catch { e = null; }
   if (!e || typeof e !== 'object' || !Number.isFinite(Number(e.cap))) return null;

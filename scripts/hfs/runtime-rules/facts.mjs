@@ -7,7 +7,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { loadSlotManifest } from '../slots.mjs';
 
 export const CODE = 'RT_FACT_FALSE';
-export const FACTS_FILE = 'knowledge/hfs/facts.yaml';
+const FACTS_FILE = 'knowledge/hfs/facts.yaml';
 const PROSE = /^(?:knowledge\/.+\.(?:ya?ml|md)|docs\/.+\.md|(?:.+\/)?README\.md)$/;
 const NEAR_LINES = 3;
 

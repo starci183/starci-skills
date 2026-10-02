@@ -18,7 +18,7 @@ const fromLinear = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.abs(c) ** (
 const clamp = (value, low = 0, high = 1) => Math.min(high, Math.max(low, value))
 
 /** Gamma-encoded sRGB (0..1, unclamped) to OKLab. */
-export function srgbToOklab([red, green, blue]) {
+function srgbToOklab([red, green, blue]) {
   const [r, g, b] = [red, green, blue].map(toLinear)
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
@@ -31,7 +31,7 @@ export function srgbToOklab([red, green, blue]) {
 }
 
 /** OKLab to gamma-encoded sRGB (0..1, unclamped: an out-of-gamut colour keeps its overshoot). */
-export function oklabToSrgb([L, a, b]) {
+function oklabToSrgb([L, a, b]) {
   const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
   const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
   const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3

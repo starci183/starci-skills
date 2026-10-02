@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
-import { relativePath, sourceLocation, workspaceExportSources } from './typescript.mjs';
+import { relativePath, workspaceExportSources } from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));

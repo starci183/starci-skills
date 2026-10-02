@@ -54,6 +54,13 @@ export const keyName = (node) => {
     return null
 }
 
+/** The decorators of a constructor parameter: on the parameter, its wrapper (`private readonly x`) or its inner identifier. */
+export const paramParts = (param) => {
+    const inner = param.type === "TSParameterProperty" ? param.parameter : param
+    const target = inner.type === "AssignmentPattern" ? inner.left : inner
+    return { target, decorators: [...new Set([...(param.decorators ?? []), ...(inner.decorators ?? []), ...(target.decorators ?? [])])] }
+}
+
 /** The name of a decorator (`@Foo` or `@Foo(...)`), else null. */
 export const decoratorName = (decorator) => {
     const expression = decorator?.expression

@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { isUnshadowedCommonJsRequire, referencedExports, relativePath, sourceLocation, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { referencedExports, relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
 export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
@@ -19,42 +21,7 @@ function canonical(file) {
   return path.resolve(file);
 }
 
-function normalizedSymbolValue(ts, checker, value) {
-  let symbol = value ?? null;
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol);
-    const target = checker.getAliasedSymbol(symbol);
-    if (!target || target === symbol) break;
-    symbol = target;
-  }
-  return symbol;
-}
 
-function normalizedSymbol(ts, checker, node) {
-  return normalizedSymbolValue(ts, checker, checker?.getSymbolAtLocation(node) ?? null);
-}
-
-function selectedNode(ts, expression) {
-  expression = unwrapExpression(ts, expression);
-  if (ts.isIdentifier(expression)) return expression;
-  if (ts.isPropertyAccessExpression(expression)) return expression.name;
-  if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression;
-  return null;
-}
-
-function valueSymbol(ts, checker, node, seen = new Set()) {
-  const selected = selectedNode(ts, node) ?? node;
-  const symbol = normalizedSymbol(ts, checker, selected);
-  if (!symbol || seen.has(symbol)) return symbol;
-  seen.add(symbol);
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
-    return valueSymbol(ts, checker, declarations[0].initializer, seen);
-  }
-  return symbol;
-}
 
 function frameworkKindForSymbol(symbol, targets) {
   const selected = targets.get(symbol);
@@ -69,125 +36,42 @@ function frameworkKindForSymbol(symbol, targets) {
   return null;
 }
 
-function returnedExpressions(ts, declaration) {
-  if ((ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) && !ts.isBlock(declaration.body)) return [declaration.body];
-  const body = ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)
-    || ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration) ? declaration.body : null;
-  if (!body || !ts.isBlock(body)) return [];
-  const returned = [];
-  const visit = node => {
-    if (node !== body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
-      || ts.isArrowFunction(node) || ts.isMethodDeclaration(node))) return;
-    if (ts.isReturnStatement(node) && node.expression) returned.push(node.expression);
-    else ts.forEachChild(node, visit);
-  };
-  visit(body);
-  return returned;
-}
-
-function tracedFrameworkKinds(ts, checker, expression, targets, seen = new Set(), depth = 0) {
-  if (!expression) return new Set();
-  if (depth > 10) return new Set([UNPROVEN_FRAMEWORK]);
-  expression = unwrapExpression(ts, expression);
-  const selected = selectedNode(ts, expression);
-  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  const direct = symbol ? frameworkKindForSymbol(valueSymbol(ts, checker, selected), targets) : null;
-  if (direct) return new Set([direct]);
-  if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
-    const kinds = new Set();
-    for (const returned of returnedExpressions(ts, expression)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, seen, depth + 1)) kinds.add(kind);
-    }
-    return kinds;
-  }
-  if (ts.isCallExpression(expression)) {
-    const kinds = tracedFrameworkKinds(ts, checker, expression.expression, targets, seen, depth + 1);
-    if (kinds.size) return kinds;
-  }
-  if (!symbol || seen.has(symbol)) return new Set();
-  const nextSeen = new Set(seen).add(symbol);
-  const kinds = new Set();
-  for (const declaration of symbol.getDeclarations?.() ?? []) {
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      for (const kind of tracedFrameworkKinds(ts, checker, declaration.initializer, targets, nextSeen, depth + 1)) kinds.add(kind);
-    }
-    if (ts.isShorthandPropertyAssignment(declaration)) {
-      const target = normalizedSymbolValue(ts, checker, checker.getShorthandAssignmentValueSymbol?.(declaration));
-      const kind = frameworkKindForSymbol(target, targets);
-      if (kind) kinds.add(kind);
-    }
-    if (ts.isPropertyAssignment(declaration)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, declaration.initializer, targets, nextSeen, depth + 1)) kinds.add(kind);
-    }
-    for (const returned of returnedExpressions(ts, declaration)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, nextSeen, depth + 1)) kinds.add(kind);
-    }
-  }
-  return kinds;
-}
+/* This module's trace through frameworkKindForSymbol (name lookup and node_modules marker) instead of the
+ * default symbol->kind map, plus the shorthand/property-assignment descent. */
+const FRAMEWORK_TRACE = {
+  directOf: (ts, checker, { selected, targets }) => frameworkKindForSymbol(valueSymbol(ts, checker, selected), targets),
+  shorthandOf: (ts, checker, target, targets) => frameworkKindForSymbol(target, targets),
+};
 
 function frameworkTargets(config, context, checker, localFiles) {
   const bySymbol = new Map();
   const reasons = [];
-  const program = context.programs.find(candidate => candidate.getTypeChecker() === checker);
-  if (!program) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
-  for (const sourceFile of program.getSourceFiles()) {
-    if (!localFiles.has(canonical(sourceFile.fileName))
-      && !(sourceFile.isDeclarationFile && isInside(config.root, sourceFile.fileName)
-        && !sourceFile.fileName.replaceAll('\\', '/').includes('/node_modules/'))) continue;
+  const files = programSourcesOf(context, checker, localFiles, { root: config.root });
+  if (!files) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
+  for (const sourceFile of files) {
     for (const statement of sourceFile.statements) {
-      const moduleSpecifier = (context.ts.isImportDeclaration(statement) || context.ts.isExportDeclaration(statement))
-        && statement.moduleSpecifier && context.ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier : null;
-      const importEquals = context.ts.isImportEqualsDeclaration(statement) && context.ts.isExternalModuleReference(statement.moduleReference)
-        && statement.moduleReference.expression && context.ts.isStringLiteralLike(statement.moduleReference.expression)
-        ? statement.moduleReference.expression : null;
-      const specifierNode = moduleSpecifier ?? importEquals;
-      const specifier = specifierNode?.text;
-      if (!specifier || !FRAMEWORK_EXPORTS.has(specifier)) continue;
-      const moduleSymbol = checker.getSymbolAtLocation(specifierNode);
-      if (!moduleSymbol) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${specifier}`);
-        continue;
-      }
-      const selected = FRAMEWORK_EXPORTS.get(specifier);
-      const exports = new Map(checker.getExportsOfModule(moduleSymbol).map(symbol => [symbol.getName(), normalizedSymbolValue(context.ts, checker, symbol)]));
-      for (const name of referencedExports(context.ts, statement, selected)) {
-        const target = exports.get(name);
+      const bound = moduleExportsOf(context.ts, checker, statement);
+      if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) continue;
+      if (!bound.symbol) { reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`); continue; }
+      for (const name of referencedExports(context.ts, statement, FRAMEWORK_EXPORTS.get(bound.specifier))) {
+        const target = bound.exports.get(name);
         if (target) bySymbol.set(target, name);
-        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${specifier}`);
+        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
       }
     }
-    const visitRequire = node => {
-      if (context.ts.isCallExpression(node) && isUnshadowedCommonJsRequire(context.ts, checker, node.expression)
-        && node.arguments.length === 1 && context.ts.isStringLiteralLike(node.arguments[0])
-        && FRAMEWORK_EXPORTS.has(node.arguments[0].text)) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses a CommonJS ${node.arguments[0].text} binding whose contract role cannot be proved`);
-      }
-      context.ts.forEachChild(node, visitRequire);
-    };
-    visitRequire(sourceFile);
+    commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => FRAMEWORK_EXPORTS.has(specifier),
+      reasons, relativePath(config.root, sourceFile.fileName), 'binding whose contract role cannot be proved');
   }
   return { bySymbol, reasons };
 }
 
-function calledExpression(ts, decorator) {
-  return ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression;
-}
-
 function decoratorKind(ts, checker, decorator, targets) {
-  const selected = selectedNode(ts, calledExpression(ts, decorator));
+  const selected = selectedNode(ts, decoratorCallee(ts, decorator));
   return selected ? frameworkKindForSymbol(valueSymbol(ts, checker, selected), targets) : null;
 }
 
-function constructedDecoratorKind(ts, checker, decorator, targets) {
-  const kinds = tracedFrameworkKinds(ts, checker, calledExpression(ts, decorator), targets);
-  if (kinds.has(UNPROVEN_FRAMEWORK)) return 'unproven framework';
-  return kinds.size === 1 ? [...kinds][0] : kinds.size ? 'multiple framework' : null;
-}
-
-function decorators(ts, node) {
-  return ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
-}
+const constructedDecoratorKind = (ts, checker, decorator, targets) =>
+  sharedConstructedDecoratorKind(ts, checker, decorator, targets, FRAMEWORK_TRACE);
 
 function modifiers(ts, node) {
   return ts.canHaveModifiers(node) ? ts.getModifiers(node) ?? [] : node.modifiers ?? [];
@@ -205,9 +89,7 @@ function readonlyMember(ts, node) {
   return hasModifier(ts, node, ts.SyntaxKind.ReadonlyKeyword);
 }
 
-function violation(config, sourceFile, node, ruleId, message, extra = {}) {
-  return { ruleId, path: relativePath(config.root, sourceFile.fileName), ...sourceLocation(sourceFile, node), message, ...extra };
-}
+
 
 function sourceRole(sourceFile) {
   const normalized = sourceFile.fileName.replaceAll('\\', '/');
@@ -221,7 +103,7 @@ function isFrameworkHelper(sourceFile, declaration, framework) {
   const role = sourceRole(sourceFile);
   if (role.transport || NON_API_SOURCE_ROLES.has(role.role) || NON_API_SOURCE_ROLES.has(role.base)) return true;
   if (declaration && declaration.name && /Module$/.test(declaration.name.text ?? '')) {
-    return decorators(framework.ts, declaration).some(decorator => decoratorKind(framework.ts, framework.checker, decorator, framework.targets) === 'Module');
+    return nodeDecorators(framework.ts, declaration).some(decorator => decoratorKind(framework.ts, framework.checker, decorator, framework.targets) === 'Module');
   }
   return false;
 }
@@ -442,19 +324,8 @@ function expressionOrigin(ts, checker, expression, seen = new Set(), depth = 0) 
   return symbol;
 }
 
-function expressionReferencesOrigin(ts, checker, expression, expected) {
-  let found = false;
-  const visit = node => {
-    if (found) return;
-    if (expressionOrigin(ts, checker, node) === expected) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(expression);
-  return found;
-}
+const expressionReferencesOrigin = (ts, checker, expression, expected) =>
+  anyDescendant(ts, expression, (node) => expressionOrigin(ts, checker, node) === expected);
 
 function isSafePrimitiveProjection(ts, checker, expression, expected) {
   expression = unwrapExpression(ts, expression);
@@ -626,13 +497,13 @@ function checkInjectedClass(config, context, checker, declaration, classKind, ta
     .map(member => [propertyName(ts, member), member]).filter(([name]) => name));
   for (const member of declaration.members) {
     if (ts.isPropertyDeclaration(member)) {
-      const injected = decorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
+      const injected = nodeDecorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
       if (injected) checkReadonlyProperty(config, context, sourceFile, member, `Injected property ${propertyName(ts, member) ?? '(computed)'}`, violations);
       continue;
     }
     if (!ts.isConstructorDeclaration(member)) continue;
     for (const parameter of member.parameters) {
-      const explicitInject = decorators(ts, parameter).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
+      const explicitInject = nodeDecorators(ts, parameter).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
       if (!classKind && !explicitInject) continue;
       const parameterProperty = modifiers(ts, parameter).some(modifier => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword,
         ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(modifier.kind));
@@ -729,7 +600,7 @@ export function checkBackendContracts(config, context) {
     };
     collectClasses(sourceFile);
     for (const statement of classes) {
-      const classDecorators = decorators(ts, statement);
+      const classDecorators = nodeDecorators(ts, statement);
       const kindsByDecorator = classDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.targets));
       const directKinds = kindsByDecorator.filter(Boolean);
       for (const [index, decorator] of classDecorators.entries()) if (!kindsByDecorator[index]) {
@@ -740,15 +611,15 @@ export function checkBackendContracts(config, context) {
       }
       const classKind = directKinds.find(kind => NEST_CREATED.has(kind)) ?? null;
       for (const member of statement.members) for (const decorated of [member, ...(ts.isConstructorDeclaration(member) ? member.parameters : [])]) {
-        for (const decorator of decorators(ts, decorated)) if (!decoratorKind(ts, checker, decorator, framework.targets)) {
+        for (const decorator of nodeDecorators(ts, decorated)) if (!decoratorKind(ts, checker, decorator, framework.targets)) {
           const constructed = constructedDecoratorKind(ts, checker, decorator, framework.targets);
           if (constructed === 'Inject' || constructed === 'unproven framework') {
             readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} injection decorator identity`);
           }
         }
       }
-      const hasInjectedMember = statement.members.some(member => decorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, framework.targets) === 'Inject')
-        || (ts.isConstructorDeclaration(member) && member.parameters.some(parameter => decorators(ts, parameter)
+      const hasInjectedMember = statement.members.some(member => nodeDecorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, framework.targets) === 'Inject')
+        || (ts.isConstructorDeclaration(member) && member.parameters.some(parameter => nodeDecorators(ts, parameter)
           .some(decorator => decoratorKind(ts, checker, decorator, framework.targets) === 'Inject'))));
       if (classKind || hasInjectedMember) {
         injectedClasses += 1;

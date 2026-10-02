@@ -794,17 +794,6 @@ BE_TEST_BUILDER_ARRANGES:
   owner: op-retry
   kind: check-finding
 
-BLOB_REF_INVALID:
-  title: "Not a blob citation"
-  title_vi: "Không phải tham chiếu khối lưu"
-  meaning_vi: "Đoạn được đưa vào để đọc khối lưu không phải một dẫn chứng khối hợp lệ."
-  causes_vi:
-    - "Truyền đường dẫn hay chuỗi không phải blob:sha256"
-    - "Băm không có trong cơ sở dữ liệu"
-  nextStep_vi: "Việc đọc bị từ chối; bên gọi phải truyền tham chiếu đúng."
-  owner: runtime-core
-  kind: runtime-fault
-
 BLOCKER_CYCLE:
   title: "blockedBy forms a cycle"
   title_vi: "Chuỗi blockedBy tạo vòng"
@@ -4568,6 +4557,146 @@ RT_HELPER_REDEFINED:
     - "Sao chép một hàm nhỏ (slash, samePath, clip, sleep, sha256, readJsonFile, isDir...) thay vì import từ thư viện"
     - "Hai thư viện đặt cùng một tên cho hai hàm có hành vi khác nhau"
   nextStep_vi: "Người giám sát xóa bản sao và import hàm của thư viện; nếu hai hợp đồng thật sự khác nhau thì đổi tên một bên, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_HELPER_NEAR_COPY:
+  title: "Shared helper copied with small edits"
+  title_vi: "Hàm dùng chung bị sao chép kèm chỉnh sửa nhỏ"
+  meaning_vi: "Một hàm ở đầu tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ có thân dài từ 30 token trở lên và giống từ 80% (độ tương đồng Dice trên bộ ba token đã chuẩn hóa tên) một hàm ở tệp khác: cùng một hàm bị viết hai lần dưới tên hoặc chi tiết khác. Nhóm sao chép có một nơi chính (hàm export của thư viện nếu có, nếu không thì đường dẫn đứng đầu); mọi thành viên còn lại là một phát hiện."
+  causes_vi:
+    - "Sao chép một bộ chuẩn hóa đường dẫn, bộ đọc yaml, bộ duyệt thư mục, bộ băm hoặc bộ đọc tham số rồi đổi tên và sửa nhẹ"
+    - "Hai tệp cùng viết một đoạn xử lý lỗi hoặc chuyển đổi dữ liệu thay vì chia sẻ"
+  nextStep_vi: "Người giám sát giữ một định nghĩa trong một mô-đun scripts/lib và để các tệp còn lại import nó, qua một lane đã land; nếu hai hàm thật sự khác hợp đồng thì tách phần khác ra khỏi phần chung."
+  owner: supervisor
+  kind: check-finding
+
+RT_DUPLICATE_CODE:
+  title: "Block of code duplicated in the runtime"
+  title_vi: "Đoạn mã bị lặp lại trong runtime"
+  meaning_vi: "Một đoạn mã đã chuẩn hóa token (bỏ khác biệt về tên biến và giá trị chữ hoặc số, bỏ chú thích và lệnh import) dài từ 8 dòng và 60 token trở lên xuất hiện hai lần trong mã nguồn của runtime (scripts, engine, modules, bin, ext, ui, packages): ở hai tệp hoặc hai chỗ trong một tệp. Ngưỡng là ngưỡng duplicateBlock của luật R21 cho sản phẩm. Bảng lặp một hình dòng, đoạn gần như chỉ là khai báo kiểu và tệp spec không bị tính."
+  causes_vi:
+    - "Sao chép một đoạn xử lý sang tệp khác thay vì đặt trong một mô-đun dùng chung"
+    - "Hai tệp cùng viết một vòng lặp hoặc một chuỗi kiểm tra giống nhau"
+  nextStep_vi: "Người giám sát gom đoạn mã vào một mô-đun scripts/lib (hoặc mô-đun sở hữu nó) rồi import ở cả hai nơi, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_EXPORT_UNUSED:
+  title: "Export used by no other file"
+  title_vi: "Export không tệp nào khác dùng"
+  meaning_vi: "Một tệp .mjs của runtime (scripts, engine, modules, bin, ext, ui, packages) export một tên mà không tệp văn bản nào khác trong repo nhắc tới (mã nguồn, spec, yaml, json, markdown, shell đều tính). Chỉ tệp đầu vào công khai của một package (main, exports, bin, types trong package.json của nó) được miễn vì là API cho người dùng bên ngoài. Không có danh sách pending hay allowlist."
+  causes_vi:
+    - "Hàm hoặc hằng được export từ lúc viết nhưng chỉ dùng trong chính tệp"
+    - "Nơi dùng đã bị xóa hoặc đã chuyển sang hàm khác mà phần export còn lại"
+  nextStep_vi: "Người giám sát bỏ từ khóa export nếu tên chỉ dùng trong tệp, hoặc xóa luôn phần khai báo nếu tệp cũng không dùng, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_ENV_UNCATALOGUED:
+  title: "Environment variable not catalogued"
+  title_vi: "Biến môi trường chưa có trong danh mục"
+  meaning_vi: "Mã nguồn production của runtime đọc một biến môi trường (process.env.X, env.X, process.env['X'], destructuring từ env) hoặc viết tên một biến STARCI_* mà modules/schemas/env.yaml không có; hoặc một mục của danh mục thiếu purpose hoặc kind hợp lệ."
+  causes_vi:
+    - "Thêm một biến môi trường mới mà không ghi vào danh mục"
+    - "Gõ sai tên một biến đã có"
+  nextStep_vi: "Người giám sát thêm biến vào modules/schemas/env.yaml với một câu purpose và kind (config, seam, handoff hoặc host), hoặc sửa tên gõ sai, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_ENV_READ_OUTSIDE_OWNER:
+  title: "Environment variable read outside its owner"
+  title_vi: "Đọc biến môi trường ngoài nơi sở hữu"
+  meaning_vi: "Một tệp production đọc trực tiếp một biến theo tên từ process.env (kể cả tên tính lúc chạy) thay vì qua scripts/lib/env.mjs (readEnv) hoặc một tham số env được truyền vào. Truyền cả process.env cho tiến trình con hoặc làm giá trị mặc định thì không bị tính."
+  causes_vi:
+    - "Đọc process.env.TEN ngay trong logic nghiệp vụ"
+    - "Đọc process.env[ten] với tên tính lúc chạy trong một hàm tiện ích"
+  nextStep_vi: "Người giám sát đổi sang readEnv('TEN') của scripts/lib/env.mjs, hoặc nhận một tham số env và đọc từ đó, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_TEST_ENV_IN_PRODUCTION:
+  title: "Production code branches on the test runner"
+  title_vi: "Mã production rẽ nhánh theo trình chạy test"
+  meaning_vi: "Một tệp production đọc NODE_TEST_CONTEXT để biết mình đang chạy trong spec. Chỉ scripts/lib/env.mjs được quan sát trình chạy test, qua một hàm isSpecRun duy nhất."
+  causes_vi:
+    - "Thêm một nhánh bỏ qua việc chạm trạng thái thật của máy khi chạy spec bằng cách đọc NODE_TEST_CONTEXT trực tiếp"
+  nextStep_vi: "Người giám sát gọi isSpecRun(env) của scripts/lib/env.mjs thay vì đọc NODE_TEST_CONTEXT, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_ENV_STALE_ENTRY:
+  title: "Catalogued environment variable nothing reads"
+  title_vi: "Biến môi trường trong danh mục không ai dùng"
+  meaning_vi: "modules/schemas/env.yaml có một biến mà không tệp production nào đọc hoặc nhắc tên nữa."
+  causes_vi:
+    - "Mã đọc biến đã bị xóa nhưng mục danh mục còn lại"
+  nextStep_vi: "Người giám sát xóa mục khỏi modules/schemas/env.yaml, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_SPEC_ASSERTS_SOURCE_TEXT:
+  title: "Spec asserts the text of the implementation"
+  title_vi: "Spec kiểm tra chữ của mã triển khai"
+  meaning_vi: "Một spec (tests/ hoặc packages/*) đọc nội dung một tệp mã production của runtime (.mjs, .js, .ts dưới scripts/, engine/, modules/, bin/, ext/ hoặc ui/ của repo này, qua import.meta hoặc một hằng gốc repo) rồi kiểm tra bằng regex. Spec phải gọi hàm được export và kiểm tra giá trị trả về hoặc thứ nó ghi; tệp fixture do spec tự ghi vào thư mục tạm không bị tính."
+  causes_vi:
+    - "Dùng assert.match trên chuỗi mã nguồn để chứng minh một lời gọi tồn tại"
+    - "Không có đường để chạy hàm thật nên đọc mã thay vì chạy"
+  nextStep_vi: "Người giám sát viết lại spec để chạy hàm được export với phụ thuộc giả và kiểm tra kết quả, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_SPEC_SKIP_UNEXPLAINED:
+  title: "Skipped test carries no reason"
+  title_vi: "Test bị bỏ qua không có lý do"
+  meaning_vi: "Một test bị skip (t.skip(), it.skip, { skip: điều kiện }) mà lệnh skip không mang lý do: không có chuỗi hoặc template nào mà giá trị skip có thể trả về, và không có định nghĩa một bước trong tệp tạo ra lý do. Skip im lặng báo xanh mà không chạy."
+  causes_vi:
+    - "{ skip: process.platform !== 'win32' } không nói thiếu gì"
+    - "t.skip() gọi không đối số"
+  nextStep_vi: "Người giám sát cấp thứ test cần để test chạy thật, hoặc viết lý do nói rõ thiếu gì và cái gì cung cấp nó, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_UNCATALOGUED:
+  title: "Emitted failure code has no catalog entry"
+  title_vi: "Mã lỗi được phát ra nhưng chưa có trong danh mục"
+  meaning_vi: "Mã nguồn trong scripts/, engine/ hoặc modules/ phát ra một mã lỗi (chuỗi UPPER_SNAKE hoặc kebab ở vị trí mã) mà modules/kernel/failure-codes.yaml chưa có mục. Mỗi mã phải được giải thích đúng ngày nó được thêm."
+  causes_vi:
+    - "Thêm một mã mới trong mã nguồn mà không ghi vào danh mục"
+    - "Một chuỗi giống mã nhưng thật ra là tên biến môi trường hoặc khóa"
+  nextStep_vi: "Người giám sát thêm mục (title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind) vào danh mục, hoặc đưa tên không phải mã vào failure-codes.not-codes, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_STALE:
+  title: "Catalogued failure code nothing emits"
+  title_vi: "Mã lỗi trong danh mục không còn ai phát ra"
+  meaning_vi: "modules/kernel/failure-codes.yaml có một mục cho một mã mà không tệp nguồn nào còn viết ra; mã đã nghỉ hưu phải rời danh mục."
+  causes_vi:
+    - "Mã nguồn phát ra mã đã bị xóa hoặc đổi tên mà mục danh mục còn lại"
+  nextStep_vi: "Người giám sát xóa mục khỏi danh mục, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_MALFORMED:
+  title: "Failure code entry is malformed"
+  title_vi: "Mục mã lỗi sai khuôn"
+  meaning_vi: "Một mục của modules/kernel/failure-codes.yaml thiếu hoặc sai một trường (title, title_vi, meaning_vi, nextStep_vi, owner, kind, causes_vi), hoặc owner/kind nằm ngoài tập đóng, hoặc owner other-op: trỏ tới op không có tệp manifest."
+  causes_vi:
+    - "Thêm mục mà quên một trường tiếng Việt"
+    - "Owner hoặc kind gõ sai"
+  nextStep_vi: "Người giám sát điền hoặc sửa trường bị nêu, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_SOLE_EMITTER:
+  title: "Failure code whose only source is the rule catalog"
+  title_vi: "Mã lỗi chỉ có danh mục luật làm nguồn"
+  meaning_vi: "Một mã chỉ xuất hiện dạng chữ trong knowledge/hfs/rules.yaml và luật chứa nó không có enforcer nào của eslint, stylelint hoặc Sonar đã xây: một dòng danh mục không phải là nơi phát ra mã, nên mã sẽ không bao giờ được báo."
+  causes_vi:
+    - "Luật liệt kê mã nhưng enforcer chưa được xây hoặc đã bị xóa"
+    - "Mã được thêm vào failureCodes của luật mà không có check nào phát ra"
+  nextStep_vi: "Người giám sát xây enforcer báo mã đó, hoặc viết mã ở nơi một check thật sự phát ra nó, hoặc xóa mã khỏi luật, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -9874,6 +10003,17 @@ retry-exists:
   nextStep_vi: "Kernel sửa job thử lại đang chờ (mở rộng phạm vi hoặc tham số) thay vì tạo job mới."
   owner: op-retry
   kind: verb-refusal
+retry-lineage-invalid:
+  title: "Retry does not follow the latest failed try"
+  title_vi: "Lần thử lại không nối tiếp lần thử thất bại gần nhất"
+  meaning_vi: "Lệnh thử lại trỏ tới một lần thử không phải lần mới nhất của đơn vị công việc, hoặc lần thử đó chưa thất bại."
+  causes_vi:
+    - "Tham số --retry-of trỏ tới lần thử cũ"
+    - "Lần thử gần nhất đang chạy hoặc đã thành công"
+    - "Đơn vị công việc chưa có lần thử nào"
+  nextStep_vi: "Lệnh bị từ chối và không ghi gì; chạy lại với --retry-of là lần thử thất bại gần nhất của đơn vị đó."
+  owner: supervisor
+  kind: verb-refusal
 retry-of-foreign:
   title: "Retry target is not an earlier job of this op"
   title_vi: "Job thử lại không thuộc op này"
@@ -10286,6 +10426,16 @@ unit-done:
   nextStep_vi: "Lệnh bị từ chối; không cần làm gì thêm cho đơn vị này."
   owner: op-retry
   kind: verb-refusal
+unit-in-flight:
+  title: "Work unit already has an open try"
+  title_vi: "Đơn vị công việc đã có một lần thử đang mở"
+  meaning_vi: "Đơn vị công việc còn một lần thử chưa kết thúc nên không mở thêm lần thử mới."
+  causes_vi:
+    - "Lần thử trước còn đang chạy hoặc chờ"
+    - "Lệnh chạy lại được gọi quá sớm"
+  nextStep_vi: "Lệnh bị từ chối; sửa lần thử đang mở (api graph-edit) hoặc đợi nó kết thúc rồi chạy lại."
+  owner: supervisor
+  kind: verb-refusal
 unit-not-admitted:
   title: "Work unit not admitted"
   title_vi: "Đơn vị việc chưa được nhận"
@@ -10303,6 +10453,16 @@ unit-overlaps-failed-unit:
     - "Tạo job mới thay vì thử lại đơn vị cũ"
   nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua api graph-edit."
   owner: op-retry
+  kind: verb-refusal
+unit-try-budget-exhausted:
+  title: "Work unit spent its try budget"
+  title_vi: "Đơn vị công việc đã dùng hết ngân sách thử"
+  meaning_vi: "Số lần thử của đơn vị công việc đã chạm ngân sách đã khai báo nên không có lần thử nào nữa."
+  causes_vi:
+    - "Đơn vị thất bại nhiều lần liên tiếp"
+    - "Ngân sách thử đặt quá thấp"
+  nextStep_vi: "Lệnh bị từ chối; chủ dự án hoặc Supervisor quyết định nâng ngân sách (api unit --raise-budget), không tự thử thêm."
+  owner: supervisor
   kind: verb-refusal
 unit-unknown:
   title: "Work unit not found"
@@ -14013,6 +14173,17 @@ RT_PROSE_RESTATES_SLOTS:
     - "Chép cây thư mục hoặc danh sách tệp của slots.yaml vào văn bản"
     - "Liệt kê các tệp cấu hình của gốc ứng dụng trong một câu"
   nextStep_vi: "Người giám sát thay bản chép bằng mã slot (slot app.format-config...) hoặc bằng một khối sinh tự động, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+CI_UPLOAD_NOT_SILENT:
+  title: "Coverage upload can skip or fail silently"
+  title_vi: "Bước tải coverage có thể bị bỏ qua hoặc lỗi mà không báo"
+  meaning_vi: "Một bước codecov/codecov-action trong workflow CI (gốc, ví dụ hoặc template của packages/hfs) không xác thực bằng OIDC (use_oidc: true cùng permissions id-token: write), không đặt fail_ci_if_error: true, có continue-on-error: true, hoặc bị chặn bởi điều kiện đọc một secret hay CODECOV_TOKEN. Khi đó thiếu secret hay tải lỗi chỉ làm bước bị bỏ qua và job vẫn xanh, coverage thôi được báo mà không ai hay."
+  causes_vi:
+    - "Dùng token trong repository secret và đặt điều kiện if theo secret đó"
+    - "Để continue-on-error hoặc quên fail_ci_if_error cho bước tải"
+  nextStep_vi: "Người giám sát đặt use_oidc: true và fail_ci_if_error: true cho bước, cấp permissions id-token: write cho job, bỏ continue-on-error và điều kiện theo secret, rồi render lại workflow bằng hfs sync --write."
   owner: supervisor
   kind: check-finding
 

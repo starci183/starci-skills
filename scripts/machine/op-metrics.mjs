@@ -51,11 +51,11 @@ import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-ma
 
 export const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
-export const METRICS_KIND = 'op-health';
+const METRICS_KIND = 'op-health';
 export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
 export const SEVERITIES = Object.freeze(['ok', 'warn', 'critical']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
-export const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease']);
+const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease']);
 const JOB_EVENT_KINDS = ['op-dispatched', 'report-filed', 'op-settled', 'dispatch-rejected', 'dead-worker-requeued', 'dead-worker-fenced', 'worker-failed-no-report'];
 const DEAD_KINDS = new Set(['dead-worker-requeued', 'dead-worker-fenced', 'worker-failed-no-report']);
 const OPEN_STATUSES = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
@@ -206,7 +206,7 @@ export function jobRecords(db, { since, now = Date.now(), workflowId = null } = 
 /* ------------------------------------------------------------ aggregation */
 
 /** The root job id of every record's retry chain (retryOf followed through `records`; an unknown parent is the root). */
-export function chainRoots(records) {
+function chainRoots(records) {
   const byId = new Map(records.map((r) => [r.jobId, r]));
   const root = new Map();
   const find = (r, seen = new Set()) => {
@@ -223,7 +223,7 @@ export function chainRoots(records) {
 }
 
 /** One health row over `records` (any grouping): see the header for each field. Pure. */
-export function healthRow(key, records) {
+function healthRow(key, records) {
   const count = (o) => records.filter((r) => r.outcome === o).length;
   const succeeded = count('succeeded'), failed = count('failed');
   const classes = new Map();
@@ -406,7 +406,7 @@ export const stuckOwedItems = (stuck, { repo = null } = {}) => stuck.filter((s) 
 }));
 
 /** What the Supervisor does about one stuck item (the owner of its next action decides the verb). */
-export function stuckAction(s) {
+function stuckAction(s) {
   if (s.owner === 'owner') return 'the owner holds it: make sure the ask reached the owner (Telegram /asks), remind once per digest; never answer it';
   if (s.owner === 'supervisor') return s.kind === 'retry-cap' ? 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'
     : s.kind === 'throttled' ? 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'
@@ -488,7 +488,7 @@ export async function currentTrend({ env = process.env, language = 'en', setting
 /* ------------------------------------------------------------ tables */
 
 /** The health table as text lines (ops or workflows rows). Pure. */
-export function healthTable(rows, { label = 'op' } = {}) {
+function healthTable(rows, { label = 'op' } = {}) {
   const head = [label, 'jobs', 'ok%', 'fail', 'wait p50', 'wait p90', 'run p50', 'settle p50', 'att/node', 'repeat', 'dead%', 'owner-wait', 'throttle', 'top failure'];
   const body = rows.map((r) => [String(r.key), r.jobs, pct(r.successRate), r.failed, fmtMs(r.queueWait.p50), fmtMs(r.queueWait.p90), fmtMs(r.runTime.p50), fmtMs(r.settleTime.p50),
     r.attemptsPerNode.mean == null ? '-' : `${r.attemptsPerNode.mean}/${r.attemptsPerNode.max}`, r.repeatedIdentical, pct(r.deadWorkerRate), fmtMs(r.ownerWait.totalMs || null), fmtMs(r.throttle.totalMs || null), r.topFailureClass ?? '-'].map(String));

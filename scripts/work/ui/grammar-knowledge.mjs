@@ -21,7 +21,7 @@ import {skillRoot} from '../../../engine/runtime-root.mjs';
  * Nothing here builds, installs or renders: every measurement is a static read of the package source,
  * and the DNA modules are loaded by stripping their TypeScript types (Node's own `stripTypeScriptTypes`).
  */
-export const GRAMMAR_KNOWLEDGE_CHECK='starci/grammar-knowledge-check@1';
+const GRAMMAR_KNOWLEDGE_CHECK='starci/grammar-knowledge-check@1';
 
 /** The families whose snapshot this check owns, and where each one's source and DNA module live. */
 export const GRAMMAR_FAMILIES=Object.freeze([
@@ -35,7 +35,7 @@ const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)
 const uniq=values=>[...new Set(values)];
 const byName=(a,b)=>a<b?-1:a>b?1:0;
 
-export function defaultPaths(root=skillRoot){
+function defaultPaths(root=skillRoot){
   return {root,packageRoot:path.join(root,'packages','grammar'),grammarRoot:path.join(root,'knowledge','grammars')};
 }
 
@@ -103,7 +103,7 @@ export function lexSource(source){
 }
 
 /** CSS with every comment blanked, offsets and lines kept. */
-export function stripCssComments(css){
+function stripCssComments(css){
   return css.replace(/\/\*[\s\S]*?\*\//g,match=>match.replace(/[^\n\r]/g,' '));
 }
 
@@ -157,7 +157,7 @@ export function cssReads(css){
 }
 
 /** A stylesheet and the relative sheets it `@import`s, in cascade order, with no repeats. */
-export function stylesheetSet(entry,{include=()=>true}={}){
+function stylesheetSet(entry,{include=()=>true}={}){
   const seen=[];
   const visit=file=>{
     if(seen.includes(file))return;
@@ -389,7 +389,7 @@ const sourceFilesUnder=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(ent
 });
 
 /** The 95-renderer census (or however many the registry now holds). */
-export function censusRenderers(packageRoot){
+function censusRenderers(packageRoot){
   const {names,groups}=registryNames(packageRoot);
   const exported=barrelExports(packageRoot);
   const catalog=ruleCatalog(packageRoot);
@@ -424,7 +424,7 @@ function inlineWrites(packageRoot,renderers){
  * imports) names outside a comment: assigned by that set (value, distinct-value count, reads), written
  * inline by a renderer, or only read (with the first read's fallback).
  */
-export function censusCommonTokens(packageRoot,renderers){
+function censusCommonTokens(packageRoot,renderers){
   // The entry sheet is read first, then the sheets it imports: a name's first read (its reported
   // fallback and source line) is the entry sheet's whenever the entry sheet reads it at all.
   const entry=path.join(packageRoot,'src','common','styles.css');
@@ -469,7 +469,7 @@ const rootSelector=family=>`.grammar-common-root[data-grammar-family="${family}"
  * theme value, and every other root-level override (narrow width, reduced motion, forced colours),
  * with the Common-read names in the family's namespace completed from Common's own value or fallback.
  */
-export function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
+function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
   const scope=rootSelector(family.source);
   const sheets=stylesheetSet(path.join(packageRoot,'src',family.source,'styles.css'),
     {include:file=>path.dirname(file)===path.join(packageRoot,'src',family.source)});
@@ -579,7 +579,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
 }
 
 /** The sha256 of each file the census read, so a reader can tell whether a snapshot still describes a tree. */
-export function censusDigests(packageRoot,files){
+function censusDigests(packageRoot,files){
   return files.map(file=>({path:`packages/grammar/${file}`,sha256:sha256File(path.join(packageRoot,file))}));
 }
 
@@ -593,14 +593,14 @@ const scalar=value=>typeof value==='number'||typeof value==='boolean'?String(val
 const flow=list=>`[${list.map(q).join(', ')}]`;
 
 /** A nested plain object as block YAML at `indent`. */
-export function yamlObject(object,indent){
+function yamlObject(object,indent){
   const pad=' '.repeat(indent);
   return Object.entries(object).map(([name,value])=>value&&typeof value==='object'&&!Array.isArray(value)
     ?`${pad}${key(name)}:\n${yamlObject(value,indent+2)}`
     :`${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`).join('\n');
 }
 
-export function yamlRenderers(renderers,{closedValues=false,source=true}={}){
+function yamlRenderers(renderers,{closedValues=false,source=true}={}){
   const lines=['renderers:'];
   for(const r of renderers){
     lines.push(`  - component: ${q(r.component)}`);
@@ -627,7 +627,7 @@ export function yamlRenderers(renderers,{closedValues=false,source=true}={}){
   return lines.join('\n');
 }
 
-export function yamlCommonTokens(tokens){
+function yamlCommonTokens(tokens){
   const lines=['tokens:'];
   for(const t of tokens){
     lines.push(`  - name: ${q(t.name)}`);
@@ -639,7 +639,7 @@ export function yamlCommonTokens(tokens){
   return lines.join('\n');
 }
 
-export function yamlFamilyTokens(tokens){
+function yamlFamilyTokens(tokens){
   const lines=['tokens:'];
   for(const t of tokens){
     lines.push(`  - name: ${q(t.name)}`);

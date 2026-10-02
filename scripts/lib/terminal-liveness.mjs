@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from './input-glyph.mjs';
+import { squash } from './clip.mjs';
 
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
@@ -108,17 +109,15 @@ const FRAMED_GATE_ROWS = 24;
 export const TRAILING_ROWS = 14;
 export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
 // The glyph set itself is scripts/lib/input-glyph.mjs INPUT_GLYPH.
-/** `text` as one row: whitespace runs collapsed to one space, trimmed. */
-export const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 /** A draft as one row of at most DRAFT_CLIP_CHARS, for receipts and events. */
-export const DRAFT_CLIP_CHARS = 200;
-export const clipDraft = (draft) => { const d = collapse(draft); return d.length > DRAFT_CLIP_CHARS ? `${d.slice(0, DRAFT_CLIP_CHARS - 1)}…` : d; };
+const DRAFT_CLIP_CHARS = 200;
+export const clipDraft = (draft) => { const d = squash(draft); return d.length > DRAFT_CLIP_CHARS ? `${d.slice(0, DRAFT_CLIP_CHARS - 1)}…` : d; };
 // A row shorter than this is too generic to call an echo of the sent text.
 const MIN_ECHO_CHARS = 12;
 /** True when `row` (input glyph and rail stripped) is a verbatim piece of the text sent to the terminal. */
 export function echoesSentText(row, sentText) {
-  const content = collapse(String(row ?? '').replace(INPUT_GLYPH, ''));
-  const sent = typeof sentText === 'string' ? collapse(sentText) : '';
+  const content = squash(String(row ?? '').replace(INPUT_GLYPH, ''));
+  const sent = typeof sentText === 'string' ? squash(sentText) : '';
   return content.length >= MIN_ECHO_CHARS && sent.length > 0 && sent.includes(content);
 }
 
@@ -168,7 +167,7 @@ const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_CLA
  * here reads the input row as one row. No draft: `screen` unchanged.
  */
 export function frameWithDraft(screen, draft) {
-  const text = collapse(draft);
+  const text = squash(draft);
   if (!text) return screen;
   const lines = String(screen ?? '').split(/\r?\n/);
   let seen = 0;
@@ -198,15 +197,15 @@ const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wak
  *  - 'foreign'  anything else - words the runtime never typed. Nothing is typed onto them.
  */
 export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAGED_PATTERN } = {}) {
-  const d = collapse(draft);
+  const d = squash(draft);
   if (!d) return { kind: 'none', draft: null };
-  const own = texts.filter((text) => typeof text === 'string').map(collapse).filter(Boolean);
+  const own = texts.filter((text) => typeof text === 'string').map(squash).filter(Boolean);
   if (own.includes(d) || stagedPattern.test(d)) return { kind: 'own', draft: d };
   let rest = d;
   for (const text of own) rest = rest.split(text).join('\n');
   const starts = [...rest.matchAll(RUNTIME_WAKE_OPENER)].map((m) => m.index);
   const cuts = [0, ...starts.filter((i) => i > 0), rest.length];
-  const pieces = cuts.slice(0, -1).map((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).flat().map(collapse).filter(Boolean);
+  const pieces = cuts.slice(0, -1).map((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).flat().map(squash).filter(Boolean);
   const runtimePiece = (piece) => new RegExp(`^(?:${RUNTIME_WAKE_OPENER.source})`).test(piece)
     || (piece.length >= MIN_ECHO_CHARS && own.some((text) => text.includes(piece)));
   return { kind: pieces.every(runtimePiece) ? 'runtime' : 'foreign', draft: d };
@@ -241,7 +240,7 @@ const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|\\bAsk Cod
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
 // launchEnv): any `;`-separated statement that runs an agent makes it a launch.
 const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
-export const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
+const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
 /**
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
  *  - the LAST non-empty row is a bare prompt ("PS <drive>:\x>");
@@ -265,7 +264,7 @@ export function exitedAgentPromptRow(screen) {
 
 // What a shell prints when it tries to run prose as a command.
 const SHELL_ERROR = /FullyQualifiedErrorId\s*:|CategoryInfo\s*:\s*\w*Error|ParserError|is not recognized as (?:the name of a cmdlet|an internal or external command)|: command not found\b|syntax error near unexpected token/i;
-const squash = (text) => String(text ?? '').replace(/\s+/g, '');
+const squashAll = (text) => String(text ?? '').replace(/\s+/g, '');
 const WAKE_KEY_CHARS = 40;
 /**
  * Proof from a frame read AFTER a send that the text went to a host shell, not an agent: the text
@@ -274,12 +273,12 @@ const WAKE_KEY_CHARS = 40;
  */
 export function shellReceivedText(after, text, before = '') {
   const rows = String(after ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
-  const key = squash(text).slice(0, WAKE_KEY_CHARS);
+  const key = squashAll(text).slice(0, WAKE_KEY_CHARS);
   if (key.length >= MIN_ECHO_CHARS) {
     for (let i = rows.length - 1; i >= 0; i -= 1) {
       const prompt = shellPromptPrefix(rows[i]);
       if (!prompt) continue;
-      const typed = squash([rows[i].slice(prompt.length), ...rows.slice(i + 1, i + 8)].join(''));
+      const typed = squashAll([rows[i].slice(prompt.length), ...rows.slice(i + 1, i + 8)].join(''));
       if (typed.startsWith(key)) return { row: rows[i], evidence: 'shell-echo' };
     }
   }
@@ -473,12 +472,12 @@ export function staleAwareState(state, outputAgeMs, activeStaleMs) {
 // A provider that holds typed text behind a running turn says so: Claude Code
 // "Press up to edit queued messages" / "Press up to select a queued message",
 // Devin "Press Enter to send queued messages".
-export const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
+const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
 // The wake is found by its opening words; a TUI wraps and indents the rest.
 const WAKE_PROBE_CHARS = 60;
 export const WAKE_PROOF_READS = 3; // a delivery proof reads the screen this many times,
 export const WAKE_PROOF_INTERVAL_MS = 1000; // this far apart (the kernel wake and the agent prompt alike)
-const screenProse = (screen) => collapse(String(screen ?? '').split(/\r?\n/)
+const screenProse = (screen) => squash(String(screen ?? '').split(/\r?\n/)
   .map((row) => row.replace(/^[\s│┃┆┊>›❯❭⎿↳●•]*/u, '')).join(' '));
 const occurrences = (haystack, needle) => {
   let n = 0;
@@ -498,7 +497,7 @@ const occurrences = (haystack, needle) => {
  *  - 'unproven': the screen shows neither.
  */
 export function wakeDeliveryOf({ before = '', after = '', text = '', stagedPattern = DEFAULT_STAGED_PATTERN } = {}) {
-  const probe = collapse(text).slice(0, WAKE_PROBE_CHARS);
+  const probe = squash(text).slice(0, WAKE_PROBE_CHARS);
   const wakeVisible = probe.length >= MIN_ECHO_CHARS
     && occurrences(screenProse(after), probe) > occurrences(screenProse(before), probe);
   const queuedMarker = QUEUED_MESSAGE_MARKER.test(String(after ?? ''));

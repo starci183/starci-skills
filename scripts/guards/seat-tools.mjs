@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guardsRoot } from './guards-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -30,7 +31,7 @@ if (isMain(import.meta.url)) {
   process.stdin.on('end', () => {
     let toolName = null;
     try { toolName = JSON.parse(input)?.tool_name ?? null; } catch { /* no decision on unreadable input */ }
-    const decision = seatToolDecision({ handle: process.env.ORCA_TERMINAL_HANDLE, toolName });
+    const decision = seatToolDecision({ handle: readEnv('ORCA_TERMINAL_HANDLE'), toolName });
     if (decision) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: decision.reason } }));
   });
 }

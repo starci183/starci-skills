@@ -4,14 +4,15 @@
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';
+import { stringList } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
 export const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 /** How a bounded context (a connection) is isolated: its own logical database, or its own schema of a shared one. */
-export const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
+const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
 /** The app kinds that may own a context: the services, never the migrate or cli apps that only run migrations. */
-export const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
+const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
 /** The database engines a connection may run on: a self-described Postgres, or the Postgres of a Supabase project. */
 export const CONNECTION_PROVIDERS = Object.freeze(["postgres", "supabase"]);
 /** The editions an app repository may declare in hfs.json (`full` when absent): the filter slots.mjs applies. */
@@ -35,11 +36,11 @@ export function connectionShapeProblems(list, apps) {
   return list.filter((c) => !owns(c)).map((c) => `connections ${c.name} is owned by ${c.owner}, which is not a ${CONTEXT_OWNER_KINDS.join(' or ')} app declared in the same side`);
 }
 export const SLOT_ID = /^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
-export const RUNTIME_SLOT_ID = /^runtime\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+const RUNTIME_SLOT_ID = /^runtime\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 export const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
 export const TRACKED = ['tracked', 'ignored', 'external'];
 /** A runtime manifest adds `generated`: tracked, written only by the slot's generatedBy, judged by drift (RT_GENERATED_DRIFT). */
-export const RUNTIME_TRACKED = [...TRACKED, 'generated'];
+const RUNTIME_TRACKED = [...TRACKED, 'generated'];
 export const TESTS = ['unit-beside', 'e2e', 'none'];
 export const APP_KIND = 'app';
 
@@ -62,7 +63,7 @@ export const RUNTIME_KIND = 'runtime';
 export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 /** The kind of a parsed manifest: `kind`, or app when absent (knowledge/hfs/slots.yaml carries none). */
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
-export const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
+const strList = (v) => stringList(v);
 
 const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'editions', 'litePresence', 'lite', 'provider'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */

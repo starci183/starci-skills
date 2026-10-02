@@ -47,7 +47,7 @@ export function replies({ since = 0, limit = 20, env = process.env } = {}) {
 }
 
 /** Resolve with the reply to inbox message `id`, or null after `timeoutMs`. */
-export async function waitReply(id, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = 2000, env = process.env } = {}) {
+async function waitReply(id, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = 2000, env = process.env } = {}) {
   const end = Date.now() + timeoutMs;
   for (;;) {
     const hit = readOutbox(SUPERVISOR_ID, env).find((r) => r.to === id);

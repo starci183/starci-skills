@@ -7,6 +7,7 @@
 // quit-agent.mjs agentOfTerminal. kernel/cli.mjs carries the same field list at
 // operationTerminalHandleOf - that file is reserved to the w2-api lanes.
 import { parseJson } from '../lib/json.mjs';
+import { normPath as normSpelling } from '../lib/path-key.mjs';
 
 /** Where a job row's terminal lives, in priority order: the worker column, then the payload. */
 export const JOB_HANDLE_FIELDS = Object.freeze([
@@ -38,7 +39,7 @@ export const kernelSignalRows = (db) =>
   db.prepare("SELECT key, value_json, expires_at FROM signals WHERE scope='kernel'").all()
     .map((row) => ({ key: row.key, expiresAt: row.expires_at, value: parse(row.value_json) ?? {} }));
 
-const normPath = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const normPath = (p) => normSpelling(p, { fold: true });
 
 /** `child` is `root` itself or a path inside it (both spellings normalized: slashes, case, no trailing slash). */
 export const pathUnder = (child, root) => {

@@ -84,12 +84,14 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { headShaOf } from '../lib/git-dir.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
 import {
-  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, latestAttemptOf, operationDispatchOf,
+  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, operationDispatchOf,
 } from './verbs/shared/rows.mjs';
-import { JOB_ROW, jobResultSql } from '../machine/job-row.mjs';
+import { JOB_ROW, jobResultSql, latestAttemptOf, latestKernelJobOf } from '../machine/job-row.mjs';
+import { agentOfJob } from '../lib/job-agent.mjs';
 import { kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
 import { foundationDutyFor } from './verbs/shared/foundation-duty.mjs';
@@ -108,9 +110,10 @@ import {
   routeCapUnderAutopilot,
 } from './autopilot-run.mjs';
 import {
-  classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, collapse,
+  classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText,
   clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN,
 } from '../lib/terminal-liveness.mjs';
+import { squash } from '../lib/clip.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
@@ -175,12 +178,15 @@ import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } fro
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
 // reader in engine/config.mjs at a different directory holding one — the same test and tooling
 // seam scripts/kernel/start-workflow.mjs and scripts/route/route-model.mjs use.
-const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
+const ownerRoot = readEnv('STARCI_OWNER_ROOT') ? path.resolve(readEnv('STARCI_OWNER_ROOT')) : skillRoot;
 
 // The status vocabulary is engine/db/ledger.mjs JOB_STATUSES; these are the
 // three views this gate reasons in. enqueue writes 'queued' and settle writes
@@ -576,7 +582,7 @@ const workerInputRowText = (screen) => {
     .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     if (!INPUT_ROW_GLYPH.test(rows[i])) continue;
-    const text = collapse(rows[i].replace(INPUT_ROW_GLYPH, ''));
+    const text = squash(rows[i].replace(INPUT_ROW_GLYPH, ''));
     if (text) return text;
   }
   return null;
@@ -1446,7 +1452,6 @@ const GIT_MEMO_SCHEMA = 'starci/status-git-memo@1';
 const GIT_READ_VERBS = new Set(['rev-parse', 'ls-tree', 'log', 'show', 'diff', 'cat-file']);
 // The flags a pinned read may carry: each shapes the answer from the named objects alone.
 const GIT_PINNED_FLAG_RX = /^(--verify|--quiet|-q|--name-only|--name-status|-r|-z|-\d+|-e|-t|-s|--batch|--batch-check|--format=.*|--pretty=.*)$/s;
-const FULL_SHA_RX = /^[0-9a-f]{40}$/;
 const GIT_PINNED_REV_RX = /^(HEAD|[0-9a-f]{40})(\^\{commit\}|:.*)?$/s;
 // One entry holds at most GIT_MEMO_MAX_BYTES (a product repo's committed-Work cat-file batch runs ~4 MB); the
 // directory is kept under GIT_MEMO_BUDGET_BYTES least-recently-used first (a hit refreshes its mtime), since
@@ -1461,29 +1466,7 @@ const gitMemoDirOf = (env = process.env) => (env.STARCI_GIT_MEMO_DIR ? path.reso
  * when it cannot be told that way (not a top level, reftable, an unreadable ref), and the read then runs live.
  * Branch refs are read from the common dir only, as git does for a linked worktree.
  */
-const gitHeadShaOf = (root) => {
-  const isSha = (text) => FULL_SHA_RX.test(text);
-  try {
-    let gitDir = path.join(root, '.git');
-    if (fs.statSync(gitDir).isFile()) {
-      const pointer = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
-      if (!pointer) return null;
-      gitDir = path.resolve(root, pointer.trim());
-    }
-    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
-    if (isSha(head)) return head;
-    const ref = /^ref:\s*(refs\/heads\/\S+)$/.exec(head)?.[1];
-    if (!ref) return null;
-    let common = gitDir;
-    try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }
-    try { const loose = fs.readFileSync(path.join(common, ref), 'utf8').trim(); return isSha(loose) ? loose : null; } catch { /* packed */ }
-    for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
-      const [sha, name] = line.trim().split(' ');
-      if (name === ref && isSha(sha)) return sha;
-    }
-  } catch { /* no git files to read */ }
-  return null;
-};
+const gitHeadShaOf = (root) => headShaOf(root, { headsOnly: true, commonOnly: true });
 
 /** A spawnSync call as a read-only git read {root, verb, args}, or null. */
 const gitReadOf = (command, argv, options) => {
@@ -1713,10 +1696,6 @@ const refuseKernelBias = (verb, args) => {
   if (flags.length) throw Object.assign(new Error(`api ${verb}: unknown option ${flags.map((f) => `--${f}`).join(', ')}; the router decides (open provider-health circuits, the retry lineage) and only the owner goal routing_bias applies`), { code: 'unknown-option' });
 };
 
-const normalizeProviderId = (provider) => {
-  const id = String(provider ?? '').trim().toLowerCase();
-  return id.replace(/-agent$/, '');
-};
 const failureText = (...parts) => parts.map((part) => {
   if (part == null) return '';
   if (typeof part === 'string') return part;
@@ -1760,7 +1739,7 @@ const providerStrikeLimit = (failureKind) => {
 // The raw provider-health row, open circuit or not: providerHealthOf answers
 // only for an OPEN circuit, so it cannot count the strikes leading to one.
 const providerSignalOf = (db, provider, now = Date.now()) => {
-  const key = normalizeProviderId(provider);
+  const key = normalizeProvider(provider);
   if (!key) return null;
   const row = readProviderCircuit(key);
   if (!row || (row.expiresAt != null && row.expiresAt <= now)) return null;
@@ -1780,7 +1759,7 @@ const circuitBackoff = () => allocationSettings().circuitBackoff ?? null;
 // recorded against a different credential is no prior strike and no prior trip.
 const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth', credential = null,
   fixedExpiresAt = null, extra = null }) => {
-  const key = normalizeProviderId(provider);
+  const key = normalizeProvider(provider);
   if (!key) return null;
   const auth = failureKind === 'auth';
   const rotatedFrom = (row) => auth && credentialRotated(row, credential);
@@ -1976,7 +1955,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
 // result, lease rows released, one event — and when `incident` is set (the
 // post-launch attestation failures) a typed infra-provider incident so survey
 // sees it without parsing events. `terminal` is the launch's handle: the worker's Dispatch id.
-const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const bestEffort = bestEffortCall;
 
 // A refusal must leave no live worker or open Task behind. Whatever this
 // attempt created before the host said no is closed exactly once here: its
@@ -2013,7 +1992,7 @@ const screenTailOf = (screen) => {
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
 // The one human-readable line of a refused launch (op attempt settle_json.message, the UI): what step refused it and why.
-export const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
+const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
   `dispatch rejected at ${step ?? 'launch'}${signal ? ` (${signal})` : ''}${error ? `: ${String(error).slice(0, 300)}` : ''}; no try spent, the job goes back to ready`;
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
@@ -2280,7 +2259,7 @@ function raiseEnvironmentIncident(ledger, job, health) {
 // terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
 // refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
 // is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
-const latestKernelJobOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1`).get(workflowId);
+
 const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = bindWorkflowRun, kernelJob = latestKernelJobOf(db, workflowId) } = {}) => {
   const kernelHandle = kernelJob?.worker_id ?? null;
   if (!runId || !kernelHandle) return { ok: false, action: 'failed', kernelHandle, error: 'no run or no kernel terminal' };
@@ -3503,61 +3482,69 @@ function reportOwnedPaths(db, job, repo) {
 
 // The visual proof a pass owes (proofMediaGate over policy.proofMedia) and the host-path-free evidence it keeps (evidenceHostPathGate): read-only,
 // before anything is written. A leg admitted before the job-proof-media or evidence-host-path change settles on its old contract.
-function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
+/**
+ * The settle-gate prelude every per-gate settle function shares: the job row (null when the job is gone, its status
+ * is not reportable, or `opOnly` names another op), its op and its contract admission. `changeId` settles a leg
+ * admitted before that change on its old contract (null); `requireChange` also refuses when the change is unknown.
+ * `requiresReport` returns null when nothing is filed - pass-report-missing owns that refusal.
+ */
+function settleJobContext(db, jobId, { changeId = null, opOnly = null, requiresReport = false, requireChange = false } = {}) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const op = jobOpOf(job), policy = proofMediaPolicyOf(skillRoot, op);
-  const admitted = admittedContractOf(db, job), changes = loadContractChanges(skillRoot);
-  const mediaOwed = Boolean(policy) && !admittedBeforeChange(admitted, changeById(changes, PROOF_MEDIA_CHANGE));
-  const hostOwed = !admittedBeforeChange(admitted, changeById(changes, EVIDENCE_HOST_PATH_CHANGE));
-  if (!mediaOwed && !hostOwed) return null;
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || (opOnly !== null && jobOpOf(job) !== opOnly)) return null;
+  const admitted = admittedContractOf(db, job);
+  const change = changeId === null ? null : changeById(loadContractChanges(skillRoot), changeId);
+  if (changeId !== null && ((requireChange && !change) || admittedBeforeChange(admitted, change))) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  if (requiresReport && (filed.attemptId == null || filed.reportId == null)) return null; // no filed report: pass-report-missing owns the refusal
+  return { job, op: jobOpOf(job), admitted, filed };
+}
+
+/**
+ * The report evidence a settle gate reads: the filed envelope (or `reportText` parsed when nothing is filed), the
+ * job's placement roots and the collected job files. `jobId` scopes collectJobFiles' recordings; null omits it.
+ */
+function settleJobFiles(db, job, repo, filed, { reportText = null, jobId = null } = {}) {
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
-  const recorded = independentChecksOf(db, { jobId: job.job_id })?.checks;
+  const { files } = collectJobFiles({ repo, envelope, roots, ...(jobId === null ? {} : { jobId }), artifacts: filed.artifacts });
+  return { envelope, roots, files };
+}
+
+function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
+  const s = settleJobContext(db, jobId);
+  if (!s) return null;
+  const policy = proofMediaPolicyOf(skillRoot, s.op), changes = loadContractChanges(skillRoot);
+  const mediaOwed = Boolean(policy) && !admittedBeforeChange(s.admitted, changeById(changes, PROOF_MEDIA_CHANGE));
+  const hostOwed = !admittedBeforeChange(s.admitted, changeById(changes, EVIDENCE_HOST_PATH_CHANGE));
+  if (!mediaOwed && !hostOwed) return null;
+  const { envelope, files } = settleJobFiles(db, s.job, repo, s.filed, { reportText, jobId: s.job.job_id });
+  const recorded = independentChecksOf(db, { jobId: s.job.job_id })?.checks;
   const gate = (hostOwed ? evidenceHostPathGate({ files }) : null) ?? (mediaOwed ? proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] }) : null);
-  return gate ? { ...gate, op, status: job.status } : null;
+  return gate ? { ...gate, op: s.op, status: s.job.status } : null;
 }
 // The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
 // runtime reads the op's attached sonar.json itself. Read-only here - api settle records the judgment. A leg admitted before
 // the sonar-enforce change settles on its old contract. Null when the op is not held to the gate.
 function settleSonarGate(db, jobId, repo) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const op = jobOpOf(job);
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), SONAR_ENFORCE_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  if (filed.attemptId == null || filed.reportId == null) return null; // no filed report: pass-report-missing owns the refusal
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
-  const judgment = judgeJob({ op, files });
-  return judgment ? { ...judgment, workflowId: job.workflow_id, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
+  const s = settleJobContext(db, jobId, { changeId: SONAR_ENFORCE_CHANGE, requiresReport: true });
+  if (!s) return null;
+  const { files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  const judgment = judgeJob({ op: s.op, files });
+  return judgment ? { ...judgment, workflowId: s.job.workflow_id, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
 // The op loop a code-writing op's settle owes (scripts/kernel/gate-settle.mjs over knowledge/op-gate.yaml): the runtime re-reads
 // the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own hfs explain. Read-only
 // here - api settle records the judgment. A leg admitted before the op-gate-loop change settles on its old contract. Null when
 // the op is not held to the loop.
 async function settleOpGate(db, jobId, repo) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const op = jobOpOf(job);
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), OP_GATE_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  if (filed.attemptId == null || filed.reportId == null) return null; // no filed report: pass-report-missing owns the refusal
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
+  const s = settleJobContext(db, jobId, { changeId: OP_GATE_CHANGE, requiresReport: true });
+  if (!s) return null;
+  const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
   // A workflow-worktree op is gated against a checkpoint its side has not moved since (op-gate-base-mismatch otherwise).
-  const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: job.workflow_id, opId: job.job_id });
-  const judgment = await judgeJobLoop({ op, files, roots: roots.length ? roots : [repo], gateBases });
-  return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
+  const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: s.job.workflow_id, opId: s.job.job_id });
+  const judgment = await judgeJobLoop({ op: s.op, files, roots: roots.length ? roots : [repo], gateBases });
+  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
 // The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):
 // the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
@@ -3565,86 +3552,57 @@ async function settleOpGate(db, jobId, repo) {
 // records the judgment. A leg admitted before the op-mechanism-proofs change settles on its old contract. Null when the op owes
 // no proof for its mode.
 async function settleOpProofs(db, jobId, repo) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const op = jobOpOf(job);
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), OP_PROOF_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  if (filed.attemptId == null || filed.reportId == null) return null; // no filed report: pass-report-missing owns the refusal
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
-  const mode = typeof jobPayloadOf(job).params?.mode === 'string' ? jobPayloadOf(job).params.mode : null;
-  const judgment = judgeJobProofs({ op, files, mode });
-  return judgment ? { ...judgment, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
+  const s = settleJobContext(db, jobId, { changeId: OP_PROOF_CHANGE, requiresReport: true });
+  if (!s) return null;
+  const { files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  const mode = typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null;
+  const judgment = judgeJobProofs({ op: s.op, files, mode });
+  return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), DRAW_ACCEPTANCE_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
-  const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
+  const s = settleJobContext(db, jobId, { changeId: DRAW_ACCEPTANCE_CHANGE, opOnly: 'interface.draw' });
+  if (!s) return null;
+  const { files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
+  const owned = (jobPayloadOf(s.job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
   // A code a contract change added after this leg was admitted is a suspect for it, never a refusal.
-  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw', withheld: admitted.withheld }).codes) : new Set();
+  const advisory = Number.isFinite(s.admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: s.admitted.at, op: 'interface.draw', withheld: s.admitted.withheld }).codes) : new Set();
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
-  return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records } : null;
+  return findings.length ? { op: s.op, status: s.job.status, findings, records: verdict.records } : null;
 }
 // The draw loop's machine metrics, RE-RUN by the runtime (scripts/work/draw-loop-settle.mjs): every live part of every
 // ui record the pass binds is re-rendered from its render source and re-measured - the capture, the DNA gate, the
 // taste metrics, the palette, the Grammar geometry and the ui-proof score - never the loop's self-reported numbers.
 // A leg admitted before the draw-loop-dna change settles on its old contract; a code it added is advisory for it.
 async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), DRAW_LOOP_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
-  const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
+  const s = settleJobContext(db, jobId, { changeId: DRAW_LOOP_CHANGE, opOnly: 'interface.draw' });
+  if (!s) return null;
+  const { files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
+  const owned = (jobPayloadOf(s.job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = await settleDrawMetricFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
-  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw', withheld: admitted.withheld }).codes) : new Set();
+  const advisory = Number.isFinite(s.admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: s.admitted.at, op: 'interface.draw', withheld: s.admitted.withheld }).codes) : new Set();
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
-  return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records, loops: verdict.loops } : null;
+  return findings.length ? { op: s.op, status: s.job.status, findings, records: verdict.records, loops: verdict.loops } : null;
 }
 // The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/work/validate/work-hygiene.mjs,
 // the same parse + scoped strict validate + secret scan the product repo's pre-commit hook runs): the files its report
 // names plus every file its commits changed since the base it was admitted on. Read-only, before anything is written.
 // A leg admitted before the work-hygiene-gate change settles on its old contract.
 function settleWorkHygiene(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), WORK_HYGIENE_CHANGE);
-  if (!change || admittedBeforeChange(admitted, change)) return null;
-  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
-  let roots = [];
-  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
+  const s = settleJobContext(db, jobId, { changeId: WORK_HYGIENE_CHANGE, requireChange: true });
+  if (!s) return null;
+  const { envelope, roots, files } = settleJobFiles(db, s.job, repo, s.filed, { reportText });
   const changed = files.map((f) => f.abs);
-  const { head, base } = jobShasOf({ envelope, result: null, payload: jobPayloadOf(job) });
+  const { head, base } = jobShasOf({ envelope, result: null, payload: jobPayloadOf(s.job) });
   if (head) for (const root of [...new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))]) {
     for (const rel of rangeFiles(root, base ?? `${head}~1`, head)) if (inSecretScope(rel)) changed.push(path.join(root, rel));
   }
   const checked = checkWorkFilesAbs([...new Set(changed.filter((p) => inSecretScope(p)))]);
-  return checked.ok ? null : { op: jobOpOf(job), status: job.status, findings: checked.findings, files: checked.files };
+  return checked.ok ? null : { op: s.op, status: s.job.status, findings: checked.findings, files: checked.files };
 }
 // The grammar proposals an interface.draw job carries (scripts/work/grammar-proposal.mjs): one grammar-proposal-filed
 // event each, status proposed - the owner decides them, never the runtime. Never un-settles.
@@ -3827,8 +3785,6 @@ function attributeChecks(db, { repo, job, checks }) {
 /* ------------------------------------------------------ the worker's agent */
 // The worker's own agent CLI: its routed provider/model, else Claude for a managed Dispatch (the
 // managed pool's agent). A managed worker used to get Claude's quit input whatever it ran.
-const agentOfJob = (payload) => /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
-  ?? (payload?.managed ? 'claude' : null);
 // Path leases of a running job whose worker is not proven dead are renewed to a full
 // dispatchLeaseTtlMs once less than half of it is left (api status). Settle and the dead-worker
 // recovery still release them; only a worker nobody observes can outlive its fence.
@@ -3918,7 +3874,7 @@ const API_INTERNALS = Object.freeze({
   handoverProofGate, reportFiledWake,
   isCheckResultEnvelope, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck,
   summarizeCheckEvidence,
-  normalizeProviderId, providerQuotaProbeCommand, providerRecoverCommand,
+  normalizeProvider, providerQuotaProbeCommand, providerRecoverCommand,
   currentCredentialOf,
   accountsOnceOf: () => accountsOnce,
   refuseDecisionsFirst, goalLegOf, workflowFinished,

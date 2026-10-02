@@ -54,8 +54,9 @@ import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, product
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
-import { slash } from '../lib/path-key.mjs';
+import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
+import { forEachFileLine } from '../lib/read-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
@@ -113,24 +114,6 @@ export function diffScanner(files = [], { encText = null } = {}) {
  *  repository's own .starcistacks + sops convention, or a value generated per run. */
 export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/uat/test-secret.mjs) or generate it per run; never a plaintext literal`;
 export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
-
-/** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
- *  (one push was 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
-export function forEachFileLine(file, onLine, { chunkBytes = 8 * 1024 * 1024 } = {}) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(chunkBytes);
-    let carry = '';
-    for (;;) {
-      const n = fs.readSync(fd, buf, 0, chunkBytes, null);
-      if (n <= 0) break;
-      const lines = (carry + buf.toString('utf8', 0, n)).split(/\r?\n/);
-      carry = lines.pop();
-      for (const l of lines) onLine(l);
-    }
-    if (carry) onLine(carry);
-  } finally { fs.closeSync(fd); }
-}
 
 /** Scan the range `from..to` of `cwd`: {ok, findings, files}. The diff is written to a temp file and read
  *  in chunks, never held whole in a spawn buffer (a 64 MB overflow read as `scan failed: git diff failed`). */
@@ -212,13 +195,13 @@ const fullHeadOf = (repo, run) => run(['rev-parse', 'main'], { cwd: repo }).stdo
 /** MB-03: a push (with its pre-push hook: one repo's Jest alone takes ~4 min) may run this long; a timeout is its own reason. */
 export const PUSH_TIMEOUT_MS = 600_000;
 /** MB-03: a refusal identical to the previous one (same head, same signature) is not re-run before base x 2^(n-1), capped. */
-export const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
+const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
 
 const outputOf = (r) => [r?.stdout, r?.stderr, r?.error].filter(Boolean).join('\n');
 const WHY_LINE = /\b(?:error|errors|failed|failure|fail|rejected|denied|refused|timed out|ERR!)\b|✖|×/i;
 
 /** The lines that say why a push failed: its error/fail lines (at most 8), else its last 8 lines. Pure. */
-export function failureSummary(text, { max = 8 } = {}) {
+function failureSummary(text, { max = 8 } = {}) {
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const why = lines.filter((l) => WHY_LINE.test(l));
   // The error lines first, then the tail (a hook's own last words: `LINT_ERROR ...`, a failing suite), once each.
@@ -248,7 +231,7 @@ export function failureSignature(r, text = outputOf(r)) {
 }
 
 /** The full (redacted) push/hook output as a blob: {sha, bytes} or null (the store refused). Never throws. */
-export function storeOutput(text, { put = null } = {}) {
+function storeOutput(text, { put = null } = {}) {
   if (!String(text ?? '').trim()) return null;
   try {
     const bytes = Buffer.from(redactText(String(text)), 'utf8');
@@ -275,7 +258,7 @@ const failureOf = (r, { store = storeOutput } = {}) => {
  * repeat, signature} while inside the backoff, else {hold: false}. `prior` = the last refusal {head, signature, at,
  * repeat}. Pure.
  */
-export function refusalHold(prior, { head, now = Date.now(), backoff = REFUSAL_BACKOFF } = {}) {
+function refusalHold(prior, { head, now = Date.now(), backoff = REFUSAL_BACKOFF } = {}) {
   if (!prior?.head || !head || prior.head !== head || !prior.signature) return { hold: false };
   const repeat = Math.max(1, Number(prior.repeat) || 1);
   const until = Number(prior.at) + Math.min(backoff.maxMs, backoff.baseMs * 2 ** (repeat - 1));
@@ -299,7 +282,7 @@ const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmd
 /** Installed dependencies, build and tool output a scratch never borrows from the live tree: the hook judges the commit,
  *  not a stale build of the working tree, and the scratch installs its own dependencies. Matched against every path
  *  segment of an ignored entry. */
-export const LOCAL_STATE_EXCLUDED = /^(?:node_modules|dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
+const LOCAL_STATE_EXCLUDED = /^(?:node_modules|dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
 
 /** A local-state path that is linked in place or not at all, never copied: the stack runtime and every file
  *  the outgoing scan forbids (env files, keys, credentials, .secrets). */
@@ -313,7 +296,7 @@ const neverCopied = (rel) => /(^|\/)\.starcistacks\//i.test(rel) || FORBIDDEN_FI
  * excluded output and anything the worktree already holds (its own npm ci install, the hooks link) are skipped.
  * Returns [{rel, dir}], `rel` '/'-separated, one point per subtree.
  */
-export function localStateEntries(repo, worktree, { run = git } = {}) {
+function localStateEntries(repo, worktree, { run = git } = {}) {
   const listed = run(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'], { cwd: repo });
   if (!listed.ok) return [];
   const points = new Map();
@@ -442,8 +425,7 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   } catch (error) { return unavailable(String(error?.message ?? error)); }
 }
 
-const canonical = (p) => { const resolved = path.resolve(p); try { return fs.realpathSync.native(resolved); } catch { return resolved; } };
-const repoKey = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
+const repoKey = (p) => foldCase(realPath(p));
 
 /**
  * The app repository the ledger owner `repo` binds in work.json. [] when no
@@ -473,7 +455,7 @@ export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot =
  * MB-03: the last push outcome per repository when it was a refusal with a signature: Map(repoKey -> {head, signature,
  * at, repeat}). A later successful push clears it. Never throws.
  */
-export function lastRefusals({ env = process.env } = {}) {
+function lastRefusals({ env = process.env } = {}) {
   const out = new Map();
   try {
     // machine.sqlite pushes: a held (skipped) attempt is not an attempt; repeat = the consecutive refusals at that head.

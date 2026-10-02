@@ -13,14 +13,14 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
+import { commitShaOf } from './commit-sha.mjs';
 import { createOwnership } from './work-ownership.mjs';
 import { CHECKPOINT_EVENTS, PRESERVED_WORKFLOW_PREFIX, checkpointOp, leasesOf, preserveAndReset, rebaseWorkflow, recordOf, splitChanges } from './workflow-checkpoint.mjs';
 
-const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 /** One git call file in `cwd`: {ok, stdout}. */
 const git = (call, cwd, args) => { const r = call(args, { cwd, timeout: 600_000, maxBuffer: 64 * 1024 * 1024 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim() }; };
-const revParse = (cwd, ref) => { const r = git(revParseQuery, cwd, ['--verify', '--quiet', `${ref}^{commit}`]); return r.ok && SHA.test(r.stdout) ? r.stdout : null; };
+const revParse = (cwd, ref) => commitShaOf(git, cwd, ref);
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const mainOf = (ctx) => ctx?.main ?? 'main';
 

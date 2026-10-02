@@ -10,24 +10,10 @@
  */
 import { posix } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
-import { typed } from "./lib/types.mjs"
+import { resolveAlias } from "./lib/specifier.mjs"
 
 /** The app slots: the slot ids of a service app's `apps/<app>/src/` folder. */
 const isAppSlot = (slotId) => typeof slotId === "string" && slotId.startsWith("be.app.")
-
-/** The absolute path (no extension) an alias specifier maps to under `compilerOptions.paths`, or null. */
-const resolveAlias = (context, specifier) => {
-  const options = typed(context).program.getCompilerOptions()
-  const base = options.baseUrl ?? options.pathsBasePath
-  if (!options.paths || typeof base !== "string") return null
-  for (const [pattern, targets] of Object.entries(options.paths)) {
-    if (!pattern.endsWith("/*") || !targets[0]) continue
-    const prefix = pattern.slice(0, -1)
-    if (!specifier.startsWith(prefix)) continue
-    return posix.normalize(`${base.replaceAll("\\", "/")}/${targets[0].replace("*", specifier.slice(prefix.length))}`)
-  }
-  return null
-}
 
 const isRelative = (specifier) => specifier === "." || specifier === ".." || specifier.startsWith("./") || specifier.startsWith("../")
 
@@ -65,7 +51,7 @@ export const serviceIsolation = {
       if (typeof specifier !== "string") return
       const target = isRelative(specifier)
         ? posix.normalize(`${posix.dirname(filename.replaceAll("\\", "/"))}/${specifier}`)
-        : resolveAlias(context, specifier)
+        : resolveAlias(context, specifier)?.target
       if (!target) return
       const reached = [`${target}.ts`, `${target}/index.ts`].find((candidate) => isAppSlot(hfs.slotOf(candidate)))
       if (!reached) return

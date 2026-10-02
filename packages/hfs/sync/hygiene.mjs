@@ -24,7 +24,7 @@ const STACKS = '.starcistacks/';
 const GUARDED = file => file.startsWith(WORK) || file.startsWith(STACKS);
 
 /** The subset of `files` git ignores (as if untracked), asked in one call: a Set of paths. */
-export function ignoredAmong(cwd, files) {
+function ignoredAmong(cwd, files) {
   if (files.length === 0) return new Set();
   try {
     const out = execFileSync('git', ['check-ignore', '--no-index', '-z', '--stdin'], { cwd, input: files.join('\0'), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -61,7 +61,7 @@ export const trackedFiles = cwd => gitList(cwd, ['ls-files', '-z']);
 const MAX_STAGED_BYTES = 1024 * 1024;
 
 /** The text of `file` as the index holds it (what the commit would record), or null when it is absent, binary or over 1 MB. */
-export function stagedText(cwd, file) {
+function stagedText(cwd, file) {
   try {
     const blob = execFileSync('git', ['show', `:${file}`], { cwd, maxBuffer: MAX_STAGED_BYTES * 2, stdio: ['ignore', 'pipe', 'ignore'] });
     return blob.length > MAX_STAGED_BYTES || blob.includes(0) ? null : blob.toString('utf8');
@@ -71,7 +71,7 @@ export function stagedText(cwd, file) {
 }
 
 /** The secret findings of `files` read from the index, as {file, code, message}; a file the name check already refused is not reported twice. */
-export function secretGuardFindings(cwd, files, alreadyRefused = new Set()) {
+function secretGuardFindings(cwd, files, alreadyRefused = new Set()) {
   return files.filter(file => !alreadyRefused.has(file)).flatMap(file => secretFileFindings({ file, text: stagedText(cwd, file) }).map(finding => ({ file, code: finding.code, message: finding.message })));
 }
 
@@ -101,7 +101,7 @@ const ledgerHygieneScript = cwd => {
  * `cwd`, as {code, file, message} entries; [] when that checkout carries no ledger-hygiene script. Never throws: a
  * report failure is one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `hfs work-hygiene`.
  */
-export async function ledgerHygieneFindings(cwd = process.cwd()) {
+async function ledgerHygieneFindings(cwd = process.cwd()) {
   const script = ledgerHygieneScript(cwd);
   if (!script || !fs.existsSync(script)) return [];
   try {

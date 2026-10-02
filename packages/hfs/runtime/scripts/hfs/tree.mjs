@@ -11,10 +11,10 @@ import { posixPath } from '../lib/path-key.mjs';
 /** Directory names no tree check enters: git's own store and installed packages. */
 const NEVER_WALKED = new Set(['.git', 'node_modules']);
 /** Two sibling names this close (Levenshtein) are the same name misspelt. */
-export const GHOST_DISTANCE = 2;
+const GHOST_DISTANCE = 2;
 
 /** Levenshtein distance of two names. */
-export function editDistance(a, b) {
+function editDistance(a, b) {
   let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {
     const row = [i];

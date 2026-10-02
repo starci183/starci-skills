@@ -8,6 +8,8 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from '../../gates/grammar-dist.mjs';
 import {slash, sameOrUnder} from '../../lib/path-key.mjs';
+import {objectList} from '../../lib/list.mjs';
+import {formatCheckLines} from '../../lib/check-format.mjs';
 import { isInside as inside } from '../../lib/walk.mjs';
 import {readJsonFile as readJson} from '../../lib/json.mjs';
 
@@ -27,15 +29,15 @@ import {readJsonFile as readJson} from '../../lib/json.mjs';
 export const BRAND_CHECKS='starci/brand-checks@1';
 export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-distinct','mascot-assets-present','icon-set-only','tokens-in-grammar','direction'];
 /** WCAG 2.x: text needs 4.5:1, a non-text indicator (primary on its surface) needs 3:1. */
-export const DEFAULT_MIN_CONTRAST=4.5;
-export const NON_TEXT_MIN_CONTRAST=3;
+const DEFAULT_MIN_CONTRAST=4.5;
+const NON_TEXT_MIN_CONTRAST=3;
 /**
  * HeroUI status tones: a solid pair (`--<tone>` + `--<tone>-foreground`) and a soft pair (`--<tone>-soft` +
  * `--<tone>-soft-foreground`, the Chip/Badge/Alert `soft` and `flat` variants). Owner decision 2026-09-30: the
  * soft foreground on its own soft tint is accepted at 3:1, and a bare status glyph on a page ground takes the
  * soft foreground instead of a darkened solid tone. A soft pair is a token with role `<tone>-soft`.
  */
-export const SOFT_MIN_CONTRAST=3;
+const SOFT_MIN_CONTRAST=3;
 export const STATUS_TONES=['success','warning','info','danger'];
 const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec(token.role??'');return match?match[1]:null;};
 /**
@@ -46,7 +48,7 @@ const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec
  */
 export const MIN_PRIMARY_DANGER_DELTA=20;
 export const TOKEN_TOLERANCE=0.5;
-export const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
+const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
 export const OFFENDER_CAP=20;
 const SCAN_EXCLUDED=new Set(['node_modules','dist','.next','.git','.dist','coverage','build','out','.turbo','.cache']);
 const SCAN_FILE_LIMIT=5000;
@@ -57,7 +59,6 @@ const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tab
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
 const digest=sha256;
-const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof item==='object');
 
 // ---------------------------------------------------------------------------
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
@@ -65,11 +66,11 @@ const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof it
 
 const clamp01=value=>value<0?0:value>1?1:value;
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
-export const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
-export const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
+const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
+const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
 
 /** Linear-light sRGB (0..1 each) to OKLab. */
-export function linearRgbToOklab([red,green,blue]){
+function linearRgbToOklab([red,green,blue]){
   const long=Math.cbrt(0.4122214708*red+0.5363325363*green+0.0514459929*blue);
   const medium=Math.cbrt(0.2119034982*red+0.6806995451*green+0.1073969566*blue);
   const short=Math.cbrt(0.0883024619*red+0.2817188376*green+0.6299787005*blue);
@@ -79,7 +80,7 @@ export function linearRgbToOklab([red,green,blue]){
 }
 
 /** OKLab to linear-light sRGB (unclamped: a value outside 0..1 is outside the sRGB gamut). */
-export function oklabToLinearRgb({L,a,b}){
+function oklabToLinearRgb({L,a,b}){
   const long=(L+0.3963377774*a+0.2158037573*b)**3;
   const medium=(L-0.1055613458*a-0.0638541728*b)**3;
   const short=(L-0.0894841775*a-1.2914855480*b)**3;
@@ -158,7 +159,7 @@ function color({notation,rgb,alpha,raw,lab=null,clipped=false}){
 /** Euclidean OKLab distance on the x100 scale: black against white is 100. */
 export const deltaEOk=(first,second)=>100*Math.hypot(first.oklab.L-second.oklab.L,first.oklab.a-second.oklab.a,first.oklab.b-second.oklab.b);
 /** WCAG 2.x relative luminance of a parsed colour. */
-export const relativeLuminance=({rgb:[red,green,blue]})=>0.2126*srgbToLinear(red/255)+0.7152*srgbToLinear(green/255)+0.0722*srgbToLinear(blue/255);
+const relativeLuminance=({rgb:[red,green,blue]})=>0.2126*srgbToLinear(red/255)+0.7152*srgbToLinear(green/255)+0.0722*srgbToLinear(blue/255);
 /** WCAG 2.x contrast ratio: 21 for black against white, 1 for a colour against itself. */
 export function contrastRatio(first,second){
   const one=relativeLuminance(first),two=relativeLuminance(second);
@@ -352,7 +353,7 @@ export function grammarTokenNames({family,grammarRoot=defaultGrammarRoot()}){
 // ---------------------------------------------------------------------------
 
 const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
-const brandTokens=brand=>listOf(brand?.color?.tokens).filter(token=>typeof token.token==='string');
+const brandTokens=brand=>objectList(brand?.color?.tokens).filter(token=>typeof token.token==='string');
 const byRole=(tokens,role)=>tokens.find(token=>token.role===role)??null;
 
 /**
@@ -424,7 +425,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
   const phase=brandStage(stage);
   const tokens=brandTokens(brand);
   const planned=tokens.filter(isPlannedToken);
-  const declared=listOf(brand?.sources).filter(source=>['css','tokens'].includes(source.kind));
+  const declared=objectList(brand?.sources).filter(source=>['css','tokens'].includes(source.kind));
   // At verify a planned token must be in the app's own source; a check that could read no source is not a pass.
   const unprovenAtVerify=(why,evidence)=>phase==='verify'&&planned.length
     ?check(id,'fail',`${why} At the verify stage the planned token${planned.length===1?'':'s'} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,
@@ -694,8 +695,8 @@ export function checkPrimaryDangerDistinct({brand}){
  */
 export function checkMascotAssetsPresent({brand,tree,brandDir}){
   const id='mascot-assets-present';
-  const assets=listOf(brand?.mascot?.assets).filter(asset=>typeof asset.path==='string'&&asset.path);
-  const declared=listOf(brand?.mascot?.assets);
+  const assets=objectList(brand?.mascot?.assets).filter(asset=>typeof asset.path==='string'&&asset.path);
+  const declared=objectList(brand?.mascot?.assets);
   if(!declared.length)return check(id,'skip','The brand declares no mascot asset.',{tree:slash(tree)});
   const root=path.resolve(tree);
   const findings=declared.map(asset=>{
@@ -812,7 +813,7 @@ export function checkTokensInGrammar({brand,family,grammarRoot}){
 
 /** The page archetypes a direction settles (work/brand@1 $defs.direction.archetypes). */
 export const DIRECTION_ARCHETYPES=Object.freeze(['dashboard','list','detail','form','wizard','empty']);
-export const DIRECTION_STATUSES=Object.freeze(['proposed','accepted']);
+const DIRECTION_STATUSES=Object.freeze(['proposed','accepted']);
 /** The owner ask that accepts a direction archetype (scripts/work/brand-direction.mjs question), and its receipt review. */
 export const DIRECTION_REVIEW_KIND='brand-direction-review';
 export const DIRECTION_REVIEW_SCHEMA='starci/brand-direction-review@1';
@@ -821,7 +822,7 @@ export const DIRECTION_DECISIONS=Object.freeze(['accept','revise']);
 const DIRECTION_ACCEPT_OPTION=0;
 /** The review a draw-review receipt carries (scripts/work/draw-review.mjs DRAW_REVIEW_SCHEMA): a golden's owner accept. */
 const DRAW_REVIEW_RECEIPT_SCHEMA='starci/draw-review@1';
-export const LEARNED_STATUSES=Object.freeze(['proposed','accepted']);
+const LEARNED_STATUSES=Object.freeze(['proposed','accepted']);
 const ARCHETYPE_FIELDS=['regionOrder','grid1184','grid390','emphasis','primaryActionPlacement','never','whenNotToUse'];
 
 /** The component names one grammar family's DNA renders (`renderers[].component`). */
@@ -833,7 +834,7 @@ export function grammarComponentNames({family,grammarRoot=defaultGrammarRoot()})
   try{
     const text=readText(file);
     const dna=path.extname(file).toLowerCase()==='.json'?JSON.parse(text):parseYaml(text);
-    const names=listOf(dna?.renderers).map(renderer=>renderer.component).filter(name=>typeof name==='string');
+    const names=objectList(dna?.renderers).map(renderer=>renderer.component).filter(name=>typeof name==='string');
     return {file,names,error:names.length?null:'the DNA snapshot declares no renderers'};
   }catch(error){return {file,names:[],error:`unreadable DNA snapshot: ${String(error.message??error)}`};}
 }
@@ -849,7 +850,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   // An owner-accepted drawing promoted to the archetype's golden (draw-feedback.mjs, brand-direction.mjs promoteGolden):
   // the owner's draw-review accept of the very parts the golden holds accepts the archetype.
   if(archetype&&review&&typeof review==='object'&&review.schema===DRAW_REVIEW_RECEIPT_SCHEMA){
-    const seen=new Set(listOf(review.parts).map(entry=>entry?.sha256).filter(Boolean));
+    const seen=new Set(objectList(review.parts).map(entry=>entry?.sha256).filter(Boolean));
     const unseen=golden.filter(entry=>!seen.has(entry.sha256));
     if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} is not a drawing the owner accepted in ${receipt.file}`};
     if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
@@ -858,7 +859,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   if(review&&typeof review==='object'){
     if(review.schema!==DIRECTION_REVIEW_SCHEMA)return {ok:false,why:`${receipt.file} answers a ${review.schema??'non-direction'} review, not a ${DIRECTION_REVIEW_SCHEMA}`};
     if(archetype&&review.archetype!==archetype)return {ok:false,why:`${receipt.file} reviews archetype ${review.archetype??'(none)'}, not ${archetype}`};
-    const seen=new Set(listOf(review.golden).map(entry=>entry.sha256));
+    const seen=new Set(objectList(review.golden).map(entry=>entry.sha256));
     const unseen=golden.filter(entry=>!seen.has(entry.sha256));
     if(archetype&&unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')} changed after the owner reviewed it`};
   }
@@ -867,7 +868,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
 }
 
 /** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
-export const AUTOPILOT_ANSWERER='autopilot';
+const AUTOPILOT_ANSWERER='autopilot';
 /**
  * Whether an archetype's `provisional` block is backed by an autopilot receipt for the rev it names, with passing gate
  * evidence, reviewing this archetype and the golden bytes on disk now: {ok, why?, receipt?}. Never an owner acceptance.
@@ -883,7 +884,7 @@ function judgeProvisional({provisional,rev,brandDir,archetype,golden=[]}){
   if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
   const review=receipt.review;
   if(!review||review.schema!==DIRECTION_REVIEW_SCHEMA||review.archetype!==archetype)return {ok:false,why:`${receipt.file} does not review archetype ${archetype}`};
-  const seen=new Set(listOf(review.golden).map(entry=>entry.sha256));
+  const seen=new Set(objectList(review.golden).map(entry=>entry.sha256));
   const unseen=golden.filter(entry=>!seen.has(entry.sha256));
   if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} changed after autopilot reviewed it`};
   return {ok:true,receipt:receipt.file};
@@ -906,11 +907,11 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
   const rev=direction.rev;
   if(!Number.isInteger(rev)||rev<1)problems.push('rev must be a positive integer');
   if(!DIRECTION_STATUSES.includes(direction.status))problems.push(`status ${JSON.stringify(direction.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
-  if(!listOf(direction.principles).length)problems.push('principles is empty');
-  for(const principle of listOf(direction.principles))if(!Array.isArray(principle.cites)||!principle.cites.length)problems.push(`principle ${principle.id??'?'} cites nothing`);
+  if(!objectList(direction.principles).length)problems.push('principles is empty');
+  for(const principle of objectList(direction.principles))if(!Array.isArray(principle.cites)||!principle.cites.length)problems.push(`principle ${principle.id??'?'} cites nothing`);
   const archetypes=direction.archetypes&&typeof direction.archetypes==='object'&&!Array.isArray(direction.archetypes)?direction.archetypes:{};
   if(!Object.keys(archetypes).length)problems.push('archetypes is empty');
-  const golden=listOf(direction.golden);
+  const golden=objectList(direction.golden);
   const goldenFindings=golden.map(entry=>{
     const finding={archetype:entry.archetype??null,png:entry.png??null,html:entry.html??null};
     for(const key of ['png','html']){
@@ -955,9 +956,9 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
     const verdict=judgeAcceptance({acceptance:direction.acceptance,rev,brandDir});
     if(!verdict.ok)problems.push(`the direction is accepted but ${verdict.why}`);
   }else if(ready.length)problems.push(`archetypes ${ready.join(', ')} are accepted while the direction itself is ${direction.status}`);
-  const checks=listOf(direction.rubric?.checks);
+  const checks=objectList(direction.rubric?.checks);
   if(!checks.length)problems.push('rubric.checks is empty');
-  if(!listOf(direction.rubric?.beautyAnchors).length)problems.push('rubric.beautyAnchors is empty');
+  if(!objectList(direction.rubric?.beautyAnchors).length)problems.push('rubric.beautyAnchors is empty');
   const seenChecks=new Set();
   for(const entry of checks){
     if(seenChecks.has(entry.id))problems.push(`rubric check ${entry.id} is declared twice`);
@@ -974,17 +975,17 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
     const dna=Array.isArray(recipe?.dna)?recipe.dna:[];
     if(!dna.length)problems.push(`recipe ${name} maps onto no DNA component`);
     if(canon.names.length)for(const component of dna)if(!components.has(component))unmapped.push(`${name}: ${component}`);
-    for(const proposal of listOf(recipe?.proposals))proposals.push({recipe:name,component:proposal.component??null,variant:proposal.variant??null,status:proposal.status??null});
+    for(const proposal of objectList(recipe?.proposals))proposals.push({recipe:name,component:proposal.component??null,variant:proposal.variant??null,status:proposal.status??null});
   }
   if(unmapped.length)problems.push(`recipes name components the \`${family}\` DNA does not render (record a grammar proposal instead): ${unmapped.join(', ')}`);
   for(const archetypeName of Object.keys(archetypes))for(const component of Array.isArray(archetypes[archetypeName]?.components)?archetypes[archetypeName].components:[])
     if(canon.names.length&&!components.has(component))problems.push(`archetype ${archetypeName} names ${component}, which the \`${family}\` DNA does not render`);
-  const pending=listOf(direction.pendingRulings).filter(entry=>entry.status!=='ruled').map(entry=>entry.id??'?');
+  const pending=objectList(direction.pendingRulings).filter(entry=>entry.status!=='ruled').map(entry=>entry.id??'?');
   // Rulings learned from the owner's draw feedback (scripts/work/draw-feedback.mjs): proposed until the owner accepts
   // the direction; an accepted one is backed by that owner answer.
   const learned={proposed:[],accepted:[]};
   const learnedIds=new Set();
-  for(const entry of listOf(direction.learned)){
+  for(const entry of objectList(direction.learned)){
     if(!entry||typeof entry!=='object'||!entry.id){problems.push('a learned ruling has no id');continue;}
     if(learnedIds.has(entry.id))problems.push(`learned ruling ${entry.id} is declared twice`);
     learnedIds.add(entry.id);
@@ -1025,10 +1026,8 @@ export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarR
 
 /** One line per check, for a person reading a terminal. */
 export function formatBrandChecks(result){
-  const mark={pass:'pass',fail:'FAIL',skip:'skip'};
-  const lines=[`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?` (${result.stage} stage)`:''}: ${result.ok?'no failing check':'failing checks'}`];
-  for(const entry of result.checks)lines.push(`  [${mark[entry.outcome]}] ${entry.id}: ${entry.detail}`);
-  return lines.join('\n');
+  const header=`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?` (${result.stage} stage)`:''}: ${result.ok?'no failing check':'failing checks'}`;
+  return formatCheckLines(header,result.checks);
 }
 
 /**

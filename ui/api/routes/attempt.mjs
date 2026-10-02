@@ -9,6 +9,7 @@ import { redactText } from '../../../scripts/lib/redact.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { transcriptWindow } from '../transcript-search.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
+import { source, many, one, parse, staleOf, page } from '../query.mjs';
 import { whyFor } from '../why.mjs';
 
 const DAY = 86_400_000;
@@ -20,14 +21,6 @@ function slaMs(code) {
   const keyed = entry.slaKey?.split('.').reduce((value, key) => value?.[key], runtimeAllocation);
   return (keyed ?? entry.slaMs ?? null) == null ? null : (keyed ?? entry.slaMs) + (entry.plusMs ?? 0);
 }
-const source = (db, ...rels) => rels.map(rel => ({ db, rel }));
-const many = (db, sql, ...args) => db.prepare(sql).all(...args);
-const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
-const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
-const staleOf = store => [...store.stale];
-const limitOf = url => Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-const cursorOf = url => { try { return Math.max(0, Number(JSON.parse(Buffer.from(url.searchParams.get('cursor') ?? '', 'base64url').toString()).offset) || 0); } catch { return 0; } };
-const page = (rows, url) => { const offset = cursorOf(url), limit = limitOf(url); return { rows: rows.slice(offset, offset + limit), next: offset + limit < rows.length ? Buffer.from(JSON.stringify({ offset: offset + limit })).toString('base64url') : null }; };
 // Owner ruling 2026-09-29: host paths, commands and cwd are public (secrets stay redacted).
 const safePath = value => value ? String(value) : null;
 function ref(kind, id, project = null) {

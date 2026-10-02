@@ -2,10 +2,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Whether `target` is `root` itself or inside it (filesystem paths, either separator). */
-export function isInside(root, target) {
+/** Whether `target` is `root` itself or inside it (filesystem paths, either separator). `includeSelf: false` excludes `target === root`. */
+export function isInside(root, target, { includeSelf = true } = {}) {
   const relative = path.relative(root, target);
-  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+  if (relative === '') return includeSelf;
+  return !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative);
 }
 /**
  * Every entry under `dir` that is not a directory, depth-first; `filter` sees the entry name and full

@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { workCli } from '../lib/work-cli.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} from '../../engine/digest.mjs';
 import {ID_RE, walk as walkAll} from '../work/validate/check-example-work.mjs';
+import { readWorkTree } from '../lib/work-tree.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../work/record-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
@@ -76,38 +78,9 @@ function classifyEdge(recordSchema, trail) {
   return EDGE_FIELD_NAMES.has(field) ? field : null;
 }
 
-/**
- * Reads every record and evidence file under `workRoot` (a `.starciwork` directory). `_derived/**` is never
- * walked - it is this script's own output, not input, and re-ingesting it as records would make every run
- * see references to itself.
- */
-function readTree(workRoot) {
-  const records = new Map(); // id -> {id, schema, state, data, file, dir, relPath, feature}
-  const evidenceByDir = new Map(); // dir (posix, relative to workRoot) -> {data, file}
-  const derivedPrefix = `${DERIVED_DIR_NAME}/`;
-
-  for (const file of walkAll(workRoot).filter(f => f.endsWith('.yaml'))) {
-    const relPath = path.relative(workRoot, file).replaceAll('\\', '/');
-    if (relPath === DERIVED_DIR_NAME || relPath.startsWith(derivedPrefix)) continue;
-    let data;
-    try { data = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    if (!isPlainObject(data)) continue;
-    const dir = path.dirname(relPath).replaceAll('\\', '/');
-
-    if (relPath.endsWith('/evidence.yaml') || relPath === 'evidence.yaml') {
-      evidenceByDir.set(dir, {data, file});
-      continue;
-    }
-    if (typeof data.id !== 'string' || !data.id) continue;
-    const segments = relPath.split('/');
-    const feature = segments[0] === 'features' && segments.length > 1 ? segments[1] : null;
-    records.set(data.id, {
-      id: data.id, schema: data.schema ?? null, state: Object.hasOwn(data, 'state') ? data.state : null,
-      data, file, dir, relPath, feature,
-    });
-  }
-  return {records, evidenceByDir};
-}
+/** The raw tree read is scripts/lib/work-tree.mjs's `readWorkTree` - `_derived/**` is never walked: it is
+ * this script's own output, not input, and re-ingesting it as records would make every run see references
+ * to itself. */
 
 /** The reverse index: id -> edge kind -> sorted, deduplicated list of ids that reference it that way.
  * Self-references (a record's own `id` echoed back by a field the collector also walks) are dropped - a
@@ -250,7 +223,7 @@ function resolveBlockers(record, records, canon = id => id) {
  * so two runs over the same tree always compute byte-identical structures (required for the --write-less
  * gate to mean anything). */
 export function computeDerived(workRoot) {
-  const {records, evidenceByDir} = readTree(workRoot);
+  const {records, evidenceByDir} = readWorkTree(workRoot);
   const {usedBy, unclassified} = buildUsedBy(records);
   const appliesToSources = new Map(); // targetId -> Set(sourceId) via the appliesTo edge kind
   for (const [targetId, byKind] of usedBy) if (byKind.has('appliesTo')) appliesToSources.set(targetId, byKind.get('appliesTo'));
@@ -403,23 +376,14 @@ export function runDerive(workRoot, {write} = {}) {
 }
 
 if (isMain(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const workFlagIndex = args.indexOf('--work');
-  const workArg = workFlagIndex >= 0 ? args[workFlagIndex + 1] : null;
-  const write = args.includes('--write');
-  if (!workArg) {
-    console.error('Usage: node scripts/example/example-derive.mjs --work <path-to-.starciwork> [--write]');
-    process.exitCode = 2;
-  } else {
-    const workRoot = path.resolve(workArg);
-    const result = runDerive(workRoot, {write});
-    const t = result.derived.tally.overall;
-    console.log(`${t.total} record(s) with a lifecycle state: ${t.done} done, ${t.todo} todo, ${t.stale} stale, ${t.blocked} blocked; ${result.derived.tally.gaps.length} gap(s) (${result.derived.tally.unbuiltModuleGaps} open unbuilt-module); ${result.derived.frontier.length} in the frontier.`);
-    if (write) {
-      console.log(`wrote ${path.relative(workRoot, path.join(workRoot, DERIVED_INDEX_REL))} and ${path.relative(workRoot, path.join(workRoot, DERIVED_FRONTIER_REL))}`);
-    } else if (!result.ok) {
-      console.log(`REFUSED: ${DERIVED_INDEX_REL} is missing or stale; run with --write to refresh it.`);
-      process.exitCode = 1;
-    }
-  }
+  workCli({
+    usage: 'Usage: node scripts/example/example-derive.mjs --work <path-to-.starciwork> [--write]',
+    run: (workRoot, { write }) => runDerive(workRoot, { write }),
+    report: (result) => {
+      const t = result.derived.tally.overall;
+      console.log(`${t.total} record(s) with a lifecycle state: ${t.done} done, ${t.todo} todo, ${t.stale} stale, ${t.blocked} blocked; ${result.derived.tally.gaps.length} gap(s) (${result.derived.tally.unbuiltModuleGaps} open unbuilt-module); ${result.derived.frontier.length} in the frontier.`);
+    },
+    wrote: (workRoot) => `wrote ${path.relative(workRoot, path.join(workRoot, DERIVED_INDEX_REL))} and ${path.relative(workRoot, path.join(workRoot, DERIVED_FRONTIER_REL))}`,
+    stale: `REFUSED: ${DERIVED_INDEX_REL} is missing or stale; run with --write to refresh it.`,
+  });
 }

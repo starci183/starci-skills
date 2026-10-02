@@ -65,7 +65,7 @@ const AUTHORED_BY_NATURE = new Set(['work/data@1', 'work/brand@1', 'work/policy-
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git', '.starciwork']);
 const GIT_PATHSPEC_CHUNK = 100;
 
-export class EvidenceBindingInputError extends Error {
+class EvidenceBindingInputError extends Error {
   constructor(message) { super(message); this.name = 'EvidenceBindingInputError'; }
 }
 
@@ -193,7 +193,7 @@ function resolveCodeDigestPath(rel, dirs, appRoot) {
 
 // ---------- the four bindings ----------
 
-export function checkEvidenceBinding({workRoot}) {
+function checkEvidenceBinding({workRoot}) {
   const findings = [];
   const add = (code, node, file, detail) => findings.push({code, node, path: slash(file), detail});
   const workspaceDoc = readWorkspace(workRoot);
@@ -282,7 +282,7 @@ export function checkEvidenceBinding({workRoot}) {
 // ---------- CLI ----------
 
 /** Stable programmatic entry used by the public CLI. It never writes and never calls process.exit. */
-export function checkEvidenceBindingMain(argv) {
+function checkEvidenceBindingMain(argv) {
   let input;
   try { input = parseArgs([...argv]); }
   catch (error) {

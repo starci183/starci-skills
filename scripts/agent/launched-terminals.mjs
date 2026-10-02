@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const FILE = 'launched-terminals.json';
 const TTL_MS = 7 * 24 * 3600 * 1000;
@@ -20,7 +21,7 @@ const read = (file) => { try { const j = JSON.parse(fs.readFileSync(file, 'utf8'
 /** Record that `terminal` is the agent terminal of `dispatchId`. Never throws (a launch must not fail on bookkeeping). */
 export function recordLaunchedTerminal({ terminal, dispatchId, env = process.env, now = Date.now() }) {
   if (!terminal || !dispatchId) return false;
-  if (env.NODE_TEST_CONTEXT && !env.STARCI_LOCAL_ROOT) return false; // a spec never writes the host's real state root
+  if (isSpecRun(env) && !env.STARCI_LOCAL_ROOT) return false; // a spec never writes the host's real state root
   try {
     const file = fileOf(env);
     const rows = read(file);

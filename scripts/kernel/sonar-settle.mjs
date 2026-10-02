@@ -16,13 +16,15 @@ import { openIncident, resolveIncident } from '../../engine/db/ledger.mjs';
 import { recordCheck } from '../machine/evidence-store.mjs';
 import { judgeSummary, loadSonarGate, SCAN_SCHEMA_PREFIX } from '../gates/sonar-gate.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
+import { attachedNameOf } from '../lib/display-names.mjs';
+import { oneLine } from '../lib/clip.mjs';
 
 export const SONAR_ENFORCE_CHANGE = 'sonar-enforce';
 export const SONAR_CHECK = 'sonar-gate';
 export const SONAR_INCIDENT_TAG = '[runtime-sonar-unavailable]';
 const SUMMARY_MAX_BYTES = 8 * 1024 * 1024;
 
-const nameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''))).replace(/\\/g, '/');
+
 
 /**
  * The newest sonar-local scan summary among a job's files ([{abs, name?}] from collectJobFiles), or null. A file counts
@@ -31,14 +33,14 @@ const nameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''
 export function readSonarSummary(files) {
   let best = null;
   for (const file of files ?? []) {
-    if (!file?.abs || !/sonar/i.test(nameOf(file)) && !/sonar/i.test(path.basename(file.abs))) continue;
+    if (!file?.abs || !/sonar/i.test(attachedNameOf(file)) && !/sonar/i.test(path.basename(file.abs))) continue;
     let doc = null;
     try {
       if (fs.statSync(file.abs).size > SUMMARY_MAX_BYTES) continue;
       doc = JSON.parse(fs.readFileSync(file.abs, 'utf8'));
     } catch { continue; }
     if (!String(doc?.schema ?? '').startsWith(SCAN_SCHEMA_PREFIX)) continue;
-    if (!best || String(doc.at ?? '') >= String(best.summary.at ?? '')) best = { summary: doc, file: nameOf(file) };
+    if (!best || String(doc.at ?? '') >= String(best.summary.at ?? '')) best = { summary: doc, file: attachedNameOf(file) };
   }
   return best;
 }
@@ -54,7 +56,7 @@ export function judgeJob({ op, files, gate = loadSonarGate(), specs = specsSetti
   return { op, judged: judgeSummary(found?.summary ?? null, gate, { specs }), file: found?.file ?? null, summary: found?.summary ?? null };
 }
 
-const oneLine = (text, n = 380) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+
 
 /**
  * Record the judgment on the attempt and, for an unavailable Sonar, tell the Supervisor. Idempotent per attempt: each

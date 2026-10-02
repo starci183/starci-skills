@@ -38,20 +38,18 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-import { readJsonFile } from '../lib/json.mjs';
+import { readJsonFile, jsonFromStdout } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { arg as argvValue } from '../lib/cli-arg.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const startFile = path.join(skillRoot, 'scripts', 'kernel', 'start-workflow.mjs');
 
 const argv = process.argv.slice(2);
-const valueOf = (name, fallback = null) => {
-  const index = argv.indexOf(`--${name}`);
-  return index >= 0 ? argv[index + 1] : fallback;
-};
+const valueOf = (name, fallback = null) => argvValue(argv, name, fallback);
 const has = name => argv.includes(`--${name}`);
 
 const repo = valueOf('repo');
@@ -65,17 +63,6 @@ const CADENCE_MS = allocationMs('watchdogCadenceMs');
 const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
-const jsonFrom = stdout => {
-  const text = String(stdout ?? '').trim();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { /* fall through */ }
-  const first = text.indexOf('{'), last = text.lastIndexOf('}');
-  if (first >= 0 && last > first) {
-    try { return JSON.parse(text.slice(first, last + 1)); } catch { /* fall through */ }
-  }
-  return null;
-};
-
 const runNodeJson = (file, args) => {
   const result = runNode([file, ...args], {
     cwd: skillRoot,
@@ -84,14 +71,14 @@ const runNodeJson = (file, args) => {
   return {
     ok: result.status === 0,
     status: result.status,
-    value: jsonFrom(result.stdout),
+    value: jsonFromStdout(result.stdout),
     stdout: String(result.stdout ?? '').trim(),
     stderr: String(result.stderr ?? '').trim(),
     error: result.error?.message ?? null,
   };
 };
 
-export const classifyKernelScreen = classifyAgentScreen;
+const classifyKernelScreen = classifyAgentScreen;
 
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
@@ -173,7 +160,7 @@ const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) =
 // The kernel job's worker ({dispatchId, agentTerminalHandle}) when the seat signal is gone, or null.
 const lostSeatWorker = () => withKernelLedger((ledger) => {
   const row = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
-  const managed = jsonFrom(row?.payload_json)?.managed ?? null;
+  const managed = jsonFromStdout(row?.payload_json)?.managed ?? null;
   return managed?.dispatchId && managed.agentTerminalHandle ? managed : null;
 });
 // A bare shell prompt at the end of the frame on two reads (the death settle between them): the agent exited.
@@ -237,9 +224,9 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
-export const WAKE_IDLE_REPLACE = 3;
+const WAKE_IDLE_REPLACE = 3;
 export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
-export const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
+const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
 // Kernel-authored job moves: reset the wakes and the idle-replaced streak.
 const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
 // Progress the Kernel did not author, and the Kernel's own records: reset the wakes only.
@@ -282,24 +269,29 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
 // replacement is recorded only once its terminal closed.
 const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
   error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
-const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }) => {
-  const terminalClosed = closeKernelTerminal(terminal, dispatch);
+export const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }, deps = {}) => {
+  const close = deps.closeKernelTerminal ?? closeKernelTerminal;
+  const openLedger = deps.withKernelLedger ?? withKernelLedger;
+  const replace = deps.replaceKernel ?? replaceKernel;
+  const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
-  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
-  return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
+  openLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
+  return replace({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel ${terminal} received ${idle.wakes} wakes with an actionable frontier and made no move: replaced (H11)` });
 };
 
-const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, misses, firstAt }) => {
-  const terminalClosed = closeKernelTerminal(terminal, dispatch);
+export const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, misses, firstAt }, deps = {}) => {
+  const close = deps.closeKernelTerminal ?? closeKernelTerminal;
+  const replace = deps.replaceKernel ?? replaceKernel;
+  const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, misses, firstAt }, terminalClosed, 'wake-dead');
-  return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
+  return replace({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel terminal ${terminal} missed ${misses} wakes since ${new Date(firstAt).toISOString()} with no output: a dead kernel behind a listed terminal` });
 };
 
 
 
-export async function watchdogTick() {
+async function watchdogTick() {
   return statusTick();
 }
 
@@ -335,7 +327,7 @@ function kernelTick(status, phase) {
     error: survey.error ?? survey.value?.reason ?? survey.stderr ?? survey.stdout,
   };
   const kernelSignal = (survey.value.signals ?? []).find(signal => signal.scope === 'kernel' && signal.key === workflowId);
-  const signalValue = kernelSignal?.value ?? jsonFrom(kernelSignal?.value_json) ?? {};
+  const signalValue = kernelSignal?.value ?? jsonFromStdout(kernelSignal?.value_json) ?? {};
   const terminal = signalValue.terminal ?? null;
 
   if (!terminal) {

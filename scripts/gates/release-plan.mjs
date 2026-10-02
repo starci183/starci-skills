@@ -9,7 +9,7 @@ import { posixPath } from '../lib/path-key.mjs';
 
 const SKIP = new Set(['node_modules', 'dist', 'storybook-static', 'reference-renders', 'coverage', '.git']);
 /** The file a package carries when it bundles the runtime's canon-pins copy: such a package is published after every other one. */
-export const BUNDLED_PINS = 'runtime/knowledge/hfs/canon-pins.yaml';
+const BUNDLED_PINS = 'runtime/knowledge/hfs/canon-pins.yaml';
 
 /** Every package folder under packages/ (runtime-relative, posix); the walk stops at a package, so templates inside one are not packages. */
 function packageFolders(root) {

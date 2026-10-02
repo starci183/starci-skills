@@ -847,6 +847,10 @@ moduleLocalDocumentKinds:
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml
 
+  - id: starci/env-catalog@1
+    governs: "The catalog of every environment variable the runtime reads or sets (purpose and kind); scripts/checks/check-env.mjs holds the source to it."
+    files: [modules/schemas/env.yaml]
+
   - id: starci/document@1
     governs: "A sectioned prose policy document (title/blocks)."
     files: [modules/ops/_common.yaml]

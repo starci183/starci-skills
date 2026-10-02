@@ -1759,6 +1759,14 @@ rules:
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
     enforcers:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
+  - id: R202
+    code: "CI_UPLOAD_NOT_SILENT"
+    law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CI_UPLOAD_NOT_SILENT"]
+    enforcers:
+      - {kind: runtime, id: ci-upload, at: scripts/hfs/runtime-rules/ci-upload.mjs}
   - id: R212
     code: "HFS_EDITION_INVALID"
     law: "hfs.json names an edition the manifest knows (full, or lite; absent means full), and a lite app holds none of what lite does not have: no spec or test file, test script, test dependency or test-tool config, no UAT record, no supabase/functions, no worker app, no event, queue, job, projection or saga pattern, no saga, reactors, jobs or realtime kind."
@@ -1833,6 +1841,11 @@ rules:
       - {kind: hfs, id: lite-secret-custody, at: scripts/hfs/rules/supabase-secrets.mjs}
       - {kind: machine, id: supabase-service-role, at: scripts/hfs/architecture/supabase.mjs}
 retired:
+  - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R199, reason: "reserved for the CLI lane (RT_CLI_VERB_PARITY); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R200, reason: "reserved for the CLI lane (RT_CLI_APP_ONLY_TEMPLATES); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R201, reason: "reserved for the CLI lane (CLI_ONLY_ENTRY); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
@@ -1848,12 +1861,6 @@ retired:
   - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R197, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
-  - {id: R198, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
-  - {id: R199, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
-  - {id: R200, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
-  - {id: R201, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
-  - {id: R202, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
   - {id: R203, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
   - {id: R204, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}
   - {id: R205, reason: "reserved by a sibling lane of the alpha.4 release (CLI R197-R201, CORE R202, COVERAGE R203-R205, SMELL R206-R211); removed when that lane merges"}

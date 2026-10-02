@@ -7,12 +7,13 @@ import { list } from '../lib/list.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
+import { valueAfter } from '../lib/cli-arg.mjs';
 export { slash };
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
 export const RECORD_DEPTH = 12;
 /** Directories a record walk never enters: a record's own files and the kernel's evidence hold no records. */
-export const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals']);
+const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** The share of a keyed #FF00FF rectangle that must be key-coloured for it to count as a slot. */
 export const SLOT_FILL_MIN = 0.98;
 
@@ -27,7 +28,7 @@ export const readYaml = (file) => parseYaml(fs.readFileSync(file, 'utf8'));
 /** A YAML file's document, or null when it is unreadable or does not parse. */
 export const readYamlOrNull = (file) => { try { return readYaml(file); } catch { return null; } };
 /** The value after `name` in argv, or null when `name` is absent or last. */
-export const flag = (args, name) => { const i = args.indexOf(name); return i >= 0 && i + 1 < args.length ? args[i + 1] : null; };
+export const flag = (args, name) => valueAfter(args, name);
 /** Every value after an occurrence of `name` in argv. */
 export const flags = (args, name) => args.flatMap((a, i) => (a === name && i + 1 < args.length ? [args[i + 1]] : []));
 
@@ -80,4 +81,34 @@ export function writeRecordFile(file, text) {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, text);
   renameOver(tmp, file);
+}
+
+/**
+ * The `<status|question|apply>` main the owner-review tools share (draw-review.mjs, brand-direction.mjs): the command
+ * is argv[0], the subject is `targetFlag`'s value (`--ui`, `--work`), `apply` runs with `--receipt`/`--write`.
+ * `status`/`question`/`apply` return the handler's answer - {exitCode, text} to refuse, else {result, text} (text
+ * carries its trailing newline): status and apply print `result` as JSON under --json, else the human text;
+ * question's answer is always the JSON question. `tag` is the error prefix.
+ */
+export function reviewMain(argv, { targetFlag, usage, tag, status, question, apply }) {
+  const [command, ...args] = argv;
+  const json = args.includes('--json');
+  const target = flag(args, targetFlag);
+  if (!['status', 'question', 'apply'].includes(command) || !target) return { exitCode: 2, text: usage };
+  try {
+    if (command === 'status') {
+      const s = status(target, args);
+      return 'exitCode' in s ? s : { exitCode: 0, text: json ? `${JSON.stringify(s.result, null, 2)}\n` : s.text };
+    }
+    if (command === 'question') {
+      const q = question(target, args);
+      return 'exitCode' in q ? q : { exitCode: 0, text: `${JSON.stringify(q.result, null, 2)}\n` };
+    }
+    const receipt = flag(args, '--receipt');
+    if (!receipt) return { exitCode: 2, text: usage };
+    const r = apply(target, receipt, args);
+    return 'exitCode' in r ? r : { exitCode: 0, text: json ? `${JSON.stringify(r.result, null, 2)}\n` : r.text };
+  } catch (error) {
+    return { exitCode: 1, text: `${tag}: ${error.message}\n` };
+  }
 }

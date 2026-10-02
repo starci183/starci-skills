@@ -50,32 +50,32 @@ import { goalTextRefusal } from '../../goal/goal-text.mjs';
 import { clocksOf } from '../sla.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
+import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
 
 /**
  * MB-01: the host's boot identity - the machine's boot minute. The boot order runs once per host boot (and when Orca
  * comes back), not once per engine process: a reload every ~6 min re-ran it 30 times on 2026-09-28.
  */
-export const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
+const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
 const BOOT_EVERY_MS = 365 * 86_400_000;
-
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
-export const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
-export const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
-export const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
-export const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
+const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
+const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
+const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
+const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 
 // A read-only probe answer that a --repair pass would act on (scripts/kernel/kernel-watchdog.mjs statusTick/kernelTick).
 export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
 // A --repair answer that replaced (or tried to replace) the Kernel.
 export const REPLACED = new Set(['restarted', 'restart-failed']);
 const DOWN_BEFORE_BOOT = new Set(['failed', 'backoff', 'starting', 'quarantined']);
-export const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
+const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
 export const STALE_RETRY_MS = 5 * 60_000;
-export const STALE_RETRY_MAX_MS = 60 * 60_000;
+const STALE_RETRY_MAX_MS = 60 * 60_000;
 export const STALE_ESCALATE_TRIES = 6;
 export const CLOSE_VERIFY = 'scripts/machine/close-verify.mjs';
-export const TERMINAL_LIST = 'scripts/api/orca/terminal-list.mjs';
+const TERMINAL_LIST = 'scripts/api/orca/terminal-list.mjs';
 
 /**
  * The replaced Kernel terminals of a workflow's open kernel-stale-terminal-unclosed incidents:
@@ -131,12 +131,12 @@ export function goalProblem(markdown, refusal) {
   return refusal(markdown) ? 'goal-text-unresolved' : null;
 }
 
-const normRepo = (p) => path.resolve(String(p)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const normRepo = (p) => pathKey(p, { fold: true });
 const argOf = (cmd, name) => {
   const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
 };
-export const RUNTIME_LOOP = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i;
+const RUNTIME_LOOP = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i;
 
 /**
  * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs whose --repo no managed

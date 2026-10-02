@@ -60,6 +60,14 @@ export function treeOf(root) {
   return { files, directories };
 }
 
+/**
+ * The prelude every tree-walking architecture checker shares: the input's config/graph/context, the compiler,
+ * the slot resolver and the tracked repository tree.
+ */
+export function checkerScope({ config, graph, context }) {
+  return { config, graph, context, ts: context.ts, resolver: graph.resolver, tree: treeOf(config.root) };
+}
+
 const strip = entry => entry.replace(/\/+$/u, '');
 const rootOfTarget = target => (target.endsWith('/') ? strip(target) : (path.posix.dirname(target) === '.' ? '' : path.posix.dirname(target)));
 

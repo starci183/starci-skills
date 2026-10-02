@@ -100,7 +100,7 @@ export const runtimeEnv = (env = process.env) => {
 /* ------------------------------------------------------------ reads */
 
 /** The latest run of each check of the item's attempt for one runner (check_runs, alpha.3). */
-export function checkRunsOf(db, item, runner = 'op') {
+function checkRunsOf(db, item, runner = 'op') {
   const attemptId = attemptIdOf(db, item);
   if (attemptId == null) return [];
   return db.prepare(`SELECT c.name, c.phase, c.runner, c.command, c.cwd, c.exit_code, c.declared_exit_code, c.status, c.started_at, c.finished_at,
@@ -150,7 +150,7 @@ async function checksFromStore(db, item, { store = null } = {}) {
  * neither settled nor handed to the Kernel nor holds for a checker that could not run. Each one is a runtime bug (settle-unsettled-report). [{workflowId, jobId, op, outcome, ageMin, consumed}]
  */
 const uncheckable = (db, it) => Boolean(db.prepare("SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1").get(EVENTS.checkUnavailable, it.jobId));
-export function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings().invariantMaxAgeMs, workflowId = null } = {}) {
+function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings().invariantMaxAgeMs, workflowId = null } = {}) {
   return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt > maxAgeMs && !KERNEL_ONLY_OPS.includes(it.op) && !kernelHandoverOf(db, it) && !uncheckable(db, it))
     .map((it) => ({ workflowId: it.workflowId, jobId: it.jobId, dispatchId: it.dispatchId, op: it.op, outcome: it.outcome, ageMin: Math.round((now - it.filedAt) / 60_000), ageMs: now - it.filedAt, consumed: it.consumedAt != null }));
 }
@@ -215,7 +215,7 @@ export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = runNod
 }
 
 /** Canon-scan over a slice's owned paths, in-process (no path on a command line). {exitCode, status, findings, root} */
-export async function canonSliceCheck(item, { repo }) {
+async function canonSliceCheck(item, { repo }) {
   const { ownedPathPlacements } = await import('../target-repo.mjs');
   const owned = item.payload.owned_paths ?? [];
   // The slice is measured in its workflow's worktree (part A's registry), where it worked, never the live checkout.
@@ -289,14 +289,14 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   return verdict;
 }
 /** The workflow's canon-wire legs of the slice's op, queued or running: [{jobId, status, ownedPaths}]. */
-export function canonWireLegsOf(db, item) {
+function canonWireLegsOf(db, item) {
   try {
     return db.prepare(`SELECT job_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND status IN ('queued','leased','running')
       AND json_extract(payload_json,'$.params.canonWire') IN (1, 'true')`).all(item.workflowId, item.op)
       .map((r) => ({ jobId: r.job_id, status: r.status, ownedPaths: (parse(r.payload_json)?.owned_paths ?? []).map(String) }));
   } catch { return []; }
 }
-export const PARITY_RECHECK_MS = 30 * 60_000;
+const PARITY_RECHECK_MS = 30 * 60_000;
 /** <ledger dir>/settle-parity/<jobId>.json: the last non-green parity verdict of a dispatch. */
 export const parityCacheFile = (repo, jobId) => path.join(path.dirname(ledgerFileFor(path.resolve(repo))), 'settle-parity', `${slug(jobId)}.json`);
 function readParityCache(repo, item) { try { return JSON.parse(fs.readFileSync(parityCacheFile(repo, item.jobId), 'utf8')); } catch { return null; } }
@@ -304,7 +304,7 @@ function writeParityCache(repo, item, rec) {
   try { const f = parityCacheFile(repo, item.jobId); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify({ dispatchId: item.dispatchId, ...rec })); } catch { /* a cache */ }
 }
 /** STARCI_SETTLER_PARITY=0 turns the canon parity verifier off (the rollback of canon-parity-settle). */
-export const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PARITY ?? '1') !== '0';
+const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PARITY ?? '1') !== '0';
 /** A baseline measured BEFORE the change (canon-scan-before, gate-before ...): evidence, never a verdict. */
 export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
 
@@ -406,13 +406,13 @@ function markAttempt(ledger, item, fields) {
 }
 
 /** Reasons a raw re-run or the worker's own declared red decide: the claim is overruled, the attempt fails. */
-export const RED_REASONS = Object.freeze(['rerun-red', 'declared-check-red', 'cut-postcondition-red', 'parity-rerun-red', 'parity-lint-new', 'parity-tsc-new', 'parity-diff-red']);
+const RED_REASONS = Object.freeze(['rerun-red', 'declared-check-red', 'cut-postcondition-red', 'parity-rerun-red', 'parity-lint-new', 'parity-tsc-new', 'parity-diff-red']);
 /**
  * What the evidence decides without judgment (H1), or null when it needs the Kernel: {verdict, checks?}. A failed or
  * partial report fails; a blocked or ask report settles blocked (an ask waits on the owner); a done report whose raw
  * re-run is red fails with that red recorded first.
  */
-export function mechanicalSettleOf(item, verdict) {
+function mechanicalSettleOf(item, verdict) {
   if (KERNEL_ONLY_OPS.includes(item.op)) return null;
   if (['failed', 'partial'].includes(item.outcome)) return { verdict: 'fail' };
   if (['blocked', 'ask'].includes(item.outcome)) return { verdict: 'blocked' };
@@ -566,7 +566,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
 /* ------------------------------------------------------------ leaks (H12) */
 
 /** An open incident without a due time is overdue after this long (its owner still answers for it). */
-export const INCIDENT_DEFAULT_DUE_MS = 24 * 3_600_000;
+const INCIDENT_DEFAULT_DUE_MS = 24 * 3_600_000;
 const LIVE_JOB = ['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
 const DECIDER_OF = { owner: 'owner', supervisor: 'supervisor' };
 /**
@@ -578,7 +578,7 @@ const DECIDER_OF = { owner: 'owner', supervisor: 'supervisor' };
  *     Decision Item for the incident's owner.
  * Returns {leases:[...], incidents:[...]}. Idempotent: a condition only moves once, a Decision Item is keyed.
  */
-export function sweepLedgerLeaks(ledger, { workflowId = null, now = Date.now() } = {}) {
+function sweepLedgerLeaks(ledger, { workflowId = null, now = Date.now() } = {}) {
   const db = ledger.db, out = { leases: [], incidents: [] };
   const scoped = (sql) => workflowId ? `${sql} AND workflow_id=?` : sql;
   const args = (...a) => (workflowId ? [...a, workflowId] : a);
@@ -666,7 +666,7 @@ export function startSettlerFor(repo, { workflowId = null, jobId = null, env = p
 }
 
 /** The ledgers the Supervisor watches (config.yaml supervisor.repos, scripts/machine/home.mjs productRepos). */
-export const supervisedRepos = async () => { try { return (await import('../../machine/home.mjs')).productRepos(); } catch { return []; } };
+const supervisedRepos = async () => { try { return (await import('../../machine/home.mjs')).productRepos(); } catch { return []; } };
 
 // No top-level await: scripts/machine/decisions.mjs imports this module, and a dynamic import of it while this
 // module still evaluates would deadlock (exit 13).

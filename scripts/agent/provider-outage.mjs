@@ -18,7 +18,8 @@
 //   A key may declare only `probe`: nothing classifies an outage for that provider, and the probe clears a
 //   quota circuit opened some other way.
 // A card without an outage key is never classified: no guessing for other providers.
-import { agentCardOf, providerKeyOf } from './credential-fingerprint.mjs';
+import { agentCardOf } from './credential-fingerprint.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,10 +27,10 @@ import { fileURLToPath } from 'node:url';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const AGENTS_DIR = path.join(skillRoot, 'modules', 'models', 'agents');
 export const QUOTA_FAILURE_KIND = 'quota';
-export const CAPACITY_FAILURE_KIND = 'capacity';
+const CAPACITY_FAILURE_KIND = 'capacity';
 /** The card keys that classify an outage, and the circuit failureKind each opens. */
 export const OUTAGE_KEYS = Object.freeze({ quotaExhausted: QUOTA_FAILURE_KIND, capacityExhausted: CAPACITY_FAILURE_KIND });
-export const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
+const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
 
 const compile = (source, flags) => { try { return new RegExp(source, flags); } catch { return null; } };
 const cardFor = (provider, card) => (card === undefined ? agentCardOf(provider) : card);
@@ -42,7 +43,7 @@ function outageSpecFrom(provider, card, key) {
   const screen = typeof spec.screen === 'string' ? compile(spec.screen, 'im') : null;
   const probe = key === 'quotaExhausted' && spec.probe && typeof spec.probe === 'object'
     ? { ...spec.probe, everyMs: Number(spec.probe.everyMs) > 0 ? Number(spec.probe.everyMs) : DEFAULT_QUOTA_PROBE_EVERY_MS } : null;
-  return { provider: providerKeyOf(provider), failureKind: OUTAGE_KEYS[key], text, screen, probe };
+  return { provider: normalizeProvider(provider), failureKind: OUTAGE_KEYS[key], text, screen, probe };
 }
 
 /** The card's quotaExhausted spec compiled, or null. */

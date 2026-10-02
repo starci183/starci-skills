@@ -138,8 +138,8 @@ const FRONTEND_RULE_IDS = [
   'FE_SOURCE_LAYOUT_INVALID',
   'FE_WORLD_OWNER_RENDER_BOUNDARY',
 ];
-export const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
-export const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
+const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
+const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
 
 /**
  * Every code the machine reports as an error because it cannot judge (a check that cannot run is an error, never a pass).

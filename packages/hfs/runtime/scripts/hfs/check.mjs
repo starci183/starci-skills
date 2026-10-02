@@ -82,7 +82,7 @@ import { editionFindings } from './rules/edition.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `hfs check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
-export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
+const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /**
  * The codes `hfs check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
@@ -137,12 +137,6 @@ export function trackedFiles(repoRoot) {
 }
 
 const fill = (text, bindings) => String(text).replace(VAR, (whole, name) => bindings[name] ?? whole);
-
-/** hfs.json of `repoRoot` resolved against the manifest, or the single refusal finding when it is absent or invalid. */
-export function openRepo({ repoRoot, root = skillRoot, manifest = loadSlotManifest({ root }) }) {
-  const repo = readRepoDeclaration(manifest, repoRoot);
-  return { manifest, repo, resolver: createSlotResolver(manifest, repo) };
-}
 
 const pinnedSpec = (spec, pin) => (spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`);
 

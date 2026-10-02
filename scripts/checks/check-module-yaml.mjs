@@ -15,7 +15,7 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export const YAML_ROOTS = Object.freeze(['modules', 'knowledge']);
+const YAML_ROOTS = Object.freeze(['modules', 'knowledge']);
 
 export function moduleYamlFiles(dirs = YAML_ROOTS.map(name => path.join(root, name))) {
   return [dirs].flat().flatMap(dir => walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)})).sort();
