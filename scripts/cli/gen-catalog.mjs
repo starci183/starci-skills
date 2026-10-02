@@ -32,7 +32,7 @@ const RETIRED_BUILTINS = [
 const VERB_FIELDS = ['summary', 'owner', 'positional', 'flags', 'exit', 'json', 'examples', 'editions', 'since', 'removed', 'impl'];
 
 /** The generated module text. */
-export const renderCatalogModule = async (cat) => {
+const renderCatalogModule = async (cat) => {
   const hash = await catalogHash(cat.sources);
   const groups = {};
   const retired = [...RETIRED_BUILTINS];
@@ -53,7 +53,7 @@ export const renderCatalogModule = async (cat) => {
 const flagSig = (f) => `--${f.name}${f.type === 'boolean' ? '' : f.type === 'enum' ? ` <${(f.enum ?? []).join('|')}>` : ' <v>'}${f.required ? ' (required)' : ''}`;
 
 /** docs/cli.md — generated English reference. */
-export const renderDocs = (cat) => {
+const renderDocs = (cat) => {
   const out = [
     `# starci CLI reference`, '',
     `<!-- ${GENERATED} -->`, '',
@@ -82,7 +82,7 @@ export const renderDocs = (cat) => {
 const allFlagsOf = (cat, verb) => [...cat.global.flags.map((f) => `--${f.name}`), ...(verb.flags ?? []).map((f) => `--${f.name}`)];
 
 /** Shell completions for bash, zsh, fish, powershell. */
-export const renderCompletions = (cat) => {
+const renderCompletions = (cat) => {
   const groups = cat.groups.map((g) => g.group);
   const verbsOf = (g) => cat.groups.find((x) => x.group === g)?.verbs.map((v) => v.verb) ?? [];
   const gwords = groups.join(' ');

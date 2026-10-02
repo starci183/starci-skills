@@ -67,8 +67,8 @@ export const withoutNodePath = (command) => String(command ?? '')
 
 export function checkFamilyOf(check) {
   const name = String(check?.name ?? ''), command = String(check?.command ?? '');
-  if (/canon-scan\.mjs/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
-  if (/gate\.mjs|\bhfs\s+lint\b|\beslint\b/.test(command) || /code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
+  if (/canon-scan\.mjs|\bstarci\s+gate\s+canon-scan\b/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
+  if (/gate\.mjs|\bstarci\s+gate\s+run\b|\bstarci\s+app\s+lint\b|\bhfs\s+lint\b|\beslint\b/.test(command) || /code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
   if (/(?:^|[\s/\\])tsc(?:\.cmd)?(?:\s|$)/.test(command) || /(?:^|[-_.])tsc(?:$|[-_.])|type-?check/i.test(name)) return 'tsc';
   if (/^git\s+diff\b[^&|;]*--check\b/.test(command.trim())) return 'diff';
   // Exactly one file operand, never a flag (a preload flag would run code).

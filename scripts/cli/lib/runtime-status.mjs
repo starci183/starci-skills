@@ -9,7 +9,7 @@ import { isMain } from '../../lib/is-main.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const normalizedHash = (file, read) => createHash('sha256').update(read(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 
-export function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = readFileSync } = {}) {
+function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = readFileSync } = {}) {
   const packageFile = path.join(runtimeRoot, 'package.json');
   const manifestFile = path.join(runtimeRoot, '.starci-skills.json');
   const version = exists(packageFile) ? JSON.parse(read(packageFile, 'utf8')).version ?? null : null;

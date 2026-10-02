@@ -21,7 +21,7 @@ const modeOf = (tunnel) => tunnel ? 'tunnel' : 'app';
 const normalize = (value) => String(value ?? '').replace(/\\/g, '/').toLowerCase();
 const writeTo = (target, text) => typeof target === 'function' ? target(text) : target.write(text);
 
-export const harnessStateFile = (env = process.env) => path.join(starciLocalRoot(env), 'services', 'harness-processes.json');
+const harnessStateFile = (env = process.env) => path.join(starciLocalRoot(env), 'services', 'harness-processes.json');
 
 const readState = (file, io = fs) => {
   try {
@@ -86,7 +86,7 @@ export function startHarness({ tunnel = false, env = process.env, pid = process.
 }
 
 /** A PID is ours only when both its command and creation time match the durable start record. */
-export function recordedHarnessProcess(record, row) {
+function recordedHarnessProcess(record, row) {
   if (!record || !row || Number(row.pid) !== Number(record.pid)) return false;
   const command = normalize(row.cmd);
   if (!command.includes(normalize(record.script ?? selfFile))) return false;

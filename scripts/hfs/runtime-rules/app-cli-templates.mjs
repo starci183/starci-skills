@@ -1,6 +1,6 @@
 // app-cli-templates.mjs - RT_CLI_APP_ONLY_TEMPLATES (R200): app-managed templates invoke product actions only through
 // `starci app ...`. Generated runtime copies of those templates are checked too; examples are re-rendered by the release lead.
-export const APP_ONLY_TEMPLATES = 'RT_CLI_APP_ONLY_TEMPLATES';
+const APP_ONLY_TEMPLATES = 'RT_CLI_APP_ONLY_TEMPLATES';
 
 const ROOTS = [
   'packages/hfs/templates/',

@@ -11,7 +11,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 export const CATALOG_DIR = 'modules/cli/commands';
 export const CATALOG_SCHEMA = 'starci/cli-catalog@1';
-export const SINCE = '1.0.0-alpha.4';
+const SINCE = '1.0.0-alpha.4';
 
 const OWNERS = new Set(['runtime', '@starci/hfs']);
 const FLAG_TYPES = new Set(['string', 'boolean', 'number', 'enum', 'list']);

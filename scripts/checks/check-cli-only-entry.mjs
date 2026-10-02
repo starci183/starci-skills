@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // CLI_ONLY_ENTRY (R201): tracked actions enter runtime code through
 // `starci <group> <verb>`, never by executing a handler or internal entry.
+// Generated package-lock.json files are exempt because pinned dependencies can name retired bins.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
-import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
 import { codexGuardBlock, toolGuardCommand } from '../agent/trust.mjs';
 import { historyHookBody, workHookBody } from '../guards/hook-install.mjs';
 import { taskScript as reconcilerTaskScript } from '../reconciler/boot.mjs';
@@ -23,12 +23,14 @@ export const EXEMPTIONS = Object.freeze({
   catalogDeclarations: Object.freeze(['modules/cli/commands/_internal.yaml', 'modules/cli/commands/** removed fields']),
   history: Object.freeze(['CHANGELOG*.md', 'modules/kernel/contract-changes/**']),
   generatedRuntimeCopies: 'packages/*/runtime/**',
+  generatedLockfiles: '**/package-lock.json',
   variableScriptPaths: 'node spawns whose script path is held only in a variable',
   retirementSentences: 'sentences saying an invocation was removed, retired, or replaced',
 });
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RETIREMENT_WORD = /\b(?:removed|retired|replaced)\b/i;
+const GENERATED_LOCKFILE = /(?:^|\/)package-lock\.json$/;
 const HELP = `Usage: check-cli-only-entry [--root <tree>] [--json]
 
 ${CODE}: actions invoke runtime entries only through starci <group> <verb>.
@@ -40,33 +42,14 @@ const posix = (file) => String(file).replace(/\\/g, '/');
 const escapeRx = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const slashPattern = (value) => posix(value).split('/').map(escapeRx).join('[\\\\/]');
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
-const lineTextAt = (text, at) => {
-  const start = text.lastIndexOf('\n', at - 1) + 1;
-  const next = text.indexOf('\n', at);
-  return text.slice(start, next < 0 ? text.length : next).trim().slice(0, 240);
-};
-
-const sentenceRanges = (text) => {
-  const ranges = [];
-  let cursor = 0;
-  for (const sentence of sentencesOf(text)) {
-    const start = text.indexOf(sentence, cursor);
-    if (start < 0) continue;
-    ranges.push({ start, end: start + sentence.length, text: sentence });
-    cursor = start + sentence.length;
-  }
-  return ranges;
-};
-
-const sentenceAt = (ranges, at, text) => ranges.find((range) => at >= range.start && at < range.end)?.text
-  ?? lineTextAt(text, at);
 
 const fullyExempt = (file) => file.startsWith('packages/cli/src/')
   || file === 'scripts/cli/main.mjs'
   || file === 'modules/cli/commands/_internal.yaml'
   || /(?:^|\/)CHANGELOG[^/]*\.md$/i.test(file)
   || file.startsWith('modules/kernel/contract-changes/')
-  || /^packages\/.+\/runtime\//.test(file);
+  || /^packages\/.+\/runtime\//.test(file)
+  || GENERATED_LOCKFILE.test(file);
 
 const isTestSpawnHelper = (text, file, at) => {
   if (!/^tests\/(?:.*\.spec\.mjs|helpers\/)/.test(file)) return false;
@@ -79,7 +62,7 @@ const isTestSpawnHelper = (text, file, at) => {
 };
 
 /** Catalog routes keyed by their actual implementation script. */
-export function entryRoutes(catalog) {
+function entryRoutes(catalog) {
   const routes = new Map();
   const add = (script, route) => {
     const list = routes.get(script) ?? [];
@@ -117,16 +100,16 @@ const retiredOverlap = (retired, finding) => retired.some((item) => item.line ==
   && (finding.spelling.includes(item.spelling) || item.spelling.includes(finding.spelling)));
 
 /** Direct node and npm-run calls in one file. Pure; context is built once per scan. */
-export function cliOnlyCallsInText(text, file, context) {
+function cliOnlyCallsInText(text, file, context) {
   const rel = posix(file);
   if (fullyExempt(rel)) return [];
   const source = String(text);
   const searchable = rel.startsWith('modules/cli/commands/') && /\.ya?ml$/.test(rel) ? maskCatalogRemoved(source) : source;
-  const ranges = sentenceRanges(source);
+  const ranges = sentenceRanges(source, sentencesOf(source));
   const retired = retiredCallsInText(source, rel, context.retiredMatchers);
   const findings = [];
   const add = (candidate) => {
-    if (!rel.startsWith('modules/cli/commands/') && RETIREMENT_WORD.test(sentenceAt(ranges, candidate.at, source))) return;
+    if (!rel.startsWith('modules/cli/commands/') && RETIREMENT_WORD.test(sentenceTextAt(ranges, candidate.at, source))) return;
     if (isTestSpawnHelper(source, rel, candidate.at)) return;
     const finding = {
       code: CODE,
@@ -164,9 +147,6 @@ export function cliOnlyCallsInText(text, file, context) {
   }
   return findings;
 }
-
-const readTracked = (root) => gitOutputOf(lsFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
-  .split('\0').filter(Boolean).map(posix);
 
 const readValue = (root, file, read) => read ? read(file) : fs.readFileSync(path.join(root, ...file.split('/')));
 
@@ -206,7 +186,7 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     parsedInternal = internal ?? loadInternalRegistry(root);
   } catch (error) { throw new CliOnlyEntryInputError(error.message); }
   let tracked;
-  try { tracked = files ?? readTracked(root); } catch (error) { throw new CliOnlyEntryInputError(error.message); }
+  try { tracked = files ?? readTrackedTextFiles(root); } catch (error) { throw new CliOnlyEntryInputError(error.message); }
   const routes = entryRoutes(parsedCatalog);
   const internalPaths = new Set(parsedInternal.map((item) => posix(item.path)));
   const scripts = new Set([...routes.keys(), ...internalPaths]);
@@ -237,38 +217,20 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
 
 /** CLI entry point; io and the scan are injectable for the spec. */
 export function main(argv = [], io = process, deps = {}) {
-  let root = DEFAULT_ROOT;
-  let json = false;
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--help' || arg === '-h') { io.stdout.write(`${HELP}\n`); return 0; }
-    if (arg === '--json') { json = true; continue; }
-    if (arg === '--root') {
-      const value = argv[++i];
-      if (value === undefined) { io.stderr.write('check-cli-only-entry: --root needs a path\n'); return 2; }
-      root = path.resolve(value);
-      continue;
-    }
-    io.stderr.write(`check-cli-only-entry: unknown argument ${arg}\n${HELP}\n`);
-    return 2;
-  }
-  let report;
-  try { report = (deps.scan ?? scanCliOnlyEntry)(root); } catch (error) {
-    io.stderr.write(`check-cli-only-entry: ${error.message}\n`);
-    return 2;
-  }
-  if (json) io.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  else if (report.ok) io.stdout.write(`check-cli-only-entry: no direct entry calls in ${report.files} tracked text file(s)\n`);
-  else {
-    for (const finding of report.findings) {
+  return runTrackedTextCheckCli(argv, io, {
+    command: 'check-cli-only-entry',
+    help: HELP,
+    defaultRoot: DEFAULT_ROOT,
+    scan: deps.scan ?? scanCliOnlyEntry,
+    cleanText: (report) => `check-cli-only-entry: no direct entry calls in ${report.files} tracked text file(s)`,
+    findingText: (finding) => {
       const replacement = finding.use
         ? `use "${finding.use}"`
         : 'internal script: not invokable; use "starci <group> <verb>" of its owner';
-      io.stdout.write(`  ${finding.file}:${finding.line} ${CODE}: "${finding.spelling}" is a direct entry invocation; ${replacement}\n`);
-    }
-    io.stdout.write(`check-cli-only-entry: red (${report.findings.length} finding(s))\n`);
-  }
-  return report.ok ? 0 : 1;
+      return `  ${finding.file}:${finding.line} ${CODE}: "${finding.spelling}" is a direct entry invocation; ${replacement}`;
+    },
+    redText: (report) => `check-cli-only-entry: red (${report.findings.length} finding(s))`,
+  });
 }
 
 if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

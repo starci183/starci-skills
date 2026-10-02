@@ -22,9 +22,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { lsFiles } from '../api/git/ls-files.mjs';
-import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 
 const RULE = 'RT_CLI_VERB_PARITY';
@@ -86,7 +85,7 @@ const codeOnly = (text) => {
 };
 
 /** True only for the three entry gates owned by the registry contract. */
-export function hasEntryGate(source) {
+function hasEntryGate(source) {
   const text = String(source ?? '');
   if (text.startsWith('#!')) return true;
   const code = codeOnly(text);
@@ -144,11 +143,6 @@ const fallbackFiles = (root) => {
   return out;
 };
 
-const trackedFiles = (root) => {
-  try { return gitOutputOf(lsFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean).map(posix); }
-  catch { return fallbackFiles(root); }
-};
-
 const entryCandidate = (file) => ENTRY_EXT.test(file) && (ENTRY_ROOT.test(file) || PACKAGE_ENTRY.test(file));
 
 const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
@@ -160,10 +154,10 @@ export const flagsOfUsage = (text) => [...new Set(
   .filter((f) => !GLOBAL_FLAGS.has(f) && !f.endsWith('-'));
 
 /** The verbs cli.mjs's main() dispatch switch can run. */
-export const verbsFromSwitch = (source) => [...source.matchAll(/^\s*case '([a-z][a-z0-9-]*)':\s*return\b/gm)].map((m) => m[1]);
+const verbsFromSwitch = (source) => [...source.matchAll(/^\s*case '([a-z][a-z0-9-]*)':\s*return\b/gm)].map((m) => m[1]);
 
 /** Per-verb usage lines of the cli.mjs usage() heredoc: {verb: line + continuations}. */
-export const usageLinesOf = (source) => {
+const usageLinesOf = (source) => {
   const start = source.indexOf('const usage = ');
   if (start < 0) throw new ParityInputError('cli.mjs has no usage() definition');
   const open = source.indexOf('`', start);
@@ -181,7 +175,7 @@ export const usageLinesOf = (source) => {
 };
 
 /** The extension verb modules of scripts/kernel/verbs/: {verb: {file, usage, required}}. */
-export const kernelVerbModules = (root) => {
+const kernelVerbModules = (root) => {
   const dir = path.join(root, 'scripts', 'kernel', 'verbs');
   const out = new Map();
   for (const f of filesIn(dir, /^[a-z][a-z0-9-]*\.mjs$/)) {
@@ -231,7 +225,7 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   }
 
   const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
-  for (const file of files ?? trackedFiles(root)) {
+  for (const file of files ?? readTrackedTextFiles(root, { onGitError: () => fallbackFiles(root) })) {
     const rel = posix(file);
     if (!entryCandidate(rel) || knownPublic.has(rel) || rel.startsWith('packages/cli/src/') || internalPaths.has(rel)) continue;
     const absolute = path.join(root, ...rel.split('/'));

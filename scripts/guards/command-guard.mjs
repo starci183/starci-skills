@@ -61,6 +61,7 @@ import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { readInput } from './hook-io.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -497,14 +498,6 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   const verdict = await commandVerdict({ ...call, guard, env, deps });
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
-
-const readInput = (stream) => new Promise((resolve, reject) => {
-  let raw = '';
-  stream.setEncoding('utf8');
-  stream.on('data', (chunk) => { raw += chunk; });
-  stream.on('end', () => resolve(raw));
-  stream.on('error', reject);
-});
 
 /** The hook entry, exported so the published CLI can dispatch it in-process without a second Node hop. */
 export async function main({ stdin = process.stdin, stderr = process.stderr, env = process.env, root = skillRoot } = {}) {

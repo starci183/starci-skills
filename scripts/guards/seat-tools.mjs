@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guardsRoot } from './guards-root.mjs';
+import { readInput } from './hook-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 
@@ -23,14 +24,6 @@ export function seatToolDecision({ handle, toolName, root = skillRoot }) {
   if (!Array.isArray(guard?.deniedTools) || !guard.deniedTools.includes(toolName)) return null;
   return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents bypass [Worker] jobs, leases and the land gate - queue a [Worker] job instead (modules/supervisor/supervisor-prompt.md).` };
 }
-
-const readInput = (stream) => new Promise((resolve, reject) => {
-  let input = '';
-  stream.setEncoding('utf8');
-  stream.on('data', (chunk) => { input += chunk; });
-  stream.on('end', () => resolve(input));
-  stream.on('error', reject);
-});
 
 /** Exported hook entry for the published CLI's in-process guard fast path. */
 export async function main({ stdin = process.stdin, stdout = process.stdout, env = process.env, root = skillRoot } = {}) {

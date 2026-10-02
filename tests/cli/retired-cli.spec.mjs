@@ -97,7 +97,7 @@ test('catalog removed fields are exempt, but another catalog field is still chec
   assert.equal(maskCatalogRemoved(block).length, block.length, 'masking preserves line offsets');
 });
 
-test('history, changelogs, generated runtime copies, the dispatcher table, and this spec are exempt', () => {
+test('history, changelogs, generated files, the dispatcher table, and this spec are exempt', () => {
   const text = 'Run `starci api survey`.\n';
   for (const file of [
     'CHANGELOG.md',
@@ -106,6 +106,8 @@ test('history, changelogs, generated runtime copies, the dispatcher table, and t
     'modules/kernel/contract-changes/old.yaml',
     'packages/hfs/runtime/scripts/old.mjs',
     'packages/eslint/fe/runtime/scripts/old.mjs',
+    'package-lock.json',
+    'packages/example/package-lock.json',
     'packages/cli/src/catalog.generated.mjs',
     'packages/cli/src/removed.mjs',
     'tests/cli/retired-cli.spec.mjs',

@@ -113,6 +113,7 @@ test('every declared exemption has a pass fixture and nearby non-exempt text sti
   assert.deepEqual(Object.keys(EXEMPTIONS).sort(), [
     'catalogDeclarations',
     'dispatcher',
+    'generatedLockfiles',
     'generatedRuntimeCopies',
     'history',
     'retirementSentences',
@@ -130,6 +131,7 @@ test('every declared exemption has a pass fixture and nearby non-exempt text sti
     ['changelog', { 'CHANGELOG-next.md': direct }, true],
     ['contract history', { 'modules/kernel/contract-changes/old.yaml': direct }, true],
     ['generated runtime copy', { 'packages/hfs/runtime/scripts/call.mjs': direct }, true],
+    ['generated lockfile', { 'packages/example/package-lock.json': direct }, true],
     ['variable script path', { 'scripts/caller.mjs': "spawn('node', [scriptPath]);\n" }, true],
     ['retirement sentence', { 'docs/actions.md': 'The invocation `node scripts/private.mjs` was removed.\n' }, true],
   ];

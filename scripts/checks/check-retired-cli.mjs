@@ -4,13 +4,13 @@
 //
 // Usage: starci runtime check --only retired-cli -- [--root <tree>] [--json]
 // Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.
+// Generated package-lock.json files are exempt because pinned dependencies can name retired bins.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
-import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
 import { sentencesOf } from './check-guidance-commands.mjs';
 
 export const CODE = 'RT_RETIRED_CLI_CALL';
@@ -27,6 +27,7 @@ const TOP_LEVEL = Object.freeze({
   goal: 'starci workflow define',
 });
 const RETIREMENT_WORD = /\b(?:removed|retired|replaced)\b/i;
+const GENERATED_LOCKFILE = /(?:^|\/)package-lock\.json$/;
 const HELP = `Usage: starci runtime check --only retired-cli -- [--root <tree>] [--json]
 
 ${CODE}: no tracked text invokes a retired CLI command.
@@ -40,7 +41,7 @@ const commandRegex = (body, flags = '') => new RegExp(`(?<![\\w@./-])${body}(?![
 const alternation = (values) => [...values].sort((a, b) => b.length - a.length || a.localeCompare(b)).map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 
 /** Catalog-owned spellings and their replacements. */
-export function catalogRetired(catalog) {
+function catalogRetired(catalog) {
   const out = [];
   for (const group of catalog.groups ?? []) {
     for (const verb of group.verbs ?? []) {
@@ -110,6 +111,7 @@ const isFullyExempt = (file) => {
   return /(?:^|\/)CHANGELOG[^/]*\.md$/i.test(rel)
     || rel.startsWith('modules/kernel/contract-changes/')
     || /^packages\/.+\/runtime\//.test(rel)
+    || GENERATED_LOCKFILE.test(rel)
     || rel === 'tests/cli/retired-cli.spec.mjs'
     || rel === 'packages/cli/src/catalog.generated.mjs'
     || rel === 'packages/cli/src/removed.mjs';
@@ -136,7 +138,7 @@ export function maskCatalogRemoved(text) {
 }
 
 /** Hide the dispatcher's built-in removed-name table, not the rest of its generator. */
-export function maskDispatcherTable(text, file) {
+function maskDispatcherTable(text, file) {
   const rel = posix(file);
   if (rel !== 'scripts/cli/gen-catalog.mjs') return text;
   const start = text.indexOf('const RETIRED_BUILTINS = [');
@@ -145,26 +147,7 @@ export function maskDispatcherTable(text, file) {
   return end < 0 ? text : masked(text, start, end + 3);
 }
 
-const sentenceRanges = (text) => {
-  const ranges = [];
-  let cursor = 0;
-  for (const sentence of sentencesOf(text)) {
-    const start = text.indexOf(sentence, cursor);
-    if (start < 0) continue;
-    ranges.push({ start, end: start + sentence.length, text: sentence });
-    cursor = start + sentence.length;
-  }
-  return ranges;
-};
-
-const sentenceAt = (ranges, at, text) => ranges.find((range) => at >= range.start && at < range.end)?.text
-  ?? text.slice(text.lastIndexOf('\n', at - 1) + 1, text.indexOf('\n', at) < 0 ? text.length : text.indexOf('\n', at));
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
-const lineTextAt = (text, at) => {
-  const start = text.lastIndexOf('\n', at - 1) + 1;
-  const next = text.indexOf('\n', at);
-  return text.slice(start, next < 0 ? text.length : next).trim().slice(0, 240);
-};
 
 /** Findings in one text file. Pure; matchers come from retiredMatchers(). */
 export function retiredCallsInText(text, file, matchers) {
@@ -189,8 +172,8 @@ export function retiredCallsInText(text, file, matchers) {
     if (selected.some((hit) => candidate.at < hit.end && candidate.end > hit.at)) continue;
     selected.push(candidate);
   }
-  const ranges = sentenceRanges(source);
-  return selected.filter((hit) => !RETIREMENT_WORD.test(sentenceAt(ranges, hit.at, source))).map((hit) => ({
+  const ranges = sentenceRanges(source, sentencesOf(source));
+  return selected.filter((hit) => !RETIREMENT_WORD.test(sentenceTextAt(ranges, hit.at, source))).map((hit) => ({
     code: CODE,
     file: rel,
     line: lineAt(String(text), hit.at),
@@ -200,14 +183,12 @@ export function retiredCallsInText(text, file, matchers) {
   }));
 }
 
-const readTracked = (root) => gitOutputOf(lsFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
-
 /** Scan every tracked non-binary file under root. */
 export function scanRetiredCli(root = DEFAULT_ROOT, { files = null, read = null, catalog = null } = {}) {
   let parsed;
   try { parsed = catalog ?? loadCatalog(root); } catch (error) { throw new RetiredCliInputError(error.message); }
   let tracked;
-  try { tracked = files ?? readTracked(root); } catch (error) { throw new RetiredCliInputError(error.message); }
+  try { tracked = files ?? readTrackedTextFiles(root); } catch (error) { throw new RetiredCliInputError(error.message); }
   const matchers = retiredMatchers(parsed);
   const findings = [];
   let checked = 0;
@@ -227,33 +208,15 @@ export function scanRetiredCli(root = DEFAULT_ROOT, { files = null, read = null,
 
 /** CLI entry point; io is injectable for the spec. */
 export function main(argv = [], io = process, deps = {}) {
-  let root = DEFAULT_ROOT;
-  let json = false;
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--help' || arg === '-h') { io.stdout.write(`${HELP}\n`); return 0; }
-    if (arg === '--json') { json = true; continue; }
-    if (arg === '--root') {
-      const value = argv[++i];
-      if (value === undefined) { io.stderr.write('check-retired-cli: --root needs a path\n'); return 2; }
-      root = path.resolve(value);
-      continue;
-    }
-    io.stderr.write(`check-retired-cli: unknown argument ${arg}\n${HELP}\n`);
-    return 2;
-  }
-  let report;
-  try { report = (deps.scan ?? scanRetiredCli)(root); } catch (error) {
-    io.stderr.write(`check-retired-cli: ${error.message}\n`);
-    return 2;
-  }
-  if (json) io.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  else if (report.ok) io.stdout.write(`check-retired-cli: no retired CLI calls in ${report.files} tracked text file(s)\n`);
-  else {
-    for (const finding of report.findings) io.stdout.write(`  ${finding.file}:${finding.line} ${CODE}: "${finding.spelling}" was removed; use "${finding.use}"\n`);
-    io.stdout.write(`check-retired-cli: red (${report.findings.length} finding(s))\n`);
-  }
-  return report.ok ? 0 : 1;
+  return runTrackedTextCheckCli(argv, io, {
+    command: 'check-retired-cli',
+    help: HELP,
+    defaultRoot: DEFAULT_ROOT,
+    scan: deps.scan ?? scanRetiredCli,
+    cleanText: (report) => `check-retired-cli: no retired CLI calls in ${report.files} tracked text file(s)`,
+    findingText: (finding) => `  ${finding.file}:${finding.line} ${CODE}: "${finding.spelling}" was removed; use "${finding.use}"`,
+    redText: (report) => `check-retired-cli: red (${report.findings.length} finding(s))`,
+  });
 }
 
 if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

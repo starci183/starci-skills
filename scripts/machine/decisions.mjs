@@ -686,7 +686,7 @@ const resolveSupervisorDecision = (id, { by, verb, decisionId = null, note = nul
   });
 }, { env, now });
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: starci machine decisions supervisor --list`;
+const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: starci machine decisions supervisor --list`;
 /** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
 const SUP_RING_KIND = 'supervisor-ring';
 

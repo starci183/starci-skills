@@ -35,11 +35,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 export const WORKFLOW = '.github/workflows/examples.yml';
 export const CODECOV = 'codecov.yml';
 /** The step that prints the matrix, and the expression every matrix job reads it through. */
-export const MATRIX_COMMAND = 'starci runtime check --only examples-ci -- --matrix';
+const MATRIX_COMMAND = 'starci runtime check --only examples-ci -- --matrix';
 const checkoutCommand = (command) => command.replace(/^starci\s+/, 'npm run starci --silent -- ');
 const runsCommand = (step, command) => [command, checkoutCommand(command)].some((candidate) => String(step?.run ?? '').includes(candidate));
-export const MATRIX_JOB = 'apps';
-export const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
+const MATRIX_JOB = 'apps';
+const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
 
 /** The example apps: every examples/<name>/hfs.json of kind app, sorted by name. */
 export function exampleApps(root = ROOT) {
@@ -83,8 +83,8 @@ export function exampleImages(root = ROOT) {
     return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
   });
 }
-export const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';
-export const IMAGES_JOB = 'images';
+const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';
+const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
 export function renderCodecov(root = ROOT) {

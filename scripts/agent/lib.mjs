@@ -36,7 +36,7 @@ import { recordLaunchedTerminal } from './launched-terminals.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 /** Put the per-user starci shim first for Orca and every agent process it launches. */
-export function addStarciShimToPath({ env = process.env, home = os.homedir(), platform = process.platform } = {}) {
+function addStarciShimToPath({ env = process.env, home = os.homedir(), platform = process.platform } = {}) {
   const key = Object.keys(env).find((name) => name.toLowerCase() === 'path') ?? (platform === 'win32' ? 'Path' : 'PATH');
   const shim = path.join(home, '.starci', 'bin');
   const entries = String(env[key] ?? '').split(path.delimiter).filter(Boolean);
