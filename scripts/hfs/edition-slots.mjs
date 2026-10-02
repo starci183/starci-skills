@@ -31,7 +31,7 @@ export function managedGroupOf(slot, edition) {
 
 /** The declared edition and the vocabulary against which it is validated. */
 export function declarationEdition(manifest, declaration) {
-  const edition = declaration.edition ?? 'full';
+  const edition = declaration.edition === undefined ? 'full' : declaration.edition;
   const known = manifest.editions ?? EDITIONS;
   return { edition, known, valid: known.includes(edition) };
 }
