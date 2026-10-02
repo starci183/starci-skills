@@ -16,12 +16,16 @@ zones:
       - scripts/guards/**
       - tests/guards/**
       - modules/kernel/protected-zone.yaml
+      - modules/kernel/command-policy.yaml
+      - scripts/hfs/runtime-rules/rights-policy.mjs
   - id: release-and-hooks
     why: the release cut, the push path and the git hooks every app and the runtime inherit
     paths:
       - scripts/supervisor/release-cut.mjs
       - scripts/supervisor/push-git.mjs
       - scripts/supervisor/push-mains.mjs
+      - scripts/supervisor/release-l4.mjs
+      - scripts/hfs/runtime-rules/release-notes.mjs
       - scripts/hfs/runtime-rules/hook-shape.mjs
       - packages/hfs/templates/app/hooks/**
   - id: ci-triggers
@@ -29,6 +33,7 @@ zones:
     paths:
       - .github/workflows/**
       - packages/hfs/templates/app/ci-workflows/**
+      - scripts/hfs/runtime-rules/git-triggers.mjs
       - examples/*/.github/workflows/**
   - id: test-policy
     why: spec selection, budgets and the specs.* switches decide how much is tested and when
@@ -54,7 +59,7 @@ zones:
 catalogEntries:
   - file: knowledge/hfs/rules.yaml
     ids: [R221, R222, R223, R224, R225]
-    codes: [RIGHTS_ROLE_DENIED, RIGHTS_PROTECTED_ZONE, RT_HOOK_SHAPE]
+    codes: [CI_TRIGGERS_RELEASE_ONLY, RELEASE_NOTES, RIGHTS_ROLE_DENIED, RIGHTS_PROTECTED_ZONE, RT_HOOK_SHAPE]
   - file: modules/kernel/failure-codes.yaml
     ids: []
     codes:
@@ -71,3 +76,5 @@ catalogEntries:
       - RIGHTS_OP_RUNTIME_WRITE
       - RIGHTS_PUSH_NOT_RELEASE
       - RT_HOOK_SHAPE
+      - CI_TRIGGERS_RELEASE_ONLY
+      - RELEASE_NOTES

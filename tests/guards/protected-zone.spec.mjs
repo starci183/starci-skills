@@ -4,11 +4,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { hookDecision, fileRightsVerdict } from '../../scripts/guards/command-guard.mjs';
+import { hookDecision } from '../../scripts/guards/command-guard.mjs';
 import { PROTECTED_ZONE_FILE, catalogNames, loadProtectedZone, zoneOfPath } from '../../scripts/guards/protected-zone.mjs';
-import { fileWriteVerdict } from '../../scripts/guards/rights.mjs';
+import { fileWriteVerdict, runtimeRootOf } from '../../scripts/guards/rights.mjs';
 import { logRefusal } from '../../scripts/guards/refusals.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
+
+/** The file-rights verdict of one write for a role: the pure verdict over the real zone declaration (what the hook computes, minus the hook). */
+async function fileRightsVerdict({ role, filePath, tool = 'Edit', edit = null, guard = null, shell = false }) {
+  if ((role !== 'supervisor' && role !== 'op') || !runtimeRootOf(filePath)) return null;
+  const zone = role === 'supervisor' ? { ...zoneOfPath(filePath), catalogNames } : { runtimeRoot: runtimeRootOf(filePath) };
+  return fileWriteVerdict({ role, filePath, tool, edit, guard, zone, shell });
+}
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const DECLARATION = loadProtectedZone({ root: ROOT });
@@ -91,11 +98,11 @@ test('the YAML is the one declaration and its six zones map a table of runtime-r
   assert.deepEqual(DECLARATION.catalog[0].ids, ['R221', 'R222', 'R223', 'R224', 'R225']);
   assert.deepEqual(DECLARATION.catalog[0].codes, ['CI_TRIGGERS_RELEASE_ONLY', 'RELEASE_NOTES', 'RIGHTS_ROLE_DENIED', 'RIGHTS_PROTECTED_ZONE', 'RT_HOOK_SHAPE']);
   assert.deepEqual(DECLARATION.catalog[1].ids, []);
-  assert.deepEqual(DECLARATION.catalog[1].codes, [
-    'RIGHTS_GIT_PUSH', 'RIGHTS_GIT_TAG', 'RIGHTS_GIT_COMMIT', 'RIGHTS_NPM_PUBLISH', 'RIGHTS_SUITE_RUN',
+  assert.deepEqual([...DECLARATION.catalog[1].codes].sort(), [
+    'RIGHTS_GIT_PUSH', 'RIGHTS_GIT_TAG', 'RIGHTS_GIT_SYNC', 'RIGHTS_RAW_TOOL', 'RIGHTS_GIT_COMMIT', 'RIGHTS_NPM_PUBLISH', 'RIGHTS_SUITE_RUN',
     'RIGHTS_NPM_CI_UNLOCKED', 'RIGHTS_RELEASE_CUT', 'RIGHTS_PROTECTED_ZONE', 'RIGHTS_OP_RUNTIME_WRITE',
     'RIGHTS_PUSH_NOT_RELEASE', 'RT_HOOK_SHAPE', 'CI_TRIGGERS_RELEASE_ONLY', 'RELEASE_NOTES',
-  ]);
+  ].sort());
 
   const yaml = fs.readFileSync(path.join(ROOT, PROTECTED_ZONE_FILE), 'utf8');
   for (const id of ZONE_IDS) {
