@@ -170,3 +170,38 @@ test('BE: a config that reads <PREFIX>_DATABASE compares that key, not <PREFIX>_
   });
   assert.equal(messages(runArch(root), 'same database').length, 1);
 });
+
+// A bounded context is its own database or its own schema of a shared one (hfs.json isolation); splitting a schema out is an env change.
+const SCHEMA_CONNECTIONS = {
+  declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'schema' }, { name: 'agentos', envPrefix: 'AGENTOS', owner: 'core', isolation: 'schema' }] },
+  apps: TWO_CONNECTIONS.apps,
+};
+const schemaConfig = (name, prefix) => `export const ${name}Config = () => ({ host: process.env.${prefix}_HOST, port: process.env.${prefix}_PORT, name: process.env.${prefix}_NAME, schema: process.env.${prefix}_SCHEMA });\n`;
+const SCHEMA_FILES = { ...CONNECTION, 'src/modules/platform/database/primary.config.ts': schemaConfig('primary', 'PRIMARY'), 'src/modules/platform/database/agentos.config.ts': schemaConfig('agentos', 'AGENTOS'), 'apps/core/src/app.module.ts': ONCE };
+const SHARED_ENV = (primarySchema, agentosSchema) => `PRIMARY_HOST=db\nPRIMARY_PORT=5432\nPRIMARY_NAME=app\nPRIMARY_SCHEMA=${primarySchema}\nAGENTOS_HOST=db\nAGENTOS_PORT=5432\nAGENTOS_NAME=app\nAGENTOS_SCHEMA=${agentosSchema}\n`;
+
+test('BE: two schema contexts in one database with distinct schemas are fine, the same schema is one database', t => {
+  const fine = archFixture(t, { ...SCHEMA_CONNECTIONS, files: { ...SCHEMA_FILES, '../.starcistacks/dev/runtime/env/db.env': SHARED_ENV('main', 'agent') } });
+  assert.deepEqual(findings(runArch(fine), 'BE_CONNECTION_DUPLICATE'), []);
+  const clash = archFixture(t, { ...SCHEMA_CONNECTIONS, files: { ...SCHEMA_FILES, '../.starcistacks/dev/runtime/env/db.env': SHARED_ENV('main', 'main') } });
+  const hits = messages(runArch(clash), 'same database');
+  assert.equal(hits.length, 1, JSON.stringify(hits));
+  assert.match(hits[0].message, /schema main/);
+  const missing = archFixture(t, { ...SCHEMA_CONNECTIONS, files: { ...SCHEMA_FILES, '../.starcistacks/dev/runtime/env/db.env': 'PRIMARY_HOST=db\nPRIMARY_PORT=5432\nPRIMARY_NAME=app\nAGENTOS_HOST=db\nAGENTOS_PORT=5432\nAGENTOS_NAME=app\n' } });
+  assert.equal(messages(runArch(missing), 'same database').length, 1, 'two schema contexts with no schema value are one database');
+});
+
+test('BE: a context that is its own database shares it with no schema context', t => {
+  const mixed = { declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }, SCHEMA_CONNECTIONS.declaration.connections[1]] }, apps: TWO_CONNECTIONS.apps };
+  const root = archFixture(t, { ...mixed, files: { ...SCHEMA_FILES, '../.starcistacks/dev/runtime/env/db.env': SHARED_ENV('main', 'agent') } });
+  assert.equal(messages(runArch(root), 'same database').length, 1);
+});
+
+test('BE: a schema context whose config never reads <PREFIX>_SCHEMA is refused, a database context needs no schema key', t => {
+  const root = archFixture(t, { ...SCHEMA_CONNECTIONS, files: { ...SCHEMA_FILES, 'src/modules/platform/database/agentos.config.ts': connectionFiles('agentos', 'AGENTOS', 'AGENTOS')['src/modules/platform/database/agentos.config.ts'] } });
+  const hits = messages(runArch(root), 'must read AGENTOS_SCHEMA');
+  assert.equal(hits.length, 1, JSON.stringify(hits.map(item => item.message)));
+  assert.equal(hits[0].path, 'src/modules/platform/database/agentos.config.ts');
+  const database = archFixture(t, { ...TWO_CONNECTIONS, files: { ...CONNECTION, 'apps/core/src/app.module.ts': ONCE } });
+  assert.deepEqual(messages(runArch(database), 'SCHEMA'), []);
+});

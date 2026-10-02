@@ -587,6 +587,15 @@ slots:
     tests: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: be.contract.events.pin
+    profiles: [be]
+    path: "contracts/<app>/events.pin.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R134 BE_CONTRACT_BREAKING)
+    rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   - id: be.app.api
@@ -602,7 +611,7 @@ slots:
     allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
-    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
+    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER]
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
@@ -614,7 +623,7 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
-    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
+    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
   - id: be.app.migrate
     profiles: [be]
     path: "apps/<app>/src/"
@@ -627,7 +636,7 @@ slots:
     requires: [main.ts]
     allows: [main.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
-    rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
+    rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS, BE_CONTEXT_OWNER]
   - id: be.app.cli
     profiles: [be]
     path: "apps/<app>/src/"
@@ -756,7 +765,7 @@ slots:
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_TRANSACTION]
   - id: be.errors
     profiles: [be]
     path: "src/modules/{domain,integrations}/<capability>/errors/"
@@ -788,7 +797,10 @@ slots:
     since: 1.0.0
   - id: be.persistence
     profiles: [be]
-    path: "src/modules/{domain,platform}/<capability>/persistence/"
+    path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
+    # R135: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
+    perConnection: [event-bus, jobs]
     presence: optional
     tracked: tracked
     tier: inherit
@@ -796,7 +808,22 @@ slots:
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
     tests: none
-    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE]
+    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
+  # A projection (R132 BE_CONTEXT_COUPLING): a read model kept up to date from events, owned by the context whose connection holds its
+  # tables. Its persistence is registered on that context's connection like a domain capability's.
+  - id: be.projection
+    profiles: [be]
+    path: "src/modules/projections/<capability>/"
+    presence: optional
+    tracked: tracked
+    tier: domain
+    owner: true
+    requires: [index.ts]
+    allows: ["<capability>.module.ts", "<capability>.options.ts", errors/, persistence/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts"]
+    forbids: [testing/, exceptions/, utils/, helpers/, shared/]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_CONTEXT_COUPLING]
   - id: be.platform
     profiles: [be]
     path: "src/modules/platform/<capability>/"

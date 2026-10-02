@@ -71,7 +71,7 @@ describe('hfs.json validation', () => {
   it('refuses a declaration the canons would refuse, so a pin bump never leaves eslint unable to start', () => {
     // the pre-2.0 connections shape (names only) is what broke eslint in a product repo after a pin bump
     assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: ['primary', 'agentos'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
-    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] } })));
+    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] } })));
   });
 });
 

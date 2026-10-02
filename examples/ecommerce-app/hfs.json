@@ -10,8 +10,8 @@
         { "name": "migrate", "kind": "migrate" }
       ],
       "connections": [
-        { "name": "identity", "envPrefix": "IDENTITY_DB" },
-        { "name": "order", "envPrefix": "ORDER_DB" }
+        { "name": "identity", "envPrefix": "IDENTITY_DB", "owner": "identity", "isolation": "database" },
+        { "name": "order", "envPrefix": "ORDER_DB", "owner": "order", "isolation": "database" }
       ],
       "optionalSlots": ["repo.docs", "be.contract.graphql"]
     },

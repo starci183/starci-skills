@@ -109,8 +109,8 @@ reads and (back end only) the database connections.
       ],
       "optionalSlots": ["be.transport.message", "be.transport.schedule", "be.contract.graphql", "repo.docs"],
       "connections": [
-        { "name": "primary", "envPrefix": "PRIMARY_DB" },
-        { "name": "agentos", "envPrefix": "AGENTOS_DB" }
+        { "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "core", "isolation": "database" },
+        { "name": "agentos", "envPrefix": "AGENTOS_DB", "owner": "core", "isolation": "database" }
       ]
     },
     "fe": {
@@ -124,8 +124,10 @@ reads and (back end only) the database connections.
 
 `sides.be.apps` lists every `be/apps/<name>` with its kind (`api`, `worker`, `migrate`, `cli`); `sides.fe.apps` every
 `fe/apps/<name>` (`next`). App names are unique across both sides. `connections` (back end only) lists every physical
-database as `{ name, envPrefix }`: the logical name (never the engine) and the prefix of its `<PREFIX>_*` environment
-keys. `reads` is a subset of the manifest's `sides.<side>.reads`. A missing `hfs.json`, or a machine run that analysed
+database or schema as `{ name, envPrefix, owner, isolation }`: the logical name (never the engine; the connection IS the bounded
+context), the prefix of its `<PREFIX>_*` environment keys, the one api or worker app that owns it (only that app composes it)
+and whether the context is its own `database` or its own `schema` of a shared database (`<PREFIX>_SCHEMA`; splitting a schema
+out into a database is an env change only). `reads` is a subset of the manifest's `sides.<side>.reads`. A missing `hfs.json`, or a machine run that analysed
 zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailable". Owners are derived from slots;
 `hfs.json` holds no owner list, path or disabled rule. `hfs scaffold app <name>` writes a new app with its declaration.
 
@@ -565,7 +567,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; an app is proven by the e2e world (`useTestWorld({ apps })`), never by a unit spec. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `be/apps/*/src`. |
 | R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority; `synchronize` is `false`. |
-| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias). |
+| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias); only a platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) registers on several. |
 | R36 | `BE_SQL_OUTSIDE_PERSISTENCE` | Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder. |
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
@@ -597,7 +599,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `be/apps/migrate` and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object. |
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface. |
-| R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
+| R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of its own context (its own capability's, or a same-context capability it may import; a cross-context JOIN is refused), and every multi-row SELECT is bounded. |
 | R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events (`EventBus`, `EventEmitter`, an RxJS `Subject`, a stored listener list); a message and an injected dependency are `readonly`. |
 | R88 | `BE_TRANSPORT_SHAPE` | A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`. |
 | R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source. |
@@ -669,3 +671,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R128 | `HFS_MONO_FE_WORKSPACE` | Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script. |
 | R129 | `HFS_MONO_NEST_PROJECTS` | The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `"monorepo": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{"type": "application", "root": "apps/<app>", "sourceRoot": "apps/<app>/src"}`. |
 | R130 | `HFS_MONO_WORKSPACE_DEP` | An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `"*"`; the app root `package.json` never declares a workspace package. |
+| R131 | `BE_CONTEXT_OWNER` | A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection). |
+| R132 | `BE_CONTEXT_COUPLING` | Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context. |
+| R133 | `BE_CONTEXT_TRANSACTION` | One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga. |
+| R134 | `BE_CONTRACT_BREAKING` | An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key. |
+| R135 | `BE_CONTEXT_PLATFORM_TABLES` | A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it. |
