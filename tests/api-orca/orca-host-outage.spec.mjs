@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -70,9 +70,11 @@ test('settledKernelVerdict waits out an outage and re-verifies; a death must be 
 
 /* ------------------------------------------------------------ integration */
 
-const fixture=t=>{
+let sharedFixture=null;
+after(()=>{if(sharedFixture)fs.rmSync(sharedFixture.root,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+
+const createFixture=()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-host-outage-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
@@ -94,11 +96,31 @@ const fixture=t=>{
   const kernel=json(booted.stdout)?.terminal;assert.ok(kernel);
   // The kernel sits at its idle Codex prompt, alive.
   writeState(s=>{s.terminals[kernel].screen='• Yielding - waiting on the op report.\n› Ask Codex to do anything\n  gpt-6-sol high · repo';});
+  // Every integration case starts from this same fully booted workflow. Restore
+  // all test-observed mutable state, including the workflow ledger, before the next
+  // case so no test observes another test's terminal, job, event, or call log.
+  const baseline=path.join(root,'baseline');fs.mkdirSync(baseline);
+  for(const name of ['repo','owner'])fs.cpSync(path.join(root,name),path.join(baseline,name),{recursive:true});
+  fs.copyFileSync(state,path.join(baseline,'orca-state.json'));
+  if(fs.existsSync(log))fs.copyFileSync(log,path.join(baseline,'calls.jsonl'));
+  const ledgerFile=ledgerFileFor(repo,{env});
+  fs.copyFileSync(ledgerFile,path.join(baseline,'runtime.sqlite'));
+  const reset=()=>{
+    for(const name of ['repo','owner']){
+      fs.rmSync(path.join(root,name),{recursive:true,force:true,maxRetries:20,retryDelay:25});
+      fs.cpSync(path.join(baseline,name),path.join(root,name),{recursive:true});
+    }
+    fs.copyFileSync(path.join(baseline,'orca-state.json'),state);
+    const baselineLog=path.join(baseline,'calls.jsonl');
+    if(fs.existsSync(baselineLog))fs.copyFileSync(baselineLog,log);else fs.rmSync(log,{force:true});
+    for(const suffix of ['','-wal','-shm'])fs.rmSync(`${ledgerFile}${suffix}`,{force:true});
+    fs.copyFileSync(path.join(baseline,'runtime.sqlite'),ledgerFile);
+  };
   const ledgerRows=()=>{
     // The spawned verbs resolve the ledger under the fixture's LOCALAPPDATA; the
     // same env must name the file here or this process lands on the host's root
     // (engine/db/ledger.mjs ledgerFileFor/projectsRootFor).
-    const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});
+    const ledger=inspectLedger({file:ledgerFile});
     try{
       const jobRow=ledger.db.prepare('SELECT status,worker_id,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
       return {
@@ -115,7 +137,7 @@ const fixture=t=>{
   // dead (signal deleted, job released, an unclosed-residue incident) while its
   // terminal kept running.
   const loseSeat=()=>{
-    const ledger=openLedger({file:ledgerFileFor(repo,{env})});
+    const ledger=openLedger({file:ledgerFile});
     const at=Date.now();
     try{
       ledger.transaction(()=>{
@@ -132,7 +154,12 @@ const fixture=t=>{
       });
     }finally{ledger.close();}
   };
-  return {repo,run,calls,readState,writeState,workflowId,kernel,ledgerRows,loseSeat};
+  return {root,repo,run,calls,readState,writeState,workflowId,kernel,ledgerRows,loseSeat,reset};
+};
+
+const fixture=()=>{
+  if(!sharedFixture)sharedFixture=createFixture();else sharedFixture.reset();
+  return sharedFixture;
 };
 
 test('start-workflow refuses to replace a kernel while Orca answers runtime_unavailable, and touches nothing',t=>{
