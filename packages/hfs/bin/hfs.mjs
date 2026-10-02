@@ -35,6 +35,7 @@
 //                                            relative to be/): the spec is built
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
 //                                            one placeholder it per public method. Never overwrites a file.
+//   hfs new image [--repo <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
 //   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 // Every finding names a why code and carries its Vietnamese text. check, lint and explain read the app, never write to it. Exit codes:
 // 0 clean, 1 error findings, 2 a refusal or bad usage.
@@ -51,6 +52,7 @@ import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
 import { scaffoldApp } from '../scaffold/app.mjs';
+import { newImages } from '../scaffold/image.mjs';
 import { contractEmitFindings } from '../runtime/scripts/hfs/rules/contract.mjs';
 import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
@@ -64,6 +66,7 @@ hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
+hfs new image [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into']);
@@ -221,7 +224,8 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       let written;
       if (kind === 'service' && args.length === 2) written = newService({ repoRoot, dir: args[0], name: args[1], inject: opts.inject ?? [] });
       else if (kind === 'spec' && args.length === 1 && opts.inject === undefined) written = newSpec({ repoRoot, file: args[0] });
-      else throw new Error('hfs new takes `service <dir> <name> [--inject ...]` or `spec <file>.service.ts`');
+      else if (kind === 'image' && args.length === 0 && opts.inject === undefined) written = newImages({ repoRoot });
+      else throw new Error('hfs new takes `service <dir> <name> [--inject ...]`, `spec <file>.service.ts` or `image`');
       for (const file of written) stdout(`created ${file}
 `);
       return 0;

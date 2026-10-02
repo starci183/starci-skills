@@ -9,6 +9,7 @@ import path from 'node:path';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
 import { NODE_IMAGE } from '../../scripts/hfs/rules/docker.mjs';
 import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { newImages } from '../../packages/hfs/scaffold/image.mjs';
 import { execForm, parseDockerfile, shellCommands, words } from '../../scripts/lib/dockerfile.mjs';
 import { APP, PRESETS, appOf, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
@@ -65,6 +66,16 @@ test('the managed .dockerignore and images workflow are required at the app root
   assert.equal(statusOf(repoOf(APP), '.dockerignore'), 'ok');
   assert.equal(statusOf(repoOf(APP, edit('.dockerignore', (text) => text.replace('.starcistacks\n', ''))), '.dockerignore'), 'drift');
   assert.equal(statusOf(repoOf(APP, edit('.github/workflows/images.yml', replace('push: false', 'push: true'))), '.github/workflows/images.yml'), 'drift');
+});
+
+const EDITED = ['# the app edited this file', 'FROM scratch', ''].join('\n');
+test('hfs new image writes the Dockerfile of every declared app that has none and never overwrites one', () => {
+  const dir = repoOf(MIXED, (root) => { fs.rmSync(at(root, 'be/apps/jobs/Dockerfile')); fs.rmSync(at(root, 'fe/apps/app/Dockerfile')); put(root, 'be/apps/cli/Dockerfile', EDITED); });
+  assert.deepEqual(newImages({ repoRoot: dir }).sort(), ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']);
+  assert.equal(fs.readFileSync(at(dir, 'be/apps/cli/Dockerfile'), 'utf8'), EDITED);
+  assert.deepEqual(newImages({ repoRoot: dir }), []);
+  const result = checkRepo({ repoRoot: gitAdd(dir) });
+  for (const file of ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']) assert.deepEqual(result.findings.filter((f) => f.path === file), [], file);
 });
 
 // ------------------------------------------------------------------------------------------------ R139 HFS_DOCKER_BUILD_CONTEXT
