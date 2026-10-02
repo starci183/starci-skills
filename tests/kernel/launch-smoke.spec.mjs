@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -238,9 +238,24 @@ const noop = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' };
 const smoke = (fake, extra = {}) => runSmoke({ entry: 'term_entry', orca: fake.client, appRepo: fake.app, noop, stateRoot: fake.tmp, root: fake.tmp,
   pollMs: 1000, timeoutMs: 60000, workflowId: 'smoke-t', ...clock(fake), ...extra });
 
+const sharedCleanups = [];
+after(async () => {
+  for (const cleanup of sharedCleanups.reverse()) await cleanup();
+});
+const sharedScope = { after: (cleanup) => sharedCleanups.push(cleanup) };
+let successfulSmokePromise;
+const successfulSmoke = () => {
+  successfulSmokePromise ??= (async () => {
+    const fake = fakeOrca(sharedScope);
+    const before = fs.readFileSync(path.join(fake.app, 'be/src/main.ts'));
+    const r = await smoke(fake);
+    return { fake, r, before };
+  })();
+  return successfulSmokePromise;
+};
+
 test('every nesting path starts through the runtime launchers at the depth Orca reports, and every agent is released', async (t) => {
-  const fake = fakeOrca(t);
-  const r = await smoke(fake);
+  const { fake, r } = await successfulSmoke();
   assert.equal(r.schema, SMOKE_SCHEMA);
   assert.equal(r.ok, true, JSON.stringify(r, null, 2));
   assert.deepEqual(r.paths['supervisor-worker'], { status: 'ok', depths: { supervisor: 1, worker: 2 } });
@@ -280,8 +295,7 @@ test('every nesting path starts through the runtime launchers at the depth Orca 
 });
 
 test('Orca creates the workflow worktree before the Kernel starts in it; the be and fe ops run in parallel in it, never in a worktree of their own', async (t) => {
-  const fake = fakeOrca(t);
-  const r = await smoke(fake);
+  const { fake, r } = await successfulSmoke();
   assert.equal(r.ok, true, JSON.stringify(r.paths, null, 2));
   const kernel = fake.launches.find((l) => l.title === ROLES.kernel.title);
   const order = fake.wfr.calls.map((c) => c[0]);
@@ -305,8 +319,7 @@ test('Orca creates the workflow worktree before the Kernel starts in it; the be 
 });
 
 test('each green op is a checkpoint gated against the previous one; the failing op is preserved and the worktree reset to the last checkpoint', async (t) => {
-  const fake = fakeOrca(t);
-  const r = await smoke(fake);
+  const { fake, r } = await successfulSmoke();
   const wf = r.workflow;
   assert.equal(r.paths['workflow-worktree'].status, 'ok', JSON.stringify(r.paths['workflow-worktree']));
   assert.equal(wf.gateBases.op.before, wf.baseHead, "the first op's gate base is the merge-base with main");
@@ -321,9 +334,7 @@ test('each green op is a checkpoint gated against the previous one; the failing 
 });
 
 test('the finish merges to main and leaves the worktree release-pending; the controller removes it; main is byte-identical but for the two green files', async (t) => {
-  const fake = fakeOrca(t);
-  const before = fs.readFileSync(path.join(fake.app, 'be/src/main.ts'));
-  const r = await smoke(fake);
+  const { fake, r, before } = await successfulSmoke();
   const wf = r.workflow;
   assert.equal(wf.finish.ok, true);
   assert.deepEqual(wf.main.added, [ownedFileOf('op', 'smoke-t', 'web'), ownedFileOf('opFe', 'smoke-t', 'web')].sort());
