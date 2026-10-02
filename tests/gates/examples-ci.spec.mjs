@@ -82,6 +82,8 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   assert.ok(steps.some((entry) => String(entry.uses ?? '').startsWith('SonarSource/sonarqube-scan-action')));
   assert.ok(steps.some((entry) => /no Sonar server is configured/.test(String(entry.run ?? ''))));
   assert.ok(steps.findIndex((entry) => entry.run === 'npm test -- --ci') < steps.indexOf(upload));
+  const at = (run) => steps.findIndex((entry) => entry.run === run);
+  assert.ok(at('npm run codegen --silent') >= 0 && at('npm run codegen --silent') < at('npm run typecheck') && at('npm run typecheck') < at('npm run build:fe'), 'codegen runs before the type-check and the fe build');
 });
 
 /** The hfs.json of a fixture example: one api app and one Next app. */

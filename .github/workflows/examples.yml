@@ -120,6 +120,9 @@ jobs:
         run: npm ci
       - name: Install app dependencies
         run: npm ci
+      # The generated inputs (gitignored) first: the fe apps import the typed document table codegen writes, before any type-check or lint.
+      - name: Codegen
+        run: npm run codegen --silent
       # tsc over be/, then turbo typecheck over every fe workspace (the packages are built first: ^build).
       - name: Typecheck both sides
         run: npm run typecheck
