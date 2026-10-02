@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
@@ -17,6 +17,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
+const inPairs=async tasks=>{for(let i=0;i<tasks.length;i+=2)await Promise.all(tasks.slice(i,i+2).map(run=>run()));};
 
 const LOGIN='wf-a-login',COLLAB='wf-b-collab',DONE='wf-c-done',ELSEWHERE='wf-d-elsewhere',ROOTLESS='wf-e-rootless';
 
@@ -27,7 +28,17 @@ const fixture=t=>{
   const base={...process.env};
   // The suite may itself run inside an Orca or op terminal: start from a caller with no identity.
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
-  const api=(args,env={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...base,...env}});
+  const api=(args,env={})=>new Promise((resolve,reject)=>{
+    const child=spawn(process.execPath,[API,...args,'--repo',repo,'--json'],{
+      cwd:ROOT,windowsHide:true,env:{...base,...env},stdio:['ignore','pipe','pipe'],
+    });
+    let stdout='',stderr='';
+    child.stdout.setEncoding('utf8').on('data',chunk=>{stdout+=chunk;});
+    child.stderr.setEncoding('utf8').on('data',chunk=>{stderr+=chunk;});
+    const timer=setTimeout(()=>child.kill(),120000);
+    child.once('error',error=>{clearTimeout(timer);reject(error);});
+    child.once('close',(status,signal)=>{clearTimeout(timer);resolve({status,signal,stdout,stderr});});
+  });
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
@@ -65,9 +76,9 @@ const fixture=t=>{
     ]);
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  const ok=(args,env)=>{const r=api(args,env);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
-  const refused=(args,code,env)=>{
-    const r=api(args,env);
+  const ok=async(args,env)=>{const r=await api(args,env);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
+  const refused=async(args,code,env)=>{
+    const r=await api(args,env);
     assert.equal(r.status,1,`${args.join(' ')} must be refused: ${r.stdout}`);
     assert.equal(lastLine(r.stderr)?.code,code,r.stderr);
   };
@@ -75,9 +86,9 @@ const fixture=t=>{
   return {repo,api,ok,refused,read,peerRows};
 };
 
-test('peers lists every running workflow sharing a source root, with its current leg and open owned paths',t=>{
+test('peers lists every running workflow sharing a source root, with its current leg and open owned paths',async t=>{
   const fx=fixture(t);
-  const out=fx.ok(['peers','--workflow',COLLAB]);
+  const out=await fx.ok(['peers','--workflow',COLLAB]);
   assert.match(out.rule,/running/);
   assert.deepEqual(out.peers.map(p=>p.workflowId).sort(),[LOGIN,ROOTLESS],'finished and other-source workflows are not peers');
   const login=out.peers.find(p=>p.workflowId===LOGIN);
@@ -88,17 +99,21 @@ test('peers lists every running workflow sharing a source root, with its current
     ['job-login-auth',['src/auth','shop-fe/apps/login']],['job-login-phone',['src/auth/phone']]],'settled jobs own nothing');
   assert.deepEqual(login.pending,{toPeer:[],fromPeer:[]});
 
-  const sent=fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification','--body','Collab needs it']);
-  const again=fx.ok(['peers','--workflow',COLLAB]).peers.find(p=>p.workflowId===LOGIN);
+  const sent=await fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification','--body','Collab needs it']);
+  const [againResult,mirroredResult]=await Promise.all([
+    fx.ok(['peers','--workflow',COLLAB]),
+    fx.ok(['peers','--workflow',LOGIN]),
+  ]);
+  const again=againResult.peers.find(p=>p.workflowId===LOGIN);
   assert.deepEqual(again.pending.toPeer.map(m=>m.key),[sent.sent[0].key]);
-  const mirrored=fx.ok(['peers','--workflow',LOGIN]).peers.find(p=>p.workflowId===COLLAB);
+  const mirrored=mirroredResult.peers.find(p=>p.workflowId===COLLAB);
   assert.deepEqual(mirrored.pending.fromPeer.map(m=>m.key),[sent.sent[0].key]);
   assert.equal(mirrored.currentLeg.jobId,'job-collab-chat');
 });
 
-test('notify, inbox and ack round trip: a request, a reply, and each disposition visible to its sender',t=>{
+test('notify, inbox and ack round trip: a request, a reply, and each disposition visible to its sender',async t=>{
   const fx=fixture(t);
-  const request=fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification',
+  const request=await fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification',
     '--body','Collab group invites need a verified phone; it belongs to the Login workflow. Can you build it?','--refs','src/auth/phone,job-collab-chat']);
   assert.equal(request.sent.length,1);
   const key=request.sent[0].key;
@@ -111,83 +126,93 @@ test('notify, inbox and ack round trip: a request, a reply, and each disposition
     refs:['src/auth/phone','job-collab-chat'],at:'number'});
 
   // A Kernel re-sending the same pending message after a crash does not duplicate it.
-  const resent=fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification',
+  const resent=await fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification',
     '--body','Collab group invites need a verified phone; it belongs to the Login workflow. Can you build it?']);
   assert.deepEqual([resent.sent[0].key,resent.sent[0].deduped],[key,true]);
   assert.equal(fx.peerRows().length,1);
 
-  const inbox=fx.ok(['inbox','--workflow',LOGIN]);
+  const [inbox,senderInbox]=await Promise.all([
+    fx.ok(['inbox','--workflow',LOGIN]),
+    fx.ok(['inbox','--workflow',COLLAB]),
+  ]);
   assert.deepEqual(inbox.pending.map(m=>[m.key,m.from,m.kind,m.subject]),[[key,COLLAB,'request','phone verification']]);
-  assert.deepEqual(fx.ok(['inbox','--workflow',COLLAB]).pending,[],'the sender has nothing pending');
+  assert.deepEqual(senderInbox.pending,[],'the sender has nothing pending');
 
   // Login answers with a reply and acks the request with what it did.
-  const reply=fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','reply','--reply-to',key,'--subject','re: phone verification',
+  const reply=await fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','reply','--reply-to',key,'--subject','re: phone verification',
     '--body','Queued as job-login-phone; expect it after the auth leg.']);
   const replyKey=reply.sent[0].key;
-  const acked=fx.ok(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','queued as job-login-phone, replied '+replyKey]);
+  const acked=await fx.ok(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','queued as job-login-phone, replied '+replyKey]);
   assert.deepEqual([acked.acked.key,acked.acked.from,acked.pending],[key,COLLAB,0]);
-  fx.refused(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','again'],'peer-message-not-pending');
-  fx.refused(['inbox','--workflow',LOGIN,'--ack','pm-000000000000','--disposition','x'],'peer-message-unknown');
+  await Promise.all([
+    fx.refused(['inbox','--workflow',LOGIN,'--ack',key,'--disposition','again'],'peer-message-not-pending'),
+    fx.refused(['inbox','--workflow',LOGIN,'--ack','pm-000000000000','--disposition','x'],'peer-message-unknown'),
+  ]);
 
   // Collab sees the reply pending and its request's disposition in its sent list.
-  const collab=fx.ok(['inbox','--workflow',COLLAB]);
+  const collab=await fx.ok(['inbox','--workflow',COLLAB]);
   assert.deepEqual(collab.pending.map(m=>[m.key,m.kind,m.replyTo,m.from]),[[replyKey,'reply',key,LOGIN]]);
   const mine=collab.sent.find(m=>m.key===key);
   assert.equal(mine.status,'applied');
   assert.equal(mine.disposition.disposition,'queued as job-login-phone, replied '+replyKey);
   assert.equal(mine.disposition.by,LOGIN);
-  fx.ok(['inbox','--workflow',COLLAB,'--ack',replyKey,'--disposition','waiting on job-login-phone']);
-  assert.deepEqual(fx.ok(['inbox','--workflow',COLLAB]).pending,[]);
+  await fx.ok(['inbox','--workflow',COLLAB,'--ack',replyKey,'--disposition','waiting on job-login-phone']);
+  assert.deepEqual((await fx.ok(['inbox','--workflow',COLLAB])).pending,[]);
 
   const events=fx.read(db=>db.prepare("SELECT workflow_id,kind FROM events WHERE kind LIKE 'peer-message-%' ORDER BY seq").all().map(e=>`${e.workflow_id}:${e.kind}`));
   assert.deepEqual(events,[`${COLLAB}:peer-message-sent`,`${LOGIN}:peer-message-sent`,`${LOGIN}:peer-message-acked`,`${COLLAB}:peer-message-acked`]);
 
   // --to peers reaches every running peer.
-  const broadcast=fx.ok(['notify','--workflow',COLLAB,'--to','peers','--kind','heads-up','--subject','chat contract v2','--body','The chat DTO gains a phone field.']);
+  const broadcast=await fx.ok(['notify','--workflow',COLLAB,'--to','peers','--kind','heads-up','--subject','chat contract v2','--body','The chat DTO gains a phone field.']);
   assert.deepEqual(broadcast.sent.map(m=>m.to).sort(),[LOGIN,ROOTLESS]);
 });
 
-test('notify refuses a finished, foreign, unknown or self target and malformed messages, writing nothing',t=>{
+test('notify refuses a finished, foreign, unknown or self target and malformed messages, writing nothing',async t=>{
   const fx=fixture(t);
   const send=(to,extra=[])=>['notify','--workflow',COLLAB,'--to',to,'--kind','request','--subject','s','--body','b',...extra];
-  fx.refused(send(DONE),'peer-not-running');
-  fx.refused(send(ELSEWHERE),'peer-not-shared-source');
-  fx.refused(send('wf-nobody'),'peer-unknown');
-  fx.refused(send(COLLAB),'peer-self');
-  fx.refused(send(`${LOGIN},${DONE}`),'peer-not-running');
-  fx.refused(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','gossip','--subject','s','--body','b'],'peer-kind-invalid');
-  fx.refused(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','reply','--subject','s','--body','b'],'reply-to-missing');
-  fx.refused(send(LOGIN,['--reply-to','pm-000000000000']),'reply-to-unknown');
-  fx.refused(['notify','--workflow',DONE,'--to',LOGIN,'--kind','heads-up','--subject','s','--body','b'],'workflow-finished');
+  await inPairs([
+    ()=>fx.refused(send(DONE),'peer-not-running'),
+    ()=>fx.refused(send(ELSEWHERE),'peer-not-shared-source'),
+    ()=>fx.refused(send('wf-nobody'),'peer-unknown'),
+    ()=>fx.refused(send(COLLAB),'peer-self'),
+    ()=>fx.refused(send(`${LOGIN},${DONE}`),'peer-not-running'),
+    ()=>fx.refused(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','gossip','--subject','s','--body','b'],'peer-kind-invalid'),
+    ()=>fx.refused(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','reply','--subject','s','--body','b'],'reply-to-missing'),
+    ()=>fx.refused(send(LOGIN,['--reply-to','pm-000000000000']),'reply-to-unknown'),
+    ()=>fx.refused(['notify','--workflow',DONE,'--to',LOGIN,'--kind','heads-up','--subject','s','--body','b'],'workflow-finished'),
+  ]);
   assert.equal(fx.peerRows().length,0,'a refused notify writes no row for any target');
   // A reply goes back to the sender of the message it answers.
-  const key=fx.ok(send(LOGIN)).sent[0].key;
-  fx.refused(['notify','--workflow',LOGIN,'--to',ROOTLESS,'--kind','reply','--reply-to',key,'--subject','s','--body','b'],'reply-to-mismatch');
+  const key=(await fx.ok(send(LOGIN))).sent[0].key;
+  await fx.refused(['notify','--workflow',LOGIN,'--to',ROOTLESS,'--kind','reply','--reply-to',key,'--subject','s','--body','b'],'reply-to-mismatch');
 });
 
-test('a pending peer message makes the frontier actionable and the ack returns it to its wait',t=>{
+test('a pending peer message makes the frontier actionable and the ack returns it to its wait',async t=>{
   const fx=fixture(t);
-  const frontier=()=>fx.ok(['status','--workflow',COLLAB]).frontier;
-  const before=frontier();
+  const frontier=async()=>(await fx.ok(['status','--workflow',COLLAB])).frontier;
+  const before=await frontier();
   assert.deepEqual([before.state,before.actionable,before.peerMessageKeys],['engaged',false,[]],'an in-flight job alone is a wait');
 
-  const key=fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','heads-up','--subject','auth guard renamed','--body','AuthGuard is now SessionGuard.']).sent[0].key;
-  const status=fx.ok(['status','--workflow',COLLAB]);
+  const key=(await fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','heads-up','--subject','auth guard renamed','--body','AuthGuard is now SessionGuard.'])).sent[0].key;
+  const [status,loginStatus]=await Promise.all([
+    fx.ok(['status','--workflow',COLLAB]),
+    fx.ok(['status','--workflow',LOGIN]),
+  ]);
   assert.deepEqual([status.frontier.state,status.frontier.actionable,status.frontier.peerMessageKeys],['peer-message',true,[key]]);
   assert.match(status.frontier.reason,/api inbox/);
   assert.match(status.frontier.reason,/--ack <key> --disposition/);
   assert.deepEqual(status.peerMessages.map(m=>[m.key,m.from,m.kind]),[[key,LOGIN,'heads-up']]);
   assert.equal(status.inboxPending,1);
-  assert.equal(fx.ok(['status','--workflow',LOGIN]).frontier.peerMessageKeys.length,0,'the sender is not woken by its own message');
+  assert.equal(loginStatus.frontier.peerMessageKeys.length,0,'the sender is not woken by its own message');
 
-  fx.ok(['inbox','--workflow',COLLAB,'--ack',key,'--disposition','imports updated in the next chat slice']);
-  const after=frontier();
+  await fx.ok(['inbox','--workflow',COLLAB,'--ack',key,'--disposition','imports updated in the next chat slice']);
+  const after=await frontier();
   assert.deepEqual([after.state,after.actionable,after.peerMessageKeys],['engaged',false,[]]);
 });
 
-test('a filed report still outranks a pending peer message',t=>{
+test('a filed report still outranks a pending peer message',async t=>{
   const fx=fixture(t);
-  fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','request','--subject','s','--body','b']);
+  await fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','request','--subject','s','--body','b']);
   const l=openLedger({file:ledgerFileFor(fx.repo)});
   try{
     // A reports row keys its dispatch attempt (reports.attempt_id → op_attempts), not the job's columns.
@@ -195,20 +220,20 @@ test('a filed report still outranks a pending peer message',t=>{
     l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'done','{}',?)")
       .run(COLLAB,attempt.attempt_id,attempt.dispatch_id,'job-collab-chat',Date.now());
   }finally{l.close();}
-  const status=fx.ok(['status','--workflow',COLLAB]);
+  const status=await fx.ok(['status','--workflow',COLLAB]);
   assert.equal(status.frontier.state,'transition-ready');
   assert.equal(status.frontier.actionable,true);
   assert.equal(status.frontier.peerMessageKeys.length,1,'the message stays listed for after the report');
 });
 
-test('enqueue names owned_paths overlapping a running peer and sends each such peer one deduped heads-up',t=>{
+test('enqueue names owned_paths overlapping a running peer and sends each such peer one deduped heads-up',async t=>{
   const fx=fixture(t);
-  const disjoint=fx.ok(['enqueue','--workflow',COLLAB,'--op','docs.author','--paths','docs/chat']);
+  const disjoint=await fx.ok(['enqueue','--workflow',COLLAB,'--op','docs.author','--paths','docs/chat']);
   assert.deepEqual([disjoint.status,disjoint.peerOverlap,disjoint.peerHeadsUp],['queued',[],[]]);
   assert.equal(fx.peerRows().length,0);
 
   // Two own paths hit the same Login jobs, and the rootless peer owns all of src.
-  const out=fx.ok(['enqueue','--workflow',COLLAB,'--op','docs.author','--paths','src/auth/phone/otp,src/auth/phone/sms']);
+  const out=await fx.ok(['enqueue','--workflow',COLLAB,'--op','docs.author','--paths','src/auth/phone/otp,src/auth/phone/sms']);
   assert.equal(out.status,'queued','an overlap never blocks the enqueue');
   const hits=out.peerOverlap.map(h=>`${h.workflowId}/${h.jobId}:${h.path}`).sort();
   assert.deepEqual(hits,[`${LOGIN}/job-login-auth:src/auth`,`${LOGIN}/job-login-phone:src/auth/phone`,`${ROOTLESS}/job-rootless-src:src`],
@@ -226,27 +251,29 @@ test('enqueue names owned_paths overlapping a running peer and sends each such p
   assert.equal(sentEvents,2);
 
   // The Login Kernel is woken by it.
-  assert.equal(fx.ok(['status','--workflow',LOGIN]).frontier.state,'peer-message');
-
-  // Login now queues a job over Collab's new one: a new pair, announced once to Collab.
-  const reverse=fx.ok(['enqueue','--workflow',LOGIN,'--op','docs.author','--paths','src/auth/phone/otp/ui']);
+  const [loginStatus,reverse]=await Promise.all([
+    fx.ok(['status','--workflow',LOGIN]),
+    // Login now queues a job over Collab's new one: a new pair, announced once to Collab.
+    fx.ok(['enqueue','--workflow',LOGIN,'--op','docs.author','--paths','src/auth/phone/otp/ui']),
+  ]);
+  assert.equal(loginStatus.frontier.state,'peer-message');
   assert.ok(reverse.peerOverlap.some(h=>h.workflowId===COLLAB&&h.jobId===out.job_id));
   assert.deepEqual(reverse.peerHeadsUp.map(m=>m.to).sort(),[COLLAB,ROOTLESS]);
   assert.equal(fx.peerRows().length,4);
 });
 
-test('an op caller is refused every peer verb',t=>{
+test('an op caller is refused every peer verb',async t=>{
   const fx=fixture(t);
   // An op caller is the Orca terminal the ledger binds to its job.
   const l=openLedger({file:ledgerFileFor(fx.repo)});
   try{l.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_collab-chat','job-collab-chat');}finally{l.close();}
   const asOp={ORCA_TERMINAL_HANDLE:'term_collab-chat'};
-  for(const args of [
+  await inPairs([
     ['peers','--workflow',COLLAB],
     ['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','s','--body','b'],
     ['inbox','--workflow',COLLAB],
     ['inbox','--workflow',COLLAB,'--ack','pm-000000000000','--disposition','x'],
-  ])fx.refused(args,'op-context-refused',asOp);
+  ].map(args=>()=>fx.refused(args,'op-context-refused',asOp)));
   assert.equal(fx.peerRows().length,0);
   const refusals=fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='op-caller-refused' AND entity_id='job-collab-chat'").get().n);
   assert.equal(refusals,4);
