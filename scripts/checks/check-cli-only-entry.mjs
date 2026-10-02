@@ -10,13 +10,15 @@ import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
 import { codexGuardBlock, toolGuardCommand } from '../agent/trust.mjs';
-import { historyHookBody, workHookBody } from '../guards/hook-install.mjs';
+import { historyHookBody, workHookCheck } from '../guards/hook-install.mjs';
 import { taskScript as reconcilerTaskScript } from '../reconciler/boot.mjs';
 import { tunnelTaskScript } from '../reconciler/tunnel-task.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
+import { loadCommandPolicy } from '../guards/command-policy.mjs';
 import { sentencesOf } from './check-guidance-commands.mjs';
 import { loadInternalRegistry } from './check-cli-parity.mjs';
 import { maskCatalogRemoved, retiredCallsInText, retiredMatchers } from './check-retired-cli.mjs';
+import { rawCommandFindingsInText, rawUseCounts } from './lib/raw-command-scan.mjs';
 
 export const CODE = 'CLI_ONLY_ENTRY';
 export const EXEMPTIONS = Object.freeze({
@@ -170,7 +172,7 @@ const packageScriptMap = (root, files, read, baseContext) => {
 export function generatedEntrySources() {
   return [
     { file: 'scripts/guards/hook-install.mjs', text: historyHookBody({ branches: [], root: '.', nodePath: 'node', terminals: '.starci/guards/terminals' }) },
-    { file: 'scripts/guards/hook-install.mjs', text: workHookBody({ root: '.', nodePath: 'node' }) },
+    { file: 'scripts/guards/hook-install.mjs', text: workHookCheck({ root: '.', nodePath: 'node' }) },
     { file: 'scripts/reconciler/boot.mjs', text: reconcilerTaskScript({ starci: 'starci', workdir: '.', every: 5 }) },
     { file: 'scripts/reconciler/tunnel-task.mjs', text: tunnelTaskScript({ task: 'StarCi Harness Tunnel', starci: 'starci', workdir: '.' }) },
     { file: 'scripts/agent/trust.mjs', text: toolGuardCommand() },
@@ -179,7 +181,7 @@ export function generatedEntrySources() {
 }
 
 /** Scan every tracked text file and the rendered command builders. */
-export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = null, catalog = null, internal = null, generated = null } = {}) {
+export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = null, catalog = null, internal = null, generated = null, policy = undefined } = {}) {
   let parsedCatalog;
   let parsedInternal;
   try {
@@ -198,6 +200,7 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     retiredMatchers: retiredMatchers(parsedCatalog),
   };
   const context = { ...baseContext, packageScripts: packageScriptMap(root, tracked, read, baseContext) };
+  const commandPolicy = policy === undefined ? loadCommandPolicy({ root }) : policy;
   const findings = [];
   let checked = 0;
   for (const raw of tracked) {
@@ -208,12 +211,21 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     const bytes = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
     if (bytes.includes(0)) continue;
     checked += 1;
-    findings.push(...cliOnlyCallsInText(bytes.toString('utf8'), file, context));
+    const text = bytes.toString('utf8');
+    findings.push(...cliOnlyCallsInText(text, file, context));
+    findings.push(...rawCommandFindingsInText(text, file, { policy: commandPolicy, cwd: root }));
   }
   for (const source of generated ?? generatedEntrySources()) findings.push(...cliOnlyCallsInText(source.text, source.file, context));
   const unique = [...new Map(findings.map((finding) => [`${finding.file}\0${finding.line}\0${finding.kind}\0${finding.spelling}`, finding])).values()];
   unique.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.spelling.localeCompare(b.spelling));
-  return { schema: 'starci/cli-only-entry-check@1', ok: unique.length === 0, code: unique.length ? CODE : null, files: checked, findings: unique };
+  return {
+    schema: 'starci/cli-only-entry-check@1',
+    ok: unique.length === 0,
+    code: unique.length ? CODE : null,
+    files: checked,
+    rawUseCounts: rawUseCounts(unique),
+    findings: unique,
+  };
 }
 
 /** CLI entry point; io and the scan are injectable for the spec. */
@@ -223,14 +235,19 @@ export function main(argv = [], io = process, deps = {}) {
     help: HELP,
     defaultRoot: DEFAULT_ROOT,
     scan: deps.scan ?? scanCliOnlyEntry,
-    cleanText: (report) => `check-cli-only-entry: no direct entry calls in ${report.files} tracked text file(s)`,
+    cleanText: (report) => `check-cli-only-entry: no direct entry calls or raw side-effecting guidance in ${report.files} tracked text file(s)`,
     findingText: (finding) => {
+      if (finding.kind === 'raw-guidance') return `  ${finding.file}:${finding.line} raw ${finding.program}${finding.sub ? ` ${finding.sub}` : ''} in guidance: use ${finding.use}`;
       const replacement = finding.use
         ? `use "${finding.use}"`
         : 'internal script: not invokable; use "starci <group> <verb>" of its owner';
       return `  ${finding.file}:${finding.line} ${CODE}: "${finding.spelling}" is a direct entry invocation; ${replacement}`;
     },
-    redText: (report) => `check-cli-only-entry: red (${report.findings.length} finding(s))`,
+    redText: (report) => {
+      const counts = Object.entries(report.rawUseCounts ?? {});
+      const summary = counts.length ? `\nraw guidance by use:\n${counts.map(([use, count]) => `  ${count} ${use}`).join('\n')}` : '';
+      return `check-cli-only-entry: red (${report.findings.length} finding(s))${summary}`;
+    },
   });
 }
 

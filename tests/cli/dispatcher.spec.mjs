@@ -86,6 +86,14 @@ test('app and runtime owners route through their injected seams', async () => {
   }), 0);
   assert.match(spawnCall.args[0], /scripts[\\/]cli[\\/]main\.mjs$/);
   assert.deepEqual(spawnCall.args.slice(1), ['runtime', 'check', '--json']);
+
+  const wrapped = path.join(path.resolve('home'), '.starci', 'bin');
+  await main(['runtime', 'check'], {
+    ...capture(), catalog, retired, home: path.resolve('home'), env: { PATH: [wrapped, path.resolve('tools')].join(path.delimiter) },
+    locateRuntime: () => ({ root: path.resolve('runtime'), source: 'test' }),
+    spawn: (command, args, options) => { spawnCall = { command, args, options }; return { status: 0 }; },
+  });
+  assert.equal(spawnCall.options.env.PATH, path.resolve('tools'), 'the runtime process never sees the guarded wrapper directory');
 });
 
 test('runtime install is in-process and never locates or spawns a runtime', async () => {

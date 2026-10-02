@@ -32,12 +32,13 @@ const specs = {
   'clean-test': { script: 'scripts/gates/package-clean-test.mjs', usage: (s) => declaration(s), flags: ['base', 'changed'] },
   'launch-smoke': { script: 'scripts/kernel/launch-smoke.mjs', usage: (s) => matching(s, 'starci release launch-smoke'), flags: ['app-repo', 'as', 'entry', 'out', 'timeout-ms'] },
   proof: { script: 'scripts/gates/release-proof.mjs', usage: (s) => declaration(s), flags: ['base', 'main', 'out', 'repo'] },
-  publish: { script: 'scripts/gates/release-publish.mjs', usage: (s) => declaration(s), flags: ['npm-user', 'poll-minutes', 'pre-land-ref', 'publish'] },
   'sync-runtime': { script: 'scripts/hfs/sync-runtime.mjs', usage: (s) => matching(s, 'starci release sync-runtime'), flags: ['check'] },
 };
 
 test('release catalog resolves every implementation and exactly declares its parsed flags', () => {
-  assert.deepEqual(Object.keys(group.verbs).sort(), Object.keys(specs).sort());
+  const scriptVerbs = Object.keys(group.verbs).filter((name) => group.verbs[name].impl.script);
+  assert.deepEqual(scriptVerbs.sort(), Object.keys(specs).sort());
+  assert.deepEqual(Object.keys(group.verbs).filter((name) => group.verbs[name].impl.module).sort(), ['images', 'publish']);
   for (const [verb, spec] of Object.entries(specs)) {
     const command = group.verbs[verb];
     assert.equal(command.impl.script, spec.script, verb);

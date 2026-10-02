@@ -17,7 +17,9 @@ const verbs = {
 };
 
 test('machine catalog resolves handlers and declares their parsed flags', () => {
-  assert.deepEqual(Object.keys(catalog.groups.machine.verbs).sort(), Object.keys(verbs).sort());
+  const group = catalog.groups.machine.verbs;
+  assert.deepEqual(Object.keys(group).filter((name) => group[name].impl.script).sort(), Object.keys(verbs).sort());
+  assert.deepEqual(Object.keys(group).filter((name) => group[name].impl.module).sort(), ['worktrees-clean']);
   for (const [verb, flags] of Object.entries(verbs)) {
     const command = catalog.groups.machine.verbs[verb];
     assert.equal(fs.existsSync(path.join(root, command.impl.script)), true, command.impl.script);

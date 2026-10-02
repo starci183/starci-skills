@@ -1,0 +1,25 @@
+group: guard
+verb: raw
+owner: runtime
+summary: apply command policy and run the real host tool behind a PATH wrapper
+impl: {module: scripts/guards/raw-verb.mjs, export: guardRaw}
+effect: host
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - the shared command policy decides every invocation before the real tool starts
+  - resolution skips the per-user StarCi shim directory so a wrapper never calls itself
+  - policy refusals exit 2; allowed commands return the real tool's exit code unchanged
+positional:
+  - {name: program, required: true, variadic: false}
+  - {name: arguments, required: false, variadic: true}
+flags: []
+exit:
+  "0": the real tool succeeded
+  "2": command policy refused the invocation or usage was invalid
+  "127": the program was not found outside the StarCi shim directory
+json: none
+examples:
+  - starci guard raw git -- status
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

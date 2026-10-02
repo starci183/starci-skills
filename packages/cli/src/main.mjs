@@ -4,6 +4,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { locateRuntime, runtimeEntryOf } from './runtime-locate.mjs';
+import { runtimeEnv } from './shim.mjs';
 
 const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
 const cliVersion = () => JSON.parse(readFileSync(packageFile, 'utf8')).version;
@@ -248,6 +249,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   try {
     result = spawn(process.execPath, [runtimeEntryOf(located.root), split.group, split.verb, ...args], {
       cwd,
+      env: runtimeEnv(env, home ? { home } : {}),
       stdio: 'inherit',
       windowsHide: true,
     });

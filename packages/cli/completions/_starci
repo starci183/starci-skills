@@ -22,6 +22,7 @@ _starci() {
     'release:prove, inspect and perform runtime release operations'
     'route:resolve runtime operations from structured routing inputs'
     'runtime:install, update and check the StarCi runtime tree'
+    'smoke:prove published StarCi behavior in isolated scratch applications'
     'supabase:operate one app'\''s isolated local Supabase stack'
     'supervisor:inspect, start or stop the one StarCi Supervisor seat'
     'task:register and inspect the runtime'\''s per-user Windows scheduled tasks'
@@ -46,17 +47,18 @@ _starci() {
       docker) _values 'verbs' 'build[build one declared application image from the application root]' 'down[remove only the labelled resources owned by one application stack]' 'ps[list StarCi-labelled containers with ports and health]' 'up[start one application stack and wait for its declared healthchecks]' ;;
       gate) _values 'verbs' 'canon-scan[measure canon conformance debt and plan its disjoint slices]' 'custody-exec[decrypt one custody document for a command or a bounded read]' 'env-health[inspect and manage the served environment used by verification]' 'hfs-sync[check an app'\''s generated files and custody trees for drift]' 'read[build the recorded READ digest for an operation]' 'reference-conventions[probe the installed backend reference rules of a reference root]' 'repo-presentation[check repository presentation rules for a product or runtime tree]' 'run[run the measured product or document gate]' 'sonar[inspect, provision and run the local Sonar quality gate]' 'starcistacks[check a repository'\''s stack declaration and custody layout]' 'test-world[run and judge one managed test-world project]' 'unit[run unit tests and judge per-subject coverage and test-kit use]' ;;
       git) _values 'verbs' 'backup[push local branch tips only to dated backup refs]' 'commit[commit staged work with the message convention and trailers]' 'land[verify a lane and fast-forward it onto local main without pushing]' 'sync[merge local main into a clean lane with rerere enabled]' ;;
-      guard) _values 'verbs' 'command[judge one shell PreToolUse request from JSON on stdin]' 'footprint-scan[scan for fresh cross-repository links and linked worktrees]' 'seat-tools[deny tools forbidden for the bound seat from JSON on stdin]' 'verify-commit[verify a protected-branch update carries only worker-owned paths]' ;;
+      guard) _values 'verbs' 'command[judge one shell PreToolUse request from JSON on stdin]' 'footprint-scan[scan for fresh cross-repository links and linked worktrees]' 'raw[apply command policy and run the real host tool behind a PATH wrapper]' 'seat-tools[deny tools forbidden for the bound seat from JSON on stdin]' 'verify-commit[verify a protected-branch update carries only worker-owned paths]' ;;
       harness) _values 'verbs' 'open[open the local harness URL in the default browser]' 'start[start the harness API and UI or its named tunnel]' 'status[report whether the harness health endpoint is up]' 'stop[stop only harness processes recorded by harness start]' ;;
       kernel) _values 'verbs' 'archive[archive a workflow that will not finish: drop open jobs, retire asks, close Kernel and Tasks]' 'artifacts[list the indexed proof files of the workflow'\''s jobs, per job (read-only)]' 'autopilot[show or drive a workflow'\''s autopilot: switch it, sweep, bundle, defer to handover, release, extend]' 'consume-report[integrate the report a job filed; the Kernel must consume it before settle]' 'contract-release[release a frozen op family at the Supervisor release point (contract-freeze.yaml)]' 'coverage[show every FR, shape and proof case of the workflow'\''s scope as proven, stale or missing]' 'cut-seam[publish a cut seam'\''s interface, release its siblings on a stub, or reconcile a stub sibling]' 'decide[open, list or close an entry of the Kernel decision log (hypothesis, action, metric)]' 'decisions[list, open, claim, resolve or escalate Decision Items; the Kernel reads them first every wake]' 'dispatch[admit a routed job and launch its worker with --spawn; without it print the launch plan]' 'dispatch-ready[route and dispatch queued-ready jobs up to the workflow allowed parallelism]' 'enqueue[enqueue a work-unit job with its op, owned paths, records and retry lineage]' 'estimate[compute the size class and agent count of a slice from runtimes.yaml allocation.slicing]' 'extensions[list the file-based kernel extensions: verbs, status fields, boolean flags, load problems]' 'finish[finish an owner-approved workflow and release its kernel seat]' 'foundation[claim, land or declare a shared foundation (or none) for a workflow]' 'foundations[list the ledger'\''s shared foundations: owner, state, dependents, waits]' 'graph-edit[apply a logged, reversible light edit to the workflow'\''s unit jobs (drop, widen, wire, ...)]' 'hierarchy[project the agent hierarchy (starci/agent-hierarchy@1) of a workflow]' 'inbox[list the workflow'\''s pending inbox items, or acknowledge one with a disposition]' 'incident[raise, resolve or attach typed release conditions to a workflow incident]' 'kernel-ack-rev[record the runtime rev whose kernel files this Kernel has read]' 'kernel-proposal[file a tier-2 shared runtime change proposal for the Supervisor, or list proposals]' 'lifecycle[pause, stop or resume a workflow; only the owner or supervisor resumes or stops]' 'log[append one typed log row to the ledger'\''s logs table]' 'logs[list the workflow'\''s typed log rows, oldest first]' 'messages[drain the workflow Runs into the ledger and list every orchestration message]' 'notify[send a typed notice to one peer workflow or all peers]' 'nudge[wake a running job'\''s worker at its exact terminal so it files its report]' 'observe[read the exact op terminal screen of a job (reasoning context, never evidence)]' 'op-contract[read the contract row dispatch wrote for a job or an op+attempt]' 'op-override[store an additive override of one op for this workflow]' 'peers[the workflow'\''s peer workflows of the same ledger]' 'plan[write the workflow'\''s derived plan into the ledger]' 'provider-backoff[open the provider circuit a persisting rate limit calls for (idempotent)]' 'provider-health[the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)]' 'questions[list the pending worker questions of a workflow, draining its Runs into the ledger first]' 'reconcile[recover a fenced launch, drop a queued job, recover a dead worker or cancel orphan kernel jobs]' 'record-change[the record'\''s OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory]' 'record-checks[record independent checks against a filed worker report]' 'redesign[dispatch the owning op with the RCA as its brief (strong reasoning pool)]' 'rename[set a workflow'\''s display name and rename its live Kernel and Op terminal tabs]' 'reply[answer a pending worker question, or route it to the owner with --to-owner]' 'report[a worker files its job report (the durable op to kernel IPC)]' 'retire-ask[close an ask the owner should no longer answer (ask-superseded)]' 'route[resolve and persist the model decision of a job]' 'run-deferred-tests[re-queue the test legs the owner'\''s specs switch deferred (see status testsDeferred)]' 'serve-ask[park an owner ask: Telegram notice first, the answer form served on demand]' 'settle[settle a consumed report: pass, fail or blocked verdict]' 'settle-tail[run the async tail of a settled job (artifact index, evidence, retention)]' 'status[the live status projection of a workflow (frontier, progress, waits)]' 'survey[the read projection a Kernel scans each wake (jobs, inbox, signals, drift)]' 'unit[the work units and their try budgets; only the owner or Supervisor raises one]' 'usage[measured tokens by op, model and Kernel of one workflow, or per workflow]' 'verify-proofs[re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering]' ;;
       lint) _values 'verbs' 'run[lint changed files or the release-scoped whole repository]' ;;
-      machine) _values 'verbs' 'decisions[inspect and act on runtime and Supervisor decision items]' 'kernel-watchdog[inspect or repair one running workflow Kernel seat]' 'lessons[inspect and update Supervisor learning records]' 'op-metrics[report operation health metrics across managed ledgers]' 'seam-policy[plan canon cuts or redispatch a blocked canon slice]' 'worktrees[inspect, collect or resume runtime worktrees]' ;;
+      machine) _values 'verbs' 'decisions[inspect and act on runtime and Supervisor decision items]' 'kernel-watchdog[inspect or repair one running workflow Kernel seat]' 'lessons[inspect and update Supervisor learning records]' 'op-metrics[report operation health metrics across managed ledgers]' 'seam-policy[plan canon cuts or redispatch a blocked canon slice]' 'worktrees[inspect, collect or resume runtime worktrees]' 'worktrees-clean[remove clean lane worktrees already merged into local main]' ;;
       npm) _values 'verbs' 'ci[install a clean lockfile into this worktree under the host lock]' 'install[add exact dependencies from canon pins under the host lock]' ;;
       orca) _values 'verbs' 'terminal-read[read an Orca terminal screen and staged draft]' 'terminal-send[send text or Enter to an Orca terminal]' ;;
       reconciler) _values 'verbs' 'once[run one reconcile pass of the controllers in memory, shadow unless --apply]' 'restart[stop the reconciler engine and ensure a new leader]' 'start[ensure the reconciler engine has a healthy leader]' 'status[print reconciler leader, queue, mode and violation status]' 'stop[stop the current reconciler engine leader]' 'up[bring the runtime host services and live seats up and print one checklist]' ;;
-      release) _values 'verbs' 'app-installs[verify a scaffolded app against fresh registry installs]' 'check[run the one read-only release readiness gate]' 'clean-test[test published packages from fresh isolated installs]' 'cut[cut the release, the only push of main with its annotated release tag]' 'launch-smoke[prove live nested-agent launch paths on an Orca host]' 'proof[build the release proof attached before publish or deploy effects]' 'publish[plan or perform the owner-run package publication sequence]' 'sync-runtime[refresh or check the runtime copies bundled in published packages]' ;;
+      release) _values 'verbs' 'app-installs[verify a scaffolded app against fresh registry installs]' 'check[run the one read-only release readiness gate]' 'clean-test[test published packages from fresh isolated installs]' 'cut[cut the release, the only push of main with its annotated release tag]' 'images[build, run, health-check and tear down the shipped application images]' 'launch-smoke[prove live nested-agent launch paths on an Orca host]' 'proof[build the release proof attached before publish or deploy effects]' 'publish[plan or perform the owner-run package publication sequence]' 'sync-runtime[refresh or check the runtime copies bundled in published packages]' ;;
       route) _values 'verbs' 'op[resolve the operation that serves a structured routing request]' ;;
       runtime) _values 'verbs' 'architecture[check one repository against the runtime architecture rules]' 'benchmark-snapshot[append one model-pool snapshot file under benchmark/snapshots]' 'check[judge the runtime tree — node --check, the runtime HFS check, the retained self-checks]' 'derived-fields[regenerate or check the derived fields of the knowledge pattern files]' 'doctor[run the installed tree'\''s own specs and report drift against the install manifest]' 'gen-catalog[write or check the generated CLI catalog outputs, docs and shell completions]' 'gen-ops[regenerate or check the generated operation registry]' 'housekeeping[inspect or apply the host housekeeping sweeps]' 'install[install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude]' 'ledger-hygiene[report orphan ledgers and legacy repository-local ledger stores]' 'link[point the per-user StarCi launcher at a live runtime checkout]' 'machine-db[inspect or maintain the host machine database]' 'owner-claims-audit[audit owner-decision claims and owner-gates in runtime ledgers]' 'readme-blocks[regenerate or check the generated blocks of knowledge/hfs/README.md]' 'status[the runtime'\''s version, tree root and manifest drift — a read-only summary]' 'update[bring an installed .claude tree to this package'\''s payload version]' 'validate[read-only Work record/tree validation — structure, consistency, artifacts, schemas]' 'version[print the runtime package version]' ;;
+      smoke) _values 'verbs' 'scaffold[scaffold and prove one full or lite app in an isolated scratch directory]' ;;
       supabase) _values 'verbs' 'start[start the app'\''s Supabase stack after enforcing its isolated port block]' 'status[show the app'\''s Supabase endpoints and key names without secret values]' 'stop[stop only the app'\''s configured Supabase project]' ;;
       supervisor) _values 'verbs' 'actions[list, record, or preview the Supervisor'\''s owed-action audit trail]' 'bridge[inspect and govern cross-workflow dependencies and shared ownership]' 'channel[register, inspect, and answer the Supervisor owner-message channel]' 'direct-commits[find runtime main commits that bypassed the exclusive land gate]' 'gate-stability[compare frozen gate behavior against accepted work in live workflows]' 'gc[inspect or collect leftover workers, shells, lanes, temp data, leases, and logs]' 'land[run the in-runtime land gate; external land-to-main.sh remains external]' 'lesson-actions[land, revert, or propose changes from the Supervisor self-learning loop]' 'notify[deliver a durable Supervisor ruling to one workflow Kernel]' 'owed[inspect and acknowledge work that running workflows owe the Supervisor]' 'poll[stream or print a read-only Supervisor digest of workflow progress and blockers]' 'push[run full repository suites and push clean main branches]' 'push-mains[scan and push main for the runtime and configured product repositories]' 'ram-cap[inspect or override RAM-aware workflow dispatch priorities]' 'report[render or send the owner'\''s detailed workflow progress report]' 'start[enable and start the one long-lived Supervisor seat]' 'status[print whether the Supervisor seat is enabled and healthy]' 'stop[disable the Supervisor seat, stop its worker and release it]' 'telegram-bridge[start, run, inspect, or stop the Supervisor Telegram bridge]' 'tell[send a desktop message to the Supervisor or read its recent replies]' 'watchdog[run one reconciler-owned Supervisor seat liveness pass]' 'workers[create, launch, inspect, report, and clean up Supervisor repair workers]' ;;
       task) _values 'verbs' 'list[list state, runs, results and actions for registered runtime tasks]' 'register[print or apply one runtime scheduled-task registration]' 'show[show state, runs, result and action for one runtime scheduled task]' ;;
@@ -68,7 +70,7 @@ _starci() {
       workflow) _values 'verbs' 'assess[cold-scan repositories for goal-definition evidence]' 'bias[normalize a routing bias or extract one from the owner'\''s text]' 'define[define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox]' 'start[claim the oldest queued goal and boot its one long-lived Kernel agent]' 'status[the workflow projection — phase, frontier, leases and pending owner asks]' 'stop[stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)]' ;;
       completion) _values 'shells' 'bash' 'zsh' 'fish' 'powershell' ;;
       help) return 0 ;;
-      explain) _values 'groups' 'app' 'check' 'connect' 'debug' 'docker' 'gate' 'git' 'guard' 'harness' 'kernel' 'lint' 'machine' 'npm' 'orca' 'reconciler' 'release' 'route' 'runtime' 'supabase' 'supervisor' 'task' 'test' 'typecheck' 'uat' 'work' 'worker' 'workflow' ;;
+      explain) _values 'groups' 'app' 'check' 'connect' 'debug' 'docker' 'gate' 'git' 'guard' 'harness' 'kernel' 'lint' 'machine' 'npm' 'orca' 'reconciler' 'release' 'route' 'runtime' 'smoke' 'supabase' 'supervisor' 'task' 'test' 'typecheck' 'uat' 'work' 'worker' 'workflow' ;;
     esac
   else
     prev="$words[CURRENT-1]"
@@ -557,6 +559,7 @@ _starci() {
     'machine:seam-policy:--repo') return 0 ;;
     'machine:seam-policy:--job') return 0 ;;
     'machine:seam-policy:--paths') return 0 ;;
+    'machine:worktrees-clean:--only') return 0 ;;
     'npm:ci:--workspace') return 0 ;;
     'orca:terminal-read:--terminal') return 0 ;;
     'orca:terminal-read:--limit') return 0 ;;
@@ -575,6 +578,10 @@ _starci() {
     'release:cut:--remote') return 0 ;;
     'release:cut:--branch') return 0 ;;
     'release:cut:--tag') return 0 ;;
+    'release:images:--app') return 0 ;;
+    'release:images:--sides') return 0 ;;
+    'release:images:--only') return 0 ;;
+    'release:images:--wait-seconds') return 0 ;;
     'release:launch-smoke:--app-repo') return 0 ;;
     'release:launch-smoke:--entry') return 0 ;;
     'release:launch-smoke:--timeout-ms') return 0 ;;
@@ -587,6 +594,8 @@ _starci() {
     'release:publish:--npm-user') return 0 ;;
     'release:publish:--poll-minutes') return 0 ;;
     'release:publish:--pre-land-ref') return 0 ;;
+    'release:publish:--expect-sha') return 0 ;;
+    'release:publish:--examples') return 0 ;;
     'route:op:--kind') return 0 ;;
     'route:op:--node-kind') return 0 ;;
     'route:op:--phase') return 0 ;;
@@ -614,6 +623,7 @@ _starci() {
     'runtime:owner-claims-audit:--workflow') return 0 ;;
     'runtime:update:--hosts') return 0 ;;
     'runtime:validate:--owned') return 0 ;;
+    'smoke:scaffold:--into') return 0 ;;
     'supervisor:actions:--item') return 0 ;;
     'supervisor:actions:--action') return 0 ;;
     'supervisor:actions:--reason') return 0 ;;
@@ -961,6 +971,7 @@ _starci() {
     'git:sync') _values 'flags' '--main-ref' '--dry-run' '--abort-on-conflict' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:command') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:footprint-scan') _values 'flags' '--root' '--depth' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'guard:raw') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:seat-tools') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:verify-commit') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'harness:open') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1029,6 +1040,7 @@ _starci() {
     'machine:op-metrics') _values 'flags' '--repo' '--window-ms' '--by' '--trend' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'machine:seam-policy') _values 'flags' '--scan' '--cut-id' '--root' '--repo' '--job' '--paths' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'machine:worktrees') _values 'flags' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'machine:worktrees-clean') _values 'flags' '--dry-run' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'npm:ci') _values 'flags' '--workspace' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'npm:install') _values 'flags' '--dev' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'orca:terminal-read') _values 'flags' '--terminal' '--tail' '--limit' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1043,9 +1055,10 @@ _starci() {
     'release:check') _values 'flags' '--final' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:clean-test') _values 'flags' '--changed' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:cut') _values 'flags' '--repo' '--remote' '--branch' '--tag' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'release:images') _values 'flags' '--app' '--sides' '--only' '--wait-seconds' '--remove-images' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:launch-smoke') _values 'flags' '--app-repo' '--entry' '--timeout-ms' '--out' '--as' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:proof') _values 'flags' '--repo' '--base' '--main' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'release:publish') _values 'flags' '--publish' '--npm-user' '--poll-minutes' '--pre-land-ref' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'release:publish') _values 'flags' '--publish' '--npm-user' '--poll-minutes' '--pre-land-ref' '--expect-sha' '--examples' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:sync-runtime') _values 'flags' '--check' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'route:op') _values 'flags' '--kind' '--node-kind' '--phase' '--intent' '--ops-dir' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:architecture') _values 'flags' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1066,6 +1079,7 @@ _starci() {
     'runtime:update') _values 'flags' '--force' '--hosts' '--no-bootstrap' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:validate') _values 'flags' '--strict' '--owned' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:version') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'smoke:scaffold') _values 'flags' '--into' '--keep' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:start') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:status') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'supabase:stop') _values 'flags' '--no-backup' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
