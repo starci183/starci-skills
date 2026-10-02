@@ -13,7 +13,9 @@ export class CreateQueueOutbox1789800010000 implements MigrationInterface {
     created_at timestamptz NOT NULL,
     sent_at timestamptz
 )`)
-        await queryRunner.query(`CREATE INDEX queue_outbox_unsent_idx ON queue_outbox (created_at, id) WHERE sent_at IS NULL`)
+        await queryRunner.query(
+            `CREATE INDEX queue_outbox_unsent_idx ON queue_outbox (created_at, id) WHERE sent_at IS NULL`,
+        )
     }
 
     /** Drops the outbox. */

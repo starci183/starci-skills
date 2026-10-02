@@ -71,7 +71,9 @@ describe("QueueWorkerService", () => {
 
             await expect(workers.onApplicationBootstrap()).resolves.toBeUndefined()
 
-            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.SchedulerFailed, failure, { scheduler: "sweep-every-minute" })
+            expect(logger.error).toHaveBeenCalledWith(QueueLogEvent.SchedulerFailed, failure, {
+                scheduler: "sweep-every-minute",
+            })
         })
     })
 

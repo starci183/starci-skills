@@ -12,7 +12,11 @@ const AT = "2026-02-03T04:05:06.000Z"
 
 const build = async (manager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
-        providers: [JobClaimService, { provide: JOBS_MANAGER, useValue: manager }, { provide: CLOCK, useValue: new FakeClock(AT) }],
+        providers: [
+            JobClaimService,
+            { provide: JOBS_MANAGER, useValue: manager },
+            { provide: CLOCK, useValue: new FakeClock(AT) },
+        ],
     }).compile()
     return { claims: moduleRef.get(JobClaimService) }
 }
@@ -23,11 +27,20 @@ describe("JobClaimService", () => {
     describe("claim", () => {
         it("claims the delivery in one statement and returns the job with the bumped token", async () => {
             const manager = mockEntityManager({
-                query: [CLAIM_JOB, [{ id: "j-1", kind: "mail", fencing_token: "3", current_step: null, payload: { id: "m-1" } }]],
+                query: [
+                    CLAIM_JOB,
+                    [{ id: "j-1", kind: "mail", fencing_token: "3", current_step: null, payload: { id: "m-1" } }],
+                ],
             })
             const { claims } = await build(manager)
 
-            const job = await claims.claim({ kind: "mail", jobKey: "k-1", payload: { id: "m-1" }, workerId: "w-1", leaseMs: 60000 })
+            const job = await claims.claim({
+                kind: "mail",
+                jobKey: "k-1",
+                payload: { id: "m-1" },
+                workerId: "w-1",
+                leaseMs: 60000,
+            })
 
             expect(job).toEqual(claimed)
             expect(manager.query).toHaveBeenCalledWith(CLAIM_JOB, [
@@ -44,7 +57,9 @@ describe("JobClaimService", () => {
             const manager = mockEntityManager({ query: [CLAIM_JOB, []] })
             const { claims } = await build(manager)
 
-            await expect(claims.claim({ kind: "mail", jobKey: "k-1", payload: {}, workerId: "w-1", leaseMs: 1000 })).resolves.toBeNull()
+            await expect(
+                claims.claim({ kind: "mail", jobKey: "k-1", payload: {}, workerId: "w-1", leaseMs: 1000 }),
+            ).resolves.toBeNull()
         })
     })
 
@@ -85,7 +100,10 @@ describe("JobClaimService", () => {
             ]
 
             for (const attempt of attempts) {
-                await expect(attempt).rejects.toMatchObject({ code: JobsErrorCode.FencedOut, params: { jobId: "j-1", token: 2 } })
+                await expect(attempt).rejects.toMatchObject({
+                    code: JobsErrorCode.FencedOut,
+                    params: { jobId: "j-1", token: 2 },
+                })
                 await expect(attempt).rejects.toBeInstanceOf(JobsError)
             }
         })

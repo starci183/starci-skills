@@ -12,14 +12,22 @@ export const CLAIM_JOB = sql`INSERT INTO jobs (kind, job_key, status, fencing_to
      WHERE jobs.status = 'failed' OR (jobs.status = 'running' AND jobs.lease_expires_at < $6)
     RETURNING id, kind, fencing_token, current_step, payload`
 
+/** The guarded writes wrap their UPDATE in a CTE: TypeORM returns a bare `UPDATE ... RETURNING` as `[rows, count]`, a SELECT as rows. */
+
 /** Records a step ($1 job id, $2 expected token, $3 step, $4 instant); no row comes back when the token is stale. */
-export const ADVANCE_JOB = sql`UPDATE jobs SET current_step = $3, updated_at = $4
-    WHERE id = $1 AND fencing_token = $2 AND status = 'running' RETURNING id`
+export const ADVANCE_JOB = sql`WITH changed AS (UPDATE jobs SET current_step = $3, updated_at = $4
+    WHERE id = $1 AND fencing_token = $2 AND status = 'running'
+       RETURNING id)
+    SELECT id FROM changed`
 
 /** Completes the job ($1 job id, $2 expected token, $3 instant). */
-export const COMPLETE_JOB = sql`UPDATE jobs SET status = 'done', lease_expires_at = NULL, updated_at = $3
-    WHERE id = $1 AND fencing_token = $2 AND status = 'running' RETURNING id`
+export const COMPLETE_JOB = sql`WITH changed AS (UPDATE jobs SET status = 'done', lease_expires_at = NULL, updated_at = $3
+    WHERE id = $1 AND fencing_token = $2 AND status = 'running'
+       RETURNING id)
+    SELECT id FROM changed`
 
 /** Fails the job ($1 job id, $2 expected token, $3 reason, $4 instant). */
-export const FAIL_JOB = sql`UPDATE jobs SET status = 'failed', error = $3, lease_expires_at = NULL, updated_at = $4
-    WHERE id = $1 AND fencing_token = $2 AND status = 'running' RETURNING id`
+export const FAIL_JOB = sql`WITH changed AS (UPDATE jobs SET status = 'failed', error = $3, lease_expires_at = NULL, updated_at = $4
+    WHERE id = $1 AND fencing_token = $2 AND status = 'running'
+       RETURNING id)
+    SELECT id FROM changed`

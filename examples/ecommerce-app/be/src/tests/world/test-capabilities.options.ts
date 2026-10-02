@@ -14,6 +14,8 @@ import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { EventBusModule } from "@modules/platform/event-bus"
 import { InboxModule } from "@modules/platform/inbox"
+import { JobsModule } from "@modules/platform/jobs"
+import { QueueModule } from "@modules/platform/queue"
 import {
     cacheOptionsOf,
     eventBusOptionsOf,
@@ -21,9 +23,13 @@ import {
     keycloakAdminOptionsOf,
     keycloakOptionsOf,
     orderApiOptionsOf,
+    queueOptionsOf,
     receiptStorageOptionsOf,
 } from "./test-apps.options"
+import { ProbeQueue, PROBE_QUEUE } from "../fixtures/queues/probe.queue"
 import { ProbeConsumerModule } from "./probe-consumer.module"
+import { ProbeJobModule } from "./probe-job.module"
+import { ProbeQueueModule } from "./probe-queue.module"
 
 /** The catalog capability over the order database: stock, reservations. */
 export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
@@ -70,4 +76,29 @@ export const IDENTITY_API_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 /** The receipt archive over the run's bucket of the stack's MinIO. */
 export const RECEIPT_STORAGE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => ReceiptStorageModule.register({ isGlobal: true, ...receiptStorageOptionsOf(w) }),
+]
+
+/** The queue capability over the run's Redis and the outbox of the order database, with the probe queue's worker and producer, and a scheduler that ticks the probe queue. */
+export const QUEUE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) =>
+        QueueModule.register({
+            isGlobal: true,
+            ...queueOptionsOf(w, `q${w.kafka.topicPrefix.replace(/\W/g, "")}`),
+            connections: [ORDER_ENTITY_MANAGER],
+            schedulers: [{ queue: PROBE_QUEUE, id: "probe-tick", everyMs: 1000, payload: { note: "tick" } }],
+        }),
+    () => ({ module: ProbeQueueModule, providers: [ProbeQueue], exports: [ProbeQueue] }),
+]
+
+/** The fenced jobs over the order database, on top of the queue capability, with the probe processor. */
+export const JOBS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    ...QUEUE_CAPABILITY_MODULES,
+    () =>
+        JobsModule.register({
+            isGlobal: true,
+            connection: ORDER_ENTITY_MANAGER,
+            workerId: "probe-worker",
+            leaseMs: 1500,
+        }),
+    () => ({ module: ProbeJobModule }),
 ]

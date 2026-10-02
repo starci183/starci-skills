@@ -38,7 +38,8 @@ export class BullmqQueueTransportClient implements QueueTransport {
         this.workers.push(
             new Worker(
                 queue,
-                (job) => handler({ id: job.id ?? "", queue, payload: job.data as object, attempt: job.attemptsMade + 1 }),
+                (job) =>
+                    handler({ id: job.id ?? "", queue, payload: job.data as object, attempt: job.attemptsMade + 1 }),
                 { ...this.connection(), concurrency },
             ),
         )

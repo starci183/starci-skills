@@ -21,7 +21,11 @@ describe("QueueOutboxService", () => {
 
             await tx.em.transaction((manager) => outbox.write(manager, "mail", { id: "m-1" }))
 
-            expect(tx.em.query).toHaveBeenCalledWith(INSERT_QUEUE_ROW, ["mail", JSON.stringify({ id: "m-1" }), new Date(AT)])
+            expect(tx.em.query).toHaveBeenCalledWith(INSERT_QUEUE_ROW, [
+                "mail",
+                JSON.stringify({ id: "m-1" }),
+                new Date(AT),
+            ])
             expect(tx.commits).toBe(1)
         })
 

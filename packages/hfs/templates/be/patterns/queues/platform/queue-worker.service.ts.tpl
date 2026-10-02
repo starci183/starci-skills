@@ -30,7 +30,8 @@ export class QueueWorkerService implements QueueWorkerRegistry, OnApplicationBoo
 
     /** Starts one worker per registered queue, then registers the schedulers of the options. */
     async onApplicationBootstrap(): Promise<void> {
-        for (const [queue, handler] of this.handlers) await this.transport.work(queue, handler, this.options.concurrency)
+        for (const [queue, handler] of this.handlers)
+            await this.transport.work(queue, handler, this.options.concurrency)
         for (const scheduler of this.options.schedulers) {
             await this.transport.upsertScheduler(scheduler).catch((cause: unknown) => {
                 this.logger.error(QueueLogEvent.SchedulerFailed, cause, { scheduler: scheduler.id })

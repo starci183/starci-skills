@@ -32,7 +32,13 @@ const build = async () => {
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { runner: moduleRef.get(JobRunnerService), claims, queues, logger, processor: mock<FencedProcessor>({ queue: "mail" }) }
+    return {
+        runner: moduleRef.get(JobRunnerService),
+        claims,
+        queues,
+        logger,
+        processor: mock<FencedProcessor>({ queue: "mail" }),
+    }
 }
 
 describe("JobRunnerService", () => {
@@ -57,7 +63,13 @@ describe("JobRunnerService", () => {
 
             await runner.run(processor, delivery)
 
-            expect(claims.claim).toHaveBeenCalledWith({ kind: "mail", jobKey: "k-1", payload: { id: "m-1" }, workerId: "w-1", leaseMs: 60000 })
+            expect(claims.claim).toHaveBeenCalledWith({
+                kind: "mail",
+                jobKey: "k-1",
+                payload: { id: "m-1" },
+                workerId: "w-1",
+                leaseMs: 60000,
+            })
             expect(processor.process).toHaveBeenCalledWith(job)
             expect(claims.complete).toHaveBeenCalledWith({ jobId: "j-1", expectedFencingToken: 2 })
             expect(claims.fail).not.toHaveBeenCalled()

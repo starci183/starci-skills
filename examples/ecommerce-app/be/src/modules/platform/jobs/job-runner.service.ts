@@ -59,9 +59,12 @@ export class JobRunnerService implements JobProcessorRegistry {
     private async recordFailure(job: ClaimedJob, cause: unknown): Promise<void> {
         const reason = cause instanceof Error ? cause.message : String(cause)
         this.logger.error(JobsLogEvent.DeliveryFailed, cause, { jobId: job.jobId, token: job.fencingToken })
-        await this.claims.fail({ jobId: job.jobId, expectedFencingToken: job.fencingToken, reason }).catch((failure: unknown) => {
-            if (isFencedOut(failure)) this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId, token: job.fencingToken })
-            else this.logger.error(JobsLogEvent.FailureNotRecorded, failure, { jobId: job.jobId })
-        })
+        await this.claims
+            .fail({ jobId: job.jobId, expectedFencingToken: job.fencingToken, reason })
+            .catch((failure: unknown) => {
+                if (isFencedOut(failure))
+                    this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId, token: job.fencingToken })
+                else this.logger.error(JobsLogEvent.FailureNotRecorded, failure, { jobId: job.jobId })
+            })
     }
 }
