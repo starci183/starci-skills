@@ -6,12 +6,12 @@
 // leg of every chain; scripts/kernel/handover.mjs reads the answer receipt back;
 // api settle records handover-approved only for the owner's approve, and api
 // finish refuses handover-not-approved without it.
-import test from 'node:test';
+import test,{describe} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,reopenUnit,raiseTryBudget,recordJobResult,updateAttempt,markReportConsumed} from '../../engine/db/ledger.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {checkOpManifest} from '../../scripts/checks/check-op-manifest.mjs';
@@ -21,11 +21,22 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const PLAN=path.join(ROOT,'scripts','route','route-plan.mjs');
 const readYaml=rel=>parseYaml(fs.readFileSync(path.join(ROOT,rel),'utf8'));
-const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
+const execute=(file,args,options)=>new Promise(resolve=>{
+  const child=spawn(file,args,{...options,stdio:['ignore','pipe','pipe']});
+  let stdout='',stderr='',settled=false;
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data',chunk=>{stdout+=chunk;});
+  child.stderr.on('data',chunk=>{stderr+=chunk;});
+  const finish=result=>{if(!settled){settled=true;resolve({stdout,stderr,...result});}};
+  child.once('error',error=>finish({status:null,error}));
+  child.once('close',(status,signal)=>finish({status,signal}));
+});
+const run=(...args)=>execute(process.execPath,[API,...args],{cwd:ROOT,windowsHide:true,timeout:120000,
   env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
 // The settler's own check recording: a caller-declared green never counts toward a pass (H8), so the
 // spec records the kernel's check the way the runtime settler does — with STARCI_CALLER=runtime-settler.
-const runSettler=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
+const runSettler=(...args)=>execute(process.execPath,[API,...args],{cwd:ROOT,windowsHide:true,timeout:120000,
   env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',STARCI_CALLER:'runtime-settler'}});
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const open=r.stdout.indexOf('{'),close=r.stdout.indexOf('\n}');return open<0||close<0?null:JSON.parse(r.stdout.slice(open,close+2));}};
 const OPTIONS=['Duy\u1ec7t - workflow ho\u00e0n t\u1ea5t','G\u00f3p \u00fd / b\u00e1o l\u1ed7i - m\u00f4 t\u1ea3 trong ghi ch\u00fa','\u0110\u1eb7t c\u00e2u h\u1ecfi - ghi trong ghi ch\u00fa'];
@@ -91,14 +102,14 @@ const writeReport=(dir,name,body)=>{
   fs.writeFileSync(file,JSON.stringify({schema:'starci/op-report@1',summary:'handover',...body}),'utf8');
   return file;
 };
-const status=(repo,wf)=>{const r=run('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return json(r);};
+const status=async(repo,wf)=>{const r=await run('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return json(r);};
 /** Files the handover ask of `attempt`, settles it blocked (awaiting-owner) and serves it on a live pid. */
-const handOver=(repo,wf,{attempt,dispatchId})=>{
+const handOver=async(repo,wf,{attempt,dispatchId})=>{
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
-  const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',
+  const filed=await run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',
     writeReport(scratch,`ask-${attempt}.json`,{outcome:'ask',question:{text:'B\u00e0n giao: \u1ee9ng d\u1ee5ng \u0111\u00e3 xong.',options:OPTIONS}}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  const settled=run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','blocked','--json');
+  const settled=await run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','blocked','--json');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   assert.equal(json(settled).awaitingOwner,true);
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:dispatchId,kind:'ask-serving',payload:{dispatchId,url:'http://127.0.0.1:6971/a-x',pid:process.pid}}));
@@ -114,11 +125,11 @@ const answer=(repo,wf,{dispatchId,optionIndex,answeredBy='owner',eventAnsweredBy
   return receiptPath;
 };
 /** The attempt that runs after an approve: it files done, the kernel records its check, then settles pass. */
-const settleApproval=(repo,wf,{attempt,dispatchId})=>{
+const settleApproval=async(repo,wf,{attempt,dispatchId})=>{
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
-  const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
+  const filed=await run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  const checked=runSettler('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
+  const checked=await runSettler('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   return run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','pass','--json');
 };
@@ -131,6 +142,7 @@ const retire=(repo,wf,jobId)=>seed(repo,ledger=>{
 });
 const approvals=(repo,wf)=>read(repo,db=>db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='handover-approved' ORDER BY seq").all(wf).map(r=>JSON.parse(r.payload_json)));
 
+describe('handover',{concurrency:2},()=>{
 test('handover.review is a valid op manifest wired into the kind catalog, the routes and the allocator',()=>{
   const result=checkOpManifest();
   assert.deepEqual(result.findings.filter(f=>f.op===HANDOVER_OP),[],'the handover manifest holds starci/op@1 and the prose rules');
@@ -149,7 +161,7 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
   assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['devin-agent','claude-agent','codex-agent']);
 });
 
-test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',t=>{
+test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',async t=>{
   assert.equal(handoverAskProblem({text:'x',options:OPTIONS}),null);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS.slice(0,2)}),/exactly 3 options/);
   assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Kh\u00e1c']}),/exactly 3 options/);
@@ -162,48 +174,48 @@ test('a handover ask carries exactly the three options approve, feedback, questi
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:'job-ho-1',op:HANDOVER_OP,unitKey:'ho',dispatchId:'ho-d1'}));
-  const two=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS.slice(0,2)}}),'--json');
+  const two=await run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS.slice(0,2)}}),'--json');
   assert.notEqual(two.status,0,'a two-option handover ask is refused');
   assert.match(two.stderr,/report-invalid/);
   assert.match(two.stderr,/exactly 3 options/);
   assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM reports WHERE workflow_id=?').get(wf).n),0,'nothing is filed');
-  const three=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'three.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS}}),'--json');
+  const three=await run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'three.json',{outcome:'ask',question:{text:'B\u00e0n giao',options:OPTIONS}}),'--json');
   assert.equal(three.status,0,three.stderr||three.stdout);
   assert.deepEqual(read(repo,db=>JSON.parse(db.prepare('SELECT report_json FROM reports WHERE workflow_id=?').get(wf).report_json)).question.options,OPTIONS);
 });
 
-test('finish is refused without the owner approval and allowed after it; a later business settle makes it stale',t=>{
+test('finish is refused without the owner approval and allowed after it; a later business settle makes it stale',async t=>{
   const repo=fixture(t),wf='wf-handover-finish';
   seedWorkflow(repo,wf);
-  const refused=run('finish','--repo',repo,'--workflow',wf,'--json');
+  const refused=await run('finish','--repo',repo,'--workflow',wf,'--json');
   assert.notEqual(refused.status,0,'no approval, no finish');
   assert.match(refused.stderr,/handover-not-approved/);
   assert.equal(read(repo,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase),'running','a refused finish writes nothing');
 
-  let s=status(repo,wf);
+  let s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.due],['handover-due',true,'not-started',true],
     'every approved leg settled: the handover is the Kernel\'s next move');
   assert.match(s.frontier.reason,/enqueue handover\.review as the final leg/);
 
-  handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
-  s=status(repo,wf);
+  await handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
+  s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state],['awaiting-owner',false,'awaiting-owner'],
     'a workflow waiting on its handover waits on the owner, it is not orphaned');
 
   answer(repo,wf,{dispatchId:'ho-d1',optionIndex:0});
-  s=status(repo,wf);
+  s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.byOwner],['handover-answered',true,'approve',true]);
   assert.match(s.frontier.reason,/enqueue handover\.review again/);
-  assert.equal(run('finish','--repo',repo,'--workflow',wf,'--json').status===0,false,'an answer is not yet the recorded approval');
+  assert.equal((await run('finish','--repo',repo,'--workflow',wf,'--json')).status===0,false,'an answer is not yet the recorded approval');
 
-  const settled=settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'});
+  const settled=await settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'});
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   assert.deepEqual(json(settled).handoverApproved,{dispatchId:'ho-d1',answeredBy:'owner'});
   const [approved]=approvals(repo,wf);
   assert.deepEqual([approved.jobId,approved.dispatchId,approved.answeredBy,approved.at],['job-ho-2','ho-d1','owner','2026-09-23T10:00:00.000Z'],
     'handover-approved {jobId, dispatchId, answeredBy, at}');
 
-  s=status(repo,wf);
+  s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.finishAllowed],['finish-ready',true,'approved',true],
     'an approved but unfinished workflow is the Kernel\'s to finish');
 
@@ -212,46 +224,46 @@ test('finish is refused without the owner approval and allowed after it; a later
     seedJob(ledger,{wf,jobId:'job-docs-2',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs-2',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
   });
-  s=status(repo,wf);
+  s=await status(repo,wf);
   assert.equal(s.handover.finishAllowed,false);
   assert.equal(s.frontier.state,'handover-due');
-  const stale=run('finish','--repo',repo,'--workflow',wf,'--json');
+  const stale=await run('finish','--repo',repo,'--workflow',wf,'--json');
   assert.notEqual(stale.status,0);
   assert.match(stale.stderr,/handover-not-approved/);
 
   // Handed over again and approved again: the new approval covers the new settle.
-  handOver(repo,wf,{attempt:3,dispatchId:'ho-d3'});
+  await handOver(repo,wf,{attempt:3,dispatchId:'ho-d3'});
   answer(repo,wf,{dispatchId:'ho-d3',optionIndex:0});
-  assert.equal(settleApproval(repo,wf,{attempt:4,dispatchId:'ho-d4'}).status,0);
-  const finished=run('finish','--repo',repo,'--workflow',wf,'--json');
+  assert.equal((await settleApproval(repo,wf,{attempt:4,dispatchId:'ho-d4'})).status,0);
+  const finished=await run('finish','--repo',repo,'--workflow',wf,'--json');
   assert.equal(finished.status,0,finished.stderr||finished.stdout);
   assert.equal(json(finished).handover.via,'handover-approved');
   assert.equal(read(repo,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase),'finished');
 });
 
-test('a non-owner answer never approves a handover',t=>{
+test('a non-owner answer never approves a handover',async t=>{
   const repo=fixture(t),wf='wf-handover-delegate';
   seedWorkflow(repo,wf);
-  handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
+  await handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
   answer(repo,wf,{dispatchId:'ho-d1',optionIndex:0,answeredBy:'supervisor'});
-  const s=status(repo,wf);
+  const s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.ask.decision,s.handover.ask.byOwner],['handover-answered','approve',false]);
   assert.match(s.frontier.reason,/only the owner approves a handover/);
-  const refused=settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'});
+  const refused=await settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'});
   assert.notEqual(refused.status,0,'a delegated approve cannot settle the handover pass');
   assert.match(refused.stderr,/handover-not-approved/);
   assert.match(refused.stderr,/answered by supervisor/);
   assert.equal(read(repo,db=>db.prepare("SELECT status FROM jobs WHERE job_id='job-ho-2'").get().status),'reported','the refused settle writes nothing');
   assert.deepEqual(approvals(repo,wf),[]);
   retire(repo,wf,'job-ho-2');
-  assert.match(run('finish','--repo',repo,'--workflow',wf,'--json').stderr,/handover-not-approved/);
+  assert.match((await run('finish','--repo',repo,'--workflow',wf,'--json')).stderr,/handover-not-approved/);
 
   // A receipt that says owner under an event that does not, and a receipt bound to another ask, approve nothing either.
   for(const [dispatchId,opts] of [['ho-d3',{eventAnsweredBy:'supervisor'}],['ho-d5',{receiptDispatch:'ho-other'}]]){
     const attempt=Number(dispatchId.slice(-1));
-    handOver(repo,wf,{attempt,dispatchId});
+    await handOver(repo,wf,{attempt,dispatchId});
     answer(repo,wf,{dispatchId,optionIndex:0,...opts});
-    const r=settleApproval(repo,wf,{attempt:attempt+1,dispatchId:`${dispatchId}-next`});
+    const r=await settleApproval(repo,wf,{attempt:attempt+1,dispatchId:`${dispatchId}-next`});
     assert.notEqual(r.status,0,`${dispatchId} must not approve`);
     assert.match(r.stderr,/handover-not-approved/);
     retire(repo,wf,`job-ho-${attempt+1}`);
@@ -259,30 +271,30 @@ test('a non-owner answer never approves a handover',t=>{
   assert.deepEqual(approvals(repo,wf),[]);
 });
 
-test('feedback and question answers are the Kernel\'s move, and a passed fix makes the handover due again',t=>{
+test('feedback and question answers are the Kernel\'s move, and a passed fix makes the handover due again',async t=>{
   const repo=fixture(t),wf='wf-handover-feedback';
   seedWorkflow(repo,wf);
-  handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
+  await handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
   answer(repo,wf,{dispatchId:'ho-d1',optionIndex:1,note:'N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng'});
-  let s=status(repo,wf);
+  let s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.note],['handover-answered',true,'feedback','N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng']);
   assert.match(s.frontier.reason,/handover-feedback-repairs-the-build/);
-  assert.match(settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'}).stderr,/not approve/,'feedback is no approval');
+  assert.match((await settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'})).stderr,/not approve/,'feedback is no approval');
   retire(repo,wf,'job-ho-2');
   seed(repo,ledger=>{
     seedJob(ledger,{wf,jobId:'job-fix',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-fix',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
   });
-  s=status(repo,wf);
+  s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.state],['handover-due','due'],'the fix passed: hand over again');
-  const deliveries=json(run('survey','--repo',repo,'--workflow',wf,'--deliveries','--json'));
+  const deliveries=json(await run('survey','--repo',repo,'--workflow',wf,'--deliveries','--json'));
   assert.deepEqual(deliveries.handoverHistory.map(h=>[h.dispatchId,h.decision,h.note]),[['ho-d1','feedback','N\u00fat l\u01b0u kh\u00f4ng ho\u1ea1t \u0111\u1ed9ng']],
     'the next handover and the fix op read the note through survey --deliveries');
   assert.deepEqual(deliveries.deliveries.map(d=>d.jobId),['job-docs','job-fix']);
 
-  handOver(repo,wf,{attempt:4,dispatchId:'ho-d4'});
+  await handOver(repo,wf,{attempt:4,dispatchId:'ho-d4'});
   answer(repo,wf,{dispatchId:'ho-d4',optionIndex:2,note:'L\u00e0m sao \u0111\u0103ng nh\u1eadp?'});
-  s=status(repo,wf);
+  s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.ask.decision],['handover-answered','question']);
   assert.match(s.frontier.reason,/answers it in the package/);
 });
@@ -306,14 +318,15 @@ test('the planner appends handover.review as the final leg of every chain',()=>{
   assert.ok(!ambiguous.legs.some(l=>l.op===HANDOVER_OP),'an intent question is no chain to hand over');
 });
 
-test('api plan does not count a trailing handover.review appended to an older chain as divergence',t=>{
+test('api plan does not count a trailing handover.review appended to an older chain as divergence',async t=>{
   const repo=fixture(t),wf='wf-handover-plan';
   seedWorkflow(repo,wf);
   seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=?').run(JSON.stringify({opChain:{legs:[{op:'docs.author'},{op:'review.verify'}]},derivedPlan:{legs:[{op:'docs.author'},{op:'review.verify'}],edges:[['docs.author','review.verify']]}}),wf));
   const planFile=(name,legs)=>{const f=path.join(repo,name);fs.writeFileSync(f,JSON.stringify({legs:legs.map(op=>({op})),edges:legs.slice(1).map((op,i)=>[legs[i],op])}));return f;};
-  const appended=run('plan','--repo',repo,'--workflow',wf,'--file',planFile('a.json',['docs.author','review.verify',HANDOVER_OP]),'--json');
+  const appended=await run('plan','--repo',repo,'--workflow',wf,'--file',planFile('a.json',['docs.author','review.verify',HANDOVER_OP]),'--json');
   assert.equal(appended.status,0,appended.stderr);
   assert.deepEqual([json(appended).divergence.diverged,json(appended).divergence.handoverAppended,json(appended).divergence.extra],[false,true,[]]);
-  const middle=run('plan','--repo',repo,'--workflow',wf,'--file',planFile('b.json',['docs.author',HANDOVER_OP,'review.verify']),'--json');
+  const middle=await run('plan','--repo',repo,'--workflow',wf,'--file',planFile('b.json',['docs.author',HANDOVER_OP,'review.verify']),'--json');
   assert.equal(json(middle).divergence.diverged,true,'anywhere but last it is a structural change');
+});
 });
