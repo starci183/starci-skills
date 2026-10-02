@@ -1,6 +1,6 @@
 # @starci/jest-preset
 
-The jest config of a Nest repository and the one shared unit-test double kit (`mock<T>()`, `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingOutbox`, `builder`, `FakeClock`, `fakeIds` and the Outcome matchers). Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
+The jest config of a Nest repository and the one shared unit-test double kit (`mock<T>()`, `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingOutbox`, `fakeInbox`, `builder`, `FakeClock`, `fakeIds` and the Outcome matchers). Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 ```js
 // jest.config.js (a managed file: `hfs sync` renders it, `hfs check` compares it; do not edit)
@@ -64,7 +64,7 @@ const service = moduleRef.get(CommissionService)
 No `new` of the service, no `imports`, no `overrideProvider`, no `jest.mock`, no casts, no `Date.now()` and no `process.env`. The
 full rules and the dependency-to-double-to-cases table are `knowledge/patterns/be/test.yaml` (BE-TEST-1 to BE-TEST-15). Every
 export below is on the package root (`@starci/jest-preset`); the sub-paths `./mock`, `./clock`, `./entity-manager`, `./ids`,
-`./matchers`, `./cache`, `./lock`, `./outbox` and `./builders` exist as well.
+`./matchers`, `./cache`, `./lock`, `./outbox`, `./inbox` and `./builders` exist as well.
 
 ## `mockEntityManager` and `fakeTransaction`
 
@@ -128,6 +128,12 @@ outbox.queueRecords(record, record)         // a duplicate delivery
 await outbox.claimDue(params)               // [] when the backlog is empty
 outbox.failNext("complete", new Error("db down"))   // the next call of that operation rejects once
 outbox.claims; outbox.completed; outbox.retried; outbox.buried; outbox.backlog
+
+const inbox = fakeInbox()                // the delivery side, the twin of recordingOutbox
+await inbox.claim("sepay", "e-1")        // true the first time, false for the same pair until it is released
+await inbox.release("sepay", "e-1")      // gives the claim back: the next claim answers true
+inbox.seen("sepay", "e-2")               // a redelivery: the next claim of the pair answers false
+inbox.claims; inbox.claimed; inbox.released; inbox.failNext("claim", new Error("db down")); inbox.clear()
 ```
 
 ## `builder`, `fakeIds` and the Outcome matchers

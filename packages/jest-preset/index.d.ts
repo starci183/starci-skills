@@ -5,6 +5,7 @@ export { mockEntityManager, fakeTransaction, MockEntityManager, FakeTransaction,
 export { fakeCache, FakeCache } from "./cache"
 export { fakeLock, FakeLock } from "./lock"
 export { recordingOutbox, RecordingOutbox } from "./outbox"
+export { fakeInbox, FakeInbox } from "./inbox"
 export { builder } from "./builders"
 export { FakeClock } from "./clock"
 export { fakeIds, FakeIds } from "./ids"

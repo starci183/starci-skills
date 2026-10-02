@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New: `fakeInbox()` (also `@starci/jest-preset/inbox`), the twin of `recordingOutbox()` for the delivery side: `claim` answers true for the first call of a (source, eventId) pair and false afterwards, `release` gives the claim back, `seen` marks a redelivery, and `claims`, `claimed`, `released`, `failNext` and `clear` let a spec assert what a consumer or a signed webhook did. A spec no longer stubs `mock<Inbox>()` by hand.
+
 ## 2.2.4 - 2026-10-02
 
 - Changed: the world runner runs up to `min(--maxWorkers, slots)` files of the integration, e2e and contract projects at once,

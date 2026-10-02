@@ -6,6 +6,7 @@ const { FakeClock } = require("./clock.cjs")
 const { fakeCache } = require("./cache.cjs")
 const { fakeLock } = require("./lock.cjs")
 const { recordingOutbox } = require("./outbox.cjs")
+const { fakeInbox } = require("./inbox.cjs")
 const { builder } = require("./builders.cjs")
 const { fakeIds, FakeIds } = require("./ids.cjs")
 
@@ -159,6 +160,7 @@ module.exports = {
   fakeCache,
   fakeLock,
   recordingOutbox,
+  fakeInbox,
   builder,
   fakeIds,
   FakeIds,

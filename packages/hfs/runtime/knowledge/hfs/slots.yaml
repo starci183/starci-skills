@@ -148,6 +148,7 @@ ruleParams:
         - {token: "(?:^|_)TRANSACTION(?:_RUNNER)?$", double: fakeTransaction, forms: [call]}
         - {token: "(?:^|_)CLOCK$", double: FakeClock, forms: [new]}
         - {token: "(?:^|_)OUTBOX(?:_|$)", double: recordingOutbox, forms: [call]}
+        - {token: "(?:^|_)INBOX(?:_|$)", double: fakeInbox, forms: [call]}
         - {token: "(?:^|_)CACHE(?:_|$)", double: fakeCache, forms: [call]}
         - {token: "(?:^|_)(?:LOCK|LEASE|FENCE|HOLD)(?:_|$)", double: fakeLock, forms: [call]}
         - {token: "(?:^|_)(?:IDS|ID_GENERATOR|ID_FACTORY)$", double: fakeIds, forms: [call]}
