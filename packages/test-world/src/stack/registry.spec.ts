@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "node:test"
-import { Registry, leaseProxyPort, leaseRedisDb, releaseRedisDb, secretsFor } from "./registry"
+import { Registry, leaseKafkaListener, leaseProxyPort, leaseRedisDb, releaseKafkaListener, releaseRedisDb, secretsFor } from "./registry"
 
 const scratch = mkdtempSync(join(tmpdir(), "starci-tw-reg-"))
 let counter = 0
@@ -28,6 +28,26 @@ describe("registry", () => {
         assert.deepEqual(data.leases.map((entry) => entry.runId), ["r1"])
         assert.deepEqual(Object.keys(data.redisDbs), ["live_ns"])
         assert.deepEqual(Object.keys(data.proxyPorts).sort(), ["kafka-abc", "r1-redis"])
+    })
+
+    it("leases kafka slot listeners 1..8 per namespace, reuses and frees them, refuses a 9th, and drops a dead run's", async () => {
+        const data = new Registry({ dir: home() }).read()
+        assert.equal(leaseKafkaListener(data, "a_w1"), 1)
+        assert.equal(leaseKafkaListener(data, "a_w2"), 2)
+        assert.equal(leaseKafkaListener(data, "a_w1"), 1)
+        releaseKafkaListener(data, "a_w1")
+        assert.equal(leaseKafkaListener(data, "b_w1"), 1)
+        for (let index = 0; index < 6; index += 1) leaseKafkaListener(data, `n${index}`)
+        assert.throws(() => leaseKafkaListener(data, "overflow"), /all 8 kafka listeners are leased/)
+        const alive = new Set([100, 200])
+        const registry = new Registry({ dir: home(), isAlive: (pid) => alive.has(pid), pause: fastPause })
+        await registry.update((fresh) => {
+            fresh.leases.push(lease("live_ns", "r1", 100), lease("dead_ns", "r2", 200))
+            leaseKafkaListener(fresh, "live_ns")
+            leaseKafkaListener(fresh, "dead_ns")
+        })
+        alive.delete(200)
+        assert.deepEqual(registry.read().kafkaListeners, { live_ns: 1 })
     })
 
     it("allocates redis DB indexes per namespace, reuses them, and frees them", () => {

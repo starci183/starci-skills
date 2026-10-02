@@ -135,6 +135,9 @@ export const buildWiring = (context: RunContext, options: WiringOptions = {}): W
             : ({
                   brokers: [`${swapHost(infra.kafka.host, host)}:${infra.kafka.port}`],
                   topicPrefix: infra.kafka.topicPrefix,
+                  groupPrefix: infra.kafka.groupPrefix,
+                  group: (name: string): string => `${infra.kafka?.groupPrefix ?? ""}${name}`,
+                  clientId: (name: string): string => `${infra.kafka?.groupPrefix ?? ""}${name}`,
                   topic: (name: string): string => infra.kafka?.topics[name] ?? `${infra.kafka?.topicPrefix ?? ""}${name}`,
               } satisfies WiredKafka),
     )

@@ -9,7 +9,7 @@ import { Docker } from "./docker"
 import type { ExecResult } from "./exec"
 import type { PgClient } from "./pg"
 import { createStack } from "./index"
-import { containerName } from "./naming"
+import { KAFKA_IMAGE, containerName, kafkaProxyName, serviceContainerName } from "./naming"
 
 const scratch = mkdtempSync(join(tmpdir(), "starci-tw-stack-"))
 let counter = 0
@@ -82,7 +82,7 @@ const fakePg = (queries: Array<string>) => (): PgClient => ({
 
 const namespace = (snake: string): Namespace => ({ snake, kebab: snake.replace(/_/g, "-"), root: `/repo/${snake}` })
 
-const harness = () => {
+const harness = (probed: Array<number> = []) => {
     const docker = fakeDocker()
     const http: Array<string> = []
     const queries: Array<string> = []
@@ -109,6 +109,10 @@ const harness = () => {
         },
         isAlive: () => true,
         pid: 4321,
+        kafkaProbe: async (_host, port) => {
+            probed.push(port)
+            return true
+        },
     })
     return { docker, http, queries, redisCalls, stack }
 }
@@ -177,6 +181,35 @@ describe("stack attach", () => {
         const again = await stack.attach(request(ns, "run3"))
         assert.equal(again.redis?.db, 0)
         assert.equal(again.postgresql?.port, 30100)
+    })
+
+    it("kafka: one broker of the pinned image with a proxy per slot listener; each slot leases its own listener, probed through its proxy", async () => {
+        const probed: Array<number> = []
+        const { docker, stack, http } = harness(probed)
+        const kafkaRequest = (ns: Namespace, runId: string): AttachRequest => ({ namespace: ns, runId, services: [{ service: "kafka", image: KAFKA_IMAGE }], kafka: { topics: ["orders"] } })
+        const one = namespace("shop_aaaaaa_w1")
+        const two = namespace("shop_aaaaaa_w2")
+        const first = await stack.attach(kafkaRequest(one, "run1-w1"))
+        assert.equal(http.filter((call) => call === "POST /proxies").length, 8, "one proxy per slot listener")
+        const second = await stack.attach(kafkaRequest(two, "run1-w2"))
+        assert.ok(docker.containers.has(serviceContainerName("kafka", KAFKA_IMAGE)))
+        assert.notEqual(serviceContainerName("kafka", KAFKA_IMAGE), containerName("kafka", KAFKA_IMAGE), "a broker of another listener shape is another container")
+        assert.equal(docker.runCount(), 2, "toxiproxy and one broker")
+        assert.equal(first.kafka?.listener, 1)
+        assert.equal(second.kafka?.listener, 2)
+        assert.equal(first.kafka?.proxy, kafkaProxyName(KAFKA_IMAGE, 1))
+        assert.equal(second.kafka?.proxy, kafkaProxyName(KAFKA_IMAGE, 2))
+        assert.notEqual(first.kafka?.port, second.kafka?.port)
+        assert.deepEqual(probed, [first.kafka?.port, second.kafka?.port])
+        assert.equal(first.kafka?.groupPrefix, "shop-aaaaaa-w1.")
+        const broker = docker.calls.find((call) => call.startsWith("run ") && call.includes("starci-ts-kafka"))
+        assert.ok(broker?.includes(`S1://127.0.0.1:${first.kafka?.port}`), broker)
+        assert.ok(broker?.includes(`S2://127.0.0.1:${second.kafka?.port}`), broker)
+        await stack.detach({ namespace: one, runId: "run1-w1", infra: first })
+        assert.equal(http.some((call) => call.startsWith("DELETE /proxies/kafka-")), false, "listener proxies belong to the broker")
+        const again = await stack.attach(kafkaRequest(namespace("blog_bbbbbb_w1"), "run2-w1"))
+        assert.equal(again.kafka?.listener, 1, "the freed listener is leased again")
+        assert.equal(again.kafka?.port, first.kafka?.port)
     })
 
     it("reset empties the namespace's databases and redis db", async () => {

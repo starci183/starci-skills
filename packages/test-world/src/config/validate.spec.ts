@@ -137,4 +137,9 @@ describe("validateDeclaration", () => {
         assert.match(problemsOf(withConnections([{ name: "a", schema: "public" }]), root), /neither public nor pg_\*/)
         assert.match(problemsOf(withConnections([{ name: "a", database: "bad-name", schema: "a" }]), root), /database: "bad-name"/)
     })
+
+    test("kafka is own infrastructure and can never be declared as faked", () => {
+        const root = fixture(FILES)
+        assert.match(problemsOf(config({ stacks: { kafka: { fakedBy: "llm", reason: "no broker here" } } }), root), /stacks\.kafka: kafka is our own event bus and always runs real/)
+    })
 })

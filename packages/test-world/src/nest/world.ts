@@ -599,7 +599,7 @@ export class World {
 
     private async restoreInfra(context: RunContext): Promise<void> {
         const { infra } = context
-        const proxies = [infra.postgresql, infra.redis, infra.minio, infra.qdrant, infra.keycloak].flatMap((entry) => (entry === undefined ? [] : [entry.proxy]))
+        const proxies = [infra.postgresql, infra.redis, infra.minio, infra.qdrant, infra.kafka, infra.keycloak].flatMap((entry) => (entry === undefined ? [] : [entry.proxy]))
         await Promise.all(proxies.map((proxy) => createProxyToxics(infra.toxiproxyApi, proxy).restore().catch(() => undefined)))
         // A connection this world took down and a failed spec never restored lets its apps in again.
         if (infra.postgresql !== undefined && this.downConnections.size > 0) {

@@ -63,6 +63,12 @@ export interface WiredQdrant {
 
 /** The Kafka of the run. */
 export interface WiredKafka {
+    /** Prefix of the slot's consumer group ids and client ids. */
+    readonly groupPrefix: string
+    /** The stored consumer group id of a logical group: every consumer of an app under test takes its group from here. */
+    group(name: string): string
+    /** The client id of a logical client, prefixed like the groups. */
+    clientId(name: string): string
     readonly brokers: ReadonlyArray<string>
     /** The prefix of every topic of the repository. */
     readonly topicPrefix: string

@@ -129,8 +129,16 @@ export interface RunQdrant extends ProxiedEndpoint {
     readonly collectionPrefix: string
 }
 
-/** The provisioned Kafka of a run. The broker advertises its proxied address, so the proxy of Kafka is stack-wide (documented exception). */
+/**
+ * The provisioned Kafka of a data slot. The broker has one listener per slot, each advertising its own proxied address, so
+ * the slot's proxy (`proxy`, `port`) carries every byte its clients exchange with the broker and an outage of it reaches this
+ * slot alone.
+ */
 export interface RunKafka extends ProxiedEndpoint {
+    /** The slot listener (1-based) leased to the namespace. */
+    readonly listener: number
+    /** Prefix of the slot's consumer groups and client ids (`<namespace.kebab>.`). */
+    readonly groupPrefix: string
     readonly topicPrefix: string
     /** Logical topic name to stored topic name. */
     readonly topics: Readonly<Record<string, string>>

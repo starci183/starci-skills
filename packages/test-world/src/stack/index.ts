@@ -15,6 +15,7 @@ import { Docker } from "./docker"
 import { realPause, waitUntil } from "./health"
 import type { FetchLike, Pause } from "./health"
 import {
+    KAFKA_SLOT_LISTENERS,
     kafkaProxyName,
     LABEL_IMAGE,
     LABEL_SERVICE,
@@ -27,10 +28,13 @@ import {
     TOXIPROXY_SERVICE,
     containerName,
     proxyNameOf,
+    serviceContainerName,
 } from "./naming"
+import { kafkaAnswers } from "./kafka-probe"
+import { slotListenerPort } from "./services/kafka"
 import { realPgConnect } from "./pg"
 import type { PgConnect } from "./pg"
-import { Registry, leaseProxyPort, leaseRedisDb, processAlive, releaseRedisDb, secretsFor } from "./registry"
+import { Registry, leaseKafkaListener, leaseProxyPort, leaseRedisDb, processAlive, releaseKafkaListener, releaseRedisDb, secretsFor } from "./registry"
 import type { IsAlive } from "./registry"
 import { redisRoundTrip } from "./resp"
 import type { RedisRoundTrip } from "./resp"
@@ -60,6 +64,8 @@ export interface StackDependencies {
     readonly pid?: number
     /** How long a service may take to become ready (default 300000). */
     readonly readyTimeoutMs?: number
+    /** Whether a Kafka listener answers ApiVersions at host:port (default: a real TCP probe). */
+    readonly kafkaProbe?: (host: string, port: number) => Promise<boolean>
 }
 
 /** The default machine state directory. */
@@ -103,6 +109,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
     const pause = dependencies.pause ?? realPause
     const pid = dependencies.pid ?? process.pid
     const readyTimeoutMs = dependencies.readyTimeoutMs ?? 300_000
+    const kafkaProbe = dependencies.kafkaProbe ?? ((host: string, port: number) => kafkaAnswers(host, port))
     const net: ServiceNet = { docker, fetch: fetchImpl, pg: dependencies.pg ?? realPgConnect, redis: dependencies.redis ?? redisRoundTrip, pause }
     let registryInstance: Registry | null = null
     const registry = (): Registry => {
@@ -137,11 +144,11 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
         return { container: name, apiUrl }
     }
 
-    const startService = async (request: StackImageRequest, kafkaPort: number | null): Promise<Ensured> => {
+    const startService = async (request: StackImageRequest, kafkaListenerPorts: ReadonlyArray<number> | null): Promise<Ensured> => {
         const definition = SERVICE_DEFINITIONS[request.service]
-        const name = containerName(request.service, request.image)
+        const name = serviceContainerName(request.service, request.image)
         const secrets = { ...(await registry().update((data) => secretsFor(data, name, () => definition.newSecrets()))) }
-        const spec = definition.spec(request.image, secrets, { advertisedPort: kafkaPort })
+        const spec = definition.spec(request.image, secrets, { kafkaListenerPorts })
         await ensureContainer(docker, { name, image: request.image, service: request.service, publish: [`${HOST}::${definition.port}`], env: spec.env, command: spec.command })
         const directPort = await waitForPort(name, definition.port)
         const target = targetOf(name, request.image, directPort, secrets)
@@ -149,28 +156,35 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
         return { service: request.service, image: request.image, container: name, directPort, secrets }
     }
 
-    /** Under the `up` lock: network, toxiproxy, every requested container running and ready, the stack-wide Kafka proxy. Concurrent callers wait, then find everything warm. */
-    const ensureStack = async (services: ReadonlyArray<StackImageRequest>): Promise<{ readonly toxiproxy: Toxiproxy; readonly ensured: ReadonlyArray<Ensured>; readonly kafkaProxy: { readonly name: string; readonly port: number } | null }> =>
+    /**
+     * Under the `up` lock: network, toxiproxy, every requested container running and ready, and for Kafka one proxy per slot
+     * listener (owned by the broker container, so they live as long as it does). Concurrent callers wait, then find everything warm.
+     */
+    const ensureStack = async (services: ReadonlyArray<StackImageRequest>): Promise<{ readonly toxiproxy: Toxiproxy; readonly ensured: ReadonlyArray<Ensured> }> =>
         registry().lock(
             "up",
             async () => {
                 await docker.ensureNetwork(STACK_NETWORK)
                 const toxiproxy = await ensureToxiproxy()
                 const kafka = services.find((request) => request.service === "kafka")
-                let kafkaProxy: { readonly name: string; readonly port: number } | null = null
+                const listeners = Array.from({ length: KAFKA_SLOT_LISTENERS }, (_, index) => index + 1)
+                let listenerPorts: ReadonlyArray<number> | null = null
                 if (kafka !== undefined) {
-                    const name = kafkaProxyName(kafka.image)
-                    const container = containerName("kafka", kafka.image)
-                    kafkaProxy = { name, port: await registry().update((data) => leaseProxyPort(data, name, { runId: null, container })) }
+                    const container = serviceContainerName("kafka", kafka.image)
+                    listenerPorts = await registry().update((data) => listeners.map((listener) => leaseProxyPort(data, kafkaProxyName(kafka.image, listener), { runId: null, container })))
                 }
-                const ensured = await Promise.all(services.map((request) => startService(request, request.service === "kafka" ? (kafkaProxy?.port ?? null) : null)))
-                if (kafka !== undefined && kafkaProxy !== null) {
+                const ensured = await Promise.all(services.map((request) => startService(request, request.service === "kafka" ? listenerPorts : null)))
+                if (kafka !== undefined && listenerPorts !== null) {
                     const client = new ToxiproxyClient(toxiproxy.apiUrl, fetchImpl)
-                    const container = containerName("kafka", kafka.image)
-                    const present = (await client.listProxies()).some((proxy) => proxy.name === kafkaProxy?.name && proxy.enabled)
-                    if (!present) await client.createProxy({ name: kafkaProxy.name, listenPort: kafkaProxy.port, upstream: `${container}:${SERVICE_DEFINITIONS.kafka.port}` })
+                    const container = serviceContainerName("kafka", kafka.image)
+                    const existing = await client.listProxies()
+                    for (const listener of listeners) {
+                        const name = kafkaProxyName(kafka.image, listener)
+                        if (existing.some((proxy) => proxy.name === name)) continue
+                        await client.createProxy({ name, listenPort: listenerPorts[listener - 1] ?? 0, upstream: `${container}:${slotListenerPort(listener)}` })
+                    }
                 }
-                return { toxiproxy, ensured, kafkaProxy }
+                return { toxiproxy, ensured }
             },
             { timeoutMs: UP_LOCK_TIMEOUT_MS },
         )
@@ -251,7 +265,8 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
                     releaseRedisDb: () => registry().update((data) => releaseRedisDb(data, namespace.snake)),
                 }),
             )
-            // Kafka's proxy is stack-wide and stays; every other proxy belongs to this run alone.
+            // A Kafka slot listener's proxy belongs to the broker and stays for the next lessee (its toxics are cleared when it is
+            // leased again); every other proxy belongs to this run alone.
             if (service !== "kafka") await attempt(() => withRunToxiproxy(infra).deleteProxy(run.proxy))
         }
         if (infra.cluster !== undefined) await attempt(async () => (await clusterApi()).detach({ namespace, runId }))
@@ -259,6 +274,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
             data.leases = data.leases.filter((lease) => lease.runId !== runId)
             for (const [name, lease] of Object.entries(data.proxyPorts)) if (lease.runId === runId) delete data.proxyPorts[name]
             releaseRedisDb(data, namespace.snake)
+            releaseKafkaListener(data, namespace.snake)
             for (const key of Object.keys(data.notes)) if (key.includes(`:${namespace.kebab}-`)) delete data.notes[key]
         })
         const first = errors[0]
@@ -320,7 +336,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
             const partial: Record<string, unknown> = { toxiproxyApi: "" }
             const infraOf = (): RunInfra => partial as unknown as RunInfra
             try {
-                const { toxiproxy, ensured, kafkaProxy } = await ensureStack(request.services)
+                const { toxiproxy, ensured } = await ensureStack(request.services)
                 partial.toxiproxyApi = toxiproxy.apiUrl
                 await registry().update((data) => {
                     const lease = data.leases.find((entry) => entry.runId === runId)
@@ -334,12 +350,18 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
                         namespace,
                         request,
                         leaseRedisDb: () => registry().update((data) => leaseRedisDb(data, namespace.snake)),
+                        leaseKafkaListener: () => registry().update((data) => leaseKafkaListener(data, namespace.snake)),
                     })
                     let proxy: string
                     let port: number
-                    if (item.service === "kafka" && kafkaProxy !== null) {
-                        proxy = kafkaProxy.name
-                        port = kafkaProxy.port
+                    if (item.service === "kafka") {
+                        // The slot's own listener: its proxy is cleared of any toxic a previous lessee left, then probed end to end.
+                        const listener = (provisioned.run as { readonly listener: number }).listener
+                        proxy = kafkaProxyName(item.image, listener)
+                        port = await registry().update((data) => leaseProxyPort(data, proxy, { runId: null, container: item.container }))
+                        await client.resetToxics(proxy)
+                        await client.setEnabled(proxy, true)
+                        await waitUntil(`kafka listener ${listener} through ${HOST}:${port}`, () => kafkaProbe(HOST, port), { timeoutMs: 60_000, intervalMs: 500, pause })
                     } else {
                         proxy = proxyNameOf(runId, item.service)
                         port = await registry().update((data) => leaseProxyPort(data, proxy, { runId, container: null }))

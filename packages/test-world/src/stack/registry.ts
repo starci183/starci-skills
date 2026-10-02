@@ -4,7 +4,7 @@ import { TestWorldErrorCode, worldError } from "../errors"
 import { realPause } from "./health"
 import type { Pause } from "./health"
 import type { StackLease } from "./contracts"
-import { PROXY_PORT_FIRST, PROXY_PORT_LAST } from "./naming"
+import { KAFKA_SLOT_LISTENERS, PROXY_PORT_FIRST, PROXY_PORT_LAST } from "./naming"
 
 /** A lease as the registry stores it: the public {@link StackLease} plus the shared containers the run uses (what `down` keeps). */
 export interface RegistryLease extends StackLease {
@@ -29,6 +29,8 @@ export interface RegistryData {
     leases: Array<RegistryLease>
     /** Redis DB index by namespace (snake). */
     redisDbs: Record<string, number>
+    /** The Kafka slot listener (1-based) leased to each namespace. */
+    kafkaListeners: Record<string, number>
     /** Toxiproxy listen ports by proxy name. */
     proxyPorts: Record<string, ProxyPortLease>
     /** Free-form notes of provisioners (e.g. the users a Keycloak import seeded), by key. */
@@ -66,7 +68,7 @@ export interface LockOptions {
     readonly intervalMs?: number
 }
 
-const emptyData = (): RegistryData => ({ version: 1, secrets: {}, leases: [], redisDbs: {}, proxyPorts: {}, notes: {} })
+const emptyData = (): RegistryData => ({ version: 1, secrets: {}, leases: [], redisDbs: {}, kafkaListeners: {}, proxyPorts: {}, notes: {} })
 
 const REDIS_DB_COUNT = 16
 const ORPHAN_LOCK_MS = 5000
@@ -169,6 +171,7 @@ export class Registry {
                 secrets: isRecord(parsed.secrets) ? (parsed.secrets as RegistryData["secrets"]) : base.secrets,
                 leases: Array.isArray(parsed.leases) ? (parsed.leases as Array<RegistryLease>) : base.leases,
                 redisDbs: isRecord(parsed.redisDbs) ? (parsed.redisDbs as RegistryData["redisDbs"]) : base.redisDbs,
+                kafkaListeners: isRecord(parsed.kafkaListeners) ? (parsed.kafkaListeners as RegistryData["kafkaListeners"]) : base.kafkaListeners,
                 proxyPorts: isRecord(parsed.proxyPorts) ? (parsed.proxyPorts as RegistryData["proxyPorts"]) : base.proxyPorts,
                 notes: isRecord(parsed.notes) ? (parsed.notes as RegistryData["notes"]) : base.notes,
             }
@@ -190,6 +193,9 @@ export class Registry {
         const runs = new Set(data.leases.map((lease) => lease.runId))
         for (const namespace of Object.keys(data.redisDbs)) {
             if (!namespaces.has(namespace)) delete data.redisDbs[namespace]
+        }
+        for (const namespace of Object.keys(data.kafkaListeners)) {
+            if (!namespaces.has(namespace)) delete data.kafkaListeners[namespace]
         }
         for (const [name, lease] of Object.entries(data.proxyPorts)) {
             if (lease.runId !== null && !runs.has(lease.runId)) delete data.proxyPorts[name]
@@ -224,6 +230,25 @@ export const leaseRedisDb = (data: RegistryData, namespace: string): number => {
 /** Frees the Redis DB index of a namespace. */
 export const releaseRedisDb = (data: RegistryData, namespace: string): void => {
     delete data.redisDbs[namespace]
+}
+
+/** The Kafka slot listener of a namespace: the existing lease, or the lowest free one (1-based). */
+export const leaseKafkaListener = (data: RegistryData, namespace: string): number => {
+    const existing = data.kafkaListeners[namespace]
+    if (existing !== undefined) return existing
+    const used = new Set(Object.values(data.kafkaListeners))
+    for (let listener = 1; listener <= KAFKA_SLOT_LISTENERS; listener += 1) {
+        if (!used.has(listener)) {
+            data.kafkaListeners[namespace] = listener
+            return listener
+        }
+    }
+    throw worldError(TestWorldErrorCode.InfrastructureFailed, `all ${KAFKA_SLOT_LISTENERS} kafka listeners are leased by live runs (${Object.keys(data.kafkaListeners).join(", ")})`)
+}
+
+/** Frees the Kafka slot listener of a namespace. */
+export const releaseKafkaListener = (data: RegistryData, namespace: string): void => {
+    delete data.kafkaListeners[namespace]
 }
 
 /** The listen port of a proxy: the existing lease, or the lowest free port of the range. */

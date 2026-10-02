@@ -85,6 +85,22 @@ test("a schema-per-context connection is wired with its own login and schema in 
     assert.equal(wiring.db["primary"]?.user, "postgres")
 })
 
+test("kafka wires the slot's topics, consumer groups and client ids under one prefix", () => {
+    const base = context()
+    const wiring = buildWiring({
+        ...base,
+        infra: {
+            ...base.infra,
+            kafka: { host: "127.0.0.1", port: 30105, directPort: 9092, proxy: "kafka-k-s2", image: "apache/kafka", container: "c", listener: 2, topicPrefix: "shop-a1b2c3-w2.", groupPrefix: "shop-a1b2c3-w2.", topics: { orders: "shop-a1b2c3-w2.orders" } },
+        },
+    })
+    assert.deepEqual(wiring.kafka.brokers, ["127.0.0.1:30105"])
+    assert.equal(wiring.kafka.topic("orders"), "shop-a1b2c3-w2.orders")
+    assert.equal(wiring.kafka.topic("audit"), "shop-a1b2c3-w2.audit")
+    assert.equal(wiring.kafka.group("billing"), "shop-a1b2c3-w2.billing")
+    assert.equal(wiring.kafka.clientId("api"), "shop-a1b2c3-w2.api")
+})
+
 test("keycloak urls derive from the proxied base and the namespaced realm", () => {
     const { keycloak } = buildWiring(context())
     assert.equal(keycloak.issuer, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo")
