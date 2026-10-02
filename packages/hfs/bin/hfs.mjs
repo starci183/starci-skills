@@ -58,6 +58,7 @@ import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError, loadPresets } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
+import { dbTypesEmitter } from '../emit/db-types.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
 import { EditionRefusal } from '../scaffold/edition-gate.mjs';
 import { addKind } from '../scaffold/add.mjs';
@@ -69,7 +70,7 @@ import { writeReport } from '../report/sonar.mjs';
 import { checkEdition } from '../upgrade/check.mjs';
 import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
 
-const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--edition full]
+const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types]
 hfs lint [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 hfs scaffold app <name> [--into <dir>] [--edition full|lite]
 hfs emit-contracts [--repo <dir>]
@@ -87,7 +88,7 @@ const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done', '--edition']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
-const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types']);
+const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types', '--db-types']);
 
 function parse(argv) {
   const opts = { positional: [] };
@@ -144,11 +145,11 @@ function printExplain(e, out) {
  * The app pass: slots, managed files, formatter, contract snapshots and the architecture machine's check surface, root and sides.
  * `only` limits the formatter to those (app-relative) files.
  */
-async function runCheck({ repoRoot, fast = false, base, only, presets, prettier }) {
+async function runCheck({ repoRoot, fast = false, base, only, presets, prettier, dbTypes = false }) {
   const tracked = trackedFiles(repoRoot);
   // Managed files of the root and both sides, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier
   // through the app's own install (R19, never under --fast).
-  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...await checkDatabase({ repoRoot, files: tracked, base }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
+  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...await checkDatabase({ repoRoot, files: tracked, base, ...(dbTypes ? { emitTypes: dbTypesEmitter() } : {}) }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
   // R23 against the be side itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
   let contracts = null;
   let be = null;
@@ -217,7 +218,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('hfs check takes no path');
       if (opts.base !== undefined && opts.fast !== true) throw new Error('--base names the ref --fast compares with; it needs --fast');
-      const result = await checkEdition({ repoRoot, edition: opts.edition, normal: () => runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier }), presets, prettier });
+      const result = await checkEdition({ repoRoot, edition: opts.edition, normal: () => runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier, dbTypes: opts['db-types'] === true }), presets, prettier });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
     }
