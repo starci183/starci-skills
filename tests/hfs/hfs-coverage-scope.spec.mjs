@@ -26,7 +26,7 @@ test('every tracked slot of the be profile declares coverage, and no other slot 
     if (measured) assert.ok(['required', 'none'].includes(slot.coverage), slot.id);
   }
   assert.deepEqual(manifest.slots.filter((slot) => slot.coverage === 'required').map((slot) => slot.id).sort(), [
-    'be.domain', 'be.integrations', 'be.integrations.model', 'be.platform', 'be.platform.event-bus', 'be.platform.jobs', 'be.platform.queue', 'be.projections',
+    'be.domain', 'be.integrations', 'be.integrations.model', 'be.integrations.supabase', 'be.platform', 'be.platform.event-bus', 'be.platform.jobs', 'be.platform.queue', 'be.projections',
   ], 'the logic of be/src/modules is the one measured thing: domain, platform (and its pattern capabilities), projections, integrations');
   assert.equal(manifest.slots.find((slot) => slot.id === 'be.feature.jobs').coverage, 'none');
   assert.equal(manifest.slots.find((slot) => slot.id === 'be.cli').coverage, 'none');

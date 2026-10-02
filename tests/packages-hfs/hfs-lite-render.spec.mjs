@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url);
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded.default ?? loaded; })();
 const validateSlotsSchema = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/hfs-slots.schema.yaml'), 'utf8')));
 const jestPreset = require('../../packages/jest-preset/index.cjs');
-const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 const RAW_MANIFEST = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/slots.yaml'), 'utf8'));
 const MANIFEST = loadSlotManifest();
 const CONNECTION = { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'api', isolation: 'schema', provider: 'supabase' };

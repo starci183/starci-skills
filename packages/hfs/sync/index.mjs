@@ -261,6 +261,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
   const fe = app.sides.fe;
   const packages = opensPackages(fe);
   const lite = app.edition === 'lite';
+  const providers = (app.sides.be.connections ?? []).map(connection => connection.provider);
   return {
     header: HEADER(scope),
     appBinary: APP_BINARY,
@@ -275,11 +276,10 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: (lite ? ['**/.next/**', '**/node_modules/**', '**/src/messages/**', 'supabase/types/**'] : [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**']).filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    jestCoverage: !lite && scope === 'be' ? jestCoverageSource(jestCoverage(manifest)) : '',
-    coverageExclusions: !lite && scope === APP_SCOPE ? sonarCoverageExclusions(manifest).join(',') : '',
-    codecovPaths: !lite && scope === APP_SCOPE ? codecovPaths(manifest).map(glob => `          - ${JSON.stringify(glob)}`).join('
-') : '',
-    codecovComponents: !lite && scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps })) : '',
+    jestCoverage: !lite && scope === 'be' ? jestCoverageSource(jestCoverage(manifest, providers)) : '',
+    coverageExclusions: !lite && scope === APP_SCOPE ? sonarCoverageExclusions(manifest, providers).join(',') : '',
+    codecovPaths: !lite && scope === APP_SCOPE ? codecovPaths(manifest, providers).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
+    codecovComponents: !lite && scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps, providers })) : '',
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
     imageMatrix: imageMatrix(app),

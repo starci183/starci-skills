@@ -1,10 +1,10 @@
-import type { SupabasePrincipal } from "@modules/integrations/supabase"
+import type { Principal } from "@modules/platform/cqrs"
 
 declare module "express-serve-static-core" {
     /** The request carries the principal established by the default-deny auth guard. */
     interface Request {
         /** The authenticated Supabase caller, when the door is not public. */
-        principal?: SupabasePrincipal
+        principal?: Principal
     }
 }
 
@@ -21,9 +21,6 @@ export interface PublicMetadata {
     /** Why the door is anonymous. */
     readonly reason: PublicReason
 }
-
-/** The only authenticated principal: claims from a cryptographically verified Supabase access token. */
-export type Principal = SupabasePrincipal
 
 /** What identity admission returns to the guard. */
 export type IdentityAdmission = Principal | PublicReason

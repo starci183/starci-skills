@@ -11,4 +11,3 @@ contracts/
 .starciwork/
 **/__generated__/
 **/messages/**
-supabase/types/

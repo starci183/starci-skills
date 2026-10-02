@@ -352,6 +352,7 @@ slots:
     tier: none
     tests: none
     managedBy: tool-config
+    liteManagedBy: tool-config-lite     # the same files plus the generated supabase/types, which the Supabase CLI writes unformatted
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL]
   - id: app.tool-config-optional
     profiles: [app]

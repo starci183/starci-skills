@@ -15,7 +15,7 @@ const PINS = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'hfs', 'cano
 const CREATED_AT = new Date('2026-10-02T12:34:56.000Z');
 const GENERATED_TYPES = 'export type Database = { public: { Tables: Record<string, never> } };\n';
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
-const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
 // Design 8.5's exact file-level output, with <ts> fixed by CREATED_AT. Empty brand/ is a directory, not a file.
 const EXPECTED_LITE_FILES = Object.freeze([
