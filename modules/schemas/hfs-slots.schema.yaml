@@ -411,6 +411,12 @@ $defs:
         minProperties: 1
         additionalProperties: {type: integer, minimum: 1}
       managedBy: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      perConnection:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        description: the platform capabilities (be.persistence only) whose tables exist on every connection that uses them; their arrays may be registered on several declared connections (R152)
       rules:
         type: array
         uniqueItems: true

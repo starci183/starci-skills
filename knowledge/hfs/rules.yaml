@@ -354,7 +354,7 @@ rules:
       - {kind: eslint-be, id: no-runtime-schema}
   - id: R35
     code: "BE_SCHEMA_OWNER"
-    law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias)."
+    law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias); only a platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) registers on several."
     kinds: [lint, codemod, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SCHEMA_OWNER"]
@@ -875,7 +875,7 @@ rules:
       - {kind: eslint-be, id: injection-token-exported}
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
-    law: "SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded."
+    law: "SQL writes only the tables of its own capability's entities, reads only tables of its own context (its own capability's, or a same-context capability it may import; a cross-context JOIN is refused), and every multi-row SELECT is bounded."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SQL_TABLE_OWNER"]
@@ -1442,6 +1442,46 @@ rules:
     enforcers:
       - {kind: hfs, id: saga-e2e, at: scripts/hfs/rules/saga.mjs}
   - id: R148
+    code: "BE_CONTEXT_OWNER"
+    law: "A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection)."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: context-owner}
+  - id: R149
+    code: "BE_CONTEXT_COUPLING"
+    law: "Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_COUPLING"]
+    enforcers:
+      - {kind: eslint-be, id: context-coupling}
+  - id: R150
+    code: "BE_CONTEXT_TRANSACTION"
+    law: "One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_TRANSACTION"]
+    enforcers:
+      - {kind: eslint-be, id: context-transaction}
+  - id: R151
+    code: "BE_CONTRACT_BREAKING"
+    law: "An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTRACT_BREAKING"]
+    enforcers:
+      - {kind: hfs, id: contract-compat, at: scripts/hfs/rules/contract-compat.mjs}
+  - id: R152
+    code: "BE_CONTEXT_PLATFORM_TABLES"
+    law: "A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_PLATFORM_TABLES"]
+    enforcers:
+      - {kind: eslint-be, id: context-platform-tables}
+  - id: R153
     code: "BE_WEBHOOK_SHAPE"
     law: "A provider webhook door (`src/features/webhooks/<provider>/<provider>.webhook.ts`) is one `@Controller` with one `@Post` handler declared `@Public({ reason: PublicReason.SignedWebhook })`; it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`, and its handler holds no branch, loop or `try`, calls only `verify` on the signature service and exactly one method of a domain service (the intake that records the delivery and publishes the event in its own transaction), and returns nothing."
     kinds: [lint]
@@ -1449,7 +1489,7 @@ rules:
     failureCodes: ["BE_WEBHOOK_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: webhook-shape}
-  - id: R149
+  - id: R154
     code: "BE_WEBHOOK_UNVERIFIED"
     law: "The first statement of a webhook handler is the unconditional `verify` call of the `WebhookSignatureService` (signature and replay window): a delivery that fails the proof throws before any other code runs, so no path reaches the domain intake unproven."
     kinds: [lint]
@@ -1457,7 +1497,7 @@ rules:
     failureCodes: ["BE_WEBHOOK_UNVERIFIED"]
     enforcers:
       - {kind: eslint-be, id: webhook-verify-first}
-  - id: R150
+  - id: R155
     code: "BE_REALTIME_SHAPE"
     law: "A realtime file is the one door its role names: `<channel>.gateway.ts` holds one `@WebSocketGateway` class with `@SubscribeMessage` handlers and `<x>.subscription.ts` holds one `@Resolver` class with `@Subscription` operations, and neither carries a query, a mutation, a field resolver, a REST route or the other protocol."
     kinds: [lint]
@@ -1465,7 +1505,7 @@ rules:
     failureCodes: ["BE_REALTIME_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: realtime-shape}
-  - id: R151
+  - id: R156
     code: "BE_REALTIME_WRITES"
     law: "A realtime door reads and pushes only: the one value injected into it is the `RealtimeHub` of `platform/realtime`; no `EntityManager`, bus, queue, event bus or domain service reaches it."
     kinds: [lint]
@@ -1473,7 +1513,7 @@ rules:
     failureCodes: ["BE_REALTIME_WRITES"]
     enforcers:
       - {kind: eslint-be, id: realtime-read-only}
-  - id: R152
+  - id: R157
     code: "BE_REALTIME_TOPIC_SCOPE"
     law: "The topic a realtime handler passes to `RealtimeHub.subscribe` is built from the handler's `@CurrentPrincipal()` parameter of `domain/identity`, so a client can only listen to channels its principal owns."
     kinds: [lint]

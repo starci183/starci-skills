@@ -54,7 +54,7 @@ rules:
   - id: BE-WEBHOOK-2
     title: The door verifies first, then makes one domain call
     kind: mandatory
-    hfsRules: [R148, R149, R41, R42]
+    hfsRules: [R153, R154, R41, R42]
     requirement: |-
       `<provider>.webhook.ts` is one `@Controller` with one `@Post` handler declared
       `@Public({ reason: PublicReason.SignedWebhook })`. The handler's FIRST statement is the unconditional

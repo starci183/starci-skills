@@ -1,16 +1,16 @@
 /**
- * The rules that hold the realtime kind (R150 `BE_REALTIME_SHAPE`, R151 `BE_REALTIME_WRITES`, R152 `BE_REALTIME_TOPIC_SCOPE`).
+ * The rules that hold the realtime kind (R155 `BE_REALTIME_SHAPE`, R156 `BE_REALTIME_WRITES`, R157 `BE_REALTIME_TOPIC_SCOPE`).
  *
  * A realtime door (`src/features/realtime/<channel>/<channel>.gateway.ts` for a socket, `<x>.subscription.ts` for a GraphQL
  * subscription, slot `be.feature.realtime`) READS and PUSHES. It never writes: the push is fed by a reactor that calls the `RealtimeHub`
  * of `platform/realtime`, and the door only subscribes a client to a topic of that hub.
  *
- *   - `realtime-shape` (R150): a `.gateway.ts` holds one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`; a
+ *   - `realtime-shape` (R155): a `.gateway.ts` holds one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`; a
  *     `.subscription.ts` holds one `@Resolver` class whose operations are `@Subscription`. Each is the door its file role names, and
  *     neither carries a query, a mutation or a REST route.
- *   - `realtime-read-only` (R151): the only value injected into a realtime door is the `RealtimeHub` of `platform/realtime`. No
+ *   - `realtime-read-only` (R156): the only value injected into a realtime door is the `RealtimeHub` of `platform/realtime`. No
  *     `EntityManager`, bus, queue, event bus or domain service reaches it.
- *   - `realtime-topic-scope` (R152): the topic passed to `hub.subscribe` is built from the principal parameter of the handler
+ *   - `realtime-topic-scope` (R157): the topic passed to `hub.subscribe` is built from the principal parameter of the handler
  *     (`@CurrentPrincipal()` of `domain/identity`), so a client can only listen to what the principal owns.
  *
  * What a receiver is comes from its TYPE, what a decorator is from the import that binds it, and where a parameter comes
