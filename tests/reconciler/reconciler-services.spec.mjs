@@ -54,7 +54,10 @@ test('the probes read the one port source; a drifted tunnel ingress fails the tu
   assert.match(t.error, /port-drift/);
   for (const e of reg) {
     const a = e.start();
-    if (e.name.startsWith('sched-task:')) assert.deepEqual(a.args.slice(0, 3), ['scripts/reconciler/boot.mjs', '--install-task', '--apply']);
+    if (e.name.startsWith('sched-task:')) {
+      assert.match(a.cmd, /[\\/]\.starci[\\/]bin[\\/]starci(?:\.cmd)?$/i);
+      assert.deepEqual(a.args.slice(0, 3), ['reconciler', 'install-task', '--apply']);
+    }
     else assert.deepEqual(a.args.slice(0, 3), ['scripts/reconciler/services.mjs', '--start', e.name], 'every actuator is one CLI');
   }
 });

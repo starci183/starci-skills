@@ -445,11 +445,11 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 
 /* ------------------------------------------------------ the command guard */
 
-const GUARD_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'guards', 'command-guard.mjs');
-export const TOOL_GUARD_MARKER = 'command-guard.mjs', TOOL_GUARD_MATCHER = 'Bash|PowerShell', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
-/** The hook command every host runs: forward slashes, since Claude and Devin run hooks through Git Bash on Windows. */
-export const toolGuardCommand = (script = GUARD_SCRIPT) => `node "${String(script).replace(/\\/g, '/')}"`;
-const isGuardHandler = (h) => typeof h?.command === 'string' && h.command.includes(TOOL_GUARD_MARKER);
+export const TOOL_GUARD_MARKER = 'starci guard command', TOOL_GUARD_MATCHER = 'Bash|PowerShell', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
+/** The hook command every host runs through the per-user StarCi shim already placed on agent PATH. */
+export const toolGuardCommand = () => TOOL_GUARD_MARKER;
+const isGuardHandler = (h) => typeof h?.command === 'string'
+  && (h.command.includes(TOOL_GUARD_MARKER) || h.command.includes('command-guard.mjs'));
 const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandler);
 
 /**

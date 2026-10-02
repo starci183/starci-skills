@@ -1,17 +1,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { CATALOG, RETIRED } from './catalog.generated.mjs';
-import { completionFor, completionShells } from './completion.mjs';
-import { groupHelp, topHelp, verbHelp } from './help.mjs';
-import { installRuntime } from './runtime-install.mjs';
 import { locateRuntime, runtimeEntryOf } from './runtime-locate.mjs';
-import { splitCommand, validateArgs } from './validate-args.mjs';
 
 const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
-const CLI_VERSION = JSON.parse(readFileSync(packageFile, 'utf8')).version;
+const cliVersion = () => JSON.parse(readFileSync(packageFile, 'utf8')).version;
+const GUARD_FAST_PATH = Object.freeze({ command: 'command-guard.mjs', 'seat-tools': 'seat-tools.mjs' });
 
 const importHfs = async () => {
   try {
@@ -33,6 +29,31 @@ const writeTo = (target, text) => {
 const fail = (stderr, message, code = 2) => {
   writeTo(stderr, `starci: ${message}\n`);
   return code;
+};
+
+/**
+ * The hooks run on every tool call. Exact hook invocations bypass the generated catalog, help modules and a second
+ * Node process; help and malformed invocations fall through to the catalog-driven dispatcher below.
+ */
+const guardFastPath = async (argv, io) => {
+  if (argv.length !== 2 || argv[0] !== 'guard' || !Object.hasOwn(GUARD_FAST_PATH, argv[1])) return null;
+  const stderr = io.stderr ?? process.stderr;
+  const cwd = io.cwd ?? process.cwd();
+  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env: io.env ?? process.env, ...(io.home ? { home: io.home } : {}) });
+  if (!located) return fail(stderr, 'the runtime group "guard" needs the StarCi runtime, which is not installed (run: starci runtime install)', 3);
+  try {
+    const file = path.join(located.root, 'scripts', 'guards', GUARD_FAST_PATH[argv[1]]);
+    const guard = await (io.importGuard ?? ((target) => import(pathToFileURL(target).href)))(file);
+    if (typeof guard.main !== 'function') return fail(stderr, `guard ${argv[1]} has no in-process entry`, 1);
+    return Number(await guard.main({
+      stdin: io.stdin ?? process.stdin,
+      stdout: io.stdout ?? process.stdout,
+      stderr,
+      env: io.env ?? process.env,
+    })) || 0;
+  } catch (error) {
+    return fail(stderr, `cannot load guard ${argv[1]}: ${error?.message ?? error}`, 1);
+  }
 };
 
 const retiredMatch = (argv, retired) => {
@@ -61,11 +82,25 @@ const handlerArgs = (validated, command, { includeQuiet = true } = {}) => {
 
 /** The published CLI entry, with I/O and process seams for deterministic specs. */
 export async function main(argv = process.argv.slice(2), io = {}) {
+  const guarded = await guardFastPath(argv, io);
+  if (guarded !== null) return guarded;
+  const [catalogModule, completionModule, helpModule, installModule, argsModule] = await Promise.all([
+    import('./catalog.generated.mjs'),
+    import('./completion.mjs'),
+    import('./help.mjs'),
+    import('./runtime-install.mjs'),
+    import('./validate-args.mjs'),
+  ]);
+  const { CATALOG, RETIRED } = catalogModule;
+  const { completionFor, completionShells } = completionModule;
+  const { groupHelp, topHelp, verbHelp } = helpModule;
+  const { installRuntime } = installModule;
+  const { splitCommand, validateArgs } = argsModule;
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
   const catalog = io.catalog ?? CATALOG;
   const retired = io.retired ?? RETIRED;
-  const version = io.version ?? CLI_VERSION;
+  const version = io.version ?? cliVersion();
   const home = io.home;
   const env = io.env ?? process.env;
   const initialCwd = io.cwd ?? process.cwd();

@@ -1,0 +1,17 @@
+group: guard
+verb: command
+owner: runtime
+summary: judge one shell PreToolUse request from JSON on stdin
+impl:
+  script: scripts/guards/command-guard.mjs
+flags: []
+exit:
+  "0": command allowed or the guard failed open
+  "2": command refused with the reason on stderr
+json: none
+examples:
+  - starci guard command
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/guards/command-guard.mjs

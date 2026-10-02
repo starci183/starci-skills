@@ -280,7 +280,9 @@ test('a hook of another tool is never overwritten', (t) => {
   fs.mkdirSync(hooks, { recursive: true });
   fs.writeFileSync(path.join(hooks, 'reference-transaction'), '#!/bin/sh\nexit 0\n');
   assert.deepEqual(ensureHistoryHook(repo, { skillRoot: ROOT }).reason, 'foreign-hook');
-  assert.match(historyHookBody({ branches: ['develop', 'bad branch'], verify: '/x/verify-commit.mjs', nodePath: '/n/node' }), /PROTECTED=" main master develop "/);
+  const history = historyHookBody({ branches: ['develop', 'bad branch'], verify: '/x/verify-commit.mjs', nodePath: '/n/node' });
+  assert.match(history, /PROTECTED=" main master develop "/);
+  assert.match(history, /'\/n\/node' '\/x\/verify-commit\.mjs'/);
 });
 
 test('the command guard refuses before git runs and passes the command as written', async (t) => {

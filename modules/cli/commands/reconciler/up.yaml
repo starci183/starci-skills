@@ -1,0 +1,35 @@
+group: reconciler
+verb: up
+owner: runtime
+summary: bring the runtime host services and live seats up and print one checklist
+impl:
+  script: scripts/reconciler/start.mjs
+flags:
+  - name: check
+    type: boolean
+    summary: run one read-only checklist pass
+  - name: wait
+    type: number
+    summary: seconds to wait for the checklist to become green
+  - name: no-build
+    type: boolean
+    summary: do not rebuild a stale harness UI
+  - name: retire-stale-ledgers
+    type: boolean
+    summary: retire registered ledgers that point at temporary test paths
+  - name: set-profile
+    type: enum
+    enum: [operational, observe]
+    summary: update the reconciler profile before bringing services up
+exit:
+  "0": every required checklist row is green
+  "1": one or more required checklist rows are red
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler up
+  - starci reconciler up --check --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/start.mjs

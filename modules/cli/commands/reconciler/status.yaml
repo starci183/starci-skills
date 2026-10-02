@@ -1,0 +1,20 @@
+group: reconciler
+verb: status
+owner: runtime
+summary: print reconciler leader, queue, mode and violation status
+impl:
+  script: scripts/reconciler/boot.mjs
+  args: [--status]
+flags: []
+exit:
+  "0": status printed
+  "1": status could not be read
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler status
+  - starci reconciler status --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/boot.mjs --status

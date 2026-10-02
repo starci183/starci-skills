@@ -5,6 +5,399 @@
 One binary, six groups. Global flags: `--json`, `--cwd <dir>`, `--quiet`, `--help`, `--edition full`.
 Exit codes: 0 clean, 1 findings, 2 refusal or bad usage, 3 the runtime group needs a runtime that is not installed.
 
+## starci app
+
+product application scaffolding, checks, managed output and local test infrastructure
+
+### starci app add
+
+add one canonical backend capability and register its patterns
+
+| flag | type | |
+| --- | --- | --- |
+| `--event` | string |  |
+| `--from` | string |  |
+| `--service` | string |  |
+| `--connection` | string |  |
+| `--owner` | string |  |
+| `--failed` | string |  |
+| `--done` | string |  |
+
+Positionals: noun, name
+
+exit: 0 capability created; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app add api checkout --service CheckoutService=@modules/domain/order
+```
+
+Removed spellings: `hfs add`, `npx hfs add`
+
+### starci app check
+
+judge the app tree, managed output, contracts, formatting and architecture
+
+| flag | type | |
+| --- | --- | --- |
+| `--fast` | boolean |  |
+| `--base` | string |  |
+
+exit: 0 clean; 1 findings; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app check
+starci app check --fast
+starci app check --json
+```
+
+Removed spellings: `hfs check`, `npx hfs check`
+
+### starci app emit
+
+emit backend GraphQL, operation and event contract snapshots
+
+exit: 0 contracts emitted; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app emit
+```
+
+Removed spellings: `hfs emit-contracts`, `npx hfs emit-contracts`
+
+### starci app explain
+
+explain which HFS slot owns one app-relative path
+
+Positionals: path
+
+exit: 0 path has one owner; 1 path is unowned or ambiguous; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app explain be/src/modules/domain/order/index.ts
+```
+
+Removed spellings: `hfs explain`, `npx hfs explain`
+
+### starci app hygiene
+
+judge staged worktree metadata, stack files and plaintext secrets
+
+exit: 0 clean; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app hygiene
+```
+
+Removed spellings: `hfs work-hygiene`, `npx hfs work-hygiene`
+
+### starci app lint
+
+lint both app sides and report repository, ESLint and stylelint findings together
+
+| flag | type | |
+| --- | --- | --- |
+| `--changed` | list |  |
+| `--workspace` | string |  |
+| `--fix` | boolean |  |
+| `--format` | enum text|json (default text) |  |
+| `--sonar` | string |  |
+
+exit: 0 clean; 1 findings; 2 refusal or tool failure
+
+json: starci/lint@1
+
+```sh
+starci app lint
+starci app lint --workspace .
+starci app lint --json
+```
+
+Removed spellings: `hfs lint`, `npx hfs lint`
+
+### starci app new
+
+create a canonical service, unit spec or app image definition
+
+| flag | type | |
+| --- | --- | --- |
+| `--inject` | list |  |
+
+Positionals: kind, arguments?
+
+exit: 0 files created; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app new service be/src/modules/domain/order order
+starci app new image
+```
+
+Removed spellings: `hfs new`, `npx hfs new`
+
+### starci app scaffold
+
+create a full-edition StarCi app repository from the canonical skeleton
+
+| flag | type | |
+| --- | --- | --- |
+| `--into` | string |  |
+
+Positionals: name
+
+exit: 0 app created; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app scaffold demo
+starci app scaffold demo --into projects
+```
+
+Removed spellings: `hfs scaffold app`, `npx hfs scaffold app`
+
+### starci app secret
+
+list, read, seal or generate an encrypted app secret
+
+| flag | type | |
+| --- | --- | --- |
+| `--key` | string |  |
+| `--env` | string |  |
+| `--age` | list |  |
+| `--bytes` | number |  |
+
+Positionals: action, slug?
+
+exit: 0 action completed; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app secret list
+starci app secret gen database --key PASSWORD
+```
+
+Removed spellings: `hfs secret`, `npx hfs secret`
+
+### starci app stack
+
+start, stop or inspect the shared local test-world infrastructure
+
+| flag | type | |
+| --- | --- | --- |
+| `--stack` | string |  |
+| `--services` | list |  |
+| `--k3d` | boolean |  |
+| `--force` | boolean |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 infrastructure failure; 2 refusal or bad usage
+
+json: flag
+
+```sh
+starci app stack up
+starci app stack status --json
+starci app stack down --force
+```
+
+Removed spellings: `starci-test-stack`, `npx starci-test-stack`
+
+### starci app sync
+
+compare or write every managed app file from its canonical template
+
+| flag | type | |
+| --- | --- | --- |
+| `--check` | boolean |  |
+| `--write` | boolean |  |
+
+exit: 0 managed output is current; 1 drift or render error; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app sync --check
+starci app sync --write
+```
+
+Removed spellings: `hfs sync`, `npx hfs sync`
+
+### starci app upgrade
+
+report the full-edition app as already current
+
+| flag | type | |
+| --- | --- | --- |
+| `--plan` | boolean |  |
+
+exit: 0 already full; 1 findings; 2 refusal or bad usage
+
+json: none
+
+```sh
+starci app upgrade
+starci app upgrade --edition full --plan
+```
+
+## starci debug
+
+run a fixed read-only inspector against the StarCi runtime
+
+### starci debug run
+
+run one allowlisted read-only runtime inspector
+
+Positionals: inspector
+
+exit: 0 inspector completed cleanly; 1 inspector found a problem or could not read its source; 2 unknown inspector or bad usage
+
+json: flag
+
+```sh
+starci debug run orca-status
+starci debug run runtime-status --json
+starci debug run supervisor-status
+```
+
+## starci guard
+
+enforce StarCi tool, history and host-footprint safety guards
+
+### starci guard command
+
+judge one shell PreToolUse request from JSON on stdin
+
+exit: 0 command allowed or the guard failed open; 2 command refused with the reason on stderr
+
+json: none
+
+```sh
+starci guard command
+```
+
+Removed spellings: `node scripts/guards/command-guard.mjs`
+
+### starci guard footprint-scan
+
+scan for fresh cross-repository links and linked worktrees
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--depth` | number |  |
+
+exit: 0 footprint scanned and recorded; 1 scan failed; 2 bad usage
+
+json: flag
+
+```sh
+starci guard footprint-scan --json
+```
+
+Removed spellings: `node scripts/guards/footprint-scan.mjs`
+
+### starci guard seat-tools
+
+deny tools forbidden for the bound seat from JSON on stdin
+
+exit: 0 hook decision emitted or the tool allowed; 2 bad usage
+
+json: always
+
+```sh
+starci guard seat-tools
+```
+
+Removed spellings: `node scripts/guards/seat-tools.mjs`
+
+### starci guard verify-commit
+
+verify a protected-branch update carries only worker-owned paths
+
+Positionals: old, new
+
+exit: 0 update allowed or the verifier failed open; 3 update refused because it carries foreign paths
+
+json: none
+
+```sh
+starci guard verify-commit <old> <new>
+```
+
+## starci harness
+
+start, stop, inspect or open the local StarCi harness
+
+### starci harness open
+
+open the local harness URL in the default browser
+
+exit: 0 browser open requested; 1 the browser could not be opened; 2 bad usage
+
+json: none
+
+```sh
+starci harness open
+```
+
+### starci harness start
+
+start the harness API and UI or its named tunnel
+
+| flag | type | |
+| --- | --- | --- |
+| `--tunnel` | boolean |  |
+
+exit: 0 harness ran until stopped; 1 a harness child failed; 2 bad usage
+
+json: none
+
+```sh
+starci harness start
+starci harness start --tunnel
+```
+
+Removed spellings: `node ui/start.mjs`, `node ui/start.mjs --tunnel`
+
+### starci harness status
+
+report whether the harness health endpoint is up
+
+exit: 0 harness is healthy; 1 harness is down or its probe failed; 2 bad usage
+
+json: flag
+
+```sh
+starci harness status
+starci harness status --json
+```
+
+### starci harness stop
+
+stop only harness processes recorded by harness start
+
+exit: 0 recorded harness processes stopped or were already gone; 1 a recorded PID could not be verified or stopped; 2 bad usage
+
+json: flag
+
+```sh
+starci harness stop
+starci harness stop --json
+```
+
 ## starci kernel
 
 kernel ledger verbs (runtime internals; the Kernel agent's door to the ledger)
@@ -1254,3 +1647,417 @@ starci kernel verify-proofs --repo <path>
 ```
 
 Removed spellings: `starci api verify-proofs`, `node scripts/kernel/cli.mjs verify-proofs`
+
+## starci reconciler
+
+control and inspect the host reconciler engine
+
+### starci reconciler install-task
+
+print or apply the StarCi-Reconciler scheduled task
+
+| flag | type | |
+| --- | --- | --- |
+| `--apply` | boolean |  |
+
+exit: 0 task plan printed or task registered; 1 task registration failed; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler install-task
+starci reconciler install-task --apply
+```
+
+Removed spellings: `node scripts/reconciler/boot.mjs --install-task`
+
+### starci reconciler restart
+
+stop the reconciler engine and ensure a new leader
+
+exit: 0 reconciler restarted; 1 reconciler could not restart; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler restart
+```
+
+Removed spellings: `node scripts/reconciler/boot.mjs --restart`
+
+### starci reconciler start
+
+ensure the reconciler engine has a healthy leader
+
+exit: 0 reconciler healthy or started; 1 reconciler could not start; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler start
+starci reconciler start --json
+```
+
+Removed spellings: `node scripts/reconciler/boot.mjs`, `node scripts/reconciler/boot.mjs ensure`
+
+### starci reconciler status
+
+print reconciler leader, queue, mode and violation status
+
+exit: 0 status printed; 1 status could not be read; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler status
+starci reconciler status --json
+```
+
+Removed spellings: `node scripts/reconciler/boot.mjs --status`
+
+### starci reconciler stop
+
+stop the current reconciler engine leader
+
+exit: 0 reconciler stopped or was not running; 1 reconciler could not be stopped; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler stop
+```
+
+### starci reconciler up
+
+bring the runtime host services and live seats up and print one checklist
+
+| flag | type | |
+| --- | --- | --- |
+| `--check` | boolean |  |
+| `--wait` | number |  |
+| `--no-build` | boolean |  |
+| `--retire-stale-ledgers` | boolean |  |
+| `--set-profile` | enum operational|observe |  |
+
+exit: 0 every required checklist row is green; 1 one or more required checklist rows are red; 2 bad usage
+
+json: flag
+
+```sh
+starci reconciler up
+starci reconciler up --check --json
+```
+
+Removed spellings: `node scripts/reconciler/start.mjs`
+
+## starci runtime
+
+install, update and check the StarCi runtime tree
+
+### starci runtime check
+
+judge the runtime tree — node --check, the runtime HFS check, the retained self-checks
+
+exit: 0 every step passed; 1 a check failed or found error findings; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime check
+```
+
+Removed spellings: `starci check`
+
+### starci runtime doctor
+
+run the installed tree's own specs and report drift against the install manifest
+
+| flag | type | |
+| --- | --- | --- |
+| `--quick` | boolean |  |
+
+exit: 0 every spec passed; 1 a spec failed or the tree drifted; 2 bad usage
+
+json: none
+
+```sh
+starci runtime doctor --cwd <repo> --quick
+```
+
+Removed spellings: `starci doctor`, `npx starci doctor`
+
+### starci runtime install
+
+install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude
+
+| flag | type | |
+| --- | --- | --- |
+| `--force` | boolean |  |
+| `--hosts` | string |  |
+| `--no-bootstrap` | boolean |  |
+
+exit: 0 installed or updated; 1 refusal or error; 2 bad usage
+
+json: none
+
+```sh
+starci runtime install
+starci runtime install --cwd <repo> --hosts claude,devin
+```
+
+Removed spellings: `starci init`, `npx starci init`
+
+### starci runtime status
+
+the runtime's version, tree root and manifest drift — a read-only summary
+
+exit: 0 status printed; 1 the tree has no install manifest or has drifted; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime status
+```
+
+### starci runtime update
+
+bring an installed .claude tree to this package's payload version
+
+| flag | type | |
+| --- | --- | --- |
+| `--force` | boolean |  |
+| `--hosts` | string |  |
+| `--no-bootstrap` | boolean |  |
+
+exit: 0 updated; 1 refusal or error; 2 bad usage
+
+json: none
+
+```sh
+starci runtime update --cwd <repo>
+```
+
+Removed spellings: `starci update`, `npx starci update`
+
+### starci runtime validate
+
+read-only Work record/tree validation — structure, consistency, artifacts, schemas
+
+| flag | type | |
+| --- | --- | --- |
+| `--strict` | boolean |  |
+| `--owned` | list |  |
+
+Positionals: target
+
+exit: 0 clean; 1 refused findings; 2 bad usage or missing target
+
+json: always
+
+```sh
+starci runtime validate .starciwork
+starci runtime validate <work-root> --strict --owned <path>
+```
+
+Removed spellings: `starci validate`
+
+### starci runtime version
+
+print the runtime package version
+
+exit: 0 version printed; 2 bad usage
+
+json: none
+
+```sh
+starci runtime version
+```
+
+Removed spellings: `starci version`, `npx starci version`
+
+## starci supervisor
+
+inspect, start or stop the one StarCi Supervisor seat
+
+### starci supervisor start
+
+enable and start the one long-lived Supervisor seat
+
+| flag | type | |
+| --- | --- | --- |
+| `--plan` | boolean |  |
+| `--reason` | string |  |
+
+exit: 0 supervisor started or already healthy; 1 launch refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor start
+starci supervisor start --plan
+```
+
+Removed spellings: `node scripts/supervisor/start-supervisor.mjs`
+
+### starci supervisor status
+
+print whether the Supervisor seat is enabled and healthy
+
+exit: 0 status printed; 1 status could not be read; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor status
+```
+
+### starci supervisor stop
+
+disable the Supervisor seat, stop its worker and release it
+
+exit: 0 supervisor disabled and stopped; 1 stop or release failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor stop
+```
+
+## starci work
+
+Work records, drawing, brand, layout, grammar and example proof tools
+
+### starci work asset-slot
+
+list or check asset slots in Work records
+
+Positionals: command, target
+
+exit: 0 success; 1 incomplete slots; 2 bad usage
+
+json: flag
+
+```sh
+starci work asset-slot check .starciwork
+```
+
+Removed spellings: `node scripts/work/asset-slot.mjs`
+
+### starci work brand-direction
+
+inspect, ask for, or apply owner review of a brand direction
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--archetype` | string |  |
+| `--lang` | enum en|vi |  |
+| `--receipt` | string |  |
+| `--write` | boolean |  |
+
+Positionals: command
+
+exit: 0 success; 1 review failed; 2 bad usage
+
+json: flag
+
+```sh
+starci work brand-direction status --work .starciwork
+```
+
+Removed spellings: `node scripts/work/brand-direction.mjs`
+
+## starci workflow
+
+workflow lifecycle — define a goal, start its kernel, status, stop
+
+### starci workflow define
+
+define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--project` | string |  |
+| `--text` | string | required |
+| `--title` | string |  |
+| `--display-name` | string |  |
+| `--params` | string |  |
+| `--plan` | boolean |  |
+| `--revise` | string |  |
+| `--reason` | string |  |
+| `--approve-revision` | string |  |
+| `--defined-by` | enum supervisor |  |
+| `--approved-by` | enum supervisor |  |
+| `--bridge-id` | string |  |
+| `--routing-bias` | string |  |
+
+exit: 0 goal queued or revision recorded; 1 refusal; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow define --text "Add password reset"
+starci workflow define --plan --text "Add password reset"
+```
+
+Removed spellings: `starci goal`, `node scripts/goal/define-goal.mjs`
+
+### starci workflow start
+
+claim the oldest queued goal and boot its one long-lived Kernel agent
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--goal` | string |  |
+| `--agent` | string |  |
+| `--launched-by` | enum watchdog|supervisor |  |
+| `--plan` | boolean |  |
+
+exit: 0 kernel booted or already live; 1 refusal or launch failure; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow start
+starci workflow start --repo <path> --goal <workflow_id>
+```
+
+Removed spellings: `starci start`, `node scripts/kernel/start-workflow.mjs`
+
+### starci workflow status
+
+the workflow projection — phase, frontier, leases and pending owner asks
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+
+exit: 0 projection printed; 1 refusal or error; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow status --workflow <id>
+```
+
+### starci workflow stop
+
+stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--reason` | string | required |
+| `--by` | enum owner|supervisor (default owner) |  |
+
+exit: 0 workflow archived; 1 refusal (unsettled reports, unknown workflow); 2 bad usage
+
+json: flag
+
+```sh
+starci workflow stop --workflow <id> --reason "superseded by the redesign"
+```

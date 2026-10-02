@@ -1,0 +1,17 @@
+group: guard
+verb: seat-tools
+owner: runtime
+summary: deny tools forbidden for the bound seat from JSON on stdin
+impl:
+  script: scripts/guards/seat-tools.mjs
+flags: []
+exit:
+  "0": hook decision emitted or the tool allowed
+  "2": bad usage
+json: always
+examples:
+  - starci guard seat-tools
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/guards/seat-tools.mjs

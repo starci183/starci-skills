@@ -61,7 +61,7 @@ test('the operational profile makes job/host/workflow/resource active, an explic
   assert.equal(configuredMode('host', plain), 'off');
   const shadow = profileItems(plain, {})[0];
   assert.equal(shadow.status, 'red');
-  assert.match(shadow.fix, /start\.mjs/);
+  assert.match(shadow.fix, /starci reconciler up --set-profile operational/);
   assert.equal(profileItems(reconcilerConfig({ config: { reconciler: { enabled: true, profile: 'operational' } } }), {})[0].status, 'green');
   assert.deepEqual(REQUIRED_ACTIVE, ['job', 'host', 'workflow', 'resource']);
   assert.equal(PROFILES.observe.job, 'shadow');

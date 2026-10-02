@@ -116,9 +116,6 @@ ruleParams:
       - {path: scripts/kernel/cli.mjs, why: every Kernel and op prompt runs it}
       - {path: scripts/kernel/start-workflow.mjs, why: the start-kernel skill and the bin}
       - {path: scripts/supervisor/start-supervisor.mjs, why: the supervisor seat launch}
-      - {path: scripts/reconciler/boot.mjs, why: the StarCi-Reconciler scheduled task}
-      - {path: scripts/guards/command-guard.mjs, why: the PreToolUse hook written into every lane worktree by scripts/agent/trust.mjs}
-      - {path: scripts/guards/seat-tools.mjs, why: the .claude/settings.json hook}
       - {path: "scripts/api/orca/<call>.mjs", why: the only Orca form agent prose may cite (scripts/checks/check-host-boundary.mjs)}
     # The retained runtime self-checks `starci check` (bin/starci.mjs) runs after the runtime check, in this order.
     selfChecks:

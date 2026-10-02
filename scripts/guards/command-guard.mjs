@@ -498,24 +498,31 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
 
-if (isMain(import.meta.url)) {
+const readInput = (stream) => new Promise((resolve, reject) => {
   let raw = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk) => { raw += chunk; });
-  process.stdin.on('end', async () => {
-    try {
-      // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
-      if (!boundGuard(process.env.ORCA_TERMINAL_HANDLE) && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
-      const decision = await hookDecision(JSON.parse(raw));
-      if (!decision) process.exit(0);
-      const { refusalLines, logRefusal } = await import('./refusals.mjs');
-      const { tool, ...verdict } = decision.verdict;
-      process.stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
-      logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
-      process.exit(2);
-    } catch (e) {
-      process.stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);
-      process.exit(0);
-    }
-  });
+  stream.setEncoding('utf8');
+  stream.on('data', (chunk) => { raw += chunk; });
+  stream.on('end', () => resolve(raw));
+  stream.on('error', reject);
+});
+
+/** The hook entry, exported so the published CLI can dispatch it in-process without a second Node hop. */
+export async function main({ stdin = process.stdin, stderr = process.stderr, env = process.env, root = skillRoot } = {}) {
+  try {
+    const raw = await readInput(stdin);
+    // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
+    if (!boundGuard(env.ORCA_TERMINAL_HANDLE, { root }) && !NAMES_PACKAGE_MANAGER.test(raw)) return 0;
+    const decision = await hookDecision(JSON.parse(raw), { env, root });
+    if (!decision) return 0;
+    const { refusalLines, logRefusal } = await import('./refusals.mjs');
+    const { tool, ...verdict } = decision.verdict;
+    stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
+    logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
+    return 2;
+  } catch (e) {
+    stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);
+    return 0;
+  }
 }
+
+if (isMain(import.meta.url)) process.exitCode = await main();

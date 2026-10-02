@@ -4,17 +4,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { DEFAULT_TUNNEL_TASK, installTunnelTask, tunnelTaskName, tunnelTaskScript } from '../../scripts/reconciler/tunnel-task.mjs';
 
-test('the harness tunnel task runs node ui/start.mjs --tunnel, never the retired run-cloudflared.ps1', () => {
+test('the harness tunnel task runs starci harness start --tunnel', () => {
   // Host paths are built under the temp directory, never spelled with a drive letter (RT_ABSOLUTE_PATH).
-  const node = path.join(os.tmpdir(), 'node', 'node.exe');
-  const workdir = path.join(os.tmpdir(), 'src', '.claude', 'ui');
+  const starci = path.join(os.tmpdir(), '.starci', 'bin', 'starci.cmd');
+  const workdir = path.join(os.tmpdir(), 'src', '.claude');
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const script = tunnelTaskScript({ task: 'StarCi Harness Tunnel', node, workdir });
-  assert.match(script, new RegExp(`"${esc(node)}" "${esc(workdir)}[\\\\/]start\\.mjs" --tunnel`));
+  const script = tunnelTaskScript({ task: 'StarCi Harness Tunnel', starci, workdir });
+  assert.match(script, new RegExp(`\\$starci = '${esc(starci)}'`));
+  assert.match(script, /harness start --tunnel/);
   assert.match(script, new RegExp(`-WorkingDirectory '${esc(workdir)}'`));
   assert.match(script, /Register-ScheduledTask -TaskName 'StarCi Harness Tunnel'/);
   assert.match(script, /-RestartCount 999/);
-  assert.doesNotMatch(script, /run-cloudflared|\.ps1/);
+  assert.doesNotMatch(script, /run-cloudflared|ui[\\/]start\.mjs/);
 });
 
 test('the task name comes from modules/reconciler/host.yaml services.harness-tunnel.task', () => {

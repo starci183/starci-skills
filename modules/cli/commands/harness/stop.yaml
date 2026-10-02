@@ -1,0 +1,19 @@
+group: harness
+verb: stop
+owner: runtime
+summary: stop only harness processes recorded by harness start
+impl:
+  script: ui/start.mjs
+  args: [stop]
+flags: []
+exit:
+  "0": recorded harness processes stopped or were already gone
+  "1": a recorded PID could not be verified or stopped
+  "2": bad usage
+json: flag
+examples:
+  - starci harness stop
+  - starci harness stop --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

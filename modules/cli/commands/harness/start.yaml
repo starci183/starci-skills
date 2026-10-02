@@ -1,0 +1,24 @@
+group: harness
+verb: start
+owner: runtime
+summary: start the harness API and UI or its named tunnel
+impl:
+  script: ui/start.mjs
+  args: [start]
+flags:
+  - name: tunnel
+    type: boolean
+    summary: run the named Cloudflare tunnel instead of the local API and UI
+exit:
+  "0": harness ran until stopped
+  "1": a harness child failed
+  "2": bad usage
+json: none
+examples:
+  - starci harness start
+  - starci harness start --tunnel
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node ui/start.mjs
+  - node ui/start.mjs --tunnel

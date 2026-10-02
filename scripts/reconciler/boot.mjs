@@ -1,6 +1,6 @@
 // scripts/reconciler/boot.mjs — the ONE way into the reconciler (DESIGN §7.7, §7.8).
 //
-//   node scripts/reconciler/boot.mjs [ensure]           a fresh leader heartbeat (< allocation.reconciler.heartbeatStaleMs)
+//   starci reconciler start                             a fresh leader heartbeat (< allocation.reconciler.heartbeatStaleMs)
 //                                                       -> exit 0; a draining engine or a running fleet:push inside
 //                                                       DRAIN_GRACE_MS -> left alone (MB-04); else stop a hung engine (alive, stale;
 //                                                       its process_runs row ends killed by boot-ensure, its leader_history
@@ -9,18 +9,19 @@
 //                                                       spawn is a `reconciler.engine-spawned` row). Crash-loop guard: more
 //                                                       than crashLoop.max spawns in crashLoop.windowMs -> ONE direct
 //                                                       Telegram (stall-alert.mjs ownerPush) and the engine starts --safe.
-//   node scripts/reconciler/boot.mjs --restart          stop the engine (if any), then ensure
-//   node scripts/reconciler/boot.mjs --status [--json]  leader, epoch, heartbeat age, modes, queue depth, open violations
-//   node scripts/reconciler/boot.mjs up [start.mjs flags]  the `start` skill: bring everything up and print one checklist (start.mjs)
-//   node scripts/reconciler/boot.mjs --install-task [--apply]
+//   starci reconciler stop                              stop the engine (if any)
+//   starci reconciler restart                           stop the engine (if any), then ensure
+//   starci reconciler status [--json]                   leader, epoch, heartbeat age, modes, queue depth, open violations
+//   starci reconciler up [flags]                        bring everything up and print one checklist (start.mjs)
+//   starci reconciler install-task [--apply]
 //                                                       print (default) or create the task StarCi-Reconciler: at logon and
 //                                                       every 5 minutes, conhost --headless, IgnoreNew, below-normal. Only
 //                                                       the owner or the coordinator runs --apply.
 import '../api/process/hide-child-windows.mjs';
+import os from 'node:os';
 import path from 'node:path';
 import { runPowershell } from '../api/process/run-powershell.mjs';
 import { spawnNode } from '../api/node/spawn-node.mjs';
-import { fileURLToPath } from 'node:url';
 import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs';
 import { stopTree } from '../supervisor/host-health.mjs';
@@ -33,13 +34,15 @@ import { isMain } from '../lib/is-main.mjs';
 export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export const TASK_NAME = 'StarCi-Reconciler';
 export const TASK_EVERY_MINUTES = 5;
+/** The one per-user launcher written by `starci runtime install`. */
+export const starciShimPath = ({ home = os.homedir(), platform = process.platform } = {}) =>
+  path.join(home, '.starci', 'bin', platform === 'win32' ? 'starci.cmd' : 'starci');
 /**
  * MB-04: a draining engine (reload handover) or one whose fleet:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
  * means a blocked event loop: then ensure stops it. 35 min > the fleet:push child's 30 min timeout (fleet.mjs PUSH_RUN_TIMEOUT_MS).
  */
 export const DRAIN_GRACE_MS = 35 * 60_000;
-const selfFile = fileURLToPath(import.meta.url);
 
 /** Kinds of the machine_logs rows boot.mjs writes (actor reconciler). */
 export const SPAWNED_KIND = 'reconciler.engine-spawned';
@@ -188,6 +191,25 @@ export async function restartEngine({ env = process.env, reason = 'owner-restart
   return ensure({ env, leader: () => ({ ...leaderState({ env }), fresh: false }), lock: () => null, starting: () => null, reason, ...seams });
 }
 
+/** Owner stop: stop only the live PID named by the reconciler lock or leader, then settle its machine rows. */
+export function stopEngine({ env = process.env, stop = (pid) => stopTree(pid), alive = pidAlive,
+  leader = () => leaderState({ env }), lock = () => lockHolder('reconciler', env), record = (fn) => recordBoot(fn, { env }) } = {}) {
+  const l = leader();
+  const held = lock();
+  const candidates = [...new Set([held?.pid, l?.pid].filter((pid) => Number.isInteger(pid) && pid > 0))];
+  const live = candidates.filter((pid) => alive(pid));
+  if (!live.length) return { ok: true, action: 'not-running', stopped: [] };
+  const stopped = live.map((pid) => ({ pid, ...stop(pid) }));
+  const killed = stopped.filter((item) => item.ok).map((item) => item.pid);
+  if (killed.length) record((m) => m.transaction(() => {
+    for (const run of m.openProcessRuns({ role: 'engine' }).filter((row) => killed.includes(row.pid)))
+      m.endProcessRun(run.run_id, { exitReason: 'stopped', killedBy: 'owner' });
+    const row = m.leaderOf(LEADER_NAME);
+    if (row && killed.includes(row.pid)) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'stopped' });
+  }));
+  return { ok: stopped.every((item) => item.ok), action: stopped.every((item) => item.ok) ? 'stopped' : 'stop-failed', stopped };
+}
+
 /** --status: {leader, modes: {name: {configured, effective, setBy}}, queue, violations, actions, starts24h, usage (token meter), stateFile}. */
 export function status({ env = process.env, now = Date.now(), numbers = reconcilerNumbers(), config = reconcilerConfig() } = {}) {
   const out = { ok: true, stateFile: machineFileFor(env), leader: leaderState({ env, now, numbers }), enabled: config.enabled, modes: {}, queue: {}, queueDepth: 0,
@@ -232,13 +254,15 @@ const describeStatus = (s) => {
   return lines.join('\n');
 };
 
-/** The PowerShell that registers StarCi-Reconciler (install-tick-task.ps1 pattern). Pure. */
-export function taskScript({ node = process.execPath, script = selfFile, workdir = SKILL_ROOT, every = TASK_EVERY_MINUTES } = {}) {
+/** The PowerShell that registers StarCi-Reconciler through the per-user starci shim. Pure. */
+export function taskScript({ starci = starciShimPath(), workdir = SKILL_ROOT, every = TASK_EVERY_MINUTES } = {}) {
   const q = (s) => String(s).replace(/'/g, "''");
   return [
     "$ErrorActionPreference = 'Stop'",
     "$conhost = Join-Path $env:SystemRoot 'System32\\conhost.exe'",
-    `$argLine = '--headless "${q(node)}" "${q(script)}" ensure'`,
+    "$cmd = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
+    `$starci = '${q(starci)}'`,
+    `$argLine = '--headless "' + $cmd + '" /d /s /c ""' + $starci + '" reconciler start"'`,
     `$action = New-ScheduledTaskAction -Execute $conhost -Argument $argLine -WorkingDirectory '${q(workdir)}'`,
     '$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name',
     `$every = New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes ${every})`,
@@ -246,7 +270,7 @@ export function taskScript({ node = process.execPath, script = selfFile, workdir
     '$logon.Repetition = $every.Repetition',
     "$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -Priority 7 -ExecutionTimeLimit (New-TimeSpan -Minutes 4) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden",
     '$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited',
-    `$task = Register-ScheduledTask -TaskName '${TASK_NAME}' -Action $action -Trigger @($logon, $every) -Settings $settings -Principal $principal -Description 'StarCi reconciler: boot.mjs ensure (DESIGN 7.7)' -Force`,
+    `$task = Register-ScheduledTask -TaskName '${TASK_NAME}' -Action $action -Trigger @($logon, $every) -Settings $settings -Principal $principal -Description 'StarCi reconciler: starci reconciler start (DESIGN 7.7)' -Force`,
     `Write-Output ("registered {0}: at logon and every ${every} minutes -> {1} {2}" -f $task.TaskName, $conhost, $argLine)`,
   ].join('\n');
 }
@@ -265,7 +289,7 @@ function installTask({ apply, json }) {
   if (!out.ok) process.exitCode = 1;
 }
 
-async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2)) {
   const json = argv.includes('--json');
   if (argv.includes('--status')) {
     const s = status();
@@ -274,6 +298,12 @@ async function main(argv = process.argv.slice(2)) {
   }
   if (argv.includes('--up') || argv[0] === 'up') { const { main: start } = await import('./start.mjs'); await start(argv.filter((a) => a !== '--up' && a !== 'up')); return; }
   if (argv.includes('--install-task')) { installTask({ apply: argv.includes('--apply'), json }); return; }
+  if (argv.includes('--stop')) {
+    const r = stopEngine();
+    console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${r.stopped.length ? ` pid ${r.stopped.map((item) => item.pid).join(', ')}` : ''}`);
+    process.exitCode = r.ok ? 0 : 1;
+    return;
+  }
   if (argv.includes('--restart')) {
     const r = await restartEngine();
     console.log(json ? JSON.stringify(r) : `[reconciler boot] restart: ${r.action} pid ${r.pid ?? '-'}${r.safe ? ' SAFE' : ''}`);

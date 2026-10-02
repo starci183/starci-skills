@@ -1,0 +1,21 @@
+group: reconciler
+verb: start
+owner: runtime
+summary: ensure the reconciler engine has a healthy leader
+impl:
+  script: scripts/reconciler/boot.mjs
+  args: [ensure]
+flags: []
+exit:
+  "0": reconciler healthy or started
+  "1": reconciler could not start
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler start
+  - starci reconciler start --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/boot.mjs
+  - node scripts/reconciler/boot.mjs ensure

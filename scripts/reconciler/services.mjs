@@ -41,6 +41,7 @@ export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
 export const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
 export const RECONCILER_TASK = 'StarCi-Reconciler';
+const starciLauncher = () => path.join(os.homedir(), '.starci', 'bin', process.platform === 'win32' ? 'starci.cmd' : 'starci');
 
 /* ------------------------------------------------------------ settings */
 
@@ -242,7 +243,7 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
         const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run });
         return t.exists || settings.allowTaskRepair ? t : { ...t, unmanaged: true };
       },
-      start: () => ({ cmd: 'node', args: ['scripts/reconciler/boot.mjs', '--install-task', '--apply', '--json'] }) }),
+      start: () => ({ cmd: starciLauncher(), args: ['reconciler', 'install-task', '--apply', '--json'] }) }),
   ];
   for (const c of settings.checkers) {
     out.push({ name: `checker:${c.name}`, kind: 'checker', restart: false, ownerPath: false, ...c, start: () => null,
@@ -445,7 +446,7 @@ export async function startService(name, { settings = hostSettings(), ports = se
       return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
-      const task = s.task; // what harness-tunnel's task runs is registered by tunnel-task.mjs (node ui/start.mjs --tunnel)
+      const task = s.task; // tunnel-task.mjs registers `starci harness start --tunnel` as the harness-tunnel action
       tasks(['/End', '/TN', task]);
       if (name === 'harness-ui' && ports.harnessPort) {
         // A listener that holds the port but does not answer blocks the new server: stop it first.

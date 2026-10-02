@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // verify-commit.mjs — the history hook's op half (scripts/guards/hook-install.mjs historyHookBody):
 //
-//   STARCI_GUARD_FILE=<guard> node verify-commit.mjs <old> <new>
+//   STARCI_GUARD_FILE=<guard> starci guard verify-commit <old> <new>
 //
 // The commits a protected-branch update brings carry only the op's owned paths. The hook names the op's guard (the
 // file bound to its Orca terminal, <guards root>/terminals/<handle>.json) in STARCI_GUARD_FILE for this one call.
@@ -58,8 +58,10 @@ export function verifyCommit(oldSha, newSha, guard, { cwd = process.cwd() } = {}
   return 3;
 }
 
-if (isMain(import.meta.url)) {
-  const [oldSha, newSha] = process.argv.slice(2);
-  const guard = process.env.STARCI_GUARD_FILE ? readJsonFile(process.env.STARCI_GUARD_FILE) : null;
-  process.exit(verifyCommit(oldSha, newSha, guard));
+export function main(argv = process.argv.slice(2), { env = process.env, cwd = process.cwd() } = {}) {
+  const [oldSha, newSha] = argv;
+  const guard = env.STARCI_GUARD_FILE ? readJsonFile(env.STARCI_GUARD_FILE) : null;
+  return verifyCommit(oldSha, newSha, guard, { cwd });
 }
+
+if (isMain(import.meta.url)) process.exitCode = main();

@@ -13,7 +13,7 @@
 // worker-footprint, subject the root, detail {state, fresh}); the newest row's state is what the next scan compares
 // against. Nothing is removed or changed - the Supervisor decides.
 //
-//   node scripts/guards/footprint-scan.mjs [--root <dir>] [--depth <n>] [--json]      one scan
+//   starci guard footprint-scan [--root <dir>] [--depth <n>] [--json]      one scan
 //   The reconciler Host controller runs it every host.yaml footprintEveryMs (scripts/reconciler/controllers/host.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,10 +103,12 @@ export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultR
   }, { env });
 }
 
-if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
+export async function main(argv = process.argv.slice(2), { stdout = process.stdout } = {}) {
   const value = (name) => { const index = argv.indexOf(`--${name}`); return index >= 0 ? argv[index + 1] : null; };
   const result = await runFootprintScan({ ...(value('root') ? { root: value('root') } : {}), ...(value('depth') ? { depth: Number(value('depth')) } : {}) });
-  if (argv.includes('--json')) process.stdout.write(`${JSON.stringify({ root: result.root, at: result.at, links: result.links, worktrees: result.worktrees, fresh: result.fresh }, null, 1)}\n`);
-  else if (!argv.includes('--quiet')) process.stdout.write(`footprint: ${result.links.length} cross-repo link(s), ${result.worktrees.length} worktree(s) under ${result.root}; ${result.fresh.length} fresh\n`);
+  if (argv.includes('--json')) stdout.write(`${JSON.stringify({ root: result.root, at: result.at, links: result.links, worktrees: result.worktrees, fresh: result.fresh }, null, 1)}\n`);
+  else if (!argv.includes('--quiet')) stdout.write(`footprint: ${result.links.length} cross-repo link(s), ${result.worktrees.length} worktree(s) under ${result.root}; ${result.fresh.length} fresh\n`);
+  return 0;
 }
+
+if (isMain(import.meta.url)) process.exitCode = await main();

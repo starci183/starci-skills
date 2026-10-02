@@ -1,0 +1,19 @@
+group: harness
+verb: status
+owner: runtime
+summary: report whether the harness health endpoint is up
+impl:
+  script: ui/start.mjs
+  args: [status]
+flags: []
+exit:
+  "0": harness is healthy
+  "1": harness is down or its probe failed
+  "2": bad usage
+json: flag
+examples:
+  - starci harness status
+  - starci harness status --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

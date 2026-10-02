@@ -5,9 +5,13 @@ _starci() {
   groups=(
     'app:product application scaffolding, checks, managed output and local test infrastructure'
     'debug:run a fixed read-only inspector against the StarCi runtime'
+    'guard:enforce StarCi tool, history and host-footprint safety guards'
+    'harness:start, stop, inspect or open the local StarCi harness'
     'kernel:kernel ledger verbs (runtime internals; the Kernel agents door to the ledger)'
+    'reconciler:control and inspect the host reconciler engine'
     'runtime:install, update and check the StarCi runtime tree'
     'supervisor:inspect, start or stop the one StarCi Supervisor seat'
+    'work:Work records, drawing, brand, layout, grammar and example proof tools'
     'workflow:workflow lifecycle — define a goal, start its kernel, status, stop'
   )
   if (( CURRENT == 2 )); then
@@ -16,9 +20,13 @@ _starci() {
     case "$words[2]" in
             app) _values 'verbs' 'add[]' 'check[]' 'emit[]' 'explain[]' 'hygiene[]' 'lint[]' 'new[]' 'scaffold[]' 'secret[]' 'stack[]' 'sync[]' 'upgrade[]' ;;
             debug) _values 'verbs' 'run[]' ;;
+            guard) _values 'verbs' 'command[]' 'footprint-scan[]' 'seat-tools[]' 'verify-commit[]' ;;
+            harness) _values 'verbs' 'open[]' 'start[]' 'status[]' 'stop[]' ;;
             kernel) _values 'verbs' 'archive[]' 'artifacts[]' 'autopilot[]' 'consume-report[]' 'contract-release[]' 'coverage[]' 'cut-seam[]' 'decide[]' 'decisions[]' 'dispatch[]' 'dispatch-ready[]' 'enqueue[]' 'estimate[]' 'extensions[]' 'finish[]' 'foundation[]' 'foundations[]' 'graph-edit[]' 'hierarchy[]' 'inbox[]' 'incident[]' 'kernel-ack-rev[]' 'kernel-proposal[]' 'lifecycle[]' 'log[]' 'logs[]' 'messages[]' 'notify[]' 'nudge[]' 'observe[]' 'op-contract[]' 'op-override[]' 'peers[]' 'plan[]' 'provider-backoff[]' 'provider-health[]' 'questions[]' 'reconcile[]' 'record-change[]' 'record-checks[]' 'redesign[]' 'rename[]' 'reply[]' 'report[]' 'retire-ask[]' 'route[]' 'run-deferred-tests[]' 'serve-ask[]' 'settle[]' 'settle-tail[]' 'status[]' 'survey[]' 'unit[]' 'usage[]' 'verify-proofs[]' ;;
+            reconciler) _values 'verbs' 'install-task[]' 'restart[]' 'start[]' 'status[]' 'stop[]' 'up[]' ;;
             runtime) _values 'verbs' 'check[]' 'doctor[]' 'install[]' 'status[]' 'update[]' 'validate[]' 'version[]' ;;
             supervisor) _values 'verbs' 'start[]' 'status[]' 'stop[]' ;;
+            work) _values 'verbs' 'asset-slot[]' 'brand-direction[]' ;;
             workflow) _values 'verbs' 'define[]' 'start[]' 'status[]' 'stop[]' ;;
     esac
   else

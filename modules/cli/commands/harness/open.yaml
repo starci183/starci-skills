@@ -1,0 +1,18 @@
+group: harness
+verb: open
+owner: runtime
+summary: open the local harness URL in the default browser
+impl:
+  script: ui/start.mjs
+  args: [open]
+flags: []
+exit:
+  "0": browser open requested
+  "1": the browser could not be opened
+  "2": bad usage
+json: none
+examples:
+  - starci harness open
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []
