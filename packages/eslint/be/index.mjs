@@ -27,6 +27,8 @@ import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
 import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
 import { recommended as eventBusRecommended, rules as eventBusRules } from "./event-bus.mjs"
+import { recommended as jobsRecommended, rules as jobsRules } from "./jobs.mjs"
+import { recommended as projectionsRecommended, rules as projectionsRules } from "./projections.mjs"
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
 import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as idempotencyRecommended, rules as idempotencyRules } from "./idempotency.mjs"
@@ -70,6 +72,8 @@ const CONTRIBUTIONS = [
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
     { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },
     { law: "event-bus", rules: eventBusRules, recommended: eventBusRecommended },
+    { law: "jobs", rules: jobsRules, recommended: jobsRecommended },
+    { law: "projections", rules: projectionsRules, recommended: projectionsRecommended },
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
     { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "idempotency", rules: idempotencyRules, recommended: idempotencyRecommended },

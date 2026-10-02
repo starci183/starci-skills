@@ -1,4 +1,4 @@
-// saga.mjs - the saga pattern of a product that declares `patterns: ["saga"]` in hfs.json (R143 to R147). A saga is a feature folder
+// saga.mjs - the saga pattern of a product that declares `patterns: ["saga"]` in hfs.json (R149 to R153). A saga is a feature folder
 //   be/src/features/<feature>/saga/
 //     <saga>.saga.service.ts              the orchestrator: the list of its steps and compensations (a service, unit-tested beside it)
 //     <saga>.saga-state.ts                the persisted state of a run, typed with its `status` and its `version` fence
@@ -7,13 +7,13 @@
 //   be/src/features/<feature>/transport/message/<event>.consumer.ts   the consumers that advance it, through the inbox
 //   be/contracts/<service>/events.json   every event, a compensating one declaring `compensates: "<step event>"`
 // Five tree checks (the slot manifest owns the paths: an undeclared saga folder is HFS_SLOT_NOT_ENABLED):
-//   R143 BE_SAGA_STEP_COMPENSATION  every step has a compensation of the same name and the other way round, and the orchestrator imports them all;
-//   R144 BE_SAGA_STATE_VERSIONED    every orchestrator has its `.saga-state.ts` whose exported state type carries `status` and a numeric `version`,
+//   R149 BE_SAGA_STEP_COMPENSATION  every step has a compensation of the same name and the other way round, and the orchestrator imports them all;
+//   R150 BE_SAGA_STATE_VERSIONED    every orchestrator has its `.saga-state.ts` whose exported state type carries `status` and a numeric `version`,
 //                                   and imports the fenced store of `platform/saga`;
-//   R145 BE_SAGA_EVENT_CONTRACT     a step and a compensation each name their event (`readonly event = "<name>"`), both are in a contract, and the
+//   R151 BE_SAGA_EVENT_CONTRACT     a step and a compensation each name their event (`readonly event = "<name>"`), both are in a contract, and the
 //                                   contract of the compensation's event says it compensates the step's event;
-//   R146 BE_SAGA_CONSUMER_DEDUPE    a consumer of a saga feature passes the id of the delivery (`message.eventId`) on to the command, so the inbox can dedupe it;
-//   R147 BE_SAGA_E2E_MISSING        every compensation path has an e2e spec through the world that names its event and injects a failure
+//   R152 BE_SAGA_CONSUMER_DEDUPE    a consumer of a saga feature passes the id of the delivery (`message.eventId`) on to the command, so the inbox can dedupe it;
+//   R153 BE_SAGA_E2E_MISSING        every compensation path has an e2e spec through the world that names its event and injects a failure
 //                                   (an outage of an infra service, an app or a fake: `during`, `cut`, `latency`, `failNext`, `interruptDatabase`).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,7 +95,7 @@ function readsEventId(ts, sourceFile) {
 /** The sagas of the app: every feature that holds a `saga/` folder. */
 const featuresOf = (files) => [...new Set(files.map((file) => SAGA_FILE.exec(file)?.[1]).filter((feature) => feature !== undefined))].sort();
 
-/** Findings of R143 to R147 over the tracked paths `files` of the app at `repoRoot`. */
+/** Findings of R149 to R153 over the tracked paths `files` of the app at `repoRoot`. */
 export function sagaFindings({ repoRoot, files }) {
   const features = featuresOf(files);
   if (features.length === 0) return [];
@@ -115,7 +115,7 @@ export function sagaFindings({ repoRoot, files }) {
     const orchestrators = under(ORCHESTRATOR);
     const states = new Map(under(STATE).map((file) => [STATE.exec(file)[2], file]));
     const folder = `be/src/features/${feature}/saga/`;
-    // R143
+    // R149
     for (const [stem, file] of steps) if (!compensations.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a saga step with no compensation: add ${folder}compensations/${stem}.compensation.ts, the command that undoes it; every forward step of a saga has one.`, { step: stem }));
     for (const [stem, file] of compensations) if (!steps.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a compensation of no step: ${folder}steps/${stem}.step.ts does not exist; a compensation undoes the step of the same name.`, { step: stem }));
     if (orchestrators.length === 0 && (steps.size > 0 || compensations.size > 0)) findings.push(found(SAGA_STEP_COMPENSATION, folder, `${folder} holds steps or compensations but no orchestrator: add <saga>.saga.service.ts, the list of the steps and their compensations.`));
@@ -127,7 +127,7 @@ export function sagaFindings({ repoRoot, files }) {
       for (const file of [...steps.values(), ...compensations.values()]) {
         if (!imported.includes(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
       }
-      // R144
+      // R150
       const stem = ORCHESTRATOR.exec(orchestrator)[2];
       const stateFile = states.get(stem);
       if (stateFile === undefined) findings.push(found(SAGA_STATE_VERSIONED, orchestrator, `${orchestrator} has no ${folder}${stem}.saga-state.ts: the persisted state of a run is typed there, with its status and its version fence.`, { saga: stem }));
@@ -137,7 +137,7 @@ export function sagaFindings({ repoRoot, files }) {
       const text = readText(repoRoot, file);
       if (text !== null && !statesVersion(ts, parse(ts, text))) findings.push(found(SAGA_STATE_VERSIONED, file, `${file} exports no state type with a \`status\` and a \`version: number\`; a saga run is persisted with a version, the fence that stops a zombie delivery from moving it twice.`, { saga: stem }));
     }
-    // R145
+    // R151
     const eventOfFile = new Map();
     for (const [kind, map] of [['step', steps], ['compensation', compensations]]) {
       for (const [stem, file] of map) {
@@ -156,13 +156,13 @@ export function sagaFindings({ repoRoot, files }) {
       }
       if (compensationEvent) compensationPaths.push({ file, stem, event: compensationEvent });
     }
-    // R146
+    // R152
     for (const file of under(CONSUMER)) {
       const text = readText(repoRoot, file);
       if (text !== null && !readsEventId(ts, parse(ts, text))) findings.push(found(SAGA_CONSUMER_DEDUPE, file, `${file} is a consumer of the saga feature ${feature} but never passes the id of the delivery on (\`message.eventId\`); the saga takes every event through the inbox, so the consumer hands the id to its command.`, { feature }));
     }
   }
-  // R147
+  // R153
   for (const { file, stem, event } of compensationPaths) {
     const named = specs.filter(({ text }) => text.includes(event));
     const expected = `be/src/tests/e2e/<area>/<name>.e2e-spec.ts`;

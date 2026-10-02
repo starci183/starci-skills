@@ -29,7 +29,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
-import { declaredSlotEnabled, optionalSlotProblems, patternShapeProblem } from './declaration-slots.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -187,8 +187,7 @@ function manifestShapeProblems(m) {
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
     if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 8) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper} and patternScenarios');
-    const scenarios = rp.be.patternScenarios;
-    if (!isPlainObject(scenarios) || !Object.entries(scenarios).every(([name, list]) => /^[a-z][a-z0-9-]*$/.test(name) && Array.isArray(list) && list.length > 0 && list.every((id) => /^[a-z][a-z0-9-]*$/.test(String(id))) && new Set(list).size === list.length)) bad.push('ruleParams.be.patternScenarios must map a pattern name to a non-empty list of unique kebab-case scenario ids');
+    bad.push(...scenarioProblem(rp.be.patternScenarios));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
@@ -228,8 +227,7 @@ function manifestSemanticProblems(m) {
         const tiers = m.tiers[profile];
         if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
         if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
-        if (slot.trigger !== undefined && !(m.triggerKinds ?? []).includes(slot.trigger)) bad.push(`slot ${slot.id}: trigger ${slot.trigger} is not one of triggerKinds`);
-        if (slot.trigger !== undefined && slot.tier !== 'feature') bad.push(`slot ${slot.id}: a trigger belongs to a feature-tier slot`);
+        bad.push(...triggerProblems(slot, m.triggerKinds));
       }
       if (slot.appKind === undefined) {
         for (const variant of braceVariants(slot.path)) {
@@ -318,12 +316,10 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    const patternProblem = patternShapeProblem(s, at, NAME);
-    if (patternProblem !== null) bad.push(patternProblem);
+    bad.push(...patternShapeProblems(s, at, NAME));
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      // One bounded context = one entry (R84, R148): {name, envPrefix, owner, isolation}; names and env prefixes unique, no prefix inside another's keys.
       const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
       if (shape.length) bad.push(...shape);
       else {

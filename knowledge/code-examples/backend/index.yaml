@@ -16,3 +16,9 @@ examples:
   - id: queue
     path: queue
     title: A typed queue producer called inside the domain transaction
+  - id: fenced-job
+    path: fenced-job
+    title: A fenced background job - claim, guarded writes and a run key
+  - id: projection
+    path: projection
+    title: A projection kept current by a reactor

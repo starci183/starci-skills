@@ -112,8 +112,8 @@ topics:
   - id: be.background
     title: Background work
     path: background.yaml
-    decides: Jobs and consumers as transports, worker apps, runners for every sweep, producers through the bus or a typed queue, lease and fencing
-    rules: BE-BACKGROUND-1 … BE-BACKGROUND-5
+    decides: Jobs and consumers as transports, worker apps, runners for every sweep, producers through the bus or a typed queue
+    rules: BE-BACKGROUND-1 … BE-BACKGROUND-4
   - id: be.event-bus
     title: Event bus
     path: event-bus.yaml
@@ -124,6 +124,21 @@ topics:
     path: queues.yaml
     decides: Typed queue producers that write the outbox in the caller's transaction, the BullMQ owner and relay, job schedulers instead of cron
     rules: BE-QUEUES-1 … BE-QUEUES-4
+  - id: be.jobs
+    title: Fenced background jobs
+    path: jobs.yaml
+    decides: The job row with one owner and one atomic claim, the required expectedFencingToken in the type, the run key of an external effect, the processor and steps shape
+    rules: BE-JOBS-1 … BE-JOBS-5
+  - id: be.projections
+    title: Projections (read models)
+    path: projections.yaml
+    decides: Read models that replace cross-context joins, one writer per table, recompute and get, replay
+    rules: BE-PROJECTIONS-1 … BE-PROJECTIONS-4
+  - id: be.reactors
+    title: Reactors
+    path: reactors.yaml
+    decides: Features that consume events of another context and keep a local copy or trigger a projection, thin doors, no cross-kind imports
+    rules: BE-REACTORS-1 … BE-REACTORS-4
   - id: be.messages
     title: Messages catalog and locale
     path: messages.yaml

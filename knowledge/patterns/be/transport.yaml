@@ -105,9 +105,9 @@ rules:
       REST is only for signed webhooks, OAuth redirects and callbacks, health and readiness, and byte streams:
       `transport/http/<action>.controller.ts`, DTOs `dto/<action>.{request,response}.ts`, versioned routes, no `@Res()`
       passthrough except a byte stream. WebSocket: `transport/websocket/<channel>.gateway.ts`, the handshake authenticated by
-      `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Schedule:
-      `transport/schedule/<job>.job.ts` (background.yaml). Message: `transport/message/<event>.consumer.ts`
-      (background.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
+      `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Jobs:
+      `features/jobs/<job>/<job>.processor.ts` (jobs.yaml). Message: `transport/message/<event>.consumer.ts`
+      (event-bus.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
       kind `cli`.
     rationale: |-
       Each protocol has one place and one shape, so an app composes exactly the transports it serves.

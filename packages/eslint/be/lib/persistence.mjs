@@ -6,6 +6,7 @@
  * `typeorm`'s; a file is the database capability's because the HFS slot manifest says so.
  */
 import { normalizePath } from "./path.mjs"
+import { ownerNameOf } from "./ports.mjs"
 import { typeOrigins } from "./types.mjs"
 
 /** The `typeorm` types a class must never receive except through the platform database capability. */
@@ -113,11 +114,11 @@ export const connectionFileOf = (hfs, file, role) => {
     return connectionsOf(hfs).find((connection) => connection.name === name) ?? null
 }
 
-/** The platform capabilities that own a `persistence/` and so may hold an `EntityManager`. */
-const PERSISTENCE_CAPABILITIES = ["database", "inbox", "outbox", "lease", "saga", "event-bus"]
+/** The platform capabilities that own a `persistence/` and so may hold an `EntityManager` (a pattern capability is named by its folder). */
+const PERSISTENCE_CAPABILITIES = ["database", "inbox", "event-bus", "queue", "jobs", "saga"]
 
 /**
- * Whether a class in this file may receive an `EntityManager`: an application handler, a domain service, a platform persistence capability.
+ * Whether a class in this file may receive an `EntityManager`: an application handler, a domain service, a projection, a platform persistence capability.
  *
  * @param {object} hfs - The HFS view of the repository.
  * @param {string} file - A file path.
@@ -128,7 +129,8 @@ export const mayHoldEntityManager = (hfs, file) => {
     const base = baseNameOf(file)
     if (found.slot === "be.feature.application") return base.endsWith(".handler.ts")
     if (found.slot === "be.domain") return base.endsWith(".service.ts")
-    return found.slot === "be.platform" && PERSISTENCE_CAPABILITIES.includes(found.bindings?.capability)
+    if (found.slot === "be.projections") return base.endsWith(".projection.ts")
+    return typeof found.slot === "string" && found.slot.startsWith("be.platform") && PERSISTENCE_CAPABILITIES.includes(ownerNameOf(hfs, file))
 }
 
 /**

@@ -25,8 +25,8 @@ const GRAPHQL_OPERATIONS = ["Query", "Mutation", "Subscription", "ResolveField"]
 /** The slot of REST doors. */
 const HTTP_SLOT = "be.transport.http"
 
-/** Slots whose classes are entered through a method the framework calls on a schedule, a queue or a command line. */
-const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.transport.schedule", "be.feature.transport.cli"])
+/** Slots whose classes are entered through a method the framework calls on a queue or a command line. */
+const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.feature.transport.cli"])
 
 /** True for the decorators that make a method a transport handler. */
 const isRouteDecorator = (context, decorator) => {
