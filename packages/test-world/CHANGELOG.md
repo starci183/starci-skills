@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.0 - 2026-10-02
+
+- Added: Kafka as real own infrastructure, Apache Kafka in KRaft mode only. The stack definition must name exactly
+  `apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69` (`KAFKA_IMAGE`, the one pin
+  shared with the dev stacks); Redpanda, cp-kafka and an undigested tag fail with `TEST_WORLD_STACK_DEFINITION`, and
+  `stacks.kafka` can never be `fakedBy`.
+- Added: per-slot Kafka. The broker has 8 slot listeners, each advertising its own toxiproxy port; a slot leases one
+  (`RunKafka.listener`), so `world.infra.kafka.cut()` reaches its slot alone (the stack-wide Kafka proxy exception is gone).
+  Topics, consumer groups and client ids of a slot begin with `<namespace>.`: `w.kafka.group(name)`, `w.kafka.clientId(name)`.
+  Readiness is the topics script on the INTERNAL listener plus an ApiVersions round trip through the slot's proxy (no Kafka
+  client dependency). Before each file the slot's topics are emptied up to the high watermark and its idle groups deleted;
+  teardown deletes only the slot's groups (waiting out a dead member's session timeout, then failing by name) and topics.
+- Added: schema-per-context Postgres. A connection may name a shared `database` and its `schema`: the connections of one
+  database share it (one copy per slot), each in its own schema with its own login role (`search_path` = the schema).
+  `w.db.<name>.schema`; reset empties only the context's schema; `infra.postgresql.connection(name).cut()` of a schema context
+  stops its login only (`NOLOGIN`), so the contexts beside it keep serving. Contexts sharing a database must each declare a
+  distinct schema (never `public` or `pg_*`).
+- Changed: extensions are created in `public` of each database.
+
 ## 1.1.0 - 2026-10-02
 
 - Added: per-worker data slots, so world spec files run in parallel. The globalSetup provisions N slots, N = min(jest

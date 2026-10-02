@@ -46,7 +46,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
 })
 ```
 
-`w` (the wiring) carries every URL of the run, built before any app boots: `w.apps.<name>.{url,port}` (ports are reserved first, so apps that call each other know each other), `w.db.<conn>.{url,host,port,user,password,database}`, `w.redis`, `w.minio`, `w.qdrant`, `w.kafka`, `w.keycloak.{baseUrl,realm,issuer,tokenUrl,jwksUrl,clientId,clientSecret(client)}` (every confidential client of the realm file gets a secret generated per run; the file never carries one), `w.fake.<name>.{url,port,values,endpoints}`, `w.services`, `w.cluster`, `w.directory(name)`, `w.secret(label)`. A service the declaration does not run throws `TEST_WORLD_NOT_DECLARED` when read.
+`w` (the wiring) carries every URL of the run, built before any app boots: `w.apps.<name>.{url,port}` (ports are reserved first, so apps that call each other know each other), `w.db.<conn>.{url,host,port,user,password,database,schema}`, `w.redis`, `w.minio`, `w.qdrant`, `w.kafka.{brokers,topic(name),group(name),clientId(name)}` (every topic, consumer group and client id of an app under test comes from here, so it is the slot's), `w.keycloak.{baseUrl,realm,issuer,tokenUrl,jwksUrl,clientId,clientSecret(client)}` (every confidential client of the realm file gets a secret generated per run; the file never carries one), `w.fake.<name>.{url,port,values,endpoints}`, `w.services`, `w.cluster`, `w.directory(name)`, `w.secret(label)`. A service the declaration does not run throws `TEST_WORLD_NOT_DECLARED` when read.
 
 ## The spec-facing API (frozen)
 
@@ -79,7 +79,7 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 
 `starci-test-stack up|down|status` (the managed `npm run test:stack -- up`). The globalSetup attaches to the stack or starts it. Containers are keyed by image (`starci-ts-<service>-<hash of image>`): two repositories on the same Postgres image share one container, another version gets its own. Machine state lives in `~/.starci/test-stack` (registry with leases, cross-process lock).
 
-Per-repository and per-slot isolation is enforced by the library from the namespace `<package>_<6 hex of the checkout path>_w<slot>`: Postgres databases `<ns>_<connection>`, a Keycloak realm `<ns>-<realm>`, a Redis DB index leased per namespace, MinIO buckets `<ns>-<name>`, Qdrant collection and Kafka topic prefixes, k3d namespaces `<ns>-<name>`, toxiproxy proxies per run. Two repositories (or two checkouts of one) run e2e concurrently; two runs of the same checkout collide with `TEST_WORLD_NAMESPACE_BUSY`. Kafka advertises its address, so its proxy is stack-wide (a documented exception).
+Per-repository and per-slot isolation is enforced by the library from the namespace `<package>_<6 hex of the checkout path>_w<slot>`: Postgres databases `<ns>_<connection>` (or, for contexts that start as schemas of one database, `<ns>_<database>` with a schema and a login role `<ns>_<connection>` per context), a Keycloak realm `<ns>-<realm>`, a Redis DB index leased per namespace, MinIO buckets `<ns>-<name>`, Qdrant collection prefixes, Kafka topic, consumer-group and client-id prefixes `<ns>.` and a Kafka broker listener per slot, k3d namespaces `<ns>-<name>`, toxiproxy proxies per run. Two repositories (or two checkouts of one) run e2e concurrently; two runs of the same checkout collide with `TEST_WORLD_NAMESPACE_BUSY`. Kafka is the ONE pinned image `apache/kafka:4.2.2@sha256:1213eb39...` (KRaft, no ZooKeeper; Redpanda, cp-kafka and undigested tags are refused) and always runs real; the broker has 8 slot listeners, each advertising its own toxiproxy port, so a slot's Kafka traffic flows only through its own proxy (8 concurrent slots machine-wide).
 
 k3d: one cluster per k3s image plus a local registry with pull-through mirrors for vendor images; own images are built by content hash (Dockerfile + lockfile + COPY'd sources), reused when the tag exists, and garbage-collected keeping the last 3 `src-*` tags.
 
@@ -92,7 +92,7 @@ globalSetup, per slot: validate declaration, read the stack definition, start th
 ## Outages and parallel spec files
 
 Spec files of different slots share nothing but the warm containers (each slot has its own proxies), so an outage in one slot
-never reaches another (Kafka excepted: its proxy is stack-wide). Within a slot an outage is serialized by the library itself: the slot's outage lock (in
+never reaches another (Kafka included: each slot has its own broker listener and proxy). Within a slot an outage is serialized by the library itself: the slot's outage lock (in
 the slot's run directory) is held SHARED by every world while it boots, around every test (`beforeEach`/`afterEach` that
 `useTestWorld` registers) and while it stops, and EXCLUSIVELY by every outage call: `world.infra.<svc>.cut()`, `latency(ms)`
 and `during(fn)` take it before they touch toxiproxy and keep it until `restore()` (or the world stops),
