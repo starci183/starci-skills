@@ -1,5 +1,6 @@
 import { sql } from "@modules/platform/database"
 import type {
+    BillingPaymentRow,
     CountRow,
     InvoiceRow,
     OrderLineRow,
@@ -62,6 +63,11 @@ export const PAYMENTS_OF_PERSON: RowQuery<PaymentRow> = {
 /** How many payments one person has ($1 person id). */
 export const PAYMENT_COUNT: RowQuery<CountRow> = {
     text: sql`SELECT count(*)::int AS count FROM payments WHERE person_id = $1`,
+}
+
+/** The payment of one order in the billing database ($1 order id): at most one, whatever the deliveries. */
+export const BILLING_PAYMENTS_OF_ORDER: RowQuery<BillingPaymentRow> = {
+    text: sql`SELECT order_id, amount_minor_units, provider_reference FROM payments WHERE order_id = $1 LIMIT 10`,
 }
 
 /** The invoices of one order ($1 order id): at most one, whatever the redeliveries. */
