@@ -64,7 +64,8 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     },
     migrate: {
         // the one migration runner: the cli migrate command's, over the cli app's connections
-        module: (env: EnvSource) => migrateConnections(parseCliAppOptions(env).connections, openConnectionSource),
+        module: (env: EnvSource) =>
+            migrateConnections(parseCliAppOptions(env).connections, { open: openConnectionSource }),
         options: (w) =>
             new EnvSource({
                 IDENTITY_DB_URL: w.db.identity.url,

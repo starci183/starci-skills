@@ -5,7 +5,7 @@ import type { HttpClient } from "@modules/platform/http"
 import { OrderApiErrorCode } from "./errors/order-api.error"
 import { OrderApiClient } from "./order-api.client"
 import { ORDER_API_DOCUMENTS } from "./order-api.contracts"
-import { MODULE_OPTIONS_TOKEN } from "./order-api.module-definition"
+import { ORDER_API_OPTIONS } from "./order-api.decorators"
 import type { OrderApiOptions } from "./order-api.options"
 
 const options: OrderApiOptions = { url: "http://order.test", timeoutMs: 3000 }
@@ -16,7 +16,7 @@ const build = async () => {
         providers: [
             OrderApiClient,
             { provide: HTTP_CLIENT, useValue: http },
-            { provide: MODULE_OPTIONS_TOKEN, useValue: options },
+            { provide: ORDER_API_OPTIONS, useValue: options },
         ],
     }).compile()
     return { client: moduleRef.get(OrderApiClient), http }

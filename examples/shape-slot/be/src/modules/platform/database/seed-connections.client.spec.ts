@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { mock } from "@starci/jest-preset"
 import { Secret } from "@modules/platform/config"
 import type { DatabaseConnectionOptions } from "./database.options"
-import type { ConnectionSource, OpenConnection } from "./database.port"
+import type { ConnectionOpener, ConnectionSource } from "./database.port"
 import { seedText } from "./database.sql"
 import { readSeedFiles, seedConnections, seedDirectoryOf } from "./seed-connections.client"
 import type { SeedFile } from "./seed-connections.client"
@@ -35,14 +35,15 @@ describe("seedConnections", () => {
             ["primary", primary],
             ["archive", archive],
         ])
-        const open: OpenConnection = jest.fn(
+        const opener = mock<ConnectionOpener>()
+        opener.open.mockImplementation(
             (target: DatabaseConnectionOptions) => sources.get(target.name) ?? mock<ConnectionSource>(),
         )
 
         const report = await seedConnections(
             [connection("primary"), connection("archive")],
             [file("primary-a.sql", "SELECT 1"), file("primary-b.sql", "SELECT 2")],
-            open,
+            opener,
         )
 
         expect(report).toEqual({
@@ -51,25 +52,31 @@ describe("seedConnections", () => {
         })
         expect(primary.query.mock.calls).toEqual([["SELECT 1"], ["SELECT 2"]])
         expect(primary.destroy).toHaveBeenCalledTimes(1)
+        expect(opener.open).toHaveBeenCalledTimes(1)
         expect(archive.initialize).not.toHaveBeenCalled()
     })
 
     it("answers the files that name no connection as unmatched", async () => {
+        const opener = mock<ConnectionOpener>()
+
         const report = await seedConnections(
             [connection("primary")],
             [file("legacy-users.sql", "INSERT INTO users DEFAULT VALUES")],
-            () => mock<ConnectionSource>(),
+            opener,
         )
 
         expect(report).toEqual({ applied: {}, unmatched: ["legacy-users.sql"] })
+        expect(opener.open).not.toHaveBeenCalled()
     })
 
     it("destroys the data source of a connection whose seed fails, and fails", async () => {
         const failing = mock<ConnectionSource>()
         failing.query.mockRejectedValue(new TypeError("relation does not exist"))
+        const opener = mock<ConnectionOpener>()
+        opener.open.mockReturnValue(failing)
 
         await expect(
-            seedConnections([connection("primary")], [file("primary-a.sql", "SELECT 1")], () => failing),
+            seedConnections([connection("primary")], [file("primary-a.sql", "SELECT 1")], opener),
         ).rejects.toThrow("relation does not exist")
         expect(failing.destroy).toHaveBeenCalledTimes(1)
     })

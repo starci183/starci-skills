@@ -4,7 +4,7 @@ import { Secret } from "@modules/platform/config"
 import { LOGGER, LoggingLogEvent } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "./database.port"
-import type { ConnectionSource, OpenConnection } from "./database.port"
+import type { ConnectionOpener, ConnectionSource } from "./database.port"
 import type { DatabaseConnectionOptions } from "./database.options"
 import { MigrationRunnerService } from "./migration-runner.service"
 
@@ -27,12 +27,13 @@ const build = async (
     openSource: (target: DatabaseConnectionOptions) => ConnectionSource,
 ) => {
     const logger = mock<Logger>()
-    const open: OpenConnection = jest.fn((target: DatabaseConnectionOptions) => openSource(target))
+    const opener = mock<ConnectionOpener>()
+    opener.open.mockImplementation((target) => openSource(target))
     const moduleRef = await Test.createTestingModule({
         providers: [
             MigrationRunnerService,
             { provide: DATABASE_OPTIONS, useValue: { connections } },
-            { provide: CONNECTION_SOURCE, useValue: open },
+            { provide: CONNECTION_SOURCE, useValue: opener },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
@@ -47,10 +48,7 @@ describe("MigrationRunnerService", () => {
             ["primary", primary],
             ["archive", archive],
         ])
-        const { runner, logger } = await build(
-            [connection("primary"), connection("archive")],
-            (target) => sources.get(target.name) ?? source([]),
-        )
+        const { runner, logger } = await build([connection("primary"), connection("archive")], (target) => sources.get(target.name) ?? source([]))
 
         await runner.run()
 

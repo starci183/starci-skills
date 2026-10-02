@@ -70,7 +70,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 ...managers,
                 DatabaseProbe,
                 MigrationRunnerService,
-                { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
+                { provide: CONNECTION_SOURCE, useValue: { open: openConnectionSource } },
             ],
             exports: [
                 DatabaseProbe,

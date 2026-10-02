@@ -35,6 +35,7 @@ describe("openConnectionSource", () => {
                 migrationsTableName: "primary_migrations",
                 synchronize: false,
             },
+            isInitialized: false,
         })
     })
 })

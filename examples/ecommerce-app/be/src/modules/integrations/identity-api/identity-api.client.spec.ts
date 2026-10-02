@@ -5,7 +5,7 @@ import type { HttpClient } from "@modules/platform/http"
 import { IdentityApiErrorCode } from "./errors/identity-api.error"
 import { IdentityApiClient } from "./identity-api.client"
 import { IDENTITY_API_DOCUMENTS } from "./identity-api.contracts"
-import { MODULE_OPTIONS_TOKEN } from "./identity-api.module-definition"
+import { IDENTITY_API_OPTIONS } from "./identity-api.decorators"
 import type { IdentityApiOptions } from "./identity-api.options"
 
 const options: IdentityApiOptions = { url: "http://identity.test", timeoutMs: 3000 }
@@ -16,7 +16,7 @@ const build = async () => {
         providers: [
             IdentityApiClient,
             { provide: HTTP_CLIENT, useValue: http },
-            { provide: MODULE_OPTIONS_TOKEN, useValue: options },
+            { provide: IDENTITY_API_OPTIONS, useValue: options },
         ],
     }).compile()
     return { client: moduleRef.get(IdentityApiClient), http }

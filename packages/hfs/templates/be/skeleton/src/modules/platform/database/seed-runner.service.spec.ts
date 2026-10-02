@@ -4,11 +4,11 @@ import { Secret } from "@modules/platform/config"
 import { LOGGER, LoggingLogEvent } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { CONNECTION_SOURCE, DATABASE_OPTIONS, READ_SEED_FILES } from "./database.port"
-import type { ConnectionSource, OpenConnection } from "./database.port"
+import type { ConnectionOpener, ConnectionSource, SeedFileReader } from "./database.port"
 import type { DatabaseConnectionOptions } from "./database.options"
 import { seedText } from "./database.sql"
 import { seedDirectoryOf } from "./seed-connections.client"
-import type { ReadSeedFiles, SeedFile } from "./seed-connections.client"
+import type { SeedFile } from "./seed-connections.client"
 import { SeedRunnerService } from "./seed-runner.service"
 
 const connection = (name: string): DatabaseConnectionOptions => ({
@@ -28,8 +28,10 @@ const build = async (
     readSeeds: (directory: string) => Promise<ReadonlyArray<SeedFile>>,
 ) => {
     const logger = mock<Logger>()
-    const open: OpenConnection = jest.fn((target: DatabaseConnectionOptions) => openSource(target))
-    const read: ReadSeedFiles = jest.fn((directory: string) => readSeeds(directory))
+    const opener = mock<ConnectionOpener>()
+    opener.open.mockImplementation((target) => openSource(target))
+    const reader = mock<SeedFileReader>()
+    reader.read.mockImplementation((directory) => readSeeds(directory))
     const moduleRef = await Test.createTestingModule({
         providers: [
             SeedRunnerService,
@@ -37,18 +39,18 @@ const build = async (
                 provide: DATABASE_OPTIONS,
                 useValue: { connections: [connection("primary")] },
             },
-            { provide: CONNECTION_SOURCE, useValue: open },
-            { provide: READ_SEED_FILES, useValue: read },
+            { provide: CONNECTION_SOURCE, useValue: opener },
+            { provide: READ_SEED_FILES, useValue: reader },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { runner: moduleRef.get(SeedRunnerService), logger, read }
+    return { runner: moduleRef.get(SeedRunnerService), logger, reader }
 }
 
 describe("SeedRunnerService", () => {
     it("reads the seeds of the named environment, runs them on their connections and logs the report", async () => {
         const primary = mock<ConnectionSource>()
-        const { runner, logger, read } = await build(
+        const { runner, logger, reader } = await build(
             () => primary,
             () =>
                 Promise.resolve([
@@ -59,7 +61,7 @@ describe("SeedRunnerService", () => {
 
         await expect(runner.run("staging")).resolves.toBeUndefined()
 
-        expect(read).toHaveBeenCalledWith(seedDirectoryOf("staging"))
+        expect(reader.read).toHaveBeenCalledWith(seedDirectoryOf("staging"))
         expect(primary.query).toHaveBeenCalledWith("INSERT INTO notes (body) VALUES ('a')")
         expect(logger.info).toHaveBeenCalledWith(LoggingLogEvent.SeedsApplied, {
             env: "staging",
@@ -69,14 +71,14 @@ describe("SeedRunnerService", () => {
     })
 
     it("reads the dev seeds when no environment is named", async () => {
-        const { runner, logger, read } = await build(
+        const { runner, logger, reader } = await build(
             () => mock<ConnectionSource>(),
             () => Promise.resolve([]),
         )
 
         await expect(runner.run()).resolves.toBeUndefined()
 
-        expect(read).toHaveBeenCalledWith(seedDirectoryOf("dev"))
+        expect(reader.read).toHaveBeenCalledWith(seedDirectoryOf("dev"))
         expect(logger.info).toHaveBeenCalledWith(LoggingLogEvent.SeedsApplied, {
             env: "dev",
             applied: {},

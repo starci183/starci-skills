@@ -1,16 +1,14 @@
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
-import Redis from "ioredis"
 import { Secret } from "@modules/platform/config"
 import type { CacheKey } from "./cache.contracts"
 import { RedisCacheClient } from "./redis-cache.client"
 import { CacheErrorCode } from "./errors/cache.error"
+import { REDIS_FACTORY } from "./cache.decorators"
 import { MODULE_OPTIONS_TOKEN } from "./cache.module-definition"
 import type { CacheOptions } from "./cache.options"
+import type { RedisDriver, RedisFactory } from "./cache.port"
 
-jest.mock("ioredis")
-
-const RedisMock = jest.mocked(Redis)
 const options: CacheOptions = { url: new Secret("redis://cache.test:6379"), timeoutMs: 2500 }
 
 const cacheKey = () => {
@@ -24,25 +22,26 @@ const cacheKey = () => {
     return { key, parse }
 }
 
-const build = async (status: Redis["status"] = "wait") => {
-    const redis = mock<Redis>({ status })
-    RedisMock.mockImplementation(() => redis)
+const build = async (status: RedisDriver["status"] = "wait") => {
+    const redis = mock<RedisDriver>({ status })
+    const factory = mock<RedisFactory>()
+    factory.create.mockReturnValue(redis)
     const moduleRef = await Test.createTestingModule({
-        providers: [RedisCacheClient, { provide: MODULE_OPTIONS_TOKEN, useValue: options }],
+        providers: [
+            RedisCacheClient,
+            { provide: MODULE_OPTIONS_TOKEN, useValue: options },
+            { provide: REDIS_FACTORY, useValue: factory },
+        ],
     }).compile()
-    return { client: moduleRef.get(RedisCacheClient), redis }
+    return { client: moduleRef.get(RedisCacheClient), redis, factory }
 }
 
 describe("RedisCacheClient", () => {
-    beforeEach(() => {
-        RedisMock.mockReset()
-    })
-
     it("opens a lazy Redis connection with the declared timeout", async () => {
-        const { client } = await build()
+        const { client, factory } = await build()
 
         expect(client.name).toBe("cache")
-        expect(RedisMock).toHaveBeenCalledWith("redis://cache.test:6379", {
+        expect(factory.create).toHaveBeenCalledWith("redis://cache.test:6379", {
             lazyConnect: true,
             maxRetriesPerRequest: 1,
             commandTimeout: 2500,

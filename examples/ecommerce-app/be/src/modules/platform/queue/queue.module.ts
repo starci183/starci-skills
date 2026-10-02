@@ -2,10 +2,22 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { Queue, Worker } from "bullmq"
 import type { EntityManager } from "typeorm"
-import { QUEUE_FACTORY, QUEUE_OUTBOX, QUEUE_RELAY_MANAGERS, QUEUE_TRANSPORT, QUEUE_WORKER_REGISTRY } from "./queue.decorators"
+import {
+    QUEUE_FACTORY,
+    QUEUE_OUTBOX,
+    QUEUE_RELAY_MANAGERS,
+    QUEUE_TRANSPORT,
+    QUEUE_WORKER_REGISTRY,
+} from "./queue.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./queue.module-definition"
 import { BullmqQueueTransportClient } from "./bullmq-queue-transport.client"
-import type { BullmqConnection, BullmqJob, BullmqQueue, BullmqWorker, BullmqWorkerOptions } from "./queue-transport.port"
+import type {
+    BullmqConnection,
+    BullmqJob,
+    BullmqQueue,
+    BullmqWorker,
+    BullmqWorkerOptions,
+} from "./queue-transport.port"
 import { QueueOutboxService } from "./queue-outbox.service"
 import { QueueRelayService } from "./queue-relay.service"
 import { QueueWorkerService } from "./queue-worker.service"
@@ -29,8 +41,11 @@ export class QueueModule extends ConfigurableModuleClass {
                     provide: QUEUE_FACTORY,
                     useValue: {
                         queue: (name: string, options: BullmqConnection): BullmqQueue => new Queue(name, options),
-                        worker: (name: string, processor: (job: BullmqJob) => Promise<void>, options: BullmqWorkerOptions): BullmqWorker =>
-                            new Worker<object>(name, processor, options),
+                        worker: (
+                            name: string,
+                            processor: (job: BullmqJob) => Promise<void>,
+                            options: BullmqWorkerOptions,
+                        ): BullmqWorker => new Worker<object>(name, processor, options),
                     },
                 },
                 BullmqQueueTransportClient,

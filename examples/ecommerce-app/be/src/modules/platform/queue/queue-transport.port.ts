@@ -59,11 +59,7 @@ export interface BullmqQueue {
     /** Adds the job; an id BullMQ already holds makes the add a no-op. */
     add(name: string, payload: object, options: BullmqJobOptions): Promise<unknown>
     /** Creates or updates the scheduler by its id. */
-    upsertJobScheduler(
-        id: string,
-        repeat: { readonly every: number },
-        template: BullmqJobTemplate,
-    ): Promise<unknown>
+    upsertJobScheduler(id: string, repeat: { readonly every: number }, template: BullmqJobTemplate): Promise<unknown>
     /** Closes the queue. */
     close(): Promise<void>
 }

@@ -1,17 +1,11 @@
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
-import { Queue, Worker } from "bullmq"
-import type { Job } from "bullmq"
 import { BullmqQueueTransportClient } from "./bullmq-queue-transport.client"
 import type { QueueHandler } from "./queue.contracts"
-import { QUEUE_OPTIONS } from "./queue.decorators"
+import { QUEUE_FACTORY, QUEUE_OPTIONS } from "./queue.decorators"
 import type { QueueOptions } from "./queue.options"
 import { ATTEMPTS, BACKOFF_MS, KEEP_COMPLETED_SECONDS } from "./queue.policy"
-
-jest.mock("bullmq")
-
-const QueueMock = jest.mocked(Queue)
-const WorkerMock = jest.mocked(Worker)
+import type { BullmqJob, BullmqQueue, BullmqWorker, QueueFactory } from "./queue-transport.port"
 
 const options: QueueOptions = {
     redisHost: "redis.test",
@@ -25,37 +19,33 @@ const options: QueueOptions = {
 }
 
 const build = async () => {
-    const queue = mock<InstanceType<typeof Queue>>()
-    const worker = mock<InstanceType<typeof Worker>>()
-    QueueMock.mockImplementation(() => queue)
-    WorkerMock.mockImplementation(() => worker)
+    const queue = mock<BullmqQueue>()
+    const worker = mock<BullmqWorker>()
+    const factory = mock<QueueFactory>()
+    factory.queue.mockReturnValue(queue)
+    factory.worker.mockReturnValue(worker)
     const moduleRef = await Test.createTestingModule({
-        providers: [BullmqQueueTransportClient, { provide: QUEUE_OPTIONS, useValue: options }],
+        providers: [
+            BullmqQueueTransportClient,
+            { provide: QUEUE_OPTIONS, useValue: options },
+            { provide: QUEUE_FACTORY, useValue: factory },
+        ],
     }).compile()
-    return { client: moduleRef.get(BullmqQueueTransportClient), queue, worker }
+    return { client: moduleRef.get(BullmqQueueTransportClient), queue, worker, factory }
 }
 
 describe("BullmqQueueTransportClient", () => {
-    beforeEach(() => {
-        QueueMock.mockReset()
-        WorkerMock.mockReset()
-    })
-
     it("adds idempotent jobs with the queue retry and retention policy", async () => {
-        const { client, queue } = await build()
+        const { client, queue, factory } = await build()
         const payload = { orderId: "order-1" }
 
         await client.add("orders", "outbox-1", payload)
         await client.add("orders", "outbox-2", payload)
 
-        expect(QueueMock).toHaveBeenCalledTimes(1)
-        expect(QueueMock).toHaveBeenCalledWith("orders", {
+        expect(factory.queue).toHaveBeenCalledTimes(1)
+        expect(factory.queue).toHaveBeenCalledWith("orders", {
             prefix: "spec.",
-            connection: {
-                host: "redis.test",
-                port: 6380,
-                maxRetriesPerRequest: null,
-            },
+            connection: { host: "redis.test", port: 6380, maxRetriesPerRequest: null },
         })
         expect(queue.add).toHaveBeenNthCalledWith(1, "orders", payload, {
             jobId: "outbox-1",
@@ -68,17 +58,8 @@ describe("BullmqQueueTransportClient", () => {
     it("upserts schedulers with their payload or an empty payload", async () => {
         const { client, queue } = await build()
 
-        await client.upsertScheduler({
-            queue: "billing",
-            id: "settlement",
-            everyMs: 60_000,
-            payload: { shard: 2 },
-        })
-        await client.upsertScheduler({
-            queue: "billing",
-            id: "cleanup",
-            everyMs: 120_000,
-        })
+        await client.upsertScheduler({ queue: "billing", id: "settlement", everyMs: 60_000, payload: { shard: 2 } })
+        await client.upsertScheduler({ queue: "billing", id: "cleanup", everyMs: 120_000 })
 
         expect(queue.upsertJobScheduler).toHaveBeenNthCalledWith(
             1,
@@ -95,39 +76,21 @@ describe("BullmqQueueTransportClient", () => {
     })
 
     it("starts a worker that translates BullMQ jobs into queue deliveries", async () => {
-        const { client } = await build()
+        const { client, factory } = await build()
         const handler = mock<QueueHandler>({ queue: "orders" })
         handler.handle.mockResolvedValue(undefined)
 
         await client.work(handler, 3)
 
-        expect(WorkerMock).toHaveBeenCalledWith("orders", expect.any(Function), {
+        expect(factory.worker).toHaveBeenCalledWith("orders", expect.any(Function), {
             prefix: "spec.",
-            connection: {
-                host: "redis.test",
-                port: 6380,
-                maxRetriesPerRequest: null,
-            },
+            connection: { host: "redis.test", port: 6380, maxRetriesPerRequest: null },
             concurrency: 3,
         })
-        const processor = WorkerMock.mock.calls[0]?.[1]
-        expect(typeof processor).toBe("function")
-        if (typeof processor === "function") {
-            await processor(
-                mock<Job<object>>({
-                    id: "job-1",
-                    data: { orderId: "order-1" },
-                    attemptsMade: 2,
-                }),
-            )
-            await processor(
-                mock<Job<object>>({
-                    id: undefined,
-                    data: { orderId: "order-2" },
-                    attemptsMade: 0,
-                }),
-            )
-        }
+        const processor = factory.worker.mock.calls[0]?.[1]
+        if (typeof processor !== "function") throw new Error("expected a BullMQ processor")
+        await processor(mock<BullmqJob>({ id: "job-1", data: { orderId: "order-1" }, attemptsMade: 2 }))
+        await processor(mock<BullmqJob>({ id: undefined, data: { orderId: "order-2" }, attemptsMade: 0 }))
 
         expect(handler.handle).toHaveBeenNthCalledWith(1, {
             id: "job-1",

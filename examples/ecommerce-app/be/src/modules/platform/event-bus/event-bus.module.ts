@@ -2,7 +2,13 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { Kafka, logLevel } from "kafkajs"
 import type { EntityManager } from "typeorm"
-import { EVENT_BUS, EVENT_RELAY_MANAGERS, EVENT_CONSUMER_REGISTRY, EVENT_TRANSPORT, KAFKA_FACTORY } from "./event-bus.decorators"
+import {
+    EVENT_BUS,
+    EVENT_RELAY_MANAGERS,
+    EVENT_CONSUMER_REGISTRY,
+    EVENT_TRANSPORT,
+    KAFKA_FACTORY,
+} from "./event-bus.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./event-bus.module-definition"
 import { EventBusService } from "./event-bus.service"
 import { EventRelayService } from "./event-relay.service"

@@ -134,7 +134,11 @@ export interface KafkaGroupOffsets {
     /** The topic. */
     readonly topic: string
     /** The committed offset per partition. */
-    readonly partitions: Array<{ readonly partition: number; readonly offset: string; readonly metadata: string | null }>
+    readonly partitions: Array<{
+        readonly partition: number
+        readonly offset: string
+        readonly metadata: string | null
+    }>
 }
 
 /** The admin client as the transport uses it. */
@@ -148,7 +152,10 @@ export interface KafkaAdmin {
     /** The end offsets of every partition of the topic. */
     fetchTopicOffsets(topic: string): Promise<Array<KafkaPartitionOffsets>>
     /** The offsets the group committed on the topics. */
-    fetchOffsets(options: { readonly groupId: string; readonly topics?: Array<string> }): Promise<Array<KafkaGroupOffsets>>
+    fetchOffsets(options: {
+        readonly groupId: string
+        readonly topics?: Array<string>
+    }): Promise<Array<KafkaGroupOffsets>>
     /** Deletes the consumer groups. */
     deleteGroups(groupIds: Array<string>): Promise<Array<unknown>>
 }

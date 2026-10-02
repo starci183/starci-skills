@@ -59,7 +59,7 @@ export function appCoverageScope(app, root = ROOT) {
 }
 
 /** The Codecov components of one example app, [{ id, name, paths }], ids and paths from the repository root (`<app>-<service>`, `<app>-platform`). */
-export function appComponents(app, root = ROOT) {
+function appComponents(app, root = ROOT) {
   const appRoot = path.join(root, 'examples', app);
   const hfs = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
   return coverageComponents(loadSlotManifest(), { ...appSource(appRoot), apps: hfs.sides.be.apps })

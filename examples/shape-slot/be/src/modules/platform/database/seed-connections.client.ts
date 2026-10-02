@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { seedText } from "./database.sql"
 import type { SqlText } from "./database.sql"
 import type { DatabaseConnectionOptions } from "./database.options"
-import type { OpenConnection } from "./database.port"
+import type { ConnectionOpener } from "./database.port"
 
 const SEED_EXTENSION = ".sql"
 
@@ -18,9 +18,6 @@ export interface SeedFile {
     readonly text: SqlText
 }
 
-/** Reads every seed file of a directory, sorted by name. */
-export type ReadSeedFiles = (directory: string) => Promise<ReadonlyArray<SeedFile>>
-
 /** What a seed run did: the files it ran by connection, and the files that name no connection (never run). */
 export interface SeedReport {
     /** The names of the files run, by connection, in the order they ran. */
@@ -33,7 +30,7 @@ export interface SeedReport {
 export const seedDirectoryOf = (env: string): string => join(".starcistacks", env, "seeds")
 
 /** Reads every `*.sql` file of the seed directory, sorted by name; a missing directory fails the run. */
-export const readSeedFiles: ReadSeedFiles = async (directory: string) => {
+export const readSeedFiles = async (directory: string): Promise<ReadonlyArray<SeedFile>> => {
     const names = (await readdir(directory))
         .filter((name) => name.endsWith(SEED_EXTENSION))
         .sort((a, b) => a.localeCompare(b))
@@ -56,13 +53,13 @@ const seeds = (file: SeedFile, connection: DatabaseConnectionOptions): boolean =
 export async function seedConnections(
     connections: ReadonlyArray<DatabaseConnectionOptions>,
     files: ReadonlyArray<SeedFile>,
-    open: OpenConnection,
+    opener: ConnectionOpener,
 ): Promise<SeedReport> {
     const applied: Record<string, ReadonlyArray<string>> = {}
     for (const connection of connections) {
         const own = files.filter((file) => seeds(file, connection))
         if (own.length === 0) continue
-        const source = open(connection)
+        const source = opener.open(connection)
         await source.initialize()
         try {
             for (const file of own) await source.query(file.text)
