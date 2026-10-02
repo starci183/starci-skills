@@ -195,12 +195,24 @@ exceptions:
   - path: packages/hfs/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: packages/hfs/templates/app/package-scripts-lite/package.json
+    reason: >
+      Managed lite app-root package-scripts template @starci/hfs writes into a lite product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/app/package-scripts/core.json
+    reason: >
+      Partial of the managed app-root package-scripts templates (the scripts both editions share); expanded into package.json by hfs sync, so it is JSON fragment text npm reads after the render.
   - path: packages/hfs/templates/app/package-scripts/package.json
     reason: >
       Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/app/skeleton-lite/.starcistacks/dev/environment.json
+    reason: >
+      Environment descriptor template of the lite scaffold (.starcistacks/dev/environment.json); the stack tooling reads JSON.
   - path: packages/hfs/templates/app/task-graph/turbo.json
     reason: >
       Managed app-root turbo task graph template @starci/hfs writes into a product repository (slot app.task-graph); turbo reads only turbo.json.
+  - path: packages/hfs/templates/app/upgrade-full/.starcistacks/dev/infra/metadata.json
+    reason: >
+      Infra metadata template hfs upgrade --edition full adds to a lite app (.starcistacks/dev/infra/metadata.json); the stack tooling reads JSON.
   - path: packages/hfs/templates/be/tool-config/src/tests/tsconfig.json
     reason: >
       TypeScript config template for the back-end test tree (src/tests) @starci/hfs writes into a product repository; tsc reads JSON (with comments).
@@ -210,6 +222,12 @@ exceptions:
   - path: packages/hfs/templates/be/tool-config/tsconfig.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/fe/app/tsconfig.json
+    reason: >
+      TypeScript config template of a front-end app hfs add app writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/fe/skeleton-lite/apps/web/src/modules/i18n/messages/vi.json
+    reason: >
+      next-intl message catalogue template for the lite scaffold app (fe/apps/web); next-intl requires JSON.
   - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/vi.json
     reason: >
       next-intl message catalogue template for the scaffolded product app (fe/apps/app); next-intl requires JSON.
