@@ -10,6 +10,7 @@ import { accountEntities } from "@modules/domain/account"
 import { cartEntities } from "@modules/domain/cart"
 import { catalogEntities } from "@modules/domain/catalog"
 import { invoiceEntities } from "@modules/domain/invoice"
+import { loyaltyEntities } from "@modules/domain/loyalty"
 import { orderEntities } from "@modules/domain/order"
 import { paymentEntities } from "@modules/domain/payment"
 import { ClockModule } from "@modules/platform/clock"
@@ -59,6 +60,8 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...catalogEntities,
     ...cartEntities,
     ...orderEntities,
+    ...loyaltyEntities,
+    ...inboxEntities,
     ...sagaEntities,
 ]
 
