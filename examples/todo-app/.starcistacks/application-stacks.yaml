@@ -133,7 +133,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
-    qualityGate: starci-new-code
+    qualityGate: starci-quality
     projects:
       - {repository: todo-app, key: starci-todo-app}
     credentials:

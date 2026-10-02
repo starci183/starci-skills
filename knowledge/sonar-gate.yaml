@@ -13,7 +13,7 @@ purpose: |
   vulnerability, every hotspot reviewed, no duplicated-lines excess, no cognitive-complexity issue). The one Sonar
   mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
 gate:
-  name: starci-new-code
+  name: starci-quality
   # A project with no new-code baseline judges the whole project as new code; a fixed
   # window keeps "new code" the recent work on main, so the server gate is passable on a healthy main.
   newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}

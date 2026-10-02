@@ -113,8 +113,8 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
           return send(200,{sources:lines.filter(l=>l.line>=from&&l.line<=to)});
         }
         case '/api/qualitygates/show':{
-          if(url.searchParams.get('name')!=='starci-new-code'||!state.gateConditions)return send(404,{errors:[{msg:'not found'}]});
-          return send(200,{name:'starci-new-code',conditions:[...state.gateConditions.values()]});
+          if(url.searchParams.get('name')!=='starci-quality'||!state.gateConditions)return send(404,{errors:[{msg:'not found'}]});
+          return send(200,{name:'starci-quality',conditions:[...state.gateConditions.values()]});
         }
         case '/api/qualitygates/create':{
           if(role!=='admin')return send(403,{});
@@ -507,7 +507,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.equal(report.scanner.runner,'npm run sonar:check');
   assert.equal(report.ceTask.status,'SUCCESS');
   assert.equal(report.schema,'starci/sonar-local-scan@3');
-  assert.equal(report.gate.name,'starci-new-code');
+  assert.equal(report.gate.name,'starci-quality');
   assert.deepEqual([report.gate.duplicationMaxPercent,report.gate.blockingSeverities,report.gate.coverageMinPercent],[3,['BLOCKER','CRITICAL'],100]);
   assert.equal(report.qualityGate.outcome,'ok');
   assert.equal(report.scope,'slice');
@@ -901,7 +901,7 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   assert.equal(first.report.qualityGate.outcome,'ok',JSON.stringify(first.report.qualityGate));
   const conditions=Object.fromEntries([...state.gateConditions.values()].map(c=>[c.metric,`${c.op} ${c.error}`]));
   assert.deepEqual(conditions,{new_coverage:'LT 100',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0',coverage:'LT 100',violations:'GT 0',security_hotspots_reviewed:'LT 100',duplicated_lines_density:'GT 3'});
-  assert.equal(state.gateSelected.get('product-repo'),'starci-new-code');
+  assert.equal(state.gateSelected.get('product-repo'),'starci-quality');
   assert.equal(state.newCode.get('product-repo'),'NUMBER_OF_DAYS:30');
   const made=state.requests.filter(r=>/create|update_condition|delete_condition/.test(r.path)&&r.path.includes('qualitygates')).length;
   // a gate someone edited on the server is put back, an extra condition is dropped

@@ -28,7 +28,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
-    qualityGate: starci-new-code
+    qualityGate: starci-quality
     projects:
       - {repository: starci-next, key: starci-next}
       - {repository: starci-next-fe, key: starci-next-fe}
