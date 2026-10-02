@@ -74,6 +74,17 @@ AGENT_HEADLESS_LAUNCH:
   owner: op-retry
   kind: verb-refusal
 
+AGENT_ORCA_WORKTREE:
+  title: "An agent's own Orca worktree refused"
+  title_vi: "Agent không được tự tạo hay xoá worktree Orca"
+  meaning_vi: "Lệnh tạo hoặc xoá worktree Orca của agent (create, add, rm, remove, delete, prune, move) bị chặn: worktree chỉ do API worktree của runtime tạo và xoá, nơi kiểm link trước khi xoá và giữ registry cùng giới hạn số worktree."
+  causes_vi:
+    - "Op workspace.manage hoặc runtime.operate tự gọi lệnh xoá worktree của Orca để dọn một worktree"
+    - "Agent tự tạo worktree Orca để làm việc riêng"
+  nextStep_vi: "Lệnh không được chạy; xem worktree bằng node scripts/machine/worktrees.mjs counts, việc tạo và xoá đi qua API worktree của runtime; nhu cầu không tự đáp được thì báo blocked environment."
+  owner: op-retry
+  kind: verb-refusal
+
 AGENT_CLI_SPAWN:
   title: "Runtime script spawns an agent CLI"
   title_vi: "Script runtime tự chạy agent CLI như tiến trình con"
@@ -6023,6 +6034,16 @@ UAT_RUN_AGING:
   nextStep_vi: "Cảnh báo nghi ngờ; cần chạy lại UAT cho mã hiện tại."
   owner: other-op:uat.verify
   kind: check-finding
+
+UAT_TEST_WORLD:
+  title: "A test world in a uat op refused"
+  title_vi: "Op uat không được chạy test world"
+  meaning_vi: "Lệnh node .../test-world-run.mjs bị chặn trong một op uat: bước đi uat chạy trên dev stack thật của app, test world giả lập đúng thứ mà bước đi phải chứng minh."
+  causes_vi:
+    - "Op uat.verify hoặc uat.assisted.* dùng test world thay vì dev stack thật"
+  nextStep_vi: "Lệnh không được chạy; dựng dev stack mà .starcistacks/<env> ở gốc app khai bằng lệnh start của chính nó, kiểm bằng env-health rồi đi bước uat; stack không lên được thì báo blocked environment."
+  owner: op-retry
+  kind: verb-refusal
 
 UI_APP_MISSING:
   title: "UI record does not say which app it is in"

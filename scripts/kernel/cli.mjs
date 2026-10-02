@@ -4086,7 +4086,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, workflowWorktr
     const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map(gitRoot))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
-    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, workflowWorktree });
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, workflowWorktree, op: job.op_id });
   } catch (e) {
     return { receipt: { error: String(e?.message ?? e) } };
   }

@@ -68,9 +68,10 @@ function writeGuardFile(dir, name, body) {
 export const GUARD_ROLES = Object.freeze(['op', 'kernel']);
 
 /** <guards root>/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
-export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op' }) {
+export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op', op = null }) {
   if (!GUARD_ROLES.includes(role)) throw new Error(`unknown guard role ${role}`);
-  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId,
+  // op: the job's op id, for the rules one op family owes (a uat op never starts a test world, launch-verdict.mjs).
+  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId, op: op ?? null,
     ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))],
     // The workflow worktree the op works in (scripts/kernel/workflow-worktree.mjs), or null: the guard refuses git history
     // and ref changes inside it - only the runtime's checkpoint commits there.
@@ -285,14 +286,14 @@ const guardSettings = (config) => ({
 });
 
 /**
- * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree, role}) -> {receipt}
+ * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree, role, op}) -> {receipt}
  * receipt rides on the dispatch record. The caller binds receipt.jobFile to the agent's Orca terminal once
  * worker-start returns it (bindGuardTerminal), which is what the command guard and the history hook read.
  */
-export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null, role = 'op' }) {
+export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null, role = 'op', op = null }) {
   const settings = guardSettings(config);
   const receipt = { jobFile: null, hooks: [] };
-  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role }); }
+  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role, op }); }
   catch (e) { receipt.jobFile = { error: String(e?.message ?? e) }; }
   if (settings.historyHook) {
     for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {
