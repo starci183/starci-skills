@@ -898,7 +898,7 @@ rules:
       - {kind: eslint-be, id: readonly-boundary}
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
-    law: "A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R133) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
+    law: "A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R134) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_TRANSPORT_SHAPE"]
@@ -1272,7 +1272,7 @@ rules:
     failureCodes: ["RT_CONTROL_CHARACTER"]
     enforcers:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
-  - id: R127
+  - id: R128
     code: "HFS_MONO_WORKSPACES"
     law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
     kinds: [check]
@@ -1280,7 +1280,7 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACES"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R128
+  - id: R129
     code: "HFS_MONO_FE_WORKSPACE"
     law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
     kinds: [check]
@@ -1288,7 +1288,7 @@ rules:
     failureCodes: ["HFS_MONO_FE_WORKSPACE"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R129
+  - id: R130
     code: "HFS_MONO_NEST_PROJECTS"
     law: "The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `\"monorepo\": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{\"type\": \"application\", \"root\": \"apps/<app>\", \"sourceRoot\": \"apps/<app>/src\"}`."
     kinds: [check]
@@ -1296,7 +1296,7 @@ rules:
     failureCodes: ["HFS_MONO_NEST_PROJECTS"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R130
+  - id: R131
     code: "HFS_MONO_WORKSPACE_DEP"
     law: "An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `\"*\"`; the app root `package.json` never declares a workspace package."
     kinds: [check]
@@ -1304,7 +1304,7 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R131
+  - id: R132
     code: "BE_CLI_REQUIRED"
     law: "Every one-off action of a back end lives in ONE app, `be/apps/cli` (kind cli, named cli): a back end that declares a connection (its migrations run as `cli migrate run`) or tracks a command under `src/features/cli/` declares exactly that app, and tracks its image `be/apps/cli/Dockerfile` (one image, run as `cli <group> <command>`)."
     kinds: [check]
@@ -1312,7 +1312,7 @@ rules:
     failureCodes: ["BE_CLI_REQUIRED"]
     enforcers:
       - {kind: hfs, id: cli, at: scripts/hfs/rules/cli.mjs}
-  - id: R132
+  - id: R133
     code: "BE_CLI_BOOTSTRAP"
     law: "The cli app boots in its `main.ts` with `CommandFactory.run(...)` of nest-commander and never serves: `NestFactory.create*` of `@nestjs/core`, a `.listen()`, a microservice connection, an `@nestjs/platform-*` adapter or `@nestjs/microservices` in the cli app is refused (by the import that binds each name)."
     kinds: [lint]
@@ -1320,7 +1320,7 @@ rules:
     failureCodes: ["BE_CLI_BOOTSTRAP"]
     enforcers:
       - {kind: eslint-be, id: cli-bootstrap}
-  - id: R133
+  - id: R134
     code: "BE_CLI_COMMAND_SHAPE"
     law: "A nest-commander command (`@Command` or `@SubCommand`, by the import that binds the decorator) is declared only in the cli feature root `src/features/cli/`: a group `@Command` in `<group>/<group>.cli.ts`, a `@SubCommand` extending `CommandRunner` in `<group>/subs/<name>.cli.ts`, one command per file, and every sub-command has its unit spec `<name>.cli.spec.ts` beside it (a command is an action runner, not a thin transport: R88 does not apply to it). `.cli.ts`, because `.command.ts` is the CQRS message."
     kinds: [lint]
@@ -1329,7 +1329,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: cli-command-shape}
       - {kind: eslint-be, id: unit-test-colocated}
-  - id: R134
+  - id: R135
     code: "BE_CLI_OWNER"
     law: "`nest-commander` is imported only by the cli app and the cli feature root, and no back-end source parses command-line arguments itself: `process.argv` and the parsers commander, yargs and minimist are refused everywhere; a one-off action anywhere but a cli command is a door the rule closes."
     kinds: [lint]

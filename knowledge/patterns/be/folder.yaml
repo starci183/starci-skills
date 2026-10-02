@@ -61,7 +61,7 @@ rules:
   - id: BE-FOLDER-2
     title: Features are grouped by trigger kind
     kind: mandatory
-    hfsRules: [R29, R87, R131, R133]
+    hfsRules: [R29, R87, R132, R134]
     requirement: |-
       `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a request
       or a background transport triggers (api.yaml) and `features/cli/` for the one-off actions an operator runs (cli.yaml);

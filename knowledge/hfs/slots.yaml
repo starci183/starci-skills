@@ -165,7 +165,7 @@ ruleParams:
     # coverage sources, held equal by spec, and the Sonar and Codecov coverage scope rendered from them). A role's subject is
     # `<name>.<role>.ts` (inside `slot` when one is named), its unit spec `<name>.<spec>.ts` beside it, and `coverage` the be-relative
     # glob the unit run measures at 100 per file. `thin` lists the thin-door rules the role is exempt from: a cli command is an
-    # action runner, not a thin transport (R133). A lane that adds a unit-tested role adds its entry here and nowhere else.
+    # action runner, not a thin transport (R134). A lane that adds a unit-tested role adds its entry here and nowhere else.
     unitRoles:
       - {role: service, spec: service.spec, coverage: "src/**/*.service.ts"}
       - {role: cli, spec: cli.spec, slot: be.cli, coverage: "src/features/cli/**/*.cli.ts", exempt: [BE_TRANSPORT_SHAPE]}

@@ -1,4 +1,4 @@
-// The one command line of a back end (scripts/hfs/rules/cli.mjs): R131 BE_CLI_REQUIRED. The clean app of
+// The one command line of a back end (scripts/hfs/rules/cli.mjs): R132 BE_CLI_REQUIRED. The clean app of
 // tests/helpers/hfs-cli-fixture.mjs is the base; a back end with a connection or a command declares the cli app be/apps/cli with
 // its Dockerfile. Where a command is declared and its spec beside it are eslint-be's (packages/eslint/be/cli.spec.mjs, testing.spec.mjs).
 import test from 'node:test';

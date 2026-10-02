@@ -54,7 +54,7 @@ function workspacesOf(files) {
   return [...folders].sort();
 }
 
-/** R127: the root package.json declares the workspaces, the package manager and turbo. */
+/** R128: the root package.json declares the workspaces, the package manager and turbo. */
 function rootFindings(repoRoot) {
   const pkg = readJson(repoRoot, MANIFEST);
   if (!pkg) return [];
@@ -65,7 +65,7 @@ function rootFindings(repoRoot) {
   return findings;
 }
 
-/** R128: the manifest of each fe workspace. */
+/** R129: the manifest of each fe workspace. */
 function workspaceManifestFindings(repoRoot, project, workspaces) {
   const findings = [];
   for (const folder of workspaces) {
@@ -90,7 +90,7 @@ function workspaceManifestFindings(repoRoot, project, workspaces) {
   return findings;
 }
 
-/** R129: be/nest-cli.json is the Nest monorepo of exactly the declared be apps. */
+/** R130: be/nest-cli.json is the Nest monorepo of exactly the declared be apps. */
 function nestFindings(repoRoot, files, beApps) {
   if (!files.includes(NEST_CLI)) return [];
   const cli = readJson(repoRoot, NEST_CLI);
@@ -132,7 +132,7 @@ const packageOf = (specifier) => {
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 };
 
-/** R130: what each fe workspace imports, it declares; the root declares no workspace package. */
+/** R131: what each fe workspace imports, it declares; the root declares no workspace package. */
 function workspaceDepFindings(repoRoot, files, workspaces) {
   const findings = [];
   const names = new Map(workspaces.map((folder) => [readJson(repoRoot, `${folder}/${MANIFEST}`)?.name, folder]).filter(([name]) => typeof name === 'string'));

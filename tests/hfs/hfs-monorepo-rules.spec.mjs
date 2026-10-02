@@ -1,5 +1,5 @@
-// The always-monorepo shape of an app (scripts/hfs/rules/monorepo.mjs): R127 HFS_MONO_WORKSPACES, R128 HFS_MONO_FE_WORKSPACE,
-// R129 HFS_MONO_NEST_PROJECTS and R130 HFS_MONO_WORKSPACE_DEP. The clean app of tests/helpers/hfs-cli-fixture.mjs is the
+// The always-monorepo shape of an app (scripts/hfs/rules/monorepo.mjs): R128 HFS_MONO_WORKSPACES, R129 HFS_MONO_FE_WORKSPACE,
+// R130 HFS_MONO_NEST_PROJECTS and R131 HFS_MONO_WORKSPACE_DEP. The clean app of tests/helpers/hfs-cli-fixture.mjs is the
 // passing base (a monorepo root, fe app workspaces, the Nest projects of the declared be apps); each violating case changes one fact.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ test('the clean monorepo is clean to every monorepo rule: root workspaces and tu
   for (const code of codes) assert.deepEqual(only(result, code), [], code);
 });
 
-// ------------------------------------------------------------------------------------------------ R127 HFS_MONO_WORKSPACES
+// ------------------------------------------------------------------------------------------------ R128 HFS_MONO_WORKSPACES
 
 test('HFS_MONO_WORKSPACES: workspaces of fe/packages only, no packageManager and no turbo devDependency are each refused on package.json', () => {
   const partial = only(checkRepo({ repoRoot: repoOf(APP, editJson('package.json', (pkg) => ({ ...pkg, workspaces: ['fe/packages/*'] }))) }), 'HFS_MONO_WORKSPACES');
@@ -60,7 +60,7 @@ test('HFS_MONO_WORKSPACES: the turbo task graph is required at the app root and 
   assert.ok(result.findings.some((f) => f.path === 'fe/turbo.json' && ['HFS_FORBIDDEN_PRESENT', 'HFS_TOOL_CONFIG_LOCAL'].includes(f.code)));
 });
 
-// ------------------------------------------------------------------------------------------------ R128 HFS_MONO_FE_WORKSPACE
+// ------------------------------------------------------------------------------------------------ R129 HFS_MONO_FE_WORKSPACE
 
 test('HFS_MONO_FE_WORKSPACE: an fe app workspace with another name, not private, or other scripts is refused on its package.json', () => {
   const file = 'fe/apps/web/package.json';
@@ -80,7 +80,7 @@ test('HFS_MONO_FE_WORKSPACE: an fe package with its build, typecheck and the wor
   assert.deepEqual(ownLint.map((f) => f.path), ['fe/packages/demo-ui/package.json']);
 });
 
-// ------------------------------------------------------------------------------------------------ R129 HFS_MONO_NEST_PROJECTS
+// ------------------------------------------------------------------------------------------------ R130 HFS_MONO_NEST_PROJECTS
 
 test('HFS_MONO_NEST_PROJECTS: a non-monorepo nest-cli, a project hfs.json does not declare, a missing one and a misplaced root are refused', () => {
   const two = appOf({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }] } });
@@ -99,7 +99,7 @@ test('HFS_MONO_NEST_PROJECTS: one project per declared app, the default an api a
   for (const declaration of [APP, two]) assert.deepEqual(only(checkRepo({ repoRoot: repoOf(declaration) }), 'HFS_MONO_NEST_PROJECTS'), [], JSON.stringify(declaration.sides.be));
 });
 
-// ------------------------------------------------------------------------------------------------ R130 HFS_MONO_WORKSPACE_DEP
+// ------------------------------------------------------------------------------------------------ R131 HFS_MONO_WORKSPACE_DEP
 
 test('HFS_MONO_WORKSPACE_DEP: a package an fe app imports but does not declare is refused, a sibling workspace package named for "*"', () => {
   const dir = repoOf(WITH_UI, (d) => {
