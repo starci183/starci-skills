@@ -54,7 +54,7 @@ test('runtime install and link use identical Windows shim text for the same runt
   const installWrites = new Map();
   assert.equal(installRuntime({ cwd, home }, {
     platform: 'win32',
-    node: 'C:\\node.exe',
+    node: path.join(home, 'node.exe'),
     exists: (file) => file === path.join(root, 'scripts', 'install', 'install.mjs'),
     mkdir: () => {},
     write: (file, text) => installWrites.set(file, text),
@@ -66,7 +66,7 @@ test('runtime install and link use identical Windows shim text for the same runt
   const linkWrites = new Map();
   assert.equal(linkRuntime({ cwd, home, root, quiet: true, stderr: () => {} }, {
     platform: 'win32',
-    node: 'C:\\node.exe',
+    node: path.join(home, 'node.exe'),
     exists: (file) => runtimeFiles(root).has(file),
     mkdir: () => {},
     write: (file, text) => linkWrites.set(file, text),
