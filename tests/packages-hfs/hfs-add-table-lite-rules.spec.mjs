@@ -39,6 +39,7 @@ const CASES = Object.freeze([
   { input: "resource2", feature: "resource2", table: "resource2" },
   { input: "v2-events", feature: "v2-events", table: "v2_events" },
 ]);
+const RESERVED = new Set(["order", "user"]);
 
 test.after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
@@ -83,6 +84,21 @@ const trackedFiles = (root) =>
     .filter(Boolean)
     .map((file) => file.replaceAll("\\", "/"));
 
+const exposeRepoTsconfig = (root) => {
+  const target = path.join(root, "node_modules", "@starci", "tsconfig");
+  fs.mkdirSync(target, { recursive: true });
+  for (const file of [
+    "package.json",
+    "base.json",
+    "be.json",
+    "build.json",
+    "next.json",
+    "e2e.json",
+  ]) {
+    fs.copyFileSync(path.join(ROOT, "packages", "tsconfig", file), path.join(target, file));
+  }
+};
+
 const problemsOf = (report) => [
   ...report.errors.map((problem) => ({ kind: "error", ...problem })),
   ...report.violations.map((problem) => ({ kind: "violation", ...problem })),
@@ -126,8 +142,11 @@ test("add table --fe stays database- and architecture-clean for every accepted t
       ),
     );
     const sql = fs.readFileSync(path.join(root, ...migration.split("/")), "utf8");
-    assert.match(sql, new RegExp(`public\\."${item.table}"`));
-    assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
+    const sqlTable = RESERVED.has(item.table) ? `"${item.table}"` : item.table;
+    assert.match(sql, new RegExp(`public\\.${sqlTable}`));
+    if (RESERVED.has(item.table)) {
+      assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
+    }
     for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
       const text = fs.readFileSync(path.join(root, ...file.split("/")), "utf8");
       const diagnostics = ts.transpileModule(text, {
@@ -152,6 +171,9 @@ test("add table --fe stays database- and architecture-clean for every accepted t
   });
   assert.deepEqual(databaseFindings, []);
 
+  // The app remains uninstalled: expose only the repository's canonical tsconfig package,
+  // while the architecture seam below supplies this repository's TypeScript compiler.
+  exposeRepoTsconfig(root);
   for (const side of ["be", "fe"]) {
     await t.test(`${side} architecture machine accepts the generated tree`, () => {
       const report = checkArchitecture({

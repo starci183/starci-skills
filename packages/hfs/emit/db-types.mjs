@@ -43,14 +43,14 @@ const PINS_FILE = new URL('../runtime/knowledge/hfs/canon-pins.yaml', import.met
  * The one spawn: an argument array, a hidden window, a bound buffer, never a shell. Specs inject a fake of the same shape. The
  * `supabase` binary is the one on PATH; a machine without it runs the CLI at the canon pin through npx (the pin of knowledge/hfs/canon-pins.yaml).
  */
-const defaultRun = (file, args, options = {}) => {
-  const first = spawn(file, args, options);
+const withNpxFallback = (run, platform) => (file, args, options = {}) => {
+  const first = run(file, args, options);
   if (file !== SUPABASE_CLI || first.error?.code !== 'ENOENT') return first;
   const version = parseYaml(fs.readFileSync(PINS_FILE, 'utf8'))?.pins?.[SUPABASE_CLI]?.version;
   if (!version) return first;
-  return process.platform === 'win32'
-    ? spawn('cmd.exe', ['/d', '/s', '/c', 'npx', '--yes', `${SUPABASE_CLI}@${version}`, ...args], options)
-    : spawn('npx', ['--yes', `${SUPABASE_CLI}@${version}`, ...args], options);
+  return platform === 'win32'
+    ? run('cmd.exe', ['/d', '/s', '/c', 'npx', '--yes', `${SUPABASE_CLI}@${version}`, ...args], options)
+    : run('npx', ['--yes', `${SUPABASE_CLI}@${version}`, ...args], options);
 };
 
 /** The first meaningful line of a failure output, for the error a human acts on. */
@@ -75,7 +75,7 @@ function apiSchemas(root) {
  * local stack), narrowed to the [api] schemas of supabase/config.toml. A failing CLI, a spawn error and an empty answer all
  * raise DbTypesError; the first stderr line names the cause.
  */
-export function emitDbTypes({ root, run = defaultRun } = {}) {
+function emitDbTypesWithRunner({ root, run }) {
   const schemas = apiSchemas(root);
   const args = ['gen', 'types', 'typescript', '--local', ...(schemas.length ? ['--schema', schemas.join(',')] : [])];
   const command = `${SUPABASE_CLI} ${args.join(' ')}`;
@@ -94,21 +94,26 @@ export function emitDbTypes({ root, run = defaultRun } = {}) {
   return stdout;
 }
 
+export function emitDbTypes({ root, run = spawn, platform = process.platform } = {}) {
+  return emitDbTypesWithRunner({ root, run: withNpxFallback(run, platform) });
+}
+
 /**
  * The types of an app that has no stack yet (a fresh scaffold): start the app's own local stack (its project id and ports from
  * supabase/config.toml; every migration of supabase/migrations is applied on start), emit the types, and stop the stack again when
  * this call started it. The slow, Docker-reaching path `hfs scaffold --edition lite` takes; `emitDbTypes` alone is the fast one for a stack that is up.
  */
-export function generateDbTypes({ root, run = defaultRun } = {}) {
-  const started = run(SUPABASE_CLI, ['start', '-x', 'studio,mailpit,logflare,vector,edge-runtime,imgproxy,supavisor'], { cwd: root });
+export function generateDbTypes({ root, run = spawn, platform = process.platform } = {}) {
+  const execute = withNpxFallback(run, platform);
+  const started = execute(SUPABASE_CLI, ['start', '-x', 'studio,mailpit,logflare,vector,edge-runtime,imgproxy,supavisor'], { cwd: root });
   const already = /already (?:running|started)/i.test(`${started?.stderr ?? ''}${started?.stdout ?? ''}`);
   if (started?.error || (started?.status !== 0 && !already)) {
     throw new DbTypesError(`\`${SUPABASE_CLI} start\` failed${started?.status != null ? ` (exit ${started.status})` : ''}: ${firstLine(started?.stderr) ?? firstLine(started?.error?.message ?? started?.error) ?? 'no output'}; Docker must be running`, { file: dbTypesPath });
   }
   try {
-    return emitDbTypes({ root, run });
+    return emitDbTypesWithRunner({ root, run: execute });
   } finally {
-    if (!already) run(SUPABASE_CLI, ['stop', '--no-backup'], { cwd: root });
+    if (!already) execute(SUPABASE_CLI, ['stop', '--no-backup'], { cwd: root });
   }
 }
 

@@ -8,12 +8,98 @@ import {
 import { TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
 
-const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
+const POSTGRES_RESERVED = new Set([
+  "all",
+  "analyse",
+  "analyze",
+  "and",
+  "any",
+  "array",
+  "as",
+  "asc",
+  "asymmetric",
+  "authorization",
+  "binary",
+  "both",
+  "case",
+  "cast",
+  "check",
+  "collate",
+  "column",
+  "constraint",
+  "create",
+  "cross",
+  "current_catalog",
+  "current_date",
+  "current_role",
+  "current_schema",
+  "current_time",
+  "current_timestamp",
+  "current_user",
+  "default",
+  "deferrable",
+  "desc",
+  "distinct",
+  "do",
+  "else",
+  "end",
+  "except",
+  "false",
+  "fetch",
+  "for",
+  "foreign",
+  "from",
+  "grant",
+  "group",
+  "having",
+  "in",
+  "initially",
+  "intersect",
+  "into",
+  "lateral",
+  "leading",
+  "limit",
+  "localtime",
+  "localtimestamp",
+  "not",
+  "null",
+  "offset",
+  "on",
+  "only",
+  "or",
+  "order",
+  "placing",
+  "primary",
+  "references",
+  "returning",
+  "select",
+  "session_user",
+  "some",
+  "symmetric",
+  "table",
+  "then",
+  "to",
+  "trailing",
+  "true",
+  "union",
+  "unique",
+  "user",
+  "using",
+  "variadic",
+  "when",
+  "where",
+  "window",
+  "with",
+]);
 
 const timestampOf = (now) =>
   new Date(now()).toISOString().replace(/\D/g, "").slice(0, 14);
 const snakeOf = (name) => name.replaceAll("-", "_");
+const featureOf = (name) => name.replaceAll("_", "-");
+const sqlIdentifierOf = (name) =>
+  POSTGRES_RESERVED.has(name) ? `"${name}"` : name;
 const singularOf = (name) => (name.endsWith("s") ? name.slice(0, -1) : name);
 const camelOf = (name) => {
   const pascal = pascalOf(name);
@@ -82,11 +168,14 @@ export function addTable({
   emitTypes = emitDbTypes,
   now = Date.now,
 }) {
-  if (!NAME.test(String(name)))
+  const requestedName = String(name);
+  if (!NAME.test(requestedName))
     throw new ScaffoldError(
       "HFS_ADD_NAME_INVALID",
-      `table name ${name} must be kebab-case (letters, digits and single dashes)`,
+      `table name ${name} must use lowercase letters, digits and single dash or underscore separators`,
     );
+  const feature = featureOf(requestedName);
+  const table = snakeOf(requestedName);
   const manifest = loadSlotManifest();
   const repo = readRepoDeclaration(manifest, root);
   const connection = repo.sides?.be?.connections?.find((candidate) => candidate.provider === "supabase");
@@ -104,10 +193,10 @@ export function addTable({
         .filter((file) => MIGRATION.test(file))
         .sort()
     : [];
-  if (migrations.some((file) => file.endsWith(`_${name}.sql`)))
+  if (migrations.some((file) => file.endsWith(`_${feature}.sql`)))
     throw new ScaffoldError(
       "HFS_ADD_EXISTS",
-      `table ${name} already has a migration`,
+      `table ${requestedName} already has a migration`,
     );
   const stamp = timestampOf(now);
   const latest = migrations.at(-1)?.slice(0, 14);
@@ -118,26 +207,27 @@ export function addTable({
     );
 
   const values = {
-    name,
-    table: snakeOf(name),
-    Name: pascalOf(name),
-    nameCamel: camelOf(name),
-    upper: snakeOf(name).toUpperCase(),
-    singular: singularOf(name),
-    Singular: pascalOf(singularOf(name)),
+    name: feature,
+    table,
+    tableSql: sqlIdentifierOf(table),
+    Name: pascalOf(feature),
+    nameCamel: camelOf(feature),
+    upper: table.toUpperCase(),
+    singular: singularOf(feature),
+    Singular: pascalOf(singularOf(feature)),
   };
   const planned = [
     {
-      relative: `supabase/migrations/${stamp}_${name}.sql`,
+      relative: `supabase/migrations/${stamp}_${feature}.sql`,
       body: template("be/table/migration.sql.tpl", values),
     },
-    { relative: `be/src/modules/domain/${name}/index.ts`, body: template("be/table/index.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/${name}.module.ts`, body: template("be/table/module.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/${name}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/${name}.options.ts`, body: template("be/table/options.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/${name}.service.ts`, body: template("be/table/service.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/persistence/${name}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
-    { relative: `be/src/modules/domain/${name}/persistence/${name}.sql.ts`, body: template("be/table/sql.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/index.ts`, body: template("be/table/index.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/${feature}.module.ts`, body: template("be/table/module.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/${feature}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/${feature}.options.ts`, body: template("be/table/options.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/${feature}.service.ts`, body: template("be/table/service.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/persistence/${feature}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${feature}/persistence/${feature}.sql.ts`, body: template("be/table/sql.ts.tpl", values) },
   ];
   if (fe) {
     const apps =
@@ -148,14 +238,14 @@ export function addTable({
         "add table --fe needs at least one declared Next app",
       );
     for (const app of apps) {
-      const base = `fe/apps/${app.name}/src/modules/db/${name}`;
+      const base = `fe/apps/${app.name}/src/modules/db/${feature}`;
       planned.push(
         {
-          relative: `${base}/read-${name}.ts`,
+          relative: `${base}/read-${feature}.ts`,
           body: template("fe/table/read.ts.tpl", values),
         },
         {
-          relative: `${base}/write-${name}.ts`,
+          relative: `${base}/write-${feature}.ts`,
           body: template("fe/table/write.ts.tpl", values),
         },
       );
@@ -170,7 +260,7 @@ export function addTable({
   if (clash.length)
     throw new ScaffoldError(
       "HFS_ADD_EXISTS",
-      `table ${name} already exists: ${clash.join(", ")}`,
+      `table ${requestedName} already exists: ${clash.join(", ")}`,
     );
   const owner = repo.sides.be.apps.find((app) => app.name === connection.owner && app.kind === "api");
   if (!owner)
@@ -197,7 +287,7 @@ export function addTable({
         fs.writeFileSync(target, generated);
       }
     }
-    wireApiModule(root, owner.name, name);
+    wireApiModule(root, owner.name, feature);
   } catch (error) {
     fs.writeFileSync(ownerFile, ownerBefore);
     if (typesBefore === null) fs.rmSync(typesFile, { force: true });

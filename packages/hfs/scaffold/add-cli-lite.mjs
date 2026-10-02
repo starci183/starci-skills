@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveRepoDeclaration } from "../runtime/scripts/hfs/slots.mjs";
 import { parseYaml } from "../runtime/engine/yaml.mjs";
-import { imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
+import { appScripts, imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError } from "./service.mjs";
 import { jsonText, packageJsonText } from "./app.mjs";
 
@@ -15,6 +15,11 @@ const PINS_FILE = path.join(import.meta.dirname, "..", "runtime", "knowledge", "
 /** Lite has no test world, so the existing cli tree is selected without its colocated full-edition specs. */
 export const selectLiteCliEntries = (entries) =>
   entries.filter((entry) => !entry.path.endsWith(".spec.ts"));
+
+const managedScripts = (repo) => {
+  const fragment = appScripts(repo).replace(/,\s*$/, "");
+  return fragment === "" ? {} : JSON.parse(`{${fragment}}`);
+};
 
 const CLI_OPTIONS = `import type { EnvSource } from "@modules/platform/config"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
@@ -32,59 +37,36 @@ export const parseCliAppOptions = (env: EnvSource): CliAppOptions => ({
 })
 `;
 
-const MIGRATE_RUN = `import { spawn } from "node:child_process"
-import { CommandRunner, SubCommand } from "nest-commander"
-
-/** Runs the managed db:push wrapper; the wrapper owns Supabase CLI flags and sealed secret loading. */
-export const runDbPush = (): Promise<void> =>
-    new Promise((resolve, reject) => {
-        const command = process.platform === "win32" ? "npm.cmd" : "npm"
-        const child = spawn(command, ["run", "db:push"], { stdio: "inherit" })
-        child.once("error", reject)
-        child.once("exit", (code) =>
-            code === 0 ? resolve() : reject(new Error(\`db:push exited \${code ?? "without a status"}\`)),
-        )
-    })
+const MIGRATE_RUN = `import { CommandRunner, SubCommand } from "nest-commander"
+import { MigrationRunnerService } from "@modules/platform/database"
 
 @SubCommand({ name: "run", description: "Push the pending Supabase migrations" })
 /** \`cli migrate run\`: delegates schema authority to the managed Supabase db:push script. */
 export class RunCli extends CommandRunner {
+    constructor(private readonly migrations: MigrationRunnerService) {
+        super()
+    }
+
     /** Runs the one managed migration wrapper and propagates its failure. */
     async run(): Promise<void> {
-        await runDbPush()
+        await this.migrations.run()
     }
 }
 `;
 
-const SEED_RUN = `import { readFile } from "node:fs/promises"
-import { CommandRunner, SubCommand } from "nest-commander"
-import type { EntityManager } from "typeorm"
-import { InjectPrimaryEntityManager } from "@modules/platform/database"
-import type { SqlText } from "@modules/platform/database"
-
-const SEED_FILE = "supabase/seed.sql"
-
-/** Brands the tracked, reviewed seed file; no runtime value is interpolated into it. */
-const seedText = (text: string): SqlText => {
-    assertSeedText(text)
-    return text
-}
-
-const assertSeedText = (_text: string): asserts _text is SqlText => {
-    // The brand is compile-time only; this function's single caller reads the tracked seed file verbatim.
-}
+const SEED_RUN = `import { CommandRunner, SubCommand } from "nest-commander"
+import { SeedRunnerService } from "@modules/platform/database"
 
 @SubCommand({ name: "run", description: "Run the tracked Supabase seed through the application role" })
 /** \`cli seed run\`: executes the one tracked seed through the shared least-privilege EntityManager. */
 export class RunSeedsCli extends CommandRunner {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {
+    constructor(private readonly seeds: SeedRunnerService) {
         super()
     }
 
     /** Executes the tracked seed when it contains at least one statement. */
     async run(): Promise<void> {
-        const text = seedText(await readFile(SEED_FILE, "utf8"))
-        if (text.trim() !== "") await this.entityManager.query(text)
+        await this.seeds.run()
     }
 }
 `;
@@ -106,7 +88,14 @@ export function ensureLiteCli({ root, manifest, repo }) {
   if (repo.edition !== "lite") return [];
   const declarationFile = path.join(root, "hfs.json");
   const declaration = JSON.parse(fs.readFileSync(declarationFile, "utf8"));
-  const declared = declaration.sides.be.apps.some((app) => app.kind === "cli");
+  const cliApps = declaration.sides.be.apps.filter((app) => app.kind === "cli");
+  if (cliApps.length > 1 || cliApps.some((app) => app.name !== "cli")) {
+    throw new ScaffoldError(
+      "HFS_ADD_CLI_DRIFT",
+      `hfs.json declares the cli app${cliApps.length === 1 ? "" : "s"} named ${cliApps.map((app) => app.name).join(", ")}; lite has one cli app named cli`,
+    );
+  }
+  const declared = cliApps.length === 1;
   const cliRoot = path.join(root, "be", "apps", "cli");
   if (declared) {
     if (!fs.existsSync(cliRoot))
@@ -199,6 +188,10 @@ export function ensureLiteCli({ root, manifest, repo }) {
   if (typeof pin !== "string" || pin === "")
     throw new ScaffoldError("HFS_ADD_CANON_PIN_MISSING", "add cli needs the nest-commander canon pin");
   packageManifest.dependencies = { ...(packageManifest.dependencies ?? {}), "nest-commander": pin };
+  packageManifest.scripts = {
+    ...(packageManifest.scripts ?? {}),
+    ...managedScripts(resolved),
+  };
   for (const [relative, body] of files) {
     const target = path.join(root, ...relative.split("/"));
     fs.mkdirSync(path.dirname(target), { recursive: true });

@@ -117,3 +117,9 @@ NEXT_PUBLIC_SUPABASE_URL	public environment variable name the front-end config r
 OBJECT_FUNCTION	PostgreSQL parser enum name (libpg-query ObjectType), not an emitted code
 ROLESPEC_PUBLIC	PostgreSQL parser enum name (libpg-query RoleSpecType), not an emitted code
 VAR_SET_VALUE	PostgreSQL parser enum name (libpg-query VariableSetKind), not an emitted code
+ACL_TARGET_ALL_IN_SCHEMA	PostgreSQL parser enum name (libpg-query), not an emitted code
+ACL_TARGET_OBJECT	PostgreSQL parser enum name (libpg-query), not an emitted code
+AEXPR_IN	PostgreSQL parser enum name (libpg-query), not an emitted code
+OBJECT_POLICY	PostgreSQL parser enum name (libpg-query), not an emitted code
+OBJECT_TABLE	PostgreSQL parser enum name (libpg-query), not an emitted code
+VAR_RESET	PostgreSQL parser enum name (libpg-query), not an emitted code

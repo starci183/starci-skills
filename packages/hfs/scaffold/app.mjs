@@ -269,6 +269,8 @@ const liteBaseFile = (scope, rel) => {
     && !rel.startsWith('src/features/cli/')
     && !rel.startsWith('src/modules/domain/note/')
     && rel !== 'src/modules/platform/database/connection-source.client.ts'
+    && rel !== 'src/modules/platform/database/migrate-connections.client.ts'
+    && rel !== 'src/modules/platform/database/seed-connections.client.ts'
     && !rel.startsWith('src/tests/')
     && !rel.endsWith('.spec.ts');
 };

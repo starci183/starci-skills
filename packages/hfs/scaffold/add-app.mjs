@@ -53,6 +53,11 @@ export function addApp({ root, name }) {
       "HFS_ADD_NO_FRONT_END",
       "this app has no front-end side",
     );
+  if (repo.edition === "lite")
+    throw new ScaffoldError(
+      "HFS_ADD_LITE_SINGLE_APP",
+      "a lite app has one front-end app; a second app needs the shared <project>-ui and <project>-i18n packages: run hfs upgrade --edition full",
+    );
   if (repo.sides.fe.apps.some((app) => app.name === name))
     throw new ScaffoldError(
       "HFS_ADD_EXISTS",
