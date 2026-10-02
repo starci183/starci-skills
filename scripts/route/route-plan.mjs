@@ -15,11 +15,11 @@
 //           edges, split rules and the INTENT/SCOPE/ORDER ambiguity ladder from
 //           legality.yaml (INTENT -> a provision.ask leg, never a guess)
 //
-// CLI:
-//   node scripts/route/route-plan.mjs --target "feature.A: exists proven" [--state <.starciwork dir>] [--surface ui|api]
-//   node scripts/route/route-plan.mjs --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
-//   node scripts/route/route-plan.mjs --text "build the enrolment screen" [--state <dir>]
-//   [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
+// Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+// Args: --target "feature.A: exists proven" [--state <.starciwork dir>] [--surface ui|api]
+//       --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
+//       --text "build the enrolment screen" [--state <dir>]
+//       [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
 //   --state is the impact-analysis SURVEY (define-goal always passes it): a goal naming a surveyed feature is an EXTEND, plans only the
 //   delta and keeps its backend lane; the plan carries an `impact` block. --work reads only the records legality.yaml settledOutOfBand names (a
 //   settled brand record drops brand.decide); --state is the full SURVEY.
@@ -49,8 +49,8 @@ const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..
 // ---------------------------------------------------------------- args -----
 
 function usage(code) {
-  console.error(`use: node scripts/route/route-plan.mjs
-    (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --text "<prompt>")
+  console.error(`Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+args: (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --text "<prompt>")
     [--state <.starciwork dir>] [--simulate] [--surface ui|api]
     [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]`);
   process.exit(code);

@@ -126,7 +126,8 @@ export const splitGoalLegParams = (brief, leg) => {
   return { owner: Object.keys(owner).length ? owner : null, kernel };
 };
 
-const { usage, parseArgs } = opCli(`use: node scripts/kernel/dispatch-op.mjs --op <id>
+const { usage, parseArgs } = opCli(`Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+args: --op <id>
     [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]
     [--budget <n>] [--lease <token>] [--worktree <selector>] [--json]`, {
   '--params': (o, take) => { o.params = take(); },

@@ -40,7 +40,7 @@ export default {
   // (DBTREE job_transitions has no reported -> cancelled). The settler (or starci kernel settle) settles it first.
   const unsettled = reportedJobs(db, { workflowId });
   if (unsettled.length) {
-    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ')}); settle them first (node scripts/kernel/settle/job-settle.mjs --repo <repo> --workflow ${workflowId}, or starci kernel settle), then archive`),
+    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ')}); wait for the reconciler-managed settler or use starci kernel settle for each job, then archive`),
       { code: 'archive-unsettled-reports', jobs: unsettled.map((it) => ({ jobId: it.jobId, outcome: it.outcome, dispatchId: it.dispatchId })) });
   }
 

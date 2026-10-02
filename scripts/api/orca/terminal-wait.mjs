@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP T2 / alpha5 item 1.2: Orca proves a terminal's exit; the runtime does not poll `terminal show` for it.
 // terminal-wait.mjs - the calls.yaml `terminal-wait` call as a callable function.
-//   node scripts/api/orca/terminal-wait.mjs --terminal <handle> --for exit|tui-idle [--timeout-ms <n>]
+// Internal entry: spawned by scripts/machine/close-verify.mjs; not invoked directly.
+// Args: --terminal <handle> --for exit|tui-idle [--timeout-ms <n>]
 // Live (Orca 1.4.209, 2026-10-02): `--for exit` answers within a second for an exited OR closed handle
 // ({wait: {condition, satisfied: true, status: 'exited', exitCode, exitCause}}) and times out (error.code timeout) for a live one.
 // Returns {ok, satisfied, timedOut, status, exitCause, error, errorCode, hostUnavailable}. A timeout is a clean `satisfied: false`,

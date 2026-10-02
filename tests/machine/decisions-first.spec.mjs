@@ -74,7 +74,7 @@ test('the doorbell carries the oldest item in copy-paste form', (t) => {
   assert.equal(r.action, 'rung');
   assert.match(sent[0], /^\[decide\] 1 waiting: starci kernel decisions --workflow wf-first \| oldest /);
   assert.match(sent[0], new RegExp(`oldest ${di.id}`));
-  assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/cli\.mjs dispatch-ready/);
+  assert.match(sent[0], /pick ONE: \(a\) push the ready units: starci kernel dispatch-ready/);
   assert.match(sent[0], new RegExp(`then: starci kernel decisions --repo repo-r --resolve ${di.id}`));
 });
 

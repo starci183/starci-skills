@@ -176,7 +176,7 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
   return { ok: false, verdict: value?.hostUnavailable ? 'unavailable' : 'error', error: String(value?.error ?? r.stderr ?? '').slice(0, 200) };
 }
 
-/** `node scripts/connectors/<script> status` answers running (and, for the tunnel, no health problems). */
+/** A connector's internal status probe answers running (and, for the tunnel, no health problems). */
 async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
   const [cmd, args] = node(`scripts/connectors/${script}`, ['status', ...extraArgs]);
   let last = null;

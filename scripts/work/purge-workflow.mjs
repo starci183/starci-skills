@@ -3,9 +3,10 @@
 // artifacts and logs are never deleted by housekeeping or any other writer; a finished workflow is deleted as a unit,
 // only with the owner's approval, and only after its evidence is archived and the archive verified.
 //
-//   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--json]
+// Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.
+// Args: --repo <repo> --workflow <id> [--archive-root <dir>] [--json]
 //       dry run (the default): what would be archived and deleted, per table, and whether the workflow may be purged
-//   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
+//       --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
 // --apply, in order (each step recorded in workflow_purges, engine/db/migrations/runtime/0001-init.sql; a re-run resumes):
 //   1. refuse unless the workflow is finished (phase 'finished') or archived (archived_at set) and no job of it is queued/leased/running/answering/
@@ -31,7 +32,7 @@ import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipRead } from '../api/fs/zip-read.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
-const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
+const USAGE = 'Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.\nargs: --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');

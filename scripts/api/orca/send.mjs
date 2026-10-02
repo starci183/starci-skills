@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // send.mjs — the calls.yaml `send` call, for the one message the runtime sends: an op's worker_done.
-//   node scripts/api/orca/send.mjs --task-id <task> --dispatch-id <dispatch> --from <agent terminal>
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: --task-id <task> --dispatch-id <dispatch> --from <agent terminal>
 //        --outcome succeeded|failed --dispatch-capability <the capability of your Orca preamble> [--report-path <path>] [--subject <text>]
 // Issued only by `starci kernel report` (scripts/kernel/verbs/report.mjs), which runs inside the op's own pane after the
 // report row committed, so Orca settles the op's Task and Dispatch from the dispatched pane (orca-deep-map REPLACE #9).

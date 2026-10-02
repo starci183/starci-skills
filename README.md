@@ -137,7 +137,7 @@ init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
 docs/               documentation
-examples/           todo-app and ecommerce-app (reference products with recorded .starciwork evidence) and shape-slot (a slot-teaching fixture, not a product)
+examples/           ecommerce-app (the reference product with recorded .starciwork evidence) and shape-slot (a slot-teaching fixture, not a product)
 tests/              node:test specs — npm test
 packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
 ```

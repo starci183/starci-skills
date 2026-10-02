@@ -7,8 +7,8 @@
 // no measured qualification, so eligible routes are probation, the
 // kernel-function step for the kernel's own calls, or refusal).
 //
-// CLI:
-//   node scripts/route/route-model.mjs --kind <kind>
+// Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+// Args: --kind <kind>
 //       [--role <implement|verify|decide|plan|write>]   (default: kinds.yaml role)
 //       [--domain <d>] [--risk <low|medium|high|critical>]
 //       [--floor <probation|standard|high|critical>]
@@ -28,7 +28,7 @@
 //       [--repo <path>]         kernel-function kinds also read that repository
 //                               ledger's provider-health circuit (open → unavailable)
 //       [--json] [--modelsDir <dir>] [--verbose]
-//   node scripts/route/route-model.mjs --help   prints this usage
+//       --help prints this argument description
 //
 // Prints: picked target (+model for the role), the rule that fired, the ordered
 // fallback chain, and per-candidate rejection reasons. Exit 1 on refusal
@@ -122,7 +122,7 @@ function parseArgs(argv) {
     const k = argv[i];
     if (k === '--help' || k === '-h') {
       const header = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n');
-      const from = header.findIndex(line => line.startsWith('// CLI:'));
+      const from = header.findIndex(line => line.startsWith('// Internal entry:'));
       const to = header.findIndex(line => line.startsWith('// Owner config:'));
       console.log(header.slice(from, to).map(line => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
       process.exit(0);

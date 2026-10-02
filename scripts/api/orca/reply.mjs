@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP M2: the reply is Orca's; the ledger disposition of the worker question stays the runtime's.
 // reply.mjs — the calls.yaml `reply` call as a callable function.
-//   node scripts/api/orca/reply.mjs --id <msg_id> --body <text> [--run <run_id>]
+// Internal entry: spawned by scripts/kernel/verbs/reply.mjs; not invoked directly.
+// Args: --id <msg_id> --body <text> [--run <run_id>]
 // Answers one worker `question` message; the worker's blocking
 // `orca orchestration ask` returns with this body. --from is left to Orca,
 // which resolves it from the calling terminal (the Kernel's own). Returns

@@ -262,7 +262,7 @@ function serviceItems(probes, { publicUrl = null, config = null } = {}) {
       : warn('services', p.name, `scheduled task ${p.name.slice(11)}`, p.unmanaged ? 'missing (unmanaged)' : 'not healthy', 'starci reconciler install-task --apply (the owner)');
     if (p.ok) return green('services', p.name, label, detail);
     if (!serviceWanted(p.name, config)) return green('services', p.name, label, 'off in config.yaml connectors (not required)', { required: false });
-    return red('services', p.name, label, detail, p.name === 'orca' ? 'open Orca yourself, then run start again (start never launches a GUI app)' : `node scripts/reconciler/services.mjs --start ${p.name}`);
+    return red('services', p.name, label, detail, p.name === 'orca' ? 'open Orca yourself, then run start again (start never launches a GUI app)' : 'the reconciler Host controller manages this service; run starci reconciler start');
   });
 }
 
@@ -312,7 +312,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from <archive root>/ledger-backups, owner-approved)')
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'restore the ledger from <archive root>/ledger-backups with every writer stopped (owner-approved)')
     : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')

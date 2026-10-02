@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // status.mjs — the calls.yaml `status` call as a callable function.
-//   node scripts/api/orca/status.mjs
+// Internal entry: spawned by scripts/reconciler/services.mjs; not invoked directly.
+// Args: none.
 // Returns {ok, reachable, state, error, spawnError, appExe}: reachable when the Orca runtime answers and is ready.
 // appExe is the Orca desktop app beside the CLI this runner resolves (<app>/resources/bin/orca.exe -> <app>/Orca.exe),
 // or null; it is read from disk, so it is there even when the runtime does not answer (the Orca restart needs it then).

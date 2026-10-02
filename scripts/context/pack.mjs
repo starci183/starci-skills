@@ -288,7 +288,8 @@ export function renderPromptReads(context) {
   return lines;
 }
 
-const { usage, parseArgs } = opCli(`use: node scripts/context/pack.mjs --op <id>
+const { usage, parseArgs } = opCli(`Internal entry: spawned by scripts/kernel/dispatch-op.mjs; not invoked directly.
+args: --op <id>
     [--records a,b] [--state <.starciwork dir>] [--repo <runtime root>]
     [--out <packet file>] [--json]`, {
   '--repo': (o, take) => { o.repo = take(); },
