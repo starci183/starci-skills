@@ -7,6 +7,10 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane EX-KINDS: the webhooks and realtime feature kinds.
+  - Slots `be.feature.webhooks` (`src/features/webhooks/<provider>/`) and `be.feature.realtime` (`src/features/realtime/<channel>/`), enabled by the declared patterns `webhooks` and `realtime` with three proof scenarios each (`ruleParams.be.patternScenarios`). The slot `be.transport.websocket` is gone: a socket is the realtime kind.
+  - New rules R137 `BE_WEBHOOK_SHAPE`, R138 `BE_WEBHOOK_UNVERIFIED`, R139 `BE_REALTIME_SHAPE`, R140 `BE_REALTIME_WRITES`, R141 `BE_REALTIME_TOPIC_SCOPE` (ids provisional). A webhook door verifies the signature and replay window first and makes one domain intake call; a realtime door injects only the `RealtimeHub` and subscribes to a topic built from the principal.
+  - R47 accepts the spec of a webhook or realtime door beside its door. Knowledge `webhooks.yaml` and `realtime.yaml`, code examples `backend/webhooks` and `backend/realtime`.
 - Lane MONO U1: every app is a monorepo, even a single one.
   - The app root `package.json` declares the npm workspaces `fe/apps/*` and `fe/packages/*`, `packageManager` npm and turbo (pin 2.11.6).
   - The root holds the managed `turbo.json` (slot `app.task-graph`). `fe/turbo.json` is gone.
