@@ -1,5 +1,5 @@
 import { builtinModules } from 'node:module';
-import { sourceLocation } from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 /**
  * R55 `client-reaches-server` (FE_CLIENT_REACHES_SERVER), the repository half of the eslint rule `client-no-server-import`,

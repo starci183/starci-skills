@@ -9,8 +9,8 @@
 import { loadSlotManifest, ruleParams } from '../slots.mjs';
 import { found } from './read.mjs';
 
-export const KIND_DECLARATION = 'BE_KIND_DECLARATION';
-export const KIND_EMPTY = 'BE_KIND_EMPTY';
+const KIND_DECLARATION = 'BE_KIND_DECLARATION';
+const KIND_EMPTY = 'BE_KIND_EMPTY';
 
 const FEATURES = 'be/src/features/';
 const CLI = 'cli';

@@ -5,6 +5,7 @@ import { canonical, isInside, slash } from './config.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { locateDeclaration } from '../slots.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
@@ -13,20 +14,10 @@ const ASSET_EXTENSION = /\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico
 // Framework build output a tsconfig may include (Next writes `.next/types/**/*.ts` back into tsconfig.json on
 // every build) is compiled for type resolution but is never source: it is gitignored, regenerated, and no
 // canon or architecture rule applies to it (nivo inc-ffe60c49f502).
-export const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.output', '.nuxt', '.svelte-kit', '.expo', '.docusaurus', '.swc', '.cache']);
-export function isGeneratedPath(root, fileName) {
+const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.output', '.nuxt', '.svelte-kit', '.expo', '.docusaurus', '.swc', '.cache']);
+function isGeneratedPath(root, fileName) {
   return slash(path.relative(root, fileName)).split('/').slice(0, -1).some(segment => GENERATED_SEGMENTS.has(segment));
 }
-// A `<tool>.config.*` or `<tool>.setup.*` module at the root of a project (beside a package manifest or a tsconfig.json:
-// next.config.ts and postcss.config.mjs of an app, which has no package.json of its own) is build tooling a broad `**/*.ts`
-// include pulls in; a `*.config.ts` inside a source tree (src/config/database.config.ts) has neither beside it and stays source.
-// The architecture program still reads tooling modules (a profile may declare one as source); the lint (hfs lint) judges one only
-// through the repository's own eslint.config.
-const TOOLING_MODULE = /^[^/]+\.(?:config|setup)\.[cm]?[jt]sx?$/i;
-export function isToolingModule(fileName) {
-  return TOOLING_MODULE.test(path.basename(fileName)) && ['package.json', 'tsconfig.json'].some((manifest) => fs.existsSync(path.join(path.dirname(fileName), manifest)));
-}
-
 function diagnosticMessage(ts, diagnostic) {
   return ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 }
@@ -53,7 +44,7 @@ function compilerError(ts, root, diagnostic, project, ruleId = 'ARCH_TSCONFIG_IN
  * Load TypeScript through the target package boundary, never through StarCi's own dependency graph. A side folder of an app has no
  * package.json of its own: the app root's one manifest is the boundary its TypeScript is installed under.
  */
-export function loadTargetTypeScript(repositoryRoot) {
+function loadTargetTypeScript(repositoryRoot) {
   const packageFile = path.join(locateDeclaration(repositoryRoot).appRoot, 'package.json');
   if (!fs.existsSync(packageFile)) throw Error('ARCH_TYPESCRIPT_MISSING: target package.json is required to resolve target-installed TypeScript.');
   const targetRequire = createRequire(packageFile);
@@ -98,7 +89,7 @@ function runtimeImport(ts, node) {
   return true;
 }
 
-function isUnshadowedCommonJsRequire(ts, checker, expression) {
+export function isUnshadowedCommonJsRequire(ts, checker, expression) {
   if (!ts.isIdentifier(expression) || expression.text !== 'require') return false;
   const symbol = checker?.getSymbolAtLocation(expression);
   if (!symbol) return true;
@@ -113,7 +104,7 @@ function isUnshadowedCommonJsRequire(ts, checker, expression) {
  * existing directory and a data-asset extension tail qualify; code never does, since a context of code would
  * be an import graph nobody wrote down. Returns the specifiers, or null when the import stays unproven.
  */
-export function assetContextSpecifiers(ts, sourceFile, argument) {
+function assetContextSpecifiers(ts, sourceFile, argument) {
   if (!argument || !ts.isTemplateExpression(argument)) return null;
   const head = argument.head.text;
   const spans = argument.templateSpans;
@@ -168,11 +159,6 @@ function moduleReferences(ts, sourceFile, checker) {
   return { found, unproven };
 }
 
-function sourceLocation(sourceFile, node) {
-  const point = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-  return { line: point.line + 1, column: point.character + 1 };
-}
-
 function isProductionSource(root, sourceFile) {
   return isInside(root, sourceFile.fileName)
     && CODE_EXTENSIONS.test(sourceFile.fileName)
@@ -210,7 +196,7 @@ function exportPatternCapture(pattern, request) {
   return request.startsWith(before) && request.endsWith(after) ? request.slice(before.length, request.length - after.length) : null;
 }
 
-function exportTargetStrings(value) {
+export function exportTargetStrings(value) {
   if (typeof value === 'string') return [value];
   if (Array.isArray(value)) return value.flatMap(exportTargetStrings);
   if (value && typeof value === 'object' && !Object.keys(value).some(key => key.startsWith('.'))) return Object.values(value).flatMap(exportTargetStrings);
@@ -581,6 +567,8 @@ export function unwrapExpression(ts, expression) {
   return expression;
 }
 
+/* ---- the AST walks every architecture checker shares ---- */
+
 /** The names of `expected` an import or re-export statement binds (all of them for a namespace or star form). */
 export function referencedExports(ts, statement, expected) {
   if (ts.isImportDeclaration(statement)) {
@@ -595,4 +583,3 @@ export function referencedExports(ts, statement, expected) {
   return [...expected];
 }
 
-export { isUnshadowedCommonJsRequire, sourceLocation };

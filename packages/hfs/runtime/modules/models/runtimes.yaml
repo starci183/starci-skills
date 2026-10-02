@@ -1,0 +1,728 @@
+schema: starci/runtimes@1
+purpose: |-
+  Every runtime is a provider-window pool with real parallel slots and a cooldown: the pool boundary IS the
+  quota-window boundary, so one pool never spans two independently metered windows and one window never splits
+  into two pools. The workflow-bound profile applies adaptive capacity from config.yaml: role, tier, tools,
+  qualification, independent review, fresh provider quota, shared admitted load and recent observed service
+  filter and score provider families before one runtime is handed to the typed launcher. The preference/tier
+  lists below are within-family suitability and a compatibility policy for direct low-level consumers; they are
+  not a provider fallback chain in a workflow. A runtime that fails is classified and parked for the cooldown of
+  that failure kind, doubling per repeat. Auth health is provider-wide rather than pool-wide: a confirmed
+  launch, worker-start or attestation auth rejection parks every runtime sharing that provider credential. A
+  stale-token preflight may make one real refresh attempt; a typed no-effect rejection falls through on the
+  same logical operation attempt, while partial or unknown effects require reconciliation before fallback.
+
+  Models are pinned inside the pool per DIFFICULTY (`models`) and attested at launch - never inferred from the
+  pool name. `roles` is the role-coverage gate; `models` is the difficulty-coverage gate. A pool is eligible
+  for a (role, difficulty) launch only when the role is in `roles` AND `models` names that difficulty - a pool
+  that declares no model for a difficulty is ineligible there, never silently rerouted to another model.
+  `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
+  is easy|medium|hard|insane; resolvers accept the S|M|L|XL spellings (and 'high' for 'hard').
+# CONCURRENCY LIVES HERE AND NOWHERE ELSE. `runtimes.<pool>.maxParallel` below is the enforced slot
+# count: scripts/kernel/cli.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
+# scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
+# `capacity.maxParallel` has drifted from it. Every other contract cites this file instead of
+# restating a number.
+# `maxParallelOps` is the fleet-wide ceiling across every workflow; `budgets.maxOps` in the owner's
+# config.yaml is the per-workflow one. The lower of the two admits: engine/admission.mjs
+# opSlotCeiling takes min(budgets.maxOps, maxParallelOps) and scripts/kernel/cli.mjs refuses
+# route/dispatch with `max-ops` at it.
+maxParallelOps: 20
+allocation:
+  # The default policy. config.yaml allocation.policy overrides it for `api route` (engine/config.mjs
+  # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
+  # balanced walks the eligible pools of that order and takes the FIRST one still below its config.yaml
+  # allocation.shares target of the recent dispatches (scripts/agent/balance.mjs counts them; scripts/agent/
+  # models.mjs selectPool picks), so the evidence order ranks and the share caps; when every eligible pool
+  # is at or above its share, the one furthest below (least over) takes it and the order breaks ties. Under
+  # both, every gate (role, difficulty pin, owner grant, host tools, quota/auth, circuit, maxParallel)
+  # applies first.
+  policy: prefer-then-overflow
+  # Under balanced, a pool listed here for a work class and tier is taken only when no other pool of the
+  # order is eligible: Opus stays hands-on overflow below insane, so its share is spent on think work; at
+  # insane, where only Opus and Sol pin a model, the two balance.
+  balanced:
+    overflowOnly:
+      hands-on:
+        easy: [claude-agent]
+        medium: [claude-agent]
+        hard: [claude-agent]
+  # Owner decision 2026-09-25 (review-hands, amending routing-by-evidence): a pool an order lists here is taken
+  # only when no other pool of that order is eligible, under EITHER policy - neither the balanced share nor the
+  # owner's goal routing_bias prefer moves it ahead. Opus and Sol are the review order's overflow: they take a review only when
+  # Devin is unavailable (circuit open, quota dead, full, or excluded by the cross-family rule).
+  overflowByOrder:
+    review: [claude-agent, codex-agent]
+  # Cross-family audit: a verify kind whose records overlap the output of the latest settled non-verify op of
+  # the workflow (scripts/kernel/cli.mjs cmdRoute finds that author with scripts/agent/balance.mjs
+  # auditAuthorOf) routes to an eligible pool of another audit family - the reviewer's provider differs from
+  # the implementer's. The audit families are the pools of `frontier` and `hands`: Opus or Sol review what
+  # Devin implemented; Sol reviews Opus's records and Opus reviews Sol's. The author's
+  # own family is taken only when no pool of another family is eligible (crossFamily.applied false).
+  # thinkAuditCrossFamily keeps its name from when only think verdicts were audited.
+  thinkAuditCrossFamily: true
+  # The frontier think group: Claude Opus 5.5 and GPT-6 Sol. It is what the kernel's own model calls route
+  # over (scripts/route/route-model.mjs decisionFlow kernel-function) and two families of the cross-family
+  # audit above.
+  frontier: [claude-agent, codex-agent]
+  # The hands group: Devin (SWE-2 Max). It implements and, since the owner decision of 2026-09-25
+  # (review-hands), reviews - the third audit family.
+  hands: [devin-agent]
+  # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the product ledgers of that window).
+  # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
+  # at its difficulty tier:
+  #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
+  #     test.author, the hands-on verify kinds, release/scope finish): Devin first, then Codex and Claude -
+  #     Devin passed 70% of backend.implement and 68% of interface.implement over the 72h scorecard.
+  #   scaffold (scaffold, docs, content, grammar.update - small work - and every cut slice of a fan-out, which
+  #     scripts/kernel/cli.mjs cmdRoute routes on this order): Devin first - backend.scaffold passed 73% on Devin,
+  #     43% on Codex over the 72h scorecard.
+  #   think, decide, plan (every think kind: decide, review and author ops): Claude Opus first, GPT-6 Sol second
+  #     and nothing else - Opus passed 72-73% of business/architecture.decide, Sol 60-64%. Think kinds route at a hard floor, where codex-agent pins Sol; the
+  #     easy and medium keys (Claude only, never Luna) exist for direct role consumers that bring no kind.
+  #   draw (interface.draw; owner ruling 2026-09-27 draw-devin-brand-claude, modules/kernel/owner-rulings.yaml):
+  #     Devin draws first (SWE-2 Max; token-render HTML + Playwright in the product checkout - its card carries
+  #     browser-dom), Codex (GPT-6 Sol at effort high) is the fallback. The raster regions a drawing needs are
+  #     artworkSlots for interface.asset, never painted by the drawer. Devin pins no easy or insane model, so the easy
+  #     and insane keys are Codex alone. The draw loop's independent critic stays a DIFFERENT model from the drawer
+  #     (allocation.drawLoop.critic, criticWhenDrawer).
+  #   asset (interface.asset): Codex only - the one agent with the image tool (image_gen.imagegen).
+  #   brand (brand.decide; owner ruling 2026-09-27 draw-devin-brand-claude): Claude Opus decides the brand and its
+  #     direction, GPT-6 Sol is the fallback when the Claude pool cannot serve; Codex is also the cross-family second
+  #     opinion on think work.
+  #   review (owner decision 2026-09-25 review-hands, amending the think order above: "codex/claude only
+  #     decide (that is, set the strategy), review must be done by the hands"): every verify kind -
+  #     review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit and
+  #     the hands-on e2e/integration/perf/uat verify kinds - and work.author walk the review order: Devin,
+  #     then Opus and Sol as overflow only (overflowByOrder.review). The cross-family rule sends a review of
+  #     what Devin implemented to Opus or Sol. An experiment, measured in
+  #     benchmark/findings/2026-09-25-review-hands.md.
+  # Claude and Codex keep strategy: request.analyze, scope.define, business/architecture/goal decide and
+  # revise, decision.prepare and implementation.plan (the cut) stay on think/decide/plan (Opus, Sol); brand.decide
+  # walks its own brand order (Opus, then Sol).
+  # interface.audit needs the browser-dom host tool: Devin and Codex carry it, Claude does not, so the
+  # host-tool gate passes Claude over (Devin audited it at 11% pass, 83% fail over the 72h scorecard -
+  # the experiment re-measures it).
+  # Devin (SWE-2-max) pins no easy or insane model, so easy hands-on work starts at Codex (Luna) and insane
+  # hands-on work at the frontier pools; Opus stays hands-on overflow below insane.
+  # Owner routing 2026-09-26: Opus brainstorms and decides (think/decide/plan orders); Sol draws, audits the UI
+  # and verifies e2e/security/assisted UAT (order ui: Devin as fallback when the Codex quota circuit
+  # opens); Devin implements, run the kernel and do the mechanical ops (provision.ask, workspace.manage,
+  # task.execute, knowledge.repair walk implement); the kernel's own model calls walk sol-think (Sol, Opus overflow).
+  tiers:
+    hard:
+      default: [devin-agent, codex-agent, claude-agent]
+      implement: [devin-agent, codex-agent, claude-agent]
+      write: [devin-agent, codex-agent, claude-agent]
+      verify: [devin-agent, codex-agent, claude-agent]
+      scaffold: [devin-agent, codex-agent, claude-agent]
+      think: [claude-agent, codex-agent]
+      decide: [claude-agent, codex-agent]
+      plan: [claude-agent, codex-agent]
+      draw: [devin-agent, codex-agent]
+      asset: [codex-agent]
+      brand: [claude-agent, codex-agent]
+      review: [devin-agent, claude-agent, codex-agent]
+      ui: [codex-agent, devin-agent]
+      sol-think: [codex-agent, claude-agent]
+    medium:
+      default: [devin-agent, codex-agent, claude-agent]
+      implement: [devin-agent, codex-agent, claude-agent]
+      write: [devin-agent, codex-agent, claude-agent]
+      verify: [devin-agent, codex-agent, claude-agent]
+      scaffold: [devin-agent, codex-agent, claude-agent]
+      think: [claude-agent]
+      decide: [claude-agent]
+      plan: [claude-agent]
+      draw: [devin-agent, codex-agent]
+      asset: [codex-agent]
+      brand: [claude-agent, codex-agent]
+      review: [devin-agent, claude-agent, codex-agent]
+      ui: [codex-agent, devin-agent]
+      sol-think: [codex-agent, claude-agent]
+    easy:
+      default: [codex-agent, claude-agent]
+      implement: [codex-agent, claude-agent]
+      write: [codex-agent, claude-agent]
+      verify: [codex-agent, claude-agent]
+      scaffold: [codex-agent, claude-agent]
+      think: [claude-agent]
+      decide: [claude-agent]
+      plan: [claude-agent]
+      draw: [codex-agent]
+      asset: [codex-agent]
+      brand: [claude-agent, codex-agent]
+      review: [claude-agent, codex-agent]
+      ui: [codex-agent]
+      sol-think: [codex-agent, claude-agent]
+    # Insane tops the ladder: only pools that declare an insane model can serve it. Devin carries no insane
+    # pin and is ineligible here by the models gate, so it is absent rather than listed-and-rejected (an insane
+    # review is Opus's, with Sol as overflow).
+    insane:
+      default: [claude-agent, codex-agent]
+      implement: [claude-agent, codex-agent]
+      write: [claude-agent, codex-agent]
+      verify: [claude-agent, codex-agent]
+      scaffold: [claude-agent, codex-agent]
+      think: [claude-agent, codex-agent]
+      decide: [claude-agent, codex-agent]
+      plan: [claude-agent, codex-agent]
+      draw: [codex-agent]
+      asset: [codex-agent]
+      brand: [claude-agent, codex-agent]
+      review: [claude-agent, codex-agent]
+      ui: [codex-agent]
+      sol-think: [codex-agent, claude-agent]
+  # config.yaml allocation.preferredProvider is a bias within the tier's eligible pools and never moves think
+  # work to a pool outside `think` (scripts/route/route-model.mjs).
+  preference:
+    implement: [devin-agent, codex-agent, claude-agent]
+    verify: [devin-agent, codex-agent, claude-agent]
+    write: [devin-agent, codex-agent, claude-agent]
+    scaffold: [devin-agent, codex-agent, claude-agent]
+    think: [claude-agent, codex-agent]
+    decide: [claude-agent, codex-agent]
+    plan: [claude-agent, codex-agent]
+    draw: [devin-agent, codex-agent]
+    asset: [codex-agent]
+    brand: [claude-agent, codex-agent]
+    review: [devin-agent, claude-agent, codex-agent]
+    ui: [codex-agent, devin-agent]
+    sol-think: [codex-agent, claude-agent]
+  # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
+  # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
+  # every slot of the pool and leaves the rest of the tree waiting behind it.
+  fanOut: {seamFirst: true, maxPerGroup: 10}
+  # Deterministic same-op slicing — the kernel measures the write scope and calls `api estimate`;
+  # it never guesses an agent count. W = sum(weight * count) in agent-minutes places the closure in
+  # a `size` class, and the class plus the owner's `parallel.gear` (config.yaml) names how many
+  # agents the op asks for. `s` and `m` are always one agent; only `l` and `xl` fan out. The static
+  # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
+  # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
+  # routes them one after the other with plain api route (a Kernel --prefer/--avoid is ignored, owner
+  # decision 2026-09-25) so the fleet spreads over the lanes instead of piling onto the first pool. A
+  # hands-on slice (payload.cut) walks the scaffold order, Devin first (owner decision 2026-09-25): each
+  # routed slice is already counted before the next one is routed, and a pool that reaches its share
+  # passes the next slice down the order.
+  # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
+  # `api estimate` requests, and admission still clamps it.
+  slicing:
+    weights: {file: 4, assertion: 3, component: 12, record: 2}
+    targetMinutes: [15, 30]
+    maxSlices: 15
+    gears: [1, 2]
+    # Size classes over the same measure. A closure is `xl` when any of its counts reaches an `xl`
+    # bound, `l` when any reaches an `l` bound, `s` when W is inside targetMinutes[0], else `m`.
+    # `l.from.files: 12` is ledger-derived: of 52 settled implement/refactor/author jobs in the
+    # measured product ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
+    # it, the first cutoff where the majority exceeds one targetMinutes[1] window
+    # (benchmark/findings/2026-09-23-parallel-gear.md). Every other `from` bound is the
+    # benchmark/findings/fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
+    # windows and no assertion or component measurement at all, so `xl.from` and both `assertions`
+    # bounds have no observation behind them and are re-derived when estimate inputs are recorded.
+    size:
+      l:  {from: {files: 12, assertions: 40},  agents: {1: 3, 2: 5}}
+      xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
+  # The fleet's operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
+  # them and kernel contracts cite the key rather than restating the number, so each one is changed here
+  # and nowhere else.
+  dispatchLeaseTtlMs: 1800000
+  watchdogCadenceMs: 300000
+  observeCadenceMs: 180000
+  # activeStaleMs: an `active` screen (spinner/"Working" row) is trusted only while the terminal still
+  # prints; a spinner re-renders every second, so output older than this is a frozen frame. The watchdog
+  # then treats the Kernel as turn-idle (reason stale-active) and wakes it, and a worker reads turn-idle
+  # for the nudge frontier (scripts/lib/terminal-liveness.mjs staleAwareState).
+  # quietMs: a worker still at its idle prompt (or frozen) this long after a delivered nudge, with no
+  # output since, is quiet - dead to the frontier; the watchdog settles it failed-no-report and queues
+  # its retry (api reconcile --dead-worker --settle-failed). A provider card's liveness.activeStaleMs /
+  # liveness.quietMs overrides these per provider (modules/models/agents/<provider>.yaml).
+  # launchGraceMs: a managed worker-start returns before Orca injects the worker's Task, so for this
+  # long after its op-dispatched event a managed worker that still reads an idle prompt is `starting`
+  # - never nudge-ready, and api nudge skips it worker-starting.
+  # A command-terminal dispatch has already proven its prompt submitted and carries no grace; a
+  # staged paste is nudge-ready at any age, and a nudge since the dispatch ends the grace.
+  # kernelTurnBudgetMs / supervisorTurnBudgetMs: the longest ONE busy turn of a Kernel / the [Supervisor] seat (its
+  # spinner timer) before the reconciler's host controller sends the agent's own interrupt key and re-wakes it with
+  # the decision doorbell; still the same turn turnInterruptGraceMs later, the seat is replaced (KERNEL_TURN_OVERDUE,
+  # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
+  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
+    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
+  # one local git read over a job's owned paths (scripts/kernel/owned-path-effects.mjs ownedPathEffects, job-artifacts.mjs).
+  settleGit: {commandMs: 15000}
+  # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
+  # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
+  # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json
+  # (scripts/kernel/patch-json.mjs) - lines kept per file and in total, files, characters per line, and the size of
+  # an image literal decoded into <patch>.assets/.
+  logs:
+    perJobCap: 2000
+    dataMaxBytes: 4096
+    diff: {fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5242880}
+  # Recovery windows. hostOutage (scripts/kernel/host-outage.mjs): how long a watchdog tick or a kernel
+  # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
+  # it is asked again.
+  hostOutage: {waitMs: 90000, deathSettleMs: 10000}
+  # resume: unused since resume-all.mjs was retired (2026-09-28); the logon run waited orcaWaitMs for Orca; the scheduled task
+  # re-runs resume every everyMs (whole minutes: schtasks /MO).
+  resume: {orcaWaitMs: 600000, everyMs: 600000}
+  # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
+  # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
+  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the host
+  # controller logs the counts and the parents holding the most. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
+  # probe fails the Orca app (never its terminal daemon) gets closeWaitMs to close before it is forced, is launched
+  # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
+  # this long flags a dead kernel. orphanedFrontierMs: a workflow read orphaned-frontier on ticks this far apart is
+  # flagged. noProgressMs: a STALLED workflow idle this long is flagged. statusApp: the status
+  # UI's port and scheduled task, restarted when the port does not answer within probeTimeoutMs. alertRepeatMs: one
+  # alert key reaches the inbox and Telegram at most once per window. actionSlaMs: an owed action (scripts/supervisor/
+  # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
+  # ownerDigestMs: the Fleet Notifier's periodic owner digest goes out at most this often.
+  supervisorTick:
+    everyMs: 1800000
+    host: {maxNode: 300, maxGit: 100}
+    orca: {probeTimeoutMs: 30000, probes: 5, gapMs: 30000, closeWaitMs: 20000}
+    deadKernelMs: 900000
+    orphanedFrontierMs: 1800000
+    noProgressMs: 21600000
+    statusApp: {port: 4547, task: 'StarCi Harness App', probeTimeoutMs: 5000}
+    alertRepeatMs: 21600000
+    actionSlaMs: 1800000
+    ownerDigestMs: 7200000
+  # supervisorLearning (scripts/machine/lessons.mjs, supervise.yaml selfLearning): a failure signature seen
+  # minRepeats times opens a hypothesis; a landed experiment is measured for measureMs (its signature recurring, a new
+  # signature naming a file it changed, or an op success rate lower by successDrop -> revert due); at most
+  # dailyAutoLandCap autonomous landings in 24 h; an owner-feedback lesson weighs ownerWeight (a self-derived one 1).
+  supervisorLearning: {minRepeats: 2, measureMs: 21600000, dailyAutoLandCap: 8, ownerWeight: 3, successDrop: 0.1}
+  # progress (scripts/kernel/progress-rca.mjs; owner 2026-09-28 "could the supervisor not think before?" and "why do
+  # workflows not coordinate themselves but wait for the supervisor"): the outcome SLA each Kernel reads first on every wake (api status
+  # progress + rca) and the Supervisor backstops. units/h over windowMs (only units that passed their gates), ETA over
+  # etaWindowMs. A priority workflow (highest ramThrottle.priorities weight) below minUnitsPerHour.priority for graceMs,
+  # or holding queued-ready work while running < its allowed parallelism, is a progress stall: the Kernel acts on the
+  # ranked rca.actions at once; a stall older than supervisorGraceMs is the Supervisor's (progress-stall). maxUnitsPerEdit
+  # bounds one light graph-edit; recutThreshold open cut-shaped failures (absent paths, grants too narrow) rank a heavy
+  # re-cut first. rca: failures of one op in one workflow >= minFailures inside windowMs open the RCA even without a stall.
+  # commandTimeoutMs: the window the tool-timeout action gives an op (op-override).
+  progress:
+    windowMs: 3600000
+    etaWindowMs: 21600000
+    graceMs: 1800000
+    supervisorGraceMs: 3600000
+    minUnitsPerHour: {priority: 3, default: 0}
+    maxUnitsPerEdit: 3
+    recutThreshold: 3
+    commandTimeoutMs: 600000
+    # settleBacklog: SETTLE-FIRST - api route/dispatch refuse settle-backlog while >= max filed reports older than ageMs
+    # wait unconsumed (a finished [Op] keeps its terminal and slot until its settle closes it).
+    # The runtime settles green reports itself (settler below); this refusal counts only the reports waiting on the Kernel
+    # (non-green outcomes and done reports the settler handed over as needs-kernel-decision), consumed or not.
+    settleBacklog: {max: 3, ageMs: 120000}
+    rca: {minFailures: 3, windowMs: 86400000, examples: 4}
+  # settler (scripts/kernel/settle/job-settle.mjs; owner ruling settle-runtime-service 2026-09-28): the runtime settles every
+  # filed done report whose declared checks re-verify green through the same `api check` + `api settle` path, from each
+  # workflow watchdog loop every everyMs and right after `api report`. rerunTimeoutMs bounds one declared check re-run and
+  # itemBudgetMs one report. invariantMaxAgeMs: the Supervisor tick asserts no filed/consumed report of a live job stays
+  # unsettled and un-handed-over longer than this (settle-unsettled-report, a runtime bug). releaseWindowMs: settled jobs
+  # this recent whose worker close is unproven are closed and verified. tail: the async settle tail (artifact indexing,
+  # evidence copy, session retention, input baselines, rev drift) retries a failed run after retryMs, up to maxAttempts.
+  settler:
+    everyMs: 60000
+    rerunTimeoutMs: 300000
+    itemBudgetMs: 900000
+    invariantMaxAgeMs: 180000
+    releaseWindowMs: 86400000
+    tail: {retryMs: 120000, maxAttempts: 5}
+  # redesign (api redesign; owner 2026-09-28: heavy redesign is dispatched to the op that owns it, and the Kernel stays on
+  # Devin): these ops, enqueued from an RCA, route as `routeAs` (implementation.plan: the plan order - Opus, then Sol) at
+  # >= minDifficulty at `effort` whatever their usual order (work.author walks the review order, Devin first, otherwise).
+  redesign:
+    ops: [work.author, scope.define, goal.revise]
+    routeAs: implementation.plan
+    minDifficulty: hard
+    effort: high
+  # restart: unused since restart-all.mjs was retired (2026-09-28); it waited waitMs for every running workflow to show one live
+  # Kernel, polling every pollMs.
+  restart: {waitMs: 480000, pollMs: 20000}
+  # selfReload (scripts/machine/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
+  # replacement takes over the loop's lock within handoverMs or is stopped.
+  selfReload: {minIntervalMs: 300000, handoverMs: 30000}
+  # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
+  # tick's claim lock is cleared after lockStaleMs.
+  footprint: {everyMs: 600000, lockStaleMs: 60000}
+  # jobGuard (scripts/guards/hook-install.mjs): a guard file older than ttlMs is pruned.
+  jobGuard: {ttlMs: 604800000}
+  # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
+  # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
+  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6}
+  # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
+  # workflow this long earns its Kernel one heads-up per newly waiting workflow.
+  waiterPriority: {blockingHeadsUpMs: 900000}
+  # cutSeam (scripts/kernel/seam-policy.mjs; owner ruling 2026-09-28 "a seam must not block the whole chain"): a cut
+  # sibling ordinal waits on its seam at most maxSiblingWaitMs (30 min), then runs on a stub and owes one
+  # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
+  # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
+  cutSeam: {maxSiblingWaitMs: 1800000, recutAfterFailures: 2}
+  # opTelemetry (scripts/machine/op-metrics.mjs): op health per op and per workflow over the last windowMs; the
+  # supervisor tick records one supervisor-op-metrics snapshot per run and the owner digest's trend line compares the
+  # newest with the one closest to trendMs earlier. stuckSla: every wait a running workflow holds (api status stuck[])
+  # is severity warn past warnMs and critical past criticalMs - either is a Supervisor owed action; the tick alerts
+  # every critical one.
+  opTelemetry:
+    windowMs: 86400000
+    trendMs: 86400000
+    stuckSla:
+      owner-gate: {warnMs: 14400000, criticalMs: 86400000}
+      peer-wait: {warnMs: 3600000, criticalMs: 14400000}
+      dependency: {warnMs: 14400000, criticalMs: 86400000}
+      retry-cap: {warnMs: 1800000, criticalMs: 14400000}
+      deferred-settle: {warnMs: 1800000, criticalMs: 7200000}
+      queued-ready: {warnMs: 900000, criticalMs: 3600000}
+      throttled: {warnMs: 3600000, criticalMs: 14400000}
+  # quitAgent (scripts/kernel/quit-agent.mjs): after the agent's own quit input is typed, settle waits
+  # this long for the terminal to disconnect before the release/close proceeds anyway.
+  quitAgent: {waitMs: 6000}
+  # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
+  drawRender: {settleMs: 500}
+  # drawLoop (scripts/work/draw-loop.mjs, scripts/work/draw/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
+  # draws -> shoots -> evaluates -> fixes in rounds. A loop stops when every machine metric passes and the
+  # independent critic's beauty is at least beautyMin, after maxRounds, or after stallRounds rounds in a row that
+  # neither cut the failures nor raised the beauty; the best round is kept. Taste thresholds: accentBudget is the
+  # largest share of the render the accent colour may fill (the brand art band excluded), bandsPerCardMax the most
+  # hairline bands one card splits into, badgesPerEntityMax the most badges one entity carries. critic is the fresh,
+  # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: started
+  # through orchestration worker-start --agent <provider> --model --effort (scripts/agent/lib.mjs startAgent) on a
+  # runtime worktree detached at the empty tree (draw-critic.mjs criticWorkspace; Orca refuses a bare temp dir) holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
+  # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27
+  # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's provider, bound to its
+  # terminal - scripts/guards/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is
+  # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
+  # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
+  # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param
+  # directionArchetype=<archetype> first). false switches the gate off.
+  drawLoop:
+    maxRounds: 10
+    stallRounds: 2
+    beautyMin: 8
+    accentBudget: 0.10
+    bandsPerCardMax: 3
+    badgesPerEntityMax: 2
+    critic: {provider: codex, model: gpt-6-sol, effort: high, timeoutMs: 900000}
+    criticWhenDrawer:
+      codex: {provider: claude, model: claude-opus-5-5, effort: high, timeoutMs: 900000}
+    directionPrerequisite: true
+    # How long the workflow that claimed foundation `shell` (the layout chain an interface.draw draws) may hold it before a
+    # waiting draw opens a Supervisor Decision Item (scripts/kernel/shell-foundation.mjs; owner ruling 2026-09-29 draw-from-todo).
+    shellFoundationStallMs: 7200000
+  # autopilot (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish, modules/kernel/
+  # owner-rulings.yaml): "run to the finish in one go, don't stop to ask the owner - not even UX/UI review; the owner
+  # reviews once at the end". enabled is the default for every running workflow; workflows.<workflowId>.enabled
+  # overrides it for one workflow (api autopilot --workflow <id> --set on|off records a ledger override that wins
+  # over both). Under autopilot:
+  #   - a draw-review or brand-direction-review ask whose machine gates pass is answered PROVISIONALLY (answeredBy
+  #     autopilot, receipt provisional:true + gate evidence); it never becomes golden and never counts as an owner
+  #     answer (owner-claim.mjs). Failing gates answer redraw/revise with the gate findings, at most
+  #     redrawBudget times per record, then the leg is deferred to the final review;
+  #   - a credential, real-money, shared-external-system or owner-only ask is deferred-to-handover: nothing is
+  #     sent or waited on, the leg proceeds on the sandbox/stub path the deferral names, the live-proof legs that
+  #     need it wait for the one end-of-flow credential checklist (provision.ask subject handover-credentials);
+  #   - a retry cap or an owner-gate that is really a runtime/process issue is a supervisor-gate incident (the
+  #     Supervisor fixes or decides the retry), supervisorExtraBudget gates per node group, then the leg is
+  #     deferred; an unresolved supervisor-gate older than supervisorGateTimeoutMs defers what it holds;
+  #   - budgets caps one workflow (non-kernel jobs, token total recorded on jobs, wall time since start): past
+  #     one, a supervisor-gate holds new dispatch until the Supervisor extends the budget.
+  autopilot:
+    enabled: true
+    workflows: {}
+    redrawBudget: 2
+    supervisorExtraBudget: 2
+    supervisorGateTimeoutMs: 21600000
+    budgets: {attempts: 600, tokens: 400000000, wallMs: 1209600000}
+  # serveAsk (scripts/kernel/ask-server.mjs): the default lifetime of a served owner-ask link
+  # (--ttl <ms> overrides it per serve).
+  serveAsk: {ttlMs: 14400000}
+  # workerJobs (scripts/supervisor/workers.mjs takeLeases, scripts/supervisor/supervisor-watchdog.mjs
+  # filedReports): a contract worker's file leases expire leaseTtlMs after it takes them, so a dead
+  # worker's leases free themselves; the watchdog consumes worker reports filed in the last
+  # reportWindowMs.
+  workerJobs: {leaseTtlMs: 604800000, reportWindowMs: 604800000}
+  # draft (scripts/kernel/clear-draft.mjs): the beat between one Ctrl+U and the re-read that judges
+  # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
+  # the wake-delivery draft probe caps its own interval at it.
+  draft: {intervalMs: 300}
+  # housekeeping (scripts/housekeeping/housekeeping.mjs): every retention window and root the host
+  # cleanup reads - no literal may live in the script. tmp: top-level %TEMP% entries whose name starts
+  # with one of tmpPrefixes (the prefixes StarCi, its ops lanes and its spec fixtures create) and
+  # whose age passes tmpMaxAgeMs are removed, never %TEMP%/claude and never a dir a live process
+  # holds. Agent session files (codex sessions and archived_sessions, devin
+  # transcripts and summaries, orca's own codex-runtime-home sessions/generated_images) older than
+  # sessionArchiveAfterMs move under archiveRoot keeping their relative path; Claude Code project
+  # transcripts get the longer claudeTranscriptArchiveAfterMs. Archive files older than
+  # archiveMaxAgeMs are deleted outright. lanesRoot is where lane worktrees sit; a landed lane is
+  # removed only once its branch reflog, HEAD reflog and directory stayed unchanged for laneGraceMs
+  # (a fresh lane with no commit yet reads as landed to git cherry); unset, no lane is removed.
+  # logMaxAgeMs caps every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
+  # gitIndexLockStaleMs: a product checkout's .git/index.lock older than this, with no git process on
+  # that repository (one naming no repository counts as on it), is removed by
+  # scripts/api/git/index-lock.mjs - from the op worker's git shim before git runs, and by the
+  # housekeeping area gitlocks - and recorded as a supervisor-ledger git-index-lock-removed event. A
+  # live git holds the lock only while it writes (a commit with hooks: minutes at most), and its
+  # process keeps the lock regardless of age.
+  housekeeping:
+    tmpMaxAgeMs: 172800000
+    tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
+      codex-, deps-, direction-part-, draw-layer-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
+      doc-language-, guidance-, hk-, hfs-, install-link-, kernel-check-, kguard-, sup-orca, land-, op-manifest-, path-key-, pathspec-, push-scan-spec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
+      work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
+      work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, example-verify-,
+      example-work-gate-, work-artifacts-, work-consistency-, work-surfaces-,
+      grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, release-gate-, seat-titles-, slice-typecheck-, unit-roles-]
+    sessionArchiveAfterMs: 259200000
+    claudeTranscriptArchiveAfterMs: 604800000
+    archiveMaxAgeMs: 2592000000
+    # archiveRoot and lanesRoot are unset on purpose: no host location lives in a tracked file. The defaults are
+    # <starciLocalRoot>/archive and <starciLocalRoot>/lanes (scripts/machine/home.mjs archiveRoot, lanesRoot); the owner
+    # relocates them with STARCI_ARCHIVE_ROOT and STARCI_LANES_ROOT or by setting these keys on the host.
+    laneGraceMs: 86400000
+    logMaxAgeMs: 1209600000
+    gitIndexLockStaleMs: 300000
+    # gc: the Supervisor's garbage collection (scripts/supervisor/gc.mjs, every tick; owner 2026-09-28 "there must be
+    # garbage collection"). An idle bare shell or an unregistered runtime terminal of a live workflow is closed only once it has
+    # been seen for gcMinAgeMs (a dispatch binds its terminal well within that); a merged lane worktree only once idle
+    # for gcLaneGraceMs. GC never purges an ended workflow: housekeeping does (Q6: 30 days, zipped and verified first).
+    gcMinAgeMs: 600000
+    gcLaneGraceMs: 1800000
+  # gc: the cadence of the Supervisor's periodic sweep (scripts/supervisor/gc.mjs; owner 2026-09-28 "every 30 minutes, not
+  # every tick": the tick only checks whether it is due) and the tabs it never touches (keepTitles: regexes on the tab or
+  # pane title; an owner's hand-opened tab with recent output is reported, not closed, allowlisted or not).
+  gc:
+    sweepMs: 1800000
+    # laneCap: the most lane worktrees that stay registered under the lanes root (scripts/supervisor/gc.mjs collectLanes); past it the
+    # longest idle clean lanes go, landed or not (an unlanded lane keeps its branch). Owner rule: worktrees never accumulate.
+    laneCap: 40
+    keepTitles: []
+  # reconciler (scripts/reconciler/*; DESIGN 7.4-7.8, contract modules/reconciler/reconciler.yaml): the engine polls
+  # every ledger's events every pollMs; the leader row lasts leaseMs and is renewed (with the heartbeat row and file)
+  # every renewMs; boot.mjs ensure restarts an engine whose heartbeat is older than
+  # heartbeatStaleMs; one api status snapshot per workflow is shared for statusCacheMs; a failing key backs off
+  # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
+  # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).
+  reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000}, crashLoop: {max: 3, windowMs: 1800000}}
+  # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
+  # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
+  # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
+  # (scripts/machine/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
+  # then reduce the number of parallel ops, avoid freezing the machine and killing ops mid-run"): at every dispatch the effective cap
+  # is min(maxParallelOps, running + the ops that fit in free RAM above hardFloorPct of total), counted across
+  # every ledger of the host, and never above maxParallelOps. minFreeRamPct is the heavy floor: below it no NEW
+  # heavy op (opRam class heavy: Playwright / render / test / implement) starts from a workflow below the top
+  # priority, light ops still start; heavy resumes only above ramThrottle.heavyResumeAbovePct (hysteresis).
+  # Below landSpecPauseBelowPct no heavy op starts from any workflow and the land gate's spec runs pause until
+  # free RAM is back above landSpecResumeAbovePct. A CPU at or above cpuHeavyStopAbove pauses heavy ops the
+  # same way until it falls below cpuHeavyResumeBelow. Running ops are never stopped. Owner ruling 2026-09-28
+  # ("15→10, 10→2.5"): the heavy floor 10% resuming at 15%, critical 2.5% resuming at 5%, the fit floor 2.5%.
+  resources:
+    minFreeDiskGb: 20
+    minFreeRamPct: 10
+    ramThrottle:
+      heavyResumeAbovePct: 15
+      landSpecPauseBelowPct: 2.5
+      landSpecResumeAbovePct: 5
+      hardFloorPct: 2.5
+      cpuHeavyStopAbove: 0.95
+      cpuHeavyResumeBelow: 0.85
+      # The estimate history: the newest historySamples op-ram-footprint samples (the Resource controller records them);
+      # a kind's measured RAM replaces its opRam prior once it has historyMinObservations observations. kernelMb:
+      # the RAM one running Kernel's agent is assumed to hold, subtracted from the agent trees before sharing.
+      historySamples: 48
+      historyMinObservations: 3
+      kernelMb: 900
+      # priorities: {<workflowId>: {weight, reserve}}. Weight 1 is everyone's default. A workflow below the top
+      # weight leaves `reserve` slots (and the RAM its queued ops need) to the higher ones and loses its heavy
+      # ops first under the heavy pause; the top one keeps starting heavy ops while they fit, until critical.
+      # The Supervisor overrides per host: node scripts/supervisor/ram-cap.mjs prioritize --workflow <id>
+      # --weight <n> [--reserve <slots>]. Owner priority 2026-09-28: the prioritized FE refactor workflow ran
+      # up to 15 parallel code.refactor slices first; the other workflows ramped up in what was left.
+      priorities: {}
+    # opRam: the per-op RAM estimate table (MB for one running op: the agent CLI plus what it runs - the
+    # test runner, the browser, the dev server) and its class. heavy = Playwright / render / test /
+    # implement; light = reading, deciding, writing records. A kind not listed takes `default`.
+    opRam:
+      default: {mb: 1000, class: light}
+      backend.implement: {mb: 2500, class: heavy}
+      interface.implement: {mb: 3000, class: heavy}
+      interface.draw: {mb: 3500, class: heavy}
+      interface.asset: {mb: 2500, class: heavy}
+      interface.audit: {mb: 3000, class: heavy}
+      brand.decide: {mb: 3000, class: heavy}
+      code.refactor: {mb: 2000, class: heavy}
+      test.author: {mb: 2500, class: heavy}
+      task.execute: {mb: 2000, class: heavy}
+      backend.scaffold: {mb: 2000, class: heavy}
+      interface.scaffold: {mb: 2000, class: heavy}
+      package.scaffold: {mb: 2000, class: heavy}
+      uat.verify: {mb: 3500, class: heavy}
+      uat.assisted.verify: {mb: 3500, class: heavy}
+      e2e.verify: {mb: 3500, class: heavy}
+      perf.verify: {mb: 3500, class: heavy}
+      unit.verify: {mb: 2500, class: heavy}
+      integration.verify: {mb: 2500, class: heavy}
+      security.verify: {mb: 1500, class: light}
+      review.verify: {mb: 1000, class: light}
+      runtime.operate: {mb: 1500, class: light}
+      release.deliver: {mb: 1500, class: light}
+      architecture.decide: {mb: 800, class: light}
+      business.decide: {mb: 800, class: light}
+      decision.prepare: {mb: 800, class: light}
+      request.analyze: {mb: 800, class: light}
+      scope.define: {mb: 800, class: light}
+      scope.finish: {mb: 800, class: light}
+      goal.revise: {mb: 800, class: light}
+      docs.author: {mb: 800, class: light}
+      content.generate: {mb: 800, class: light}
+      work.author: {mb: 800, class: light}
+      grammar.update: {mb: 800, class: light}
+      knowledge.repair: {mb: 800, class: light}
+      handover.review: {mb: 800, class: light}
+      provision.ask: {mb: 800, class: light}
+      uat.assisted.prepare: {mb: 1000, class: light}
+      workspace.manage: {mb: 1000, class: light}
+  # A routed-but-queued job (payload.model set, status queued) holds its pool slot only this long after its latest route
+  # decision (payload.routedAt, else its newest route-decided event): long enough for one fan-out's sequential route
+  # calls to spread across pools, short enough that a job parked behind a gate, hold, peer-wait, dependency or
+  # readiness loop does not starve the pool (scripts/kernel/cli.mjs poolLoadOf, shared by api route and api status).
+  # Running, leased and answering jobs always hold theirs. Re-routing refreshes the hold.
+  routeHoldMs: 900000
+  verifyAvoidsImplementRuntime: true
+  onLaunchFailure: next-available-runtime
+  tieBreak: round-robin
+  # worker-start is a managed launch the host refused without classifying it. Two minutes is long
+  # enough for the kernel to reroute the attempt to a different pool, short enough that a one-off
+  # host hiccup does not park a healthy pool for the rest of the leg. prompt-delivery-stalled is its
+  # command-terminal twin: a prompt lost on a stalled send and on its one re-delivery (scripts/agent/lib.mjs).
+  # quota: the fallback only - a provider whose plan reset is configured holds its quota circuit until that reset
+  # plus one probe interval, cleared earlier by its recovery probe.
+  # capacity: the provider refused to serve the model for now (an agent card's capacityExhausted row).
+  cooldownMs: {rate-limited: 600000, quota: 3600000, capacity: 600000, auth: 86400000, other: 300000, worker-start: 120000, prompt-delivery-stalled: 120000}
+  # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
+  # a provider answering 401 is not a flake, a single refused launch can be.
+  # A circuit that reopens for the same failure inside windowMs waits factor
+  # times longer each time, capped at capMs (scripts/kernel/cli.mjs
+  # writeProviderCircuit). An un-onboarded CLI does not clear in two minutes.
+  circuitBackoff: {factor: 5, capMs: 3600000, windowMs: 3600000}
+  providerStrikes: {worker-start: 2, prompt-delivery-stalled: 2}
+  backoffFactor: 2
+  maxCooldownMs: 3600000
+runtimes:
+  # One Codex account window carries both models: Luna is the easy/medium model, Sol the hard and insane one.
+  # Role/tier/tool/quality gates still apply on top of the difficulty pin; an owner allocation changes
+  # capacity, never qualification or effect authority.
+  codex-agent:
+    target: codex-agent
+    provider: codex
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 10
+    models:
+      easy: gpt-6-luna
+      medium: gpt-6-luna
+      hard: gpt-6-sol
+      insane: gpt-6-sol
+    effort:
+      easy: low
+      medium: medium
+      hard: high
+      insane: max
+  # One Claude session/week window, all five roles on the same pinned model at every difficulty. The Claude
+  # CLI lists no models, so the dispatch's model attestation is what proves the claude-opus-5-5 id.
+  claude-agent:
+    target: claude-agent
+    provider: claude
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 6
+    models:
+      easy: claude-opus-5-5
+      medium: claude-opus-5-5
+      hard: claude-opus-5-5
+      insane: claude-opus-5-5
+  # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
+  # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
+  # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
+  # `api route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed launch/refusal status are the live capacity signal on top of
+  # this cap. swe-2-max is a medium+ agent: no easy pin, and the easy tier does not list the pool.
+  devin-agent:
+    target: devin-agent
+    provider: devin
+    roles: [implement, verify, write]
+    maxParallel: 10
+    capacityAuthority: explicit-workflow-quota
+    quotaTelemetry: launch-status
+    models:
+      medium: swe-2-max
+      hard: swe-2-max
+# The allocator's reading of each kind, from what its op manifest's goal and steps do. `role` is the
+# kinds.yaml role. `work` is `think` when the output is a canonical record (SRS, SDS, scope, goal, decision,
+# brand, ui, Work, workspace, rule) or a verdict about quality, and `hands-on` when the op builds, runs or
+# measures under a record someone else settled. `floor` is the least difficulty the kind routes at:
+# scripts/agent/models.mjs selectPool raises a measured difficulty to it and never lowers one. Every think
+# kind's floor is hard, the tier where every think pool pins a frontier model. The kernel's own model
+# calls (selection.yaml kernelFunctionKinds) are think work at the same floor. `order` names the allocation
+# tiers/preference key the kind walks when it is not the default (`think` for think work, else the role):
+# `scaffold` (Devin first) for scaffold, docs, content and grammar work, `draw` (Devin first, Codex Sol at effort high
+# the fallback) for interface.draw, `asset` (Codex only, the image tool) for interface.asset, `brand` (Opus first, Sol
+# the fallback) for brand.decide, `review` (Devin, Opus and Sol overflow) for the remaining verify kinds and
+# work.author (owner decision 2026-09-25 review-hands), `ui` (Codex first, Devin as fallback) for
+# interface.audit, e2e.verify, security.verify and uat.assisted.verify, `implement` for the mechanical
+# think ops the hands take whatever their kind role - provision.ask, workspace.manage, task.execute and
+# knowledge.repair - and `sol-think` (Sol first, Opus overflow) for the kernel's own model calls, verify
+# calls included (owner routing 2026-09-26). work.author authors Work records - the write role, as in
+# modules/models/kinds.yaml - so the hands pools, which carry no plan role, can take it; its cut form,
+# implementation.plan, stays plan work on the think order.
+roleOfKind:
+  request.analyze: {role: plan, work: think, floor: hard}
+  task.execute: {role: plan, work: think, floor: hard, order: implement}
+  backend.implement: {role: implement, work: hands-on, floor: medium}
+  backend.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
+  interface.implement: {role: implement, work: hands-on, floor: medium}
+  interface.audit: {role: verify, work: think, floor: hard, order: ui}
+  interface.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
+  package.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
+  scope.define: {role: decide, work: think, floor: hard}
+  code.refactor: {role: implement, work: hands-on, floor: easy}
+  test.author: {role: implement, work: hands-on, floor: easy}
+  grammar.update: {role: implement, work: hands-on, floor: hard, order: scaffold}
+  architecture.revise: {role: decide, work: think, floor: hard}
+  business.revise: {role: decide, work: think, floor: hard}
+  content.generate: {role: write, work: hands-on, floor: easy, order: scaffold}
+  docs.author: {role: write, work: hands-on, floor: easy, order: scaffold}
+  knowledge.repair: {role: write, work: think, floor: hard, order: implement}
+  release.deliver: {role: implement, work: hands-on, floor: hard}
+  scope.finish: {role: implement, work: hands-on, floor: hard}
+  runtime.operate: {role: implement, work: hands-on, floor: medium}
+  review.verify: {role: verify, work: think, floor: hard, order: review}
+  handover.review: {role: verify, work: think, floor: hard, order: review}
+  e2e.verify: {role: verify, work: hands-on, floor: medium, order: ui}
+  integration.verify: {role: verify, work: hands-on, floor: hard, order: review}
+  security.verify: {role: verify, work: think, floor: hard, order: ui}
+  perf.verify: {role: verify, work: hands-on, floor: medium, order: review}
+  unit.verify: {role: verify, work: hands-on, floor: medium, order: review}
+  uat.verify: {role: verify, work: hands-on, floor: medium, order: review}
+  uat.assisted.prepare: {role: write, work: hands-on, floor: medium}
+  uat.assisted.verify: {role: verify, work: think, floor: hard, order: ui}
+  goal.validate: {role: verify, work: think, floor: hard, order: review}
+  architecture.decide: {role: decide, work: think, floor: hard}
+  business.decide: {role: decide, work: think, floor: hard}
+  goal.revise: {role: decide, work: think, floor: hard}
+  decision.prepare: {role: decide, work: think, floor: hard}
+  provision.ask: {role: decide, work: think, floor: hard, order: implement}
+  brand.decide: {role: write, work: think, floor: hard, order: brand}
+  interface.draw: {role: write, work: think, floor: hard, order: draw}
+  interface.asset: {role: write, work: hands-on, floor: medium, order: asset}
+  work.author: {role: write, work: think, floor: hard, order: review}
+  implementation.plan: {role: plan, work: think, floor: hard}
+  workspace.manage: {role: plan, work: think, floor: hard, order: implement}
+  model.assessGoal: {role: plan, work: think, floor: hard, order: sol-think}
+  model.planOp: {role: plan, work: think, floor: hard, order: sol-think}
+  model.decide: {role: decide, work: think, floor: hard, order: sol-think}
+  model.manageWorkflow: {role: decide, work: think, floor: hard, order: sol-think}
+  model.validateOp: {role: verify, work: think, floor: hard, order: sol-think}
+  model.critiqueGoal: {role: verify, work: think, floor: hard, order: sol-think}
+  judge: {role: verify, work: think, floor: hard, order: sol-think}

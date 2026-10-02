@@ -16,7 +16,7 @@ export const DOC_LANGUAGE_RULE_IDS = ['HFS_DOC_NOT_ENGLISH'];
 
 const RULE = 'HFS_DOC_NOT_ENGLISH';
 /** The top-level folders whose documents this check reads. */
-export const DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'src', 'apps']);
+const DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'src', 'apps']);
 
 export function checkDocLanguage({ config, graph }) {
   const resolver = graph.resolver;

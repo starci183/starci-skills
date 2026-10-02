@@ -9,11 +9,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSlotManifest, ruleParams } from '../slots.mjs';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
+import { literalText } from '../../lib/ts-ast.mjs';
 import { found, readJson, readText } from './read.mjs';
 
-export const EVENT_CLASS_CONTRACT = 'BE_EVENT_CLASS_CONTRACT';
-export const PATTERN_SPEC_MISSING = 'BE_PATTERN_SPEC_MISSING';
+const EVENT_CLASS_CONTRACT = 'BE_EVENT_CLASS_CONTRACT';
+const PATTERN_SPEC_MISSING = 'BE_PATTERN_SPEC_MISSING';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EVENT_FILE_PREFIX = 'be/src/modules/events/';
@@ -25,16 +26,10 @@ const SPEC_SUFFIXES = ['.e2e-spec.ts', '.integration-spec.ts'];
 const TEST_CALLEES = new Set(['it', 'test']);
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The event-bus pattern file name of an event name: dots become dashes (`order.placed` -> `order-placed`). */
 export const stemOfEvent = (name) => name.split('.').join('-');
-
-/** The literal text of a string-like expression, or null. */
-const literalText = (ts, node) => (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : null);
 
 /** The `eventName` and `version` literals a class declares as `static readonly` members, with the line of the class. */
 function readEventClass(ts, text, file) {

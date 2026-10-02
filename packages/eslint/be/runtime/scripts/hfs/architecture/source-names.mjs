@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { isUnshadowedCommonJsRequire, relativePath, sourceLocation, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
+import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, tracedFrameworkKinds, valueSymbol, violation } from './ast-walks.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
 const SOURCE_NAME_RULE_ID = 'BE_SOURCE_FORM';
@@ -41,162 +43,40 @@ function canonical(file) {
   return path.resolve(file);
 }
 
-function normalizedSymbolValue(ts, checker, value) {
-  let symbol = value ?? null;
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol);
-    const target = checker.getAliasedSymbol(symbol);
-    if (!target || target === symbol) break;
-    symbol = target;
-  }
-  return symbol;
-}
 
-function normalizedSymbol(ts, checker, node) {
-  return normalizedSymbolValue(ts, checker, checker?.getSymbolAtLocation(node) ?? null);
-}
-
-function selectedNode(ts, expression) {
-  expression = unwrapExpression(ts, expression);
-  if (ts.isIdentifier(expression)) return expression;
-  if (ts.isPropertyAccessExpression(expression)) return expression.name;
-  if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression;
-  return null;
-}
-
-function valueSymbol(ts, checker, node, seen = new Set()) {
-  const selected = selectedNode(ts, node) ?? node;
-  const symbol = normalizedSymbol(ts, checker, selected);
-  if (!symbol || seen.has(symbol)) return symbol;
-  seen.add(symbol);
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
-    return valueSymbol(ts, checker, declarations[0].initializer, seen);
-  }
-  return symbol;
-}
 
 function frameworkTargets(config, context, checker, localFiles) {
-  const bySymbol = new Map();
   const reasons = [];
-  const program = context.programs.find(candidate => candidate.getTypeChecker() === checker);
-  if (!program) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
-  for (const sourceFile of program.getSourceFiles()) {
-    if (!localFiles.has(canonical(sourceFile.fileName))) continue;
+  const bySymbol = new Map();
+  const files = programSourcesOf(context, checker, localFiles);
+  if (!files) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
+  for (const sourceFile of files) {
     for (const statement of sourceFile.statements) {
-      const specifierNode = (context.ts.isImportDeclaration(statement) || context.ts.isExportDeclaration(statement))
-        && statement.moduleSpecifier && context.ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier : null;
-      const specifier = specifierNode?.text;
-      if (!specifier || !FRAMEWORK_EXPORTS.has(specifier)) continue;
-      const moduleSymbol = checker.getSymbolAtLocation(specifierNode);
-      if (!moduleSymbol) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${specifier}`);
-        continue;
-      }
-      const selected = FRAMEWORK_EXPORTS.get(specifier);
-      for (const exported of checker.getExportsOfModule(moduleSymbol)) if (selected.has(exported.getName())) {
-        const target = normalizedSymbolValue(context.ts, checker, exported);
-        if (target) bySymbol.set(target, exported.getName());
-      }
+      const bound = moduleExportsOf(context.ts, checker, statement);
+      if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) continue;
+      if (!bound.symbol) { reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`); continue; }
+      const selected = FRAMEWORK_EXPORTS.get(bound.specifier);
+      for (const [name, target] of bound.exports) if (selected.has(name) && target) bySymbol.set(target, name);
     }
-    const visit = node => {
-      if (context.ts.isCallExpression(node) && isUnshadowedCommonJsRequire(context.ts, checker, node.expression)
-        && node.arguments.length === 1 && context.ts.isStringLiteralLike(node.arguments[0]) && FRAMEWORK_EXPORTS.has(node.arguments[0].text)) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses a CommonJS ${node.arguments[0].text} binding whose source role cannot be proved`);
-      }
-      context.ts.forEachChild(node, visit);
-    };
-    visit(sourceFile);
+    commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => FRAMEWORK_EXPORTS.has(specifier),
+      reasons, relativePath(config.root, sourceFile.fileName), 'binding whose source role cannot be proved');
   }
   return { bySymbol, reasons };
 }
 
-function calledExpression(ts, decorator) {
-  return ts.isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression;
-}
-
 function decoratorKind(ts, checker, decorator, targets) {
-  const selected = selectedNode(ts, calledExpression(ts, decorator));
+  const selected = selectedNode(ts, decoratorCallee(ts, decorator));
   return selected ? targets.get(valueSymbol(ts, checker, selected)) ?? null : null;
 }
 
-function mutableDecoratorKind(ts, checker, decorator, targets) {
-  const selected = selectedNode(ts, calledExpression(ts, decorator));
-  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  const declarations = symbol?.getDeclarations?.() ?? [];
-  if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
-    || (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) return null;
-  return targets.get(valueSymbol(ts, checker, declarations[0].initializer)) ?? null;
-}
-
-function returnedExpressions(ts, declaration) {
-  if ((ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) && !ts.isBlock(declaration.body)) return [declaration.body];
-  const body = ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)
-    || ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration) ? declaration.body : null;
-  if (!body || !ts.isBlock(body)) return [];
-  const returned = [];
-  const visit = node => {
-    if (node !== body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node))) return;
-    if (ts.isReturnStatement(node) && node.expression) returned.push(node.expression);
-    else ts.forEachChild(node, visit);
-  };
-  visit(body);
-  return returned;
-}
-
-function tracedFrameworkKinds(ts, checker, expression, targets, seen = new Set(), depth = 0) {
-  if (!expression) return new Set();
-  if (depth > 10) return new Set([UNPROVEN_FRAMEWORK]);
-  expression = unwrapExpression(ts, expression);
-  const selected = selectedNode(ts, expression);
-  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  const direct = symbol ? targets.get(symbol) : null;
-  if (direct) return new Set([direct]);
-  if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
-    const kinds = new Set();
-    for (const returned of returnedExpressions(ts, expression)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, seen, depth + 1)) kinds.add(kind);
-    }
-    return kinds;
-  }
-  if (ts.isCallExpression(expression)) {
-    const kinds = tracedFrameworkKinds(ts, checker, expression.expression, targets, seen, depth + 1);
-    if (kinds.size) return kinds;
-  }
-  if (ts.isNewExpression(expression)) return tracedFrameworkKinds(ts, checker, expression.expression, targets, seen, depth + 1);
-  if (!symbol || seen.has(symbol)) return new Set();
-  const nextSeen = new Set(seen).add(symbol);
-  const kinds = new Set();
-  for (const declaration of symbol.getDeclarations?.() ?? []) {
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      for (const kind of tracedFrameworkKinds(ts, checker, declaration.initializer, targets, nextSeen, depth + 1)) kinds.add(kind);
-    }
-    for (const returned of returnedExpressions(ts, declaration)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, nextSeen, depth + 1)) kinds.add(kind);
-    }
-  }
-  return kinds;
-}
-
-function constructedDecoratorKind(ts, checker, decorator, targets) {
-  const kinds = tracedFrameworkKinds(ts, checker, calledExpression(ts, decorator), targets);
-  if (kinds.has(UNPROVEN_FRAMEWORK)) return 'unproven framework';
-  return kinds.size === 1 ? [...kinds][0] : kinds.size ? 'multiple framework' : null;
-}
-
-function decorators(ts, node) {
-  return ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
-}
+/* This module's trace descends `new X()` callees too; the framework map keys symbols directly. */
+const TRACE_NEW = { newExpression: true };
 
 function hasModifier(ts, node, kind) {
   return (ts.canHaveModifiers(node) ? ts.getModifiers(node) ?? [] : node.modifiers ?? []).some(modifier => modifier.kind === kind);
 }
 
-function violation(config, sourceFile, node, ruleId, message, extra = {}) {
-  return { ruleId, path: relativePath(config.root, sourceFile.fileName), ...sourceLocation(sourceFile, node), message, ...extra };
-}
+
 
 function sourceRole(ts, sourceFile) {
   const file = path.basename(sourceFile.fileName).replace(SOURCE_EXTENSION, '');
@@ -304,7 +184,7 @@ function companionInterfaceAllowed(ts, sourceFile, name) {
   if (!/^I[A-Z]/.test(name)) return false;
   const companion = name.slice(1);
   return sourceFile.statements.some(statement => ts.isClassDeclaration(statement) && statement.name?.text === companion
-    && decorators(ts, statement).length > 0);
+    && nodeDecorators(ts, statement).length > 0);
 }
 
 function camelCase(value) {
@@ -485,7 +365,7 @@ export function checkBackendSourceShape(config, context) {
 
     const classDeclarations = sourceFile.statements.filter(statement => ts.isClassDeclaration(statement));
     for (const declaration of classDeclarations) {
-      const declarationDecorators = decorators(ts, declaration);
+      const declarationDecorators = nodeDecorators(ts, declaration);
       const kinds = declarationDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.bySymbol)).filter(Boolean);
       const graphQlDto = kinds.some(kind => kind === 'ArgsType' || kind === 'InputType' || kind === 'ObjectType');
       if (graphQlDto && (!featureRoot || !inTransport || directories[transportIndex + 1] !== 'graphql')) {
@@ -551,11 +431,11 @@ export function checkBackendSourceShape(config, context) {
     }
 
     const visit = node => {
-      for (const decorator of decorators(ts, node)) {
+      for (const decorator of nodeDecorators(ts, node)) {
         const kind = decoratorKind(ts, checker, decorator, framework.bySymbol);
         if (!kind) {
           const dynamic = mutableDecoratorKind(ts, checker, decorator, framework.bySymbol)
-            ?? constructedDecoratorKind(ts, checker, decorator, framework.bySymbol);
+            ?? constructedDecoratorKind(ts, checker, decorator, framework.bySymbol, TRACE_NEW);
           if (dynamic) {
             const detail = `${relative} uses a mutable or constructed ${dynamic} decorator identity`;
             if (['Entity', 'ViewEntity', 'ArgsType', 'InputType', 'ObjectType', 'multiple framework', 'unproven framework'].includes(dynamic)) layoutReasons.push(detail);
@@ -574,7 +454,7 @@ export function checkBackendSourceShape(config, context) {
       }
       const exportedFactoryCall = ts.isCallExpression(node) && ts.isVariableDeclaration(node.parent) && publicDeclarations.has(node.parent);
       if ((ts.isNewExpression(node) || exportedFactoryCall) && featureRoot) {
-        const constructed = tracedFrameworkKinds(ts, checker, node, framework.bySymbol);
+        const constructed = tracedFrameworkKinds(ts, checker, node, framework.bySymbol, TRACE_NEW);
         if (constructed.has('EntitySchema')) violations.push(violation(config, sourceFile, node.expression, SOURCE_LAYOUT_RULE_ID,
           'TypeORM EntitySchema cannot be owned by a feature; place schema under its declared persistence module.'));
         if (constructed.has(UNPROVEN_FRAMEWORK)) layoutReasons.push(`${relative} has a constructed provider identity beyond the bounded static trace`);
