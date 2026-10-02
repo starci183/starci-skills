@@ -122,7 +122,6 @@ export function gcSettings(allocation = allocationSettings()) {
     laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
 }
 
-
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
 /** {seen: {handle: firstSeenMs}}: the open terminals rows' opened_at (the first sighting of an idle-shell candidate). */
