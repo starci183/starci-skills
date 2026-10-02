@@ -1,7 +1,7 @@
 group: kernel
 verb: messages
 owner: runtime
-summary: every orchestration message on the workflow Runs (read-only)
+summary: drain the workflow Runs into the ledger and list every orchestration message
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,10 +13,11 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": "messages listed (also when the JSON says ok:false)"
+  "1": failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel messages --repo <path> --workflow <workflow>

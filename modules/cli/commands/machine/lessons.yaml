@@ -6,16 +6,16 @@ impl: {script: scripts/machine/lessons.mjs}
 positional:
   - {name: action, enum: [list, match, tier, result, feedback, tick, export], required: true, variadic: false}
 flags:
-  - {name: signature, type: string}
-  - {name: text, type: string}
-  - {name: commit, type: list}
-  - {name: experiment, type: string}
-  - {name: outcome, type: enum, enum: [kept, reverted, did-not-work]}
-  - {name: reason, type: string}
-  - {name: via, type: enum, enum: [chat, telegram, draw-note]}
-  - {name: refs, type: list}
-  - {name: items, type: string}
-  - {name: write, type: boolean}
+  - {name: signature, type: string, summary: failure signature to match or attach a lesson to}
+  - {name: text, type: string, summary: lesson or feedback text}
+  - {name: commit, type: list, summary: commit ids whose files set the tier (comma list)}
+  - {name: experiment, type: string, summary: experiment id receiving the result}
+  - {name: outcome, type: enum, enum: [kept, reverted, did-not-work], summary: experiment outcome (result needs it)}
+  - {name: reason, type: string, summary: why the experiment ended so (result needs it)}
+  - {name: via, type: enum, enum: [chat, telegram, draw-note], summary: channel the owner feedback came through (default chat)}
+  - {name: refs, type: list, summary: references recorded with the feedback (comma list)}
+  - {name: items, type: string, summary: JSON array of learning items for tick}
+  - {name: write, type: boolean, summary: export writes modules/supervisor/lessons.yaml in the current directory}
 exit: {"0": action completed, "1": action failed, "2": bad usage}
 json: flag
 examples:

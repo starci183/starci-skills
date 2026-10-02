@@ -1,7 +1,7 @@
 group: kernel
 verb: foundation
 owner: runtime
-summary: claim, land or declare the shared foundations a workflow depends on
+summary: claim, land or declare a shared foundation (or none) for a workflow
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,10 +13,13 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: claim
     type: string
+    summary: foundation name this workflow owns
   - name: kind
     type: enum
+    summary: foundation kind (--claim)
     enum:
       - layout-tree
       - brand
@@ -28,25 +31,35 @@ flags:
       - other
   - name: version
     type: string
+    summary: version of the foundation (--claim, --land)
   - name: declare-dependent
     type: string
+    summary: foundation name this workflow needs
   - name: land
     type: string
+    summary: "foundation name that landed; needs --proof"
   - name: proof
     type: string
+    summary: what proves the landing (--land)
   - name: refs
     type: string
+    summary: comma list of refs recorded with --land
   - name: declare-none
     type: boolean
+    summary: declare the workflow owns and needs no shared foundation
   - name: detail
     type: string
+    summary: free detail recorded with the action
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": recorded
+  "1": refused or failed (not exactly one action, workflow not running, unknown kind)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel foundation --repo <path> --workflow <workflow>
+  - starci kernel foundation --repo <path> --workflow <workflow> --claim <name> --kind module
+  - starci kernel foundation --repo <path> --workflow <workflow> --declare-dependent <name>
+  - starci kernel foundation --repo <path> --workflow <workflow> --land <name> --proof <proof>
+  - starci kernel foundation --repo <path> --workflow <workflow> --declare-none
 editions:
   - full
 since: 1.0.0-alpha.4

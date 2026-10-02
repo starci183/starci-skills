@@ -12,19 +12,24 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: job
     type: string
+    summary: job whose contract to read; required unless --workflow and --op name the op
   - name: workflow
     type: string
+    summary: workflow of the op (with --op, instead of --job)
   - name: op
     type: string
+    summary: op id (with --workflow, instead of --job)
   - name: attempt
-    type: string
+    type: number
+    summary: attempt number (jobs.try_no); the newest attempt when omitted
 exit:
   "0": success
   "1": refusal or error
   "2": bad usage
 json: flag
 examples:
-  - starci kernel op-contract --repo <path>
+  - starci kernel op-contract --repo <path> --job <job>
+  - starci kernel op-contract --repo <path> --workflow <workflow> --op <op> --attempt 2 --json
 editions:
   - full
 since: 1.0.0-alpha.4

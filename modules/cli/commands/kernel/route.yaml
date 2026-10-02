@@ -13,8 +13,15 @@ flags:
   - name: job
     type: string
     required: true
+    summary: queued job to route
   - name: difficulty
-    type: string
+    type: enum
+    enum:
+      - easy
+      - medium
+      - hard
+      - insane
+    summary: difficulty tier overriding the job's own (medium when it carries none)
 exit:
   "0": success
   "1": refusal or error
@@ -22,6 +29,7 @@ exit:
 json: flag
 examples:
   - starci kernel route --repo <path> --job <job>
+  - starci kernel route --repo <path> --job <job> --difficulty hard --json
 editions:
   - full
 since: 1.0.0-alpha.4

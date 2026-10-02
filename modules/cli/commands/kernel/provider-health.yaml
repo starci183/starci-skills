@@ -12,25 +12,34 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: provider
     type: string
+    summary: provider id; required unless --quota-probe (which then probes every quota provider)
   - name: recover
     type: boolean
+    summary: clear the open circuit (refused outside a running Kernel terminal)
   - name: reason
     type: string
+    summary: why the circuit is recovered; required with --recover
   - name: probe
     type: boolean
+    summary: with --recover, prove the credential or quota with a real probe first
   - name: quota-probe
     type: boolean
+    summary: probe an open quota circuit (at most once per probe interval) and clear it on a pass
   - name: force
     type: boolean
+    summary: with --quota-probe, probe even inside the throttle interval
   - name: workflow
     type: string
+    summary: with --quota-probe, workflow the recovery event is recorded on
 exit:
   "0": success
   "1": refusal or error
   "2": bad usage
 json: flag
 examples:
-  - starci kernel provider-health --repo <path>
+  - starci kernel provider-health --repo <path> --provider <provider>
+  - starci kernel provider-health --repo <path> --provider <provider> --recover --reason <reason> --probe
+  - starci kernel provider-health --repo <path> --quota-probe --force --json
 editions:
   - full
 since: 1.0.0-alpha.4

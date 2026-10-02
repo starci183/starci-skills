@@ -3,7 +3,7 @@
 group: kernel
 verb: log
 owner: runtime
-summary: append one typed log row to the ledger (buffered writer, no events row)
+summary: "append one typed log row to the ledger's logs table"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,40 +15,81 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: job
     type: string
+    summary: job the row belongs to (an op may log only its own)
   - name: kind
-    type: string
+    type: enum
     required: true
+    summary: "typed row kind; --data must carry its required fields"
+    enum:
+      - step.start
+      - step.end
+      - cmd.run
+      - file.edit
+      - check.result
+      - test.result
+      - render
+      - video
+      - trace
+      - warning
+      - decision
+      - narration
+      - ask
+      - error
+      - dispatch
+      - report
+      - settle
+      - land
+      - incident
+      - job.drop
+      - supervisor.action
+      - gc.collect
+      - gc.summary
+      - reconciler.would
+      - reconciler.act
+      - reconciler.error
+      - reconciler.event
+      - invariant.violated
+      - invariant.cleared
+      - log.truncated
   - name: msg
     type: string
     required: true
+    summary: short message
   - name: data
     type: string
+    summary: kind-specific data as a JSON object
   - name: refs
     type: string
+    summary: comma list of refs
   - name: level
     type: enum
+    summary: row level (default by kind)
     enum:
       - info
       - warn
       - error
   - name: node
     type: string
+    summary: work-graph node the row is about
   - name: actor
     type: enum
+    summary: actor the row speaks for (an op always logs as op)
     enum:
       - kernel
       - runtime
       - check
       - land
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": row appended (or dropped at the job cap)
+  "1": refused or failed (unknown job or kind, bad data JSON, actor not allowed)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel log --repo <path> --workflow <workflow> --kind <kind> --msg <msg>
+  - starci kernel log --repo <path> --workflow <workflow> --kind narration --msg <message>
+  - starci kernel log --repo <path> --workflow <workflow> --job <job> --kind cmd.run --msg <message> --data <json>
 editions:
   - full
 since: 1.0.0-alpha.4

@@ -13,11 +13,14 @@ flags:
   - name: job
     type: string
     required: true
+    summary: job the worker is reporting for
   - name: report
     type: string
     required: true
+    summary: report JSON file inside the attempt's scratch (starci/op-report@1)
   - name: attach
     type: list
+    summary: attachment file inside the scratch; repeat the flag for each file
   - name: outcome
     type: enum
     enum:
@@ -26,8 +29,10 @@ flags:
       - failed
       - ask
       - blocked
+    summary: the outcome the report must carry; refused when the envelope says otherwise
   - name: dispatch-capability
     type: string
+    summary: the dispatch capability from the Orca preamble, authenticating the worker_done message
 exit:
   "0": success
   "1": refusal or error
@@ -35,6 +40,7 @@ exit:
 json: flag
 examples:
   - starci kernel report --repo <path> --job <job> --report <report>
+  - starci kernel report --repo <path> --job <job> --report <report> --attach <file> --outcome done --dispatch-capability <capability> --json
 editions:
   - full
 since: 1.0.0-alpha.4

@@ -4,14 +4,14 @@ owner: runtime
 summary: deliver and maintain owner Telegram notifications
 impl: {script: scripts/connectors/telegram.mjs}
 positional:
-  - {name: action, enum: [notify, sweep, discover-chat, test], required: true, variadic: false}
+  - {name: action, enum: [notify, sweep, discover-chat, test], required: false, variadic: false}
 flags:
-  - {name: discover-chat, type: boolean}
-  - {name: ledger, type: string}
-  - {name: repo, type: string}
-  - {name: workflow, type: string}
-  - {name: dispatch, type: string}
-exit: {"0": action completed, "1": Telegram delivery failed, "2": bad usage or configuration}
+  - {name: discover-chat, type: boolean, summary: "same as the discover-chat action (list the chats that wrote to the bot)"}
+  - {name: ledger, type: string, summary: ledger file holding the ask (notify)}
+  - {name: repo, type: string, summary: repository the ledger belongs to (notify)}
+  - {name: workflow, type: string, summary: workflow id of the ask (notify)}
+  - {name: dispatch, type: string, summary: dispatch id of the ask (notify)}
+exit: {"0": action completed, "1": the test message was not delivered, "2": bad usage or configuration}
 json: always
 examples:
   - starci connect telegram discover-chat

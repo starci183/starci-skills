@@ -72,35 +72,35 @@ complete -c starci -n '__starci_needs_verb harness' -a 'open' -d 'open the local
 complete -c starci -n '__starci_needs_verb harness' -a 'start' -d 'start the harness API and UI or its named tunnel'
 complete -c starci -n '__starci_needs_verb harness' -a 'status' -d 'report whether the harness health endpoint is up'
 complete -c starci -n '__starci_needs_verb harness' -a 'stop' -d 'stop only harness processes recorded by harness start'
-complete -c starci -n '__starci_needs_verb kernel' -a 'archive' -d 'stop a workflow that will not finish (archives it, drops open jobs, retires asks)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'artifacts' -d 'every indexed proof file of the workflow'\''s jobs (job_artifacts), per job'
-complete -c starci -n '__starci_needs_verb kernel' -a 'autopilot' -d 'record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'consume-report' -d 'integrate the report a job filed (the kernel must consume before settle)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'contract-release' -d 'the Supervisor'\''s release point of a frozen op family (modules/kernel/contract-freeze.yaml)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'coverage' -d 'every FR, shape and proof case of the workflow'\''s scope with its evidence: proven|stale|missing'
-complete -c starci -n '__starci_needs_verb kernel' -a 'cut-seam' -d 'the seam publishes its interface: siblings start on it'
-complete -c starci -n '__starci_needs_verb kernel' -a 'decide' -d 'the Kernel decision log'
-complete -c starci -n '__starci_needs_verb kernel' -a 'decisions' -d 'Decision Items: read them first every wake'
-complete -c starci -n '__starci_needs_verb kernel' -a 'dispatch' -d 'launch the worker of a routed job (contract row, leases, spawn)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'dispatch-ready' -d 'route + dispatch queued-ready units up to starci kernel status progress.allowedParallel'
-complete -c starci -n '__starci_needs_verb kernel' -a 'enqueue' -d 'enqueue a work-unit job: op, owned paths, records, retry lineage'
-complete -c starci -n '__starci_needs_verb kernel' -a 'estimate' -d 'deterministic size class + agent count from runtimes.yaml allocation.slicing'
-complete -c starci -n '__starci_needs_verb kernel' -a 'extensions' -d 'the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems'
-complete -c starci -n '__starci_needs_verb kernel' -a 'finish' -d 'finish a workflow once its work is done'
-complete -c starci -n '__starci_needs_verb kernel' -a 'foundation' -d 'claim, land or declare the shared foundations a workflow depends on'
-complete -c starci -n '__starci_needs_verb kernel' -a 'foundations' -d 'the ledger'\''s shared foundations: owner, state, dependents, waits; undeclared workflows'
-complete -c starci -n '__starci_needs_verb kernel' -a 'graph-edit' -d 'the Kernel light, logged, reversible unit edits to the work graph'
+complete -c starci -n '__starci_needs_verb kernel' -a 'archive' -d 'archive a workflow that will not finish: drop open jobs, retire asks, close Kernel and Tasks'
+complete -c starci -n '__starci_needs_verb kernel' -a 'artifacts' -d 'list the indexed proof files of the workflow'\''s jobs, per job (read-only)'
+complete -c starci -n '__starci_needs_verb kernel' -a 'autopilot' -d 'show or drive a workflow'\''s autopilot: switch it, sweep, bundle, defer to handover, release, extend'
+complete -c starci -n '__starci_needs_verb kernel' -a 'consume-report' -d 'integrate the report a job filed; the Kernel must consume it before settle'
+complete -c starci -n '__starci_needs_verb kernel' -a 'contract-release' -d 'release a frozen op family at the Supervisor release point (contract-freeze.yaml)'
+complete -c starci -n '__starci_needs_verb kernel' -a 'coverage' -d 'show every FR, shape and proof case of the workflow'\''s scope as proven, stale or missing'
+complete -c starci -n '__starci_needs_verb kernel' -a 'cut-seam' -d 'publish a cut seam'\''s interface, release its siblings on a stub, or reconcile a stub sibling'
+complete -c starci -n '__starci_needs_verb kernel' -a 'decide' -d 'open, list or close an entry of the Kernel decision log (hypothesis, action, metric)'
+complete -c starci -n '__starci_needs_verb kernel' -a 'decisions' -d 'list, open, claim, resolve or escalate Decision Items; the Kernel reads them first every wake'
+complete -c starci -n '__starci_needs_verb kernel' -a 'dispatch' -d 'admit a routed job and launch its worker with --spawn; without it print the launch plan'
+complete -c starci -n '__starci_needs_verb kernel' -a 'dispatch-ready' -d 'route and dispatch queued-ready jobs up to the workflow allowed parallelism'
+complete -c starci -n '__starci_needs_verb kernel' -a 'enqueue' -d 'enqueue a work-unit job with its op, owned paths, records and retry lineage'
+complete -c starci -n '__starci_needs_verb kernel' -a 'estimate' -d 'compute the size class and agent count of a slice from runtimes.yaml allocation.slicing'
+complete -c starci -n '__starci_needs_verb kernel' -a 'extensions' -d 'list the file-based kernel extensions: verbs, status fields, boolean flags, load problems'
+complete -c starci -n '__starci_needs_verb kernel' -a 'finish' -d 'finish an owner-approved workflow and release its kernel seat'
+complete -c starci -n '__starci_needs_verb kernel' -a 'foundation' -d 'claim, land or declare a shared foundation (or none) for a workflow'
+complete -c starci -n '__starci_needs_verb kernel' -a 'foundations' -d 'list the ledger'\''s shared foundations: owner, state, dependents, waits'
+complete -c starci -n '__starci_needs_verb kernel' -a 'graph-edit' -d 'apply a logged, reversible light edit to the workflow'\''s unit jobs (drop, widen, wire, ...)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'hierarchy' -d 'project the agent hierarchy (starci/agent-hierarchy@1) of a workflow'
-complete -c starci -n '__starci_needs_verb kernel' -a 'inbox' -d 'the workflow'\''s pending inbox items; --ack records a disposition'
-complete -c starci -n '__starci_needs_verb kernel' -a 'incident' -d 'file, resolve, or type the release of a workflow incident'
-complete -c starci -n '__starci_needs_verb kernel' -a 'kernel-ack-rev' -d 'record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'kernel-proposal' -d 'tier 2: a shared .claude change for the Supervisor'
-complete -c starci -n '__starci_needs_verb kernel' -a 'lifecycle' -d 'pause, stop or resume a workflow; only the owner resumes a stopped one'
-complete -c starci -n '__starci_needs_verb kernel' -a 'log' -d 'append one typed log row to the ledger (buffered writer, no events row)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'logs' -d 'The workflow'\''s typed log rows, oldest first;'
-complete -c starci -n '__starci_needs_verb kernel' -a 'messages' -d 'every orchestration message on the workflow Runs (read-only)'
+complete -c starci -n '__starci_needs_verb kernel' -a 'inbox' -d 'list the workflow'\''s pending inbox items, or acknowledge one with a disposition'
+complete -c starci -n '__starci_needs_verb kernel' -a 'incident' -d 'raise, resolve or attach typed release conditions to a workflow incident'
+complete -c starci -n '__starci_needs_verb kernel' -a 'kernel-ack-rev' -d 'record the runtime rev whose kernel files this Kernel has read'
+complete -c starci -n '__starci_needs_verb kernel' -a 'kernel-proposal' -d 'file a tier-2 shared runtime change proposal for the Supervisor, or list proposals'
+complete -c starci -n '__starci_needs_verb kernel' -a 'lifecycle' -d 'pause, stop or resume a workflow; only the owner or supervisor resumes or stops'
+complete -c starci -n '__starci_needs_verb kernel' -a 'log' -d 'append one typed log row to the ledger'\''s logs table'
+complete -c starci -n '__starci_needs_verb kernel' -a 'logs' -d 'list the workflow'\''s typed log rows, oldest first'
+complete -c starci -n '__starci_needs_verb kernel' -a 'messages' -d 'drain the workflow Runs into the ledger and list every orchestration message'
 complete -c starci -n '__starci_needs_verb kernel' -a 'notify' -d 'send a typed notice to one peer workflow or all peers'
-complete -c starci -n '__starci_needs_verb kernel' -a 'nudge' -d 'send a nudge to a job'\''s live worker terminal'
+complete -c starci -n '__starci_needs_verb kernel' -a 'nudge' -d 'wake a running job'\''s worker at its exact terminal so it files its report'
 complete -c starci -n '__starci_needs_verb kernel' -a 'observe' -d 'read the exact op terminal screen of a job (reasoning context, never evidence)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'op-contract' -d 'read the contract row dispatch wrote for a job or an op+attempt'
 complete -c starci -n '__starci_needs_verb kernel' -a 'op-override' -d 'store an additive override of one op for this workflow'
@@ -108,18 +108,18 @@ complete -c starci -n '__starci_needs_verb kernel' -a 'peers' -d 'the workflow'\
 complete -c starci -n '__starci_needs_verb kernel' -a 'plan' -d 'write the workflow'\''s derived plan into the ledger'
 complete -c starci -n '__starci_needs_verb kernel' -a 'provider-backoff' -d 'open the provider circuit a persisting rate limit calls for (idempotent)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'provider-health' -d 'the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'questions' -d 'the workflow'\''s open questions waiting on the owner'
-complete -c starci -n '__starci_needs_verb kernel' -a 'reconcile' -d 'kernel jobs of finished/archived workflows -> cancelled'
+complete -c starci -n '__starci_needs_verb kernel' -a 'questions' -d 'list the pending worker questions of a workflow, draining its Runs into the ledger first'
+complete -c starci -n '__starci_needs_verb kernel' -a 'reconcile' -d 'recover a fenced launch, drop a queued job, recover a dead worker or cancel orphan kernel jobs'
 complete -c starci -n '__starci_needs_verb kernel' -a 'record-change' -d 'the record'\''s OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory'
 complete -c starci -n '__starci_needs_verb kernel' -a 'record-checks' -d 'record independent checks against a filed worker report'
 complete -c starci -n '__starci_needs_verb kernel' -a 'redesign' -d 'dispatch the owning op with the RCA as its brief (strong reasoning pool)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'rename' -d 'set the workflow'\''s display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs'
-complete -c starci -n '__starci_needs_verb kernel' -a 'reply' -d 'answer an orchestration message on the workflow'
+complete -c starci -n '__starci_needs_verb kernel' -a 'rename' -d 'set a workflow'\''s display name and rename its live [Kernel] and [Op] terminal tabs'
+complete -c starci -n '__starci_needs_verb kernel' -a 'reply' -d 'answer a pending worker question, or route it to the owner with --to-owner'
 complete -c starci -n '__starci_needs_verb kernel' -a 'report' -d 'a worker files its job report (the durable op to kernel IPC)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'retire-ask' -d 'close an ask the owner should no longer answer (ask-superseded)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'route' -d 'resolve and persist the model decision of a job'
 complete -c starci -n '__starci_needs_verb kernel' -a 'run-deferred-tests' -d 're-queue the test legs the owner'\''s specs switch deferred (see status testsDeferred)'
-complete -c starci -n '__starci_needs_verb kernel' -a 'serve-ask' -d 'park an owner ask (serve-ask.mjs): Telegram notice first, form on demand'
+complete -c starci -n '__starci_needs_verb kernel' -a 'serve-ask' -d 'park an owner ask: Telegram notice first, the answer form served on demand'
 complete -c starci -n '__starci_needs_verb kernel' -a 'settle' -d 'settle a consumed report: pass, fail or blocked verdict'
 complete -c starci -n '__starci_needs_verb kernel' -a 'settle-tail' -d 'run the async tail of a settled job (artifact index, evidence, retention)'
 complete -c starci -n '__starci_needs_verb kernel' -a 'status' -d 'the live status projection of a workflow (frontier, progress, waits)'
@@ -243,8 +243,8 @@ complete -c starci -n '__starci_using_command app add' -l owner -r -d 'service t
 complete -c starci -n '__starci_using_command app add' -l failed -r -d 'failure event consumed by a saga'
 complete -c starci -n '__starci_using_command app add' -l done -r -d 'completion event consumed by a saga'
 complete -c starci -n '__starci_using_command app check' -l fast -d 'judge only paths changed since the merge base'
-complete -c starci -n '__starci_using_command app check' -l base -r -d 'merge-base ref used by --fast'
-complete -c starci -n '__starci_using_command app lint' -l changed -r -d 'app-relative files to judge'
+complete -c starci -n '__starci_using_command app check' -l base -r -d 'merge-base ref used by --fast (refused without it)'
+complete -c starci -n '__starci_using_command app lint' -l changed -r -d 'app-relative files to judge (space-separated; not with --workspace)'
 complete -c starci -n '__starci_using_command app lint' -l workspace -r -d 'one frontend workspace to judge'
 complete -c starci -n '__starci_using_command app lint' -l fix -d 'let ESLint and stylelint apply safe fixes'
 complete -c starci -n '__starci_using_command app lint' -l format -r -a 'text json' -d 'report format'
@@ -262,23 +262,23 @@ complete -c starci -n '__starci_using_command app stack' -l force -d 'stop the s
 complete -c starci -n '__starci_using_command app sync' -l check -d 'compare managed output without writing'
 complete -c starci -n '__starci_using_command app sync' -l write -d 'rewrite managed output that drifted'
 complete -c starci -n '__starci_using_command app upgrade' -l plan -d 'preview the upgrade without writing'
-complete -c starci -n '__starci_using_command connect ask-gateway' -l port -r
-complete -c starci -n '__starci_using_command connect ask-gateway' -l repo -r
-complete -c starci -n '__starci_using_command connect telegram' -l discover-chat
-complete -c starci -n '__starci_using_command connect telegram' -l ledger -r
-complete -c starci -n '__starci_using_command connect telegram' -l repo -r
-complete -c starci -n '__starci_using_command connect telegram' -l workflow -r
-complete -c starci -n '__starci_using_command connect telegram' -l dispatch -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l ledger -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l repo -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l workflow -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l job -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l attempt -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l op -r
-complete -c starci -n '__starci_using_command connect telegram-media' -l verdict -r -a 'pass fail blocked'
-complete -c starci -n '__starci_using_command connect telegram-media' -l dispatch -r
-complete -c starci -n '__starci_using_command connect tunnel' -l port -r
-complete -c starci -n '__starci_using_command connect tunnel' -l fast
+complete -c starci -n '__starci_using_command connect ask-gateway' -l port -r -d 'local port to listen on (default: connectors.gateway.port)'
+complete -c starci -n '__starci_using_command connect ask-gateway' -l repo -r -d 'extra repository whose ledger asks the gateway serves; repeatable'
+complete -c starci -n '__starci_using_command connect telegram' -l discover-chat -d 'same as the discover-chat action (list the chats that wrote to the bot)'
+complete -c starci -n '__starci_using_command connect telegram' -l ledger -r -d 'ledger file holding the ask (notify)'
+complete -c starci -n '__starci_using_command connect telegram' -l repo -r -d 'repository the ledger belongs to (notify)'
+complete -c starci -n '__starci_using_command connect telegram' -l workflow -r -d 'workflow id of the ask (notify)'
+complete -c starci -n '__starci_using_command connect telegram' -l dispatch -r -d 'dispatch id of the ask (notify)'
+complete -c starci -n '__starci_using_command connect telegram-media' -l ledger -r -d 'ledger file of the settled job'
+complete -c starci -n '__starci_using_command connect telegram-media' -l repo -r -d 'repository the ledger belongs to'
+complete -c starci -n '__starci_using_command connect telegram-media' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command connect telegram-media' -l job -r -d 'settled job id'
+complete -c starci -n '__starci_using_command connect telegram-media' -l attempt -r -d 'job attempt number (default 1)'
+complete -c starci -n '__starci_using_command connect telegram-media' -l op -r -d 'operation id of the job'
+complete -c starci -n '__starci_using_command connect telegram-media' -l verdict -r -a 'pass fail blocked' -d 'settle verdict of the job'
+complete -c starci -n '__starci_using_command connect telegram-media' -l dispatch -r -d 'dispatch id of the job attempt'
+complete -c starci -n '__starci_using_command connect tunnel' -l port -r -d 'gateway port the tunnel forwards to (default: connectors.gateway.port)'
+complete -c starci -n '__starci_using_command connect tunnel' -l fast -d 'status only - skip the process-table scan for extra tunnel managers'
 complete -c starci -n '__starci_using_command debug pass' -l snapshot -r -d 'saved core-watch snapshot for a pass'
 complete -c starci -n '__starci_using_command debug pass' -l child-timeout -r -d 'child call timeout in seconds'
 complete -c starci -n '__starci_using_command debug pass' -l token-window -r -d 'token-spike window in minutes'
@@ -303,7 +303,7 @@ complete -c starci -n '__starci_using_command gate canon-scan' -l blob -d 'store
 complete -c starci -n '__starci_using_command gate custody-exec' -l get -r -d 'print one named value'
 complete -c starci -n '__starci_using_command gate custody-exec' -l keys -d 'print the top-level key names'
 complete -c starci -n '__starci_using_command gate custody-exec' -l input-type -r -a 'yaml json dotenv' -d 'state the encrypted document format'
-complete -c starci -n '__starci_using_command gate env-health' -l repo -r -d 'repository holding the environment ledger'
+complete -c starci -n '__starci_using_command gate env-health' -l repo -r -d 'repository holding the environment ledger (check needs it)'
 complete -c starci -n '__starci_using_command gate env-health' -l env -r -d 'environment ids or resource files'
 complete -c starci -n '__starci_using_command gate env-health' -l paths -r -d 'owned paths used to resolve environments'
 complete -c starci -n '__starci_using_command gate env-health' -l restart -d 'restart a down or hung owned service'
@@ -360,241 +360,242 @@ complete -c starci -n '__starci_using_command guard footprint-scan' -l depth -r 
 complete -c starci -n '__starci_using_command harness install-task' -l apply -d 'register the task instead of printing it'
 complete -c starci -n '__starci_using_command harness start' -l tunnel -d 'run the named Cloudflare tunnel instead of the local API and UI'
 complete -c starci -n '__starci_using_command kernel archive' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel archive' -l workflow -r
-complete -c starci -n '__starci_using_command kernel archive' -l reason -r
-complete -c starci -n '__starci_using_command kernel archive' -l by -r -a 'owner supervisor'
+complete -c starci -n '__starci_using_command kernel archive' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel archive' -l reason -r -d 'why the workflow is archived (recorded on workflow-archived)'
+complete -c starci -n '__starci_using_command kernel archive' -l by -r -a 'owner supervisor' -d 'who archives; a Kernel never archives'
 complete -c starci -n '__starci_using_command kernel artifacts' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel artifacts' -l workflow -r
-complete -c starci -n '__starci_using_command kernel artifacts' -l job -r
-complete -c starci -n '__starci_using_command kernel artifacts' -l kind -r -a 'diff patch image video report log trace file'
-complete -c starci -n '__starci_using_command kernel artifacts' -l subkind -r
+complete -c starci -n '__starci_using_command kernel artifacts' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel artifacts' -l job -r -d 'only this job'
+complete -c starci -n '__starci_using_command kernel artifacts' -l kind -r -a 'diff patch image video report log trace file' -d 'only this artifact kind'
+complete -c starci -n '__starci_using_command kernel artifacts' -l subkind -r -a 'draw-render asset-gen app-capture e2e-capture uat-capture uat-video e2e-video playwright-trace patch patch-json diff report log critique metrics grammar-proposal asset-request terminal-transcript cli-transcript' -d 'only this artifact subkind'
 complete -c starci -n '__starci_using_command kernel autopilot' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel autopilot' -l workflow -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l sweep
-complete -c starci -n '__starci_using_command kernel autopilot' -l bundle
-complete -c starci -n '__starci_using_command kernel autopilot' -l checklist
-complete -c starci -n '__starci_using_command kernel autopilot' -l lang -r -a 'vi en'
-complete -c starci -n '__starci_using_command kernel autopilot' -l set -r -a 'on off'
-complete -c starci -n '__starci_using_command kernel autopilot' -l reason -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l defer-to-handover
-complete -c starci -n '__starci_using_command kernel autopilot' -l op -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l class -r -a 'credential real-money shared-system owner-decision'
-complete -c starci -n '__starci_using_command kernel autopilot' -l detail -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l fields -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l stub -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l job -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l release -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l defer-leg -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l reopen -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l handover-answer -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l note -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l extend-budget -r
-complete -c starci -n '__starci_using_command kernel autopilot' -l by -r -a 'supervisor kernel autopilot'
+complete -c starci -n '__starci_using_command kernel autopilot' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel autopilot' -l sweep -d 'answer, defer, reroute and time out the open asks now'
+complete -c starci -n '__starci_using_command kernel autopilot' -l bundle -d 'print the owner'\''s end-of-flow bundle of provisional and deferred items'
+complete -c starci -n '__starci_using_command kernel autopilot' -l checklist -d 'print the credential checklist question for the owner'
+complete -c starci -n '__starci_using_command kernel autopilot' -l lang -r -a 'vi en' -d 'checklist language (default vi)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l set -r -a 'on off' -d 'switch autopilot for the workflow; needs --reason'
+complete -c starci -n '__starci_using_command kernel autopilot' -l reason -r -d 'why (--set, --release, --defer-leg, --extend-budget)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l defer-to-handover -d 'defer an owner-only need to the handover; needs --op, --class and --detail'
+complete -c starci -n '__starci_using_command kernel autopilot' -l op -r -d 'the asking op (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l class -r -a 'credential real-money shared-system owner-decision' -d 'what is owed by the owner (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l detail -r -d 'what is owed (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l fields -r -d 'comma list of the fields the owner must supply (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l stub -r -d 'path of the stub the op built meanwhile (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l job -r -d 'the asking job (--defer-to-handover)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l release -r -d 'dispatch id or key of a deferred item: it waits on the owner again (needs --reason)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l defer-leg -r -d 'job id whose leg is deferred to the final review (needs --reason)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l reopen -r -d 'dispatch id of a provisional record to re-open (needs --handover-answer)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l handover-answer -r -d 'the owner-answered handover dispatch id (--reopen)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l note -r -d 'free note recorded with --reopen'
+complete -c starci -n '__starci_using_command kernel autopilot' -l extend-budget -r -d 'comma list of attempts=<n>, tokens=<n>, wallMs=<n> added to the budget (needs --reason)'
+complete -c starci -n '__starci_using_command kernel autopilot' -l by -r -a 'supervisor kernel autopilot' -d 'who acts (default supervisor)'
 complete -c starci -n '__starci_using_command kernel consume-report' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel consume-report' -l job -r
+complete -c starci -n '__starci_using_command kernel consume-report' -l job -r -d 'job whose filed report is consumed'
 complete -c starci -n '__starci_using_command kernel contract-release' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel contract-release' -l family -r
-complete -c starci -n '__starci_using_command kernel contract-release' -l workflow -r
-complete -c starci -n '__starci_using_command kernel contract-release' -l batch -r
-complete -c starci -n '__starci_using_command kernel contract-release' -l reason -r
-complete -c starci -n '__starci_using_command kernel contract-release' -l by -r -a 'supervisor owner'
-complete -c starci -n '__starci_using_command kernel contract-release' -l dry-run
+complete -c starci -n '__starci_using_command kernel contract-release' -l family -r -d 'op family to release'
+complete -c starci -n '__starci_using_command kernel contract-release' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel contract-release' -l batch -r -d 'name of the release batch'
+complete -c starci -n '__starci_using_command kernel contract-release' -l reason -r -d 'why the family is released'
+complete -c starci -n '__starci_using_command kernel contract-release' -l by -r -a 'supervisor owner' -d 'who releases it'
+complete -c starci -n '__starci_using_command kernel contract-release' -l dry-run -d 'report what would be released without recording it'
 complete -c starci -n '__starci_using_command kernel coverage' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel coverage' -l workflow -r
+complete -c starci -n '__starci_using_command kernel coverage' -l workflow -r -d 'workflow id'
 complete -c starci -n '__starci_using_command kernel cut-seam' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel cut-seam' -l publish-interface
-complete -c starci -n '__starci_using_command kernel cut-seam' -l job -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l files -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l summary -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l release
-complete -c starci -n '__starci_using_command kernel cut-seam' -l workflow -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l op -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l cut-id -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l reason -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l reconcile
-complete -c starci -n '__starci_using_command kernel cut-seam' -l exit-code -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l command -r
-complete -c starci -n '__starci_using_command kernel cut-seam' -l evidence -r
+complete -c starci -n '__starci_using_command kernel cut-seam' -l publish-interface -d 'mode: the seam job publishes its interface files; needs --job and --files'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l release -d 'mode: the Kernel releases a cut to run on a stub now; needs --workflow, --op, --cut-id, --reason'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l reconcile -d 'mode: record the re-verify of a stub sibling against the landed seam; needs --job and --exit-code'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l job -r -d 'seam job (--publish-interface) or sibling job (--reconcile)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l files -r -d 'comma list of the interface files the seam publishes'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l summary -r -d 'one-line description of the published interface'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l op -r -d 'op of the cut (--release)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l cut-id -r -d 'cut id (--release)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l reason -r -d 'why the cut is released early (--release)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l exit-code -r -d 'exit code of the sibling re-verify (--reconcile)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l command -r -d 'the re-verify command that was run (--reconcile)'
+complete -c starci -n '__starci_using_command kernel cut-seam' -l evidence -r -d 'path of the re-verify evidence (--reconcile)'
 complete -c starci -n '__starci_using_command kernel decide' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel decide' -l workflow -r
-complete -c starci -n '__starci_using_command kernel decide' -l hypothesis -r
-complete -c starci -n '__starci_using_command kernel decide' -l action-key -r
-complete -c starci -n '__starci_using_command kernel decide' -l metric -r
-complete -c starci -n '__starci_using_command kernel decide' -l command -r
-complete -c starci -n '__starci_using_command kernel decide' -l close -r
-complete -c starci -n '__starci_using_command kernel decide' -l result -r -a 'keep revert'
-complete -c starci -n '__starci_using_command kernel decide' -l observed -r
-complete -c starci -n '__starci_using_command kernel decide' -l list
+complete -c starci -n '__starci_using_command kernel decide' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel decide' -l hypothesis -r -d 'what the action should change (open)'
+complete -c starci -n '__starci_using_command kernel decide' -l action-key -r -d 'stable key of the action tried (open)'
+complete -c starci -n '__starci_using_command kernel decide' -l metric -r -d 'the metric that judges it (open)'
+complete -c starci -n '__starci_using_command kernel decide' -l command -r -d 'the command that applies the action (open)'
+complete -c starci -n '__starci_using_command kernel decide' -l close -r -d 'id of the open decision to close'
+complete -c starci -n '__starci_using_command kernel decide' -l result -r -a 'keep revert' -d 'verdict of the close (needs --observed)'
+complete -c starci -n '__starci_using_command kernel decide' -l observed -r -d 'what the metric showed (close)'
+complete -c starci -n '__starci_using_command kernel decide' -l list -d 'list the decisions of the workflow'
 complete -c starci -n '__starci_using_command kernel decisions' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel decisions' -l workflow -r
-complete -c starci -n '__starci_using_command kernel decisions' -l list
-complete -c starci -n '__starci_using_command kernel decisions' -l all
-complete -c starci -n '__starci_using_command kernel decisions' -l next
-complete -c starci -n '__starci_using_command kernel decisions' -l open
-complete -c starci -n '__starci_using_command kernel decisions' -l kind -r
-complete -c starci -n '__starci_using_command kernel decisions' -l summary -r
-complete -c starci -n '__starci_using_command kernel decisions' -l by -r
-complete -c starci -n '__starci_using_command kernel decisions' -l entity-type -r
-complete -c starci -n '__starci_using_command kernel decisions' -l entity-id -r
-complete -c starci -n '__starci_using_command kernel decisions' -l decider -r -a 'kernel supervisor owner'
-complete -c starci -n '__starci_using_command kernel decisions' -l due-ms -r
-complete -c starci -n '__starci_using_command kernel decisions' -l key -r
-complete -c starci -n '__starci_using_command kernel decisions' -l evidence-file -r
-complete -c starci -n '__starci_using_command kernel decisions' -l evidence -r
-complete -c starci -n '__starci_using_command kernel decisions' -l evidence-json -r
-complete -c starci -n '__starci_using_command kernel decisions' -l allowed-verbs -r
-complete -c starci -n '__starci_using_command kernel decisions' -l options-json -r
-complete -c starci -n '__starci_using_command kernel decisions' -l severity -r
-complete -c starci -n '__starci_using_command kernel decisions' -l item -r
-complete -c starci -n '__starci_using_command kernel decisions' -l claim -r
-complete -c starci -n '__starci_using_command kernel decisions' -l resolve -r
-complete -c starci -n '__starci_using_command kernel decisions' -l verb -r
-complete -c starci -n '__starci_using_command kernel decisions' -l decision -r
-complete -c starci -n '__starci_using_command kernel decisions' -l note -r
-complete -c starci -n '__starci_using_command kernel decisions' -l escalate -r
-complete -c starci -n '__starci_using_command kernel decisions' -l to -r -a 'supervisor owner'
-complete -c starci -n '__starci_using_command kernel decisions' -l reason -r
+complete -c starci -n '__starci_using_command kernel decisions' -l workflow -r -d 'workflow id (required except for --claim, --resolve, --escalate)'
+complete -c starci -n '__starci_using_command kernel decisions' -l list -d 'list the live Decision Items (default)'
+complete -c starci -n '__starci_using_command kernel decisions' -l all -d 'with --list: include closed ones'
+complete -c starci -n '__starci_using_command kernel decisions' -l next -d 'print the next Decision Item the Kernel must act on'
+complete -c starci -n '__starci_using_command kernel decisions' -l open -d 'open a Decision Item; needs --kind and --summary'
+complete -c starci -n '__starci_using_command kernel decisions' -l kind -r -d 'Decision Item kind (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l summary -r -d 'one-line summary (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l by -r -d 'acting actor; required with --claim, --resolve, --escalate'
+complete -c starci -n '__starci_using_command kernel decisions' -l entity-type -r -d 'type of the entity the item concerns (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l entity-id -r -d 'id of that entity (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l decider -r -a 'kernel supervisor owner' -d 'who must decide (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l due-ms -r -d 'milliseconds until the item is due (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l key -r -d 'idempotency key (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l evidence-file -r -d 'file of evidence refs, JSON array or one ref per line (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l evidence -r -d 'inline evidence text (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l evidence-json -r -d 'evidence as a JSON array (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l allowed-verbs -r -d 'comma list of the verbs that may resolve it (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l options-json -r -d 'options as a JSON array (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l severity -r -d 'severity, e.g. critical (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l item -r -d 'owed key the item is about (open)'
+complete -c starci -n '__starci_using_command kernel decisions' -l claim -r -d 'id of the item to claim'
+complete -c starci -n '__starci_using_command kernel decisions' -l resolve -r -d 'id of the item to resolve (needs --verb)'
+complete -c starci -n '__starci_using_command kernel decisions' -l verb -r -d 'the command that was run to resolve it'
+complete -c starci -n '__starci_using_command kernel decisions' -l decision -r -d 'starci kernel decide id recorded with the resolution'
+complete -c starci -n '__starci_using_command kernel decisions' -l note -r -d 'free note recorded with --resolve'
+complete -c starci -n '__starci_using_command kernel decisions' -l escalate -r -d 'id of the item to escalate'
+complete -c starci -n '__starci_using_command kernel decisions' -l to -r -a 'supervisor owner' -d 'escalation target (default supervisor)'
+complete -c starci -n '__starci_using_command kernel decisions' -l reason -r -d 'why it is escalated'
 complete -c starci -n '__starci_using_command kernel dispatch' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel dispatch' -l job -r
-complete -c starci -n '__starci_using_command kernel dispatch' -l spawn
-complete -c starci -n '__starci_using_command kernel dispatch' -l model -r
-complete -c starci -n '__starci_using_command kernel dispatch' -l worktree -r
-complete -c starci -n '__starci_using_command kernel dispatch' -l lease-ttl -r
-complete -c starci -n '__starci_using_command kernel dispatch' -l env-gate -r -a 'off'
+complete -c starci -n '__starci_using_command kernel dispatch' -l job -r -d 'job to dispatch'
+complete -c starci -n '__starci_using_command kernel dispatch' -l spawn -d 'actually launch the worker (contract row, leases)'
+complete -c starci -n '__starci_using_command kernel dispatch' -l model -r -d 'model target, overriding the persisted route'
+complete -c starci -n '__starci_using_command kernel dispatch' -l worktree -r -d 'checkout the worker runs in'
+complete -c starci -n '__starci_using_command kernel dispatch' -l lease-ttl -r -d 'path-lease time-to-live in milliseconds'
+complete -c starci -n '__starci_using_command kernel dispatch' -l env-gate -r -a 'off' -d 'skip the environment-health gate for an env-gated op'
 complete -c starci -n '__starci_using_command kernel dispatch-ready' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel dispatch-ready' -l workflow -r
-complete -c starci -n '__starci_using_command kernel dispatch-ready' -l max -r
-complete -c starci -n '__starci_using_command kernel dispatch-ready' -l dry-run
-complete -c starci -n '__starci_using_command kernel dispatch-ready' -l foreground
+complete -c starci -n '__starci_using_command kernel dispatch-ready' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel dispatch-ready' -l max -r -d 'dispatch at most this many jobs'
+complete -c starci -n '__starci_using_command kernel dispatch-ready' -l dry-run -d 'show which jobs would be dispatched; dispatch nothing'
+complete -c starci -n '__starci_using_command kernel dispatch-ready' -l foreground -d 'run in this process instead of a detached child'
 complete -c starci -n '__starci_using_command kernel enqueue' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel enqueue' -l workflow -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l op -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l paths -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l records -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l params -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l repository -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l cut-id -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l cut-ordinal -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l cut-total -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l after -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l foundation -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l contract-change -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l follow-up-of -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l new-module -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l retry-of -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l reopen -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l derived-from -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l canon-scan -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l what -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l title -r
-complete -c starci -n '__starci_using_command kernel enqueue' -l risk -r
+complete -c starci -n '__starci_using_command kernel enqueue' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel enqueue' -l op -r -d 'op id (a brief at modules/ops/ops/<op>.yaml)'
+complete -c starci -n '__starci_using_command kernel enqueue' -l paths -r -d 'comma list of the paths the job owns (its write set)'
+complete -c starci -n '__starci_using_command kernel enqueue' -l records -r -d 'comma list of .starciwork records the job reads'
+complete -c starci -n '__starci_using_command kernel enqueue' -l params -r -d 'op params as a JSON object'
+complete -c starci -n '__starci_using_command kernel enqueue' -l repository -r -d 'repository id the job runs in'
+complete -c starci -n '__starci_using_command kernel enqueue' -l cut-id -r -d 'cut id; with --cut-ordinal and --cut-total'
+complete -c starci -n '__starci_using_command kernel enqueue' -l cut-ordinal -r -d 'position of the unit in its cut, from 1'
+complete -c starci -n '__starci_using_command kernel enqueue' -l cut-total -r -d 'number of units in the cut'
+complete -c starci -n '__starci_using_command kernel enqueue' -l after -r -d 'comma list of job ids this job waits for'
+complete -c starci -n '__starci_using_command kernel enqueue' -l foundation -r -d 'shared foundation this unit builds'
+complete -c starci -n '__starci_using_command kernel enqueue' -l contract-change -r -d 'registered follow-up change id in contract-changes.yaml'
+complete -c starci -n '__starci_using_command kernel enqueue' -l follow-up-of -r -d 'job of this workflow the follow-up leg answers'
+complete -c starci -n '__starci_using_command kernel enqueue' -l new-module -r -d 'comma list of module root dirs the grant creates'
+complete -c starci -n '__starci_using_command kernel enqueue' -l retry-of -r -d 'job this one retries'
+complete -c starci -n '__starci_using_command kernel enqueue' -l reopen -r -d 'reason a settled unit is reopened'
+complete -c starci -n '__starci_using_command kernel enqueue' -l derived-from -r -d 'comma list of job ids this unit derives from'
+complete -c starci -n '__starci_using_command kernel enqueue' -l canon-scan -r -d 'canon scan file of a canon slice'
+complete -c starci -n '__starci_using_command kernel enqueue' -l resolves -r -d 'Decision Item id this enqueue resolves (decisions-first gate)'
+complete -c starci -n '__starci_using_command kernel enqueue' -l what -r -d 'short display name (60 chars)'
+complete -c starci -n '__starci_using_command kernel enqueue' -l title -r -d 'job title'
+complete -c starci -n '__starci_using_command kernel enqueue' -l risk -r -d 'risk note recorded on the job'
 complete -c starci -n '__starci_using_command kernel estimate' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel estimate' -l files -r
-complete -c starci -n '__starci_using_command kernel estimate' -l assertions -r
-complete -c starci -n '__starci_using_command kernel estimate' -l components -r
-complete -c starci -n '__starci_using_command kernel estimate' -l records -r
-complete -c starci -n '__starci_using_command kernel estimate' -l paths -r
-complete -c starci -n '__starci_using_command kernel estimate' -l gear -r
+complete -c starci -n '__starci_using_command kernel estimate' -l files -r -d 'number of files in the slice'
+complete -c starci -n '__starci_using_command kernel estimate' -l assertions -r -d 'number of assertions'
+complete -c starci -n '__starci_using_command kernel estimate' -l components -r -d 'number of components'
+complete -c starci -n '__starci_using_command kernel estimate' -l records -r -d 'number of records'
+complete -c starci -n '__starci_using_command kernel estimate' -l paths -r -d 'comma list of paths to measure instead'
+complete -c starci -n '__starci_using_command kernel estimate' -l gear -r -d 'gear id declared in allocation.slicing.gears (default from config)'
 complete -c starci -n '__starci_using_command kernel extensions' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel finish' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel finish' -l workflow -r
+complete -c starci -n '__starci_using_command kernel finish' -l workflow -r -d 'workflow id'
 complete -c starci -n '__starci_using_command kernel foundation' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel foundation' -l workflow -r
-complete -c starci -n '__starci_using_command kernel foundation' -l claim -r
-complete -c starci -n '__starci_using_command kernel foundation' -l kind -r -a 'layout-tree brand grammar module contract baseline scaffold other'
-complete -c starci -n '__starci_using_command kernel foundation' -l version -r
-complete -c starci -n '__starci_using_command kernel foundation' -l declare-dependent -r
-complete -c starci -n '__starci_using_command kernel foundation' -l land -r
-complete -c starci -n '__starci_using_command kernel foundation' -l proof -r
-complete -c starci -n '__starci_using_command kernel foundation' -l refs -r
-complete -c starci -n '__starci_using_command kernel foundation' -l declare-none
-complete -c starci -n '__starci_using_command kernel foundation' -l detail -r
+complete -c starci -n '__starci_using_command kernel foundation' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel foundation' -l claim -r -d 'foundation name this workflow owns'
+complete -c starci -n '__starci_using_command kernel foundation' -l kind -r -a 'layout-tree brand grammar module contract baseline scaffold other' -d 'foundation kind (--claim)'
+complete -c starci -n '__starci_using_command kernel foundation' -l version -r -d 'version of the foundation (--claim, --land)'
+complete -c starci -n '__starci_using_command kernel foundation' -l declare-dependent -r -d 'foundation name this workflow needs'
+complete -c starci -n '__starci_using_command kernel foundation' -l land -r -d 'foundation name that landed; needs --proof'
+complete -c starci -n '__starci_using_command kernel foundation' -l proof -r -d 'what proves the landing (--land)'
+complete -c starci -n '__starci_using_command kernel foundation' -l refs -r -d 'comma list of refs recorded with --land'
+complete -c starci -n '__starci_using_command kernel foundation' -l declare-none -d 'declare the workflow owns and needs no shared foundation'
+complete -c starci -n '__starci_using_command kernel foundation' -l detail -r -d 'free detail recorded with the action'
 complete -c starci -n '__starci_using_command kernel foundations' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel foundations' -l workflow -r
+complete -c starci -n '__starci_using_command kernel foundations' -l workflow -r -d 'only this workflow: its duty, owns and needs'
 complete -c starci -n '__starci_using_command kernel graph-edit' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel graph-edit' -l workflow -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l decision -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l edit -r -a 'drop widen wire continue retry reorder split merge params scan recut undo'
-complete -c starci -n '__starci_using_command kernel graph-edit' -l jobs -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l job -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l add-paths -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l paths -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l op -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l before -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l after -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l parts -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l set -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l cut-id -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l from-scan -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l path-prefix -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l exclude -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l reason -r
-complete -c starci -n '__starci_using_command kernel graph-edit' -l undo -r
+complete -c starci -n '__starci_using_command kernel graph-edit' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l edit -r -a 'drop widen wire continue retry reorder split merge params scan recut undo' -d 'the edit to apply'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l decision -r -d 'Decision Item the edit answers; required for every edit except undo'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l jobs -r -d 'comma list of job ids (drop, merge)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l job -r -d 'the job edited (widen, reorder, params, continue, retry, split)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l add-paths -r -d 'comma list of paths added to the job'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l paths -r -d 'comma list of owned paths of the merged job'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l op -r -d 'op id (merge, recut)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l before -r -d 'comma list of job ids the new job runs before (wire, merge)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l after -r -d 'comma list of job ids the job runs after (reorder, wire)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l parts -r -d 'JSON array of path arrays that partition the job (split)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l set -r -d 'JSON object of param overrides (params, continue, retry)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l cut-id -r -d 'cut id (scan, recut)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l from-scan -r -d 'canon scan file the recut reads'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l path-prefix -r -d 'prefix put before the recut paths'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l exclude -r -d 'comma list of path prefixes the scan skips'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l reason -r -d 'why the edit is made (required for drop)'
+complete -c starci -n '__starci_using_command kernel graph-edit' -l undo -r -d 'edit id to undo (--edit undo)'
 complete -c starci -n '__starci_using_command kernel hierarchy' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel hierarchy' -l workflow -r
+complete -c starci -n '__starci_using_command kernel hierarchy' -l workflow -r -d 'workflow id'
 complete -c starci -n '__starci_using_command kernel inbox' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel inbox' -l workflow -r
-complete -c starci -n '__starci_using_command kernel inbox' -l ack -r
-complete -c starci -n '__starci_using_command kernel inbox' -l disposition -r
+complete -c starci -n '__starci_using_command kernel inbox' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel inbox' -l ack -r -d 'key of the inbox item to acknowledge'
+complete -c starci -n '__starci_using_command kernel inbox' -l disposition -r -d 'what was done about it; required with --ack'
 complete -c starci -n '__starci_using_command kernel incident' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel incident' -l workflow -r
-complete -c starci -n '__starci_using_command kernel incident' -l kind -r
-complete -c starci -n '__starci_using_command kernel incident' -l detail -r
-complete -c starci -n '__starci_using_command kernel incident' -l op -r
-complete -c starci -n '__starci_using_command kernel incident' -l holds -r
-complete -c starci -n '__starci_using_command kernel incident' -l peer -r
-complete -c starci -n '__starci_using_command kernel incident' -l refs -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-message -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-foundation -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-landed -r
-complete -c starci -n '__starci_using_command kernel incident' -l resolve -r
-complete -c starci -n '__starci_using_command kernel incident' -l by -r -a 'kernel owner supervisor'
-complete -c starci -n '__starci_using_command kernel incident' -l owner-answer -r
-complete -c starci -n '__starci_using_command kernel incident' -l introduced-by -r
-complete -c starci -n '__starci_using_command kernel incident' -l introducer -r
-complete -c starci -n '__starci_using_command kernel incident' -l fix -r
-complete -c starci -n '__starci_using_command kernel incident' -l attach -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-record -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-job -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-commit -r
-complete -c starci -n '__starci_using_command kernel incident' -l until-incident -r
+complete -c starci -n '__starci_using_command kernel incident' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel incident' -l kind -r -d 'incident kind, e.g. peer-wait or shared-blocker (raise)'
+complete -c starci -n '__starci_using_command kernel incident' -l detail -r -d 'what happened (raise; optional on resolve and attach)'
+complete -c starci -n '__starci_using_command kernel incident' -l op -r -d 'op the incident concerns'
+complete -c starci -n '__starci_using_command kernel incident' -l holds -r -d 'comma list of op or job ids the incident holds'
+complete -c starci -n '__starci_using_command kernel incident' -l peer -r -d 'workflow waited on (--kind peer-wait)'
+complete -c starci -n '__starci_using_command kernel incident' -l refs -r -d 'comma list of refs of the wait (--kind peer-wait)'
+complete -c starci -n '__starci_using_command kernel incident' -l resolve -r -d 'id of the incident to resolve'
+complete -c starci -n '__starci_using_command kernel incident' -l by -r -a 'kernel owner supervisor' -d 'who resolves it'
+complete -c starci -n '__starci_using_command kernel incident' -l owner-answer -r -d 'comma list of owner-answered dispatch ids backing the resolution'
+complete -c starci -n '__starci_using_command kernel incident' -l introduced-by -r -d 'comma list of commits that introduced the blocker (shared-blocker)'
+complete -c starci -n '__starci_using_command kernel incident' -l introducer -r -d 'workflow that introduced the blocker (shared-blocker)'
+complete -c starci -n '__starci_using_command kernel incident' -l fix -r -d 'the fix the introducer owes (shared-blocker)'
+complete -c starci -n '__starci_using_command kernel incident' -l attach -r -d 'id of an open incident to type with --until-* conditions'
+complete -c starci -n '__starci_using_command kernel incident' -l until-record -r -d 'release when the record reaches the state: <path>[@state|>=rev]'
+complete -c starci -n '__starci_using_command kernel incident' -l until-job -r -d 'release when the job settles: <jobId>[:settled|succeeded]'
+complete -c starci -n '__starci_using_command kernel incident' -l until-message -r -d 'release on a peer message: <peer>[:kind]; a bare flag needs --kind peer-wait'
+complete -c starci -n '__starci_using_command kernel incident' -l until-commit -r -d 'release when the ref or path lands: <repo>:<ref-or-path>'
+complete -c starci -n '__starci_using_command kernel incident' -l until-incident -r -d 'release when the incident resolves: <id>[:resolved]'
+complete -c starci -n '__starci_using_command kernel incident' -l until-foundation -r -d 'release when the foundation lands: <name>'
+complete -c starci -n '__starci_using_command kernel incident' -l until-landed -r -d 'release when the workflow lands its product: <workflowId>@<repository>'
 complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l workflow -r
-complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l rev -r
-complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l files -r
+complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l rev -r -d 'runtime commit (sha or ref) that was read'
+complete -c starci -n '__starci_using_command kernel kernel-ack-rev' -l files -r -d 'comma list of the kernel files read at that rev'
 complete -c starci -n '__starci_using_command kernel kernel-proposal' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l workflow -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l title -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l evidence -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l patch -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l files -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l decision -r
-complete -c starci -n '__starci_using_command kernel kernel-proposal' -l list
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l title -r -d 'one-line title of the proposal (required unless --list)'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l evidence -r -d 'why the change is needed (required unless --list)'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l patch -r -d 'path of a patch file for the change'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l files -r -d 'comma list of the files the change touches'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l decision -r -d 'Decision Item the proposal answers'
+complete -c starci -n '__starci_using_command kernel kernel-proposal' -l list -d 'list the proposals of the workflow'
 complete -c starci -n '__starci_using_command kernel lifecycle' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel lifecycle' -l workflow -r
-complete -c starci -n '__starci_using_command kernel lifecycle' -l pause
-complete -c starci -n '__starci_using_command kernel lifecycle' -l stop
-complete -c starci -n '__starci_using_command kernel lifecycle' -l resume
-complete -c starci -n '__starci_using_command kernel lifecycle' -l by -r -a 'owner supervisor kernel'
-complete -c starci -n '__starci_using_command kernel lifecycle' -l reason -r
+complete -c starci -n '__starci_using_command kernel lifecycle' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel lifecycle' -l pause -d 'pause a running workflow (owner, supervisor or kernel)'
+complete -c starci -n '__starci_using_command kernel lifecycle' -l stop -d 'stop the workflow (owner or supervisor)'
+complete -c starci -n '__starci_using_command kernel lifecycle' -l resume -d 'resume a paused or stopped workflow (owner or supervisor)'
+complete -c starci -n '__starci_using_command kernel lifecycle' -l by -r -a 'owner supervisor kernel' -d 'who makes the move'
+complete -c starci -n '__starci_using_command kernel lifecycle' -l reason -r -d 'why the move is made'
 complete -c starci -n '__starci_using_command kernel log' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel log' -l workflow -r
-complete -c starci -n '__starci_using_command kernel log' -l job -r
-complete -c starci -n '__starci_using_command kernel log' -l kind -r
-complete -c starci -n '__starci_using_command kernel log' -l msg -r
-complete -c starci -n '__starci_using_command kernel log' -l data -r
-complete -c starci -n '__starci_using_command kernel log' -l refs -r
-complete -c starci -n '__starci_using_command kernel log' -l level -r -a 'info warn error'
-complete -c starci -n '__starci_using_command kernel log' -l node -r
-complete -c starci -n '__starci_using_command kernel log' -l actor -r -a 'kernel runtime check land'
+complete -c starci -n '__starci_using_command kernel log' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel log' -l job -r -d 'job the row belongs to (an op may log only its own)'
+complete -c starci -n '__starci_using_command kernel log' -l kind -r -a 'step.start step.end cmd.run file.edit check.result test.result render video trace warning decision narration ask error dispatch report settle land incident job.drop supervisor.action gc.collect gc.summary reconciler.would reconciler.act reconciler.error reconciler.event invariant.violated invariant.cleared log.truncated' -d 'typed row kind; --data must carry its required fields'
+complete -c starci -n '__starci_using_command kernel log' -l msg -r -d 'short message'
+complete -c starci -n '__starci_using_command kernel log' -l data -r -d 'kind-specific data as a JSON object'
+complete -c starci -n '__starci_using_command kernel log' -l refs -r -d 'comma list of refs'
+complete -c starci -n '__starci_using_command kernel log' -l level -r -a 'info warn error' -d 'row level (default by kind)'
+complete -c starci -n '__starci_using_command kernel log' -l node -r -d 'work-graph node the row is about'
+complete -c starci -n '__starci_using_command kernel log' -l actor -r -a 'kernel runtime check land' -d 'actor the row speaks for (an op always logs as op)'
 complete -c starci -n '__starci_using_command kernel logs' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel logs' -l workflow -r
-complete -c starci -n '__starci_using_command kernel logs' -l job -r
-complete -c starci -n '__starci_using_command kernel logs' -l after -r
-complete -c starci -n '__starci_using_command kernel logs' -l kinds -r
-complete -c starci -n '__starci_using_command kernel logs' -l limit -r
+complete -c starci -n '__starci_using_command kernel logs' -l workflow -r -d 'workflow id'
+complete -c starci -n '__starci_using_command kernel logs' -l job -r -d 'only this job'
+complete -c starci -n '__starci_using_command kernel logs' -l after -r -d 'only rows after this seq'
+complete -c starci -n '__starci_using_command kernel logs' -l kinds -r -d 'comma list of log kinds to keep'
+complete -c starci -n '__starci_using_command kernel logs' -l limit -r -d 'at most this many rows (default 500)'
 complete -c starci -n '__starci_using_command kernel messages' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel messages' -l workflow -r
+complete -c starci -n '__starci_using_command kernel messages' -l workflow -r -d 'workflow id'
 complete -c starci -n '__starci_using_command kernel notify' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel notify' -l workflow -r
 complete -c starci -n '__starci_using_command kernel notify' -l to -r
@@ -607,176 +608,176 @@ complete -c starci -n '__starci_using_command kernel nudge' -l repo -r -d 'manag
 complete -c starci -n '__starci_using_command kernel nudge' -l job -r
 complete -c starci -n '__starci_using_command kernel observe' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel observe' -l job -r
-complete -c starci -n '__starci_using_command kernel observe' -l lines -r
+complete -c starci -n '__starci_using_command kernel observe' -l lines -r -d 'how many trailing screen lines to read (positive integer)'
 complete -c starci -n '__starci_using_command kernel op-contract' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel op-contract' -l job -r
-complete -c starci -n '__starci_using_command kernel op-contract' -l workflow -r
-complete -c starci -n '__starci_using_command kernel op-contract' -l op -r
-complete -c starci -n '__starci_using_command kernel op-contract' -l attempt -r
+complete -c starci -n '__starci_using_command kernel op-contract' -l job -r -d 'job whose contract to read; required unless --workflow and --op name the op'
+complete -c starci -n '__starci_using_command kernel op-contract' -l workflow -r -d 'workflow of the op (with --op, instead of --job)'
+complete -c starci -n '__starci_using_command kernel op-contract' -l op -r -d 'op id (with --workflow, instead of --job)'
+complete -c starci -n '__starci_using_command kernel op-contract' -l attempt -r -d 'attempt number (jobs.try_no); the newest attempt when omitted'
 complete -c starci -n '__starci_using_command kernel op-override' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel op-override' -l workflow -r
-complete -c starci -n '__starci_using_command kernel op-override' -l op -r
-complete -c starci -n '__starci_using_command kernel op-override' -l set -r
-complete -c starci -n '__starci_using_command kernel op-override' -l clear
-complete -c starci -n '__starci_using_command kernel op-override' -l decision -r
+complete -c starci -n '__starci_using_command kernel op-override' -l op -r -d 'op to override (required with --set or --clear; narrows the shown list otherwise)'
+complete -c starci -n '__starci_using_command kernel op-override' -l set -r -d 'JSON object of additive override fields (notes, commandTimeoutMs, difficulty, model, effort)'
+complete -c starci -n '__starci_using_command kernel op-override' -l clear -d 'remove the op'\''s override'
+complete -c starci -n '__starci_using_command kernel op-override' -l decision -r -d 'owner decision id that authorises a --set or --clear'
 complete -c starci -n '__starci_using_command kernel peers' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel peers' -l workflow -r
 complete -c starci -n '__starci_using_command kernel plan' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel plan' -l workflow -r
-complete -c starci -n '__starci_using_command kernel plan' -l file -r
-complete -c starci -n '__starci_using_command kernel plan' -l replanned-from -r
-complete -c starci -n '__starci_using_command kernel plan' -l blocker -r
-complete -c starci -n '__starci_using_command kernel plan' -l path-delta -r
-complete -c starci -n '__starci_using_command kernel plan' -l routing-reason -r
+complete -c starci -n '__starci_using_command kernel plan' -l file -r -d 'plan JSON file {legs:[{op,paths?,notes?}], edges:[[fromLeg,toLeg]]}'
+complete -c starci -n '__starci_using_command kernel plan' -l replanned-from -r -d 'lineage note - the plan this one replaces'
+complete -c starci -n '__starci_using_command kernel plan' -l blocker -r -d 'lineage note - the blocker that forced the replan'
+complete -c starci -n '__starci_using_command kernel plan' -l path-delta -r -d 'lineage note - how the owned paths changed'
+complete -c starci -n '__starci_using_command kernel plan' -l routing-reason -r -d 'lineage note - why the routing changed'
 complete -c starci -n '__starci_using_command kernel provider-backoff' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel provider-backoff' -l provider -r
-complete -c starci -n '__starci_using_command kernel provider-backoff' -l open-circuit
-complete -c starci -n '__starci_using_command kernel provider-backoff' -l kind -r -a 'quota rate-limited'
-complete -c starci -n '__starci_using_command kernel provider-backoff' -l reason -r
-complete -c starci -n '__starci_using_command kernel provider-backoff' -l by -r
+complete -c starci -n '__starci_using_command kernel provider-backoff' -l provider -r -d 'provider id whose circuit to open'
+complete -c starci -n '__starci_using_command kernel provider-backoff' -l open-circuit -d 'the action; the verb refuses without it'
+complete -c starci -n '__starci_using_command kernel provider-backoff' -l kind -r -a 'quota rate-limited' -d 'failure kind recorded on the circuit'
+complete -c starci -n '__starci_using_command kernel provider-backoff' -l reason -r -d 'why the circuit opens (kept to 400 chars)'
+complete -c starci -n '__starci_using_command kernel provider-backoff' -l by -r -d 'actor that opens it (kept to 80 chars)'
 complete -c starci -n '__starci_using_command kernel provider-health' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel provider-health' -l provider -r
-complete -c starci -n '__starci_using_command kernel provider-health' -l recover
-complete -c starci -n '__starci_using_command kernel provider-health' -l reason -r
-complete -c starci -n '__starci_using_command kernel provider-health' -l probe
-complete -c starci -n '__starci_using_command kernel provider-health' -l quota-probe
-complete -c starci -n '__starci_using_command kernel provider-health' -l force
-complete -c starci -n '__starci_using_command kernel provider-health' -l workflow -r
+complete -c starci -n '__starci_using_command kernel provider-health' -l provider -r -d 'provider id; required unless --quota-probe (which then probes every quota provider)'
+complete -c starci -n '__starci_using_command kernel provider-health' -l recover -d 'clear the open circuit (refused outside a running Kernel terminal)'
+complete -c starci -n '__starci_using_command kernel provider-health' -l reason -r -d 'why the circuit is recovered; required with --recover'
+complete -c starci -n '__starci_using_command kernel provider-health' -l probe -d 'with --recover, prove the credential or quota with a real probe first'
+complete -c starci -n '__starci_using_command kernel provider-health' -l quota-probe -d 'probe an open quota circuit (at most once per probe interval) and clear it on a pass'
+complete -c starci -n '__starci_using_command kernel provider-health' -l force -d 'with --quota-probe, probe even inside the throttle interval'
+complete -c starci -n '__starci_using_command kernel provider-health' -l workflow -r -d 'with --quota-probe, workflow the recovery event is recorded on'
 complete -c starci -n '__starci_using_command kernel questions' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel questions' -l workflow -r
 complete -c starci -n '__starci_using_command kernel reconcile' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel reconcile' -l job -r
-complete -c starci -n '__starci_using_command kernel reconcile' -l drop
-complete -c starci -n '__starci_using_command kernel reconcile' -l reason -r
-complete -c starci -n '__starci_using_command kernel reconcile' -l dead-worker
-complete -c starci -n '__starci_using_command kernel reconcile' -l settle-failed
-complete -c starci -n '__starci_using_command kernel reconcile' -l no-salvage
-complete -c starci -n '__starci_using_command kernel reconcile' -l release-worker
-complete -c starci -n '__starci_using_command kernel reconcile' -l orphan-kernel-jobs
-complete -c starci -n '__starci_using_command kernel reconcile' -l workflow -r
-complete -c starci -n '__starci_using_command kernel reconcile' -l dry-run
+complete -c starci -n '__starci_using_command kernel reconcile' -l job -r -d 'job to reconcile; required unless --orphan-kernel-jobs'
+complete -c starci -n '__starci_using_command kernel reconcile' -l drop -d 'retire a queued job that was never dispatched (needs --reason)'
+complete -c starci -n '__starci_using_command kernel reconcile' -l reason -r -d 'why the job is dropped; required with --drop'
+complete -c starci -n '__starci_using_command kernel reconcile' -l dead-worker -d 'recover a running job whose exact worker terminal is gone'
+complete -c starci -n '__starci_using_command kernel reconcile' -l settle-failed -d 'with --dead-worker, settle the job failed instead of requeueing it'
+complete -c starci -n '__starci_using_command kernel reconcile' -l no-salvage -d 'with --dead-worker, skip filing a report the dead worker wrote but never filed'
+complete -c starci -n '__starci_using_command kernel reconcile' -l release-worker -d 'release the worker of a job whose settle is held, keeping the job for its settle'
+complete -c starci -n '__starci_using_command kernel reconcile' -l orphan-kernel-jobs -d 'cancel the kernel jobs of finished or archived workflows'
+complete -c starci -n '__starci_using_command kernel reconcile' -l workflow -r -d 'with --orphan-kernel-jobs, limit to one workflow'
+complete -c starci -n '__starci_using_command kernel reconcile' -l dry-run -d 'with --orphan-kernel-jobs, list what would be cancelled without writing'
 complete -c starci -n '__starci_using_command kernel record-change' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel record-change' -l workflow -r
-complete -c starci -n '__starci_using_command kernel record-change' -l record -r
-complete -c starci -n '__starci_using_command kernel record-change' -l reach -r -a 'follow-up advisory'
-complete -c starci -n '__starci_using_command kernel record-change' -l reason -r
+complete -c starci -n '__starci_using_command kernel record-change' -l record -r -d '.starciwork record directory or file (no glob) the workflow owns'
+complete -c starci -n '__starci_using_command kernel record-change' -l reach -r -a 'follow-up advisory' -d 'follow-up = breaking (peers owe one follow-up leg); advisory = peers are only told'
+complete -c starci -n '__starci_using_command kernel record-change' -l reason -r -d 'what the change withdraws or replaces, and why'
 complete -c starci -n '__starci_using_command kernel record-checks' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel record-checks' -l job -r
-complete -c starci -n '__starci_using_command kernel record-checks' -l checks -r
-complete -c starci -n '__starci_using_command kernel record-checks' -l checks-file -r
+complete -c starci -n '__starci_using_command kernel record-checks' -l job -r -d 'job whose filed worker report the checks are recorded against'
+complete -c starci -n '__starci_using_command kernel record-checks' -l checks -r -d 'JSON {checks:[{name,exitCode,command?,evidence?}]}; one of --checks or --checks-file is required'
+complete -c starci -n '__starci_using_command kernel record-checks' -l checks-file -r -d 'path to a file holding the same JSON, absolute or relative to --repo'
 complete -c starci -n '__starci_using_command kernel redesign' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel redesign' -l workflow -r
-complete -c starci -n '__starci_using_command kernel redesign' -l op -r
-complete -c starci -n '__starci_using_command kernel redesign' -l paths -r
-complete -c starci -n '__starci_using_command kernel redesign' -l decision -r
-complete -c starci -n '__starci_using_command kernel redesign' -l brief -r
+complete -c starci -n '__starci_using_command kernel redesign' -l workflow -r -d 'workflow whose cut, scope or leg plan is redesigned'
+complete -c starci -n '__starci_using_command kernel redesign' -l op -r -d 'owning op to dispatch (work.author, scope.define or goal.revise by default)'
+complete -c starci -n '__starci_using_command kernel redesign' -l paths -r -d 'comma-separated paths the redesign op owns'
+complete -c starci -n '__starci_using_command kernel redesign' -l decision -r -d 'owner decision id that authorises the redesign'
+complete -c starci -n '__starci_using_command kernel redesign' -l brief -r -d 'replacement for the default ask sent to the op beside the RCA'
 complete -c starci -n '__starci_using_command kernel rename' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel rename' -l workflow -r
-complete -c starci -n '__starci_using_command kernel rename' -l title -r
-complete -c starci -n '__starci_using_command kernel rename' -l by -r -a 'owner supervisor'
-complete -c starci -n '__starci_using_command kernel rename' -l no-terminals
-complete -c starci -n '__starci_using_command kernel rename' -l dry-run
+complete -c starci -n '__starci_using_command kernel rename' -l title -r -d 'the new display name (workflow_id is unchanged)'
+complete -c starci -n '__starci_using_command kernel rename' -l by -r -a 'owner supervisor' -d 'who renames the workflow, recorded on the event'
+complete -c starci -n '__starci_using_command kernel rename' -l no-terminals -d 'leave the live terminal tabs to the next boot or dispatch'
+complete -c starci -n '__starci_using_command kernel rename' -l dry-run -d 'show the rename and the tab it would touch without writing'
 complete -c starci -n '__starci_using_command kernel reply' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel reply' -l workflow -r
-complete -c starci -n '__starci_using_command kernel reply' -l message -r
-complete -c starci -n '__starci_using_command kernel reply' -l body -r
-complete -c starci -n '__starci_using_command kernel reply' -l to-owner
+complete -c starci -n '__starci_using_command kernel reply' -l message -r -d 'id of the pending worker question or escalation'
+complete -c starci -n '__starci_using_command kernel reply' -l body -r -d 'the answer text; required unless --to-owner'
+complete -c starci -n '__starci_using_command kernel reply' -l to-owner -d 'route the question to the owner through outcome ask (--body adds a Kernel note)'
 complete -c starci -n '__starci_using_command kernel report' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel report' -l job -r
-complete -c starci -n '__starci_using_command kernel report' -l report -r
-complete -c starci -n '__starci_using_command kernel report' -l attach -r
-complete -c starci -n '__starci_using_command kernel report' -l outcome -r -a 'done partial failed ask blocked'
-complete -c starci -n '__starci_using_command kernel report' -l dispatch-capability -r
+complete -c starci -n '__starci_using_command kernel report' -l job -r -d 'job the worker is reporting for'
+complete -c starci -n '__starci_using_command kernel report' -l report -r -d 'report JSON file inside the attempt'\''s scratch (starci/op-report@1)'
+complete -c starci -n '__starci_using_command kernel report' -l attach -r -d 'attachment file inside the scratch; repeat the flag for each file'
+complete -c starci -n '__starci_using_command kernel report' -l outcome -r -a 'done partial failed ask blocked' -d 'the outcome the report must carry; refused when the envelope says otherwise'
+complete -c starci -n '__starci_using_command kernel report' -l dispatch-capability -r -d 'the dispatch capability from the Orca preamble, authenticating the worker_done message'
 complete -c starci -n '__starci_using_command kernel retire-ask' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel retire-ask' -l workflow -r
-complete -c starci -n '__starci_using_command kernel retire-ask' -l dispatch -r
-complete -c starci -n '__starci_using_command kernel retire-ask' -l reason -r
+complete -c starci -n '__starci_using_command kernel retire-ask' -l workflow -r -d 'workflow that owns the ask'
+complete -c starci -n '__starci_using_command kernel retire-ask' -l dispatch -r -d 'dispatch id of the ask report to retire'
+complete -c starci -n '__starci_using_command kernel retire-ask' -l reason -r -d 'why the owner should no longer answer it, recorded on the ask-superseded event'
 complete -c starci -n '__starci_using_command kernel route' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel route' -l job -r
-complete -c starci -n '__starci_using_command kernel route' -l difficulty -r
+complete -c starci -n '__starci_using_command kernel route' -l job -r -d 'queued job to route'
+complete -c starci -n '__starci_using_command kernel route' -l difficulty -r -a 'easy medium hard insane' -d 'difficulty tier overriding the job'\''s own (medium when it carries none)'
 complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l workflow -r
-complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l kind -r -a 'unit e2e integration'
-complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l by -r
-complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l dry-run
+complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l kind -r -a 'unit e2e integration' -d 'limit to one test class; every deferred class when omitted'
+complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l by -r -d 'who re-queues the legs, recorded on the event (owner when omitted)'
+complete -c starci -n '__starci_using_command kernel run-deferred-tests' -l dry-run -d 'list the deferred legs that would be re-queued without re-queuing them'
 complete -c starci -n '__starci_using_command kernel serve-ask' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel serve-ask' -l workflow -r
-complete -c starci -n '__starci_using_command kernel serve-ask' -l dispatch -r
-complete -c starci -n '__starci_using_command kernel serve-ask' -l ttl -r
-complete -c starci -n '__starci_using_command kernel serve-ask' -l now
+complete -c starci -n '__starci_using_command kernel serve-ask' -l workflow -r -d 'workflow that owns the ask'
+complete -c starci -n '__starci_using_command kernel serve-ask' -l dispatch -r -d 'dispatch id of the ask report; the newest ask when omitted'
+complete -c starci -n '__starci_using_command kernel serve-ask' -l ttl -r -d 'milliseconds the served form stays up (allocation.serveAsk.ttlMs when omitted)'
+complete -c starci -n '__starci_using_command kernel serve-ask' -l now -d 'serve the form now instead of waiting for the owner to ask on Telegram'
 complete -c starci -n '__starci_using_command kernel settle' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel settle' -l job -r
-complete -c starci -n '__starci_using_command kernel settle' -l verdict -r -a 'pass fail blocked'
-complete -c starci -n '__starci_using_command kernel settle' -l tool-error
-complete -c starci -n '__starci_using_command kernel settle' -l report -r
-complete -c starci -n '__starci_using_command kernel settle' -l sync-tail
+complete -c starci -n '__starci_using_command kernel settle' -l job -r -d 'dispatched job whose filed report is judged'
+complete -c starci -n '__starci_using_command kernel settle' -l verdict -r -a 'pass fail blocked' -d 'the verdict to record'
+complete -c starci -n '__starci_using_command kernel settle' -l tool-error -r -d 'a failed measurement leg is a tooling error, not findings; any value (read as a value flag)'
+complete -c starci -n '__starci_using_command kernel settle' -l report -r -d 'ignored with a warning; settle reads the report the job filed'
+complete -c starci -n '__starci_using_command kernel settle' -l sync-tail -d 'run the settle tail inline instead of detached'
 complete -c starci -n '__starci_using_command kernel settle-tail' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel settle-tail' -l job -r
+complete -c starci -n '__starci_using_command kernel settle-tail' -l job -r -d 'settled job whose queued tail runs'
 complete -c starci -n '__starci_using_command kernel status' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel status' -l workflow -r
+complete -c starci -n '__starci_using_command kernel status' -l workflow -r -d 'workflow to project'
 complete -c starci -n '__starci_using_command kernel survey' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel survey' -l workflow -r
-complete -c starci -n '__starci_using_command kernel survey' -l deliveries
+complete -c starci -n '__starci_using_command kernel survey' -l workflow -r -d 'workflow to survey'
+complete -c starci -n '__starci_using_command kernel survey' -l deliveries -d 'add the settled jobs, pending credentials and handover asks'
 complete -c starci -n '__starci_using_command kernel unit' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel unit' -l workflow -r
-complete -c starci -n '__starci_using_command kernel unit' -l unit -r
-complete -c starci -n '__starci_using_command kernel unit' -l raise-budget -r
-complete -c starci -n '__starci_using_command kernel unit' -l by -r -a 'owner supervisor'
-complete -c starci -n '__starci_using_command kernel unit' -l ref -r
+complete -c starci -n '__starci_using_command kernel unit' -l unit -r -d 'one work unit; every unit of the workflow when omitted'
+complete -c starci -n '__starci_using_command kernel unit' -l raise-budget -r -d 'new try budget, an integer above the current one (needs --unit, --by and --ref)'
+complete -c starci -n '__starci_using_command kernel unit' -l by -r -a 'owner supervisor' -d 'who raises the budget; required with --raise-budget'
+complete -c starci -n '__starci_using_command kernel unit' -l ref -r -d 'decision item or incident that asked for the raise; required with --raise-budget'
 complete -c starci -n '__starci_using_command kernel usage' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel usage' -l workflow -r
-complete -c starci -n '__starci_using_command kernel usage' -l legs
+complete -c starci -n '__starci_using_command kernel usage' -l workflow -r -d 'one workflow; every live workflow of the ledger when omitted'
+complete -c starci -n '__starci_using_command kernel usage' -l legs -d 'with --workflow, list every attempt'
 complete -c starci -n '__starci_using_command kernel verify-proofs' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
-complete -c starci -n '__starci_using_command kernel verify-proofs' -l workflow -r
-complete -c starci -n '__starci_using_command machine decisions' -l repo -r
-complete -c starci -n '__starci_using_command machine decisions' -l workflow -r
-complete -c starci -n '__starci_using_command machine decisions' -l apply
-complete -c starci -n '__starci_using_command machine decisions' -l list
-complete -c starci -n '__starci_using_command machine decisions' -l all
-complete -c starci -n '__starci_using_command machine decisions' -l ring
-complete -c starci -n '__starci_using_command machine decisions' -l claim -r
-complete -c starci -n '__starci_using_command machine decisions' -l resolve -r
-complete -c starci -n '__starci_using_command machine decisions' -l by -r
-complete -c starci -n '__starci_using_command machine decisions' -l verb -r
-complete -c starci -n '__starci_using_command machine decisions' -l decision -r
-complete -c starci -n '__starci_using_command machine decisions' -l note -r
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l repo -r
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l workflow -r
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l goal -r
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l once
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l repair
-complete -c starci -n '__starci_using_command machine kernel-watchdog' -l interval-ms -r
-complete -c starci -n '__starci_using_command machine lessons' -l signature -r
-complete -c starci -n '__starci_using_command machine lessons' -l text -r
-complete -c starci -n '__starci_using_command machine lessons' -l commit -r
-complete -c starci -n '__starci_using_command machine lessons' -l experiment -r
-complete -c starci -n '__starci_using_command machine lessons' -l outcome -r -a 'kept reverted did-not-work'
-complete -c starci -n '__starci_using_command machine lessons' -l reason -r
-complete -c starci -n '__starci_using_command machine lessons' -l via -r -a 'chat telegram draw-note'
-complete -c starci -n '__starci_using_command machine lessons' -l refs -r
-complete -c starci -n '__starci_using_command machine lessons' -l items -r
-complete -c starci -n '__starci_using_command machine lessons' -l write
-complete -c starci -n '__starci_using_command machine op-metrics' -l repo -r
-complete -c starci -n '__starci_using_command machine op-metrics' -l window-ms -r
-complete -c starci -n '__starci_using_command machine op-metrics' -l by -r -a 'op workflow'
-complete -c starci -n '__starci_using_command machine op-metrics' -l trend
-complete -c starci -n '__starci_using_command machine seam-policy' -l scan -r
-complete -c starci -n '__starci_using_command machine seam-policy' -l cut-id -r
-complete -c starci -n '__starci_using_command machine seam-policy' -l root -r
-complete -c starci -n '__starci_using_command machine seam-policy' -l repo -r
-complete -c starci -n '__starci_using_command machine seam-policy' -l job -r
-complete -c starci -n '__starci_using_command machine seam-policy' -l paths -r
-complete -c starci -n '__starci_using_command machine worktrees' -l plan
-complete -c starci -n '__starci_using_command orca terminal-read' -l terminal -r
-complete -c starci -n '__starci_using_command orca terminal-read' -l tail
-complete -c starci -n '__starci_using_command orca terminal-read' -l limit -r
-complete -c starci -n '__starci_using_command orca terminal-send' -l terminal -r
-complete -c starci -n '__starci_using_command orca terminal-send' -l text -r
-complete -c starci -n '__starci_using_command orca terminal-send' -l text-file -r
-complete -c starci -n '__starci_using_command orca terminal-send' -l no-enter
-complete -c starci -n '__starci_using_command orca terminal-send' -l wait-submit -r
+complete -c starci -n '__starci_using_command kernel verify-proofs' -l workflow -r -d 'workflow whose indexed proof files and event chain are verified'
+complete -c starci -n '__starci_using_command machine decisions' -l repo -r -d 'repository whose workflow doorbell rings (ring needs it)'
+complete -c starci -n '__starci_using_command machine decisions' -l workflow -r -d 'workflow id to ring (ring needs it)'
+complete -c starci -n '__starci_using_command machine decisions' -l apply -d 'carry out the due escalations instead of only planning them'
+complete -c starci -n '__starci_using_command machine decisions' -l list -d 'list Supervisor decisions (the supervisor default)'
+complete -c starci -n '__starci_using_command machine decisions' -l all -d 'include settled Supervisor decisions in the list'
+complete -c starci -n '__starci_using_command machine decisions' -l ring -d 'ring the Supervisor doorbell instead of listing'
+complete -c starci -n '__starci_using_command machine decisions' -l claim -r -d 'Supervisor decision id to claim'
+complete -c starci -n '__starci_using_command machine decisions' -l resolve -r -d 'Supervisor decision id to resolve'
+complete -c starci -n '__starci_using_command machine decisions' -l by -r -d 'who claims or resolves (default supervisor)'
+complete -c starci -n '__starci_using_command machine decisions' -l verb -r -d 'starci verb recorded as the resolution'
+complete -c starci -n '__starci_using_command machine decisions' -l decision -r -d 'decision id recorded with the resolution'
+complete -c starci -n '__starci_using_command machine decisions' -l note -r -d 'free-text note recorded with the resolution'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l repo -r -d 'repository holding the workflow ledger'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l workflow -r -d 'workflow id whose Kernel seat to check (or --goal)'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l goal -r -d 'goal id used to find the workflow when --workflow is absent'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l once -d 'run a single check pass (the only supported mode)'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l repair -d 'restart the Kernel seat when the check finds it dead'
+complete -c starci -n '__starci_using_command machine kernel-watchdog' -l interval-ms -r -d 'accepted but unused since a single pass never loops'
+complete -c starci -n '__starci_using_command machine lessons' -l signature -r -d 'failure signature to match or attach a lesson to'
+complete -c starci -n '__starci_using_command machine lessons' -l text -r -d 'lesson or feedback text'
+complete -c starci -n '__starci_using_command machine lessons' -l commit -r -d 'commit ids whose files set the tier (comma list)'
+complete -c starci -n '__starci_using_command machine lessons' -l experiment -r -d 'experiment id receiving the result'
+complete -c starci -n '__starci_using_command machine lessons' -l outcome -r -a 'kept reverted did-not-work' -d 'experiment outcome (result needs it)'
+complete -c starci -n '__starci_using_command machine lessons' -l reason -r -d 'why the experiment ended so (result needs it)'
+complete -c starci -n '__starci_using_command machine lessons' -l via -r -a 'chat telegram draw-note' -d 'channel the owner feedback came through (default chat)'
+complete -c starci -n '__starci_using_command machine lessons' -l refs -r -d 'references recorded with the feedback (comma list)'
+complete -c starci -n '__starci_using_command machine lessons' -l items -r -d 'JSON array of learning items for tick'
+complete -c starci -n '__starci_using_command machine lessons' -l write -d 'export writes modules/supervisor/lessons.yaml in the current directory'
+complete -c starci -n '__starci_using_command machine op-metrics' -l repo -r -d 'ledger repository to read (repeat it; default the managed repos)'
+complete -c starci -n '__starci_using_command machine op-metrics' -l window-ms -r -d 'how far back to count jobs (milliseconds)'
+complete -c starci -n '__starci_using_command machine op-metrics' -l by -r -a 'op workflow' -d 'group the health table by op or by workflow'
+complete -c starci -n '__starci_using_command machine op-metrics' -l trend -d 'print the stored snapshot trend instead of a fresh count'
+complete -c starci -n '__starci_using_command machine seam-policy' -l scan -r -d 'canon-scan --json file (canon-plan needs it)'
+complete -c starci -n '__starci_using_command machine seam-policy' -l cut-id -r -d 'cut id for the plan (default canon)'
+complete -c starci -n '__starci_using_command machine seam-policy' -l root -r -d 'scanned repository used to find importers (default the scan'\''s own)'
+complete -c starci -n '__starci_using_command machine seam-policy' -l repo -r -d 'ledger repository of the blocked job (canon-redispatch needs it)'
+complete -c starci -n '__starci_using_command machine seam-policy' -l job -r -d 'blocked slice job id (canon-redispatch needs it)'
+complete -c starci -n '__starci_using_command machine seam-policy' -l paths -r -d 'extra paths to grant the redispatched slice (comma list)'
+complete -c starci -n '__starci_using_command machine worktrees' -l plan -d 'gc only; report what would be removed without removing it'
+complete -c starci -n '__starci_using_command orca terminal-read' -l terminal -r -d 'Orca terminal handle'
+complete -c starci -n '__starci_using_command orca terminal-read' -l tail -d 'read the scrollback tail instead of the rendered screen'
+complete -c starci -n '__starci_using_command orca terminal-read' -l limit -r -d 'number of lines to read'
+complete -c starci -n '__starci_using_command orca terminal-send' -l terminal -r -d 'Orca terminal handle'
+complete -c starci -n '__starci_using_command orca terminal-send' -l text -r -d 'text to send'
+complete -c starci -n '__starci_using_command orca terminal-send' -l text-file -r -d 'file whose content is sent'
+complete -c starci -n '__starci_using_command orca terminal-send' -l no-enter -d 'send the text without pressing Enter'
+complete -c starci -n '__starci_using_command orca terminal-send' -l wait-submit -r -d 'seconds to watch the prompt turn start after Enter'
 complete -c starci -n '__starci_using_command reconciler install-task' -l apply -d 'register the task instead of printing its plan'
-complete -c starci -n '__starci_using_command reconciler once' -l controller -r -d 'run only this controller (job, host, workflow, resource, gc, fleet or learning)'
+complete -c starci -n '__starci_using_command reconciler once' -l controller -r -a 'job host gc resource workflow fleet learning' -d 'run only this controller'
 complete -c starci -n '__starci_using_command reconciler once' -l key -r -d 'reconcile only this key'
 complete -c starci -n '__starci_using_command reconciler once' -l apply -d 'take the lead and apply the actions instead of planning them; refused while another leader is live'
 complete -c starci -n '__starci_using_command reconciler up' -l check -d 'run one read-only checklist pass'
@@ -787,7 +788,7 @@ complete -c starci -n '__starci_using_command reconciler up' -l set-profile -r -
 complete -c starci -n '__starci_using_command release app-installs' -l keep -d 'keep and print the temporary application path'
 complete -c starci -n '__starci_using_command release check' -l final -d 'include final identity and main-branch proofs'
 complete -c starci -n '__starci_using_command release check' -l only -r -d 'comma-separated proof ids to run'
-complete -c starci -n '__starci_using_command release clean-test' -l changed -r -d 'files used to select affected packages'
+complete -c starci -n '__starci_using_command release clean-test' -l changed -r -d 'changed paths selecting affected packages (space-separated or repeated; no comma lists)'
 complete -c starci -n '__starci_using_command release clean-test' -l base -r -d 'revision whose changes select affected packages'
 complete -c starci -n '__starci_using_command release launch-smoke' -l app-repo -r -d 'scratch app main checkout registered in Orca'
 complete -c starci -n '__starci_using_command release launch-smoke' -l entry -r -d 'plain entry terminal for the smoke'
@@ -803,12 +804,12 @@ complete -c starci -n '__starci_using_command release publish' -l npm-user -r -d
 complete -c starci -n '__starci_using_command release publish' -l poll-minutes -r -d 'registry confirmation deadline per package'
 complete -c starci -n '__starci_using_command release publish' -l pre-land-ref -r -d 'require HEAD to equal this pre-land commit'
 complete -c starci -n '__starci_using_command release sync-runtime' -l check -d 'report drift without writing copies'
-complete -c starci -n '__starci_using_command route op' -l kind -r
-complete -c starci -n '__starci_using_command route op' -l node-kind -r
-complete -c starci -n '__starci_using_command route op' -l phase -r
-complete -c starci -n '__starci_using_command route op' -l intent -r
-complete -c starci -n '__starci_using_command route op' -l ops-dir -r
-complete -c starci -n '__starci_using_command runtime architecture' -l base -r
+complete -c starci -n '__starci_using_command route op' -l kind -r -d 'operation id or family to route'
+complete -c starci -n '__starci_using_command route op' -l node-kind -r -d 'work node kind the operation serves'
+complete -c starci -n '__starci_using_command route op' -l phase -r -d 'workflow phase the operation runs in'
+complete -c starci -n '__starci_using_command route op' -l intent -r -d 'intent term; comma list or repeatable'
+complete -c starci -n '__starci_using_command route op' -l ops-dir -r -d 'operation catalog directory (default is modules/ops)'
+complete -c starci -n '__starci_using_command runtime architecture' -l base -r -d 'first commit of the range to judge (default the whole tree)'
 complete -c starci -n '__starci_using_command runtime benchmark-snapshot' -l since-hours -r -d 'positive scorecard window in hours'
 complete -c starci -n '__starci_using_command runtime benchmark-snapshot' -l repo -r -d 'product ledger owner path'
 complete -c starci -n '__starci_using_command runtime benchmark-snapshot' -l date -r -d 'snapshot date as YYYY-MM-DD'
@@ -831,14 +832,14 @@ complete -c starci -n '__starci_using_command runtime install' -l hosts -r -d 'c
 complete -c starci -n '__starci_using_command runtime install' -l no-bootstrap -d 'leave the host AGENTS.md/.gitignore untouched'
 complete -c starci -n '__starci_using_command runtime ledger-hygiene' -l apply -d 'archive orphan ledgers outside repositories'
 complete -c starci -n '__starci_using_command runtime link' -l root -r -d 'runtime checkout to link; defaults to the nearest runtime root above cwd'
-complete -c starci -n '__starci_using_command runtime machine-db' -l file -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l all
-complete -c starci -n '__starci_using_command runtime machine-db' -l ledger-id -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l name -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l repo -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l ledger-file -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l product -r
-complete -c starci -n '__starci_using_command runtime machine-db' -l create
+complete -c starci -n '__starci_using_command runtime machine-db' -l file -r -d 'machine database file (default the host database)'
+complete -c starci -n '__starci_using_command runtime machine-db' -l all -d 'ledgers action includes retired ledgers'
+complete -c starci -n '__starci_using_command runtime machine-db' -l ledger-id -r -d 'ledger id for register or resolve'
+complete -c starci -n '__starci_using_command runtime machine-db' -l name -r -d 'ledger name for register or resolve'
+complete -c starci -n '__starci_using_command runtime machine-db' -l repo -r -d 'repository root of the ledger for register or resolve'
+complete -c starci -n '__starci_using_command runtime machine-db' -l ledger-file -r -d 'ledger file path to register'
+complete -c starci -n '__starci_using_command runtime machine-db' -l product -r -d 'product the ledger belongs to'
+complete -c starci -n '__starci_using_command runtime machine-db' -l create -d 'resolve action registers the ledger when it is unknown'
 complete -c starci -n '__starci_using_command runtime owner-claims-audit' -l repo -r -d 'comma-separated product ledger owner paths'
 complete -c starci -n '__starci_using_command runtime owner-claims-audit' -l workflow -r -d 'workflow id to audit'
 complete -c starci -n '__starci_using_command runtime readme-blocks' -l write -d 'rewrite the stale output in place'
@@ -982,174 +983,174 @@ complete -c starci -n '__starci_using_command supervisor workers' -l summary -r 
 complete -c starci -n '__starci_using_command supervisor workers' -l summary-file -r -d 'file containing the worker report summary'
 complete -c starci -n '__starci_using_command supervisor workers' -l needs -r -d 'comma-separated follow-up needs'
 complete -c starci -n '__starci_using_command supervisor workers' -l reason -r -d 'cancellation or acknowledgement reason'
-complete -c starci -n '__starci_using_command uat assisted-runner' -l request -r
-complete -c starci -n '__starci_using_command uat assisted-runner' -l receipt -r
-complete -c starci -n '__starci_using_command uat assisted-runner' -l after -r
-complete -c starci -n '__starci_using_command uat assisted-runner' -l value -r -a 'ok fail cancel'
-complete -c starci -n '__starci_using_command uat assisted-runner' -l actor -r
-complete -c starci -n '__starci_using_command uat slots' -l record-dir -r
-complete -c starci -n '__starci_using_command work brand' -l source -r
-complete -c starci -n '__starci_using_command work brand' -l stage -r -a 'decide verify'
-complete -c starci -n '__starci_using_command work brand' -l grammar-root -r
-complete -c starci -n '__starci_using_command work brand-direction' -l work -r
-complete -c starci -n '__starci_using_command work brand-direction' -l archetype -r
-complete -c starci -n '__starci_using_command work brand-direction' -l lang -r -a 'en vi'
-complete -c starci -n '__starci_using_command work brand-direction' -l receipt -r
-complete -c starci -n '__starci_using_command work brand-direction' -l write
-complete -c starci -n '__starci_using_command work brand-palette' -l prompt -r
-complete -c starci -n '__starci_using_command work brand-palette' -l check -r
-complete -c starci -n '__starci_using_command work brand-palette' -l brand -r
-complete -c starci -n '__starci_using_command work brand-palette' -l scan -r
-complete -c starci -n '__starci_using_command work compose-direction' -l ui -r
-complete -c starci -n '__starci_using_command work compose-direction' -l content -r
-complete -c starci -n '__starci_using_command work compose-direction' -l breakpoint -r
-complete -c starci -n '__starci_using_command work compose-direction' -l theme -r -a 'light dark'
-complete -c starci -n '__starci_using_command work compose-direction' -l state -r
-complete -c starci -n '__starci_using_command work compose-direction' -l presentation -r -a 'page overlay'
-complete -c starci -n '__starci_using_command work compose-direction' -l host-state -r
-complete -c starci -n '__starci_using_command work compose-direction' -l fit -r -a 'cover stretch'
-complete -c starci -n '__starci_using_command work compose-direction' -l scrim -r
-complete -c starci -n '__starci_using_command work compose-direction' -l tool -r
-complete -c starci -n '__starci_using_command work compose-direction' -l prompt -r
-complete -c starci -n '__starci_using_command work compose-direction' -l out -r
-complete -c starci -n '__starci_using_command work draw-acceptance' -l repo -r
-complete -c starci -n '__starci_using_command work draw-acceptance' -l job -r
-complete -c starci -n '__starci_using_command work draw-acceptance' -l files -r
-complete -c starci -n '__starci_using_command work draw-dna' -l family -r
-complete -c starci -n '__starci_using_command work draw-dna' -l proposals -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l ui -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l shape -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l note -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l class -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l target -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l as -r
-complete -c starci -n '__starci_using_command work draw-feedback' -l by -r -a 'kernel critic'
-complete -c starci -n '__starci_using_command work draw-feedback' -l write
-complete -c starci -n '__starci_using_command work draw-gates' -l ui -r
-complete -c starci -n '__starci_using_command work draw-gates' -l repo -r
-complete -c starci -n '__starci_using_command work draw-gates' -l files -r
-complete -c starci -n '__starci_using_command work draw-gates' -l no-remeasure
-complete -c starci -n '__starci_using_command work draw-gates' -l checks-out -r
-complete -c starci -n '__starci_using_command work draw-grammar' -l product -r
-complete -c starci -n '__starci_using_command work draw-grammar' -l file -r
-complete -c starci -n '__starci_using_command work draw-grammar' -l grammar -r -a 'auto product claude-dist'
-complete -c starci -n '__starci_using_command work draw-grammar' -l grammar-dist -r
-complete -c starci -n '__starci_using_command work draw-layer' -l playwright -r
-complete -c starci -n '__starci_using_command work draw-loop' -l ui -r
-complete -c starci -n '__starci_using_command work draw-loop' -l html -r
-complete -c starci -n '__starci_using_command work draw-loop' -l source -r
-complete -c starci -n '__starci_using_command work draw-loop' -l fixture -r
-complete -c starci -n '__starci_using_command work draw-loop' -l product -r
-complete -c starci -n '__starci_using_command work draw-loop' -l css -r
-complete -c starci -n '__starci_using_command work draw-loop' -l grammar -r -a 'auto product claude-dist'
-complete -c starci -n '__starci_using_command work draw-loop' -l grammar-dist -r
-complete -c starci -n '__starci_using_command work draw-loop' -l base -r
-complete -c starci -n '__starci_using_command work draw-loop' -l state -r
-complete -c starci -n '__starci_using_command work draw-loop' -l viewports -r
-complete -c starci -n '__starci_using_command work draw-loop' -l repo -r
-complete -c starci -n '__starci_using_command work draw-loop' -l out -r
-complete -c starci -n '__starci_using_command work draw-loop' -l family -r
-complete -c starci -n '__starci_using_command work draw-loop' -l drawer -r
-complete -c starci -n '__starci_using_command work draw-loop' -l no-full-page
-complete -c starci -n '__starci_using_command work draw-loop' -l no-critic
-complete -c starci -n '__starci_using_command work draw-loop' -l parts -r
-complete -c starci -n '__starci_using_command work draw-loop' -l prompt -r
-complete -c starci -n '__starci_using_command work draw-loop' -l force
-complete -c starci -n '__starci_using_command work draw-rationale' -l rationale -r
-complete -c starci -n '__starci_using_command work draw-rationale' -l ui -r
-complete -c starci -n '__starci_using_command work draw-rationale' -l records -r
-complete -c starci -n '__starci_using_command work draw-render' -l html -r
-complete -c starci -n '__starci_using_command work draw-render' -l out -r
-complete -c starci -n '__starci_using_command work draw-render' -l viewports -r
-complete -c starci -n '__starci_using_command work draw-render' -l name -r
-complete -c starci -n '__starci_using_command work draw-render' -l theme -r -a 'light dark'
-complete -c starci -n '__starci_using_command work draw-render' -l component -r
-complete -c starci -n '__starci_using_command work draw-render' -l export -r
-complete -c starci -n '__starci_using_command work draw-render' -l props -r
-complete -c starci -n '__starci_using_command work draw-render' -l css -r
-complete -c starci -n '__starci_using_command work draw-render' -l state -r
-complete -c starci -n '__starci_using_command work draw-render' -l base -r
-complete -c starci -n '__starci_using_command work draw-render' -l rationale -r
-complete -c starci -n '__starci_using_command work draw-render' -l product -r
-complete -c starci -n '__starci_using_command work draw-render' -l grammar -r -a 'auto product claude-dist'
-complete -c starci -n '__starci_using_command work draw-render' -l grammar-dist -r
-complete -c starci -n '__starci_using_command work draw-render' -l harness-out -r
-complete -c starci -n '__starci_using_command work draw-render' -l full-page
-complete -c starci -n '__starci_using_command work draw-render' -l trace
-complete -c starci -n '__starci_using_command work draw-review' -l ui -r
-complete -c starci -n '__starci_using_command work draw-review' -l lang -r -a 'en vi'
-complete -c starci -n '__starci_using_command work draw-review' -l owner-requested
-complete -c starci -n '__starci_using_command work draw-review' -l job -r
-complete -c starci -n '__starci_using_command work draw-review' -l receipt -r
-complete -c starci -n '__starci_using_command work draw-review' -l write
-complete -c starci -n '__starci_using_command work draw-source' -l fixture -r
-complete -c starci -n '__starci_using_command work draw-source' -l product -r
-complete -c starci -n '__starci_using_command work draw-source' -l grammar -r -a 'auto product claude-dist'
-complete -c starci -n '__starci_using_command work draw-source' -l grammar-dist -r
-complete -c starci -n '__starci_using_command work draw-source' -l rationale -r
-complete -c starci -n '__starci_using_command work draw-taste' -l html -r
-complete -c starci -n '__starci_using_command work draw-taste' -l png -r
+complete -c starci -n '__starci_using_command uat assisted-runner' -l request -r -d 'absolute path of the prepared request YAML'
+complete -c starci -n '__starci_using_command uat assisted-runner' -l receipt -r -d 'absolute path of the new receipt YAML'
+complete -c starci -n '__starci_using_command uat assisted-runner' -l after -r -d 'wait until the session revision is past this number'
+complete -c starci -n '__starci_using_command uat assisted-runner' -l value -r -a 'ok fail cancel' -d 'signal to send to the waiting session'
+complete -c starci -n '__starci_using_command uat assisted-runner' -l actor -r -d 'who sends the signal (default is the user)'
+complete -c starci -n '__starci_using_command uat slots' -l record-dir -r -d 'record directory the held slot is recorded in'
+complete -c starci -n '__starci_using_command work brand' -l source -r -d 'repository root of the product the brand colours are compared with'
+complete -c starci -n '__starci_using_command work brand' -l stage -r -a 'decide verify' -d 'brand check stage to run'
+complete -c starci -n '__starci_using_command work brand' -l grammar-root -r -d 'grammar package root the grammar tokens are read from'
+complete -c starci -n '__starci_using_command work brand-direction' -l work -r -d 'the .starciwork root that holds the brand record'
+complete -c starci -n '__starci_using_command work brand-direction' -l archetype -r -d 'brand direction archetype to ask the owner about'
+complete -c starci -n '__starci_using_command work brand-direction' -l lang -r -a 'en vi' -d 'language of the owner question'
+complete -c starci -n '__starci_using_command work brand-direction' -l receipt -r -d 'owner answer receipt to apply'
+complete -c starci -n '__starci_using_command work brand-direction' -l write -d 'write the answer into the brand record; without it apply only reports'
+complete -c starci -n '__starci_using_command work brand-palette' -l prompt -r -d 'work root whose brand palette becomes a prompt block'
+complete -c starci -n '__starci_using_command work brand-palette' -l check -r -d 'rendered PNG to check against the brand palette'
+complete -c starci -n '__starci_using_command work brand-palette' -l brand -r -d 'work root that holds the brand record for --check (default is the current directory)'
+complete -c starci -n '__starci_using_command work brand-palette' -l scan -r -d 'work root whose rendered images are all checked against the brand palette'
+complete -c starci -n '__starci_using_command work compose-direction' -l ui -r -d 'ui record directory the drawing belongs to'
+complete -c starci -n '__starci_using_command work compose-direction' -l content -r -d 'PNG of the drawn content to place'
+complete -c starci -n '__starci_using_command work compose-direction' -l breakpoint -r -d 'breakpoint name of the shell capture to compose into'
+complete -c starci -n '__starci_using_command work compose-direction' -l theme -r -a 'light dark' -d 'theme of the shell capture'
+complete -c starci -n '__starci_using_command work compose-direction' -l state -r -d 'flow state of the drawing'
+complete -c starci -n '__starci_using_command work compose-direction' -l presentation -r -a 'page overlay' -d 'place the content as a page or as an overlay (default is the record presentation)'
+complete -c starci -n '__starci_using_command work compose-direction' -l host-state -r -d 'flow state of the page behind an overlay'
+complete -c starci -n '__starci_using_command work compose-direction' -l fit -r -a 'cover stretch' -d 'how the content fills the slot'
+complete -c starci -n '__starci_using_command work compose-direction' -l scrim -r -d 'overlay scrim opacity from 0 to 1'
+complete -c starci -n '__starci_using_command work compose-direction' -l tool -r -d 'tool name recorded as the composite provenance'
+complete -c starci -n '__starci_using_command work compose-direction' -l prompt -r -d 'prompt text recorded with the composite'
+complete -c starci -n '__starci_using_command work compose-direction' -l out -r -d 'output PNG path (default is beside the content)'
+complete -c starci -n '__starci_using_command work draw-acceptance' -l repo -r -d 'product repository root'
+complete -c starci -n '__starci_using_command work draw-acceptance' -l job -r -d 'job id whose report files and owned paths are judged'
+complete -c starci -n '__starci_using_command work draw-acceptance' -l files -r -d 'comma list of bound files to judge instead of a job'
+complete -c starci -n '__starci_using_command work draw-dna' -l family -r -d 'grammar family to compare with'
+complete -c starci -n '__starci_using_command work draw-dna' -l proposals -r -d 'grammar proposals file that licenses off-grammar parts'
+complete -c starci -n '__starci_using_command work draw-feedback' -l ui -r -d 'ui record directory holding the owner notes'
+complete -c starci -n '__starci_using_command work draw-feedback' -l shape -r -d 'XBase#state shape the brief is for'
+complete -c starci -n '__starci_using_command work draw-feedback' -l note -r -d 'owner note id to classify'
+complete -c starci -n '__starci_using_command work draw-feedback' -l class -r -a 'product-direction grammar knowledge one-off' -d 'class to give the note'
+complete -c starci -n '__starci_using_command work draw-feedback' -l target -r -d 'knowledge rule id or path the note belongs to'
+complete -c starci -n '__starci_using_command work draw-feedback' -l as -r -a 'antiPattern vocabulary rubric' -d 'learned kind for a product-direction note'
+complete -c starci -n '__starci_using_command work draw-feedback' -l by -r -a 'kernel critic' -d 'who classified the note'
+complete -c starci -n '__starci_using_command work draw-feedback' -l write -d 'write the classification into the record; without it classify only reports'
+complete -c starci -n '__starci_using_command work draw-gates' -l ui -r -d 'ui record directory of the drawing'
+complete -c starci -n '__starci_using_command work draw-gates' -l repo -r -d 'product repository root'
+complete -c starci -n '__starci_using_command work draw-gates' -l files -r -d 'comma list of bound files to judge'
+complete -c starci -n '__starci_using_command work draw-gates' -l no-remeasure -d 'trust the stored measurements instead of rendering again'
+complete -c starci -n '__starci_using_command work draw-gates' -l checks-out -r -d 'file to write the gate checks to as JSON'
+complete -c starci -n '__starci_using_command work draw-grammar' -l product -r -d 'product app directory whose grammar install is resolved'
+complete -c starci -n '__starci_using_command work draw-grammar' -l file -r -d 'draw source file the grammar must type-check against'
+complete -c starci -n '__starci_using_command work draw-grammar' -l grammar -r -a 'auto product claude-dist' -d 'grammar source preference'
+complete -c starci -n '__starci_using_command work draw-grammar' -l grammar-dist -r -d 'package root of the runtime-built grammar'
+complete -c starci -n '__starci_using_command work draw-layer' -l playwright -r -d 'product directory whose Playwright install is used'
+complete -c starci -n '__starci_using_command work draw-loop' -l ui -r -d 'ui record directory of the drawing'
+complete -c starci -n '__starci_using_command work draw-loop' -l html -r -d 'HTML drawing source for a round'
+complete -c starci -n '__starci_using_command work draw-loop' -l source -r -d 'X.draw.tsx drawing source for a component round'
+complete -c starci -n '__starci_using_command work draw-loop' -l fixture -r -d 'props fixture JSON; <width>=<file> sets one width; repeatable'
+complete -c starci -n '__starci_using_command work draw-loop' -l product -r -d 'product app directory of the drawing source'
+complete -c starci -n '__starci_using_command work draw-loop' -l css -r -d 'product global stylesheet for a component round; repeatable'
+complete -c starci -n '__starci_using_command work draw-loop' -l grammar -r -a 'auto product claude-dist' -d 'grammar source preference'
+complete -c starci -n '__starci_using_command work draw-loop' -l grammar-dist -r -d 'package root of the runtime-built grammar'
+complete -c starci -n '__starci_using_command work draw-loop' -l base -r -d 'XBase the drawing is of'
+complete -c starci -n '__starci_using_command work draw-loop' -l state -r -d 'flow state the drawing shows'
+complete -c starci -n '__starci_using_command work draw-loop' -l viewports -r -d 'comma list of WxH viewports to render'
+complete -c starci -n '__starci_using_command work draw-loop' -l repo -r -d 'product repository root'
+complete -c starci -n '__starci_using_command work draw-loop' -l out -r -d 'loop directory (round creates it; status and finish read it)'
+complete -c starci -n '__starci_using_command work draw-loop' -l family -r -d 'grammar family to measure against'
+complete -c starci -n '__starci_using_command work draw-loop' -l drawer -r -d 'model provider that critiques or draws'
+complete -c starci -n '__starci_using_command work draw-loop' -l no-full-page -d 'skip the full-page capture'
+complete -c starci -n '__starci_using_command work draw-loop' -l no-critic -d 'skip the independent critic'
+complete -c starci -n '__starci_using_command work draw-loop' -l parts -r -d 'directory of the final part renders for finish'
+complete -c starci -n '__starci_using_command work draw-loop' -l prompt -r -d 'brief prompt file recorded with the finished drawing'
+complete -c starci -n '__starci_using_command work draw-loop' -l force -d 'finish even when the best round is not the last'
+complete -c starci -n '__starci_using_command work draw-rationale' -l rationale -r -d 'rationale JSON file (default is the one beside the render)'
+complete -c starci -n '__starci_using_command work draw-rationale' -l ui -r -d 'ui record directory whose drawing the rationale explains'
+complete -c starci -n '__starci_using_command work draw-rationale' -l records -r -d 'comma list of draw-render JSON records to measure against'
+complete -c starci -n '__starci_using_command work draw-render' -l html -r -d 'HTML file to render (exclusive with --component)'
+complete -c starci -n '__starci_using_command work draw-render' -l out -r -d 'directory the PNG captures and JSON records are written to'
+complete -c starci -n '__starci_using_command work draw-render' -l viewports -r -d 'comma list of WxH viewports'
+complete -c starci -n '__starci_using_command work draw-render' -l name -r -d 'capture base name (default is the file name or export)'
+complete -c starci -n '__starci_using_command work draw-render' -l theme -r -a 'light dark' -d 'colour scheme to render with'
+complete -c starci -n '__starci_using_command work draw-render' -l component -r -d 'product module that exports the drawing component'
+complete -c starci -n '__starci_using_command work draw-render' -l export -r -d 'exported XBase to render'
+complete -c starci -n '__starci_using_command work draw-render' -l props -r -d 'fixture JSON passed as props'
+complete -c starci -n '__starci_using_command work draw-render' -l css -r -d 'product global stylesheet; repeatable'
+complete -c starci -n '__starci_using_command work draw-render' -l state -r -d 'flow state slug that names the capture'
+complete -c starci -n '__starci_using_command work draw-render' -l base -r -d 'XBase that names an --html capture'
+complete -c starci -n '__starci_using_command work draw-render' -l rationale -r -d 'rationale JSON file for the capture'
+complete -c starci -n '__starci_using_command work draw-render' -l product -r -d 'product app directory the component is bundled in'
+complete -c starci -n '__starci_using_command work draw-render' -l grammar -r -a 'auto product claude-dist' -d 'grammar source preference'
+complete -c starci -n '__starci_using_command work draw-render' -l grammar-dist -r -d 'package root of the runtime-built grammar'
+complete -c starci -n '__starci_using_command work draw-render' -l harness-out -r -d 'directory to keep the bundled harness in'
+complete -c starci -n '__starci_using_command work draw-render' -l full-page -d 'capture the full page'
+complete -c starci -n '__starci_using_command work draw-render' -l trace -d 'write a Playwright trace beside the capture'
+complete -c starci -n '__starci_using_command work draw-review' -l ui -r -d 'ui record directory of the drawing'
+complete -c starci -n '__starci_using_command work draw-review' -l lang -r -a 'en vi' -d 'language of the owner question'
+complete -c starci -n '__starci_using_command work draw-review' -l owner-requested -d 'mark the review as asked by the owner'
+complete -c starci -n '__starci_using_command work draw-review' -l job -r -d 'op job id the question is filed under'
+complete -c starci -n '__starci_using_command work draw-review' -l receipt -r -d 'owner answer receipt to apply'
+complete -c starci -n '__starci_using_command work draw-review' -l write -d 'write the answer into the record; without it apply only reports'
+complete -c starci -n '__starci_using_command work draw-source' -l fixture -r -d 'props fixture JSON to type-check against; repeatable'
+complete -c starci -n '__starci_using_command work draw-source' -l product -r -d 'product app directory (default is the source directory)'
+complete -c starci -n '__starci_using_command work draw-source' -l grammar -r -a 'auto product claude-dist' -d 'grammar source preference'
+complete -c starci -n '__starci_using_command work draw-source' -l grammar-dist -r -d 'package root of the runtime-built grammar'
+complete -c starci -n '__starci_using_command work draw-source' -l rationale -r -d 'rationale JSON file to check the layout values against'
+complete -c starci -n '__starci_using_command work draw-taste' -l html -r -d 'rendered HTML to check'
+complete -c starci -n '__starci_using_command work draw-taste' -l png -r -d 'rendered part PNG for the accent budget; repeatable'
 complete -c starci -n '__starci_using_command work evidence-binding' -l work -r -d 'the .starciwork root to check'
-complete -c starci -n '__starci_using_command work example-critique' -l work -r
-complete -c starci -n '__starci_using_command work example-critique' -l write
-complete -c starci -n '__starci_using_command work example-derive' -l work -r
-complete -c starci -n '__starci_using_command work example-derive' -l write
-complete -c starci -n '__starci_using_command work example-evidence' -l work -r
-complete -c starci -n '__starci_using_command work example-evidence' -l record -r
-complete -c starci -n '__starci_using_command work example-evidence' -l cwd -r
-complete -c starci -n '__starci_using_command work example-evidence' -l assert -r
-complete -c starci -n '__starci_using_command work example-verify' -l work -r
-complete -c starci -n '__starci_using_command work example-verify' -l record -r
-complete -c starci -n '__starci_using_command work example-verify' -l cwd -r
-complete -c starci -n '__starci_using_command work grammar-geometry' -l prompt
-complete -c starci -n '__starci_using_command work grammar-geometry' -l repo -r
-complete -c starci -n '__starci_using_command work grammar-geometry' -l family -r -a 'starci nivo'
-complete -c starci -n '__starci_using_command work grammar-geometry' -l check -r
-complete -c starci -n '__starci_using_command work grammar-geometry' -l viewport -r
-complete -c starci -n '__starci_using_command work grammar-knowledge' -l write
-complete -c starci -n '__starci_using_command work grammar-registry-pin' -l repo -r
-complete -c starci -n '__starci_using_command work graph' -l repo -r
-complete -c starci -n '__starci_using_command work graph' -l workflow -r
-complete -c starci -n '__starci_using_command work graph' -l version -r
-complete -c starci -n '__starci_using_command work graph' -l file -r
-complete -c starci -n '__starci_using_command work graph' -l from -r
-complete -c starci -n '__starci_using_command work graph' -l to -r
-complete -c starci -n '__starci_using_command work graph' -l job -r
-complete -c starci -n '__starci_using_command work graph' -l reason -r
-complete -c starci -n '__starci_using_command work graph' -l slice -r
+complete -c starci -n '__starci_using_command work example-critique' -l work -r -d 'the .starciwork tree to derive from'
+complete -c starci -n '__starci_using_command work example-critique' -l write -d 'write the critique records; without it only checks they are current'
+complete -c starci -n '__starci_using_command work example-derive' -l work -r -d 'the .starciwork tree to derive from'
+complete -c starci -n '__starci_using_command work example-derive' -l write -d 'write the derived artifacts; without it only checks they are current'
+complete -c starci -n '__starci_using_command work example-evidence' -l work -r -d 'the .starciwork tree that holds the record'
+complete -c starci -n '__starci_using_command work example-evidence' -l record -r -d 'record id to collect evidence for'
+complete -c starci -n '__starci_using_command work example-evidence' -l cwd -r -d 'directory the assertion commands run in'
+complete -c starci -n '__starci_using_command work example-evidence' -l assert -r -d '<ac-id>=<command> assertion to run; repeatable'
+complete -c starci -n '__starci_using_command work example-verify' -l work -r -d 'the .starciwork tree that holds the record'
+complete -c starci -n '__starci_using_command work example-verify' -l record -r -d 'record id whose evidence is replayed'
+complete -c starci -n '__starci_using_command work example-verify' -l cwd -r -d 'directory the recorded commands are replayed in'
+complete -c starci -n '__starci_using_command work grammar-geometry' -l prompt -d 'print the geometry guidance for the product grammar'
+complete -c starci -n '__starci_using_command work grammar-geometry' -l repo -r -d 'product repository root'
+complete -c starci -n '__starci_using_command work grammar-geometry' -l family -r -a 'starci nivo' -d 'grammar family to use instead of the detected one'
+complete -c starci -n '__starci_using_command work grammar-geometry' -l check -r -d 'HTML file or capture directory to measure'
+complete -c starci -n '__starci_using_command work grammar-geometry' -l viewport -r -d 'WxH viewport to measure at'
+complete -c starci -n '__starci_using_command work grammar-knowledge' -l write -d 'rewrite the grammar DNA from the package; without it only compares'
+complete -c starci -n '__starci_using_command work grammar-registry-pin' -l repo -r -d 'frontend repository root'
+complete -c starci -n '__starci_using_command work graph' -l repo -r -d 'repository root that holds the ledger'
+complete -c starci -n '__starci_using_command work graph' -l workflow -r -d 'workflow id whose graph is read (propose may name --job instead)'
+complete -c starci -n '__starci_using_command work graph' -l version -r -d 'graph version to show (default is the latest)'
+complete -c starci -n '__starci_using_command work graph' -l file -r -d 'candidate graph file (JSON or YAML)'
+complete -c starci -n '__starci_using_command work graph' -l from -r -d 'graph version to diff from'
+complete -c starci -n '__starci_using_command work graph' -l to -r -d 'graph version to diff to (default is the latest)'
+complete -c starci -n '__starci_using_command work graph' -l job -r -d 'op job id that proposes the change'
+complete -c starci -n '__starci_using_command work graph' -l reason -r -d 'why the graph changes; propose needs it'
+complete -c starci -n '__starci_using_command work graph' -l slice -r -d 'slice id a cutting job changes'
 complete -c starci -n '__starci_using_command work hygiene' -l repo -r -d 'the product repository (default is the current directory)'
-complete -c starci -n '__starci_using_command work layout-tree' -l work -r
-complete -c starci -n '__starci_using_command work layout-tree' -l app-dir -r
-complete -c starci -n '__starci_using_command work layout-tree' -l write
-complete -c starci -n '__starci_using_command work layout-tree' -l app -r
-complete -c starci -n '__starci_using_command work layout-tree' -l repo-root -r
-complete -c starci -n '__starci_using_command work layout-tree' -l node -r
-complete -c starci -n '__starci_using_command work layout-tree' -l breakpoint -r
-complete -c starci -n '__starci_using_command work layout-tree' -l theme -r
-complete -c starci -n '__starci_using_command work layout-tree' -l file -r
-complete -c starci -n '__starci_using_command work layout-tree' -l url -r
-complete -c starci -n '__starci_using_command work layout-tree' -l provenance -r
-complete -c starci -n '__starci_using_command work layout-tree' -l destination -r
-complete -c starci -n '__starci_using_command work layout-tree' -l route -r
-complete -c starci -n '__starci_using_command work layout-tree' -l locale -r
-complete -c starci -n '__starci_using_command work layout-tree' -l from -r
-complete -c starci -n '__starci_using_command work layout-tree' -l rect -r
-complete -c starci -n '__starci_using_command work layout-tree' -l active-nav -r
-complete -c starci -n '__starci_using_command work layout-tree' -l design -r
-complete -c starci -n '__starci_using_command work layout-tree' -l files -r
-complete -c starci -n '__starci_using_command work layout-tree' -l key -r
-complete -c starci -n '__starci_using_command work layout-tree' -l tolerance -r
-complete -c starci -n '__starci_using_command work render-proof' -l work -r
-complete -c starci -n '__starci_using_command work render-proof' -l record -r
-complete -c starci -n '__starci_using_command work shell-conformance' -l admitted-at -r
-complete -c starci -n '__starci_using_command work shell-conformance' -l op -r
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l surface -r
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l repo -r
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l family -r -a 'starci nivo'
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l elements -r
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l score -r
-complete -c starci -n '__starci_using_command work ui-proof-brief' -l viewport -r
-complete -c starci -n '__starci_using_command workflow assess' -l repo -r
+complete -c starci -n '__starci_using_command work layout-tree' -l work -r -d 'the .starciwork root that holds the shell record'
+complete -c starci -n '__starci_using_command work layout-tree' -l app-dir -r -d 'frontend app directory to scan; repeatable'
+complete -c starci -n '__starci_using_command work layout-tree' -l write -d 'write the record; without it the command only reports'
+complete -c starci -n '__starci_using_command work layout-tree' -l app -r -d 'app name when the shell has several apps'
+complete -c starci -n '__starci_using_command work layout-tree' -l repo-root -r -d 'repository root the app directories resolve in'
+complete -c starci -n '__starci_using_command work layout-tree' -l node -r -d 'layout node id to capture or plan; repeatable for plan'
+complete -c starci -n '__starci_using_command work layout-tree' -l breakpoint -r -d 'breakpoint of the capture'
+complete -c starci -n '__starci_using_command work layout-tree' -l theme -r -d 'theme of the capture'
+complete -c starci -n '__starci_using_command work layout-tree' -l file -r -d 'capture image file'
+complete -c starci -n '__starci_using_command work layout-tree' -l url -r -d 'URL the capture was taken from'
+complete -c starci -n '__starci_using_command work layout-tree' -l provenance -r -d 'how the capture was made'
+complete -c starci -n '__starci_using_command work layout-tree' -l destination -r -d 'destination key the capture shows'
+complete -c starci -n '__starci_using_command work layout-tree' -l route -r -d 'route to resolve the shell captures for; repeatable'
+complete -c starci -n '__starci_using_command work layout-tree' -l locale -r -d 'locale of the capture'
+complete -c starci -n '__starci_using_command work layout-tree' -l from -r -d 'capture or layout composite to crop the lockup from'
+complete -c starci -n '__starci_using_command work layout-tree' -l rect -r -d 'crop rectangle as x,y,w,h'
+complete -c starci -n '__starci_using_command work layout-tree' -l active-nav -r -d 'active navigation item for a route lookup'
+complete -c starci -n '__starci_using_command work layout-tree' -l design -r -d 'design record the planned node follows'
+complete -c starci -n '__starci_using_command work layout-tree' -l files -r -d 'comma list of files a planned node owns'
+complete -c starci -n '__starci_using_command work layout-tree' -l key -r -d 'slot key colour as hex'
+complete -c starci -n '__starci_using_command work layout-tree' -l tolerance -r -d 'colour tolerance when finding the slot'
+complete -c starci -n '__starci_using_command work render-proof' -l work -r -d 'the .starciwork tree that holds the record'
+complete -c starci -n '__starci_using_command work render-proof' -l record -r -d 'record id to render'
+complete -c starci -n '__starci_using_command work shell-conformance' -l admitted-at -r -d 'ISO time or epoch ms the work was admitted at'
+complete -c starci -n '__starci_using_command work shell-conformance' -l op -r -d 'op id whose contract changes count (needs --admitted-at)'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l surface -r -d 'ui record path the brief is for'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l repo -r -d 'product repository root'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l family -r -a 'starci nivo' -d 'grammar family to use instead of the detected one'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l elements -r -d 'comma list of extra element kinds to brief'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l score -r -d 'rendered HTML to score against the brief'
+complete -c starci -n '__starci_using_command work ui-proof-brief' -l viewport -r -d 'WxH viewport to score at'
+complete -c starci -n '__starci_using_command workflow assess' -l repo -r -d 'repository to scan; repeat for several (without --json at least one is required)'
 complete -c starci -n '__starci_using_command workflow bias' -l normalize -r -d 'a JSON bias object {prefer, avoid}: aliases canonicalized, unknown pools dropped, avoid wins'
 complete -c starci -n '__starci_using_command workflow define' -l repo -r -d 'repository whose .starciwork ledger owns the goal (default: the working directory)'
 complete -c starci -n '__starci_using_command workflow define' -l project -r -d 'registered project name; resolves the work.json binding (mutually exclusive with --repo)'
@@ -1175,7 +1176,7 @@ complete -c starci -n '__starci_using_command workflow status' -l workflow -r -d
 complete -c starci -n '__starci_using_command workflow stop' -l repo -r -d 'repository whose .starciwork ledger holds the workflow (default: the working directory)'
 complete -c starci -n '__starci_using_command workflow stop' -l workflow -r -d 'the workflow_id'
 complete -c starci -n '__starci_using_command workflow stop' -l reason -r -d 'why the workflow is stopped'
-complete -c starci -n '__starci_using_command workflow stop' -l by -r -a 'owner supervisor'
+complete -c starci -n '__starci_using_command workflow stop' -l by -r -a 'owner supervisor' -d 'who stops the workflow'
 complete -c starci -l json -d 'machine output; forwarded to handlers that declare a json mode'
 complete -c starci -l cwd -r -d 'working directory the handler runs in (replaces --repo/--root of app verbs)'
 complete -c starci -l quiet -d 'suppress human-readable chatter'

@@ -52,8 +52,7 @@ flags:
     summary: JSON routing bias attached to the workflow payload
 exit:
   "0": goal queued or revision recorded
-  "1": refusal
-  "2": bad usage
+  "2": refusal or bad usage
 json: flag
 examples:
   - starci workflow define --text "Add password reset"

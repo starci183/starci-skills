@@ -6,8 +6,8 @@ impl: {script: scripts/work/draw/draw-layer.mjs}
 positional:
   - {name: path, required: true, variadic: true}
 flags:
-  - {name: playwright, type: string}
-exit: {"0": clean, "1": findings, "2": bad usage}
+  - {name: playwright, type: string, summary: product directory whose Playwright install is used}
+exit: {"0": no layer finding, "1": a layer finding, "2": bad usage}
 json: flag
 examples: ['starci work draw-layer <render-dir> --json']
 editions: [full]

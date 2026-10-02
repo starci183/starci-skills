@@ -4,12 +4,12 @@ owner: runtime
 summary: emit grammar geometry guidance or check captured geometry
 impl: {script: scripts/work/ui/grammar-geometry.mjs}
 flags:
-  - {name: prompt, type: boolean}
-  - {name: repo, type: string, required: true}
-  - {name: family, type: enum, enum: [starci, nivo]}
-  - {name: check, type: string}
-  - {name: viewport, type: string}
-exit: {"0": clean, "1": findings, "2": bad usage}
+  - {name: prompt, type: boolean, summary: print the geometry guidance for the product grammar}
+  - {name: repo, type: string, required: true, summary: product repository root}
+  - {name: family, type: enum, enum: [starci, nivo], summary: grammar family to use instead of the detected one}
+  - {name: check, type: string, summary: HTML file or capture directory to measure}
+  - {name: viewport, type: string, summary: WxH viewport to measure at, default: "390x844"}
+exit: {"0": guidance printed or the geometry is clean, "1": a geometry finding, "2": bad usage}
 json: flag
 examples: ['starci work grammar-geometry --prompt --repo <repo> --json']
 editions: [full]

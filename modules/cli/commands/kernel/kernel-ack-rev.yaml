@@ -3,7 +3,7 @@
 group: kernel
 verb: kernel-ack-rev
 owner: runtime
-summary: record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+summary: record the runtime rev whose kernel files this Kernel has read
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,15 +15,18 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: rev
     type: string
     required: true
+    summary: runtime commit (sha or ref) that was read
   - name: files
     type: string
+    summary: comma list of the kernel files read at that rev
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": acked
+  "1": refused or failed (rev is no commit of the runtime)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev>

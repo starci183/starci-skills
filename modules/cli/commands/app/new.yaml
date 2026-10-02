@@ -8,7 +8,7 @@ positional:
   - {name: arguments, required: false, variadic: true}
 flags:
   - {name: inject, type: list, summary: constructor binding as Decorator=module:Type or Class=module}
-exit: {"0": files created, "1": findings, "2": refusal or bad usage}
+exit: {"0": files created, "2": refusal or bad usage}
 json: none
 examples: ['starci app new service be/src/modules/domain/order order', 'starci app new image']
 editions: [full]

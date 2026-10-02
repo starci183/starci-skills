@@ -14,8 +14,10 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
+    summary: one workflow; every live workflow of the ledger when omitted
   - name: legs
     type: boolean
+    summary: with --workflow, list every attempt
 exit:
   "0": success
   "1": refusal or error
@@ -23,6 +25,7 @@ exit:
 json: flag
 examples:
   - starci kernel usage --repo <path>
+  - starci kernel usage --repo <path> --workflow <workflow> --legs --json
 editions:
   - full
 since: 1.0.0-alpha.4

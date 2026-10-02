@@ -16,14 +16,19 @@ flags:
   - name: file
     type: string
     required: true
+    summary: plan JSON file {legs:[{op,paths?,notes?}], edges:[[fromLeg,toLeg]]}
   - name: replanned-from
     type: string
+    summary: lineage note - the plan this one replaces
   - name: blocker
     type: string
+    summary: lineage note - the blocker that forced the replan
   - name: path-delta
     type: string
+    summary: lineage note - how the owned paths changed
   - name: routing-reason
     type: string
+    summary: lineage note - why the routing changed
 exit:
   "0": success
   "1": refusal or error
@@ -31,6 +36,7 @@ exit:
 json: flag
 examples:
   - starci kernel plan --repo <path> --workflow <workflow> --file <file>
+  - starci kernel plan --repo <path> --workflow <workflow> --file <file> --replanned-from <plan> --blocker <blocker> --json
 editions:
   - full
 since: 1.0.0-alpha.4

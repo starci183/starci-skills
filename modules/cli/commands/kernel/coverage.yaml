@@ -3,7 +3,7 @@
 group: kernel
 verb: coverage
 owner: runtime
-summary: "every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing"
+summary: "show every FR, shape and proof case of the workflow's scope as proven, stale or missing"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,10 +15,11 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
 exit:
   "0": success
-  "1": refusal or error
-  "2": bad usage
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel coverage --repo <path> --workflow <workflow>

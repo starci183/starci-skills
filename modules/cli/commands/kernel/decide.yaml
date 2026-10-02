@@ -3,7 +3,7 @@
 group: kernel
 verb: decide
 owner: runtime
-summary: the Kernel decision log
+summary: open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,32 +15,43 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: hypothesis
     type: string
+    summary: what the action should change (open)
   - name: action-key
     type: string
+    summary: stable key of the action tried (open)
   - name: metric
     type: string
+    summary: the metric that judges it (open)
   - name: command
     type: string
+    summary: the command that applies the action (open)
   - name: close
     type: string
+    summary: id of the open decision to close
   - name: result
     type: enum
+    summary: verdict of the close (needs --observed)
     enum:
       - keep
       - revert
   - name: observed
     type: string
+    summary: what the metric showed (close)
   - name: list
     type: boolean
+    summary: list the decisions of the workflow
 exit:
-  "0": recorded
-  "1": refused
-  "2": bad usage
+  "0": listed or recorded
+  "1": refused (incomplete, action already open or reverted, unknown or closed decision)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel decide --repo <path> --workflow <workflow>
+  - starci kernel decide --repo <path> --workflow <workflow> --list
+  - starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
+  - starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
 editions:
   - full
 since: 1.0.0-alpha.4

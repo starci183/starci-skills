@@ -14,6 +14,7 @@ flags:
 exit:
   "0": supervisor started or already healthy
   "1": launch refused or failed
+  "75": Orca is not answering (host unavailable)
   "2": bad usage
 json: flag
 examples:

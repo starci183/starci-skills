@@ -6,10 +6,10 @@ impl: {script: scripts/work/brand/brand.mjs}
 positional:
   - {name: work-root, required: true, variadic: false}
 flags:
-  - {name: source, type: string}
-  - {name: stage, type: enum, enum: [decide, verify]}
-  - {name: grammar-root, type: string}
-exit: {"0": success, "1": findings, "2": bad usage}
+  - {name: source, type: string, summary: repository root of the product the brand colours are compared with}
+  - {name: stage, type: enum, enum: [decide, verify], summary: brand check stage to run, default: decide}
+  - {name: grammar-root, type: string, summary: grammar package root the grammar tokens are read from}
+exit: {"0": every brand check passed or was skipped, "1": a brand check failed or the checks could not run, "2": bad usage}
 json: flag
 examples: ['starci work brand .starciwork --stage verify --json']
 editions: [full]

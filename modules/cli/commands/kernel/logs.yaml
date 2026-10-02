@@ -3,7 +3,7 @@
 group: kernel
 verb: logs
 owner: runtime
-summary: The workflow's typed log rows, oldest first;
+summary: "list the workflow's typed log rows, oldest first"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,21 +15,27 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: job
     type: string
+    summary: only this job
   - name: after
-    type: string
+    type: number
+    summary: only rows after this seq
   - name: kinds
     type: string
+    summary: comma list of log kinds to keep
   - name: limit
-    type: string
+    type: number
+    summary: at most this many rows (default 500)
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": rows listed
+  "1": refused or failed (unknown kind)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel logs --repo <path> --workflow <workflow>
+  - starci kernel logs --repo <path> --workflow <workflow> --kinds cmd.run,error --after 100 --limit 50
 editions:
   - full
 since: 1.0.0-alpha.4

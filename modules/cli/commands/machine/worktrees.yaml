@@ -6,8 +6,8 @@ impl: {script: scripts/machine/worktrees.mjs}
 positional:
   - {name: action, enum: [counts, gc, resume], required: true, variadic: false}
 flags:
-  - {name: plan, type: boolean}
-exit: {"0": action completed, "1": a worktree problem remains, "2": bad usage}
+  - {name: plan, type: boolean, summary: gc only; report what would be removed without removing it}
+exit: {"0": action completed, "1": counts found an over-cap repo or orphan or gc failed to remove one, "2": bad usage}
 json: flag
 examples:
   - starci machine worktrees counts --json

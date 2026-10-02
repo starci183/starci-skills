@@ -1,7 +1,7 @@
 group: kernel
 verb: hierarchy
 owner: runtime
-summary: project the agent hierarchy (starci/agent-hierarchy@1) of a workflow
+summary: "project the agent hierarchy (starci/agent-hierarchy@1) of a workflow"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,10 +13,11 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
 exit:
   "0": success
-  "1": refusal or error
-  "2": bad usage
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel hierarchy --repo <path> --workflow <workflow>

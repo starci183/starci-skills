@@ -4,10 +4,10 @@ owner: runtime
 summary: read an Orca terminal screen and staged draft
 impl: {script: scripts/api/orca/terminal-read.mjs}
 flags:
-  - {name: terminal, type: string, required: true}
-  - {name: tail, type: boolean}
-  - {name: limit, type: number}
-exit: {"0": terminal read, "1": Orca call failed, "2": bad usage}
+  - {name: terminal, type: string, required: true, summary: Orca terminal handle}
+  - {name: tail, type: boolean, summary: read the scrollback tail instead of the rendered screen}
+  - {name: limit, type: number, summary: number of lines to read}
+exit: {"0": terminal read, "1": the Orca call failed, "2": bad usage}
 json: always
 examples:
   - starci orca terminal-read --terminal <handle>

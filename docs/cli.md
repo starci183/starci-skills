@@ -25,7 +25,7 @@ add one canonical backend capability and register its patterns
 
 Positionals: noun, name
 
-exit: 0 capability created; 1 findings; 2 refusal or bad usage
+exit: 0 capability created; 2 refusal or bad usage
 
 json: none
 
@@ -60,7 +60,7 @@ Removed spellings: `hfs check`, `npx hfs check`
 
 emit backend GraphQL, operation and event contract snapshots
 
-exit: 0 contracts emitted; 1 findings; 2 refusal or bad usage
+exit: 0 contracts emitted; 2 refusal or bad usage
 
 json: none
 
@@ -134,7 +134,7 @@ create a canonical service, unit spec or app image definition
 
 Positionals: kind, arguments?
 
-exit: 0 files created; 1 findings; 2 refusal or bad usage
+exit: 0 files created; 2 refusal or bad usage
 
 json: none
 
@@ -155,7 +155,7 @@ create a full-edition StarCi app repository from the canonical skeleton
 
 Positionals: name
 
-exit: 0 app created; 1 findings; 2 refusal or bad usage
+exit: 0 app created; 2 refusal or bad usage
 
 json: none
 
@@ -179,7 +179,7 @@ list, read, seal or generate an encrypted app secret
 
 Positionals: action, slug?
 
-exit: 0 action completed; 1 findings; 2 refusal or bad usage
+exit: 0 action completed; 2 refusal or bad usage
 
 json: none
 
@@ -243,7 +243,7 @@ report the full-edition app as already current
 | --- | --- | --- |
 | `--plan` | boolean |  |
 
-exit: 0 already full; 1 findings; 2 refusal or bad usage
+exit: 0 already full; 2 refusal or bad usage
 
 json: none
 
@@ -267,7 +267,7 @@ operate the local owner-ask HTTP gateway
 
 Positionals: action?
 
-exit: 0 action completed; 1 gateway unavailable; 2 bad usage or configuration
+exit: 0 action completed; 1 another gateway owns the state or the port cannot be bound; 2 bad usage or configuration
 
 json: always
 
@@ -290,9 +290,9 @@ deliver and maintain owner Telegram notifications
 | `--workflow` | string |  |
 | `--dispatch` | string |  |
 
-Positionals: action
+Positionals: action?
 
-exit: 0 action completed; 1 Telegram delivery failed; 2 bad usage or configuration
+exit: 0 action completed; 1 the test message was not delivered; 2 bad usage or configuration
 
 json: always
 
@@ -341,7 +341,7 @@ operate the Cloudflare owner-ask tunnel
 
 Positionals: action?
 
-exit: 0 action completed; 1 tunnel unavailable; 2 bad usage or configuration
+exit: 0 action completed; 1 another tunnel manager owns the tunnel state; 2 bad usage or configuration
 
 json: always
 
@@ -456,7 +456,7 @@ decrypt one custody document for a command or a bounded read
 
 Positionals: file, command?
 
-exit: 0 requested read or command completed; 1 decryption, lookup or command failed; 2 bad usage
+exit: 0 requested read or command completed; 1 decryption, lookup, missing command or command failed (a command's own status passes through); 2 bad flag or missing file refused by the dispatcher
 
 json: none
 
@@ -744,9 +744,9 @@ Removed spellings: `node scripts/guards/footprint-scan.mjs`
 
 deny tools forbidden for the bound seat from JSON on stdin
 
-exit: 0 hook decision emitted or the tool allowed; 2 bad usage
+exit: 0 hook decision emitted or the tool allowed (a malformed input is allowed too)
 
-json: always
+json: none
 
 ```sh
 starci guard seat-tools
@@ -854,7 +854,7 @@ kernel ledger verbs (runtime internals; the Kernel agent's door to the ledger)
 
 ### starci kernel archive
 
-stop a workflow that will not finish (archives it, drops open jobs, retires asks)
+archive a workflow that will not finish: drop open jobs, retire asks, close Kernel and Tasks
 
 | flag | type | |
 | --- | --- | --- |
@@ -863,19 +863,20 @@ stop a workflow that will not finish (archives it, drops open jobs, retires asks
 | `--reason` | string | required |
 | `--by` | enum owner|supervisor (default owner) |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 archived (also when it was already archived); 1 refused (archive-unsettled-reports) or failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel archive --repo <path> --workflow <workflow> --reason <reason>
+starci kernel archive --repo <path> --workflow <workflow> --reason <reason> --by supervisor
 ```
 
 Removed spellings: `starci api archive`, `node scripts/kernel/cli.mjs archive`
 
 ### starci kernel artifacts
 
-every indexed proof file of the workflow's jobs (job_artifacts), per job
+list the indexed proof files of the workflow's jobs, per job (read-only)
 
 | flag | type | |
 | --- | --- | --- |
@@ -883,21 +884,22 @@ every indexed proof file of the workflow's jobs (job_artifacts), per job
 | `--workflow` | string | required |
 | `--job` | string |  |
 | `--kind` | enum diff|patch|image|video|report|log|trace|file |  |
-| `--subkind` | string |  |
+| `--subkind` | enum draw-render|asset-gen|app-capture|e2e-capture|uat-capture|uat-video|e2e-video|playwright-trace|patch|patch-json|diff|report|log|critique|metrics|grammar-proposal|asset-request|terminal-transcript|cli-transcript |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 success; 1 refused or failed (the JSON error names the reason); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel artifacts --repo <path> --workflow <workflow>
+starci kernel artifacts --repo <path> --workflow <workflow> --job <job> --kind video
 ```
 
 Removed spellings: `starci api artifacts`, `node scripts/kernel/cli.mjs artifacts`
 
 ### starci kernel autopilot
 
-record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+show or drive a workflow's autopilot: switch it, sweep, bundle, defer to handover, release, extend
 
 | flag | type | |
 | --- | --- | --- |
@@ -924,26 +926,29 @@ record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (r
 | `--extend-budget` | string |  |
 | `--by` | enum supervisor|kernel|autopilot (default supervisor) |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 state shown or the requested move recorded; 1 refused or failed (unknown class, missing companion flag, unknown job); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel autopilot --repo <path> --workflow <workflow>
+starci kernel autopilot --repo <path> --workflow <workflow> --set on --reason <reason>
+starci kernel autopilot --repo <path> --workflow <workflow> --sweep
+starci kernel autopilot --repo <path> --workflow <workflow> --defer-to-handover --op <op> --class credential --detail <detail>
 ```
 
 Removed spellings: `starci api autopilot`, `node scripts/kernel/cli.mjs autopilot`
 
 ### starci kernel consume-report
 
-integrate the report a job filed (the kernel must consume before settle)
+integrate the report a job filed; the Kernel must consume it before settle
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--job` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 report consumed; 1 refused or failed (no report, unknown job); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -955,7 +960,7 @@ Removed spellings: `starci api consume-report`, `node scripts/kernel/cli.mjs con
 
 ### starci kernel contract-release
 
-the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
+release a frozen op family at the Supervisor release point (contract-freeze.yaml)
 
 | flag | type | |
 | --- | --- | --- |
@@ -967,26 +972,27 @@ the Supervisor's release point of a frozen op family (modules/kernel/contract-fr
 | `--by` | enum supervisor|owner |  |
 | `--dry-run` | boolean |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 released, or the dry-run plan shown; 1 refused or failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel contract-release --repo <path> --family <family>
+starci kernel contract-release --repo <path> --family <family> --workflow <workflow> --batch <batch> --reason <reason> --dry-run
 ```
 
 Removed spellings: `starci api contract-release`, `node scripts/kernel/cli.mjs contract-release`
 
 ### starci kernel coverage
 
-every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
+show every FR, shape and proof case of the workflow's scope as proven, stale or missing
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 success; 1 refused or failed (the JSON error names the reason); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -998,38 +1004,40 @@ Removed spellings: `starci api coverage`, `node scripts/kernel/cli.mjs coverage`
 
 ### starci kernel cut-seam
 
-the seam publishes its interface: siblings start on it
+publish a cut seam's interface, release its siblings on a stub, or reconcile a stub sibling
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--publish-interface` | boolean |  |
+| `--release` | boolean |  |
+| `--reconcile` | boolean |  |
 | `--job` | string |  |
 | `--files` | string |  |
 | `--summary` | string |  |
-| `--release` | boolean |  |
 | `--workflow` | string |  |
 | `--op` | string |  |
 | `--cut-id` | string |  |
 | `--reason` | string |  |
-| `--reconcile` | boolean |  |
-| `--exit-code` | string |  |
+| `--exit-code` | number |  |
 | `--command` | string |  |
 | `--evidence` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 recorded; 1 refused or failed (not a seam, no stub, seam already passed, unknown job); 2 bad usage: no mode, a mode flag is missing, or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel cut-seam --repo <path>
+starci kernel cut-seam --repo <path> --publish-interface --job <job> --files <files>
+starci kernel cut-seam --repo <path> --release --workflow <workflow> --op <op> --cut-id <cut> --reason <reason>
+starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 ```
 
 Removed spellings: `starci api cut-seam`, `node scripts/kernel/cli.mjs cut-seam`
 
 ### starci kernel decide
 
-the Kernel decision log
+open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
 
 | flag | type | |
 | --- | --- | --- |
@@ -1044,19 +1052,21 @@ the Kernel decision log
 | `--observed` | string |  |
 | `--list` | boolean |  |
 
-exit: 0 recorded; 1 refused; 2 bad usage
+exit: 0 listed or recorded; 1 refused (incomplete, action already open or reverted, unknown or closed decision); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel decide --repo <path> --workflow <workflow>
+starci kernel decide --repo <path> --workflow <workflow> --list
+starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
+starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
 ```
 
 Removed spellings: `starci api decide`, `node scripts/kernel/cli.mjs decide`
 
 ### starci kernel decisions
 
-Decision Items: read them first every wake
+list, open, claim, resolve or escalate Decision Items; the Kernel reads them first every wake
 
 | flag | type | |
 | --- | --- | --- |
@@ -1072,7 +1082,7 @@ Decision Items: read them first every wake
 | `--entity-type` | string |  |
 | `--entity-id` | string |  |
 | `--decider` | enum kernel|supervisor|owner |  |
-| `--due-ms` | string |  |
+| `--due-ms` | number |  |
 | `--key` | string |  |
 | `--evidence-file` | string |  |
 | `--evidence` | string |  |
@@ -1090,19 +1100,21 @@ Decision Items: read them first every wake
 | `--to` | enum supervisor|owner |  |
 | `--reason` | string |  |
 
-exit: 0 listed or recorded; 1 refused; 2 bad usage
+exit: 0 listed or recorded; 1 refused (unknown or closed item, bad evidence, missing field); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel decisions --repo <path>
+starci kernel decisions --repo <path> --workflow <workflow>
+starci kernel decisions --repo <path> --workflow <workflow> --next
+starci kernel decisions --repo <path> --resolve <decision> --by <actor> --verb <command>
 ```
 
 Removed spellings: `starci api decisions`, `node scripts/kernel/cli.mjs decisions`
 
 ### starci kernel dispatch
 
-launch the worker of a routed job (contract row, leases, spawn)
+admit a routed job and launch its worker with --spawn; without it print the launch plan
 
 | flag | type | |
 | --- | --- | --- |
@@ -1111,44 +1123,46 @@ launch the worker of a routed job (contract row, leases, spawn)
 | `--spawn` | boolean |  |
 | `--model` | string |  |
 | `--worktree` | string |  |
-| `--lease-ttl` | string |  |
+| `--lease-ttl` | number |  |
 | `--env-gate` | enum off |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 plan shown or worker launched; 1 refused, waiting or rejected (the JSON reason names which); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel dispatch --repo <path> --job <job>
+starci kernel dispatch --repo <path> --job <job> --spawn --model <target>
 ```
 
 Removed spellings: `starci api dispatch`, `node scripts/kernel/cli.mjs dispatch`
 
 ### starci kernel dispatch-ready
 
-route + dispatch queued-ready units up to starci kernel status progress.allowedParallel
+route and dispatch queued-ready jobs up to the workflow allowed parallelism
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
-| `--max` | string |  |
+| `--max` | number |  |
 | `--dry-run` | boolean |  |
 | `--foreground` | boolean |  |
 
-exit: 0 pushed (or started); 1 refused; 2 bad usage
+exit: 0 pushed or started (the result file or JSON lists each job); 1 refused or failed (decisions-first gate, unreadable status); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel dispatch-ready --repo <path> --workflow <workflow>
+starci kernel dispatch-ready --repo <path> --workflow <workflow> --max 2 --dry-run
 ```
 
 Removed spellings: `starci api dispatch-ready`, `node scripts/kernel/cli.mjs dispatch-ready`
 
 ### starci kernel enqueue
 
-enqueue a work-unit job: op, owned paths, records, retry lineage
+enqueue a work-unit job with its op, owned paths, records and retry lineage
 
 | flag | type | |
 | --- | --- | --- |
@@ -1160,64 +1174,68 @@ enqueue a work-unit job: op, owned paths, records, retry lineage
 | `--params` | string |  |
 | `--repository` | string |  |
 | `--cut-id` | string |  |
-| `--cut-ordinal` | string |  |
-| `--cut-total` | string |  |
-| `--after` | list |  |
+| `--cut-ordinal` | number |  |
+| `--cut-total` | number |  |
+| `--after` | string |  |
 | `--foundation` | string |  |
 | `--contract-change` | string |  |
 | `--follow-up-of` | string |  |
-| `--new-module` | list |  |
+| `--new-module` | string |  |
 | `--retry-of` | string |  |
 | `--reopen` | string |  |
-| `--derived-from` | list |  |
+| `--derived-from` | string |  |
 | `--canon-scan` | string |  |
+| `--resolves` | string |  |
 | `--what` | string |  |
 | `--title` | string |  |
 | `--risk` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 job enqueued; 1 refused or failed (unknown op, paths outside the op writes, undeclared foundation, bad cut); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths>
+starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths> --retry-of <job>
+starci kernel enqueue --repo <path> --workflow <workflow> --op <op> --paths <paths> --cut-id <cut> --cut-ordinal 1 --cut-total 3
 ```
 
 Removed spellings: `starci api enqueue`, `node scripts/kernel/cli.mjs enqueue`
 
 ### starci kernel estimate
 
-deterministic size class + agent count from runtimes.yaml allocation.slicing
+compute the size class and agent count of a slice from runtimes.yaml allocation.slicing
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
-| `--files` | string | required |
-| `--assertions` | string |  |
-| `--components` | string |  |
-| `--records` | string |  |
+| `--files` | number |  |
+| `--assertions` | number |  |
+| `--components` | number |  |
+| `--records` | number |  |
 | `--paths` | string |  |
-| `--gear` | string |  |
+| `--gear` | number |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 estimate printed; 1 refused (no measure given, unknown gear) or failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel estimate --repo <path> --files <files>
+starci kernel estimate --repo <path> --files 12
+starci kernel estimate --repo <path> --files 40 --assertions 120 --gear 2
 ```
 
 Removed spellings: `starci api estimate`, `node scripts/kernel/cli.mjs estimate`
 
 ### starci kernel extensions
 
-the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems
+list the file-based kernel extensions: verbs, status fields, boolean flags, load problems
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 
-exit: 0 when every extension loads; 1 when one is a problem (named in `problems`).; 2 bad usage
+exit: 0 every extension loaded; 1 an extension failed to load (listed as PROBLEM); 2 bad usage: unknown flag
 
 json: flag
 
@@ -1229,14 +1247,14 @@ Removed spellings: `starci api extensions`, `node scripts/kernel/cli.mjs extensi
 
 ### starci kernel finish
 
-finish a workflow once its work is done
+finish an owner-approved workflow and release its kernel seat
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 finished (also when it was already finished); 1 refused or failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -1248,7 +1266,7 @@ Removed spellings: `starci api finish`, `node scripts/kernel/cli.mjs finish`
 
 ### starci kernel foundation
 
-claim, land or declare the shared foundations a workflow depends on
+claim, land or declare a shared foundation (or none) for a workflow
 
 | flag | type | |
 | --- | --- | --- |
@@ -1264,45 +1282,49 @@ claim, land or declare the shared foundations a workflow depends on
 | `--declare-none` | boolean |  |
 | `--detail` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 recorded; 1 refused or failed (not exactly one action, workflow not running, unknown kind); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel foundation --repo <path> --workflow <workflow>
+starci kernel foundation --repo <path> --workflow <workflow> --claim <name> --kind module
+starci kernel foundation --repo <path> --workflow <workflow> --declare-dependent <name>
+starci kernel foundation --repo <path> --workflow <workflow> --land <name> --proof <proof>
+starci kernel foundation --repo <path> --workflow <workflow> --declare-none
 ```
 
 Removed spellings: `starci api foundation`, `node scripts/kernel/cli.mjs foundation`
 
 ### starci kernel foundations
 
-the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
+list the ledger's shared foundations: owner, state, dependents, waits
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 success; 1 refused or failed (the JSON error names the reason); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel foundations --repo <path>
+starci kernel foundations --repo <path> --workflow <workflow>
 ```
 
 Removed spellings: `starci api foundations`, `node scripts/kernel/cli.mjs foundations`
 
 ### starci kernel graph-edit
 
-the Kernel light, logged, reversible unit edits to the work graph
+apply a logged, reversible light edit to the workflow's unit jobs (drop, widen, wire, ...)
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
-| `--decision` | string | required |
 | `--edit` | enum drop|widen|wire|continue|retry|reorder|split|merge|params|scan|recut|undo | required |
+| `--decision` | string |  |
 | `--jobs` | string |  |
 | `--job` | string |  |
 | `--add-paths` | string |  |
@@ -1319,12 +1341,14 @@ the Kernel light, logged, reversible unit edits to the work graph
 | `--reason` | string |  |
 | `--undo` | string |  |
 
-exit: 0 applied; 1 refused; 2 bad usage
+exit: 0 edit applied (receipt carries the undo command); 1 refused or failed (decision missing, job foreign, wrong status, bad JSON); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel graph-edit --repo <path> --workflow <workflow> --decision <decision> --edit drop
+starci kernel graph-edit --repo <path> --workflow <workflow> --edit drop --decision <decision> --jobs <jobs> --reason <reason>
+starci kernel graph-edit --repo <path> --workflow <workflow> --edit reorder --decision <decision> --job <job> --after <jobs>
+starci kernel graph-edit --repo <path> --workflow <workflow> --edit undo --undo <edit>
 ```
 
 Removed spellings: `starci api graph-edit`, `node scripts/kernel/cli.mjs graph-edit`
@@ -1338,7 +1362,7 @@ project the agent hierarchy (starci/agent-hierarchy@1) of a workflow
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 success; 1 refused or failed (the JSON error names the reason); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -1350,7 +1374,7 @@ Removed spellings: `starci api hierarchy`, `node scripts/kernel/cli.mjs hierarch
 
 ### starci kernel inbox
 
-the workflow's pending inbox items; --ack records a disposition
+list the workflow's pending inbox items, or acknowledge one with a disposition
 
 | flag | type | |
 | --- | --- | --- |
@@ -1359,19 +1383,20 @@ the workflow's pending inbox items; --ack records a disposition
 | `--ack` | string |  |
 | `--disposition` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 listed or acknowledged; 1 refused or failed (unknown key); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel inbox --repo <path> --workflow <workflow>
+starci kernel inbox --repo <path> --workflow <workflow> --ack <key> --disposition <text>
 ```
 
 Removed spellings: `starci api inbox`, `node scripts/kernel/cli.mjs inbox`
 
 ### starci kernel incident
 
-file, resolve, or type the release of a workflow incident
+raise, resolve or attach typed release conditions to a workflow incident
 
 | flag | type | |
 | --- | --- | --- |
@@ -1380,37 +1405,39 @@ file, resolve, or type the release of a workflow incident
 | `--kind` | string |  |
 | `--detail` | string |  |
 | `--op` | string |  |
-| `--holds` | list |  |
+| `--holds` | string |  |
 | `--peer` | string |  |
 | `--refs` | string |  |
-| `--until-message` | string |  |
-| `--until-foundation` | string |  |
-| `--until-landed` | string |  |
 | `--resolve` | string |  |
 | `--by` | enum kernel|owner|supervisor |  |
 | `--owner-answer` | string |  |
-| `--introduced-by` | list |  |
+| `--introduced-by` | string |  |
 | `--introducer` | string |  |
 | `--fix` | string |  |
 | `--attach` | string |  |
-| `--until-record` | string |  |
-| `--until-job` | string |  |
-| `--until-commit` | string |  |
-| `--until-incident` | string |  |
+| `--until-record` | list |  |
+| `--until-job` | list |  |
+| `--until-message` | list |  |
+| `--until-commit` | list |  |
+| `--until-incident` | list |  |
+| `--until-foundation` | list |  |
+| `--until-landed` | list |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 raised, resolved or attached; 1 refused or failed (unknown or not-open incident, wrong kind combination); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel incident --repo <path> --workflow <workflow>
+starci kernel incident --repo <path> --workflow <workflow> --kind <kind> --detail <detail>
+starci kernel incident --repo <path> --workflow <workflow> --resolve <incident> --by kernel
+starci kernel incident --repo <path> --workflow <workflow> --attach <incident> --until-job <job>
 ```
 
 Removed spellings: `starci api incident`, `node scripts/kernel/cli.mjs incident`
 
 ### starci kernel kernel-ack-rev
 
-record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+record the runtime rev whose kernel files this Kernel has read
 
 | flag | type | |
 | --- | --- | --- |
@@ -1419,7 +1446,7 @@ record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (r
 | `--rev` | string | required |
 | `--files` | string |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 acked; 1 refused or failed (rev is no commit of the runtime); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -1431,7 +1458,7 @@ Removed spellings: `starci api kernel-ack-rev`, `node scripts/kernel/cli.mjs ker
 
 ### starci kernel kernel-proposal
 
-tier 2: a shared .claude change for the Supervisor
+file a tier-2 shared runtime change proposal for the Supervisor, or list proposals
 
 | flag | type | |
 | --- | --- | --- |
@@ -1444,19 +1471,20 @@ tier 2: a shared .claude change for the Supervisor
 | `--decision` | string |  |
 | `--list` | boolean |  |
 
-exit: 0 filed or listed; 1 refused; 2 bad usage
+exit: 0 listed or filed; 1 refused (incomplete, duplicate within 6 hours, patch missing); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel kernel-proposal --repo <path> --workflow <workflow>
+starci kernel kernel-proposal --repo <path> --workflow <workflow> --list
+starci kernel kernel-proposal --repo <path> --workflow <workflow> --title <title> --evidence <evidence>
 ```
 
 Removed spellings: `starci api kernel-proposal`, `node scripts/kernel/cli.mjs kernel-proposal`
 
 ### starci kernel lifecycle
 
-pause, stop or resume a workflow; only the owner resumes a stopped one
+pause, stop or resume a workflow; only the owner or supervisor resumes or stops
 
 | flag | type | |
 | --- | --- | --- |
@@ -1468,26 +1496,27 @@ pause, stop or resume a workflow; only the owner resumes a stopped one
 | `--by` | enum owner|supervisor|kernel | required |
 | `--reason` | string | required |
 
-exit: 0 moved; 1 refused; 2 bad usage
+exit: 0 moved; 1 refused or failed (not exactly one move, wrong phase, actor may not make it); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel lifecycle --repo <path> --workflow <workflow> --by owner --reason <reason>
+starci kernel lifecycle --repo <path> --workflow <workflow> --pause --by owner --reason <reason>
+starci kernel lifecycle --repo <path> --workflow <workflow> --resume --by owner --reason <reason>
 ```
 
 Removed spellings: `starci api lifecycle`, `node scripts/kernel/cli.mjs lifecycle`
 
 ### starci kernel log
 
-append one typed log row to the ledger (buffered writer, no events row)
+append one typed log row to the ledger's logs table
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--job` | string |  |
-| `--kind` | string | required |
+| `--kind` | enum step.start|step.end|cmd.run|file.edit|check.result|test.result|render|video|trace|warning|decision|narration|ask|error|dispatch|report|settle|land|incident|job.drop|supervisor.action|gc.collect|gc.summary|reconciler.would|reconciler.act|reconciler.error|reconciler.event|invariant.violated|invariant.cleared|log.truncated | required |
 | `--msg` | string | required |
 | `--data` | string |  |
 | `--refs` | string |  |
@@ -1495,49 +1524,51 @@ append one typed log row to the ledger (buffered writer, no events row)
 | `--node` | string |  |
 | `--actor` | enum kernel|runtime|check|land |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 row appended (or dropped at the job cap); 1 refused or failed (unknown job or kind, bad data JSON, actor not allowed); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
-starci kernel log --repo <path> --workflow <workflow> --kind <kind> --msg <msg>
+starci kernel log --repo <path> --workflow <workflow> --kind narration --msg <message>
+starci kernel log --repo <path> --workflow <workflow> --job <job> --kind cmd.run --msg <message> --data <json>
 ```
 
 Removed spellings: `starci api log`, `node scripts/kernel/cli.mjs log`
 
 ### starci kernel logs
 
-The workflow's typed log rows, oldest first;
+list the workflow's typed log rows, oldest first
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--job` | string |  |
-| `--after` | string |  |
+| `--after` | number |  |
 | `--kinds` | string |  |
-| `--limit` | string |  |
+| `--limit` | number |  |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 rows listed; 1 refused or failed (unknown kind); 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
 starci kernel logs --repo <path> --workflow <workflow>
+starci kernel logs --repo <path> --workflow <workflow> --kinds cmd.run,error --after 100 --limit 50
 ```
 
 Removed spellings: `starci api logs`, `node scripts/kernel/cli.mjs logs`
 
 ### starci kernel messages
 
-every orchestration message on the workflow Runs (read-only)
+drain the workflow Runs into the ledger and list every orchestration message
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 messages listed (also when the JSON says ok:false); 1 failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
@@ -1574,7 +1605,7 @@ Removed spellings: `starci api notify`, `node scripts/kernel/cli.mjs notify`
 
 ### starci kernel nudge
 
-send a nudge to a job's live worker terminal
+wake a running job's worker at its exact terminal so it files its report
 
 | flag | type | |
 | --- | --- | --- |
@@ -1599,7 +1630,7 @@ read the exact op terminal screen of a job (reasoning context, never evidence)
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--job` | string | required |
-| `--lines` | string |  |
+| `--lines` | number |  |
 
 exit: 0 success; 1 refusal or error; 2 bad usage
 
@@ -1607,6 +1638,7 @@ json: flag
 
 ```sh
 starci kernel observe --repo <path> --job <job>
+starci kernel observe --repo <path> --job <job> --lines 60
 ```
 
 Removed spellings: `starci api observe`, `node scripts/kernel/cli.mjs observe`
@@ -1621,14 +1653,15 @@ read the contract row dispatch wrote for a job or an op+attempt
 | `--job` | string |  |
 | `--workflow` | string |  |
 | `--op` | string |  |
-| `--attempt` | string |  |
+| `--attempt` | number |  |
 
 exit: 0 success; 1 refusal or error; 2 bad usage
 
 json: flag
 
 ```sh
-starci kernel op-contract --repo <path>
+starci kernel op-contract --repo <path> --job <job>
+starci kernel op-contract --repo <path> --workflow <workflow> --op <op> --attempt 2 --json
 ```
 
 Removed spellings: `starci api op-contract`, `node scripts/kernel/cli.mjs op-contract`
@@ -1652,6 +1685,8 @@ json: flag
 
 ```sh
 starci kernel op-override --repo <path> --workflow <workflow>
+starci kernel op-override --repo <path> --workflow <workflow> --op <op> --set '{"notes":["..."]}' --decision <decision>
+starci kernel op-override --repo <path> --workflow <workflow> --op <op> --clear --decision <decision>
 ```
 
 Removed spellings: `starci api op-override`, `node scripts/kernel/cli.mjs op-override`
@@ -1695,6 +1730,7 @@ json: flag
 
 ```sh
 starci kernel plan --repo <path> --workflow <workflow> --file <file>
+starci kernel plan --repo <path> --workflow <workflow> --file <file> --replanned-from <plan> --blocker <blocker> --json
 ```
 
 Removed spellings: `starci api plan`, `node scripts/kernel/cli.mjs plan`
@@ -1708,7 +1744,7 @@ open the provider circuit a persisting rate limit calls for (idempotent)
 | `--repo` | string |  |
 | `--provider` | string | required |
 | `--open-circuit` | boolean | required |
-| `--kind` | enum quota|rate-limited |  |
+| `--kind` | enum quota|rate-limited (default quota) |  |
 | `--reason` | string | required |
 | `--by` | string | required |
 
@@ -1742,14 +1778,16 @@ exit: 0 success; 1 refusal or error; 2 bad usage
 json: flag
 
 ```sh
-starci kernel provider-health --repo <path>
+starci kernel provider-health --repo <path> --provider <provider>
+starci kernel provider-health --repo <path> --provider <provider> --recover --reason <reason> --probe
+starci kernel provider-health --repo <path> --quota-probe --force --json
 ```
 
 Removed spellings: `starci api provider-health`, `node scripts/kernel/cli.mjs provider-health`
 
 ### starci kernel questions
 
-the workflow's open questions waiting on the owner
+list the pending worker questions of a workflow, draining its Runs into the ledger first
 
 | flag | type | |
 | --- | --- | --- |
@@ -1768,7 +1806,7 @@ Removed spellings: `starci api questions`, `node scripts/kernel/cli.mjs question
 
 ### starci kernel reconcile
 
-kernel jobs of finished/archived workflows -> cancelled
+recover a fenced launch, drop a queued job, recover a dead worker or cancel orphan kernel jobs
 
 | flag | type | |
 | --- | --- | --- |
@@ -1789,7 +1827,10 @@ exit: 0 success; 1 refusal or error; 2 bad usage
 json: flag
 
 ```sh
-starci kernel reconcile --repo <path>
+starci kernel reconcile --repo <path> --job <job>
+starci kernel reconcile --repo <path> --job <job> --drop --reason <reason>
+starci kernel reconcile --repo <path> --job <job> --dead-worker --settle-failed
+starci kernel reconcile --repo <path> --orphan-kernel-jobs --dry-run --json
 ```
 
 Removed spellings: `starci api reconcile`, `node scripts/kernel/cli.mjs reconcile`
@@ -1812,6 +1853,7 @@ json: flag
 
 ```sh
 starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach follow-up --reason <reason>
+starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach advisory --reason <reason> --json
 ```
 
 Removed spellings: `starci api record-change`, `node scripts/kernel/cli.mjs record-change`
@@ -1832,7 +1874,8 @@ exit: 0 success; 1 refusal or error; 2 bad usage
 json: flag
 
 ```sh
-starci kernel record-checks --repo <path> --job <job>
+starci kernel record-checks --repo <path> --job <job> --checks '{"checks":[{"name":"build","exitCode":0}]}'
+starci kernel record-checks --repo <path> --job <job> --checks-file <file> --json
 ```
 
 Removed spellings: `starci api record-checks`, `node scripts/kernel/cli.mjs record-checks`, `starci api check`, `node scripts/kernel/cli.mjs check`
@@ -1862,7 +1905,7 @@ Removed spellings: `starci api redesign`, `node scripts/kernel/cli.mjs redesign`
 
 ### starci kernel rename
 
-set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
+set a workflow's display name and rename its live [Kernel] and [Op] terminal tabs
 
 | flag | type | |
 | --- | --- | --- |
@@ -1879,13 +1922,15 @@ json: flag
 
 ```sh
 starci kernel rename --repo <path> --workflow <workflow> --title <title>
+starci kernel rename --repo <path> --workflow <workflow> --title <title> --by supervisor --no-terminals --json
+starci kernel rename --repo <path> --workflow <workflow> --title <title> --dry-run
 ```
 
 Removed spellings: `starci api rename`, `node scripts/kernel/cli.mjs rename`
 
 ### starci kernel reply
 
-answer an orchestration message on the workflow
+answer a pending worker question, or route it to the owner with --to-owner
 
 | flag | type | |
 | --- | --- | --- |
@@ -1900,7 +1945,8 @@ exit: 0 success; 1 refusal or error; 2 bad usage
 json: flag
 
 ```sh
-starci kernel reply --repo <path> --workflow <workflow> --message <message>
+starci kernel reply --repo <path> --workflow <workflow> --message <message> --body <answer>
+starci kernel reply --repo <path> --workflow <workflow> --message <message> --to-owner --json
 ```
 
 Removed spellings: `starci api reply`, `node scripts/kernel/cli.mjs reply`
@@ -1924,6 +1970,7 @@ json: flag
 
 ```sh
 starci kernel report --repo <path> --job <job> --report <report>
+starci kernel report --repo <path> --job <job> --report <report> --attach <file> --outcome done --dispatch-capability <capability> --json
 ```
 
 Removed spellings: `starci api report`, `node scripts/kernel/cli.mjs report`
@@ -1957,7 +2004,7 @@ resolve and persist the model decision of a job
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--job` | string | required |
-| `--difficulty` | string |  |
+| `--difficulty` | enum easy|medium|hard|insane |  |
 
 exit: 0 success; 1 refusal or error; 2 bad usage
 
@@ -1965,6 +2012,7 @@ json: flag
 
 ```sh
 starci kernel route --repo <path> --job <job>
+starci kernel route --repo <path> --job <job> --difficulty hard --json
 ```
 
 Removed spellings: `starci api route`, `node scripts/kernel/cli.mjs route`
@@ -1987,20 +2035,21 @@ json: flag
 
 ```sh
 starci kernel run-deferred-tests --repo <path> --workflow <workflow>
+starci kernel run-deferred-tests --repo <path> --workflow <workflow> --kind unit --dry-run --json
 ```
 
 Removed spellings: `starci api run-deferred-tests`, `node scripts/kernel/cli.mjs run-deferred-tests`
 
 ### starci kernel serve-ask
 
-park an owner ask (serve-ask.mjs): Telegram notice first, form on demand
+park an owner ask: Telegram notice first, the answer form served on demand
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--dispatch` | string |  |
-| `--ttl` | string |  |
+| `--ttl` | number |  |
 | `--now` | boolean |  |
 
 exit: 0 success; 1 refusal or error; 2 bad usage
@@ -2009,6 +2058,7 @@ json: flag
 
 ```sh
 starci kernel serve-ask --repo <path> --workflow <workflow>
+starci kernel serve-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --now --ttl 600000 --json
 ```
 
 Removed spellings: `starci api serve-ask`, `node scripts/kernel/cli.mjs serve-ask`
@@ -2022,7 +2072,7 @@ settle a consumed report: pass, fail or blocked verdict
 | `--repo` | string |  |
 | `--job` | string | required |
 | `--verdict` | enum pass|fail|blocked | required |
-| `--tool-error` | boolean |  |
+| `--tool-error` | string |  |
 | `--report` | string |  |
 | `--sync-tail` | boolean |  |
 
@@ -2032,6 +2082,7 @@ json: flag
 
 ```sh
 starci kernel settle --repo <path> --job <job> --verdict pass
+starci kernel settle --repo <path> --job <job> --verdict fail --tool-error checker-did-not-run --sync-tail --json
 ```
 
 Removed spellings: `starci api settle`, `node scripts/kernel/cli.mjs settle`
@@ -2051,6 +2102,7 @@ json: flag
 
 ```sh
 starci kernel settle-tail --repo <path> --job <job>
+starci kernel settle-tail --repo <path> --job <job> --json
 ```
 
 Removed spellings: `starci api settle-tail`, `node scripts/kernel/cli.mjs settle-tail`
@@ -2090,6 +2142,7 @@ json: flag
 
 ```sh
 starci kernel survey --repo <path> --workflow <workflow>
+starci kernel survey --repo <path> --workflow <workflow> --deliveries --json
 ```
 
 Removed spellings: `starci api survey`, `node scripts/kernel/cli.mjs survey`
@@ -2103,7 +2156,7 @@ the work units and their try budgets; only the owner or Supervisor raises one
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--unit` | string |  |
-| `--raise-budget` | string |  |
+| `--raise-budget` | number |  |
 | `--by` | enum owner|supervisor |  |
 | `--ref` | string |  |
 
@@ -2113,6 +2166,7 @@ json: flag
 
 ```sh
 starci kernel unit --repo <path> --workflow <workflow>
+starci kernel unit --repo <path> --workflow <workflow> --unit <unit> --raise-budget 4 --by owner --ref <ref>
 ```
 
 Removed spellings: `starci api unit`, `node scripts/kernel/cli.mjs unit`
@@ -2133,6 +2187,7 @@ json: flag
 
 ```sh
 starci kernel usage --repo <path>
+starci kernel usage --repo <path> --workflow <workflow> --legs --json
 ```
 
 Removed spellings: `starci api usage`, `node scripts/kernel/cli.mjs usage`
@@ -2146,7 +2201,7 @@ re-hash every indexed proof file and walk the events digest chain; exit 1 on tam
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
-exit: 0 success; 1 refusal or error; 2 bad usage
+exit: 0 success; 1 tampering found, or refusal or error; 2 bad usage
 
 json: flag
 
@@ -2283,7 +2338,7 @@ plan canon cuts or redispatch a blocked canon slice
 
 Positionals: action
 
-exit: 0 plan produced; 2 bad usage
+exit: 0 plan produced; 1 scan file or ledger unreadable; 2 bad usage
 
 json: always
 
@@ -2304,7 +2359,7 @@ inspect, collect or resume runtime worktrees
 
 Positionals: action
 
-exit: 0 action completed; 1 a worktree problem remains; 2 bad usage
+exit: 0 action completed; 1 counts found an over-cap repo or orphan or gc failed to remove one; 2 bad usage
 
 json: flag
 
@@ -2329,7 +2384,7 @@ read an Orca terminal screen and staged draft
 | `--tail` | boolean |  |
 | `--limit` | number |  |
 
-exit: 0 terminal read; 1 Orca call failed; 2 bad usage
+exit: 0 terminal read; 1 the Orca call failed; 2 bad usage
 
 json: always
 
@@ -2352,7 +2407,7 @@ send text or Enter to an Orca terminal
 | `--no-enter` | boolean |  |
 | `--wait-submit` | number |  |
 
-exit: 0 input accepted; 1 Orca call failed; 2 bad usage
+exit: 0 input accepted; 1 the Orca call failed or the input was refused; 2 bad usage
 
 json: always
 
@@ -2392,7 +2447,7 @@ run one reconcile pass of the controllers in memory, shadow unless --apply
 
 | flag | type | |
 | --- | --- | --- |
-| `--controller` | string |  |
+| `--controller` | enum job|host|gc|resource|workflow|fleet|learning |  |
 | `--key` | string |  |
 | `--apply` | boolean |  |
 
@@ -2439,7 +2494,7 @@ Removed spellings: `node scripts/reconciler/boot.mjs`, `node scripts/reconciler/
 
 print reconciler leader, queue, mode and violation status
 
-exit: 0 status printed; 1 status could not be read; 2 bad usage
+exit: 0 status printed; 2 bad usage
 
 json: flag
 
@@ -2461,6 +2516,8 @@ json: flag
 ```sh
 starci reconciler stop
 ```
+
+Removed spellings: `node scripts/reconciler/boot.mjs --stop`
 
 ### starci reconciler up
 
@@ -2654,7 +2711,7 @@ resolve the operation that serves a structured routing request
 | `--intent` | list |  |
 | `--ops-dir` | string |  |
 
-exit: 0 operation resolved; 1 no operation matched; 2 bad usage
+exit: 0 operation resolved; 1 no operation matched or the catalog is missing; 2 bad usage or no routing key
 
 json: flag
 
@@ -2742,7 +2799,7 @@ regenerate or check the derived fields of the knowledge pattern files
 | `--write` | boolean |  |
 | `--check` | boolean |  |
 
-exit: 0 current; 1 stale output listed; 2 bad usage
+exit: 0 current or rewritten by --write; 1 stale output listed; 2 bad usage
 
 json: none
 
@@ -2781,7 +2838,7 @@ write or check the generated CLI catalog outputs, docs and shell completions
 | `--check` | boolean |  |
 | `--root` | string |  |
 
-exit: 0 outputs in sync or written; 1 drift listed; 2 bad usage or a catalog error
+exit: 0 outputs in sync or written; 1 drift listed or a catalog error; 2 neither --write nor --check given or bad usage
 
 json: none
 
@@ -2802,7 +2859,7 @@ regenerate or check the generated operation registry
 | `--ops-dir` | string |  |
 | `--out` | string |  |
 
-exit: 0 registry written or current; 1 registry is stale or sources are invalid; 2 bad usage
+exit: 0 registry written or current; 1 --check finds the registry stale or the sources invalid or the operation catalog is missing; 2 bad usage
 
 json: none
 
@@ -2949,7 +3006,7 @@ regenerate or check the generated blocks of knowledge/hfs/README.md
 | `--write` | boolean |  |
 | `--check` | boolean |  |
 
-exit: 0 current; 1 stale output listed; 2 bad usage
+exit: 0 current or rewritten by --write; 1 stale output listed; 2 bad usage
 
 json: none
 
@@ -2964,7 +3021,7 @@ Removed spellings: `node scripts/hfs/readme-blocks.mjs`, `node .claude/scripts/h
 
 the runtime's version, tree root and manifest drift — a read-only summary
 
-exit: 0 status printed; 1 the tree has no install manifest or has drifted; 2 bad usage
+exit: 0 status printed; 1 the install manifest is invalid or an installed file drifted (a source checkout has none and is healthy); 2 bad usage
 
 json: flag
 
@@ -3079,7 +3136,7 @@ inspect and govern cross-workflow dependencies and shared ownership
 | `--reason` | string |  |
 | `--blocker` | string |  |
 | `--title` | string |  |
-| `--kind` | enum layout-tree|brand|grammar|module|contract|baseline|scaffold|other |  |
+| `--kind` | enum layout-tree|brand|grammar|module|contract|baseline|scaffold|other (default other) |  |
 | `--waits` | string |  |
 | `--paths` | string |  |
 | `--finding` | string |  |
@@ -3309,7 +3366,7 @@ inspect and acknowledge work that running workflows owe the Supervisor
 
 Positionals: action?
 
-exit: 0 inspection or acknowledgement completed; 1 finding or acknowledgement refusal; 2 bad usage
+exit: 0 inspection or acknowledgement completed; 1 acknowledgement refused or unknown action; 2 bad usage
 
 json: flag
 
@@ -3442,7 +3499,7 @@ enable and start the one long-lived Supervisor seat
 | `--plan` | boolean |  |
 | `--reason` | string |  |
 
-exit: 0 supervisor started or already healthy; 1 launch refused or failed; 2 bad usage
+exit: 0 supervisor started or already healthy; 1 launch refused or failed; 2 bad usage; 75 Orca is not answering (host unavailable)
 
 json: flag
 
@@ -3457,7 +3514,7 @@ Removed spellings: `node scripts/supervisor/start-supervisor.mjs`
 
 print whether the Supervisor seat is enabled and healthy
 
-exit: 0 status printed; 1 status could not be read; 2 bad usage
+exit: 0 status printed; 2 bad usage
 
 json: flag
 
@@ -3597,7 +3654,7 @@ inspect and run a prepared assisted UAT request
 
 Positionals: action
 
-exit: 0 action completed; 1 request or session failed; 2 bad usage
+exit: 0 action completed; 1 the request was refused or the session failed; 2 bad usage
 
 json: always
 
@@ -3618,7 +3675,7 @@ inspect UAT slots or run a command while holding one
 
 Positionals: action, command?
 
-exit: 0 status clean or command passed; 1 command failed; 2 bad usage
+exit: 0 status printed or the command passed; 1 the command failed or could not start (its code passes through); 2 bad usage; 130 interrupted while holding a slot
 
 json: none
 
@@ -3639,12 +3696,13 @@ list or check asset slots in Work records
 
 Positionals: command, target
 
-exit: 0 success; 1 incomplete slots; 2 bad usage
+exit: 0 every slot has a request, or list was asked; 1 check found a slot with no request; 2 bad usage
 
 json: flag
 
 ```sh
 starci work asset-slot check .starciwork
+starci work asset-slot list .starciwork --json
 ```
 
 Removed spellings: `node scripts/work/asset-slot.mjs`
@@ -3656,12 +3714,12 @@ derive or verify the canonical brand Work record
 | flag | type | |
 | --- | --- | --- |
 | `--source` | string |  |
-| `--stage` | enum decide|verify |  |
+| `--stage` | enum decide|verify (default decide) |  |
 | `--grammar-root` | string |  |
 
 Positionals: work-root
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 every brand check passed or was skipped; 1 a brand check failed or the checks could not run; 2 bad usage
 
 json: flag
 
@@ -3679,13 +3737,13 @@ inspect, ask for, or apply owner review of a brand direction
 | --- | --- | --- |
 | `--work` | string | required |
 | `--archetype` | string |  |
-| `--lang` | enum en|vi |  |
+| `--lang` | enum en|vi (default en) |  |
 | `--receipt` | string |  |
 | `--write` | boolean |  |
 
 Positionals: command
 
-exit: 0 success; 1 review failed; 2 bad usage
+exit: 0 status printed, question built or answer applied; 1 the review failed or the answer was refused; 2 bad usage
 
 json: flag
 
@@ -3706,7 +3764,7 @@ emit a brand palette prompt or check rendered images against it
 | `--brand` | string |  |
 | `--scan` | string |  |
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 prompt printed, image clean, or scan reported (scan never exits 1); 1 check found an off-brand image; 2 bad usage or no brand record
 
 json: flag
 
@@ -3740,12 +3798,12 @@ place drawn content into its measured page or overlay shell
 | `--content` | string | required |
 | `--breakpoint` | string | required |
 | `--theme` | enum light|dark | required |
-| `--state` | string |  |
+| `--state` | string (default default) |  |
 | `--presentation` | enum page|overlay |  |
 | `--host-state` | string |  |
-| `--fit` | enum cover|stretch |  |
-| `--scrim` | number |  |
-| `--tool` | string |  |
+| `--fit` | enum cover|stretch (default cover) |  |
+| `--scrim` | number (default 0.5) |  |
+| `--tool` | string (default draw-render) |  |
 | `--prompt` | string |  |
 | `--out` | string |  |
 
@@ -3769,7 +3827,7 @@ verify that drawn assets are accepted render shapes
 | `--job` | string |  |
 | `--files` | string |  |
 
-exit: 0 accepted; 1 findings; 2 bad usage
+exit: 0 every bound asset accepted; 1 a bound asset was refused; 2 bad usage
 
 json: flag
 
@@ -3785,12 +3843,12 @@ compare a rendered drawing with grammar DNA
 
 | flag | type | |
 | --- | --- | --- |
-| `--family` | string |  |
+| `--family` | string (default starci) |  |
 | `--proposals` | string |  |
 
 Positionals: html
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 the drawing matches the grammar DNA; 1 findings; 2 bad usage
 
 json: flag
 
@@ -3809,15 +3867,15 @@ build, inspect, check, or classify drawing feedback
 | `--ui` | string | required |
 | `--shape` | string |  |
 | `--note` | string |  |
-| `--class` | string |  |
+| `--class` | enum product-direction|grammar|knowledge|one-off |  |
 | `--target` | string |  |
-| `--as` | string |  |
-| `--by` | enum kernel|critic |  |
+| `--as` | enum antiPattern|vocabulary|rubric |  |
+| `--by` | enum kernel|critic (default kernel) |  |
 | `--write` | boolean |  |
 
 Positionals: command
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 brief or status printed, notes addressed or classified; 1 an owner note is unaddressed or the record failed; 2 bad usage
 
 json: flag
 
@@ -3839,7 +3897,7 @@ run machine and owner gates for a drawn UI record
 | `--no-remeasure` | boolean |  |
 | `--checks-out` | string |  |
 
-exit: 0 gates green; 1 findings; 2 bad usage
+exit: 0 every gate green; 1 a gate is red; 2 bad usage
 
 json: flag
 
@@ -3857,10 +3915,10 @@ resolve the grammar package used by a drawing
 | --- | --- | --- |
 | `--product` | string | required |
 | `--file` | string |  |
-| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar` | enum auto|product|claude-dist (default auto) |  |
 | `--grammar-dist` | string |  |
 
-exit: 0 grammar resolved; 1 resolution failed; 2 bad usage
+exit: 0 grammar resolved; 1 no grammar resolved for the drawing; 2 bad usage
 
 json: flag
 
@@ -3880,7 +3938,7 @@ verify that drawings are isolated content layers
 
 Positionals: path
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 no layer finding; 1 a layer finding; 2 bad usage
 
 json: flag
 
@@ -3902,7 +3960,7 @@ render, score, inspect, finish, or verify an iterative drawing loop
 | `--fixture` | list |  |
 | `--product` | string |  |
 | `--css` | list |  |
-| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar` | enum auto|product|claude-dist (default auto) |  |
 | `--grammar-dist` | string |  |
 | `--base` | string |  |
 | `--state` | string |  |
@@ -3919,7 +3977,7 @@ render, score, inspect, finish, or verify an iterative drawing loop
 
 Positionals: command
 
-exit: 0 success; 1 drawing gates red; 2 bad usage
+exit: 0 round recorded, status shown, loop passed or record verified; 1 finish was blocked or verify refused a render source; 2 bad usage
 
 json: flag
 
@@ -3941,7 +3999,7 @@ verify the rationale bound to a rendered drawing
 
 Positionals: html
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 every decision is justified; 1 findings; 2 bad usage
 
 json: flag
 
@@ -3961,7 +4019,7 @@ render HTML or a drawing component at declared viewports
 | `--out` | string | required |
 | `--viewports` | string | required |
 | `--name` | string |  |
-| `--theme` | enum light|dark |  |
+| `--theme` | enum light|dark (default light) |  |
 | `--component` | string |  |
 | `--export` | string |  |
 | `--props` | string |  |
@@ -3970,13 +4028,13 @@ render HTML or a drawing component at declared viewports
 | `--base` | string |  |
 | `--rationale` | string |  |
 | `--product` | string |  |
-| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar` | enum auto|product|claude-dist (default auto) |  |
 | `--grammar-dist` | string |  |
 | `--harness-out` | string |  |
 | `--full-page` | boolean |  |
 | `--trace` | boolean |  |
 
-exit: 0 renders written; 1 render failed; 2 bad usage
+exit: 0 every capture is green; 1 a capture is red or the draw file was refused; 2 bad usage or no Playwright, Chromium or esbuild
 
 json: flag
 
@@ -3993,7 +4051,7 @@ inspect, ask for, or apply owner review of a drawing
 | flag | type | |
 | --- | --- | --- |
 | `--ui` | string | required |
-| `--lang` | enum en|vi |  |
+| `--lang` | enum en|vi (default en) |  |
 | `--owner-requested` | boolean |  |
 | `--job` | string |  |
 | `--receipt` | string |  |
@@ -4001,7 +4059,7 @@ inspect, ask for, or apply owner review of a drawing
 
 Positionals: command
 
-exit: 0 success; 1 review failed; 2 bad usage
+exit: 0 status printed, question built or answer applied; 1 the review failed or the answer was refused; 2 bad usage
 
 json: flag
 
@@ -4019,13 +4077,13 @@ validate a drawing source and its fixture bindings
 | --- | --- | --- |
 | `--fixture` | list |  |
 | `--product` | string |  |
-| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar` | enum auto|product|claude-dist (default auto) |  |
 | `--grammar-dist` | string |  |
 | `--rationale` | string |  |
 
 Positionals: source
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 the source is clean; 1 findings; 2 bad usage
 
 json: flag
 
@@ -4044,7 +4102,7 @@ check a rendered drawing against visual taste rules
 | `--html` | string | required |
 | `--png` | list |  |
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 within the taste budgets; 1 a taste finding; 2 bad usage
 
 json: flag
 
@@ -4081,7 +4139,7 @@ derive example critique records from a Work tree
 | `--work` | string | required |
 | `--write` | boolean |  |
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 records are current or were written; 1 records are stale or the tree was refused; 2 bad usage
 
 json: none
 
@@ -4100,7 +4158,7 @@ derive example catalog artifacts from a Work tree
 | `--work` | string | required |
 | `--write` | boolean |  |
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 artifacts are current or were written; 1 artifacts are stale or the tree was refused; 2 bad usage
 
 json: none
 
@@ -4119,14 +4177,14 @@ collect evidence for one example Work record
 | `--work` | string | required |
 | `--record` | string | required |
 | `--cwd` | string | required |
-| `--assert` | list |  |
+| `--assert` | list | required |
 
-exit: 0 evidence collected; 1 evidence failed; 2 bad usage
+exit: 0 every assertion passed; 1 an assertion failed or the arguments were refused; 2 bad usage
 
 json: none
 
 ```sh
-starci work example-evidence --work .starciwork --record <id> --cwd <repo>
+starci work example-evidence --work .starciwork --record <id> --cwd <repo> --assert AC-1="npm test"
 ```
 
 Removed spellings: `node scripts/example/example-evidence.mjs`
@@ -4141,7 +4199,7 @@ replay and verify evidence for one example Work record
 | `--record` | string | required |
 | `--cwd` | string | required |
 
-exit: 0 evidence verified; 1 verification failed; 2 bad usage
+exit: 0 every assertion replays as recorded; 1 a replay differs, is stale, or the arguments were refused; 2 bad usage
 
 json: none
 
@@ -4161,9 +4219,9 @@ emit grammar geometry guidance or check captured geometry
 | `--repo` | string | required |
 | `--family` | enum starci|nivo |  |
 | `--check` | string |  |
-| `--viewport` | string |  |
+| `--viewport` | string (default 390x844) |  |
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 guidance printed or the geometry is clean; 1 a geometry finding; 2 bad usage
 
 json: flag
 
@@ -4181,7 +4239,7 @@ compare or refresh measured grammar knowledge
 | --- | --- | --- |
 | `--write` | boolean |  |
 
-exit: 0 clean; 1 drift; 2 bad usage
+exit: 0 knowledge matches the package, or was rewritten; 1 knowledge drifted from the package; 2 bad usage
 
 json: flag
 
@@ -4197,12 +4255,13 @@ list or check grammar proposals in Work records
 
 Positionals: command, target
 
-exit: 0 success; 1 incomplete proposals; 2 bad usage
+exit: 0 every proposal is complete, or list was asked; 1 check found an incomplete proposal; 2 bad usage
 
 json: flag
 
 ```sh
 starci work grammar-proposal check .starciwork
+starci work grammar-proposal list .starciwork --json
 ```
 
 Removed spellings: `node scripts/work/grammar-proposal.mjs`
@@ -4215,7 +4274,7 @@ check a frontend grammar dependency against the registry pin
 | --- | --- | --- |
 | `--repo` | string | required |
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 the grammar dependency matches the registry pin; 1 the dependency drifted from the pin; 2 bad usage
 
 json: flag
 
@@ -4243,7 +4302,7 @@ inspect, validate, diff or propose a workflow work graph
 
 Positionals: action
 
-exit: 0 action completed; 1 graph refused or invalid; 2 bad usage
+exit: 0 action completed; 1 the graph was refused or is invalid; 2 bad usage
 
 json: flag
 
@@ -4264,7 +4323,7 @@ parse, scope-validate and secret-check Work and stack files before they are comm
 
 Positionals: mode, file?
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 every file is clean; 1 a hygiene finding; 2 bad usage
 
 json: flag
 
@@ -4300,12 +4359,12 @@ scan, capture, plan, lock, or inspect a product layout tree
 | `--active-nav` | string |  |
 | `--design` | string |  |
 | `--files` | string |  |
-| `--key` | string |  |
-| `--tolerance` | number |  |
+| `--key` | string (default ff00ff) |  |
+| `--tolerance` | number (default 8) |  |
 
 Positionals: command, image?
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 success; 1 a refused record, missing layout tree, or slot not found; 2 bad usage
 
 json: flag
 
@@ -4324,7 +4383,7 @@ render a proof document for one Work record
 | `--work` | string | required |
 | `--record` | string | required |
 
-exit: 0 proof rendered; 1 render failed; 2 bad usage
+exit: 0 proof rendered; 1 render refused or the arguments were refused; 2 bad usage
 
 json: none
 
@@ -4345,7 +4404,7 @@ check Work and implementation records against the measured frontend shell
 
 Positionals: target
 
-exit: 0 clean; 1 findings; 2 bad usage
+exit: 0 conformant; 1 refused or suspect records; 2 bad usage
 
 json: flag
 
@@ -4366,9 +4425,9 @@ emit a UI proof brief or score a rendered surface
 | `--family` | enum starci|nivo |  |
 | `--elements` | string |  |
 | `--score` | string |  |
-| `--viewport` | string |  |
+| `--viewport` | string (default 390x844) |  |
 
-exit: 0 success; 1 findings; 2 bad usage
+exit: 0 brief printed or the score is clean; 1 a scoring finding; 2 bad usage
 
 json: flag
 
@@ -4410,7 +4469,7 @@ normalize a routing bias or extract one from the owner's text
 
 Positionals: text?
 
-exit: 0 printed the JSON; 1 the JSON could not be read; 2 bad usage
+exit: 0 printed the JSON; 2 bad usage
 
 json: always
 
@@ -4442,7 +4501,7 @@ define a goal — assess the prompt, plan the op chain, queue it in the ledger i
 | `--bridge-id` | string |  |
 | `--routing-bias` | string |  |
 
-exit: 0 goal queued or revision recorded; 1 refusal; 2 bad usage
+exit: 0 goal queued or revision recorded; 2 refusal or bad usage
 
 json: flag
 
@@ -4462,10 +4521,10 @@ claim the oldest queued goal and boot its one long-lived Kernel agent
 | `--repo` | string |  |
 | `--goal` | string |  |
 | `--agent` | string |  |
-| `--launched-by` | enum watchdog|supervisor |  |
+| `--launched-by` | enum watchdog|supervisor (default supervisor) |  |
 | `--plan` | boolean |  |
 
-exit: 0 kernel booted or already live; 1 refusal or launch failure; 2 bad usage
+exit: 0 kernel booted or already live; 1 refusal or launch failure; 2 bad usage; 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
 
 json: flag
 

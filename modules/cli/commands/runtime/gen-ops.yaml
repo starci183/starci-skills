@@ -8,7 +8,7 @@ flags:
   - {name: check, type: boolean, summary: compare without writing}
   - {name: ops-dir, type: string, summary: operation catalog directory}
   - {name: out, type: string, summary: registry output file}
-exit: {"0": registry written or current, "1": registry is stale or sources are invalid, "2": bad usage}
+exit: {"0": registry written or current, "1": --check finds the registry stale or the sources invalid or the operation catalog is missing, "2": bad usage}
 json: none
 examples:
   - starci runtime gen-ops

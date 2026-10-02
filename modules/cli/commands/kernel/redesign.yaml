@@ -14,17 +14,22 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow whose cut, scope or leg plan is redesigned
   - name: op
     type: string
     required: true
+    summary: owning op to dispatch (work.author, scope.define or goal.revise by default)
   - name: paths
     type: string
     required: true
+    summary: comma-separated paths the redesign op owns
   - name: decision
     type: string
     required: true
+    summary: owner decision id that authorises the redesign
   - name: brief
     type: string
+    summary: replacement for the default ask sent to the op beside the RCA
 exit:
   "0": enqueued
   "1": refused

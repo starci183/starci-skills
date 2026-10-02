@@ -6,13 +6,13 @@ impl: {script: scripts/kernel/seam-policy.mjs}
 positional:
   - {name: action, enum: [canon-plan, canon-redispatch], required: true, variadic: false}
 flags:
-  - {name: scan, type: string}
-  - {name: cut-id, type: string}
-  - {name: root, type: string}
-  - {name: repo, type: string}
-  - {name: job, type: string}
-  - {name: paths, type: list}
-exit: {"0": plan produced, "2": bad usage}
+  - {name: scan, type: string, summary: canon-scan --json file (canon-plan needs it)}
+  - {name: cut-id, type: string, summary: cut id for the plan (default canon)}
+  - {name: root, type: string, summary: scanned repository used to find importers (default the scan's own)}
+  - {name: repo, type: string, summary: ledger repository of the blocked job (canon-redispatch needs it)}
+  - {name: job, type: string, summary: blocked slice job id (canon-redispatch needs it)}
+  - {name: paths, type: list, summary: extra paths to grant the redispatched slice (comma list)}
+exit: {"0": plan produced, "1": scan file or ledger unreadable, "2": bad usage}
 json: always
 examples:
   - starci machine seam-policy canon-plan --scan <file> --cut-id <id>

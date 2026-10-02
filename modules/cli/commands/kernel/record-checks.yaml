@@ -13,17 +13,21 @@ flags:
   - name: job
     type: string
     required: true
+    summary: job whose filed worker report the checks are recorded against
   - name: checks
     type: string
+    summary: 'JSON {checks:[{name,exitCode,command?,evidence?}]}; one of --checks or --checks-file is required'
   - name: checks-file
     type: string
+    summary: path to a file holding the same JSON, absolute or relative to --repo
 exit:
   "0": success
   "1": refusal or error
   "2": bad usage
 json: flag
 examples:
-  - starci kernel record-checks --repo <path> --job <job>
+  - starci kernel record-checks --repo <path> --job <job> --checks '{"checks":[{"name":"build","exitCode":0}]}'
+  - starci kernel record-checks --repo <path> --job <job> --checks-file <file> --json
 editions:
   - full
 since: 1.0.0-alpha.4

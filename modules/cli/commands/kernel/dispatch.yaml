@@ -1,7 +1,7 @@
 group: kernel
 verb: dispatch
 owner: runtime
-summary: launch the worker of a routed job (contract row, leases, spawn)
+summary: "admit a routed job and launch its worker with --spawn; without it print the launch plan"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,25 +13,32 @@ flags:
   - name: job
     type: string
     required: true
+    summary: job to dispatch
   - name: spawn
     type: boolean
+    summary: actually launch the worker (contract row, leases)
   - name: model
     type: string
+    summary: model target, overriding the persisted route
   - name: worktree
     type: string
+    summary: checkout the worker runs in
   - name: lease-ttl
-    type: string
+    type: number
+    summary: path-lease time-to-live in milliseconds
   - name: env-gate
     type: enum
+    summary: skip the environment-health gate for an env-gated op
     enum:
       - off
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": plan shown or worker launched
+  "1": refused, waiting or rejected (the JSON reason names which)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel dispatch --repo <path> --job <job>
+  - starci kernel dispatch --repo <path> --job <job> --spawn --model <target>
 editions:
   - full
 since: 1.0.0-alpha.4

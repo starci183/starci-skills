@@ -2,7 +2,7 @@
 group: kernel
 verb: kernel-proposal
 owner: runtime
-summary: "tier 2: a shared .claude change for the Supervisor"
+summary: file a tier-2 shared runtime change proposal for the Supervisor, or list proposals
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -14,25 +14,33 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: title
     type: string
+    summary: one-line title of the proposal (required unless --list)
   - name: evidence
     type: string
+    summary: why the change is needed (required unless --list)
   - name: patch
     type: string
+    summary: path of a patch file for the change
   - name: files
     type: string
+    summary: comma list of the files the change touches
   - name: decision
     type: string
+    summary: Decision Item the proposal answers
   - name: list
     type: boolean
+    summary: list the proposals of the workflow
 exit:
-  "0": filed or listed
-  "1": refused
-  "2": bad usage
+  "0": listed or filed
+  "1": refused (incomplete, duplicate within 6 hours, patch missing)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel kernel-proposal --repo <path> --workflow <workflow>
+  - starci kernel kernel-proposal --repo <path> --workflow <workflow> --list
+  - starci kernel kernel-proposal --repo <path> --workflow <workflow> --title <title> --evidence <evidence>
 editions:
   - full
 since: 1.0.0-alpha.4

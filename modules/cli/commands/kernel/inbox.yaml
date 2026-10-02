@@ -1,7 +1,7 @@
 group: kernel
 verb: inbox
 owner: runtime
-summary: the workflow's pending inbox items; --ack records a disposition
+summary: "list the workflow's pending inbox items, or acknowledge one with a disposition"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,17 +13,21 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: ack
     type: string
+    summary: key of the inbox item to acknowledge
   - name: disposition
     type: string
+    summary: "what was done about it; required with --ack"
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": listed or acknowledged
+  "1": refused or failed (unknown key)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel inbox --repo <path> --workflow <workflow>
+  - starci kernel inbox --repo <path> --workflow <workflow> --ack <key> --disposition <text>
 editions:
   - full
 since: 1.0.0-alpha.4

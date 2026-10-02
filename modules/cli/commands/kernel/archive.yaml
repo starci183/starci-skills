@@ -1,7 +1,7 @@
 group: kernel
 verb: archive
 owner: runtime
-summary: stop a workflow that will not finish (archives it, drops open jobs, retires asks)
+summary: "archive a workflow that will not finish: drop open jobs, retire asks, close Kernel and Tasks"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,22 +13,26 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: reason
     type: string
     required: true
+    summary: why the workflow is archived (recorded on workflow-archived)
   - name: by
     type: enum
+    summary: "who archives; a Kernel never archives"
     enum:
       - owner
       - supervisor
     default: owner
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": archived (also when it was already archived)
+  "1": refused (archive-unsettled-reports) or failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel archive --repo <path> --workflow <workflow> --reason <reason>
+  - starci kernel archive --repo <path> --workflow <workflow> --reason <reason> --by supervisor
 editions:
   - full
 since: 1.0.0-alpha.4

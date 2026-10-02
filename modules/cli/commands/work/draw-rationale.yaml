@@ -6,10 +6,10 @@ impl: {script: scripts/work/draw/draw-rationale.mjs}
 positional:
   - {name: html, required: true, variadic: false}
 flags:
-  - {name: rationale, type: string}
-  - {name: ui, type: string}
-  - {name: records, type: string}
-exit: {"0": clean, "1": findings, "2": bad usage}
+  - {name: rationale, type: string, summary: "rationale JSON file (default is the one beside the render)"}
+  - {name: ui, type: string, summary: ui record directory whose drawing the rationale explains}
+  - {name: records, type: string, summary: comma list of draw-render JSON records to measure against}
+exit: {"0": every decision is justified, "1": findings, "2": bad usage}
 json: flag
 examples: ['starci work draw-rationale <render.html> --json']
 editions: [full]

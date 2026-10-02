@@ -13,6 +13,7 @@ flags:
   - name: job
     type: string
     required: true
+    summary: dispatched job whose filed report is judged
   - name: verdict
     type: enum
     enum:
@@ -20,12 +21,16 @@ flags:
       - fail
       - blocked
     required: true
+    summary: the verdict to record
   - name: tool-error
-    type: boolean
+    type: string
+    summary: a failed measurement leg is a tooling error, not findings; any value (read as a value flag)
   - name: report
     type: string
+    summary: ignored with a warning; settle reads the report the job filed
   - name: sync-tail
     type: boolean
+    summary: run the settle tail inline instead of detached
 exit:
   "0": success
   "1": refusal or error
@@ -33,6 +38,7 @@ exit:
 json: flag
 examples:
   - starci kernel settle --repo <path> --job <job> --verdict pass
+  - starci kernel settle --repo <path> --job <job> --verdict fail --tool-error checker-did-not-run --sync-tail --json
 editions:
   - full
 since: 1.0.0-alpha.4

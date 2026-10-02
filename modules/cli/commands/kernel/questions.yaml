@@ -1,7 +1,7 @@
 group: kernel
 verb: questions
 owner: runtime
-summary: the workflow's open questions waiting on the owner
+summary: list the pending worker questions of a workflow, draining its Runs into the ledger first
 impl:
   script: scripts/kernel/cli.mjs
   args:

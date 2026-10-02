@@ -1,7 +1,7 @@
 group: kernel
 verb: cut-seam
 owner: runtime
-summary: "the seam publishes its interface: siblings start on it"
+summary: "publish a cut seam's interface, release its siblings on a stub, or reconcile a stub sibling"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -12,37 +12,52 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: publish-interface
     type: boolean
-  - name: job
-    type: string
-  - name: files
-    type: string
-  - name: summary
-    type: string
+    summary: "mode: the seam job publishes its interface files; needs --job and --files"
   - name: release
     type: boolean
-  - name: workflow
-    type: string
-  - name: op
-    type: string
-  - name: cut-id
-    type: string
-  - name: reason
-    type: string
+    summary: "mode: the Kernel releases a cut to run on a stub now; needs --workflow, --op, --cut-id, --reason"
   - name: reconcile
     type: boolean
-  - name: exit-code
+    summary: "mode: record the re-verify of a stub sibling against the landed seam; needs --job and --exit-code"
+  - name: job
     type: string
+    summary: seam job (--publish-interface) or sibling job (--reconcile)
+  - name: files
+    type: string
+    summary: comma list of the interface files the seam publishes
+  - name: summary
+    type: string
+    summary: one-line description of the published interface
+  - name: workflow
+    type: string
+    summary: workflow id
+  - name: op
+    type: string
+    summary: op of the cut (--release)
+  - name: cut-id
+    type: string
+    summary: cut id (--release)
+  - name: reason
+    type: string
+    summary: why the cut is released early (--release)
+  - name: exit-code
+    type: number
+    summary: exit code of the sibling re-verify (--reconcile)
   - name: command
     type: string
+    summary: the re-verify command that was run (--reconcile)
   - name: evidence
     type: string
+    summary: path of the re-verify evidence (--reconcile)
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": recorded
+  "1": refused or failed (not a seam, no stub, seam already passed, unknown job)
+  "2": "bad usage: no mode, a mode flag is missing, or a flag has no value"
 json: flag
 examples:
-  - starci kernel cut-seam --repo <path>
+  - starci kernel cut-seam --repo <path> --publish-interface --job <job> --files <files>
+  - starci kernel cut-seam --repo <path> --release --workflow <workflow> --op <op> --cut-id <cut> --reason <reason>
+  - starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 editions:
   - full
 since: 1.0.0-alpha.4

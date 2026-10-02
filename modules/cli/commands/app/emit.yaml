@@ -4,7 +4,7 @@ owner: "@starci/hfs"
 summary: emit backend GraphQL, operation and event contract snapshots
 impl: null
 flags: []
-exit: {"0": contracts emitted, "1": findings, "2": refusal or bad usage}
+exit: {"0": contracts emitted, "2": refusal or bad usage}
 json: none
 examples: ['starci app emit']
 editions: [full]

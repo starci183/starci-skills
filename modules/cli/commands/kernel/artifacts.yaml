@@ -3,7 +3,7 @@
 group: kernel
 verb: artifacts
 owner: runtime
-summary: every indexed proof file of the workflow's jobs (job_artifacts), per job
+summary: "list the indexed proof files of the workflow's jobs, per job (read-only)"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,10 +15,13 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: job
     type: string
+    summary: only this job
   - name: kind
     type: enum
+    summary: only this artifact kind
     enum:
       - diff
       - patch
@@ -29,14 +32,36 @@ flags:
       - trace
       - file
   - name: subkind
-    type: string
+    type: enum
+    summary: only this artifact subkind
+    enum:
+      - draw-render
+      - asset-gen
+      - app-capture
+      - e2e-capture
+      - uat-capture
+      - uat-video
+      - e2e-video
+      - playwright-trace
+      - patch
+      - patch-json
+      - diff
+      - report
+      - log
+      - critique
+      - metrics
+      - grammar-proposal
+      - asset-request
+      - terminal-transcript
+      - cli-transcript
 exit:
   "0": success
-  "1": refusal or error
-  "2": bad usage
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel artifacts --repo <path> --workflow <workflow>
+  - starci kernel artifacts --repo <path> --workflow <workflow> --job <job> --kind video
 editions:
   - full
 since: 1.0.0-alpha.4

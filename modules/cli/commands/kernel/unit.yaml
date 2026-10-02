@@ -16,15 +16,19 @@ flags:
     required: true
   - name: unit
     type: string
+    summary: one work unit; every unit of the workflow when omitted
   - name: raise-budget
-    type: string
+    type: number
+    summary: new try budget, an integer above the current one (needs --unit, --by and --ref)
   - name: by
     type: enum
     enum:
       - owner
       - supervisor
+    summary: who raises the budget; required with --raise-budget
   - name: ref
     type: string
+    summary: decision item or incident that asked for the raise; required with --raise-budget
 exit:
   "0": shown or raised
   "1": refused
@@ -32,6 +36,7 @@ exit:
 json: flag
 examples:
   - starci kernel unit --repo <path> --workflow <workflow>
+  - starci kernel unit --repo <path> --workflow <workflow> --unit <unit> --raise-budget 4 --by owner --ref <ref>
 editions:
   - full
 since: 1.0.0-alpha.4

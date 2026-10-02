@@ -1,7 +1,7 @@
 group: kernel
 verb: foundations
 owner: runtime
-summary: "the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows"
+summary: "list the ledger's shared foundations: owner, state, dependents, waits"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -12,13 +12,15 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
+    summary: "only this workflow: its duty, owns and needs"
 exit:
   "0": success
-  "1": refusal or error
-  "2": bad usage
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel foundations --repo <path>
+  - starci kernel foundations --repo <path> --workflow <workflow>
 editions:
   - full
 since: 1.0.0-alpha.4

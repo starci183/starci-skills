@@ -17,6 +17,7 @@ flags:
   - name: launched-by
     type: enum
     enum: [watchdog, supervisor]
+    default: supervisor
     summary: provenance of an automated start
   - name: plan
     type: boolean
@@ -25,6 +26,8 @@ exit:
   "0": kernel booted or already live
   "1": refusal or launch failure
   "2": bad usage
+  "3": the previous Kernel dispatch is still alive
+  "75": Orca is not answering (host unavailable)
 json: flag
 examples:
   - starci workflow start

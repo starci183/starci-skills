@@ -1,7 +1,7 @@
 group: kernel
 verb: autopilot
 owner: runtime
-summary: record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+summary: "show or drive a workflow's autopilot: switch it, sweep, bundle, defer to handover, release, extend"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,30 +13,40 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: sweep
     type: boolean
+    summary: answer, defer, reroute and time out the open asks now
   - name: bundle
     type: boolean
+    summary: "print the owner's end-of-flow bundle of provisional and deferred items"
   - name: checklist
     type: boolean
+    summary: print the credential checklist question for the owner
   - name: lang
     type: enum
+    summary: checklist language (default vi)
     enum:
       - vi
       - en
   - name: set
     type: enum
+    summary: "switch autopilot for the workflow; needs --reason"
     enum:
       - on
       - off
   - name: reason
     type: string
+    summary: why (--set, --release, --defer-leg, --extend-budget)
   - name: defer-to-handover
     type: boolean
+    summary: "defer an owner-only need to the handover; needs --op, --class and --detail"
   - name: op
     type: string
+    summary: the asking op (--defer-to-handover)
   - name: class
     type: enum
+    summary: what is owed by the owner (--defer-to-handover)
     enum:
       - credential
       - real-money
@@ -44,38 +54,52 @@ flags:
       - owner-decision
   - name: detail
     type: string
+    summary: what is owed (--defer-to-handover)
   - name: fields
     type: string
+    summary: comma list of the fields the owner must supply (--defer-to-handover)
   - name: stub
     type: string
+    summary: path of the stub the op built meanwhile (--defer-to-handover)
   - name: job
     type: string
+    summary: the asking job (--defer-to-handover)
   - name: release
     type: string
+    summary: "dispatch id or key of a deferred item: it waits on the owner again (needs --reason)"
   - name: defer-leg
     type: string
+    summary: job id whose leg is deferred to the final review (needs --reason)
   - name: reopen
     type: string
+    summary: dispatch id of a provisional record to re-open (needs --handover-answer)
   - name: handover-answer
     type: string
+    summary: the owner-answered handover dispatch id (--reopen)
   - name: note
     type: string
+    summary: free note recorded with --reopen
   - name: extend-budget
     type: string
+    summary: comma list of attempts=<n>, tokens=<n>, wallMs=<n> added to the budget (needs --reason)
   - name: by
     type: enum
+    summary: who acts (default supervisor)
     enum:
       - supervisor
       - kernel
       - autopilot
     default: supervisor
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": state shown or the requested move recorded
+  "1": refused or failed (unknown class, missing companion flag, unknown job)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel autopilot --repo <path> --workflow <workflow>
+  - starci kernel autopilot --repo <path> --workflow <workflow> --set on --reason <reason>
+  - starci kernel autopilot --repo <path> --workflow <workflow> --sweep
+  - starci kernel autopilot --repo <path> --workflow <workflow> --defer-to-handover --op <op> --class credential --detail <detail>
 editions:
   - full
 since: 1.0.0-alpha.4

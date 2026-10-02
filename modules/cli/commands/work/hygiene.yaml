@@ -8,7 +8,7 @@ positional:
   - {name: file, required: false, variadic: true}
 flags:
   - {name: repo, type: string, summary: the product repository (default is the current directory)}
-exit: {"0": clean, "1": findings, "2": bad usage}
+exit: {"0": every file is clean, "1": a hygiene finding, "2": bad usage}
 json: flag
 examples:
   - starci work hygiene staged --repo <repo>

@@ -15,12 +15,15 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow that owns the ask
   - name: dispatch
     type: string
     required: true
+    summary: dispatch id of the ask report to retire
   - name: reason
     type: string
     required: true
+    summary: why the owner should no longer answer it, recorded on the ask-superseded event
 exit:
   "0": success
   "1": refusal or error

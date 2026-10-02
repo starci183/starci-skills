@@ -6,9 +6,9 @@ impl: {script: scripts/work/ui/shell-conformance.mjs}
 positional:
   - {name: target, required: true, variadic: false}
 flags:
-  - {name: admitted-at, type: string}
-  - {name: op, type: string}
-exit: {"0": clean, "1": findings, "2": bad usage}
+  - {name: admitted-at, type: string, summary: ISO time or epoch ms the work was admitted at}
+  - {name: op, type: string, summary: "op id whose contract changes count (needs --admitted-at)"}
+exit: {"0": conformant, "1": refused or suspect records, "2": bad usage}
 json: flag
 examples: ['starci work shell-conformance .starciwork --json']
 editions: [full]

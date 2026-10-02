@@ -3,7 +3,7 @@
 group: kernel
 verb: serve-ask
 owner: runtime
-summary: "park an owner ask (serve-ask.mjs): Telegram notice first, form on demand"
+summary: "park an owner ask: Telegram notice first, the answer form served on demand"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,12 +15,16 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow that owns the ask
   - name: dispatch
     type: string
+    summary: dispatch id of the ask report; the newest ask when omitted
   - name: ttl
-    type: string
+    type: number
+    summary: milliseconds the served form stays up (allocation.serveAsk.ttlMs when omitted)
   - name: now
     type: boolean
+    summary: serve the form now instead of waiting for the owner to ask on Telegram
 exit:
   "0": success
   "1": refusal or error
@@ -28,6 +32,7 @@ exit:
 json: flag
 examples:
   - starci kernel serve-ask --repo <path> --workflow <workflow>
+  - starci kernel serve-ask --repo <path> --workflow <workflow> --dispatch <dispatch> --now --ttl 600000 --json
 editions:
   - full
 since: 1.0.0-alpha.4

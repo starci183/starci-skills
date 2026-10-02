@@ -4,7 +4,7 @@ owner: runtime
 summary: test published packages from fresh isolated installs
 impl: {script: scripts/gates/package-clean-test.mjs}
 flags:
-  - {name: changed, type: list, summary: files used to select affected packages}
+  - {name: changed, type: list, summary: changed paths selecting affected packages (space-separated or repeated; no comma lists)}
   - {name: base, type: string, summary: revision whose changes select affected packages}
 exit:
   "0": every selected package is green

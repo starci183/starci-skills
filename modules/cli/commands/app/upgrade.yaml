@@ -5,7 +5,7 @@ summary: report the full-edition app as already current
 impl: null
 flags:
   - {name: plan, type: boolean, summary: preview the upgrade without writing}
-exit: {"0": already full, "1": findings, "2": refusal or bad usage}
+exit: {"0": already full, "2": refusal or bad usage}
 json: none
 examples: ['starci app upgrade', 'starci app upgrade --edition full --plan']
 editions: [full]

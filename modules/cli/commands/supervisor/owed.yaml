@@ -14,7 +14,7 @@ flags:
   - {name: commits, type: string, summary: comma-separated fixing commit shas}
   - {name: reason, type: string, summary: acknowledgement reason}
   - {name: force, type: boolean, summary: store an acknowledgement without a current item}
-exit: {"0": inspection or acknowledgement completed, "1": finding or acknowledgement refusal, "2": bad usage}
+exit: {"0": inspection or acknowledgement completed, "1": acknowledgement refused or unknown action, "2": bad usage}
 json: flag
 examples:
   - starci supervisor owed --repo <path>

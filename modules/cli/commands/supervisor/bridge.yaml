@@ -19,7 +19,7 @@ flags:
   - {name: reason, type: string, summary: reason for the governance action}
   - {name: blocker, type: string, summary: workflow currently blocking dependents}
   - {name: title, type: string, summary: bridging workflow title}
-  - {name: kind, type: enum, enum: [layout-tree, brand, grammar, module, contract, baseline, scaffold, other], summary: foundation kind}
+  - {name: kind, type: enum, enum: [layout-tree, brand, grammar, module, contract, baseline, scaffold, other], default: other, summary: foundation kind}
   - {name: waits, type: string, summary: comma-separated wait incident ids}
   - {name: paths, type: string, summary: comma-separated owned paths}
   - {name: finding, type: string, summary: dependency finding key}

@@ -4,11 +4,11 @@ owner: runtime
 summary: emit a brand palette prompt or check rendered images against it
 impl: {script: scripts/work/brand/brand-palette.mjs}
 flags:
-  - {name: prompt, type: string}
-  - {name: check, type: string}
-  - {name: brand, type: string}
-  - {name: scan, type: string}
-exit: {"0": success, "1": findings, "2": bad usage}
+  - {name: prompt, type: string, summary: work root whose brand palette becomes a prompt block}
+  - {name: check, type: string, summary: rendered PNG to check against the brand palette}
+  - {name: brand, type: string, summary: "work root that holds the brand record for --check (default is the current directory)"}
+  - {name: scan, type: string, summary: work root whose rendered images are all checked against the brand palette}
+exit: {"0": "prompt printed, image clean, or scan reported (scan never exits 1)", "1": check found an off-brand image, "2": bad usage or no brand record}
 json: flag
 examples: ['starci work brand-palette --scan .starciwork --json']
 editions: [full]

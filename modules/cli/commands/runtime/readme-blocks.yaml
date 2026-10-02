@@ -6,7 +6,7 @@ impl: {script: scripts/hfs/readme-blocks.mjs}
 flags:
   - {name: write, type: boolean, summary: rewrite the stale output in place}
   - {name: check, type: boolean, summary: list the stale output (the default)}
-exit: {"0": current, "1": stale output listed, "2": bad usage}
+exit: {"0": current or rewritten by --write, "1": stale output listed, "2": bad usage}
 json: none
 examples:
   - starci runtime readme-blocks --check

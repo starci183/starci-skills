@@ -1,7 +1,7 @@
 group: kernel
 verb: contract-release
 owner: runtime
-summary: the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
+summary: release a frozen op family at the Supervisor release point (contract-freeze.yaml)
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,26 +13,33 @@ flags:
   - name: family
     type: string
     required: true
+    summary: op family to release
   - name: workflow
     type: string
+    summary: workflow id
   - name: batch
     type: string
+    summary: name of the release batch
   - name: reason
     type: string
+    summary: why the family is released
   - name: by
     type: enum
+    summary: who releases it
     enum:
       - supervisor
       - owner
   - name: dry-run
     type: boolean
+    summary: report what would be released without recording it
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": released, or the dry-run plan shown
+  "1": refused or failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel contract-release --repo <path> --family <family>
+  - starci kernel contract-release --repo <path> --family <family> --workflow <workflow> --batch <batch> --reason <reason> --dry-run
 editions:
   - full
 since: 1.0.0-alpha.4

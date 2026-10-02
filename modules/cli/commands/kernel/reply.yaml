@@ -1,7 +1,7 @@
 group: kernel
 verb: reply
 owner: runtime
-summary: answer an orchestration message on the workflow
+summary: answer a pending worker question, or route it to the owner with --to-owner
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -16,17 +16,21 @@ flags:
   - name: message
     type: string
     required: true
+    summary: id of the pending worker question or escalation
   - name: body
     type: string
+    summary: the answer text; required unless --to-owner
   - name: to-owner
     type: boolean
+    summary: route the question to the owner through outcome ask (--body adds a Kernel note)
 exit:
   "0": success
   "1": refusal or error
   "2": bad usage
 json: flag
 examples:
-  - starci kernel reply --repo <path> --workflow <workflow> --message <message>
+  - starci kernel reply --repo <path> --workflow <workflow> --message <message> --body <answer>
+  - starci kernel reply --repo <path> --workflow <workflow> --message <message> --to-owner --json
 editions:
   - full
 since: 1.0.0-alpha.4

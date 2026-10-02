@@ -16,9 +16,10 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow whose indexed proof files and event chain are verified
 exit:
   "0": success
-  "1": refusal or error
+  "1": tampering found, or refusal or error
   "2": bad usage
 json: flag
 examples:

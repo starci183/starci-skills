@@ -6,14 +6,14 @@ impl: {script: scripts/connectors/telegram-media.mjs}
 positional:
   - {name: action, enum: [settle], required: true, variadic: false}
 flags:
-  - {name: ledger, type: string, required: true}
-  - {name: repo, type: string}
-  - {name: workflow, type: string, required: true}
-  - {name: job, type: string, required: true}
-  - {name: attempt, type: number}
-  - {name: op, type: string, required: true}
-  - {name: verdict, type: enum, enum: [pass, fail, blocked], required: true}
-  - {name: dispatch, type: string}
+  - {name: ledger, type: string, required: true, summary: ledger file of the settled job}
+  - {name: repo, type: string, summary: repository the ledger belongs to}
+  - {name: workflow, type: string, required: true, summary: workflow id}
+  - {name: job, type: string, required: true, summary: settled job id}
+  - {name: attempt, type: number, summary: job attempt number (default 1)}
+  - {name: op, type: string, required: true, summary: operation id of the job}
+  - {name: verdict, type: enum, enum: [pass, fail, blocked], required: true, summary: settle verdict of the job}
+  - {name: dispatch, type: string, summary: dispatch id of the job attempt}
 exit: {"0": delivery completed or was skipped, "1": delivery failed, "2": bad usage}
 json: always
 examples:

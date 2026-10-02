@@ -2,7 +2,7 @@
 group: kernel
 verb: dispatch-ready
 owner: runtime
-summary: route + dispatch queued-ready units up to starci kernel status progress.allowedParallel
+summary: route and dispatch queued-ready jobs up to the workflow allowed parallelism
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -14,19 +14,24 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: max
-    type: string
+    type: number
+    summary: dispatch at most this many jobs
   - name: dry-run
     type: boolean
+    summary: "show which jobs would be dispatched; dispatch nothing"
   - name: foreground
     type: boolean
+    summary: run in this process instead of a detached child
 exit:
-  "0": pushed (or started)
-  "1": refused
-  "2": bad usage
+  "0": pushed or started (the result file or JSON lists each job)
+  "1": refused or failed (decisions-first gate, unreadable status)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel dispatch-ready --repo <path> --workflow <workflow>
+  - starci kernel dispatch-ready --repo <path> --workflow <workflow> --max 2 --dry-run
 editions:
   - full
 since: 1.0.0-alpha.4

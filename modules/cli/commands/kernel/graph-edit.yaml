@@ -3,7 +3,7 @@
 group: kernel
 verb: graph-edit
 owner: runtime
-summary: the Kernel light, logged, reversible unit edits to the work graph
+summary: "apply a logged, reversible light edit to the workflow's unit jobs (drop, widen, wire, ...)"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -15,11 +15,11 @@ flags:
   - name: workflow
     type: string
     required: true
-  - name: decision
-    type: string
-    required: true
+    summary: workflow id
   - name: edit
     type: enum
+    required: true
+    summary: the edit to apply
     enum:
       - drop
       - widen
@@ -33,44 +33,63 @@ flags:
       - scan
       - recut
       - undo
-    required: true
+  - name: decision
+    type: string
+    summary: "Decision Item the edit answers; required for every edit except undo"
   - name: jobs
     type: string
+    summary: comma list of job ids (drop, merge)
   - name: job
     type: string
+    summary: the job edited (widen, reorder, params, continue, retry, split)
   - name: add-paths
     type: string
+    summary: comma list of paths added to the job
   - name: paths
     type: string
+    summary: comma list of owned paths of the merged job
   - name: op
     type: string
+    summary: op id (merge, recut)
   - name: before
     type: string
+    summary: comma list of job ids the new job runs before (wire, merge)
   - name: after
     type: string
+    summary: comma list of job ids the job runs after (reorder, wire)
   - name: parts
     type: string
+    summary: JSON array of path arrays that partition the job (split)
   - name: set
     type: string
+    summary: JSON object of param overrides (params, continue, retry)
   - name: cut-id
     type: string
+    summary: cut id (scan, recut)
   - name: from-scan
     type: string
+    summary: canon scan file the recut reads
   - name: path-prefix
     type: string
+    summary: prefix put before the recut paths
   - name: exclude
     type: string
+    summary: comma list of path prefixes the scan skips
   - name: reason
     type: string
+    summary: why the edit is made (required for drop)
   - name: undo
     type: string
+    summary: edit id to undo (--edit undo)
 exit:
-  "0": applied
-  "1": refused
-  "2": bad usage
+  "0": edit applied (receipt carries the undo command)
+  "1": refused or failed (decision missing, job foreign, wrong status, bad JSON)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel graph-edit --repo <path> --workflow <workflow> --decision <decision> --edit drop
+  - starci kernel graph-edit --repo <path> --workflow <workflow> --edit drop --decision <decision> --jobs <jobs> --reason <reason>
+  - starci kernel graph-edit --repo <path> --workflow <workflow> --edit reorder --decision <decision> --job <job> --after <jobs>
+  - starci kernel graph-edit --repo <path> --workflow <workflow> --edit undo --undo <edit>
 editions:
   - full
 since: 1.0.0-alpha.4

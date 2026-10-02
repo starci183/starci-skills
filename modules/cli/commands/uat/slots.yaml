@@ -7,8 +7,8 @@ positional:
   - {name: action, enum: [status, run], required: true, variadic: false}
   - {name: command, required: false, variadic: true}
 flags:
-  - {name: record-dir, type: string}
-exit: {"0": status clean or command passed, "1": command failed, "2": bad usage}
+  - {name: record-dir, type: string, summary: record directory the held slot is recorded in}
+exit: {"0": status printed or the command passed, "1": "the command failed or could not start (its code passes through)", "2": bad usage, "130": interrupted while holding a slot}
 json: none
 examples:
   - starci uat slots status

@@ -15,6 +15,7 @@ flags:
   - name: job
     type: string
     required: true
+    summary: settled job whose queued tail runs
 exit:
   "0": done or already running
   "1": failed (left queued for retry)
@@ -22,6 +23,7 @@ exit:
 json: flag
 examples:
   - starci kernel settle-tail --repo <path> --job <job>
+  - starci kernel settle-tail --repo <path> --job <job> --json
 editions:
   - full
 since: 1.0.0-alpha.4

@@ -13,8 +13,10 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow to survey
   - name: deliveries
     type: boolean
+    summary: add the settled jobs, pending credentials and handover asks
 exit:
   "0": success
   "1": refusal or error
@@ -22,6 +24,7 @@ exit:
 json: flag
 examples:
   - starci kernel survey --repo <path> --workflow <workflow>
+  - starci kernel survey --repo <path> --workflow <workflow> --deliveries --json
 editions:
   - full
 since: 1.0.0-alpha.4

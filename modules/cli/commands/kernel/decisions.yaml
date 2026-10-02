@@ -3,7 +3,7 @@
 group: kernel
 verb: decisions
 owner: runtime
-summary: "Decision Items: read them first every wake"
+summary: "list, open, claim, resolve or escalate Decision Items; the Kernel reads them first every wake"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -14,74 +14,104 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
+    summary: workflow id (required except for --claim, --resolve, --escalate)
   - name: list
     type: boolean
+    summary: list the live Decision Items (default)
   - name: all
     type: boolean
+    summary: "with --list: include closed ones"
   - name: next
     type: boolean
+    summary: print the next Decision Item the Kernel must act on
   - name: open
     type: boolean
+    summary: "open a Decision Item; needs --kind and --summary"
   - name: kind
     type: string
+    summary: Decision Item kind (open)
   - name: summary
     type: string
+    summary: one-line summary (open)
   - name: by
     type: string
+    summary: "acting actor; required with --claim, --resolve, --escalate"
   - name: entity-type
     type: string
+    summary: type of the entity the item concerns (open)
   - name: entity-id
     type: string
+    summary: id of that entity (open)
   - name: decider
     type: enum
+    summary: who must decide (open)
     enum:
       - kernel
       - supervisor
       - owner
   - name: due-ms
-    type: string
+    type: number
+    summary: milliseconds until the item is due (open)
   - name: key
     type: string
+    summary: idempotency key (open)
   - name: evidence-file
     type: string
+    summary: file of evidence refs, JSON array or one ref per line (open)
   - name: evidence
     type: string
+    summary: inline evidence text (open)
   - name: evidence-json
     type: string
+    summary: evidence as a JSON array (open)
   - name: allowed-verbs
     type: string
+    summary: comma list of the verbs that may resolve it (open)
   - name: options-json
     type: string
+    summary: options as a JSON array (open)
   - name: severity
     type: string
+    summary: severity, e.g. critical (open)
   - name: item
     type: string
+    summary: owed key the item is about (open)
   - name: claim
     type: string
+    summary: id of the item to claim
   - name: resolve
     type: string
+    summary: id of the item to resolve (needs --verb)
   - name: verb
     type: string
+    summary: the command that was run to resolve it
   - name: decision
     type: string
+    summary: starci kernel decide id recorded with the resolution
   - name: note
     type: string
+    summary: free note recorded with --resolve
   - name: escalate
     type: string
+    summary: id of the item to escalate
   - name: to
     type: enum
+    summary: escalation target (default supervisor)
     enum:
       - supervisor
       - owner
   - name: reason
     type: string
+    summary: why it is escalated
 exit:
   "0": listed or recorded
-  "1": refused
-  "2": bad usage
+  "1": refused (unknown or closed item, bad evidence, missing field)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel decisions --repo <path>
+  - starci kernel decisions --repo <path> --workflow <workflow>
+  - starci kernel decisions --repo <path> --workflow <workflow> --next
+  - starci kernel decisions --repo <path> --resolve <decision> --by <actor> --verb <command>
 editions:
   - full
 since: 1.0.0-alpha.4

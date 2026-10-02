@@ -1,7 +1,7 @@
 group: kernel
 verb: reconcile
 owner: runtime
-summary: kernel jobs of finished/archived workflows -> cancelled
+summary: recover a fenced launch, drop a queued job, recover a dead worker or cancel orphan kernel jobs
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -12,31 +12,44 @@ flags:
     summary: managed repository whose .starciwork ledger the command uses
   - name: job
     type: string
+    summary: job to reconcile; required unless --orphan-kernel-jobs
   - name: drop
     type: boolean
+    summary: retire a queued job that was never dispatched (needs --reason)
   - name: reason
     type: string
+    summary: why the job is dropped; required with --drop
   - name: dead-worker
     type: boolean
+    summary: recover a running job whose exact worker terminal is gone
   - name: settle-failed
     type: boolean
+    summary: with --dead-worker, settle the job failed instead of requeueing it
   - name: no-salvage
     type: boolean
+    summary: with --dead-worker, skip filing a report the dead worker wrote but never filed
   - name: release-worker
     type: boolean
+    summary: release the worker of a job whose settle is held, keeping the job for its settle
   - name: orphan-kernel-jobs
     type: boolean
+    summary: cancel the kernel jobs of finished or archived workflows
   - name: workflow
     type: string
+    summary: with --orphan-kernel-jobs, limit to one workflow
   - name: dry-run
     type: boolean
+    summary: with --orphan-kernel-jobs, list what would be cancelled without writing
 exit:
   "0": success
   "1": refusal or error
   "2": bad usage
 json: flag
 examples:
-  - starci kernel reconcile --repo <path>
+  - starci kernel reconcile --repo <path> --job <job>
+  - starci kernel reconcile --repo <path> --job <job> --drop --reason <reason>
+  - starci kernel reconcile --repo <path> --job <job> --dead-worker --settle-failed
+  - starci kernel reconcile --repo <path> --orphan-kernel-jobs --dry-run --json
 editions:
   - full
 since: 1.0.0-alpha.4

@@ -13,6 +13,7 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow to project
 exit:
   "0": success
   "1": refusal or error

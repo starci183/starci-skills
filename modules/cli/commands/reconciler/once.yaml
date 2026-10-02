@@ -6,7 +6,7 @@ impl:
   script: scripts/reconciler/engine.mjs
   args: [--once]
 flags:
-  - {name: controller, type: string, summary: "run only this controller (job, host, workflow, resource, gc, fleet or learning)"}
+  - {name: controller, type: enum, enum: [job, host, gc, resource, workflow, fleet, learning], summary: run only this controller}
   - {name: key, type: string, summary: reconcile only this key}
   - {name: apply, type: boolean, summary: "take the lead and apply the actions instead of planning them; refused while another leader is live"}
 exit:

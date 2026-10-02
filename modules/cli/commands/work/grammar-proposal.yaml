@@ -7,9 +7,11 @@ positional:
   - {name: command, enum: [list, check], required: true, variadic: false}
   - {name: target, required: true, variadic: true}
 flags: []
-exit: {"0": success, "1": incomplete proposals, "2": bad usage}
+exit: {"0": "every proposal is complete, or list was asked", "1": check found an incomplete proposal, "2": bad usage}
 json: flag
-examples: ['starci work grammar-proposal check .starciwork']
+examples:
+  - 'starci work grammar-proposal check .starciwork'
+  - 'starci work grammar-proposal list .starciwork --json'
 editions: [full]
 since: 1.0.0-alpha.4
 removed: ['node scripts/work/grammar-proposal.mjs']

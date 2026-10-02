@@ -19,10 +19,13 @@ flags:
       - unit
       - e2e
       - integration
+    summary: limit to one test class; every deferred class when omitted
   - name: by
     type: string
+    summary: who re-queues the legs, recorded on the event (owner when omitted)
   - name: dry-run
     type: boolean
+    summary: list the deferred legs that would be re-queued without re-queuing them
 exit:
   "0": success
   "1": refusal or error
@@ -30,6 +33,7 @@ exit:
 json: flag
 examples:
   - starci kernel run-deferred-tests --repo <path> --workflow <workflow>
+  - starci kernel run-deferred-tests --repo <path> --workflow <workflow> --kind unit --dry-run --json
 editions:
   - full
 since: 1.0.0-alpha.4

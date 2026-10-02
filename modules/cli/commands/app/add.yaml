@@ -14,7 +14,7 @@ flags:
   - {name: owner, type: string, summary: service that owns a saga}
   - {name: failed, type: string, summary: failure event consumed by a saga}
   - {name: done, type: string, summary: completion event consumed by a saga}
-exit: {"0": capability created, "1": findings, "2": refusal or bad usage}
+exit: {"0": capability created, "2": refusal or bad usage}
 json: none
 examples: ['starci app add api checkout --service CheckoutService=@modules/domain/order']
 editions: [full]

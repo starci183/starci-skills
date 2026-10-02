@@ -12,8 +12,8 @@ flags:
   - {name: input-type, type: enum, enum: [yaml, json, dotenv], summary: state the encrypted document format}
 exit:
   "0": requested read or command completed
-  "1": decryption, lookup or command failed
-  "2": bad usage
+  "1": decryption, lookup, missing command or command failed (a command's own status passes through)
+  "2": bad flag or missing file refused by the dispatcher
 json: none
 examples:
   - starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --keys

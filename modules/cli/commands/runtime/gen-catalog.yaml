@@ -7,7 +7,7 @@ flags:
   - {name: write, type: boolean, summary: rewrite every generated output from modules/cli/commands}
   - {name: check, type: boolean, summary: exit 1 listing each output that differs}
   - {name: root, type: string, summary: the runtime tree to read and write}
-exit: {"0": outputs in sync or written, "1": drift listed, "2": bad usage or a catalog error}
+exit: {"0": outputs in sync or written, "1": drift listed or a catalog error, "2": neither --write nor --check given or bad usage}
 json: none
 examples:
   - starci runtime gen-catalog --check

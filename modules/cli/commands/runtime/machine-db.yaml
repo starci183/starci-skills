@@ -6,14 +6,14 @@ impl: {script: engine/db/machine.mjs}
 positional:
   - {name: action, enum: [init, status, ledgers, register, resolve], required: false, variadic: false}
 flags:
-  - {name: file, type: string}
-  - {name: all, type: boolean}
-  - {name: ledger-id, type: string}
-  - {name: name, type: string}
-  - {name: repo, type: string}
-  - {name: ledger-file, type: string}
-  - {name: product, type: string}
-  - {name: create, type: boolean}
+  - {name: file, type: string, summary: machine database file (default the host database)}
+  - {name: all, type: boolean, summary: ledgers action includes retired ledgers}
+  - {name: ledger-id, type: string, summary: ledger id for register or resolve}
+  - {name: name, type: string, summary: ledger name for register or resolve}
+  - {name: repo, type: string, summary: repository root of the ledger for register or resolve}
+  - {name: ledger-file, type: string, summary: ledger file path to register}
+  - {name: product, type: string, summary: product the ledger belongs to}
+  - {name: create, type: boolean, summary: resolve action registers the ledger when it is unknown}
 exit: {"0": action completed, "2": bad usage or database error}
 json: always
 examples:

@@ -15,4 +15,5 @@ examples:
   - starci reconciler stop
 editions: [full]
 since: 1.0.0-alpha.4
-removed: []
+removed:
+  - node scripts/reconciler/boot.mjs --stop

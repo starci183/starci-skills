@@ -16,15 +16,18 @@ flags:
   - name: record
     type: string
     required: true
+    summary: .starciwork record directory or file (no glob) the workflow owns
   - name: reach
     type: enum
     enum:
       - follow-up
       - advisory
     required: true
+    summary: follow-up = breaking (peers owe one follow-up leg); advisory = peers are only told
   - name: reason
     type: string
     required: true
+    summary: what the change withdraws or replaces, and why
 exit:
   "0": success
   "1": refusal or error
@@ -32,6 +35,7 @@ exit:
 json: flag
 examples:
   - starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach follow-up --reason <reason>
+  - starci kernel record-change --repo <path> --workflow <workflow> --record <record> --reach advisory --reason <reason> --json
 editions:
   - full
 since: 1.0.0-alpha.4

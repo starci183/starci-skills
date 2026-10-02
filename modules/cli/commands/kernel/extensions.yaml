@@ -3,7 +3,7 @@
 group: kernel
 verb: extensions
 owner: runtime
-summary: "the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems"
+summary: "list the file-based kernel extensions: verbs, status fields, boolean flags, load problems"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,9 +13,9 @@ flags:
     type: string
     summary: managed repository whose .starciwork ledger the command uses
 exit:
-  "0": when every extension loads
-  "1": when one is a problem (named in `problems`).
-  "2": bad usage
+  "0": every extension loaded
+  "1": an extension failed to load (listed as PROBLEM)
+  "2": "bad usage: unknown flag"
 json: flag
 examples:
   - starci kernel extensions --repo <path>

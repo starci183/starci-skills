@@ -3,7 +3,7 @@
 group: kernel
 verb: rename
 owner: runtime
-summary: set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
+summary: set a workflow's display name and rename its live [Kernel] and [Op] terminal tabs
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -18,16 +18,20 @@ flags:
   - name: title
     type: string
     required: true
+    summary: the new display name (workflow_id is unchanged)
   - name: by
     type: enum
     enum:
       - owner
       - supervisor
     default: owner
+    summary: who renames the workflow, recorded on the event
   - name: no-terminals
     type: boolean
+    summary: leave the live terminal tabs to the next boot or dispatch
   - name: dry-run
     type: boolean
+    summary: show the rename and the tab it would touch without writing
 exit:
   "0": success
   "1": refusal or error
@@ -35,6 +39,8 @@ exit:
 json: flag
 examples:
   - starci kernel rename --repo <path> --workflow <workflow> --title <title>
+  - starci kernel rename --repo <path> --workflow <workflow> --title <title> --by supervisor --no-terminals --json
+  - starci kernel rename --repo <path> --workflow <workflow> --title <title> --dry-run
 editions:
   - full
 since: 1.0.0-alpha.4

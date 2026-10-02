@@ -14,7 +14,8 @@ flags:
     type: string
     required: true
   - name: lines
-    type: string
+    type: number
+    summary: how many trailing screen lines to read (positive integer)
 exit:
   "0": success
   "1": refusal or error
@@ -22,6 +23,7 @@ exit:
 json: flag
 examples:
   - starci kernel observe --repo <path> --job <job>
+  - starci kernel observe --repo <path> --job <job> --lines 60
 editions:
   - full
 since: 1.0.0-alpha.4

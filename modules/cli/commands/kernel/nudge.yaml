@@ -1,7 +1,7 @@
 group: kernel
 verb: nudge
 owner: runtime
-summary: send a nudge to a job's live worker terminal
+summary: wake a running job's worker at its exact terminal so it files its report
 impl:
   script: scripts/kernel/cli.mjs
   args:

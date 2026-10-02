@@ -1,7 +1,7 @@
 group: kernel
 verb: estimate
 owner: runtime
-summary: deterministic size class + agent count from runtimes.yaml allocation.slicing
+summary: compute the size class and agent count of a slice from runtimes.yaml allocation.slicing
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -11,25 +11,31 @@ flags:
     type: string
     summary: managed repository whose .starciwork ledger the command uses
   - name: files
-    type: string
-    required: true
+    type: number
+    summary: number of files in the slice
   - name: assertions
-    type: string
+    type: number
+    summary: number of assertions
   - name: components
-    type: string
+    type: number
+    summary: number of components
   - name: records
-    type: string
+    type: number
+    summary: number of records
   - name: paths
     type: string
+    summary: comma list of paths to measure instead
   - name: gear
-    type: string
+    type: number
+    summary: gear id declared in allocation.slicing.gears (default from config)
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": estimate printed
+  "1": refused (no measure given, unknown gear) or failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel estimate --repo <path> --files <files>
+  - starci kernel estimate --repo <path> --files 12
+  - starci kernel estimate --repo <path> --files 40 --assertions 120 --gear 2
 editions:
   - full
 since: 1.0.0-alpha.4

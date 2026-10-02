@@ -1,7 +1,7 @@
 group: kernel
 verb: consume-report
 owner: runtime
-summary: integrate the report a job filed (the kernel must consume before settle)
+summary: "integrate the report a job filed; the Kernel must consume it before settle"
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,10 +13,11 @@ flags:
   - name: job
     type: string
     required: true
+    summary: job whose filed report is consumed
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": report consumed
+  "1": refused or failed (no report, unknown job)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel consume-report --repo <path> --job <job>

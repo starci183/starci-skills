@@ -16,12 +16,16 @@ flags:
     required: true
   - name: op
     type: string
+    summary: op to override (required with --set or --clear; narrows the shown list otherwise)
   - name: set
     type: string
+    summary: JSON object of additive override fields (notes, commandTimeoutMs, difficulty, model, effort)
   - name: clear
     type: boolean
+    summary: remove the op's override
   - name: decision
     type: string
+    summary: owner decision id that authorises a --set or --clear
 exit:
   "0": stored or shown
   "1": refused
@@ -29,6 +33,8 @@ exit:
 json: flag
 examples:
   - starci kernel op-override --repo <path> --workflow <workflow>
+  - starci kernel op-override --repo <path> --workflow <workflow> --op <op> --set '{"notes":["..."]}' --decision <decision>
+  - starci kernel op-override --repo <path> --workflow <workflow> --op <op> --clear --decision <decision>
 editions:
   - full
 since: 1.0.0-alpha.4

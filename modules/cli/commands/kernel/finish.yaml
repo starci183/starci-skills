@@ -1,7 +1,7 @@
 group: kernel
 verb: finish
 owner: runtime
-summary: finish a workflow once its work is done
+summary: finish an owner-approved workflow and release its kernel seat
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,10 +13,11 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": finished (also when it was already finished)
+  "1": refused or failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
   - starci kernel finish --repo <path> --workflow <workflow>

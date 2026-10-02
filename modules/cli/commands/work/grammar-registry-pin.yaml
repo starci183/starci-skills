@@ -4,8 +4,8 @@ owner: runtime
 summary: check a frontend grammar dependency against the registry pin
 impl: {script: scripts/work/ui/grammar-registry-pin.mjs}
 flags:
-  - {name: repo, type: string, required: true}
-exit: {"0": clean, "1": findings, "2": bad usage}
+  - {name: repo, type: string, required: true, summary: frontend repository root}
+exit: {"0": the grammar dependency matches the registry pin, "1": the dependency drifted from the pin, "2": bad usage}
 json: flag
 examples: ['starci work grammar-registry-pin --repo <repo> --json']
 editions: [full]

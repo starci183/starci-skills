@@ -4,9 +4,9 @@ owner: runtime
 summary: derive example critique records from a Work tree
 impl: {script: scripts/example/example-critique.mjs}
 flags:
-  - {name: work, type: string, required: true}
-  - {name: write, type: boolean}
-exit: {"0": success, "1": findings, "2": bad usage}
+  - {name: work, type: string, required: true, summary: the .starciwork tree to derive from}
+  - {name: write, type: boolean, summary: "write the critique records; without it only checks they are current"}
+exit: {"0": records are current or were written, "1": records are stale or the tree was refused, "2": bad usage}
 json: none
 examples: ['starci work example-critique --work .starciwork --write']
 editions: [full]

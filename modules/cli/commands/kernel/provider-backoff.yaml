@@ -15,20 +15,26 @@ flags:
   - name: provider
     type: string
     required: true
+    summary: provider id whose circuit to open
   - name: open-circuit
     type: boolean
     required: true
+    summary: the action; the verb refuses without it
   - name: kind
     type: enum
     enum:
       - quota
       - rate-limited
+    default: quota
+    summary: failure kind recorded on the circuit
   - name: reason
     type: string
     required: true
+    summary: why the circuit opens (kept to 400 chars)
   - name: by
     type: string
     required: true
+    summary: actor that opens it (kept to 80 chars)
 exit:
   "0": opened or already open
   "1": refused

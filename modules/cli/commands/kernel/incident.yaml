@@ -1,7 +1,7 @@
 group: kernel
 verb: incident
 owner: runtime
-summary: file, resolve, or type the release of a workflow incident
+summary: raise, resolve or attach typed release conditions to a workflow incident
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -13,57 +13,80 @@ flags:
   - name: workflow
     type: string
     required: true
+    summary: workflow id
   - name: kind
     type: string
+    summary: incident kind, e.g. peer-wait or shared-blocker (raise)
   - name: detail
     type: string
+    summary: "what happened (raise; optional on resolve and attach)"
   - name: op
     type: string
+    summary: op the incident concerns
   - name: holds
-    type: list
+    type: string
+    summary: comma list of op or job ids the incident holds
   - name: peer
     type: string
+    summary: workflow waited on (--kind peer-wait)
   - name: refs
     type: string
-  - name: until-message
-    type: string
-  - name: until-foundation
-    type: string
-  - name: until-landed
-    type: string
+    summary: comma list of refs of the wait (--kind peer-wait)
   - name: resolve
     type: string
+    summary: id of the incident to resolve
   - name: by
     type: enum
+    summary: who resolves it
     enum:
       - kernel
       - owner
       - supervisor
   - name: owner-answer
     type: string
+    summary: comma list of owner-answered dispatch ids backing the resolution
   - name: introduced-by
-    type: list
+    type: string
+    summary: comma list of commits that introduced the blocker (shared-blocker)
   - name: introducer
     type: string
+    summary: workflow that introduced the blocker (shared-blocker)
   - name: fix
     type: string
+    summary: the fix the introducer owes (shared-blocker)
   - name: attach
     type: string
+    summary: "id of an open incident to type with --until-* conditions"
   - name: until-record
-    type: string
+    type: list
+    summary: "release when the record reaches the state: <path>[@state|>=rev]"
   - name: until-job
-    type: string
+    type: list
+    summary: "release when the job settles: <jobId>[:settled|succeeded]"
+  - name: until-message
+    type: list
+    summary: "release on a peer message: <peer>[:kind]; a bare flag needs --kind peer-wait"
   - name: until-commit
-    type: string
+    type: list
+    summary: "release when the ref or path lands: <repo>:<ref-or-path>"
   - name: until-incident
-    type: string
+    type: list
+    summary: "release when the incident resolves: <id>[:resolved]"
+  - name: until-foundation
+    type: list
+    summary: "release when the foundation lands: <name>"
+  - name: until-landed
+    type: list
+    summary: "release when the workflow lands its product: <workflowId>@<repository>"
 exit:
-  "0": success
-  "1": refusal or error
-  "2": bad usage
+  "0": raised, resolved or attached
+  "1": refused or failed (unknown or not-open incident, wrong kind combination)
+  "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
-  - starci kernel incident --repo <path> --workflow <workflow>
+  - starci kernel incident --repo <path> --workflow <workflow> --kind <kind> --detail <detail>
+  - starci kernel incident --repo <path> --workflow <workflow> --resolve <incident> --by kernel
+  - starci kernel incident --repo <path> --workflow <workflow> --attach <incident> --until-job <job>
 editions:
   - full
 since: 1.0.0-alpha.4

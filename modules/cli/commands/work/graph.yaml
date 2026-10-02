@@ -6,16 +6,16 @@ impl: {script: scripts/work/work-graph.mjs}
 positional:
   - {name: action, enum: [show, validate, diff, propose], required: true, variadic: false}
 flags:
-  - {name: repo, type: string, required: true}
-  - {name: workflow, type: string}
-  - {name: version, type: number}
-  - {name: file, type: string}
-  - {name: from, type: number}
-  - {name: to, type: number}
-  - {name: job, type: string}
-  - {name: reason, type: string}
-  - {name: slice, type: string}
-exit: {"0": action completed, "1": graph refused or invalid, "2": bad usage}
+  - {name: repo, type: string, required: true, summary: repository root that holds the ledger}
+  - {name: workflow, type: string, summary: "workflow id whose graph is read (propose may name --job instead)"}
+  - {name: version, type: number, summary: "graph version to show (default is the latest)"}
+  - {name: file, type: string, summary: "candidate graph file (JSON or YAML)"}
+  - {name: from, type: number, summary: graph version to diff from}
+  - {name: to, type: number, summary: "graph version to diff to (default is the latest)"}
+  - {name: job, type: string, summary: op job id that proposes the change}
+  - {name: reason, type: string, summary: "why the graph changes; propose needs it"}
+  - {name: slice, type: string, summary: slice id a cutting job changes}
+exit: {"0": action completed, "1": the graph was refused or is invalid, "2": bad usage}
 json: flag
 examples:
   - starci work graph show --repo <path> --workflow <id>

@@ -4,13 +4,13 @@ owner: runtime
 summary: emit a UI proof brief or score a rendered surface
 impl: {script: scripts/work/ui/ui-proof-brief.mjs}
 flags:
-  - {name: surface, type: string}
-  - {name: repo, type: string, required: true}
-  - {name: family, type: enum, enum: [starci, nivo]}
-  - {name: elements, type: string}
-  - {name: score, type: string}
-  - {name: viewport, type: string}
-exit: {"0": success, "1": findings, "2": bad usage}
+  - {name: surface, type: string, summary: ui record path the brief is for}
+  - {name: repo, type: string, required: true, summary: product repository root}
+  - {name: family, type: enum, enum: [starci, nivo], summary: grammar family to use instead of the detected one}
+  - {name: elements, type: string, summary: comma list of extra element kinds to brief}
+  - {name: score, type: string, summary: rendered HTML to score against the brief}
+  - {name: viewport, type: string, summary: WxH viewport to score at, default: "390x844"}
+exit: {"0": brief printed or the score is clean, "1": a scoring finding, "2": bad usage}
 json: flag
 examples: ['starci work ui-proof-brief --surface <record> --repo <repo> --json']
 editions: [full]

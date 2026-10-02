@@ -4,18 +4,18 @@ owner: runtime
 summary: place drawn content into its measured page or overlay shell
 impl: {script: scripts/work/compose-direction.mjs}
 flags:
-  - {name: ui, type: string, required: true}
-  - {name: content, type: string, required: true}
-  - {name: breakpoint, type: string, required: true}
-  - {name: theme, type: enum, enum: [light, dark], required: true}
-  - {name: state, type: string}
-  - {name: presentation, type: enum, enum: [page, overlay]}
-  - {name: host-state, type: string}
-  - {name: fit, type: enum, enum: [cover, stretch]}
-  - {name: scrim, type: number}
-  - {name: tool, type: string}
-  - {name: prompt, type: string}
-  - {name: out, type: string}
+  - {name: ui, type: string, required: true, summary: ui record directory the drawing belongs to}
+  - {name: content, type: string, required: true, summary: PNG of the drawn content to place}
+  - {name: breakpoint, type: string, required: true, summary: breakpoint name of the shell capture to compose into}
+  - {name: theme, type: enum, enum: [light, dark], required: true, summary: theme of the shell capture}
+  - {name: state, type: string, summary: flow state of the drawing, default: default}
+  - {name: presentation, type: enum, enum: [page, overlay], summary: "place the content as a page or as an overlay (default is the record presentation)"}
+  - {name: host-state, type: string, summary: flow state of the page behind an overlay}
+  - {name: fit, type: enum, enum: [cover, stretch], summary: how the content fills the slot, default: cover}
+  - {name: scrim, type: number, summary: overlay scrim opacity from 0 to 1, default: 0.5}
+  - {name: tool, type: string, summary: tool name recorded as the composite provenance, default: draw-render}
+  - {name: prompt, type: string, summary: prompt text recorded with the composite}
+  - {name: out, type: string, summary: "output PNG path (default is beside the content)"}
 exit: {"0": composite written, "1": composition refused, "2": bad usage}
 json: flag
 examples: ['starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light']

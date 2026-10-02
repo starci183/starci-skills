@@ -5,7 +5,7 @@ summary: judge the app tree, managed output, contracts, formatting and architect
 impl: null
 flags:
   - {name: fast, type: boolean, summary: judge only paths changed since the merge base}
-  - {name: base, type: string, summary: merge-base ref used by --fast}
+  - {name: base, type: string, summary: merge-base ref used by --fast (refused without it)}
 exit: {"0": clean, "1": findings, "2": refusal or bad usage}
 json: flag
 examples: ['starci app check', 'starci app check --fast', 'starci app check --json']
