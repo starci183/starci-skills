@@ -3,6 +3,7 @@
 // `starci harness start --tunnel` runs the named Cloudflare tunnel (starci-harness, %USERPROFILE%/.cloudflared/harness.yml)
 //                          to the served UI on 127.0.0.1:<statusApp.port of modules/models/runtimes.yaml>;
 //                          the tunnel credential file authenticates it, never a token.
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
