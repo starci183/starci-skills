@@ -66,6 +66,8 @@ export function patternTopicFiles() {
 }
 
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
+/** The rule catalog the edition filter of hfs check reads (check.mjs judgedFindings), so the bundled runtime carries it. */
+const RULE_CATALOG_FILE = 'knowledge/hfs/rules.yaml';
 /**
  * Data files the architecture machine reads at run time beside its code, which a canon bundle must carry because the
  * canons run the machine behind the project-graph law: the managed package-scripts templates (README script names) and
@@ -74,7 +76,7 @@ export const CATALOG = 'modules/kernel/failure-codes.yaml';
 const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', ...patternTopicFiles()])].sort()), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', RULE_CATALOG_FILE, ...patternTopicFiles()])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
 });
