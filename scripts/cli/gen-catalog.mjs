@@ -1,7 +1,7 @@
 // gen-catalog.mjs — generate the CLI catalog products from modules/cli/commands
 // (cli/design.md). Writes, never by hand:
-//   node scripts/cli/gen-catalog.mjs --write   write the outputs
-//   node scripts/cli/gen-catalog.mjs --check   exit 1 with the diff list when any output differs (RT_CLI_CATALOG_DRIFT)
+//   starci runtime gen-catalog --write   write the outputs
+//   starci runtime gen-catalog --check   exit 1 with the diff list when any output differs (RT_CLI_CATALOG_DRIFT)
 // Outputs: packages/cli/src/catalog.generated.mjs, docs/cli.md,
 // packages/cli/completions/{starci.bash,_starci,starci.fish,starci.ps1}.
 import fs from 'node:fs';
@@ -173,7 +173,7 @@ const main = () => {
   const mode = argv[0];
   const rootIdx = argv.indexOf('--root');
   if (!['--write', '--check'].includes(mode) || (rootIdx >= 0 && argv[rootIdx + 1] === undefined) || argv.length > (rootIdx < 0 ? 1 : 3)) {
-    console.error('use: node scripts/cli/gen-catalog.mjs [--write|--check] [--root <tree>]');
+    console.error('use: starci runtime gen-catalog [--write|--check] [--root <tree>]');
     process.exit(2);
   }
   const root = rootIdx < 0 ? skillRoot : path.resolve(argv[rootIdx + 1]);
@@ -192,7 +192,7 @@ const main = () => {
       return !fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text;
     }).map(([rel]) => rel);
     if (diffs.length) {
-      console.error(`${DRIFT_CODE}: generated output differs — ${diffs.join(', ')} (run: node scripts/cli/gen-catalog.mjs --write)`);
+      console.error(`${DRIFT_CODE}: generated output differs — ${diffs.join(', ')} (run: starci runtime gen-catalog --write)`);
       process.exit(1);
     }
     console.log('cli catalog: generated outputs are in sync');

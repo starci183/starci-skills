@@ -1,4 +1,4 @@
-// 3.5: the land gate runs the FULL `starci runtime check` (bin/starci.mjs check) of the candidate as a step of its own, not only the
+// 3.5: the land gate runs the FULL `starci runtime check` of the candidate as a step of its own, not only the
 // gate: a red run refuses the land, a green one passes, and a tree with no entry point is skipped (a fixture tree).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,13 +17,13 @@ const fullCheck = (dir) => fullCheckWith(dir, runner);
 const made = [];
 test.after(() => { for (const dir of made) fs.rmSync(dir, { recursive: true, force: true }); });
 
-/** A temp tree whose bin/starci.mjs is a stand-in `check` that prints `line` and exits `code`; null: no entry point. */
+/** A temp tree whose CLI dispatcher is a stand-in `runtime check` that prints `line` and exits `code`; null: no entry point. */
 const tree = (code, line = 'self-checks: 1 of 1 passed') => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'land-full-check-'));
   made.push(dir);
   if (code !== null) {
     fs.mkdirSync(path.join(dir, path.dirname(FULL_CHECK_ENTRY)), { recursive: true });
-    fs.writeFileSync(path.join(dir, FULL_CHECK_ENTRY), `if (process.argv[2] !== 'check') process.exit(64);\nconsole.log(${JSON.stringify(line)});\nprocess.exit(${code});\n`);
+    fs.writeFileSync(path.join(dir, FULL_CHECK_ENTRY), `if (process.argv[2] !== 'runtime' || process.argv[3] !== 'check') process.exit(64);\nconsole.log(${JSON.stringify(line)});\nprocess.exit(${code});\n`);
   }
   return dir;
 };
@@ -36,7 +36,7 @@ test('the land runs `starci runtime check` of the candidate: green passes, red r
   assert.match(red.output, /RT_EXAMPLE a self-check failed/);
 });
 
-test('a tree with no bin/starci.mjs is skipped, not a pass of the check it cannot run', () => {
+test('a tree with no CLI dispatcher is skipped, not a pass of the check it cannot run', () => {
   assert.deepEqual(fullCheck(tree(null)), { ok: true, skipped: true });
 });
 

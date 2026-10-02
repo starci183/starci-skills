@@ -2658,6 +2658,27 @@ starci runtime doctor --cwd <repo> --quick
 
 Removed spellings: `starci doctor`, `npx starci doctor`
 
+### starci runtime gen-catalog
+
+write or check the generated CLI catalog outputs, docs and shell completions
+
+| flag | type | |
+| --- | --- | --- |
+| `--write` | boolean |  |
+| `--check` | boolean |  |
+| `--root` | string |  |
+
+exit: 0 outputs in sync or written; 1 drift listed; 2 bad usage or a catalog error
+
+json: none
+
+```sh
+starci runtime gen-catalog --check
+starci runtime gen-catalog --write
+```
+
+Removed spellings: `node scripts/cli/gen-catalog.mjs`, `node .claude/scripts/cli/gen-catalog.mjs`
+
 ### starci runtime gen-ops
 
 regenerate or check the generated operation registry
@@ -2768,6 +2789,26 @@ starci runtime machine-db ledgers --all
 ```
 
 Removed spellings: `node engine/db/machine.mjs`, `node .claude/engine/db/machine.mjs`
+
+### starci runtime owner-claims-audit
+
+audit owner-decision claims and owner-gates in runtime ledgers
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--workflow` | string |  |
+
+exit: 0 no unsupported owner claims; 1 findings exist; 2 bad usage or an unreadable ledger
+
+json: flag
+
+```sh
+starci runtime owner-claims-audit --repo <repo>
+starci runtime owner-claims-audit --repo <repo>[,<repo>...] --workflow <id> --json
+```
+
+Removed spellings: `node scripts/housekeeping/owner-claims-audit.mjs`
 
 ### starci runtime readme-blocks
 
@@ -2936,6 +2977,79 @@ starci supervisor bridge rewire --repo <path> --bridge <id>
 
 Removed spellings: `node scripts/supervisor/bridge.mjs`
 
+### starci supervisor channel
+
+register, inspect, and answer the Supervisor owner-message channel
+
+| flag | type | |
+| --- | --- | --- |
+| `--id` | string | required |
+| `--label` | string |  |
+| `--repos` | string |  |
+| `--force` | boolean |  |
+| `--peek` | boolean |  |
+| `--text` | string |  |
+| `--text-file` | string |  |
+| `--to` | string |  |
+| `--timeout-ms` | number |  |
+
+Positionals: action
+
+exit: 0 channel action completed; 1 channel action refused or failed; 2 bad usage; 124 inbox wait timed out
+
+json: flag
+
+```sh
+starci supervisor channel register --id main --label Supervisor
+starci supervisor channel inbox --id main --peek
+starci supervisor channel reply --id main --text <text> --to <message-id>
+```
+
+Removed spellings: `node scripts/supervisor/channel.mjs`, `node .claude/scripts/supervisor/channel.mjs`
+
+### starci supervisor direct-commits
+
+find runtime main commits that bypassed the exclusive land gate
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+
+exit: 0 no direct commits found; 1 direct commits found; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor direct-commits
+starci supervisor direct-commits --repo <path> --json
+```
+
+Removed spellings: `node scripts/supervisor/direct-commits.mjs`, `node .claude/scripts/supervisor/direct-commits.mjs`
+
+### starci supervisor gate-stability
+
+compare frozen gate behavior against accepted work in live workflows
+
+| flag | type | |
+| --- | --- | --- |
+| `--family` | string | required |
+| `--tree` | string |  |
+| `--base` | string |  |
+| `--head` | string |  |
+| `--ledger` | list |  |
+| `--gate` | list |  |
+
+exit: 0 stability report completed; 2 bad usage or report execution failed
+
+json: flag
+
+```sh
+starci supervisor gate-stability --family <op> --tree <dir>
+starci supervisor gate-stability --family <op> --base <dir> --head <dir> --json
+```
+
+Removed spellings: `node scripts/supervisor/gate-stability.mjs`, `node .claude/scripts/supervisor/gate-stability.mjs`
+
 ### starci supervisor gc
 
 inspect or collect leftover workers, shells, lanes, temp data, leases, and logs
@@ -2989,6 +3103,41 @@ starci supervisor land --commit <sha> --specs touching --lane <name>
 ```
 
 Removed spellings: `node scripts/supervisor/land.mjs`
+
+### starci supervisor lesson-actions
+
+land, revert, or propose changes from the Supervisor self-learning loop
+
+| flag | type | |
+| --- | --- | --- |
+| `--signature` | string |  |
+| `--commit` | string |  |
+| `--lane` | string |  |
+| `--specs` | string |  |
+| `--wrongly-blocked` | string |  |
+| `--reason` | string |  |
+| `--wait-ms` | number |  |
+| `--experiment` | string |  |
+| `--apply` | boolean |  |
+| `--title` | string |  |
+| `--evidence` | string |  |
+| `--options` | string |  |
+| `--recommendation` | string |  |
+| `--send` | boolean |  |
+
+Positionals: action
+
+exit: 0 lesson action completed; 1 lesson action refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor lesson-actions land --signature <id> --commit <sha> --lane <name>
+starci supervisor lesson-actions revert --experiment <id> --apply
+starci supervisor lesson-actions propose --title <text> --evidence <text> --options <text> --recommendation <text>
+```
+
+Removed spellings: `node scripts/supervisor/lesson-actions.mjs`, `node .claude/scripts/supervisor/lesson-actions.mjs`
 
 ### starci supervisor notify
 
@@ -3086,6 +3235,28 @@ starci supervisor push --json
 
 Removed spellings: `node scripts/supervisor/push-git.mjs`
 
+### starci supervisor push-mains
+
+scan and push main for the runtime and configured product repositories
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--dry-run` | boolean |  |
+| `--hooks-only` | boolean |  |
+
+exit: 0 every repository passed; 1 a repository was refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor push-mains
+starci supervisor push-mains --repo <path> --dry-run
+starci supervisor push-mains --hooks-only --json
+```
+
+Removed spellings: `node scripts/supervisor/push-mains.mjs`, `node .claude/scripts/supervisor/push-mains.mjs`
+
 ### starci supervisor ram-cap
 
 inspect or override RAM-aware workflow dispatch priorities
@@ -3176,6 +3347,24 @@ json: flag
 starci supervisor stop
 ```
 
+### starci supervisor telegram-bridge
+
+start, run, inspect, or stop the Supervisor Telegram bridge
+
+Positionals: action?
+
+exit: 0 bridge action completed; 1 bridge start or run failed; 2 bad usage
+
+json: always
+
+```sh
+starci supervisor telegram-bridge status
+starci supervisor telegram-bridge start
+starci supervisor telegram-bridge run
+```
+
+Removed spellings: `node scripts/supervisor/telegram-bridge.mjs`, `node .claude/scripts/supervisor/telegram-bridge.mjs`
+
 ### starci supervisor tell
 
 send a desktop message to the Supervisor or read its recent replies
@@ -3201,6 +3390,64 @@ starci supervisor tell --read --since 30m --json
 ```
 
 Removed spellings: `node scripts/supervisor/tell.mjs`
+
+### starci supervisor watchdog
+
+run one reconciler-owned Supervisor seat liveness pass
+
+| flag | type | |
+| --- | --- | --- |
+| `--once` | boolean | required |
+
+exit: 0 watchdog pass completed; 1 watchdog pass failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor watchdog --once
+starci supervisor watchdog --once --json
+```
+
+Removed spellings: `node scripts/supervisor/supervisor-watchdog.mjs`, `node .claude/scripts/supervisor/supervisor-watchdog.mjs`
+
+### starci supervisor workers
+
+create, launch, inspect, report, and clean up Supervisor repair workers
+
+| flag | type | |
+| --- | --- | --- |
+| `--cluster` | string |  |
+| `--title` | string |  |
+| `--files` | string |  |
+| `--incidents` | string |  |
+| `--specs` | string |  |
+| `--brief` | string |  |
+| `--brief-file` | string |  |
+| `--agent` | enum claude|codex|devin |  |
+| `--job` | string |  |
+| `--dry-run` | boolean |  |
+| `--self` | boolean |  |
+| `--name` | string |  |
+| `--outcome` | enum done|diagnosed|blocked|failed |  |
+| `--commit` | string |  |
+| `--summary` | string |  |
+| `--summary-file` | string |  |
+| `--needs` | string |  |
+| `--reason` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 worker action refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor workers list
+starci supervisor workers create --cluster <id> --title <text> --files <csv>
+starci supervisor workers report --job <id> --outcome done --commit <sha>
+```
+
+Removed spellings: `node scripts/supervisor/workers.mjs`, `node .claude/scripts/supervisor/workers.mjs`
 
 ## starci uat
 
@@ -3844,6 +4091,27 @@ starci work graph propose --repo <path> --job <id> --file <candidate> --reason <
 ```
 
 Removed spellings: `node scripts/work/work-graph.mjs`, `node .claude/scripts/work/work-graph.mjs`
+
+### starci work hygiene
+
+parse, scope-validate and secret-check Work and stack files before they are committed
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+
+Positionals: mode, file?
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work hygiene staged --repo <repo>
+starci work hygiene files --repo <repo> <file>
+```
+
+Removed spellings: `node scripts/work/validate/work-hygiene.mjs`, `node .claude/scripts/work/validate/work-hygiene.mjs`
 
 ### starci work layout-tree
 

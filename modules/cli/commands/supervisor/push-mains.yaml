@@ -1,0 +1,21 @@
+group: supervisor
+verb: push-mains
+owner: runtime
+summary: scan and push main for the runtime and configured product repositories
+impl:
+  script: scripts/supervisor/push-mains.mjs
+flags:
+  - {name: repo, type: list, summary: repository path to process}
+  - {name: dry-run, type: boolean, summary: report pushes without changing remotes}
+  - {name: hooks-only, type: boolean, summary: run the committed main pre-push hook without pushing}
+exit: {"0": every repository passed, "1": a repository was refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor push-mains
+  - starci supervisor push-mains --repo <path> --dry-run
+  - starci supervisor push-mains --hooks-only --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/push-mains.mjs
+  - node .claude/scripts/supervisor/push-mains.mjs

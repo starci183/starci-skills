@@ -1,0 +1,20 @@
+group: supervisor
+verb: telegram-bridge
+owner: runtime
+summary: start, run, inspect, or stop the Supervisor Telegram bridge
+impl:
+  script: scripts/supervisor/telegram-bridge.mjs
+positional:
+  - {name: action, enum: [start, run, status, stop], required: false, variadic: false}
+flags: []
+exit: {"0": bridge action completed, "1": bridge start or run failed, "2": bad usage}
+json: always
+examples:
+  - starci supervisor telegram-bridge status
+  - starci supervisor telegram-bridge start
+  - starci supervisor telegram-bridge run
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/telegram-bridge.mjs
+  - node .claude/scripts/supervisor/telegram-bridge.mjs

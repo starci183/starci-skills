@@ -1,0 +1,38 @@
+group: supervisor
+verb: workers
+owner: runtime
+summary: create, launch, inspect, report, and clean up Supervisor repair workers
+impl:
+  script: scripts/supervisor/workers.mjs
+positional:
+  - {name: action, enum: [create, spawn, stage, report, list, cap, show, cancel, ack, cleanup], required: true, variadic: false}
+flags:
+  - {name: cluster, type: string, summary: root-cause cluster id for a new worker job}
+  - {name: title, type: string, summary: worker job title}
+  - {name: files, type: string, summary: comma-separated explicit file leases}
+  - {name: incidents, type: string, summary: comma-separated related incident ids}
+  - {name: specs, type: string, summary: comma-separated spec files}
+  - {name: brief, type: string, summary: inline worker brief}
+  - {name: brief-file, type: string, summary: file containing the worker brief}
+  - {name: agent, type: enum, enum: [claude, codex, devin], summary: preferred worker agent}
+  - {name: job, type: string, summary: Supervisor worker job id}
+  - {name: dry-run, type: boolean, summary: plan worker launches without starting them}
+  - {name: self, type: boolean, summary: stage the Supervisor's own checkout}
+  - {name: name, type: string, summary: slug for a self-staged checkout}
+  - {name: outcome, type: enum, enum: [done, diagnosed, blocked, failed], summary: reported worker outcome}
+  - {name: commit, type: string, summary: commit produced by a completed worker}
+  - {name: summary, type: string, summary: inline worker report summary}
+  - {name: summary-file, type: string, summary: file containing the worker report summary}
+  - {name: needs, type: string, summary: comma-separated follow-up needs}
+  - {name: reason, type: string, summary: cancellation or acknowledgement reason}
+exit: {"0": action completed, "1": worker action refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor workers list
+  - starci supervisor workers create --cluster <id> --title <text> --files <csv>
+  - starci supervisor workers report --job <id> --outcome done --commit <sha>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/workers.mjs
+  - node .claude/scripts/supervisor/workers.mjs

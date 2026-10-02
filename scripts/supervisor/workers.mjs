@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// workers.mjs — [Worker] fix agents, spawned on demand by the one [Supervisor] (modules/supervisor/supervise.yaml
+// starci supervisor workers — [Worker] fix agents, spawned on demand by the one [Supervisor] (modules/supervisor/supervise.yaml
 // workers, docs/supervisor.md). One job per root-cause cluster, never one per incident.
 //
-//   node scripts/supervisor/workers.mjs create --cluster <id> --title <t> --files <csv> [--incidents <csv>]
+//   starci supervisor workers create --cluster <id> --title <t> --files <csv> [--incidents <csv>]
 //        [--specs <csv>] [--brief <text> | --brief-file <f>] [--agent <claude|codex|devin>]
-//   node scripts/supervisor/workers.mjs spawn [--job <id>] [--dry-run]     launch queued jobs up to the cap
-//   node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>   the Supervisor's own checkout
-//   node scripts/supervisor/workers.mjs report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
-//        [--specs <csv>] [--summary <t>] [--needs <csv>]                  (the worker's last act)
-//   node scripts/supervisor/workers.mjs list | cap | show --job <id> | cancel --job <id> [--reason <t>]
-//   node scripts/supervisor/workers.mjs ack --job <id> --reason <t>   a decided diagnosed/blocked/failed report: consumed, never re-announced
-//   node scripts/supervisor/workers.mjs cleanup [--job <id>]                remove finished staging checkouts
+//   starci supervisor workers spawn [--job <id>] [--dry-run]     launch queued jobs up to the cap
+//   starci supervisor workers stage --self --name <slug> --files <csv>   the Supervisor's own checkout
+//   starci supervisor workers report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
+//        [--specs <csv>] [--summary <t> | --summary-file <f>] [--needs <csv>]  (the worker's last act)
+//   starci supervisor workers list | cap | show --job <id> | cancel --job <id> [--reason <t>]
+//   starci supervisor workers ack --job <id> --reason <t>   a decided diagnosed/blocked/failed report: consumed, never re-announced
+//   starci supervisor workers cleanup [--job <id>]                remove finished staging checkouts
 //   ... [--json]
 //
 // Lifecycle (machine.sqlite, engine/db/machine.mjs B1: sup_jobs / sup_leases / sup_attempts / sup_reports, audit in
@@ -581,7 +581,7 @@ export function recordLandFailed(m, { jobId, reason, startedAt = Date.now() }) {
 }
 
 /**
- * The running self jobs (workers.mjs stage --self) a `--commit` land just completed: a landed commit is on the
+ * The running self jobs (`starci supervisor workers stage --self`) a `--commit` land just completed: a landed commit is on the
  * job's recorded staging branch beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
  * still missing from main. A branch only partly landed stays open ({jobId, pending}). Returns {done: [jobId], partial}.
  */
@@ -631,7 +631,7 @@ async function main() {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r, text = null) => { console.log(asJson || !text ? JSON.stringify(r, null, asJson ? 0 : 2) : text); if (r?.ok === false) process.exitCode = 1; };
-  if (!verb || has('help')) { console.log('use: workers.mjs create|spawn|stage|report|list|cap|show|cancel|cleanup ... (see the header)'); return; }
+  if (!verb || has('help')) { console.log('use: starci supervisor workers create|spawn|stage|report|list|cap|show|cancel|ack|cleanup ... (see the header)'); return; }
   if (verb === 'list') {
     const board = readSupervisor((m) => workerBoard(m), { active: [], queued: [], reported: [], recent: [] });
     const line = (j) => `  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} age ${j.ageMin}m${j.terminal ? ` ${j.terminal}` : ''}${j.report ? ` commit ${String(j.report.commit ?? '').slice(0, 9)}` : ''}${j.result ? ` ${JSON.stringify(j.result).slice(0, 120)}` : ''}`;
@@ -660,7 +660,7 @@ async function main() {
       return out(r);
     }
     if (verb === 'stage') {
-      if (!has('self')) return out({ ok: false, error: 'stage is the Supervisor\'s own checkout: stage --self --name <slug> --files <csv>' });
+      if (!has('self')) return out({ ok: false, error: 'stage is the Supervisor\'s own checkout: starci supervisor workers stage --self --name <slug> --files <csv>' });
       return out(stageSelf(m, { name: value('name') ?? 'change', files: csv(value('files')) }));
     }
     if (verb === 'report') {

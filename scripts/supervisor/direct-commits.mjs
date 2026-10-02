@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// direct-commits.mjs — the exclusive-mode finding of the land gate (modules/supervisor/supervise.yaml
+// starci supervisor direct-commits — the exclusive-mode finding of the land gate (modules/supervisor/supervise.yaml
 // landGate.transition). Once config.yaml supervisor.landGate.mode is exclusive, every runtime change
 // reaches .claude main through land.mjs only, so a first-parent commit on main that no gate land
 // produced is a finding. land.mjs records each land as a `land-passed` event whose payload.landed is
@@ -8,7 +8,7 @@
 // each as `DIRECT-COMMIT <sha> <subject>` (silent in shared mode). Read-only: the Supervisor reverts
 // and re-lands through the gate — nothing here touches the tree.
 //
-//   node scripts/supervisor/direct-commits.mjs [--json] [--repo <path>]
+//   starci supervisor direct-commits [--json] [--repo <path>]
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';

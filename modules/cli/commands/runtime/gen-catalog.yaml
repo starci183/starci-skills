@@ -1,0 +1,19 @@
+group: runtime
+verb: gen-catalog
+owner: runtime
+summary: write or check the generated CLI catalog outputs, docs and shell completions
+impl: {script: scripts/cli/gen-catalog.mjs}
+flags:
+  - {name: write, type: boolean, summary: rewrite every generated output from modules/cli/commands}
+  - {name: check, type: boolean, summary: exit 1 listing each output that differs}
+  - {name: root, type: string, summary: the runtime tree to read and write}
+exit: {"0": outputs in sync or written, "1": drift listed, "2": bad usage or a catalog error}
+json: none
+examples:
+  - starci runtime gen-catalog --check
+  - starci runtime gen-catalog --write
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/cli/gen-catalog.mjs
+  - node .claude/scripts/cli/gen-catalog.mjs

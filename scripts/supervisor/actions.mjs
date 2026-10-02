@@ -36,7 +36,7 @@ export const NOTICE_KIND = 'supervisor-notice';
 /** The classes, each with what the Supervisor does (supervise.yaml mission.classes). */
 export const CLASSES = Object.freeze({
   'progress-stall': 'OUTCOME FIRST: the workflow does not progress past allocation.progress.supervisorGraceMs although its Kernel owns it. Read starci kernel status progress + rca, five-whys to the root cause, find the ONE systemic change that fixes the most (never re-dispatch the same failing shape): the Kernel lacks authority -> do it (lane) or rule it; a runtime cause -> runtime-defect; cross-workflow -> bridge/notify the peer; the Kernel ignores its rca.actions -> the tick already notified it, a second miss is a Kernel-loop defect (lane)',
-  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (starci kernel kernel-proposal): AUTO tier -> land it through a lane (lesson-actions.mjs land), IMPORTANT -> lesson-actions.mjs propose to the owner; record the result and close it in the product ledger',
+  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (starci kernel kernel-proposal): AUTO tier -> land it through a lane (starci supervisor lesson-actions land), IMPORTANT -> starci supervisor lesson-actions propose to the owner; record the result and close it in the product ledger',
   'runtime-defect': 'fix it in an Opus lane or ONE [Worker] job per cluster, land it, then resolve each incident: starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel',
   'fixed-defect': 'verify the commit against the incident, then starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel (or ack the pattern: owed.mjs ack)',
   'retry-cap': 'never a blind retry: diagnose the root cause (a [Worker] diagnose job), then notify the Kernel with the disposition - re-route to the root-cause op, re-cut the leg, or drop it',
@@ -51,7 +51,7 @@ export const CLASSES = Object.freeze({
   orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
   stalled: 'read starci kernel status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
   'contract-stale': 'notify the Kernel to re-read the changed runtime files and starci kernel kernel-ack-rev --rev <sha>',
-  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: node scripts/supervisor/lesson-actions.mjs revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
+  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: starci supervisor lesson-actions revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
   'push-refused': 'classify (secret / lint / test / hook) from the refusal and route the fix to a lane; a secret is removed from history in a lane, never pushed',
 });
 

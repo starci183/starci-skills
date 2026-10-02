@@ -23,7 +23,7 @@
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
-//      the FULL `starci runtime check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
+//      the FULL `starci runtime check` of the candidate (land-full-check.mjs: packages/cli/bin/starci.mjs runtime check, not only the gate), a step of its own; red refuses, no baseline;
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -50,7 +50,7 @@
 // 5. Push main (secret scan of origin/main..main first, hooks on) unless --no-push or config
 //    supervisor.landGate.push is false. A push the remote refuses leaves the land in place and is reported.
 // A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
-// (workers.mjs stage --self) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
+// (`starci supervisor workers stage --self`) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
@@ -819,7 +819,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
     try {
       m.openSupDecision({ keyParts: { kind: 'push-owed', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', head: String(result.landed).slice(0, 12) }, kind: 'push-refused',
         summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate', dueAt: Date.now() + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
-        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'node scripts/supervisor/push-mains.mjs --repo <runtime root> --json', recommended: true }] });
+        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'starci supervisor push-mains --repo <runtime root> --json', recommended: true }] });
     } catch { /* the land_runs row and its push row are the record */ }
   }
   return runId;

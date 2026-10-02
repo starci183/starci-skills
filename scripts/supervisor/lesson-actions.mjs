@@ -1,11 +1,11 @@
-// lesson-actions.mjs — the self-learning loop's effectful verbs: land an experiment through the land gate, revert one in a
+// starci supervisor lesson-actions — the self-learning loop's effectful verbs: land an experiment through the land gate, revert one in a
 // scratch worktree, propose a change to the owner (Telegram). The state, guards and measuring live in
 // scripts/machine/lessons.mjs; these three call the Supervisor's land gate and the owner push, so they sit one tier up.
 //
-//   node scripts/supervisor/lesson-actions.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>]
+//   starci supervisor lesson-actions land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>]
 //        [--wrongly-blocked <tests/<name>.spec.mjs>] [--reason <t>] [--wait-ms <ms>] [--json]
-//   node scripts/supervisor/lesson-actions.mjs revert --experiment <id> [--apply] [--json]
-//   node scripts/supervisor/lesson-actions.mjs propose --title <t> --evidence <t> --options <t> --recommendation <t> [--send] [--json]
+//   starci supervisor lesson-actions revert --experiment <id> [--apply] [--json]
+//   starci supervisor lesson-actions propose --title <t> --evidence <t> --options <t> --recommendation <t> [--send] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -138,7 +138,7 @@ if (isMain(import.meta.url)) {
       const r = await propose({ title: value('title'), evidence: value('evidence'), options: value('options'), recommendation: value('recommendation'), send: argv.includes('--send') });
       print(r, `${r.id} recorded${r.telegram ? ` (telegram ${r.telegram.ok ? r.telegram.skipped ?? 'sent' : 'FAILED'})` : ''}\n${r.text}`);
     } else {
-      console.error('use: lesson-actions.mjs land | revert | propose (see the header)');
+      console.error('use: starci supervisor lesson-actions land | revert | propose (see the header)');
       process.exitCode = 2;
     }
   } catch (error) {

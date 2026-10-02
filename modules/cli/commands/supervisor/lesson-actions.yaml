@@ -1,0 +1,34 @@
+group: supervisor
+verb: lesson-actions
+owner: runtime
+summary: land, revert, or propose changes from the Supervisor self-learning loop
+impl:
+  script: scripts/supervisor/lesson-actions.mjs
+positional:
+  - {name: action, enum: [land, revert, propose], required: true, variadic: false}
+flags:
+  - {name: signature, type: string, summary: learned rule signature to land}
+  - {name: commit, type: string, summary: comma-separated experiment commit shas}
+  - {name: lane, type: string, summary: source lane name}
+  - {name: specs, type: string, summary: comma-separated specs for the land gate}
+  - {name: wrongly-blocked, type: string, summary: spec proving the prior gate was wrong}
+  - {name: reason, type: string, summary: reason when no spec applies}
+  - {name: wait-ms, type: number, summary: maximum land-queue wait in milliseconds}
+  - {name: experiment, type: string, summary: experiment id to revert}
+  - {name: apply, type: boolean, summary: apply and land an experiment revert}
+  - {name: title, type: string, summary: proposal title}
+  - {name: evidence, type: string, summary: proposal evidence}
+  - {name: options, type: string, summary: proposal options}
+  - {name: recommendation, type: string, summary: recommended proposal option}
+  - {name: send, type: boolean, summary: send the proposal to the owner}
+exit: {"0": lesson action completed, "1": lesson action refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor lesson-actions land --signature <id> --commit <sha> --lane <name>
+  - starci supervisor lesson-actions revert --experiment <id> --apply
+  - starci supervisor lesson-actions propose --title <text> --evidence <text> --options <text> --recommendation <text>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/lesson-actions.mjs
+  - node .claude/scripts/supervisor/lesson-actions.mjs

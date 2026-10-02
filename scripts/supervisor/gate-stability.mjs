@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gate-stability.mjs — would a gate change newly fail work the live workflows already accepted?
+// starci supervisor gate-stability — would a gate change newly fail work the live workflows already accepted?
 //
 // Owner ruling 2026-09-28 ("Freeze the drawing rules"): a gate or checker change of a frozen op family
 // (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
@@ -9,9 +9,9 @@
 // of the family op in every live workflow of every ledger on this host's registry - read-only. A flip is a leg the
 // base gates pass and the candidate gates fail; newFindings are the candidate findings the base did not report.
 //
-//   node scripts/supervisor/gate-stability.mjs --family <op> --tree <gate tree> [--ledger <runtime.sqlite>]... [--json]
+//   starci supervisor gate-stability --family <op> --tree <gate tree> [--ledger <runtime.sqlite>]... [--json]
 //     one side: the findings of --tree's gates (default this tree) on the accepted legs
-//   node scripts/supervisor/gate-stability.mjs --family <op> --base <tree> --head <tree> [--ledger <file>]... [--json]
+//   starci supervisor gate-stability --family <op> --base <tree> --head <tree> [--ledger <file>]... [--json]
 //     both sides and the flips (each side runs in its own process, so each tree's modules load their own data)
 // Exit 0 always when it could run (a report, never a refusal), 2 on bad arguments.
 import fs from 'node:fs';
@@ -125,7 +125,7 @@ async function main(argv) {
   const values = (name) => argv.flatMap((a, i) => (a === name && i + 1 < argv.length ? [argv[i + 1]] : []));
   const one = (name) => values(name)[0] ?? null;
   const family = one('--family'), json = argv.includes('--json');
-  if (!family) { process.stderr.write('use: gate-stability.mjs --family <op> (--tree <dir> | --base <dir> --head <dir>) [--ledger <file>]... [--json]\n'); return 2; }
+  if (!family) { process.stderr.write('use: starci supervisor gate-stability --family <op> (--tree <dir> | --base <dir> --head <dir>) [--ledger <file>]... [--json]\n'); return 2; }
   const ledgers = values('--ledger').length ? values('--ledger').map((l) => path.resolve(l)) : null;
   if (one('--base') || one('--head')) {
     if (!one('--base') || !one('--head')) { process.stderr.write('--base and --head go together\n'); return 2; }
