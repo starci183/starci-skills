@@ -261,24 +261,14 @@ accepted SRS/SDS. A green architecture check is structural evidence only.
 
 ## Reference critique
 
-Reference: the `examples/todo-app` and `examples/ecommerce-app` trees of this repository.
+Reference: the `examples/ecommerce-app` tree of this repository.
 
 ### Keep as reference
 
-- `examples/todo-app/fe/apps/web/src/app/[locale]/sign-in/page.tsx` is a thin route adapter that mounts one
-  page owner.
-- `examples/todo-app/fe/apps/web/src/app/[locale]/layout.tsx` is a valid server layout for locale
-  validation, metadata and shell composition; its sibling `providers.tsx` is a narrow client provider
-  boundary.
-- `examples/ecommerce-app/fe/apps/shop/src/app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid
+- `examples/ecommerce-app/fe/apps/app/src/app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid
   zero-visual-owner adapter.
-- `examples/todo-app/fe/apps/web/src/modules/api/client.ts` is a cohesive technical capability, and hooks
-  such as `src/hooks/task/useTasks.ts` show SWR owning product data caching.
 - Product code imports the public `@starci/grammar/common` entry; the installed package's declared exports
   are the API.
-- `examples/todo-app/fe/apps/web/src/components/blocks/sign-in-screen/index.tsx` legitimately owns the
-  sign-in form's draft state beside its connected role. An unsaved form draft is intrinsic state, not
-  product-world lifecycle, and is not evidence of a missing responsibility boundary.
 
 ### Treat as debt, not precedent
 

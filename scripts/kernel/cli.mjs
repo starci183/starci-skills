@@ -637,7 +637,7 @@ const workerGateAnswerOf = (db, job, gate) => {
 };
 // One writability judgement for liveness and nudge. Orca's `terminal show` can answer writable:true for a
 // terminal whose writes it refuses terminal_not_writable: Orca 1.4.209 binds a send to the terminal's
-// process incarnation, and every terminal created before the update refuses (nivo inc-f1b576fb6006). A nudge records that
+// process incarnation, and every terminal created before the update refuses (inc-f1b576fb6006). A nudge records that
 // refusal (op-worker-unwritable); a refusal newer than the worker's last output and last heartbeat makes
 // the terminal unwritable here, so status reads it disconnected and reconcile --dead-worker recovers it.
 const TERMINAL_NOT_WRITABLE = 'terminal_not_writable';
@@ -673,7 +673,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
   }
   // A leased job with no worker bound is a launch: in flight until its lease deadline (jobs.deadline,
   // dispatchLeaseTtlMs after the lease), abandoned after it. A dispatch killed mid-spawn (a shell timeout
-  // around api dispatch, nivo inc-c1d5bdbea173) leaves exactly that row.
+  // around api dispatch, inc-c1d5bdbea173) leaves exactly that row.
   if (job.status === 'leased' && !terminalHandle) {
     const deadline = Number(job.deadline);
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null,
@@ -789,7 +789,7 @@ const staleInputProjection = (db, wf, repo = null) => {
 };
 const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
 const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
-const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
+const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes/'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
 const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 /* ---------------------------------------------------------------- status */
 /**
@@ -1931,7 +1931,7 @@ const resolveModel = (target) => {
     requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
-const ownerLanguage = () => ownerLanguageOf('en');
+const ownerLanguage = () => ownerLanguageOf();
 const ownerDelegation = () => { try { return activeDelegation(); } catch { return null; } };
 
 // Each owned path as the packet carries it. A path the target resolver
@@ -2150,7 +2150,7 @@ const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
 // resolves paths with, so a request and a held lease can never disagree.
 // In a bound project each request is spelled repository-qualified (scripts/kernel/lease-canon.mjs), and
 // held rows are compared in that form through their holder job, so a bare and a repository-prefixed
-// spelling of one file overlap (nivo inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
+// spelling of one file overlap (inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
 const opLeaseRequests = (payload, canon = null, op = null) => (canon
   ? canon.requests(payload, op ?? payload?.opId ?? null)
   : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
@@ -2225,7 +2225,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
 const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
   `# dispatch contract — [Op] ${op} (job ${jobId})\n\n${prompt}\n\n## packet\n\n\`\`\`json\n${JSON.stringify(packet, null, 2)}\n\`\`\`\n`;
 // context.contract is the contract version the leg is admitted under (scripts/machine/contract-version.mjs):
-// the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes.yaml).
+// the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes/).
 // A frozen family's batched changes not yet released for this workflow are WITHHELD from the leg (contract.withheld,
 // modules/kernel/contract-freeze.yaml): it is judged as if admitted before them, for life.
 const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
@@ -2289,7 +2289,7 @@ function raiseEnvironmentIncident(ledger, job, health) {
 // same worktree.
 // Every Run-scoped call (dispatch, api reply, a Task close) binds the Run to the workflow's current Kernel
 // terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
-// refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
+// refuses its reply and task-update consumer_fenced until then (inc-e523617a3c31). bindWorkflowRun
 // is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
 const latestKernelJobOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1`).get(workflowId);
 const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = bindWorkflowRun, kernelJob = latestKernelJobOf(db, workflowId) } = {}) => {

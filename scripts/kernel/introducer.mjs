@@ -99,7 +99,7 @@ export function resolveIntroducer(db, { commits = [], roots = [], explicit = nul
 
 /**
  * The open jobs of `workflowId` that own a file one of `commits` changed: the introducer's legs that
- * will repair it (nivo inc-9474fe9ff445: 9caa2d5c changed pod-registration.controller.ts, owned by the
+ * will repair it (inc-9474fe9ff445: 9caa2d5c changed pod-registration.controller.ts, owned by the
  * queued op-backend.implement-853af99286). Ledger and git reads only; [] when nothing resolves.
  */
 export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {

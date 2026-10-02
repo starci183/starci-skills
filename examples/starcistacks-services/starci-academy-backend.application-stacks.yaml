@@ -53,7 +53,7 @@ services:
     mode: local
     purpose: >-
       The one SonarQube every StarCi product is analysed on. Ops scan through
-      scripts/checks/sonar-local.mjs against host.local; GitHub CI reaches the same server through
+      scripts/gates/sonar-local.mjs against host.local; GitHub CI reaches the same server through
       host.public. Projects are created and per-project tokens minted by sonar-local.mjs with the
       admin credential - never asked of the owner.
     host:

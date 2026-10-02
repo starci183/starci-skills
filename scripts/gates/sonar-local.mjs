@@ -59,7 +59,7 @@ import {createRequire} from 'node:module';
  * the slice verdict reads only the slice's files, so the isolated analysis proves the same verdict.
  * Without the admin token in custody --isolate falls back to the full analysis and says so.
  *
- * The verdict is the slice's own (nivo inc-f92febebbb64). Sonar way judges "new code", and a project
+ * The verdict is the slice's own (inc-f92febebbb64). Sonar way judges "new code", and a project
  * with no new-code baseline has the whole project as new code, so no single slice could pass the
  * project's gate while each op may only touch its own paths. A scan therefore evaluates the slice's
  * changed lines through the Web API against the ONE gate in knowledge/sonar-gate.yaml (the thresholds live
@@ -76,7 +76,7 @@ import {createRequire} from 'node:module';
  * (scripts/kernel/sonar-settle.mjs) records it as the explicit sonar-unavailable why, never as a pass.
  *
  * Secret handling: a token is decrypted from its .enc member with sops and the shared master identity
- * (~/.starci/master.identity, the same identity scripts/stack-secret.mjs uses) straight into memory; the
+ * (~/.starci/master.identity, the SOPS_AGE_KEY_FILE default of scripts/api/sops/decrypt.mjs) straight into memory; the
  * materialized plaintext sibling that `stack-secret show` or `sync` leaves is the fallback. A value is only
  * ever placed in a child process environment or an Authorization header - never on a command line, in a
  * report, a log or an error; every text this module emits passes through scrub().
@@ -311,7 +311,7 @@ const stackRootOf=file=>{
 
 /**
  * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
- * through that repository's own tool (scripts/stack-secret.mjs; an absolute reference names that tree directly - a project
+ * through that repository's own tool (scripts/stack-secret.mjs inside that repository, not this runtime; an absolute reference names that tree directly - a project
  * token minted into the declaring repository while the sonar stack itself is the host extension - and a relative one stays a
  * member of the configured stack), and a runtime extension's ext/<service>/secrets directory (the example apps' analysis
  * tokens), sealed by sealExtCustody. Anything else is refused and mintToken revokes the value again. Never argv.

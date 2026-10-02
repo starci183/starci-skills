@@ -516,7 +516,7 @@ tick:
       decomposed into exact selected migration node/resource/stack slices when
       those slices are derivable. In multi-repository projects each product
       prefix is qualified by its stable repository binding (for example
-      `todo-app-fe/apps/landing`); canonical Work remains `.starciwork/...`.
+      `shop-fe/apps/landing`); canonical Work remains `.starciwork/...`.
 
   drive:
     nextActions: >-

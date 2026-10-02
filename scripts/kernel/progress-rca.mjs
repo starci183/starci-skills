@@ -32,7 +32,7 @@ import { JOB_ROW } from '../machine/job-row.mjs';
 import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -506,7 +506,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
 }
 
 /** The `why slow` line (Vietnamese owner digest / English lines). */
-export function whyLine(rca, { language = 'vi', limit = 5 } = {}) {
+export function whyLine(rca, { language = ownerLanguage(), limit = 5 } = {}) {
   const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit);
   if (!cls.length) return null;
   const head = translator(language)('Why slow');

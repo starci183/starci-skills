@@ -51,8 +51,8 @@ The examples use NestJS backend and Next.js frontend applications.
 
 This repository is the StarCi runtime package: `modules/` holds contracts, `engine/` and
 `scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
-human guidance, and `examples/` holds two backend/frontend product examples (todo-app, ecommerce-app) and
-shape-slot, the front-end slot-teaching fixture (not a product). Each
+human guidance, and `examples/` holds one backend/frontend product example (ecommerce-app), the
+shape-slot front-end slot-teaching fixture (not a product) and the starcistacks-services declarations. Each
 product example follows the [HFS tree](docs/source-layout.md); [Detailed layout](#detailed-layout)
 maps the runtime directories below.
 
@@ -133,7 +133,7 @@ init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
 docs/               documentation
-examples/           todo-app and ecommerce-app (reference products with recorded .starciwork evidence) and shape-slot (a slot-teaching fixture, not a product)
+examples/           ecommerce-app (a reference product with recorded .starciwork evidence), shape-slot (a slot-teaching fixture, not a product) and starcistacks-services (service declarations)
 tests/              node:test specs — npm test
 packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
 ```

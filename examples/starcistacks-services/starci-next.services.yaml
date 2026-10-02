@@ -34,7 +34,7 @@ services:
       - {repository: starci-next-fe, key: starci-next-fe}
     credentials:
       - id: admin
-        purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
+        purpose: Project creation and per-project token minting by scripts/gates/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
       - id: starci-next

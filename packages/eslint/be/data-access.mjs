@@ -9,7 +9,7 @@
  * - `must-inject-entity-manager` - a constructor parameter typed `EntityManager` carries the named injector of a declared
  *   connection. A lookalike (`InjectFooEntityManager`) or a bare `InjectEntityManager()` is not one.
  * - `named-entity-manager-only` - no property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a
- *   `DataSource` or `QueryRunner` is injected only in the platform database capability and the migrate app; no
+ *   `DataSource` or `QueryRunner` is injected only in the platform database capability and the cli app; no
  *   `getRepository(...)` on a manager or data source; and outside those places no type reference, awaited value,
  *   or `provide:` token is a `DataSource` or `QueryRunner` (a wrapper service that exposes one is the same door), and no
  *   class receives a wrapper class that exposes one.
@@ -70,18 +70,18 @@ export const namedEntityManagerOnly = {
         type: "problem",
         docs: {
             description:
-                "No property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a `DataSource` or `QueryRunner` only in the platform database capability, the migrate app and the test world (`src/tests/world`); no `getRepository`.",
+                "No property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a `DataSource` or `QueryRunner` only in the platform database capability, the cli app and the test world (`src/tests/world`); no `getRepository`.",
         },
         schema: [],
         messages: {
             property:
                 "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and the app module. Receive the named-injector `EntityManager` as a constructor parameter.",
             infra:
-                "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability, the migrate app and the test world in `src/tests/world`; specs take `world.db.<connection>`; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
+                "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability, the cli app and the test world in `src/tests/world`; specs take `world.db.<connection>`; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
             exposed:
-                "`{{type}}` is written here outside the platform database capability, the migrate app and the test world. A wrapper service that returns, holds or hands out a connection is the same door as injecting it: the connection is opened and held only by `platform/database`, and everything else calls the shared EntityManager through its named injector.",
+                "`{{type}}` is written here outside the platform database capability, the cli app and the test world. A wrapper service that returns, holds or hands out a connection is the same door as injecting it: the connection is opened and held only by `platform/database`, and everything else calls the shared EntityManager through its named injector.",
             token:
-                "This provider is bound to a `{{type}}`. A token that resolves to a connection object is a second door to the database: only `platform/database`, the migrate app and the test world provide one.",
+                "This provider is bound to a `{{type}}`. A token that resolves to a connection object is a second door to the database: only `platform/database`, the cli app and the test world provide one.",
             wrapper:
                 "`{{wrapper}}` exposes a `{{type}}` through `{{member}}`, and this class receives it. A connection wrapper is not a service dependency: inject the shared EntityManager with its named injector and call it directly.",
             getRepository:

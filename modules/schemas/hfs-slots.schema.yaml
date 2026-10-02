@@ -60,12 +60,20 @@ $defs:
       ruleParams:
         type: object
         additionalProperties: false
-        required: [be, fe]
+        required: [common, be]
         properties:
+          common:
+            type: object
+            additionalProperties: false
+            required: [fileLines, duplicateBlock]
+            description: The parameters both sides share (ruleParams(profile) merges common under the profile); a side restates one of them only to override it.
+            properties:
+              fileLines: {$ref: '#/$defs/fileLines'}
+              duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
           be:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
+            required: [infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -184,7 +192,7 @@ $defs:
           fe:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock]
+            description: The fe overrides of ruleParams.common, when a side needs its own value.
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}

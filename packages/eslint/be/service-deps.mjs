@@ -11,7 +11,7 @@
  *     token: it is either a broken provider or a raw string/number injection.
  *   - `no-repository-class` (R83): a class that receives or returns an `EntityManager`, a typeorm `Repository`, a
  *     `DataSource` or a `QueryRunner` in any member lives only where the manager may be held (an application handler,
- *     a domain service, a platform persistence capability), in the migrate app, in the test world or in a migration.
+ *     a domain service, a platform persistence capability), in the cli app, in the test world or in a migration.
  *     A per-entity persistence class anywhere else is a repository under another name.
  *   - `no-test-double-in-source` (R89): a class, function or constant of production source is not named as a test
  *     double (`Mock`, `Fake`, `Stub` as a PascalCase or camelCase word). A double lives in a spec or `src/tests`;
@@ -140,7 +140,7 @@ const persistenceMember = (context, classNode) => {
 export const noRepositoryClass = {
     meta: {
         type: "problem",
-        docs: { description: "A class with a member typed `EntityManager`, `Repository`, `DataSource` or `QueryRunner` lives only in an application handler, a domain service, a platform persistence capability, the migrate app, the test world or a migration." },
+        docs: { description: "A class with a member typed `EntityManager`, `Repository`, `DataSource` or `QueryRunner` lives only in an application handler, a domain service, a platform persistence capability, the cli app, the test world or a migration." },
         schema: [],
         messages: {
             statements:

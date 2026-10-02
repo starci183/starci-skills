@@ -412,7 +412,7 @@ export function createHostController(deps = {}) {
    * The retry start-workflow never had: every replaced Kernel terminal an open kernel-stale-terminal-unclosed
    * incident of this workflow names is closed again (close-verify.mjs --tree) and the incident resolved once the
    * terminal is proven gone - show says gone, or a responding Orca no longer lists it. 'disconnected' alone is no
-   * proof: Orca keeps a disconnected terminal's persisted tab (wf-nivo-auth-mum8xr9a inc-11df8ae56795 stayed open
+   * proof: Orca keeps a disconnected terminal's persisted tab (inc-11df8ae56795 stayed open
    * 65+ min on {proof: disconnected, attempts: 1}). The seat's own terminal is never touched.
    */
   async function staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle }) {

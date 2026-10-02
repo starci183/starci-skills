@@ -14,7 +14,6 @@ family: cross-cutting
 provenance:
   extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
   sources:
-    - examples/todo-app
     - examples/ecommerce-app
     - examples/shape-slot
   limitations: |

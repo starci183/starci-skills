@@ -12,7 +12,7 @@ const foundationBriefOf = (db, foundation) => ({
  * A workflow's foundation duty. With running peers it declares what it owns and needs (or none)
  * before its first leg. The declaration is REQUIRED of a workflow created after the
  * shared-foundation-planning contract change; an older, already-running one is advised, never held
- * (the versioned-contract rule, modules/kernel/contract-changes.yaml).
+ * (the versioned-contract rule, modules/kernel/contract-changes/).
  */
 export const foundationDutyFor = (db, wf, skillRoot, { foundations = readFoundations(db), registry = loadContractChanges(skillRoot) } = {}) => {
   const peers = peerWorkflowsOf(db, wf).map((peer) => peer.workflow_id);

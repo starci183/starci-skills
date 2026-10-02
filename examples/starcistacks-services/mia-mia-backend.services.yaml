@@ -5,7 +5,7 @@
 # sonar-local.mjs ensure-project creates. No per-project token is in mia-mia-backend custody yet: BEFORE
 # applying, copy the minted twin sonarqube-mia-mia-backend-token.key.enc from the legacy source-host
 # stack into mia-mia-backend/.starcistacks/dev/runtime/files/ (or run
-#   node <Source>/.claude/scripts/checks/sonar-local.mjs ensure-project --key mia-mia-backend --with-token
+#   node <Source>/.claude/scripts/gates/sonar-local.mjs ensure-project --key mia-mia-backend --with-token
 # to re-mint it) — until then check-starcistacks refuses this block with STACKS_CUSTODY_MISSING.
 # Re-set the GitHub SONAR_TOKEN from the minted token.
 # The shared server itself is a host extension (.claude/ext/sonar) - the `owner: host` stack form below,
@@ -35,7 +35,7 @@ services:
       - {repository: mia-mia-backend, key: mia-mia-backend}
     credentials:
       - id: admin
-        purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
+        purpose: Project creation and per-project token minting by scripts/gates/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
       - id: mia-mia-backend

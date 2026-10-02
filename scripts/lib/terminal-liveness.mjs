@@ -14,9 +14,9 @@ import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from './input-glyph
 //                   reads `active`. Devin wraps a long spinner row ("⠀⠴ Writing .\\<path>" /
 //                   "  <path> · 113m 0s · (1291c ·" / "  ctrl+o for details · alt+t to toggle)"), so
 //                   the braille row carries no digit and the last row is no spinner at all; that frame
-//                   read turn-idle and nudge-ready (mia inc-1b82f657a6a8, nivo inc-266976b75b25).
+//                   read turn-idle and nudge-ready (inc-1b82f657a6a8, inc-266976b75b25).
 //   chromePatterns  rows the provider draws between its spinner and its input row that are not a
-//                   finished answer: Claude's "◐ medium · /effort" (mia inc-fcd1c1c10d8a) and its
+//                   finished answer: Claude's "◐ medium · /effort" (inc-fcd1c1c10d8a) and its
 //                   notice rows ("✘ Auto-update failed: claude.exe in use … · Run claude doctor",
 //                   "✔ Update installed · Restart to apply", IDE and MCP notices; sn-learn-content
 //                   term_2cd5a276 read turn-idle under a live spinner, 2026-09-25).

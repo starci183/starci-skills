@@ -89,10 +89,10 @@ Reviewed 2026-09-16:
 
 Local reference evidence is the checked-in examples of this repository; it is evidence, not law:
 
-- `examples/todo-app/be`: `apps/todo/src/main.ts` and `app.module.ts` show the valid bootstrap/composition exception, and no `*.service.ts` lives under `apps/*/src`.
+- `examples/ecommerce-app/be`: `apps/order/src/main.ts` and `app.module.ts` show the valid bootstrap/composition exception, and no `*.service.ts` lives under `apps/*/src`.
 - That backend root module performs broad registration. It is evidence for app composition, not evidence that named database/provider/tenant instances may be collapsed into one global singleton. Provider identity remains a DI/boot-test obligation.
-- `examples/ecommerce-app/fe`: the shop's `app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid zero-visual-owner adapter. `examples/todo-app/fe`: `components/branches/TaskRow/index.tsx` owns a confirmation state and a DOM ref for focus return without transport/product-world ownership; forcing a forwarding twin would add ceremony without a responsibility boundary.
-- `examples/todo-app/fe` is one app consuming the published `@starci/grammar` package; `examples/ecommerce-app/fe` is npm workspaces with `apps/{landing,shop}` and `packages/*`. Both topologies must obey the same ownership and public-export rules.
+- `examples/ecommerce-app/fe`: the app's `app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid zero-visual-owner adapter.
+- `examples/ecommerce-app/fe` is npm workspaces with `apps/{app,landing}` and `packages/*`; `examples/shape-slot` is one app under `apps/shape-slot`. Both topologies must obey the same ownership and public-export rules.
 
 ## HFS machine
 

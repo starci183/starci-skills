@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "node start.mjs",
-    "dev:ui": "vite --host 127.0.0.1 --port 4545",
+    "dev:ui": "vite --host 127.0.0.1",
     "dev:api": "node server.mjs",
     "build": "npm run lint && tsc --noEmit && vite build",
     "lint": "eslint src/app.tsx src/router.ts src/api src/i18n src/components src/pages",
     "serve": "node server.mjs --serve-static",
-    "preview": "vite preview --host 127.0.0.1 --port 4545"
+    "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

@@ -15,6 +15,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadConfig } from '../../engine/config.mjs';
+import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
 
 export const CATALOG_DIR = 'modules/i18n/messages';
 export const PLACEHOLDER = /\{([A-Za-z_][\w]*)\}/g;
@@ -51,15 +52,15 @@ export const placeholdersOf = (text) => [...String(text).matchAll(PLACEHOLDER)].
 export const fill = (text, vars = {}) => String(text).replace(PLACEHOLDER, (whole, name) => (Object.hasOwn(vars, name) ? String(vars[name]) : whole));
 
 /** The message `en` in `language` (`vi` translates through the catalog; any other language is the English source). */
-export function translate(en, vars = {}, { language = 'en', root = skillRoot } = {}) {
+export function translate(en, vars = {}, { language = DEFAULT_OWNER_LANGUAGE, root = skillRoot } = {}) {
   const vi = language === 'vi' ? loadCatalog(root).get(en) : undefined;
   return fill(vi ?? en, vars);
 }
 
-/** The owner's language (config.yaml `language`); `fallback` when there is no readable config. */
-export function ownerLanguage(fallback = 'vi') {
+/** The owner's language (config.yaml `language`); `fallback` when there is no readable config (DEFAULT_OWNER_LANGUAGE of scripts/machine/home.mjs). */
+export function ownerLanguage(fallback = DEFAULT_OWNER_LANGUAGE) {
   try { return loadConfig()?.language ?? fallback; } catch { return fallback; }
 }
 
 /** A translator bound to one language: `tr(en, vars)`. */
-export const translator = (language = 'en', { root = skillRoot } = {}) => (en, vars = {}) => translate(en, vars, { language, root });
+export const translator = (language = DEFAULT_OWNER_LANGUAGE, { root = skillRoot } = {}) => (en, vars = {}) => translate(en, vars, { language, root });

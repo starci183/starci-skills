@@ -37,7 +37,7 @@ const isEnvMember = (node) => node?.type === "MemberExpression" && isProcessEnv(
 /**
  * The world is the only infrastructure location. Refused in fixtures, integration, e2e and contract specs: importing a
  * migration (a class declared in a `be.persistence` `migrations/` file, or a value whose type is an array of them) or
- * anything the migrate app declares; importing typeorm's `DataSource` or a testcontainers package; calling
+ * anything the cli app declares; importing typeorm's `DataSource` or a testcontainers package; calling
  * `runMigrations`/`synchronize`/`dropDatabase`/`createSchema`... on a typeorm receiver; constructing a container; writing
  * `process.env`. Migration behaviour is tested by the e2e world.
  */

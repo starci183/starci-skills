@@ -15,7 +15,7 @@
 //   --new          the repository is being created by this leg (interface.scaffold, backend.scaffold,
 //                  package.scaffold): a missing declaration or services block is refused, not a suspect
 //   --admitted-at  the leg's admission (api op-contract --json admission.admittedAt): finding codes a
-//                  contract change added after it are suspects for that leg (modules/kernel/contract-changes.yaml)
+//                  contract change added after it are suspects for that leg (modules/kernel/contract-changes/)
 //
 // Refusals: an unknown or ambiguous service declaration, custody that is missing where it is declared,
 // an owner action declared for something custody already holds, CI calling a service the declaration
@@ -388,7 +388,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         const custodyArea = parts.length > 3 && (parts[2] === 'runtime' || parts[2] === 'secrets');
         const base = parts.at(-1);
         // infra/** is tracked source, but a value file inside it (.env*, *.env, *.key, *.pem, *.tfvars)
-        // is plaintext custody (mia inc-5360513a96b3: infra/compose/.env.generated was trackable).
+        // is plaintext custody (inc-5360513a96b3: infra/compose/.env.generated was trackable).
         const infraValue = parts.length > 3 && parts[2] === 'infra' && INFRA_VALUE_FILE.test(base) && !/\.enc$/.test(base) && !/\.example$/.test(base);
         if ((custodyArea && !/\.enc$/.test(base) && !['KEYS.md', '.gitkeep'].includes(base)) || infraValue)
           add('refuse', 'STACKS_PLAINTEXT_TRACKED', file, /\.enc\.(?:ya?ml|json|env)$/u.test(base)

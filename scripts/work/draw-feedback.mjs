@@ -41,7 +41,7 @@ import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './br
 import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
-/** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes.yaml). */
+/** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes/). */
 export const DRAW_FEEDBACK_CHANGE = 'owner-draw-feedback-golden';
 export const DRAW_FEEDBACK_UNADDRESSED = 'DRAW_FEEDBACK_UNADDRESSED';
 /** Ledger events (payloads are names, ids and digests; the note text is the owner's own words). */

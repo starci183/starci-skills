@@ -19,7 +19,7 @@ Projects may map an established equivalent, but new Nest and Next source starts 
 | Nest composition | `apps/<app>/src/main.ts`, `apps/<app>/src/app.module.ts` | Validate startup inputs, compose modules, start and stop the process |
 | Nest configuration | `src/modules/platform/env/schema.ts`, `config.ts`, optional `public-config.ts` | Parse the complete environment once; expose typed server config and an explicit non-secret public projection |
 | Nest health policy | `src/modules/platform/health/dependency-policy.ts`, `liveness.service.ts`, `readiness.service.ts` | Classify dependencies and compute process-local liveness versus traffic readiness |
-| Nest health transport | `src/features/system-health/transport/http/live.controller.ts`, `ready.controller.ts` | Thin HTTP adapters; operational GraphQL/status views remain separate from orchestrator probes |
+| Nest health transport | `src/features/api/system-health/transport/http/live.controller.ts`, `ready.controller.ts` | Thin HTTP adapters; operational GraphQL/status views remain separate from orchestrator probes |
 | Next configuration | `src/config/env/schema.ts`, `server.ts`, `public.ts` | Keep server-only values out of client graphs; validate the allowlisted browser projection |
 | Next startup | `src/instrumentation.ts` when server startup work exists | Validate server runtime config before requests; do not make a browser bundle depend on server secrets |
 | Next health policy | `src/modules/platform/health/policy.ts`, `readiness.ts` | Server-only dependency policy and bounded readiness checks |

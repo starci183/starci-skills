@@ -5,9 +5,9 @@
 scripts/api/orca/project-setup-delete.mjs	typed call of modules/host/orca/calls.yaml with no code importer; KEEP by owner ruling
 scripts/checks/check-entry.mjs	CLI that CONTEXT.md tells an agent to run when an entry path errors (installed-entry sanity); kept because a live instruction names it
 scripts/checks/check-example-architecture.mjs	CLI run by the owner (RED14: the examples meet their own standard); a spec reads it
-scripts/checks/check-example-derived.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
-scripts/example/example-evidence.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); specs read it
-scripts/example/example-verify.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
+scripts/checks/check-example-derived.mjs	CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it
+scripts/example/example-evidence.mjs	CLI of the example work standard (scripts/work/validate/check-example-work.mjs); specs read it
+scripts/example/example-verify.mjs	CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it
 scripts/gates/hfs-sync.mjs	gate CLI that a product repository runs (docs/application-stacks.md); specs read it
 scripts/gates/repo-presentation.mjs	gate CLI that a product repository runs (docs/repo-presentation.md); no spec
 scripts/kernel/launch-smoke.mjs	release smoke run by the owner (docs/releasing.md); specs read it

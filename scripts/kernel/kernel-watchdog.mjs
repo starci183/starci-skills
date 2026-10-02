@@ -481,7 +481,7 @@ const print = result => {
 
 if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
-    console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
+    console.error('use: kernel-watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
   const result = await watchdogTick();

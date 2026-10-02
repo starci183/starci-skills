@@ -13,7 +13,7 @@
 //           (scripts/machine/contract-version.mjs). A later Source edit is
 //           `sourceDrift` - advisory, never stale: work that must catch up is a
 //           change registered `reach: follow-up` in
-//           modules/kernel/contract-changes.yaml, which status lists as
+//           modules/kernel/contract-changes/, which status lists as
 //           contractFollowUps.
 //   work    the product records the job read: the `.starciwork/**` entries of
 //           its payload.records (the records its packet bound). Recorded at

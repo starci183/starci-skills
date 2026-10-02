@@ -58,7 +58,7 @@ export function ownerClaimOf(text) {
 }
 
 // An owner-gate whose own text says the wait is not the owner's: a runtime limit or defect, a settle the
-// Kernel defers, a supervisor's step (nivo inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
+// Kernel defers, a supervisor's step (inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
 // viec owner thuc hien").
 const NOT_OWNER_WORK = /\bruntime limit\b|\bruntime[- ]defect\b|\bruntime fix\b|\bcho sua (?:source )?runtime\b|\bnot an? owner(?:'s)? (?:step|ask|action|work|task|wait)\b|\bnot owner work\b|\bkhong phai (?:la )?(?:viec|buoc)(?: cua)? (?:owner|chu)|\bkhong phai owner\b|\bdeferred settle\b|\bcho supervisor\b|\bwaits? (?:on|for) (?:the )?supervisor\b/;
 

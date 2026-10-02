@@ -3,7 +3,7 @@
 ## Boundaries
 
 - The interface/API code lives in the source runtime `<Source>/.claude/ui`. The app needs the runtime modules and the StarCi databases on the same machine; it cannot be deployed standalone to Cloudflare Pages.
-- `npm run build` produces the static UI; `npm run serve` serves the UI and a read-only API on `127.0.0.1:4547`. The machine DB defaults to `%LOCALAPPDATA%/StarCi/machine.sqlite`; project ledgers are looked up through the `machine.ledgers` table and opened with the read-only engine reader.
+- `npm run build` produces the static UI; `npm run serve` serves the UI and a read-only API on `127.0.0.1:<port>` where `<port>` is `allocation.supervisorTick.statusApp.port` of `modules/models/runtimes.yaml` (the one home of the port; `STARCI_STATUS_PORT` overrides it). The machine DB defaults to `%LOCALAPPDATA%/StarCi/machine.sqlite`; project ledgers are looked up through the `machine.ledgers` table and opened with the read-only engine reader.
 - A dedicated `starci-harness` tunnel (`3c3469d5-8493-4af0-b13f-68f0ae5b9a8c`) connects `harness.starci.org` to loopback. The tunnel credential and `harness.yml` live outside Git at `%USERPROFILE%/.cloudflared/`.
 - The origin serves publicly with no password. JSON data and text blobs are sensitivity-filtered before being returned; diffs and images come from indexed evidence blobs. If the machine or tunnel stops, the site is temporarily unavailable on the Internet; DNS still exists.
 - Before the route switch, `harness.starci.org` was a CNAME to `starci183.github.io` and served the "StarCi Skills" page. To roll back, restore this CNAME and then stop the two StarCi Harness tasks.
@@ -17,7 +17,7 @@ npm run build
 npm run serve
 ```
 
-The tunnel runs with `node start.mjs --tunnel` (cloudflared `tunnel --config %USERPROFILE%/.cloudflared/harness.yml run starci-harness`, without the CF token variables); `node scripts/reconciler/tunnel-task.mjs --install-task [--apply]` prints or registers its scheduled task. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at `http://127.0.0.1:4547`, and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
+The tunnel runs with `node start.mjs --tunnel` (cloudflared `tunnel --config %USERPROFILE%/.cloudflared/harness.yml run starci-harness`, without the CF token variables); `node scripts/reconciler/tunnel-task.mjs --install-task [--apply]` prints or registers its scheduled task. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at the same port (`statusApp.port` of `modules/models/runtimes.yaml` — the ingress is checked for `port-drift` against it), and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
 
 ## Verification
 

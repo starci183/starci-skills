@@ -33,7 +33,7 @@ An ended workflow (`phase` `archived`|`finished`) contributes no live row to `v_
 
 ## 1. HTTP API and source map
 
-Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
+Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port `statusApp.port` of `modules/models/runtimes.yaml`. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
 
 | Endpoint | Main source | UI consumer |
 | --- | --- | --- |

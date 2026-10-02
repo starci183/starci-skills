@@ -4,7 +4,7 @@ A small real shop: one StarCi app, two NestJS services in `be/` and two Next.js 
 
 ## Overview
 
-The back end runs three services (`be/apps/identity`, `be/apps/order`, `be/apps/billing`: billing consumes `order.placed` and invoices the order, the order service consumes `billing.invoice-rejected` and compensates the order) and one migrate app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
+The back end runs three services (`be/apps/identity`, `be/apps/order`, `be/apps/billing`: billing consumes `order.placed` and invoices the order, the order service consumes `billing.invoice-rejected` and compensates the order) and one cli app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
 convention: CQRS handlers, GraphQL doors that only dispatch the bus, one injected `EntityManager` per database, outcomes for
 expected refusals and one error family per capability.
 

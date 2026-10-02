@@ -176,7 +176,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     const subject = subjectOfJob(row.job_id);
     // Neither subject nor cut: the wait holds until a later job of the same op AND the same unit of
     // work unit exists (scripts/kernel/units.mjs) - an unrelated same-op job enqueued meanwhile
-    // is not its successor (mia inc-2f7968ede59c: two served asks vanished from awaitingOwner).
+    // is not its successor (inc-2f7968ede59c: two served asks vanished from awaitingOwner).
     if (!subject) {
       const own = workflowJobs.find((j) => j.job_id === row.job_id) ?? row;
       // Try numbers count per unit: a later try of the same unit replaces it.

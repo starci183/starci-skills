@@ -6,9 +6,9 @@ import { matchAgentProcess, reapAgentProcess, REAP_WINDOW_MS } from '../../scrip
 // their terminals (stop_unverified); the supervisor matched each by the agent
 // image started inside its op's dispatch window and stopped it by hand.
 const at = Date.parse('2026-09-23T07:43:59Z');
-const CLAUDE_OP = String.raw`"C:\Users\Hi\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe" --dangerously-skip-permissions --model claude-opus-5-5`;
-const CLAUDE_APP = String.raw`"C:\Program Files\WindowsApps\Claude_2.2553.13.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer`;
-const CODEX = String.raw`C:\Users\Hi\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe --model gpt-6-sol`;
+const CLAUDE_OP = String.raw`"C:\Users\builder\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe" --dangerously-skip-permissions --model claude-opus-5-5`;
+const CLAUDE_APP = String.raw`"C:\Program Files\WindowsApps\Claude_0.0.0.0_x64__aaaaaaaaaaaa\app\claude.exe" --type=renderer`;
+const CODEX = String.raw`C:\Users\builder\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe --model gpt-6-sol`;
 const proc = (pid, commandLine, startedAt) => ({ pid, image: commandLine.replace(/^"?([^"]+?\.exe)"?.*$/, '$1'), commandLine, startedAt });
 
 test('exactly one agent process started inside the dispatch window is the match', () => {

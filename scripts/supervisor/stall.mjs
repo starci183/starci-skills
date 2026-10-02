@@ -436,7 +436,7 @@ const activeStaleMsOf = () => { try { return allocationMs('liveness.activeStaleM
  * The workers of one `api status` read that are mid-turn: liveness active / active-unclassified, or - whatever
  * the frame classified as - terminal output or a dispatch heartbeat fresher than activeStaleMs on a worker the
  * frontier does not list as dead, wedged, nudge-ready or asking. The ages are api status's own
- * (terminal-liveness.mjs outputAgeOf; heartbeatAgeMs), never re-read here: nivo inc-3a0e90528cbc,
+ * (terminal-liveness.mjs outputAgeOf; heartbeatAgeMs), never re-read here: inc-3a0e90528cbc,
  * op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with commands running while status read
  * a liveness outside active and stall alerted STALLED idle 94m on a frontier that was only waiting for it.
  */

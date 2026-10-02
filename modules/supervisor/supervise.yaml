@@ -228,7 +228,7 @@ chatSeat:
     The default (config.yaml supervisor.mode chat): the owner's desktop Claude chat session is the Supervisor.
     It persists with the owner's chat, not with an Orca terminal, and no [Supervisor] kernel runs beside it:
     the skill /start and the Host controller start none (start-supervisor.mjs answers action chat-mode;
-    a watchdog.mjs --once pass does nothing).
+    a supervisor-watchdog.mjs --once pass does nothing).
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
     - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (land-gate) is answered locally; Fleet owed work arrives as Decision Items"

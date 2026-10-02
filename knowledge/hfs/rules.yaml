@@ -1669,7 +1669,7 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R189
     code: "HFS_DOCKER_ENTRY"
-    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node fe/apps/<app>/server.js`); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
+    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node fe/apps/<app>/server.js`); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOCKER_ENTRY"]

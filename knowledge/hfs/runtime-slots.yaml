@@ -256,7 +256,7 @@ slots:
     tier: entry
     owner: true
     requires: [package.json, server.mjs, README.md, CONTRACT.md]
-    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, "api/**", "src/**", "public/**", "fixtures/**"]
+    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]

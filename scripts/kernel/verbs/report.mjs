@@ -109,7 +109,7 @@ export default {
     }
   }
   // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
-  // the owner accepted its drawn parts (mia inc-a4b5b1abdd90): a done interface.draw report that leaves one
+  // the owner accepted its drawn parts (inc-a4b5b1abdd90): a done interface.draw report that leaves one
   // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
   // (scripts/work/draw-review.mjs). A ui record the guard cannot judge - one that does not parse, a layout tree or a
   // dependent record that does not, a guard that crashes - may owe the review, so the report is refused

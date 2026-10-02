@@ -131,12 +131,14 @@ export function newestEvent(m, kind) {
  * Where the Supervisor role runs (config.yaml supervisor.mode, default 'chat'). Owner, 2026-09-25: "move the
  * supervisor back into chat so it stays persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
  * (registers and drains it with no Orca terminal), runs the 10-minute tick itself and lands its Opus lanes through
- * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + watchdog.mjs); in chat
+ * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + supervisor-watchdog.mjs); in chat
  * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
  * config (specs, a one-off CLI run).
  */
 export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
 export const DEFAULT_SUPERVISOR_MODE = 'chat';
+/** The owner-facing language when config.yaml `language` is absent — the one default every reader shares (scripts/lib/i18n.mjs ownerLanguage). */
+export const DEFAULT_OWNER_LANGUAGE = 'en';
 export function supervisorMode({ env = process.env, config = undefined } = {}) {
   const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();
   if (SUPERVISOR_MODES.includes(fromEnv)) return fromEnv;
@@ -164,9 +166,9 @@ export function supervisorSettings({ config = undefined } = {}) {
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,
       max: Math.min(DEFAULTS.workers.max, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
     landGate: { mode: sup.landGate?.mode === 'exclusive' ? 'exclusive' : DEFAULTS.landGate.mode, push: sup.landGate?.push !== false },
-    // watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
+    // supervisor-watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
     frozenMinutes: Number.isInteger(sup.frozenMinutes) && sup.frozenMinutes > 0 ? sup.frozenMinutes : DEFAULTS.frozenMinutes,
-    language: typeof cfg?.language === 'string' ? cfg.language : 'en',
+    language: typeof cfg?.language === 'string' ? cfg.language : DEFAULT_OWNER_LANGUAGE,
   };
 }
 

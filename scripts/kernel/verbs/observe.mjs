@@ -79,7 +79,7 @@ export default {
       screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
       // The provider card's activeStaleMs, as status reads it: with the global ten minutes a Devin
       // worker that redrew nothing through a long tool call read turn-idle here while status read it
-      // active (nivo inc-266976b75b25).
+      // active (inc-266976b75b25).
       const stale = staleAwareState(screenState, terminal.idleMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
       turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
       if (stale.staleActive) terminal.livenessReason = 'stale-active';

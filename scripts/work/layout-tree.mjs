@@ -45,7 +45,7 @@ export const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 
 export const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
 export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
-// How a planned layout's drawing gets accepted (mia inc-a4b5b1abdd90): nothing else writes its ui record done
+// How a planned layout's drawing gets accepted (inc-a4b5b1abdd90): nothing else writes its ui record done
 // before the final reconciliation, so interface.draw parks one owner draw-review ask of its parts and applies the
 // accept answer onto the record - the owner's, or auto-accepted when the owner did not ask for the drawing
 // (scripts/work/draw-review.mjs).
@@ -439,7 +439,7 @@ export const appNameOf = (root) => {
 const digestOfParts = (parts) => sha256Of([...parts].sort((a, b) => a[0].localeCompare(b[0])).map(([p, s]) => `${p}\0${s}`).join('\n'));
 
 // ---------------------------------------------------------------------------------------------------------
-// The message keys the tree uses (nivo inc-13f6af8494bf)
+// The message keys the tree uses (inc-13f6af8494bf)
 // ---------------------------------------------------------------------------------------------------------
 //
 // A message catalog is shared by every workflow, so a whole-file digest stales the tree on every unrelated
@@ -987,7 +987,7 @@ export function mergeScan(existing, scans, { at = now() } = {}) {
   for (const { entry, scan } of entries) {
     if (entry.i18n && scan.catalogs) entry.i18n = { ...entry.i18n, used: keyedI18n(scan.catalogs, usedI18nKeys({ nodes: entry.nodes, brand: record.brand })) };
   }
-  // A catalog file's own digest is not structural, only the used keys are (nivo inc-13f6af8494bf).
+  // A catalog file's own digest is not structural, only the used keys are (inc-13f6af8494bf).
   const i18nShape = (e) => ({ catalogs: list(e?.i18n?.catalogs).map((c) => [c.locale, c.path]), used: e?.i18n?.used ?? null });
   const structural = (r) => JSON.stringify(appsOf(r).map((e) => ({ name: e.name, appDir: e.appDir, nodes: e.nodes, source: e.source?.digest, i18n: i18nShape(e) })));
   const changed = !base || structural(base) !== structural(record);
@@ -1084,7 +1084,7 @@ export function addDestinationCapture(record, shellDir, { node: id, destination,
 // ---------------------------------------------------------------------------------------------------------
 
 /**
- * Where a lockup may be cropped from (mia inc-1649b9490cb5): `shell/<path>` - a recorded capture (a real render)
+ * Where a lockup may be cropped from (inc-1649b9490cb5): `shell/<path>` - a recorded capture (a real render)
  * of a layout of this tree; `ui.<id>:<path>` - the ACCEPTED layout composite of a planned visible layout's
  * design record (the record is done, the asset is its selected page composite with a measured childSlot, and
  * the record is the layout.design of a planned node). Returns {file, ref, kind, sha256, node} | {error}.

@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { clipLine } from './clip.mjs';
-import { translator } from './i18n.mjs';
+import { ownerLanguage, translator } from './i18n.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
 import { readYamlFile } from './read-yaml.mjs';
@@ -33,7 +33,7 @@ export function opLabelMap() {
   return labelsCache;
 }
 /** The human label of an op (a `op#instance` leg label reads as its op), else the op id itself. */
-export function opLabel(op, language = 'vi') {
+export function opLabel(op, language = ownerLanguage()) {
   const id = String(op ?? '').trim();
   if (!id) return '';
   const entry = opLabelMap()[id] ?? opLabelMap()[id.split('#')[0]];
@@ -84,7 +84,7 @@ export const nameWithId = (name, id) => (name && name !== id ? `${name} (${id})`
 // ---------------------------------------------------------------------------------- workflow names
 const BRAND_CASE = { starci: 'StarCi', nivo: 'Nivo' };
 const REPO_ROLE_SUFFIX = /[-_](backend|be|frontend|fe|api|server|web|app)$/i;
-/** The product's display word(s) from a project or repository name: `todo-app-be` -> `Todo App`. */
+/** The product's display word(s) from a project or repository name: `shop-be` -> `Shop`. */
 export function productName(raw) {
   const base = oneLine(raw).replace(REPO_ROLE_SUFFIX, '');
   if (!base) return '';
@@ -193,7 +193,7 @@ export function nodeLabel(node) {
  * `payload` is the job payload, `op` its op id, `nodes` the workflow's latest work-graph nodes, `repo`
  * the ledger owner (to read Work record titles).
  */
-export function jobWhat({ payload, op = null, nodes = null, repo = null, max = JOB_WHAT_MAX, language = 'vi' } = {}) {
+export function jobWhat({ payload, op = null, nodes = null, repo = null, max = JOB_WHAT_MAX, language = ownerLanguage() } = {}) {
   const p = payload ?? {};
   const owned = list(p.owned_paths ?? p.ownedPaths).map((x) => (typeof x === 'string' ? x : x?.path)).filter(Boolean);
   const records = list(p.records).filter((x) => typeof x === 'string');
@@ -223,7 +223,7 @@ export function jobWhat({ payload, op = null, nodes = null, repo = null, max = J
 }
 
 /** `<op label> · <what> · <workflow name>`, skipping a missing part. */
-export function jobDisplayName({ op, what = null, workflowName = null, language = 'vi' } = {}) {
+export function jobDisplayName({ op, what = null, workflowName = null, language = ownerLanguage() } = {}) {
   return [opLabel(op, language), oneLine(what), oneLine(workflowName)].filter(Boolean).join(NAME_SEPARATOR);
 }
 
@@ -231,7 +231,7 @@ export function jobDisplayName({ op, what = null, workflowName = null, language 
  * The display name of one jobs row of `db`: reads its workflow's name and latest work-graph nodes unless
  * given. `cache` (a Map) shares the workflow reads across many jobs.
  */
-export function jobDisplayNameOf(db, job, { repo = null, workflowName = null, nodes = undefined, cache = null, language = 'vi' } = {}) {
+export function jobDisplayNameOf(db, job, { repo = null, workflowName = null, nodes = undefined, cache = null, language = ownerLanguage() } = {}) {
   if (!job) return null;
   const payload = typeof job.payload_json === 'string' ? parseJson(job.payload_json, {}) : (job.payload ?? {});
   const op = job.op_id ?? job.opId ?? payload.opId ?? null;

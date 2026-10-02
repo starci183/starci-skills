@@ -179,7 +179,7 @@ export default {
   let contractChange = null;
   if (args['contract-change'] != null || args['follow-up-of'] != null) {
     const change = changeById(registry, String(args['contract-change'] ?? '').trim());
-    if (!change || change.reach !== 'follow-up') throw Object.assign(new Error(`--contract-change ${args['contract-change'] ?? '(missing)'} names no registered reach: follow-up change in modules/kernel/contract-changes.yaml`), { code: 'contract-change-unknown' });
+    if (!change || change.reach !== 'follow-up') throw Object.assign(new Error(`--contract-change ${args['contract-change'] ?? '(missing)'} names no registered reach: follow-up change in modules/kernel/contract-changes/`), { code: 'contract-change-unknown' });
     const source = db.prepare('SELECT job_id FROM jobs WHERE job_id=? AND workflow_id=?').get(String(args['follow-up-of'] ?? ''), workflowId);
     if (!source) throw Object.assign(new Error(`--follow-up-of ${args['follow-up-of'] ?? '(missing)'} is not a job of ${workflowId}`), { code: 'follow-up-of-unknown' });
     contractChange = { id: change.id, followUpOf: source.job_id };

@@ -536,11 +536,16 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.equal(feHfs.classifyPath('packages/app-api/src/graphql.ts').slot, 'fe.package.api');
   assert.equal(feHfs.classifyPath('packages/app-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
-  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.common.fileLines.soft = 0; }, (d) => { delete d.ruleParams.common.duplicateBlock; }, (d) => { d.ruleParams.common.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.common.extra = 1; }, (d) => { d.ruleParams.fe = { extra: 1 }; }, (d) => { d.ruleParams.fe = { duplicateBlock: { lines: 1, tokens: 60 } }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { d.ruleParams.be.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {
     const doc = parseYaml(manifestText); mutate(doc);
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
   }
+  // a side restates a common key only to override it: ruleParams(profile) merges common under the profile
+  const overridden = parseYaml(manifestText); overridden.ruleParams.fe = { duplicateBlock: { lines: 10, tokens: 60 } };
+  const feParams = ruleParams(loadSlotManifest({ text: JSON.stringify(overridden) }), 'fe');
+  assert.deepEqual(feParams.duplicateBlock, { lines: 10, tokens: 60 });
+  assert.deepEqual(feParams.fileLines, { soft: 500, hardGrowth: true });
   // two entries for one type are a loader refusal (a schema cannot state uniqueness by a member)
   const twice = parseYaml(manifestText); twice.ruleParams.be.paramNames.push({ type: 'Clock', names: ['now'] });
   refusal(() => loadSlotManifest({ text: JSON.stringify(twice) }), 'HFS_MANIFEST_INVALID');

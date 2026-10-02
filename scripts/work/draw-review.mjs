@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// draw-review.mjs — the owner's review of a drawing, and what its answer writes (mia inc-a4b5b1abdd90).
+// draw-review.mjs — the owner's review of a drawing, and what its answer writes (inc-a4b5b1abdd90).
 //
 // Defect: brand.decide a7 could not crop the greenfield lockup. layout-tree.mjs crops only from the drawing of a
 // ui record in state done ("the layout drawing is accepted before its lockup is taken"), interface.draw had drawn
@@ -70,7 +70,7 @@ import { readBrandRecord } from './brand/brand.mjs';
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 export const DRAW_REVIEW_OP = 'interface.draw';
-/** The contract change that made a gating drawing owe its owner review (modules/kernel/contract-changes.yaml). */
+/** The contract change that made a gating drawing owe its owner review (modules/kernel/contract-changes/). */
 export const DRAW_REVIEW_CHANGE = 'interface-draw-owner-review';
 /** The contract change that refuses a done report whose ui records the guard cannot judge (draw-review-unjudged). */
 export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
@@ -78,7 +78,7 @@ export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
 export const DRAW_REVIEW_DECISIONS = Object.freeze(['accept', 'redraw']);
 const OPTIONS = ['Accept the drawn parts', 'Redraw - say in the note what to change'];
 const OWNER = 'owner';
-/** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
+/** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes/). */
 export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
 /** Autopilot (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
 export const AUTOPILOT_BY = 'autopilot';

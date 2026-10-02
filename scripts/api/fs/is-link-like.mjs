@@ -1,7 +1,7 @@
 // is-link-like.mjs — whether a path is a link of any kind (a symlink, a junction, or another reparse point that
 // redirects it), read with lstat, readlink and real paths. Every tree walk of the runtime asks it before it enters a
 // directory (safe-remove.mjs, links-under.mjs, the housekeeping collectors), so no walk ever follows a link
-// (nivo-fe inc-c8fbf76aa499).
+// (inc-c8fbf76aa499).
 import fs from 'node:fs';
 import path from 'node:path';
 import { samePath } from '../../lib/path-key.mjs';

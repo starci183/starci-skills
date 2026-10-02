@@ -58,7 +58,7 @@ const signalRegexp = (source) => {
 
 // A bare '401' matched any number or id holding those digits (a job id '...-false-401-...' in the echoed launch
 // line, an epoch, a token count) and the product's own "mapped to 401" in a pasted Task; each tripped a 24 h auth
-// circuit (nivo inc-7d452a3329ba). 401 counts only as a word next to an auth word or
+// circuit (inc-7d452a3329ba). 401 counts only as a word next to an auth word or
 // an HTTP/status/error prefix.
 const GENERIC_FAILURE = [
   '\\b401\\b[^\\n]{0,60}\\b(?:unauthori[sz]ed|authentication|not authenticated|invalid[^\\n]{0,20}(?:key|token|credential))',
@@ -374,7 +374,7 @@ function sendPrompt(handle, text, adapter, io) {
 // {ok:false, step, error, code, errorCode, effectState, dispatchId, terminal, observation, cleanup, trust}. A start that
 // left an effect is reconciled before the failure returns, so no caller ever owns a half launch.
 // `onCreated(handle, dispatchId)` runs the moment the agent terminal is known (before attestation when the start
-// receipt names it): the caller records it durably (nivo inc-e523617a3c31).
+// receipt names it): the caller records it durably (inc-e523617a3c31).
 // Depth preflight (contract change worker-depth-limit): `parentDispatch` is the Dispatch of the runtime-launched worker
 // this one nests under (an op under its Kernel, the critic under its op), none under the owner's chat. Its depth
 // (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'

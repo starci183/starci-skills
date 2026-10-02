@@ -192,7 +192,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
         let scan = null;
         try { scan = scanAppDir(appDirOf, { repoRoot: located.repoRoot, name }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `app/ could not be scanned (${error.message})`))); }
         // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
-        // string another workflow adds is not drift (nivo inc-13f6af8494bf).
+        // string another workflow adds is not drift (inc-13f6af8494bf).
         const drift = scan ? sourceDrift(tree, scan) : null;
         if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
       }
@@ -582,7 +582,7 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
 /**
  * The whole check for one target: a work tree, the shell dir, a ui record dir or an implementation record dir.
  * `advisoryCodes`: finding codes a contract change added after the checked leg was admitted
- * (--admitted-at, modules/kernel/contract-changes.yaml) - suspects for that leg, never refusals.
+ * (--admitted-at, modules/kernel/contract-changes/) - suspects for that leg, never refusals.
  */
 export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
   const resolved = path.resolve(target);

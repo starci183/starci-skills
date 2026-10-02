@@ -274,7 +274,9 @@ allocation:
   # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
   # this long flags a dead kernel. orphanedFrontierMs: a workflow read orphaned-frontier on ticks this far apart is
   # flagged. noProgressMs: a STALLED workflow idle this long is flagged. statusApp: the status
-  # UI's port and scheduled task, restarted when the port does not answer within probeTimeoutMs. alertRepeatMs: one
+  # UI's ports and scheduled task — port serves the built UI and its read-only API, devPort the Vite dev/preview
+  # server (ui/ports.mjs is the one reader; nothing else states either) — restarted when port does not answer
+  # within probeTimeoutMs. alertRepeatMs: one
   # alert key reaches the inbox and Telegram at most once per window. actionSlaMs: an owed action (scripts/supervisor/
   # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
   # ownerDigestMs: the Fleet Notifier's periodic owner digest goes out at most this often.
@@ -285,7 +287,7 @@ allocation:
     deadKernelMs: 900000
     orphanedFrontierMs: 1800000
     noProgressMs: 21600000
-    statusApp: {port: 4547, task: 'StarCi Harness App', probeTimeoutMs: 5000}
+    statusApp: {port: 4547, devPort: 4545, task: 'StarCi Harness App', probeTimeoutMs: 5000}
     alertRepeatMs: 21600000
     actionSlaMs: 1800000
     ownerDigestMs: 7200000
