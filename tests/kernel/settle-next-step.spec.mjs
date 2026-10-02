@@ -2,14 +2,14 @@
 // modules/models/kinds.yaml routes), and `api status` names the Kernel's next moves as nextActions and
 // colours every leg. Before it `api settle --verdict fail` enqueued nothing, the frontier fell to
 // orphaned-frontier, and a worker that died without a report was retried without a cap.
-import test from 'node:test';
+import test,{after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {createKernelSettleNextStepFixture} from '../helpers/kernel-settle-next-step-fixture.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {unitSubjectKey} from '../../engine/admission.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs) is
@@ -19,14 +19,12 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
+const fixture=createKernelSettleNextStepFixture();
+beforeEach(()=>fixture.reset());
+after(()=>fixture.dispose());
 
 const world=(t,{legs=['docs.author'],edges=legs.slice(1).map((op,i)=>[legs[i],op])}={})=>{
-  const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-settle-next-'));
-  t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const env={...process.env,STARCI_PROJECTS_ROOT:path.join(repo,'projects'),STARCI_TEST_MACHINE_FILE:path.join(repo,'machine.sqlite'),LOCALAPPDATA:path.join(repo,'localappdata')};
-  fs.mkdirSync(path.join(repo,'docs'),{recursive:true});const wf='wf-next-step';
-  const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger);}finally{ledger.close();}};
-  const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger.db);}finally{ledger.close();}};
+  const {repo,env,seed,read}=fixture;const wf='wf-next-step';
   seed(ledger=>{
     ledger.ensureWorkflow({workflowId:wf,title:'next step'});
     ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'next step'});
