@@ -268,7 +268,7 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
     }
     if (cond.type === 'job') {
       // The wait follows the job's retry lineage (lineageHeadOf): a cancelled job was dropped or
-      // re-planned, never settled (nivo auth inc-7c46a61faba1 released on a cancel of
+      // re-planned, never settled (an auth workflow's inc-7c46a61faba1 released on a cancel of
       // op-backend.implement-3156a882e8), and a failed job with a retry is not the unit's last word.
       const head = lineageHeadById(db, cond.jobId);
       if (!head) return { met: false, unmeetable: `job ${cond.jobId} is gone`, evidence: `${cond.jobId} absent` };

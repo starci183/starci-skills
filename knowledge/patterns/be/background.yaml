@@ -15,7 +15,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner-locked BE convention 2026-09-30
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
     Static checks prove that a background method has a runner and that an app composes it. They do not prove lease

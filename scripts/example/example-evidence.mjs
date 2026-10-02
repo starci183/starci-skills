@@ -12,7 +12,7 @@ import { isMain } from '../lib/is-main.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
- * commands, the way `docs/backend-source-pattern.md`'s example tree expects an implementation, business
+ * commands, the way `docs/architecture.md`'s example tree expects an implementation, business
  * rule or acceptance criterion to be proven. This is a toolkit script for the examples, not the kernel:
  * it can only be run by hand or by CI, never by a live workflow, and it must never claim `starci-kernel`
  * provenance it did not earn (see the provenance note below).

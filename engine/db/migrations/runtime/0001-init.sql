@@ -902,7 +902,7 @@ FROM work_units u LEFT JOIN ui_state_map m ON m.entity='unit' AND m.native=u.sta
 CREATE VIEW IF NOT EXISTS v_checks AS
 SELECT c.*, COALESCE(m.ui,'unknown') AS ui FROM check_runs c LEFT JOIN ui_state_map m ON m.entity='check' AND m.native=c.status;
 
--- An ENDED workflow (phase archived|finished) surfaces no live leftovers: the predicate of scripts/reconciler/decisions.mjs listDecisions,
+-- An ENDED workflow (phase archived|finished) surfaces no live leftovers: the predicate of scripts/machine/decisions.mjs listDecisions,
 -- applied per leg here (a missing workflow row survives; v_decision_rows keeps an ended workflow's resolved rows as history).
 -- Decision items with a time-rule ui: overdue or escalations >= 2 -> bad; under 20% of the window left -> warn.
 CREATE VIEW IF NOT EXISTS v_decision_rows AS

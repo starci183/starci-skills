@@ -14,9 +14,9 @@
 //
 // Source is English too (HFS_SOURCE_NOT_ENGLISH): every comment, string and SQL comment of scripts/, engine/, bin/, ui/,
 // packages/ and tests/ (`.mjs .cjs .js .ts .tsx .sql .ps1 .sh .html .css`). Text the owner must read in Vietnamese lives in a
-// DECLARED catalog instead, keyed from its English source: scripts/lib/i18n.mjs reads modules/i18n/messages/*.yaml, and the UI
-// catalog files under ui/src/i18n/ are declared in DECLARED_SOURCE_CATALOGS. Phrase data a matcher applies to owner or
-// product text lives in modules/goal/source-phrases.yaml (source-phrases.mjs). A new undeclared Vietnamese line fails.
+// DECLARED catalog instead, keyed from its English source: scripts/lib/i18n.mjs reads modules/i18n/messages/*.yaml and generates
+// the UI's ignored browser map. Phrase data a matcher applies to owner or product text lives in
+// modules/goal/source-phrases.yaml (source-phrases.mjs). A new undeclared Vietnamese line fails.
 // Exit 0 clean, 1 findings.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,8 +56,8 @@ export function runtimeDocuments(root = skillRoot) {
 /** The source folders whose code files are read, and the file kinds. */
 export const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'tests']);
 export const SOURCE_EXTENSIONS = Object.freeze(['.mjs', '.cjs', '.js', '.ts', '.tsx', '.sql', '.ps1', '.sh', '.html', '.css']);
-/** Source that IS declared Vietnamese: the UI catalog directory (ui/src/i18n/t.ts reads ui/src/i18n/messages/*.ts, keyed from the English source) and the Vietnamese-letter detector itself. */
-export const DECLARED_SOURCE_CATALOGS = Object.freeze(['ui/src/i18n/', 'scripts/lib/language.mjs']);
+/** Source that IS declared Vietnamese: the Vietnamese-letter detector itself. UI source is English; its generated map is ignored. */
+export const DECLARED_SOURCE_CATALOGS = Object.freeze(['scripts/lib/language.mjs']);
 /**
  * Functional Vietnamese: source that MATCHES owner text (a phrase or mark the owner types) and so cannot be translated. One
  * entry per file with the reason; the file is exempt from HFS_SOURCE_NOT_ENGLISH, nothing else is.

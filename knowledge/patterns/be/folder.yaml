@@ -3,7 +3,7 @@ id: be.folder
 title: Backend folder
 purpose: |-
   Given backend code, which directory does it live in? Apply the HFS backend tree: the `be.*` slots of
-  knowledge/hfs/slots.yaml are its machine form, and docs/backend-source-pattern.md states the code forms.
+  knowledge/hfs/slots.yaml are its machine form, and docs/architecture.md states the code forms.
 appliesTo:
   - backend
 family: be
@@ -13,7 +13,7 @@ provenance:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/fundamentals/dynamic-modules
   limitations: |-

@@ -30,7 +30,7 @@
 //
 // Every frame here carries the input box's draft. Orca lifts the text of an agent's input box out of
 // the frame and answers it as `draft` (scripts/lib/orca-terminal.mjs draftText); read without it, a wake
-// whose Enter was dropped sat invisible in the box and the next wake was appended to it (nivo collab
+// whose Enter was dropped sat invisible in the box and the next wake was appended to it (a collab
 // Kernel, 2026-09-25). So the draft is written back into the input row before any proof
 // (terminal-liveness.mjs frameWithDraft), and a draft found BEFORE typing decides first
 // (terminal-liveness.mjs draftOwnership):
@@ -87,7 +87,7 @@ const exitedRefusal = (screen) => {
 };
 
 // The wake reached a host shell, not an agent: the text follows a shell prompt, a
-// shell error appeared, or the frame now ends in a bare prompt. nivo term_8f9e0611
+// shell error appeared, or the frame now ends in a bare prompt. a product's term_8f9e0611
 // (2026-09-24 03:56): PowerShell echoed and ran a nudge, and the echoed text was
 // read as the wake landing - delivery 'delivered'. It is never delivered.
 const shellRefusal = (after, text, before, extra) => {
@@ -164,7 +164,7 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
   // The frame read immediately before typing decides, however recent the
   // caller's own read was: an agent can exit between an observation and the
-  // send (nivo term_8f9e0611). A caller's frame that already shows a shell
+  // send (a product's term_8f9e0611). A caller's frame that already shows a shell
   // refuses too, and with no frame at all nothing is typed blind.
   const callerBefore = typeof beforeScreen === 'string' ? beforeScreen : null;
   const exitedEarlier = callerBefore != null ? exitedRefusal(callerBefore) : null;

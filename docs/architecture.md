@@ -1,3 +1,4 @@
+Owner: modules/
 # Architecture
 
 StarCi is a source-only runtime installed under a host's `.claude/`. One owner goal becomes one
@@ -208,3 +209,172 @@ words in a summary. A checker that is unavailable is an infrastructure problem, 
 Changed inputs invalidate dependent proof without rewriting history; corrections are new rows, not
 edited ones. These are consistency checks, not a security sandbox: agent actions remain subject to
 the host's tool permissions and owner authority.
+
+## A product repository
+
+The runtime works on **product** repositories — the bound project's app. One app is one Git
+repository: one root package manifest and lockfile (npm only — slots `app.package-manifest`,
+`app.lockfile`), one repository declaration of kind `app` (slot `app.declaration`, shape:
+`modules/schemas/hfs-repo.schema.yaml`), its back end under `be/` and its front end
+under `fe/`, the one Work tree `.starciwork` and the deployment tree `.starcistacks` at the app
+root. The only cross-side reach is `fe/` reading `be/contracts/` (declared in `hfs.json`
+`sides.fe.reads`); a side imports nothing outside itself (`ARCH_INTERNAL_IMPORT_OUTSIDE`).
+
+`knowledge/hfs/slots.yaml` is the machine form of the whole tree: every kind of content that may
+exist is a slot with a path, presence, tracking, tier and required files; `tiers.be`/`tiers.fe`
+fix the import direction and `ruleParams` the budgets. The human reading is
+[knowledge/hfs/README.md](../knowledge/hfs/README.md); the repository law is
+`knowledge/patterns/repo/folder.yaml`. An app carries no owner list, allowlist or local rule of
+its own. Tests split by slot: unit specs are the only tests an automatic gate runs; the
+`be.tests.*` trees (integration, e2e, contract) run by hand and never join a gate; a front end
+has no tests at all.
+
+A routed app carries the host's `.claude/CONTEXT.md` marker and never grows a second Work tree in
+`fe/` (`HFS_WORK_IN_FE`) or a `.starcistacks` inside a side (`HFS_STACKS_IN_SIDE`). A Kernel
+workflow's worktree lives outside the app checkout, one per workflow ([workflow kernel](workflow-kernel.md)).
+
+## The responsibility graph
+
+Every product follows one dependency direction, whatever its topology:
+
+```text
+framework entry -> feature scenario -> reusable module -> vendor or Grammar
+```
+
+| Responsibility | Owns | Must not own |
+| --- | --- | --- |
+| Framework entry (app) | Boot, composition, route adapters, framework providers | Product scenario logic, persistence, reusable UI internals |
+| Feature | One scenario: its commands, queries and handlers, transport adapters, scenario state and mapping | Generic infrastructure for unrelated scenarios |
+| Module | One cohesive domain, platform or integration capability | Feature orchestration, app boot |
+| Package (Grammar/UI) | Product-agnostic renderers, tokens, interaction primitives | Routes, session, persistence, transport |
+
+A feature with one consumer and a module with one consumer are both legal: reuse count is not an
+ownership rule. The model rejects a total folder rank (the tiers expose legal edges, not mandatory
+hops), hooks hidden beside visuals (every authored custom hook lives under `hooks/<domain>`), and
+machinery that owns nothing (a presentational twin, a forwarding service, a command for its own
+sake).
+
+The **back end** instantiates it in Nest/TypeScript: apps compose processes (the `be.app.*` slots),
+an api feature exposes operations as typed commands and queries with one handler each
+(`transport -> command -> handler -> domain`, one transaction inside a bounded context, an event
+only to cross contexts or carry async work), and each capability module registers exactly once per
+app with typed options (`register`, `ConfigurableModuleBuilder`, `isGlobal: true` only in app
+roots). Every infrastructure dependency is injected through a zero-argument `Inject<Thing>()`
+exported from its owner's `<owner>.decorators.ts`. The **front end** instantiates it in Next.js:
+`app/` route adapters mount feature owners and hold no product logic; a connected block splits
+world ownership (`index.tsx`) from rendering (sibling `component.tsx`); every authored custom hook
+lives in `hooks/<domain>`; transport has exactly one client and one `Outcome` union
+(`fe.modules.api` or `fe.package.api.*`). The concrete law is `knowledge/patterns/be/*.yaml` and
+`knowledge/patterns/fe/*.yaml`, each case citing the catalog rule ids it implements; the tree
+shapes are the `be.*`/`fe.*` slots of `knowledge/hfs/slots.yaml`.
+
+## Common architecture rules
+
+`knowledge/architecture-rules.yaml` owns the semantic obligations (`ARCH-*`) that need a reviewing
+agent — ownership, composition, dependency direction, public API, abstraction, data boundary,
+state, identity, configuration, authority, effect, concurrency, operability, evidence, work and
+deployment. Every obligation a machine can decide is an `R`-rule of `knowledge/hfs/rules.yaml`,
+stated only there. Load order for an op: the `ARCH-*` catalog, `knowledge/coding-reference.yaml`
+for the concrete Nest/Next profile, then the applicable `knowledge/patterns/**` topics. The
+executable inventory is `modules/models/code-patterns.yaml` ([code-pattern enforcement](code-pattern-enforcement.md));
+a missing or unavailable checker is a coverage failure an agent can never waive, and the
+[design catalog](design-pattern-catalog.md) supplies the conditional semantic decisions
+(`knowledge/design-patterns.yaml`).
+
+Mechanisms are conditional, not a mandatory list: an obligation names a trigger and a required
+property and the design picks the smallest mechanism that satisfies it — an outbox for durable
+external notification, a persisted saga for cross-transaction progress, fencing where a replaced
+worker could still write, an atomic constraint or lock where concurrent requests compete, CQRS
+where dispatch/read/write separation has real semantics, typed options for per-caller
+configuration, a connected/presentational split where data lifecycle and rendering genuinely
+differ, a shared package for an independent lifecycle. None is generated into every project, and
+none is chosen because its narrow test is easy.
+
+Evidence channels stay separate: static checks prove resolved dependency edges and file/role
+shapes; freshness scripts prove declared inputs still agree; stack validation proves declared
+consistency; behavioral runs prove the exercised invariant under recorded conditions; design
+review covers responsibility and uncovered obligations. No channel substitutes for another, and no
+ignore, suppression, relaxed threshold or stale hash manufactures a pass. Unsupported syntax and
+unavailable tools block coverage; they are never relabeled as design.
+
+## The sds family: source-independent design
+
+Business records (fr, br, nfr, data, journey, decision — see [business records](business-srs.md))
+define observable behavior. The `sds` family maps it to logical components, contracts,
+integrations, events and decisions — flat family folders under `.starciwork/features/<feature>/`,
+placed by `modules/schemas/work-layout.yaml`, one schema per family (`work-sds-component@1`,
+`work-contract@1`, `work-integration@1`, `work-event@1`, `work-policy-decision@1`). An sds record
+never names a repository path, symbol, signature or source revision: architecture may inspect the
+relevant source to check feasibility and transition impact, but records the logical decision only;
+implementation binds design to actual code (`owners` is written by `review.verify` reconciliation
+from done implementation records, never by `architecture.decide`).
+
+A component record states its responsibility, the interfaces others may assume, the business
+records it refs, its allowed `dependsOn`, and an optional `stateMachine`/`sequence` traced to
+observable outcomes. Records carry `state`/`activity` (`todo`, `activity: investigating |
+implementing | verifying`, `blockers[]`) rather than a second lifecycle; an implementation op
+reports an `sds-gap` blocker only on concrete proof of a bounded contradiction, and the kernel
+routes it to `architecture.revise`. `bin/starci.mjs validate` proves structure and traceability —
+not code conformance.
+
+## The layout tree
+
+A product's UI wraps a screen through the Next.js App Router layout chain. The Work tree records
+it once at `.starciwork/shell/index.yaml` (schema `work/layout-tree@1`, generated by
+`scripts/work/layout-tree.mjs scan`): one tree per declared front-end app, one node per `app/`
+segment, and per layout its chrome, navigation, used i18n keys and per-breakpoint captures. A
+re-scan keeps owner decisions, bumps a changed layout's `rev` and returns it to `todo`.
+
+`interface.draw` and `brand.decide` are its only writers — one workflow at a time, so parallel
+workers never invent chrome. Every `ui` record binds to the tree by `app`, `route` and
+`surface` (`layout`, `page`, `modal`, `drawer`, `loading`, `error`, `not-found`), and a draw works
+from the unsettled shell first: a missing ancestor layout is drawn and settled before the screens
+on top. `compose-direction.mjs` composites a drawn state onto the real layout captures;
+`scripts/work/ui/shell-conformance.mjs` judges the tree, the ui bindings and the implementation
+routes, and [interface audit](interface-audit.md) applies the same check as its layout lens.
+
+## The architecture machine
+
+`scripts/hfs/architecture.mjs` (`checkArchitecture`) is the read-only tree, dependency and
+source-shape check of one side of an app, run per side (`hfs check`, or directly with
+`node scripts/hfs/architecture.mjs <app>/be [--base <commit>]`) and through the op gate. It
+resolves the side's manifests, tsconfig aliases, relative paths, package exports, re-export
+barrels and literal dynamic imports, then emits one `starci/architecture-check@1` record whose
+`coverage` states what actually ran — an unavailable parser, an unresolvable target or a missing
+base is `unavailable` coverage, never a pass.
+
+Its findings name the rule ids of `knowledge/hfs/rules.yaml`: the tier-direction matrix and owner
+cycles, owner reachability and composition, dead exports and files, required files, size growth,
+duplicate code and duplicated symbols, alias re-exports; on the back end the composition and data
+family (connection map, SQL ownership and bounds, register-once, default-deny guard order, error
+masking and error homes, feature shape, unit-spec providers, schema owner, module-per-transport,
+background ownership); on the front end the route and client family (transport owner, thin route
+files, hooks domains, package shape, client-to-server reachability, cross-app duplicates, slot
+file roles); on both, document language. `errors` report inputs the checker could not resolve;
+`violations` report boundaries crossed. The static result is structural evidence only — cohesive
+ownership, DI scope, transaction isolation, idempotency and rendered behavior remain for boot,
+contract, concurrency and recovery proof. [code-pattern enforcement](code-pattern-enforcement.md)
+describes the executable inventory, and [nest contract check](nest-contract-check.md) and
+[next data lifecycle check](next-data-lifecycle-check.md) the specialized contract checkers.
+
+## This repository's own layout
+
+The runtime repository is judged by the same engine with its own manifest,
+`knowledge/hfs/runtime-slots.yaml` (the root `hfs.json` declares `{"hfs": 1, "kind": "runtime"}`).
+Its `tiers.runtime` fixes the one import direction — entry over checks over reconciler, supervisor
+and kernel over domain, gates, machine and hfs, down to the api, db and base tiers — and
+`ruleParams.runtime.infraOwners` declares which api system may call which host surface
+(`node:child_process` only in `scripts/api/*`, `node:sqlite` only in `engine/db`, each program word
+only in its own system's folder). A path the target tree moves is a forbidden slot whose `goesTo`
+names its successor; files move with the move codemod, which appends the `moved[]` entries of
+`modules/kernel/retired-paths.yaml`.
+
+`npm run check` is `node bin/starci.mjs check` → `scripts/checks/check-runtime.mjs`: `node --check`
+over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check
+(`scripts/hfs/runtime-check.mjs`) with the runtime-rule modules of `scripts/hfs/runtime-rules/` and
+the cited-path scan over live prose; then every retained self-check of
+`ruleParams.runtime.selfChecks`, in order. Every source file is read with the TypeScript AST
+(`scripts/hfs/runtime-rules/source-ast.mjs`); no text is grepped. The one allowlist is
+`modules/kernel/allowlist.yaml` (`starci/allowlist@1`): every exception a check keeps is a named,
+shrink-only section of it, and `scripts/checks/check-one-allowlist.mjs` refuses a second one
+(`RT_ALLOWLIST_SPRAWL`).

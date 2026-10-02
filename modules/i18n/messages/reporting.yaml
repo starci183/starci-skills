@@ -1,6 +1,7 @@
 schema: starci/i18n-catalog@1
-area: v3
-purpose: Owner-visible messages of the legacy-purge v3 chunk, keyed from their English source (scripts/lib/i18n.mjs).
+area: reporting
+scope: runtime
+purpose: Owner-visible supervision, incident and design-review messages, keyed from their English source.
 messages:
   - {en: "Supervisor judgement", vi: "Nhận định của Supervisor"}
   - {en: "Open invariant violations", vi: "Vi phạm bất biến đang mở"}

@@ -120,10 +120,10 @@ test('RT_API_SHAPE: one exported call named after its file, and a contract id pe
 // ------------------------------------------------------------------------------------------- RT_SPEC_PLACEMENT
 
 test('RT_SPEC_PLACEMENT: a flat spec, a _ fixture, a package .test file and a spec under scripts/ are refused', () => {
-  assert.equal(specPlacementFinding('tests/hfs-slots.spec.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
-  assert.equal(specPlacementFinding('tests/_ledger-fixture.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
+  assert.equal(specPlacementFinding('tests/gone-slots.spec.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
+  assert.equal(specPlacementFinding('tests/_gone-fixture.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT');
   assert.equal(specPlacementFinding('tests/helpers/x.spec.mjs', 'runtime.tests').code, 'RT_SPEC_PLACEMENT', 'helpers is no source area');
-  assert.equal(specPlacementFinding('packages/eslint/be/cqrs.test.mjs', 'runtime.package').code, 'RT_SPEC_PLACEMENT');
+  assert.equal(specPlacementFinding('packages/eslint/be/gone-cqrs.test.mjs', 'runtime.package').code, 'RT_SPEC_PLACEMENT');
   assert.equal(specPlacementFinding('scripts/kernel/x.spec.mjs', 'runtime.kernel').code, 'RT_SPEC_PLACEMENT');
 });
 
@@ -153,15 +153,15 @@ test('RT_SOURCE_NAME: kebab names, and lib.mjs repeated across api systems, are 
 
 test('RT_RETIRED_PRESENT: a retired path, a moved-from path or a retired symbol that comes back is refused', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': 'export function closeOperationTask() {}\n' }, {
-    files: ['scripts/lib/kill-tree.mjs', old('scripts', 'checks', 'gate.mjs')],
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    files: ['scripts/lib/gone-tree.mjs', old('scripts', 'checks', 'gate.mjs')],
+    retiredPaths: { retired: [{ path: 'scripts/lib/gone-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(codesOf(retiredFindings(ctx)), ['RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT']);
 });
 
 test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called, never declared, are clean', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': "import { other } from './x.mjs';\nother('closeOperationTask');\n" }, {
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    retiredPaths: { retired: [{ path: 'scripts/lib/gone-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(retiredFindings(ctx), []);
 });

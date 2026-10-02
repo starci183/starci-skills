@@ -39,6 +39,7 @@ import { loadSonarGate } from './sonar-gate.mjs';
 import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from './runtime-host.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
+import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
 
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
@@ -46,7 +47,7 @@ export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
 export const CONTRACT_CHANGE = 'starcistacks-services';
 export const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
-  detail: 'author the services block of the repository stack declaration (sonar and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
+  detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
 
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
 export const SERVICE_CATALOG = {
@@ -435,14 +436,13 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
   const pick = (level) => findings.filter((finding) => finding.level === level).map((finding) => `${finding.file}: ${finding.message} [${finding.code}]${finding.advisory ? ' (added after this leg was admitted)' : ''}`);
   const refused = pick('refuse');
   const needsFollowUp = findings.some((finding) => ['STACKS_DECLARATION_MISSING', 'STACKS_SERVICES_MISSING', 'STACKS_SERVICE_UNDECLARED'].includes(finding.code) && finding.level !== 'refuse');
-  const fixture = path.join(skillRoot, 'examples', 'starcistacks-services', `${name}.services.yaml`);
   return {
     schema: RESULT_SCHEMA, ok: refused.length === 0, repository: name, repoRoot: slash(repo), newRepo,
     declaration: declaration?.file ? slash(declaration.file) : null, root: declaration?.root ?? null,
     governedBy: governing ? slash(governing.repo) : null,
     services: Object.fromEntries(Object.entries(normalized).map(([id, service]) => [id, summary(service)])),
     refused, suspect: pick('suspect'), findings,
-    ...(needsFollowUp ? { followUp: { change: CONTRACT_CHANGE, ...FOLLOW_UP, ...(isFile(fixture) ? { fixture: slash(path.relative(skillRoot, fixture)) } : {}) } } : {}),
+    ...(needsFollowUp ? { followUp: { change: CONTRACT_CHANGE, ...FOLLOW_UP, ...(isFile(path.join(skillRoot, STACK_DECLARATION_TEMPLATE)) ? { fixture: STACK_DECLARATION_TEMPLATE } : {}) } } : {}),
   };
 }
 

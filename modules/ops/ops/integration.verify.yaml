@@ -34,7 +34,7 @@ graphPolicy:
 reads:
   - id: application-stacks
     path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+      docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: Resolve the selected backend Stack environment and its identity custody for every credential
         read. When the selected scope touches application deployment, bootstrap or recovery,

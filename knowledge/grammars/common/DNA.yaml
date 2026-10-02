@@ -167,7 +167,7 @@ identity:
     region: "--grammar-region-gap"
     pageInset: "--grammar-page-inset"
   publishedSpacingScale: "0=0, 1=0.25rem, 2=0.5rem, 3=0.75rem, 4=1rem, 6=1.5rem, 8=2rem"
-  ruleCatalog: "COMMON_UI_RULE_IDS is generated from the knowledge tree by scripts/generate-rule-catalog.mjs (150 ids at capture)"
+  ruleCatalog: "COMMON_UI_RULE_IDS is generated from the knowledge tree by packages/grammar/scripts/generate-rule-catalog.mjs (150 ids at capture)"
   rendererGroups:
     base: "42 renderers, re-exported by src/common/renderers.ts"
     forms: "20 renderers, COMMON_FORMS_COMPONENTS in src/common/renderers-forms.ts"

@@ -196,7 +196,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const calls=fx.callArgv();
   const workerStartCall=calls.find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   // Claude is the managed exemplar: Codex operations launch as unattended
-  // command terminals (tests/codex-unattended-ops.spec.mjs).
+  // command terminals.
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--agent')+1],'claude',
     'managed profiles use Orca native managed-agent admission');
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--from')+1],'fake-kernel-terminal',

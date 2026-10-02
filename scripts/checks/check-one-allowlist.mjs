@@ -6,7 +6,7 @@
 // allowlist of the runtime: every exception a check keeps is a reasoned entry of one of its named sections and every
 // section only shrinks. No second list file exists. This check refuses a git-tracked file whose NAME looks like one:
 //   - *.pending, *.entries, *.not-codes      the list-file suffixes the runtime once carried
-//   - *exceptions*.yaml                       a scoped exception list like the retired modules/schemas/json-exceptions.yaml
+//   - *exceptions*.yaml                       a scoped exception list like the retired `json-exceptions.yaml`
 //   - *baseline*.json / *.yaml / *.txt        a lint or scan baseline
 //   - *allowlist*.yaml                        a second allowlist
 // other than the allowlist itself, its schema file (modules/schemas/allowlist.schema.yaml) and the files of this check.

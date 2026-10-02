@@ -1535,7 +1535,7 @@ DRAW_BASE_SIGNATURE:
   causes_vi:
     - "Thiếu XBase"
     - "Fixture sai dạng"
-  nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; sửa nguồn theo mẫu shape-slot rồi vẽ lại."
+  nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; sửa nguồn theo luật drawing rồi vẽ lại."
   owner: other-op:interface.draw
   kind: check-finding
 
@@ -2201,7 +2201,7 @@ FE_COMPONENT_API:
     - "Component nhận className từ ngoài"
     - "Khối kết nối không có bản trình bày thuần"
     - "Trạng thái dữ liệu tự chế thay vì qua SlotView"
-  nextStep_vi: "Sửa chữ ký component theo mẫu shape-slot và tách phần trình bày; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  nextStep_vi: "Sửa chữ ký component theo luật drawing và tách phần trình bày; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -4440,7 +4440,7 @@ HFS_SOURCE_NOT_ENGLISH:
   causes_vi:
     - "Chú thích hoặc chuỗi viết bằng tiếng Việt"
     - "Thông điệp cho chủ chưa đi qua danh mục i18n"
-  nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages hoặc ui/src/i18n/messages, qua một lane đã land."
+  nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages, qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4461,6 +4461,28 @@ RT_I18N_SCHEMA:
   causes_vi:
     - "Tệp mới tạo thiếu dòng schema"
   nextStep_vi: "Người giám sát thêm dòng schema vào đầu tệp qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_AREA:
+  title: "I18n catalog area does not match its file"
+  title_vi: "Khu vực danh mục i18n không khớp tên tệp"
+  meaning_vi: "Trường area của danh mục không trùng với tên tệp, nên nội dung không có một chủ đề rõ ràng."
+  causes_vi:
+    - "Đổi tên tệp nhưng chưa đổi area"
+    - "Sao chép phần đầu từ danh mục khác"
+  nextStep_vi: "Người giám sát đặt area bằng tên tệp không có đuôi qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_SCOPE:
+  title: "I18n catalog scope is invalid"
+  title_vi: "Phạm vi danh mục i18n không hợp lệ"
+  meaning_vi: "Danh mục không khai báo scope runtime hoặc ui, nên loader không biết nơi dùng các bản dịch."
+  causes_vi:
+    - "Tệp mới thiếu scope"
+    - "Scope mang một giá trị ngoài runtime và ui"
+  nextStep_vi: "Người giám sát khai báo scope runtime hoặc ui qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4508,7 +4530,7 @@ RT_I18N_PLACEHOLDERS:
 RT_I18N_DUPLICATE:
   title: "I18n source translated twice"
   title_vi: "Một nguồn tiếng Anh được dịch hai lần"
-  meaning_vi: "Cùng một chuỗi en xuất hiện trong hai mục của danh mục, tức là hai cách dịch cho một thông điệp."
+  meaning_vi: "Cùng một chuỗi en xuất hiện hai lần trong một scope của danh mục, tức là hai cách dịch cho một thông điệp ở cùng nơi dùng."
   causes_vi:
     - "Hai lane cùng thêm một thông điệp"
   nextStep_vi: "Người giám sát giữ một mục và xóa mục còn lại qua một lane đã land."
@@ -4645,6 +4667,61 @@ RT_CITED_PATH_MISSING:
     - "Di chuyển hay xóa tệp mà không cập nhật tài liệu"
     - "Gõ sai đường dẫn trong tài liệu"
   nextStep_vi: "Người giám sát sửa trích dẫn thành đường dẫn hiện tại (moved[].to của retired-paths.yaml cho tệp đã chuyển) hoặc xóa câu đó."
+  owner: supervisor
+  kind: check-finding
+
+RT_RETIRED_NAME_LIVE:
+  title: "A retired name appears in a live file"
+  title_vi: "Một tên đã loại bỏ xuất hiện trong tệp đang dùng"
+  meaning_vi: "Một tệp đang sống được git theo dõi nhắc tới một tên mà registry tuyên bố đã chết: một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml, hoặc một tên gọi không phải đường dẫn trong retiredNames[] (một app đã xóa, một kiểu đặt tên tầng, một tiền tố verb). Lịch sử (contract-changes, CHANGELOG, benchmark, các bản ghi .starciwork) và chính registry được giữ tên đó; văn bản đang sống thì không."
+  causes_vi:
+    - "Di chuyển hay đổi tên một cơ chế mà văn bản, comment hay fixture kiểm thử vẫn nhắc tên cũ"
+    - "Sao chép một ví dụ hay mẫu kiểm thử cũ vào một tệp mới"
+  nextStep_vi: "Người giám sát viết lại chỗ đó theo tên hiện tại (moved[].to, hoặc ghi chú của mục retiredNames) hoặc xóa nó; một tên mà một luật phải gọi đích danh được viết từ các phần ghép, không phải literal."
+  owner: supervisor
+  kind: check-finding
+
+RT_EXAMPLE_COUPLING:
+  title: "Runtime source names a concrete example tree"
+  title_vi: "Mã nguồn runtime gọi tên một cây examples/ cụ thể"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử contract-change, CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
+  causes_vi:
+    - "Một script hay gate đọc ví dụ của riêng một sản phẩm (ví dụ một tệp declaration đặt theo tên repo) lúc chạy, thay vì một mẫu chung hay tệp của repo đang được kiểm"
+    - "Comment, tài liệu hay chuỗi trong nguồn trích dẫn đường dẫn examples/<name> cụ thể thay vì nói examples/<app>"
+  nextStep_vi: "Người giám sát khái quát hóa chỗ đó (ví dụ examples/<app>, một mẫu template.*, hay một hằng trong scripts/lib/example-refs.mjs khi runtime thật sự đọc cây đó) hoặc trỏ tới repo đang được kiểm tra, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PRODUCT_NAME_IN_SOURCE:
+  title: "A product name is written in runtime source"
+  title_vi: "Tên một sản phẩm xuất hiện trong mã nguồn runtime"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi viết tên của một sản phẩm mà runtime từng ship kèm (danh sách đóng PRODUCT_NAMES trong scripts/lib/example-refs.mjs) hoặc một mã inc-<hash> có tiền tố là tên sản phẩm. Canon chạy trong mọi repo sản phẩm, nên một tên cứng trong source rò rỉ phán đoán của một sản phẩm sang mọi sản phẩm khác. Spec, test và lịch sử được giữ tên đó; mọi nơi khác phải nói chung chung hoặc qua hằng khai báo trong scripts/lib/example-refs.mjs."
+  causes_vi:
+    - "Một câu chuyện sự cố trong comment hay log viết thẳng tên sản phẩm (ví dụ workflow wf-<product>-… hay một ledger cụ thể) thay vì 'a product's …' hay <product>"
+    - "Một ánh xạ, alias hay fixture đặt theo tên sản phẩm được để trong source thay vì trong tệp khai báo chung"
+  nextStep_vi: "Người giám sát viết lại chỗ đó theo dạng chung (<product>, a product's …, acme cho một ví dụ) hoặc chuyển giá trị thật sự cần vào một hằng trong scripts/lib/example-refs.mjs, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_HOST_PATH_IN_TEMPLATE:
+  title: "A host drive path is hard-coded in source"
+  title_vi: "Một đường dẫn trên host bị viết cứng trong mã nguồn"
+  meaning_vi: "Một tệp nguồn runtime hay một template quản lý viết cứng một đường dẫn của máy host — một ổ đĩa Windows kiểu chữ cái kèm dấu hai chấm, một thư mục người dùng kiểu Users hay home, hay một đường AppData đã bung. Source và template ship sang mọi máy và mọi sản phẩm, nên đường dẫn phải tương đối, đi qua runtime root, os.tmpdir() hay một giá trị cấu hình."
+  causes_vi:
+    - "Sao chép một đường dẫn tuyệt đối từ máy phát triển vào một script, template hay fixture"
+    - "Một chuỗi gỡ lỗi hay ví dụ viết thẳng đường dẫn host thay vì biến môi trường hay đường tương đối"
+  nextStep_vi: "Người giám sát thay đường đó bằng đường tương đối, runtime root, os.tmpdir() hay một cấu hình đã khai báo, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_DOC_NO_OWNER:
+  title: "A document has no single ownership header"
+  title_vi: "Một tài liệu không có đúng một dòng sở hữu"
+  meaning_vi: "Một tệp docs/*.md không mở đầu bằng đúng một dòng sở hữu — \"Owner: <đường dẫn knowledge/ hoặc modules/ tồn tại>\" khi tài liệu giải thích một nguồn do máy sở hữu, hoặc \"Task: <một việc>\" với một tài liệu hướng dẫn — hoặc nó trùng một tài liệu khác: cùng một dòng Task, hoặc hai tiêu đề chung từ hai từ chủ đề trở lên trong khi ít nhất 30% câu của tài liệu ngắn hơn xuất hiện trong tài liệu kia. Một câu chuyện chỉ có một tài liệu; nguồn máy là luật và tài liệu chỉ đọc nó."
+  causes_vi:
+    - "Thêm một tài liệu mà quên dòng Owner:/Task: đầu tiên, hoặc Owner trỏ tới một đường dẫn không tồn tại hay ngoài knowledge/ và modules/"
+    - "Tách một tài liệu thành hai mà không gộp nội dung trùng hoặc không đổi dòng Task của một trong hai"
+  nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 

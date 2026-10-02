@@ -100,7 +100,7 @@ test('every cite under modules/goal and modules/ops resolves in the real tree', 
   assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
 });
 
-test('a retired path is valid history in a contract-change entry or owner ruling, and dead in live contract text', () => {
+test('a retired path is valid history in a contract-change entry, and dead in live text — owner-rulings.yaml included', () => {
   const root = fixtureTree({
     'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@1\nretired:\n  - {path: scripts/old/loop.mjs, retiredAt: 2026-09-28}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/loop.mjs` did it once"\n',
@@ -110,8 +110,8 @@ test('a retired path is valid history in a contract-change entry or owner ruling
   });
   try {
     const report = checkContractCites(root);
-    assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/live.yaml'], JSON.stringify(report.dead));
-    assert.equal(report.retiredCites, 3);
+    assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/live.yaml', 'modules/kernel/owner-rulings.yaml'], JSON.stringify(report.dead));
+    assert.equal(report.retiredCites, 2, 'the contract-change entry and the registry itself keep the cite as history');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -119,9 +119,9 @@ test('a retired path is valid history in a contract-change entry or owner ruling
 
 test('a moved path is valid history and dead in live text, named with where it went (moved[])', () => {
   const root = fixtureTree({
-    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/api-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
+    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/gone-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
-    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/api-verbs/settle.mjs` settled"\n',
+    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/gone-verbs/settle.mjs` settled"\n',
     'modules/kernel/contract-changes/copy.yaml': 'id: copy\nsummary: "`packages/hfs/runtime/scripts/old/gate.mjs` was bundled"\n',
     'knowledge/hfs/runtime-slots.yaml': 'ruleParams:\n  runtime:\n    generated:\n      - {root: packages/hfs/runtime, generatedBy: x.mjs}\n',
     'packages/hfs/runtime/.keep': '',
@@ -137,19 +137,25 @@ test('a moved path is valid history and dead in live text, named with where it w
   }
 });
 
-test('RT_CITED_PATH_MISSING: a dead runtime path in live docs or skills is a finding', () => {
+test('RT_CITED_PATH_MISSING: the widened scan reads every tracked doc, yaml and source comment, never history', () => {
   const root = fixtureTree({
     'modules/kernel/live.yaml': 'a: 1\n',
     'docs/guide.md': 'Run `scripts/missing/tool.mjs` first.\n',
-    'docs/examples/app.md': 'Run `scripts/codegen.mjs` in the product.\n',
-    'skills/s/SKILL.md': 'Read `scripts/present.mjs`.\n',
+    'knowledge/patterns/fe/x.yaml': 'note: "scripts/missing/tool.mjs did it"\n',
+    'scripts/run.mjs': '// runs `scripts/missing/tool.mjs` next\nexport const codePath = "scripts/missing/in-data.mjs";\n',
+    'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/missing/tool.mjs` did it once"\n',
+    'CHANGELOG.md': '# old\n\n`scripts/missing/tool.mjs` was here.\n',
+    'benchmark/note.md': 'a finding: `scripts/missing/tool.mjs`\n',
     'scripts/present.mjs': '',
   });
   try {
-    assert.ok(runtimeCiteScan(root).includes('docs/guide.md') && !runtimeCiteScan(root).includes('docs/examples/app.md'), 'docs/examples describe product apps and are not read');
     const findings = citedPathFindings(root);
-    assert.deepEqual(findings.map((f) => [f.code, f.path]), [[CITED_PATH_MISSING, 'docs/guide.md']]);
-    assert.equal(findings[0].code, 'RT_CITED_PATH_MISSING');
+    assert.deepEqual(
+      findings.map((f) => f.path).sort(),
+      ['docs/guide.md', 'knowledge/patterns/fe/x.yaml', 'scripts/run.mjs'],
+      'a doc, a knowledge yaml and a source comment are scanned; a string literal, contract history, a changelog and a benchmark are not',
+    );
+    assert.ok(findings.every((f) => f.code === CITED_PATH_MISSING && f.message.includes('scripts/missing/tool.mjs')));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

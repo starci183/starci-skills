@@ -4,7 +4,7 @@ import type { Kubectl } from "./kubectl"
 import { pollUntil, realClock } from "./poll"
 import type { Clock } from "./poll"
 
-/** The label value of a namespace prefix (`nivo-x-1a2b3c-` gives `nivo-x-1a2b3c`). */
+/** The label value of a namespace prefix (`acme-x-1a2b3c-` gives `acme-x-1a2b3c`). */
 export const labelValue = (prefix: string): string => prefix.replace(/-$/, "")
 
 /** The manifest of one repository namespace, labelled so reset and detach select it. */

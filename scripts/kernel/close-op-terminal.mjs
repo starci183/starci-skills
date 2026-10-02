@@ -10,7 +10,7 @@ import { unbindGuardTerminal } from '../guards/hook-install.mjs';
 // An operation terminal is closed with its tab when nothing else lives in
 // that tab. A pane close left the tab in Orca's persisted layout, and Orca
 // brought the agent session back in a fresh tab under a new handle: five
-// settled nivo op sessions (Codex and Claude) sat live as STRAY_TERMINAL, each
+// settled product op sessions (Codex and Claude) sat live as STRAY_TERMINAL, each
 // resuming its finished transcript. `terminal close --tab` waits until the tab
 // is durably removed. A terminal that shares its tab (or whose tab the listing
 // does not name) keeps the pane close. A closed terminal's guard binding

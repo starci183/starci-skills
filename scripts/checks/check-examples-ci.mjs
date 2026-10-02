@@ -13,7 +13,7 @@
 //
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
+//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
 //   node scripts/checks/check-examples-ci.mjs --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
 //   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own codecov.yml and sonar-project.properties from the render
 //

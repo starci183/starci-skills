@@ -486,7 +486,7 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
 
 /* -------------------------------------------------------- fixture mode */
 
-/** A package's root found by walking node_modules up from `dir` - for a package whose exports hide its package.json (a workspace package such as @nivo/ui). */
+/** A package's root found by walking node_modules up from `dir` - for a package whose exports hide its package.json (a workspace package such as @acme/ui). */
 const packageDirUp = (dir, name) => {
   for (let d = path.resolve(dir); ; d = path.dirname(d)) {
     const root = path.join(d, 'node_modules', ...name.split('/'));

@@ -420,7 +420,7 @@ policy:
               secrets or creating accounts.
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: When the imported source contains application deployment, .starcistacks compose material or
               bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
@@ -691,7 +691,7 @@ policy:
               runbooks, secret pairs and the refused shapes.
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: The whole-application dev and VPS contract and the declaration's field schema.
         - id: repo

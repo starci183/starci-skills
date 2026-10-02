@@ -36,7 +36,7 @@
 //                  every running-page capture of an implementation record is painted in the brand record's
 //                  colours (scripts/work/brand/brand-palette.mjs): PALETTE_OFF_BRAND names each foreign colour, its
 //                  area share and the nearest brand token; PRIMARY_ABSENT when that colour stands in for the
-//                  brand primary. Owner 2026-09-24: a nivo part drew its primary in blue, the brand is red.
+//                  brand primary. Owner 2026-09-24: a product part drew its primary in blue, the brand is red.
 //
 // Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model

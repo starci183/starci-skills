@@ -1,5 +1,6 @@
 schema: starci/i18n-catalog@1
-area: v4
+area: canon
+scope: runtime
 purpose: Owner-visible Vietnamese of the lint canons' "why" maps (packages/eslint/fe/lib/why.mjs and packages/stylelint/lib/why.mjs), keyed from their English source (scripts/lib/i18n.mjs). <file>/<what>/<line>/<n>/<m>/<tag>/<unit>/<text>/<slot>/<method> markers are filled by the reader, not by the translator.
 messages:
   # packages/eslint/fe/lib/why.mjs - headlines (en field)

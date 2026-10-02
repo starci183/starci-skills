@@ -423,7 +423,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
       // Nor one nobody ever tried to run: settled with no dispatch and no dispatch reject (a stranded --after chain
       // the Kernel settled blocked; a launcher that kept refusing is repeat-reject's, and still counts here).
-      // nivo wf-nivo-collab-group-chat a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
+      // a collab-group-chat workflow's a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
       // days later chained to it (--retry-of) and a3 read as the loop's first failure.
       const dispatched = new Set(db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind IN ('op-dispatched','dispatch-rejected')").all(wf).map((r) => r.entity_id));
       for (const r of db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind='op-settled'").all(wf)) if (!dispatched.has(r.entity_id)) notAFailure.add(r.entity_id);

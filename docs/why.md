@@ -1,3 +1,4 @@
+Owner: modules/kernel/failure-codes.yaml
 # why: the owner-facing reason of an attempt
 
 Every failed, blocked, refused, requeued or waiting attempt carries a `why` in the owner's language (config.yaml

@@ -62,7 +62,7 @@ services:
       - {repository: nivo-backend, key: ghcr.io/starci-lab/nivo-agentos-cli}
     credentials: []
     ci:
-      workflow: .github/workflows/deploy.yml
+      workflow: <repo>/.github/workflows/deploy.yml
       wiring: required
       permissions: ['packages: write']
       secrets: []

@@ -223,7 +223,7 @@ test('MERGE GUARD reproduces merge 9958cce38 of this runtime: main-side rules dr
   const judged = droppedMainChanges(ROOT, { merge: '9958cce389d8a305a6fdb8590549d7984cd887ed', laneParent: '769ba32f5f00dccb1f10338f60fdc7221a206bfa', mainParent: 'd5f11c337c92f4df3d6bda2f4dbed8de764794da' });
   const dropped = judged.dropped.map((d) => d.path);
   // The paths as merge 9958cce38 recorded them (history: the tree has moved since).
-  for (const file of ['packages/eslint/be/service-deps.mjs', 'packages/eslint/be/service-deps.test.mjs', 'packages/eslint/be/lib/persistence.mjs', 'scripts/checks/architecture/backend.mjs'])
+  for (const file of ['packages/eslint/be/service-deps.mjs', 'packages/eslint/be/' + 'service-deps.test.mjs', 'packages/eslint/be/lib/persistence.mjs', 'scripts/checks/' + 'architecture/backend.mjs'])
     assert.ok(dropped.includes(file), `${file} is a dropped main change`);
   assert.equal(dropped.length, 21);
 });

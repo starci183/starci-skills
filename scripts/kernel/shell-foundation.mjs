@@ -1,6 +1,6 @@
 // shell-foundation.mjs - the layout chain of a product is ONE shared foundation, `shell`, across every workflow of a
 // ledger (owner ruling 2026-09-29 draw-from-todo: "interface.draw must start from todo; if the parent is not drawn,
-// draw the parent, or tell the supervisor"; the shell/layout ancestors are shared by the five nivo workflows).
+// draw the parent, or tell the supervisor"; the shell/layout ancestors are shared by the five workflows of one product).
 //
 // interface.draw never refuses because a layout above its record is todo or unsettled. `api dispatch` decides who
 // draws the parents (scripts/kernel/verbs/dispatch.mjs):

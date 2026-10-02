@@ -13,6 +13,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
+import { REFERENCE_APP_MANIFEST } from '../lib/example-refs.mjs';
 
 export const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
 export const WHY_FILES = Object.freeze([
@@ -140,7 +141,7 @@ if (isMain(import.meta.url)) {
   const root = skillRoot;
   const { createProseResolver, sample } = await import('./runtime-rules/prose-path.mjs');
   const manifest = loadSlotManifest({ root });
-  const examples = ['examples/ecommerce-app/hfs.json'].filter((f) => fs.existsSync(path.join(root, f)));
+  const examples = [REFERENCE_APP_MANIFEST].filter((f) => fs.existsSync(path.join(root, f)));
   const resolver = createProseResolver({ files: examples, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') }, manifest);
   const classify = (p) => resolver.classify(`be/${sample(p.replace(/<kind>/g, 'api'))}`).slot ?? null;
   const files = gitOutputOf(lsFiles([], { dir: root, maxBuffer: 1 << 28 }), 'git ls-files').split('\n').filter(Boolean);

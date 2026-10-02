@@ -427,26 +427,26 @@ schemas:
     file: modules/kernel/retired-paths.yaml
     dialect: prose-data
     subsystem: kernel
-    governs: "The path ledger for intentionally retired runtime files (retired[]), moved files (moved[] from -> to, the chunk that moved them, quiesced for a pinned path) and replaced symbols (retiredSymbols[])."
-    binds: "modules/kernel/retired-paths.yaml retired[], moved[] and retiredSymbols[] entries"
-    usedBy: [scripts/checks/check-contract-cites.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
+    governs: "The path ledger for intentionally retired runtime files (retired[]), moved files (moved[] from -> to, the chunk that moved them, quiesced for a pinned path), replaced symbols (retiredSymbols[]) and retired namings that are not paths (retiredNames[])."
+    binds: "modules/kernel/retired-paths.yaml retired[], moved[], retiredNames[] and retiredSymbols[] entries"
+    usedBy: [scripts/checks/check-contract-cites.mjs, scripts/checks/check-retired-names.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
     business:
-      question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path or symbol stay gone?"
-      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED).
-      whenNot: Never authorizes a live runtime reference to a deleted or moved file.
+      question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path, name or symbol stay gone?"
+      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_RETIRED_NAME_LIVE, RT_PINNED_PATH_MOVED).
+      whenNot: Never authorizes a live runtime reference to a deleted or moved file or name.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
   - id: starci/i18n-catalog@1
     file: modules/i18n/messages/common.yaml
     dialect: prose-data
     subsystem: kernel
-    governs: "The Vietnamese message catalog of owner-visible runtime text: modules/i18n/messages/<area>.yaml, a messages[] list of {en, vi} entries keyed from the English source."
+    governs: "The one Vietnamese message catalog for runtime and UI text: modules/i18n/messages/<area>.yaml, scoped messages[] lists of {en, vi} entries keyed from the English source."
     binds: "modules/i18n/messages/*.yaml messages[] entries"
-    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs]
+    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs, scripts/i18n/generate-ui-catalog.mjs]
     business:
-      question: "What does the owner read in Vietnamese for this English runtime message?"
-      whenNeeded: Translating a Telegram notice, a why line, a progress report or any owner-visible runtime message; the only declared home of Vietnamese outside the failure-code, op and archetype fields.
-      whenNot: Never holds English-only text, a second translation of one source, or a message whose placeholders differ between en and vi.
+      question: "What does the owner read in Vietnamese for this English runtime or UI message?"
+      whenNeeded: Translating a Telegram notice, why line, progress report or browser label; the only declared catalog home of Vietnamese outside the failure-code, op and archetype fields.
+      whenNot: Never holds English-only text, a second translation of one source in one scope, or a message whose placeholders differ between en and vi.
       selectedBy: scripts/lib/i18n.mjs translator(language) and the i18n-catalog check.
 
   - id: starci/op@1

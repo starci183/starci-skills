@@ -927,7 +927,7 @@ const routeHoldMsOf = () => allocationMs('routeHoldMs');
  * leased and answering jobs always, and a routed-but-QUEUED one only while its latest route decision (payload.routedAt,
  * else its newest route-decided event) is younger than allocation.routeHoldMs. The hold lets sequential route calls of
  * one fan-out see the workers filling instead of piling every slice onto the first preferred pool; past it, a job parked
- * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (nivo
+ * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (seen live
  * 2026-09-28: devin 10/10 with 5 ops running). Re-routing a queued job refreshes its hold.
  * {byModel: {pool: n}, holders: Set<jobId>, routeHoldMs}; `excludeJobId` (the job being routed) holds nothing.
  */
@@ -1022,7 +1022,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // the Kernel must drop and re-enqueue.
   // A lineage that leads back to this job is its own history, never a wait: a retry whose --after
   // names the attempt it retries (a draw follow-up enqueued --after op-interface.draw-3cd517a152
-  // as that job's retry, nivo wf-nivo-workspace-provision-mujek7cb) otherwise held itself forever.
+  // as that job's retry, wf-<product>-workspace-provision-mujek7cb) otherwise held itself forever.
   const heldByJob = (priorId) => {
     const prior = lineageHeadById(db, priorId)?.row ?? null;
     return prior && prior.status !== 'succeeded' && prior.job_id !== job.job_id ? prior : null;
@@ -1033,7 +1033,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
     ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
     : null;
   // A released sibling is not held back through the seam's Work record either: a record edge to a job
-  // of its own cut's seam (ordinal 1) is the same wait the release lifted (cut-seam.mjs; nivo collab-impl-be
+  // of its own cut's seam (ordinal 1) is the same wait the release lifted (cut-seam.mjs; a product's collab-impl-be
   // ordinals dependsOn the composition record the seam owns).
   const seamReleased = Boolean(seamHold && !seamHold.hold);
   const ownSeamRow = (id) => {
@@ -1426,7 +1426,7 @@ function seamActionsOf(set) {
   return actions;
 }
 /* ------------------------------------------------------- status git memo */
-// api status took 26-31 s per workflow under load (8 s idle) on the nivo ledger, nearly all of it in
+// api status took 26-31 s per workflow under load (8 s idle) on a product ledger, nearly all of it in
 // spawnSync: every git call pays a process start (0.1-2.5 s on a loaded Windows host), and status repeated
 // the same reads - runtime-rev.mjs re-resolved the current rev once per running job and re-diffed the same
 // commit pair on every call, and two typed waits naming the same --until-commit targets ran the same
@@ -1949,7 +1949,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
     // The owner's goal text of the revision the job is bound to, so an op reads it from
-    // `api op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
+    // `api op-contract --json` and never opens the ledger for it (a product's auth, inc-26b260e101e4).
     ...((boundGoal ?? (payload.goal_binding?.revision == null ? goal : null)) ? { goal: goalForPacket(boundGoal ?? goal) } : {}),
     attempt: tryOf(job),
     owner_language: ownerLanguage(),
@@ -2147,7 +2147,7 @@ const opLeaseRequests = (payload, canon = null, op = null) => (canon
   ? canon.requests(payload, op ?? payload?.opId ?? null)
   : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
 
-// A write set another job's LIVE lease still owns is a wait, never a launch failure. A nivo job
+// A write set another job's LIVE lease still owns is a wait, never a launch failure. A job
 // was dispatched twice and rejected at `reserve` both times behind its own workflow's running
 // interface.implement (en.json/vi.json); each refusal was recorded dispatch-rejected and fed
 // repeat-reject OWED. Now route and dispatch answer path-lease and leave the job queued: status
@@ -2879,7 +2879,7 @@ const repairTemplateOf = (db, job, ops) => {
 };
 /**
  * The job that owns the Work record a rootCause.node names when the node is a record id rather than `<op>#...`
- * (a nivo uat.verify named a record id of another repository five times and the
+ * (a uat.verify named a record id of another repository five times and the
  * route re-ran the same UAT, never the owner of that record): the newest settled job of another op of the workflow
  * whose owned .starciwork record directory holds an index.yaml with that id. Null when none does.
  */
@@ -2998,7 +2998,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const routed = { route: route.id, from: job.job_id, firing: base.firing, limit };
     const classNote = failure?.class ? { class: failure.class, classReason: failure.reason } : {};
     // A product defect or measured findings with a named owner: repair THAT build, then this op runs again
-    // behind it - never the same walk again at the same HEAD (nivo app-auth uat.verify a1-a5).
+    // behind it - never the same walk again at the same HEAD (an app-auth uat.verify, a1-a5).
     // A node that names an op with a job in this workflow keeps the read-only root verify below (the
     // op-graph ruling); a Work record id, an explicit rootCause.op/files, or an op with no job here is
     // repaired directly.
@@ -3055,7 +3055,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const targets = routeTargetOps(catalog, route, op);
     // A report that names its root cause outside itself (rootCause.self false) and that this workflow
     // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
-    // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db and another
+    // the same partial (a collab op-backend.implement-bd2609ff17 -> a1dad730db and another
     // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
     // report's own checks pin on a peer's change settles peer-blocked like api check's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
@@ -3435,7 +3435,7 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
 // still dispatchable (running/queued/leased/answering) whose workflow is
 // finished or archived. Nothing will ever release it — finish settles the
 // kernel job it finds, and a restart after finish (or a finish from an older
-// runtime) left kernel-wf-nivo-ang-stales-refactor-mu9nfaxf 'running' for a
+// runtime) left kernel-wf-<product>-ang-stales-refactor-mu9nfaxf 'running' for a
 // workflow finished days before. Each is settled cancelled with its leases, a
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
@@ -3582,7 +3582,7 @@ async function settleOpProofs(db, jobId, repo) {
 }
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
-// drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
+// drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
@@ -3797,7 +3797,7 @@ function handoverProofGate(db, job, repo) {
 // class peer marks it peerBlocked {peers[], routes[]}, which summarizeCheckEvidence counts neither
 // passed nor failed. Only the api decides: a caller-supplied peerBlocked or attribution is dropped.
 // A red check with no `failing` list is attributed on the source files its own evidence/output text
-// names (failingFromText), recorded as failing + failingDerived: nivo collab's Kernel re-ran the
+// names (failingFromText), recorded as failing + failingDerived: a product's collab Kernel re-ran the
 // typecheck, wrote the peer's tsc line into the evidence and filed no list, so the peer's red was
 // counted this op's and the same op re-ran for hours.
 function attributeChecks(db, { repo, job, checks }) {

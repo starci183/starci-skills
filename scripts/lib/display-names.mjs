@@ -18,6 +18,7 @@ import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
 import { readYamlFile } from './read-yaml.mjs';
 import { collapse as oneLine } from './terminal-liveness.mjs';
+import { PRODUCT_NAME_SEGMENT } from './example-refs.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
 export const DISPLAY_NAME_LIMIT = 80;
@@ -82,7 +83,7 @@ export function workflowNames(db) {
 export const nameWithId = (name, id) => (name && name !== id ? `${name} (${id})` : String(id ?? name ?? ''));
 
 // ---------------------------------------------------------------------------------- workflow names
-const BRAND_CASE = { starci: 'StarCi', nivo: 'Nivo' };
+const BRAND_CASE = { starci: 'StarCi' };
 const REPO_ROLE_SUFFIX = /[-_](backend|be|frontend|fe|api|server|web|app)$/i;
 /** The product's display word(s) from a project or repository name: `shop-be` -> `Shop`. */
 export function productName(raw) {
@@ -103,7 +104,7 @@ export function firstClause(text) {
  */
 export function deriveWorkflowDisplayName({ text, product = null, fallback = null, max = WORKFLOW_NAME_MAX } = {}) {
   const prod = productName(product);
-  // The product leads the name already: a goal text that opens with it ("Nivo: …") starts after it.
+  // The product leads the name already: a goal text that opens with it ("<product>: …") starts after it.
   let body = oneLine(text);
   if (prod && body.toLowerCase().startsWith(prod.toLowerCase())) body = body.slice(prod.length).replace(/^[\s:·,–—-]+/, '');
   const clause = firstClause(body);
@@ -171,7 +172,7 @@ export function pathLabel(p) {
   const at = segs.indexOf('features');
   if (at >= 0 && segs[at + 1]) {
     const feature = segs[at + 1];
-    const rest = segs.slice(at + 2).filter((s) => !s.includes('.') && !FAMILY.has(s.toLowerCase()) && !/^(nivo|starci|mia)[-\w]*$/i.test(s));
+    const rest = segs.slice(at + 2).filter((s) => !s.includes('.') && !FAMILY.has(s.toLowerCase()) && !PRODUCT_NAME_SEGMENT.test(s));
     const leaf = rest.at(-1);
     return leaf && leaf !== feature ? `${words(feature)} / ${words(leaf)}` : words(feature);
   }

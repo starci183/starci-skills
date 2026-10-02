@@ -112,6 +112,7 @@ ruleParams:
       - {root: packages/hfs/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/be/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/fe/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
+      - {root: ui/src/i18n/generated, generatedBy: scripts/i18n/generate-ui-catalog.mjs}
     # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
     pinned:
       - {path: bin/starci.mjs, why: the npm bin}
@@ -142,6 +143,9 @@ ruleParams:
       - {id: i18n-catalog, run: scripts/checks/check-i18n-catalog.mjs}
       - {id: grammar-dist, run: scripts/checks/check-grammar-dist.mjs}
       - {id: canon-pins, run: scripts/checks/check-canon-pins.mjs}
+      - {id: retired-names, run: scripts/checks/check-retired-names.mjs}
+      - {id: example-coupling, run: scripts/checks/check-example-coupling.mjs}
+      - {id: doc-owner, run: scripts/checks/check-doc-owner.mjs}
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
       - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
@@ -530,7 +534,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_DOC_NO_OWNER]
   - id: runtime.skill
     profiles: [runtime]
     path: "skills/<skill>/"

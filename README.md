@@ -53,7 +53,7 @@ This repository is the StarCi runtime package: `modules/` holds contracts, `engi
 `scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
 human guidance, and `examples/` holds one backend/frontend product example (ecommerce-app), the
 shape-slot front-end slot-teaching fixture (not a product) and the starcistacks-services declarations. Each
-product example follows the [HFS tree](docs/source-layout.md); [Detailed layout](#detailed-layout)
+product example follows the [HFS tree](docs/architecture.md); [Detailed layout](#detailed-layout)
 maps the runtime directories below.
 
 ## Development

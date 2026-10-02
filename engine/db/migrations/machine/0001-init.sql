@@ -63,7 +63,7 @@ INSERT OR IGNORE INTO blob_ref_columns VALUES
 -- ledgers: the ONLY registry of every runtime.sqlite (reconciler, GC, harness read it here; replaces config.yaml supervisor.repos).
 CREATE TABLE IF NOT EXISTS ledgers(
   ledger_id      TEXT PRIMARY KEY,               -- = meta.ledger_id inside the file (UUID)
-  name           TEXT NOT NULL UNIQUE,           -- 'nivo-backend'
+  name           TEXT NOT NULL UNIQUE,           -- 'acme-backend'
   product        TEXT,
   repo_root      TEXT NOT NULL,
   file           TEXT NOT NULL,
@@ -880,7 +880,7 @@ UNION ALL SELECT 'sup_decisions', COALESCE(max(max(opened_at), max(COALESCE(reso
 
 -- ---------------------------------------------------------------------------------------------------------
 -- B8. Cross-DB queries - NO durable view (SQLite forbids a main view referencing an ATTACHed DB).
---   * Cross-ledger lists (progress, op_history, media, open_work, blocking, settle_overdue, scorecard): engine/machine-db.mjs
+--   * Cross-ledger lists (progress, op_history, media, open_work, blocking, settle_overdue, scorecard): engine/db/machine.mjs
 --     forEachLedger(fn) opens each runtime.sqlite read-only, runs the same-named view, adds the ledger column, merges in JS.
 --     attachLedgers(batch <= 9) is for ad-hoc queries only.
 --   * Blob GC: mark PER ledger into gc_marks (per each DB's blob_ref_columns) then sweep - no ATTACH-UNION.

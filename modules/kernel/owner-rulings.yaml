@@ -23,7 +23,7 @@ rulings:
   - id: heroui-defaults-first
     date: '2026-09-27'
     ruling: HeroUI and Grammar defaults come first; the canvas stays the HeroUI grey and brand tweaks come later, by owner ruling only.
-    enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [knowledge/ui/examples/brand-direction.example.yaml]
   - id: draw-dna-only
     date: '2026-09-27'
     ruling: Compose only the Grammar's DNA components - a notice is Alert, a ratio is Meter; anything DNA lacks is a grammar proposal, never an inline invention.
@@ -51,7 +51,7 @@ rulings:
   - id: grammar-gaps-0.6.0
     date: '2026-09-27'
     ruling: "add them all - add every grammar gap the real-component prototype found: the ink artwork band with the orbit motif, the unlabelled Divider, the DescriptionList stat strip, the Alert action icon, asset-slot props on Image/MediaFrame, the SectionHeader count and source meta, the off TagGroup chip, the quiet (ghost) IconButton, the PinnedActionBar, and data-component on every grammar root (@starci/grammar 0.6.0)."
-    enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.example.yaml]
   - id: secondary-input-contrast-accepted
     date: '2026-09-27'
     ruling: The low contrast of a secondary input's fill is accepted (COLOR-3 case-6).
@@ -63,7 +63,7 @@ rulings:
   - id: nivo-main-colour-ink
     date: '2026-09-27'
     ruling: The Nivo main colour is ink black #040d1c, not red; red is for artwork and danger only.
-    enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [knowledge/ui/examples/brand-direction.example.yaml]
     confirmed: '2026-09-27 - owner answered "settled" in the desktop chat; pendingRulings main-colour is ruled'
   - id: one-version-owner-review
     date: '2026-09-27'

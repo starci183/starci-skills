@@ -378,7 +378,7 @@ steps:
         lorem text, blurred stand-ins, skeleton or shimmer. A status line sits alone at the top of its
         card or as a neutral grey band, never beside a field label.
         DRAW WITH THE REAL GRAMMAR COMPONENTS (owner ruling 2026-09-27, 'settled'): the deliverable per shape is
-        `<XBase>.draw.tsx` - the shape-slot XBase (examples/shape-slot: it takes {state, props, on}, props are
+        `<XBase>.draw.tsx` - the drawing-law XBase (examples/shape-slot: it takes {state, props, on}, props are
         atoms, local helper components allowed, exported as <XBase>) composing ONLY @starci/grammar[/<family>]
         exports with their real props and closed variants (Alert, Meter segments, Badge, Button variant,
         SurfaceCard, IconTile, SectionHeader, Text, Heading, DescriptionList, TagGroup, PageContainer ...), icons

@@ -79,7 +79,7 @@ writes:
     path: shared
     content:
       en: shared
-      vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
+      vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-retired-names, check-json-exceptions - exit và từng lỗi."
 steps:
   - reads: [standard, rule]
     writes: [read-digest]

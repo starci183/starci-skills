@@ -1,3 +1,4 @@
+Task: judge whether a workflow is done
 # QUALITY BAR — what ".claude produces a high-quality project" means
 
 > **Status: DRAFT** — aspiration list. An item is only real once a check, an op

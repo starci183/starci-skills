@@ -240,7 +240,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.
@@ -374,7 +374,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.

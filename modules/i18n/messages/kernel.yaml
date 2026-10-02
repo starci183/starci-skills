@@ -1,6 +1,7 @@
 schema: starci/i18n-catalog@1
-area: v1
-purpose: Owner-visible messages of the legacy-purge v1 chunk (kernel verbs, ask form, autopilot, why reasons, derived log rows), keyed from their English source (scripts/lib/i18n.mjs).
+area: kernel
+scope: runtime
+purpose: Owner-visible messages from kernel verbs, ask forms, automatic operation, why reasons and derived log rows, keyed from their English source.
 messages:
   - en: "Owner decision"
     vi: "Quyết định của thầy"

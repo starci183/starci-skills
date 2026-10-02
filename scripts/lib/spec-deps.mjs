@@ -33,14 +33,14 @@ export function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(
     });
     if (hit && !path.relative(root, hit).startsWith('..')) out.push(posix(path.relative(root, hit)));
   }
-  // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/x/y.mjs') is a
+  // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/kernel/cli.mjs') is a
   // dependency too: the spec exercises that entry and everything it imports.
   for (const rel of spawnedEntriesOf(text)) if (fs.existsSync(path.join(root, rel))) out.push(rel);
   return out;
 }
 
 const ENTRY_ROOTS = '(?:scripts|engine|bin)';
-/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/a/b.mjs') or as path segments ('scripts', 'a', 'b.mjs'). */
+/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/kernel/cli.mjs') or as path segments ('scripts', 'kernel', 'cli.mjs'). */
 export function spawnedEntriesOf(text) {
   const out = new Set();
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);

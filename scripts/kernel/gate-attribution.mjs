@@ -19,12 +19,12 @@
 //   peer      (via preexisting) none of the above, the file is clean, outside this job's owned paths,
 //             imports nothing under them, and its last commit - older than the lineage - resolves to
 //             another workflow: the gate was already red on that workflow's change when this op
-//             started (nivo collab inc-72edd7aa6741: typecheck red on workspace-provision's
+//             started (a collab workflow's inc-72edd7aa6741: typecheck red on workspace-provision's
 //             c0e7552d, committed 04:08Z, before collab's lineage began 07:55Z; it read unknown, the
 //             attempt was spent and backend.implement re-ran for hours on a file it may not touch)
 //   foreign   a Work record file (under .starciwork/) outside this job's owned paths that nobody changed since the
 //             lineage began (clean, no commit): a record this job may not write and did not touch - its refusal is
-//             debt the job inherits, never its own failure (nivo wf-nivo-app-auth-mujek72s op-interface.draw a4-a6
+//             debt the job inherits, never its own failure (a product's app-auth op-interface.draw a4-a6
 //             spent three attempts on DATA_STATUS_DRAWN in ui/session-ending records outside owned_paths). Code and
 //             test files are never foreign: a change of this job can break a spec it does not own.
 //   unknown   neither: nothing ties the file to anyone since the work began
@@ -71,7 +71,7 @@ const SOURCE_PATH = /(?:^|[\s'"`(\[,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~[\](
 const FAILING_CAP = 20;
 /**
  * The failing files a red check's own text names, for a check that carries no `failing` list: a Kernel
- * that re-ran `npm run typecheck` and wrote the tsc line into its evidence (nivo collab
+ * that re-ran `npm run typecheck` and wrote the tsc line into its evidence (a collab
  * op-backend.implement-bd2609ff17, check peer-typecheck-failure-confirmed) is still attributed.
  * node_modules paths and URLs never count; at most FAILING_CAP distinct files, in order, `path[:line]`.
  */

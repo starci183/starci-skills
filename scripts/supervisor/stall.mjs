@@ -1,7 +1,7 @@
 // stall.mjs — progress, not liveness: which running workflow has stopped
 // moving, and whether the gate holding it still has a reason to hold.
 //
-// Incident (2026-09-24): nivo Collab sat idle ~2 hours. Its three queued
+// Incident (2026-09-24): a product's Collab sat idle ~2 hours. Its three queued
 // interface.implement jobs were held by owner-gate inc-48bc556d89a6 ("resolve
 // when the shell record .starciwork/shell/index.yaml exists (peer heads-up)").
 // The record was written done at ~02:20 and the peer's ask had closed, but no
@@ -341,7 +341,7 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
   }
   const peerProgress = lastProgress(peerDb, wait.peer);
   const peerIdleMs = now - peerProgress.at;
-  // A quiet ledger is not an idle peer while a turn of it is running: nivo AUTH inc-9f2e1e7ff1f6 read
+  // A quiet ledger is not an idle peer while a turn of it is running: one product's AUTH inc-9f2e1e7ff1f6 read
   // STALE-PEER-WAIT while its peer's op-backend.implement-82b3110067 worker (Devin) was mid-turn.
   // busyOf is asked only once the ledger says idle (it reads api status and the Kernel frame).
   let peerBusy = null;
@@ -417,8 +417,8 @@ export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
  * Why a workflow whose ledger is quiet is still working: a worker mid-turn (its `api status` workers) or
  * its Kernel mid-turn (`kernelTurn`, a thunk read only when no worker is); null when neither. The one
  * judgement for a peer (judgePeerWait's busyOf) and for the workflow itself (STALLED): a Kernel mid-turn
- * is moving, so an actionable frontier is not "the Kernel has not moved" (nivo
- * wf-nivo-workspace-provision-mudqjokb, inc-b1435cb9c2b9: STALLED idle 966m 'orphaned-frontier ACTIONABLE
+ * is moving, so an actionable frontier is not "the Kernel has not moved" (a product's
+ * wf-<product>-workspace-provision-mudqjokb, inc-b1435cb9c2b9: STALLED idle 966m 'orphaned-frontier ACTIONABLE
  * but the Kernel has not moved' while every wake was skipped kernel-busy for 8.5 h and the Kernel enqueued
  * the next leg 9 s before the alert).
  */
@@ -557,7 +557,7 @@ export function stallFindings(db, {
         if (!job || !['dependency-failed', 'dependency'].includes(item.queuedBecause) || !item.blockedBy?.job) continue;
         const blocker = db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(item.blockedBy.job);
         if (!blocker || !SETTLED.includes(blocker.status)) continue;
-        // The Kernel needs a turn to react to a blocker that just settled (nivo Modules re-enqueued
+        // The Kernel needs a turn to react to a blocker that just settled (a product's Modules re-enqueued
         // the failed blocker 9 s after it settled, yet the alert fired at "0m ago"): same grace as gates.
         if (now - blocker.updated_at < graceMs) continue;
         out.push({ type: 'STALE-WAIT', key: `STALE-WAIT|${wf}|${job.job_id}`, workflowId: wf, repo, jobId: job.job_id, alert: true,

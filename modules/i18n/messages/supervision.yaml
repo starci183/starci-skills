@@ -1,6 +1,7 @@
 schema: starci/i18n-catalog@1
-area: v2
-purpose: Owner-visible messages of the legacy-purge v2 chunk (connectors + supervisor), keyed from their English source (scripts/lib/i18n.mjs).
+area: supervision
+scope: runtime
+purpose: Owner-visible connector and supervisor messages, keyed from their English source.
 messages:
   - {en: "not found", vi: "không tìm thấy"}
   - {en: "This question asks for credentials, so it is not served over the public link. Answer it on the machine through the localhost link.", vi: "Câu hỏi này cần thông tin bí mật nên không mở qua link công khai. Hãy trả lời trên máy bằng link localhost."}

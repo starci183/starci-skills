@@ -10,7 +10,7 @@ import { loadContractChanges } from '../../scripts/machine/contract-version.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schema = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'application-stacks.schema.yaml'), 'utf8'));
-const fixtures = path.join(root, 'examples', 'starcistacks-services');
+const fixtures = path.join(root, 'tests', 'fixtures', 'starcistacks-services');
 
 const write = (file, body) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); };
 const yamlOf = (value) => JSON.stringify(value, null, 2); // JSON is YAML

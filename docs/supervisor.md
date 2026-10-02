@@ -1,3 +1,4 @@
+Owner: modules/supervisor/
 # Supervisor
 
 One Supervisor decision seat, `[Worker]` fix agents spawned on demand, and one land gate.

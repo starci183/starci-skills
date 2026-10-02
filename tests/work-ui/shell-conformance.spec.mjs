@@ -13,6 +13,7 @@ import { productLocaleFor } from '../../scripts/kernel/product-locale.mjs';
 import { nodeById } from '../../scripts/work/layout-tree.mjs';
 import { encodePng, blankImage } from '../../scripts/work/png.mjs';
 import { cloneTree, drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
+import { readAppFixtureYaml } from '../helpers/app-fixture.mjs';
 
 // The layout-tree redesign (owner-approved 2026-09-24): design follows the Next.js App Router layout
 // architecture. The shell record is the layout tree scanned from app/, directions are generated slot content
@@ -53,9 +54,9 @@ test('work/layout-tree@1 and the ui-screen route/surface/overlay/composite field
   assert.ok(errorsAt({ ...base, route: 'photos' }, 'route').length, 'a route is a layout tree node id');
   assert.ok(errorsAt({ ...base, host: 'photos list' }, 'host').length);
   assert.deepEqual(errorsAt({ ...base, shell: { ref: 'shell', rev: 2, layouts: [{ node: CONSOLE, rev: 1 }] } }, 'shell'), []);
-  const example = readYaml('examples/ecommerce-app/.starciwork/features/checkout/ui/cart/index.yaml');
-  delete example.shell;
-  ui(example);
+  const fixture = readAppFixtureYaml('.starciwork/features/identity/ui/sign-in/index.yaml');
+  delete fixture.shell;
+  ui(fixture);
   assert.deepEqual((ui.errors ?? []).filter((e) => /^\/(route|surface|shell|direction|routed|host)/.test(e.instancePath)), [], 'a historical ui record without the new fields still compiles');
 });
 

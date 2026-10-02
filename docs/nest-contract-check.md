@@ -1,3 +1,4 @@
+Owner: knowledge/patterns/be/architecture-check.yaml
 # Nest callable contract and readonly boundary check
 
 `node scripts/hfs/architecture.mjs <repository>` reports two independent Nest contract rules:

@@ -1,3 +1,4 @@
+Owner: knowledge/application-stacks.yaml
 # Remote application API boundaries
 
 An application hosted in Kubernetes or K3s remains an application API to its callers.

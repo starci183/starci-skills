@@ -1,6 +1,7 @@
+Owner: knowledge/design-patterns.yaml
 # Enterprise design pattern catalog for Next.js and NestJS
 
-Reviewed against primary framework/database documentation and original engineering pattern analyses on **2026-09-16**. Links identify each source's author/maintainer; recommendations below are this standard's design judgments, not an industry certification. This is the agent's semantic design reference under the [common rules](architecture-rules.md). It does not replace the executable [code-pattern contract](code-pattern-enforcement.md), select infrastructure, authorize product changes or certify the inspected source.
+Reviewed against primary framework/database documentation and original engineering pattern analyses on **2026-09-16**. Links identify each source's author/maintainer; recommendations below are this standard's design judgments, not an industry certification. This is the agent's semantic design reference under the [common rules](architecture.md). It does not replace the executable [code-pattern contract](code-pattern-enforcement.md), select infrastructure, authorize product changes or certify the inspected source.
 
 The standard fixes TypeScript, Next.js, NestJS and the owner's adopted Academy code forms. The choices below concern consistency, ownership and failure handling within that stack. Use the smallest design that satisfies the actual invariant. A pattern name in a class, dependency list or SDS is not evidence that its guarantees hold.
 
@@ -33,7 +34,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 ## DP-01 — Modular capability, use case and adapter
 
-**Use:** Features own scenarios; shared modules own reusable capability policy, state or integration. A public contract exposes the responsibility. A protocol/provider adapter translates its external representation at the boundary. Map roles through the [backend](backend-source-pattern.md) and [portable FE/BE](portable-source-architecture.md) profiles.
+**Use:** Features own scenarios; shared modules own reusable capability policy, state or integration. A public contract exposes the responsibility. A protocol/provider adapter translates its external representation at the boundary. Map roles through the [architecture profiles](architecture.md).
 
 **Avoid:** An interface, forwarding service or empty dynamic-module builder for every class. Nest dynamic registration is useful when callers actually configure a module; it is not required merely because a module exists. [Nest dynamic modules](https://docs.nestjs.com/fundamentals/dynamic-modules).
 
@@ -153,7 +154,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 ## DP-16 — Compatible rollout and expand/contract
 
-**Use:** When versions coexist, introduce compatible fields/contracts first, deploy readers/writers in a safe order, backfill with restartable progress, verify parity, then drop the earlier contract after its users are gone. This is this standard's deployment inference from explicit producer/consumer compatibility, not a claim that a schema checker proves a live rollout. See DP-11 and the [application runtime/config/health profile](application-runtime-config-and-health.md).
+**Use:** When versions coexist, introduce compatible fields/contracts first, deploy readers/writers in a safe order, backfill with restartable progress, verify parity, then drop the earlier contract after its users are gone. This is this standard's deployment inference from explicit producer/consumer compatibility, not a claim that a schema checker proves a live rollout. See DP-11 and the [application runtime/config/health profile](application-stacks.md).
 
 **Avoid:** A destructive schema change and new binary that can only work when every process changes atomically; replaying old sagas through an incompatible definition; calling a rollback safe after irreversible data transformation.
 

@@ -20,7 +20,7 @@
 // The rubric is the product's: `.starciwork/brand/index.yaml` brand.direction.rubric.checks (brand.decide's direction
 // mode - lane ui-discipline-brand), with the archetype block of the record's ui.archetype when the direction has one.
 // A product whose brand record carries no rubric yet is judged by DEFAULT_RUBRIC below (the r5 bake-off rubric,
-// brand-neutral, in the work/brand@1 rubric shape; knowledge/ui/examples/brand-direction.nivo.yaml seeds a product's
+// brand-neutral, in the work/brand@1 rubric shape; knowledge/ui/examples/brand-direction.example.yaml seeds a product's
 // own).
 import fs from 'node:fs';
 import path from 'node:path';

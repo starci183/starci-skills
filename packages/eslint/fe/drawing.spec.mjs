@@ -1,7 +1,7 @@
 /**
- * Twin tests for the shape-slot law.
+ * Twin tests for the drawing law.
  *
- *   node --test shape-slot.spec.mjs
+ *   node --test drawing.spec.mjs
  *
  * The scope is the pure half of a split tier. The cases that matter sit just outside it: the
  * connected half and the recipe composite are SUPPOSED to read status flags, and a layout alone
@@ -16,7 +16,7 @@ import {
   noDataStatusShape,
   rules,
   slotStatusThroughSlotView,
-} from "./shape-slot.mjs"
+} from "./drawing.mjs"
 
 const tester = slotTester()
 

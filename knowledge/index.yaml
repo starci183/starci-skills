@@ -91,7 +91,7 @@ branches:
     path: ui/index.yaml
     use: Composition, presentation and rendered-proof criteria selected for the current scope, including the
       owner's UX/UI discipline (composition/taste.yaml DISCIPLINE-1..3, HIERARCHY-6, ACCENT-6) and the worked
-      brand.direction example a product's brand record settles per archetype (ui/examples/brand-direction.nivo.yaml).
+      brand.direction example a product's brand record settles per archetype (ui/examples/brand-direction.example.yaml).
   - id: grammars
     title: Grammar snapshots
     path: grammars/index.yaml

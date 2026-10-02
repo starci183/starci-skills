@@ -35,7 +35,7 @@ export function cssTokenDeclarations(text){
   return [...code.matchAll(/(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]*)/g)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
 }
 
-/** The families `scripts/copy-css.mjs` copies: every `src/<family>` that has a `styles.css`. */
+/** The families `packages/grammar/scripts/copy-css.mjs` copies: every `src/<family>` that has a `styles.css`. */
 function cssFamilies(packageRoot){
   const src=path.join(packageRoot,'src');
   if(!fs.existsSync(src))return [];

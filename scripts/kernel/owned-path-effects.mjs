@@ -117,7 +117,7 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
       for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
     }
     // A dirty file last written before the attempt's dispatch (PREEXISTING_SLACK_MS) is debris the
-    // attempt found, not its effect: nivo modules-agentos brand.decide a1 never launched (launch-abandoned)
+    // attempt found, not its effect: a product's modules-agentos brand.decide a1 never launched (launch-abandoned)
     // yet settled "partial" on brand-check files written 2026-09-21. A deleted file has no mtime and stays.
     const own = [], found = [];
     for (const file of d.dirty) {

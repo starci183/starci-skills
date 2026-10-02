@@ -52,13 +52,13 @@ test('the kernel cuts a canon code.refactor leg by canon-scan slices, each still
 test('the conformance leg carries the owner families as a declared code.refactor param', () => {
   const brief = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'ops', 'ops', 'code.refactor.yaml'), 'utf8'));
   // code.refactor also declares kernel params with defaults (canonWire, resumeFrom - canon slice wire).
-  assert.deepEqual(resolveOpParams(brief, { leg: { canonFamilies: 'shape-slot,architecture' }, enforceRequired: true }).params,
-    { gateRounds: 5, canonFamilies: 'shape-slot,architecture', canonWire: false, resumeFrom: '' });
+  assert.deepEqual(resolveOpParams(brief, { leg: { canonFamilies: 'drawing,architecture' }, enforceRequired: true }).params,
+    { gateRounds: 5, canonFamilies: 'drawing,architecture', canonWire: false, resumeFrom: '' });
   assert.equal(resolveOpParams(brief, { enforceRequired: true }).params.canonFamilies, '');
   assert.equal(resolveOpParams(brief, { flag: { canonFamilies: 'all' } }).ok, false, 'the kernel cannot set an owner param the leg does not carry');
 });
 
-const findings = (files, family = 'shape-slot') => files.map((file) => ({ machine: 'eslint', ruleId: `starci-fe/${family}`, family, file, line: 1, fixable: false }));
+const findings = (files, family = 'drawing') => files.map((file) => ({ machine: 'eslint', ruleId: `starci-fe/${family}`, family, file, line: 1, fixable: false }));
 
 test('units follow the declared roots and skip route segments', () => {
   const conformance = loadConformance();
@@ -143,9 +143,9 @@ test('canon-scan lints with the runtime canon source, groups by law, and bounds 
     const report = JSON.parse(all.stdout);
     assert.equal(report.schema, 'starci/canon-findings@1');
     assert.equal(report.canon.source, 'packages/eslint/fe');
-    assert.deepEqual(report.totals.byFamily, { 'shape-slot': 2, 'class-names': 2 });
+    assert.deepEqual(report.totals.byFamily, { 'drawing': 2, 'class-names': 2 });
     assert.deepEqual(report.slices.map((slice) => slice.wave), ['foundation', 'shared', 'surfaces']);
-    const one = JSON.parse(scan('--paths', 'src/components/leaves', '--families', 'shape-slot').stdout);
+    const one = JSON.parse(scan('--paths', 'src/components/leaves', '--families', 'drawing').stdout);
     assert.equal(one.totals.findings, 1);
     assert.deepEqual(one.findings.map((finding) => finding.file), ['src/components/leaves/MoneyText/index.tsx']);
     const deferred = JSON.parse(scan('--exclude', 'src/components/blocks').stdout);

@@ -113,7 +113,7 @@ reads:
         the installed package and the real source files determine what a value may actually be.
   - id: direction
     path: knowledge/ui/composition/{taste,hierarchy,accent}.yaml + knowledge/ui/proof/{taste,brand}.yaml +
-      knowledge/grammars/<family>/DNA.yaml + knowledge/ui/examples/brand-direction.nivo.yaml
+      knowledge/grammars/<family>/DNA.yaml + knowledge/ui/examples/brand-direction.example.yaml
     purpose:
       en: "Read in direction mode: the owner's nine-step UX/UI discipline (DISCIPLINE-1..3, HIERARCHY-6,
         ACCENT-6 and the TASTE proof cases), the DNA components the recipes map onto, and a worked

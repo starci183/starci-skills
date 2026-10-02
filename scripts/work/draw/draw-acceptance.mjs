@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // draw-acceptance.mjs — what an interface.draw pass is judged by: EVERY asset its accepted record binds, the files it
-// wrote and the ones it adopted, inherited or found already there alike (nivo wf-nivo-app-auth-mujek72s
+// wrote and the ones it adopted, inherited or found already there alike (a product's wf-<product>-app-auth-mujek72s
 // op-interface.draw-7c2821e002 settled pass by committing 40 image-gen evidence files of three older jobs unchanged).
 //
 // Owner ruling 2026-09-27: interface.draw draws shapes only - one image per XBase#state of the ui record's ui.shapes -

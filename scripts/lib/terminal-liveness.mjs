@@ -159,7 +159,7 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
 // frame and answers it as `draft` (Orca out/shared/terminal-composer-draft.js). Every classifier
 // below read the frame alone, so a wake typed without Enter, or whose Enter was dropped, sat in the
 // input box unseen: the frame read turn-idle with an empty '❯', the next wake was typed onto it, and
-// the texts piled up (nivo collab Kernel, 2026-09-25). A reader puts the draft back where the agent
+// the texts piled up (a collab Kernel, 2026-09-25). A reader puts the draft back where the agent
 // shows it before any classification.
 const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_CLASS})(?:\\s|$)`, 'u');
 /**
@@ -246,7 +246,7 @@ export const isAgentLaunch = (text) => String(text ?? '').split(';').some((state
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
  *  - the LAST non-empty row is a bare prompt ("PS <drive>:\x>");
  *  - the LAST non-empty row STARTS with a prompt and the rows just above it are the agent's own input
- *    row or footer. A Codex op killed mid-turn (nivo term_8f9e0611, 2026-09-24 03:56) froze its frame at
+ *    row or footer. A Codex op killed mid-turn (a product's term_8f9e0611, 2026-09-24 03:56) froze its frame at
  *    "• Working (10m 46s • esc to interrupt)" / "› Ask Codex to do anything", and PowerShell printed its
  *    prompt over the footer row without clearing it: "PS <drive>:\x> <what is left of the footer>". No agent
  *    draws a shell prompt BELOW its own input box, so that row is the host shell. The frame read
@@ -321,7 +321,7 @@ const QUEUED_BEHIND_TURN = /press up to (?:edit|select) (?:a )?queued messages?/
 
 // A tool call that carries its own bound returns by itself, so "No output yet" under it is a tool
 // still running, never a stuck turn: Devin prints the bound of every shell call ("│ Timeout: 4m40s")
-// and polls a background shell with "Read shell"; Codex waits on a background terminal. A nivo
+// and polls a background shell with "Read shell"; Codex waits on a background terminal. A product
 // backend.implement worker polling its sonar-local slice scan (--wait) read wedged at 30 minutes of
 // turn time and the frontier pointed at a recovery that would have killed it (inc-d8f08b77ca8b).
 // The spinner's minutes are the whole turn's, not the command's, so only an unbounded command -

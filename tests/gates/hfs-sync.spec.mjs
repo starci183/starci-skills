@@ -270,7 +270,7 @@ describe('the Sonar key', () => {
     assert.equal(await readDeclaredSonarKey(dir, { fail }), null);
     fs.mkdirSync(path.join(dir, '.starcistacks'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'nivo-backend' }));
-    fs.copyFileSync(path.join(ROOT, 'examples', 'starcistacks-services', 'nivo-backend.services.yaml'), path.join(dir, '.starcistacks', 'application-stacks.yaml'));
+    fs.copyFileSync(path.join(ROOT, 'tests', 'fixtures', 'starcistacks-services', 'nivo-backend.services.yaml'), path.join(dir, '.starcistacks', 'application-stacks.yaml'));
     assert.equal(await readDeclaredSonarKey(dir, { fail }), 'nivo-backend');
   });
 });

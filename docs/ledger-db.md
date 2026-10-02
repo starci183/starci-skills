@@ -1,3 +1,4 @@
+Task: read the runtime's storage
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
 The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql`

@@ -47,7 +47,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 }
 
 // A long owned-path list rides in a file, never inline: the prompt is the Orca worker-start --spec argv,
-// and Windows caps a command line at 32,767 characters. nivo workspace-provision's leg
+// and Windows caps a command line at 32,767 characters. a product's workspace-provision leg
 // of 993 frozen paths (op-business.decide-cc63d20d87) failed the Task's creation with spawnSync ENAMETOOLONG on
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the

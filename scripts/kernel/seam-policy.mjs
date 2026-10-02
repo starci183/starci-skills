@@ -3,7 +3,7 @@
 //
 // A cut (driver-loop.yaml enqueue.cutExecution) runs seam-first: ordinal 1 owns the shared seam and the
 // other ordinals waited for it to settle succeeded. When the seam failed, queued or sat behind a wait the
-// whole cut stalled - nivo wf-nivo-collab-group-chat-mujek7ue held seven backend.implement ordinals for
+// whole cut stalled - wf-<product>-collab-group-chat-mujek7ue held seven backend.implement ordinals for
 // more than a day behind seam op-backend.implement-9a2c4c2f03 (attempt 11, queued under a peer-wait).
 //
 // The contract here is contract-first:

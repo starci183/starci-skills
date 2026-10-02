@@ -48,7 +48,7 @@ const canonFiles = () => [
 
 test('a deleted slot id cited in text is found, a real one, a family prefix and a file name are not', () => {
   const vocabulary = slotVocabulary();
-  const found = deadCites('the migrate app (be.app.migrate) and be.feature.transport.cli\nbe.app.cli, be.transport and be.feature.application\n@starci/tsconfig/be.json, fe.package.bogus and be.transport.*', vocabulary);
+  const found = deadCites('the migrate slot (be.app.migrate) and be.feature.transport.cli\nbe.app.cli, be.transport and be.feature.application\n@starci/tsconfig/be.json, fe.package.bogus and be.transport.*', vocabulary);
   assert.deepEqual(found.map((f) => [f.token, f.line]), [['be.app.migrate', 1], ['be.feature.transport.cli', 1], ['fe.package.bogus', 3]]);
 });
 

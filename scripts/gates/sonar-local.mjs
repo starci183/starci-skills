@@ -311,7 +311,7 @@ const stackRootOf=file=>{
 
 /**
  * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
- * through that repository's own tool (scripts/stack-secret.mjs inside that repository, not this runtime; an absolute reference names that tree directly - a project
+ * through that repository's own tool (<repo>/scripts/stack-secret.mjs inside that repository, not this runtime; an absolute reference names that tree directly - a project
  * token minted into the declaring repository while the sonar stack itself is the host extension - and a relative one stays a
  * member of the configured stack), and a runtime extension's ext/<service>/secrets directory (the example apps' analysis
  * tokens), sealed by sealExtCustody. Anything else is refused and mintToken revokes the value again. Never argv.
@@ -603,7 +603,7 @@ export function readProperties(file){
 const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replace(/"/g,'\\"')}"`;
 
 /**
- * The repository's own scanner: its `sonar:check` script when it has one (nivo repositories), otherwise
+ * The repository's own scanner: its `sonar:check` script when it has one (repositories that declare it), otherwise
  * the official npm scanner. The host is forced to the local server on the command line - it wins over
  * sonar.host.url in sonar-project.properties, which keeps the public name for CI and dashboards - and the
  * scanner's work directory goes outside the repository so a scan leaves no .scannerwork behind.
@@ -698,7 +698,7 @@ export function sliceChanges(cwd,{base,paths}={}){
   if(first.error)return {ok:false,code:'SLICE_NOT_GIT',reason:`git diff against ${baseRef} failed: ${first.error}`};
   let {files}=first,used=baseCommit,baseFallback=null;
   // An attempt that authored no delta of its own (its slice was committed by an earlier attempt, so the base the op
-  // recorded is HEAD) read as SLICE_EMPTY and left backend.implement red in ops (nivo, 2 of 5 scans). The slice is then
+  // recorded is HEAD) read as SLICE_EMPTY and left backend.implement red in ops (observed on one ledger, 2 of 5 scans). The slice is then
   // what the branch carries inside --paths beyond its merge-base with the trunk: the same code the gate has to judge.
   if(!files.length&&git(revParseQuery,cwd,['--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
     for(const ref of ['@{upstream}','origin/main','main','origin/master','master']){

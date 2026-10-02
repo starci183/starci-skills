@@ -1,3 +1,4 @@
+Owner: modules/kernel/api.yaml
 # Connectors: public owner asks over Cloudflare + Telegram
 
 An owner ask is a `serve-ask` form (`scripts/kernel/ask-server.mjs`) on a random loopback port

@@ -1,3 +1,4 @@
+Task: write the host-local config.yaml
 # Local config format
 
 StarCi keeps **local runtime preferences** in ignored `config.yaml` at the skill root. That file is host-local state, never part of the shipped source payload, and is not overwritten by install/update when it already exists.

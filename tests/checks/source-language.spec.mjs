@@ -39,14 +39,14 @@ test('a Vietnamese string, comment or SQL comment in source is refused, in every
   ]);
 });
 
-test('a declared catalog file, a bundle copy and a document are not source findings', (t) => {
-  assert.deepEqual(DECLARED_SOURCE_CATALOGS, ['ui/src/i18n/', 'scripts/lib/language.mjs']);
+test('the detector, a bundle copy and a document are not source findings; UI source has no catalog exemption', (t) => {
+  assert.deepEqual(DECLARED_SOURCE_CATALOGS, ['scripts/lib/language.mjs']);
   assert.deepEqual(found(fixture(t, {
-    'ui/src/i18n/vi.ts': `export const nav = { overview: '${VI}' };\n`,
     'packages/hfs/runtime/scripts/lib/x.mjs': `// ${VI}\n`,
     'docs/note.md': `${VI}\n`,
     'scripts/machine/ask-recommendation.mjs': `const MARK = /(${VI})/u;\n`,
   })), []);
+  assert.deepEqual(found(fixture(t, { 'ui/src/i18n/vi.ts': `export const nav = { overview: '${VI}' };\n` })), [['HFS_SOURCE_NOT_ENGLISH', 'ui/src/i18n/vi.ts']]);
   assert.deepEqual(found(fixture(t, { 'scripts/machine/other.mjs': `const MARK = /(${VI})/u;\n` })), [['HFS_SOURCE_NOT_ENGLISH', 'scripts/machine/other.mjs']]);
 });
 

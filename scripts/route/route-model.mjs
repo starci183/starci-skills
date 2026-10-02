@@ -309,14 +309,14 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
   // A pool serves the kind when it serves its role or the order the kind walks
   // (owner routing 2026-09-26: the implement order's mechanical ops are
   // decide/plan/write-role kinds the hands take anyway) — the same gate
-  // models.mjs::selectPool applies.
+  // scripts/agent/models.mjs::selectPool applies.
   const serveKey = orderKeyOf({ work: w.work, order: w.order }, w.role);
   return chain.map(id => {
     const rt = runtimes?.runtimes?.[id] ?? null;
     if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no registry.yaml entry for this pool'] };
     // The launch model is the pool's per-difficulty pin (registry.yaml pools
     // models[difficulty]); a pool without that pin is structurally off this
-    // chain, the same gate models.mjs::selectPool applies.
+    // chain, the same gate scripts/agent/models.mjs::selectPool applies.
     const lm = resolveLaunchModel(id, difficulty, { runtimes });
     const model = lm.modelId ?? rt.target ?? id;
     const pf = preflightFor(rt);
@@ -563,7 +563,7 @@ async function main() {
       return { c, eligible: false, mode: null, reasons: [
         `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     // A pool serves the kind when it serves its role or the order the kind
-    // walks (models.mjs::selectPool applies the same gate).
+    // walks (scripts/agent/models.mjs::selectPool applies the same gate).
     if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
       return { c, eligible: false, mode: null, reasons: [
         `pool does not serve role '${w.role}'${orderKey !== w.role ? ` or order '${orderKey}'` : ''}`] };

@@ -349,7 +349,7 @@ sections:
         refuses such an ask (ask-declared-in-stack); a custody or server gap is repaired in the stack
         and CI wiring marked optional-follow-up is a Kernel's follow-up, not an owner provision. A
         repository whose declaration lacks the block gets suspects and the planned follow-up
-        (workspace.manage mode stacks, examples/starcistacks-services/<repository>.services.yaml),
+        (workspace.manage mode stacks, examples/starcistacks-services/template.services.yaml),
         never a hold on running work."
       - "The layout covers the whole .starciwork tree. Workflow run state is the runtime.sqlite
         ledger — goals/jobs/inbox/reports/contracts/checks ROWS transacted through `api` verbs.
@@ -626,7 +626,7 @@ shared:
   reads:
     - id: application-stacks
       path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-        docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+        docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
       purpose:
         en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
           load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -760,7 +760,7 @@ shared:
       content:
         en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result
           - doc-language, check-work-surfaces, check-work-deep, check-example-work,
-          check-contract-cites, check-json-exceptions - its exit and every finding."
+          check-contract-cites, check-retired-names, check-json-exceptions - its exit and every finding."
   placeholders:
     feature: Selected feature slug
     repository: Implementation repository segment under impl/

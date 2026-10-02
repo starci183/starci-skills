@@ -218,7 +218,7 @@ export default {
           claimOverruled = true;
           result.claimOverruled = true;
         } else if (verdict === 'pass' && measurementLeg && envelope.outcome === 'failed' && !measuredSplit.errors.length) {
-          // A measurement filed as `failed` only because it found findings (nivo fe-canon review.verify a1-a4).
+          // A measurement filed as `failed` only because it found findings (a fe-canon review.verify, a1-a4).
           result.measurement = { leg: 'measurement', reportOutcome: 'failed', readAs: 'done', findings: measuredSplit.findings.map((c) => c.name) };
         } else {
           throw Object.assign(new Error(`verdict '${verdict}' cannot settle a report of outcome '${envelope.outcome}'`), { code: 'verdict-outcome-mismatch' });

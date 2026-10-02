@@ -1,5 +1,5 @@
 /**
- * The rules that hold the shape-slot law (example: examples/shape-slot).
+ * The rules that hold the drawing law (the `drawing` slot role: a surface's pure `component.tsx`).
  *
  * TWO AXES, AND ONLY ONE IS DRAWN. A surface's `state` is its SHAPE: a layout the owner approves as
  * one drawing. A slot's data status (loading, forbidden, error, empty) is not a shape; it is a
@@ -77,7 +77,7 @@ const membersOf = (node, types, seen = new Set()) => {
 /** The key a property signature declares. */
 const keyOf = (member) => (member.key?.type === "Identifier" ? member.key.name : member.key?.value)
 
-// -- SHAPE-SLOT-1 ----------------------------------------------------------------------------------
+// -- DRAWING-1 ----------------------------------------------------------------------------------
 
 /** The pure half takes `{ state, props, on }` of atoms; only a layout also takes `children`. */
 export const basePropsAtom = {
@@ -189,7 +189,7 @@ export const basePropsAtom = {
   },
 }
 
-// -- SHAPE-SLOT-2 ----------------------------------------------------------------------------------
+// -- DRAWING-2 ----------------------------------------------------------------------------------
 
 /** Only the sibling `index.tsx` (and its specs) may reach `component.tsx`; only `X` leaves the folder. */
 export const baseImportPair = {
@@ -241,7 +241,7 @@ export const baseImportPair = {
   },
 }
 
-// -- SHAPE-SLOT-3 ----------------------------------------------------------------------------------
+// -- DRAWING-3 ----------------------------------------------------------------------------------
 
 /** Words that name a data status or an open/closed lifecycle, never a drawn shape. */
 const DATA_STATUS = new Set([
@@ -279,7 +279,7 @@ export const noDataStatusShape = {
   },
 }
 
-// -- SHAPE-SLOT-4 ----------------------------------------------------------------------------------
+// -- DRAWING-4 ----------------------------------------------------------------------------------
 
 /** Flags that are a slot's data status. */
 const STATUS_FLAG = /^(?:isLoading|isError|isForbidden|isPending|isValidating|isEmpty)$/

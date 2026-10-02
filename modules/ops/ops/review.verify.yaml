@@ -170,7 +170,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.
@@ -679,7 +679,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.
@@ -815,7 +815,7 @@ policy:
               required checks; do not infer deployment or repair authority.
         - id: policy
           path: knowledge/coding-reference.yaml + docs/code-pattern-enforcement.md +
-            modules/models/code-patterns.yaml + docs/architecture-check.md +
+            modules/models/code-patterns.yaml + docs/architecture.md +
             docs/application-stacks.md + scripts/gates/canon-scan.mjs
           purpose:
             en: Read the applicable FE/BE responsibility boundaries and static-check limits for mono or separate

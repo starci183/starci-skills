@@ -32,6 +32,7 @@ packages/**/storybook-static/
 packages/hfs/runtime/
 packages/eslint/be/runtime/
 packages/eslint/fe/runtime/
+ui/src/i18n/generated/
 
 # Scratch space for throwaway experiments: use it freely, it is never committed.
 /ex-testing/

@@ -1,7 +1,7 @@
 // hk-tmp.mjs — the %TEMP% sweep of the host-housekeeping run (STORAGE-PROMPT item 1.tmp).
 //
 // On 2026-09-26 %TEMP% held 53k top-level entries, 45k of them older than a day — spec fixtures and runtime
-// temp dirs nobody removes (starci*, evidence*, sup-k*, si*, starci-w2*, work-v3*, w1*, nivo*, orca*). The
+// temp dirs nobody removes (starci*, evidence*, sup-k*, si*, starci-w2*, work-v3*, w1*, orca*). The
 // sweep removes the top-level entries whose names start with a prefix the allocation declares and whose
 // mtime is older than the declared age. Both come from modules/models/runtimes.yaml
 // `allocation.housekeeping` (tmpPrefixes, tmpMaxAgeMs) via allocationSettings(); callers may inject the

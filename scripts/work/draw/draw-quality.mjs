@@ -1,4 +1,4 @@
-// draw-quality.mjs — owner ruling 2026-09-27 (nivo wf-nivo-modules-agentos-mujek7lg op-interface.draw-2815deda22): a
+// draw-quality.mjs — owner ruling 2026-09-27 (a product's wf-<product>-modules-agentos-mujek7lg op-interface.draw-2815deda22): a
 // draw with correct tokens is not a draw that passes. The owner judged the module-ledger drawing ugly - ten whole-page
 // renders of one layout that differ only in a status banner, no controls for the FR's commands, internal ids and
 // jargon in the copy, badges bound to no tone - and it had gone green on checks alone. What an interface.draw pass

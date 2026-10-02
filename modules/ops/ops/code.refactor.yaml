@@ -18,7 +18,7 @@ params:
     default: ''
     setBy: owner
     doc:
-      en: "Comma-separated canon-scan families (a canon law such as shape-slot, architecture, or a lint
+      en: "Comma-separated canon-scan families (a canon law such as drawing, architecture, or a lint
         plugin prefix) this slice drives to zero inside its owned paths; `all` names every family
         canon-scan reports and an empty value means the slice is no canon-conformance slice."
   canonWire:
@@ -94,7 +94,7 @@ reads:
         topics for the selected repository.
   - id: machines
     path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml +
-      docs/architecture-check.md
+      docs/architecture.md
     purpose:
       en: When the slice lives in a checked app (`be/` or `fe/`), read the sealed architecture and
         code-pattern machines' supported arguments, report schema, exit codes and coverage limits.

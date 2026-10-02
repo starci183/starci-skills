@@ -1,5 +1,6 @@
 schema: starci/i18n-catalog@1
-area: v5
+area: operations
+scope: runtime
 purpose: Owner-readable Vietnamese for the UI op catalog (ui/api/op-catalog.mjs), keyed from the English source.
 messages:
   - en: "Reads the owner's request, picks the matching workflow and writes a scope summary — nothing real is done yet."

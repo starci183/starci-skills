@@ -18,17 +18,17 @@ test('the allowlist, its schema, the check and its spec are the only list-named 
 
 test('a file named like a retired list mechanism is sprawl wherever it lives', () => {
   assert.deepEqual(codes(allowlistSprawlFindings([
-    'modules/kernel/failure-codes.not-codes',
-    'modules/schemas/json-exceptions.yaml',
-    'scripts/checks/dead-scripts.entries',
+    'modules/kernel/dead-codes.not-codes',
+    'modules/schemas/yaml-exceptions.yaml',
+    'scripts/checks/gone-scripts.entries',
     'knowledge/hfs/audit.pending',
     'tools/lint-baseline.json',
     'docs/scan-baseline.txt',
     'modules/ops/allowlist.yaml',
   ])), [
-    ['RT_ALLOWLIST_SPRAWL', 'modules/kernel/failure-codes.not-codes'],
-    ['RT_ALLOWLIST_SPRAWL', 'modules/schemas/json-exceptions.yaml'],
-    ['RT_ALLOWLIST_SPRAWL', 'scripts/checks/dead-scripts.entries'],
+    ['RT_ALLOWLIST_SPRAWL', 'modules/kernel/dead-codes.not-codes'],
+    ['RT_ALLOWLIST_SPRAWL', 'modules/schemas/yaml-exceptions.yaml'],
+    ['RT_ALLOWLIST_SPRAWL', 'scripts/checks/gone-scripts.entries'],
     ['RT_ALLOWLIST_SPRAWL', 'knowledge/hfs/audit.pending'],
     ['RT_ALLOWLIST_SPRAWL', 'tools/lint-baseline.json'],
     ['RT_ALLOWLIST_SPRAWL', 'docs/scan-baseline.txt'],

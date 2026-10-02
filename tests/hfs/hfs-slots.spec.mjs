@@ -457,7 +457,7 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
   const cli = sideOf(APP, 'be');
   assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').slot, 'be.cli');
   assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').status, 'owned');
-  assert.equal(cli.classifyPath('src/features/api/orders/transport/cli/import.cli.ts').slot === 'be.cli', false);
+  assert.equal(cli.classifyPath('src/features/api/orders/transport/rest/import.cli.ts').slot === 'be.cli', false);
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
