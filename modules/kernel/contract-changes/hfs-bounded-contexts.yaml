@@ -15,7 +15,7 @@ summary: >-
   connections. The be.persistence slot covers `src/modules/projections/<capability>/persistence/`, the manifest slot field
   `perConnection` lists the platform capabilities that exist per connection, the context tiers are domain and projections,
   and the opt-in slot be.contract.events.pin is new. BE-PERSISTENCE-2, -3, -5, -8 and -9 change and BE-PERSISTENCE-11 to -15 are new;
-  BE-CONVENTION 1.4.1, 1.4.3, 1.4.6 change and 1.4.7 is new. Rule ids are provisional and renumber at rebase.
+  BE-CONVENTION 1.4.1, 1.4.3, 1.4.6 change and 1.4.7 is new. R166 BE_SQL_RETURNING_SHAPE (eslint-be sql-returning) refuses an UPDATE or DELETE with RETURNING that is not wrapped in a CTE SELECT, BE-PERSISTENCE-16. Rule ids are provisional and renumber at rebase.
 reach: new-legs
 paths:
   - scripts/hfs/architecture/context-map.mjs
@@ -24,6 +24,7 @@ paths:
   - scripts/hfs/architecture/context-transaction.mjs
   - scripts/hfs/architecture/context-platform-tables.mjs
   - scripts/hfs/architecture/sql-owner.mjs
+  - scripts/hfs/architecture/sql-returning.mjs
   - scripts/hfs/architecture/connection-map.mjs
   - scripts/hfs/architecture/schema-owner.mjs
   - scripts/hfs/architecture/surface.mjs

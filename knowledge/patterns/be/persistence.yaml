@@ -322,6 +322,26 @@ rules:
       manual:
         - Run a refusal-after-write case against a real database and assert the rollback.
     relatedExamples: []
+  - id: BE-PERSISTENCE-16
+    title: UPDATE or DELETE with RETURNING is wrapped in a SELECT
+    kind: mandatory
+    hfsRules: [R166]
+    requirement: |-
+      EntityManager.query returns a bare `UPDATE ... RETURNING` or `DELETE ... RETURNING` as `[rows, affectedCount]`, not as rows (an
+      `INSERT ... RETURNING` returns rows). A `SqlText` constant that updates or deletes and returns columns is written as
+      `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed`, which returns rows, and an e2e spec runs it on the real database.
+    rationale: |-
+      A unit spec that stubs the SQL result cannot see the shape; the caller read the tuple as rows and a saga stalled with stock unreleased.
+    cases:
+      - id: case-1
+        when: Releasing reserved stock and reading the released rows
+        write: 'export const RELEASE = sql`WITH changed AS (UPDATE stock_items SET qty = qty + $2 WHERE id = $1 RETURNING id, qty) SELECT id, qty FROM changed`'
+    verification:
+      automated:
+        - BE_SQL_RETURNING_SHAPE
+      manual:
+        - Confirm the e2e run exercises the statement against the real database.
+    relatedExamples: []
   - id: BE-PERSISTENCE-11
     title: A connection is a bounded context with one owning service
     kind: mandatory
