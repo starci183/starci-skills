@@ -269,18 +269,23 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
 // replacement is recorded only once its terminal closed.
 const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
   error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
-const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }) => {
-  const terminalClosed = closeKernelTerminal(terminal, dispatch);
+export const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }, deps = {}) => {
+  const close = deps.closeKernelTerminal ?? closeKernelTerminal;
+  const openLedger = deps.withKernelLedger ?? withKernelLedger;
+  const replace = deps.replaceKernel ?? replaceKernel;
+  const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
-  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
-  return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
+  openLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
+  return replace({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel ${terminal} received ${idle.wakes} wakes with an actionable frontier and made no move: replaced (H11)` });
 };
 
-const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, misses, firstAt }) => {
-  const terminalClosed = closeKernelTerminal(terminal, dispatch);
+export const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, misses, firstAt }, deps = {}) => {
+  const close = deps.closeKernelTerminal ?? closeKernelTerminal;
+  const replace = deps.replaceKernel ?? replaceKernel;
+  const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, misses, firstAt }, terminalClosed, 'wake-dead');
-  return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
+  return replace({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel terminal ${terminal} missed ${misses} wakes since ${new Date(firstAt).toISOString()} with no output: a dead kernel behind a listed terminal` });
 };
 

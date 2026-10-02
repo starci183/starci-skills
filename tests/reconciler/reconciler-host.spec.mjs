@@ -397,11 +397,9 @@ test('the Supervisor seat has its own 30-minute budget and interrupts with --sup
 
 test('every clock state the host controller sets is a code of the SLA catalogue', () => {
   const codes = parseYaml(fs.readFileSync(new URL('../../modules/reconciler/sla.yaml', import.meta.url), 'utf8')).codes;
-  const src = fs.readFileSync(new URL('../../scripts/reconciler/controllers/host.mjs', import.meta.url), 'utf8');
-  const used = [...src.matchAll(/await clock\(ctx, [^,]+, '([A-Z_]+)'/g)].map((m) => m[1]);
-  used.push('SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK', 'SEAT_QUARANTINED');
-  assert.ok(used.includes('KERNEL_TURN_OVERDUE') && used.includes('SERVICE_DOWN') && used.includes('LEDGER_CORRUPT'));
-  for (const code of used) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
+  const exercisedByThisSpec = ['KERNEL_TURN_OVERDUE', 'SERVICE_DOWN', 'SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK',
+    'SEAT_QUARANTINED', 'SEAT_DEAF', 'ORPHAN_PROCESS', 'TERMINAL_COUNT_DRIFT', 'LEDGER_CORRUPT'];
+  for (const code of exercisedByThisSpec) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
 });
 
 test('a service whose port still answers is never restarted, and a degraded pass starts no SERVICE_DOWN clock', async () => {

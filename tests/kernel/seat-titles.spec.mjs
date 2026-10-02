@@ -8,7 +8,7 @@ import { tabTitlesOf } from '../../scripts/kernel/terminal-dedupe.mjs';
 import { repairKernelTabTitle } from '../../scripts/kernel/kernel-watchdog.mjs';
 import { repairSupervisorTabTitles, watchdogPass } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { launchSupervisor } from '../../scripts/supervisor/start-supervisor.mjs';
-import { SKILL_ROOT } from '../../scripts/machine/home.mjs';
+import { SKILL_ROOT, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX } from '../../scripts/machine/home.mjs';
 
 const listing = (tabs) => ({ ok: true,
   terminals: Object.keys(tabs).map((handle, i) => ({ handle, tabId: `tab${i}`, title: 'Done - Claude', connected: true })),
@@ -20,16 +20,13 @@ const host = (tabs) => {
     rename: (terminal, title) => { calls.push({ terminal, title }); return { ok: true }; } };
 };
 
-test('launchers declare runtime tab titles and do not disable managed Claude title readiness', () => {
-  const kernel = fs.readFileSync(new URL('../../scripts/kernel/start-workflow.mjs', import.meta.url), 'utf8');
-  const supervisor = fs.readFileSync(new URL('../../scripts/supervisor/start-supervisor.mjs', import.meta.url), 'utf8');
-  const workers = fs.readFileSync(new URL('../../scripts/supervisor/workers.mjs', import.meta.url), 'utf8');
-  const ops = fs.readFileSync(new URL('../../scripts/kernel/cli.mjs', import.meta.url), 'utf8');
-  assert.match(kernel, /const title = `\[Kernel\] \$\{kernelName\}`/);
-  assert.match(supervisor, /title: SUPERVISOR_TITLE, prompt/);
-  assert.match(workers, /const title = `\$\{WORKER_TITLE_PREFIX\} \$\{job\.payload\.cluster\}`/);
-  assert.doesNotMatch(workers, /CLAUDE_CODE_DISABLE_TERMINAL_TITLE/);
-  assert.doesNotMatch(ops, /CLAUDE_CODE_DISABLE_TERMINAL_TITLE/);
+test('public runtime title contracts produce the semantic seat titles', () => {
+  assert.equal(SUPERVISOR_TITLE, '[Supervisor] main');
+  assert.equal(`${WORKER_TITLE_PREFIX} fix-title`, '[Worker] fix-title');
+  const d = host({ term_kernel: 'Claude Code', term_supervisor: 'Claude Code', term_worker: 'Claude Code' });
+  repairKernelTabTitle('term_kernel', 'Example workflow', d);
+  repairSupervisorTabTitles('term_supervisor', [{ worker_id: 'term_worker', payload: { cluster: 'fix-title', terminalClosed: false } }], d);
+  assert.deepEqual(d.calls.map(({ title }) => title), ['[Kernel] Example workflow', '[Supervisor] main', '[Worker] fix-title']);
 });
 
 test('kernel watchdog repairs a drifted tab, ignoring the pane title', () => {
@@ -79,13 +76,15 @@ test('a Supervisor watchdog pass applies the seat title while handling a wake', 
   const env = { LOCALAPPDATA: path.join(root, 'local'), STARCI_SUPERVISOR_MODE: 'kernel' };
   const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000,
     language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+  let startRequest = null;
   const launch = await launchSupervisor({ env, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, deps: {
     list: () => ({ ok: true, terminals: [{ handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }], visualLayouts: [] }), tabTitles: () => new Map(),
     screen: () => '❯ ', exitedRow: () => null, close: () => ({ ok: true }), quit: () => ({ exited: true }),
     show: () => ({ ok: false, error: 'no worker' }), bindSeat: () => 'seat.json',
-    start: () => ({ ok: true, terminal: 'term_sup', dispatchId: 'ctx_sup', runId: 'run_sup', taskId: 'task_sup' }),
+    start: (request) => { startRequest = request; return { ok: true, terminal: 'term_sup', dispatchId: 'ctx_sup', runId: 'run_sup', taskId: 'task_sup' }; },
   } });
   assert.equal(launch.ok, true);
+  assert.equal(startRequest.title, '[Supervisor] main', 'the launcher passes the semantic title to the managed worker start');
   const d = host({ term_sup: 'Done - Claude' });
   Object.assign(d, { show: () => ({ ok: true, state: 'ready' }), screen: () => '❯ ',
     settleMs: 0, state: () => 'turn-idle', wake: () => ({ action: 'kernel-woken', delivered: true }),

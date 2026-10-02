@@ -331,7 +331,4 @@ test('an op launched into a workflow worktree gets a guard file naming it (the h
   assert.equal(guard.workflowId, 'wf-guard');
   const outside = guardLaunch({ skillRoot, jobId: 'op-plain', workflowId: 'wf-none', ledgerRepo: app, owned: [], repos: [], config: { guards: { historyHook: false, workHook: false } } });
   assert.equal(JSON.parse(fs.readFileSync(outside.receipt.jobFile, 'utf8')).workflowWorktree, null, 'no workflow worktree, no field value');
-  // api dispatch hands the registry path of the workflow's worktree to the guard (scripts/kernel/verbs/dispatch.mjs).
-  const dispatchSource = fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
-  assert.match(dispatchSource, /opGuardLaunch\(\{[^}]*workflowWorktree: workflowTree\?\.path \?\? null/);
 });

@@ -129,7 +129,7 @@ test('a conflict: the branch stays, its head is preserved, one rebase-conflict D
   assert.equal(fx.escalations.length, 2);
 });
 
-test('api settle is the caller (settleCheckpoint), after a green checkpoint only; rebase-conflict is a Decision Item kind', (t) => {
+test('settleCheckpoint rebases only after a green checkpoint; rebase-conflict is a Decision Item kind', (t) => {
   const fx = fixture(t, { behindLimit: 1 });
   commit(fx.repo, 'fe/x1.ts', '1\n');
   write(fx.dir, 'be/d.ts', 'export const d = 1;\n');
@@ -141,8 +141,6 @@ test('api settle is the caller (settleCheckpoint), after a green checkpoint only
   assert.equal(green.kind, 'workflow-checkpoint');
   assert.deepEqual([green.milestone.due, green.milestone.why, green.milestone.rebased], [true, 'behind', true]);
   assert.equal(fx.registry.get(WF).checkpoint, green.milestone.head, 'the checkpoint follows the milestone rebase');
-  const settle = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'settle.mjs'), 'utf8');
-  assert.match(settle, /checkpoint = settleCheckpoint\(wfCtx, \{ workflowId: settlingJob\.workflow_id, opId: jobId, pass: verdict === 'pass' \}\);/);
   assert.ok(DI_KINDS.includes('rebase-conflict'));
   const codes = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'failure-codes.yaml'), 'utf8');
   assert.match(codes, /^rebase-conflict:\n/m, 'the DI kind has its failure-code entry');

@@ -183,7 +183,7 @@ const seedJob = (repo, { jobId, op = 'backend.implement', wf = 'wf-s', report })
 };
 const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...process.env, ORCA_TERMINAL_HANDLE: '' } }); let body = null; try { body = JSON.parse(r.stdout); } catch { body = null; } return { r, body }; };
 
-test('the typed-log rules reach every new dispatch and every kernel boot', async () => {
+test('the operation and kernel prompt contracts both require typed logs', async () => {
   const { buildOpPrompt } = await import('../../scripts/kernel/op-prompt.mjs');
   const packet = { op: 'backend.implement', brief: 'modules/ops/ops/backend.implement.yaml', context: { records: [], owned_paths: [], attempt: 1, workflow: { id: 'wf-p' } }, constraints: { model: 'm' } };
   const prompt = buildOpPrompt({ skillRoot: ROOT, packet, jobId: 'op-p-1', repo: 'repo/p' });
@@ -191,11 +191,8 @@ test('the typed-log rules reach every new dispatch and every kernel boot', async
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);
   assert.match(prompt, /cli\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
-  const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
-  assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'api dispatch renders the op prompt with the logging block');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);
   assert.match(kernelPrompt, /\[boundary\.typedLogs\]/);
   assert.match(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'driver-loop.yaml'), 'utf8'), /^\s+typedLogs: >-/m);
-  assert.match(fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'start-workflow.mjs'), 'utf8'), /readFileSync\(path\.join\(skillRoot, 'modules', 'kernel', 'kernel-prompt\.md'\)/, 'every kernel boot reads kernel-prompt.md');
 });

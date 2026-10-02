@@ -5,10 +5,11 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, chatRoute, bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, ONLINE_MS,
+  createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, chatRoute, bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, BRIDGE_FILE, ONLINE_MS,
 } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { readInbox } from '../../scripts/machine/sup-messages.mjs';
-import { claimManager, writeConnectorState } from '../../scripts/connectors/lib.mjs';
+import { claimManager, claimOrTakeOver, writeConnectorState } from '../../scripts/connectors/lib.mjs';
+import { reexecSelf, RELOAD_ENV } from '../../scripts/machine/self-reload.mjs';
 import { askKeyOf, readSentStore, textFor } from '../../scripts/connectors/telegram.mjs';
 import { ledgerResolver } from '../../scripts/connectors/ask-gateway.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -239,7 +240,7 @@ test('run stops when telegram is not ready, when another bridge owns the updates
 
 test('run hands the bridge to a replacement between rounds when the runtime changed (self-reload), like the watchdogs', async (t) => {
   const bot = await fakeBot(t);
-  const { bridge, logs } = setup(t, bot);
+  const { bridge, logs, env } = setup(t, bot);
   const asked = [];
   const reload = async () => { asked.push(bot.of('getUpdates').length); return asked.length === 3 ? 5151 : null; };
   assert.deepEqual(await bridge.run({ maxRounds: 10, reload }), { stopped: 'reloaded', reloaded: 5151 });
@@ -249,9 +250,23 @@ test('run hands the bridge to a replacement between rounds when the runtime chan
   const files = bridgeReloadFiles().map((f) => path.basename(f));
   for (const name of ['telegram-bridge.mjs', 'telegram.mjs', 'lib.mjs', 'self-reload.mjs']) assert.ok(files.includes(name), name);
   for (const file of bridgeReloadFiles()) assert.ok(fs.existsSync(file), file);
-  const main = fs.readFileSync(new URL('../../scripts/supervisor/telegram-bridge.mjs', import.meta.url), 'utf8');
-  assert.match(main, /claimOrTakeOver\(BRIDGE_NAME, \{ from: handoverFrom, env \}\)/, 'the replacement takes the lock over from the bridge that spawned it');
-  assert.match(main, /reexecSelf\(\{ script: BRIDGE_FILE, args: \['run'\]/);
+
+  const original = claimManager(BRIDGE_NAME, { env });
+  assert.equal(original.ok, true);
+  const replacement = claimOrTakeOver(BRIDGE_NAME, { from: process.pid, env });
+  assert.deepEqual([replacement.ok, replacement.takenOver], [true, true], 'the replacement atomically takes the old bridge lock');
+  replacement.release();
+
+  let spawned = null;
+  const handed = await reexecSelf({
+    script: BRIDGE_FILE, args: ['run'], lockName: BRIDGE_NAME, env, selfPid: 4141, now: () => 1234,
+    spawnChild: (request) => { spawned = request; return { pid: 5151, exited: () => false }; },
+    holder: () => ({ pid: 5151 }), sleep: async () => {}, kill: () => assert.fail('a successful handover is never killed'),
+    reclaim: () => assert.fail('a successful handover is never reclaimed'), log: () => {},
+  });
+  assert.deepEqual(handed, { ok: true, pid: 5151 });
+  assert.deepEqual([spawned.script, spawned.args, spawned.env[RELOAD_ENV.handoverFrom], spawned.env[RELOAD_ENV.reloadedAt]],
+    [BRIDGE_FILE, ['run'], '4141', '1234'], 'the replacement runs the bridge verb with explicit handover identity');
 });
 
 test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregistered, and launches otherwise', (t) => {
