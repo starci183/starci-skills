@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { EVENT_BUS } from "@modules/platform/event-bus"
 import type { EventBus } from "@modules/platform/event-bus"
 import { OrderError, OrderErrorCode } from "@modules/domain/order"
@@ -8,6 +8,9 @@ import { DUPLICATE_OUTBOX_ROW, OUTBOX_OF_EVENT } from "../../fixtures/persistenc
 import { EVENT_BUS_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { ProbeBehavior } from "../../world/probe-consumer.module"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /** How many 250 ms polls a spec watches for something that must NOT happen (the relay passes every 100 ms, so each poll spans two). */
 const QUIET_POLLS = 8
@@ -22,7 +25,7 @@ describe("event bus (integration)", () => {
     const world = useTestWorld({ modules: EVENT_BUS_CAPABILITY_MODULES })
 
     const bus = (): EventBus => world.resolve<EventBus>(EVENT_BUS)
-    const eventId = (): string => `probe-${randomUUID()}`
+    const eventId = (): string => `probe-${ids.next()}`
 
     it("event-bus/atomic-with-transaction: the outbox row commits with the change and is gone with a rollback", async () => {
         const kept = eventId()

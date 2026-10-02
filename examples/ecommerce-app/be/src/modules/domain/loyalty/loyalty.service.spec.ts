@@ -1,10 +1,9 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeInbox, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { INBOX } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { LoyaltyService } from "./loyalty.service"
 import { LoyaltyEntryEntity } from "./persistence/entities/loyalty-entry.entity"
 import { SUM_PERSON_POINTS } from "./persistence/loyalty.sql"
@@ -22,8 +21,8 @@ const entry = (points: number): LoyaltyEntryEntity => ({
 })
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
-    const inbox = mock<Inbox>()
-    inbox.claim.mockResolvedValue(claimed)
+    const inbox = fakeInbox()
+    if (!claimed) inbox.seen("order-paid-loyalty", "o-1")
     const moduleRef = await Test.createTestingModule({
         providers: [
             LoyaltyService,
@@ -43,7 +42,7 @@ describe("LoyaltyService", () => {
 
             await service.grantForOrder(grant)
 
-            expect(inbox.claim).toHaveBeenCalledWith("order-paid-loyalty", "o-1")
+            expect(inbox.claims).toEqual([{ source: "order-paid-loyalty", eventId: "o-1" }])
             expect(manager.save).toHaveBeenCalledWith(LoyaltyEntryEntity, {
                 personId: "p-1",
                 orderId: "o-1",
@@ -78,7 +77,7 @@ describe("LoyaltyService", () => {
 
             await expect(service.grantForOrder(grant)).rejects.toBe(failure)
 
-            expect(inbox.release).toHaveBeenCalledWith("order-paid-loyalty", "o-1")
+            expect(inbox.released).toEqual([{ source: "order-paid-loyalty", eventId: "o-1" }])
         })
     })
 

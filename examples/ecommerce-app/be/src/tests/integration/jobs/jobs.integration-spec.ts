@@ -1,11 +1,14 @@
+import { fakeIds } from "@starci/jest-preset"
 import assert from "node:assert"
-import { randomUUID } from "node:crypto"
 import type { ClaimedJob } from "@modules/platform/jobs"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { JOB_OF_KEY } from "../../fixtures/queues/probe.sql"
 import { ProbeJobBehavior } from "../../world/probe-job.module"
 import { JOBS_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /** A claim lease short enough that a spec waits it out: one 250 ms poll is enough. */
 const LEASE_MS = 150
@@ -36,7 +39,7 @@ describe("fenced jobs (integration)", () => {
         expect(write()).rejects.toMatchObject({ code: FENCED_OUT })
 
     it("fenced-job/claim-bumps-token: a first claim holds token 1, a live claim blocks a second worker, an expired one is taken with a bigger token", async () => {
-        const key = `claim-${randomUUID()}`
+        const key = `claim-${ids.next()}`
 
         const first = await claim(key)
         const blocked = await claim(key)
@@ -53,7 +56,7 @@ describe("fenced jobs (integration)", () => {
     })
 
     it("fenced-job/zombie-fenced-out: a worker whose claim was taken over changes nothing and learns it from JobFencedOut", async () => {
-        const key = `zombie-${randomUUID()}`
+        const key = `zombie-${ids.next()}`
         const zombie = await claim(key)
         await leaseExpires()
         const owner = await claim(key)
@@ -78,7 +81,7 @@ describe("fenced jobs (integration)", () => {
     })
 
     it("fenced-job/redispatch-isolated: a redelivery after a failure runs under a new token and run key, and the first attempt cannot write", async () => {
-        const key = `redispatch-${randomUUID()}`
+        const key = `redispatch-${ids.next()}`
         const first = await claim(key, 60_000)
         assert(first !== null)
         await claims().fail({ jobId: first.jobId, expectedFencingToken: first.fencingToken, reason: "provider down" })

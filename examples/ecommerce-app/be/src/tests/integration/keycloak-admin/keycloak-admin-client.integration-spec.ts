@@ -1,9 +1,12 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { KEYCLOAK_ADMIN, KeycloakAdminErrorCode } from "@modules/integrations/keycloak-admin"
 import type { KeycloakAdmin } from "@modules/integrations/keycloak-admin"
 import { refused } from "@modules/platform/primitives"
 import { KEYCLOAK_ADMIN_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /**
  * keycloak-admin: the real admin client against the run's realm of the stack's Keycloak, no HTTP door of ours. It writes as
@@ -16,7 +19,7 @@ describe("keycloak-admin: shopper directory client (integration)", () => {
     const world = useTestWorld({ modules: KEYCLOAK_ADMIN_CAPABILITY_MODULES })
 
     const admin = (): KeycloakAdmin => world.resolve<KeycloakAdmin>(KEYCLOAK_ADMIN)
-    const shopper = () => ({ email: `shopper-${randomUUID()}@ecommerce.dev`, password: `pw-${randomUUID()}` })
+    const shopper = () => ({ email: `shopper-${ids.next()}@ecommerce.dev`, password: `pw-${ids.next()}` })
 
     it("creates a shopper that signs in to the realm with its password", async () => {
         const params = shopper()
@@ -38,7 +41,7 @@ describe("keycloak-admin: shopper directory client (integration)", () => {
         const params = shopper()
         await admin().createMember(params)
 
-        expect(await admin().createMember({ ...params, password: `pw-${randomUUID()}` })).toEqual(
+        expect(await admin().createMember({ ...params, password: `pw-${ids.next()}` })).toEqual(
             refused(KeycloakAdminErrorCode.EmailTaken),
         )
     })

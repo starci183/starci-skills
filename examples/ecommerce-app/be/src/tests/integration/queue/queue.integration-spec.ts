@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { OrderError, OrderErrorCode } from "@modules/domain/order"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { ProbeQueue } from "../../fixtures/queues/probe.queue"
@@ -6,6 +6,9 @@ import { PROBE_ROWS_OF_NOTE } from "../../fixtures/queues/probe.sql"
 import { QUEUE_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { ProbeQueueBehavior } from "../../world/probe-queue.module"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /** How many 250 ms polls a spec watches for something that must NOT happen, or lets time pass. */
 const QUIET_POLLS = 6
@@ -33,8 +36,8 @@ describe("queue (integration)", () => {
     }
 
     it("queue/enqueue-atomic-with-transaction: the job commits with the change and is gone with a rollback", async () => {
-        const kept = `kept-${randomUUID()}`
-        const lost = `lost-${randomUUID()}`
+        const kept = `kept-${ids.next()}`
+        const lost = `lost-${ids.next()}`
 
         await world.db.order.transaction((manager) => producer().enqueueProbe({ note: kept }, manager))
         await expect(
@@ -53,7 +56,7 @@ describe("queue (integration)", () => {
     })
 
     it("queue/relay-job-id-is-outbox-id: the BullMQ job id is the outbox row id, and the row is marked sent", async () => {
-        const note = `id-${randomUUID()}`
+        const note = `id-${ids.next()}`
 
         await world.db.order.transaction((manager) => producer().enqueueProbe({ note }, manager))
 

@@ -20,6 +20,20 @@ describe("order paid archives its receipt", () => {
         await productBuilder(world.db.order).build({ id: "sku-kettle", priceMinorUnits: 2_400, stock: 5 })
     })
 
+    /** Waits for billing to issue the invoice of an order. */
+    const issuedInvoice = (orderId: string) =>
+        world.waitFor("billing issues the invoice", async () => {
+            const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [orderId])
+            return rows[0]?.status === "issued" ? rows[0] : null
+        })
+
+    /** Waits for the receipt of a paid order to be readable by its buyer. */
+    const archivedReceipt = (buyer: ReturnType<typeof world.apps.order.api.bearing>, orderId: string) =>
+        world.waitFor("the receipt of the paid order is archived", async () => {
+            const read = await buyer.read<OrderReceiptData>("orderReceipt", { variables: { input: { orderId } } })
+            return read.errorCode === null ? read : null
+        })
+
     it("the send-receipt job archives the receipt of a paid order and the buyer downloads it through a link that expires", async () => {
         const session = await world.signedInPerson("receipt-owner")
         const buyer = world.apps.order.api.bearing(session.sessionToken)
@@ -31,20 +45,12 @@ describe("order paid archives its receipt", () => {
             variables: { input: { idempotencyKey: "receipt-owner-1" } },
         })
         const order = present(placed.data, "placeOrder data").placeOrder
-        await world.waitFor("billing issues the invoice", async () => {
-            const rows = await readRows(world.db.billing, INVOICES_OF_ORDER, [order.orderId])
-            return rows[0]?.status === "issued" ? rows[0] : null
-        })
+        await issuedInvoice(order.orderId)
 
         const delivery = await world.fake.sepay.settle({ reference: order.orderId, amount: 4_800 })
 
         expect(delivery?.status).toBe(204)
-        const receipt = await world.waitFor("the receipt of the paid order is archived", async () => {
-            const read = await buyer.read<OrderReceiptData>("orderReceipt", {
-                variables: { input: { orderId: order.orderId } },
-            })
-            return read.errorCode === null ? read : null
-        })
+        const receipt = await archivedReceipt(buyer, order.orderId)
         const link = new URL(present(receipt.data, "orderReceipt data").orderReceipt.url)
         const downloaded = await world.http(link.origin).get<ReceiptDocumentView>(`${link.pathname}${link.search}`)
         expect(downloaded.status).toBe(200)

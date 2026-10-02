@@ -1,10 +1,16 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, fakeTransaction, mock, mockEntityManager, recordingEventBus } from "@starci/jest-preset"
+import {
+    builder,
+    FakeClock,
+    fakeInbox,
+    fakeTransaction,
+    mockEntityManager,
+    recordingEventBus,
+} from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { BILLING_ENTITY_MANAGER } from "@modules/platform/database"
 import { INBOX } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { InvoiceIssuedEvent, InvoiceRejectedEvent } from "@modules/events/billing"
 import { EVENT_BUS } from "@modules/platform/event-bus"
 import { invoiceRow } from "@tests/fixtures/builders/invoice.builder"
@@ -21,8 +27,8 @@ const options = builder<InvoiceOptions>({ maxTotalMinorUnits: 10_000 })()
 const request = { eventId: "o-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 }
 
 const build = async (entityManager: MockEntityManager, claimed = true) => {
-    const inbox = mock<Inbox>()
-    inbox.claim.mockResolvedValue(claimed)
+    const inbox = fakeInbox()
+    if (!claimed) inbox.seen("order", "o-1")
     const bus = recordingEventBus()
     const moduleRef = await Test.createTestingModule({
         providers: [
@@ -49,7 +55,7 @@ describe("InvoiceService", () => {
                 kind: "ok",
                 value: { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 },
             })
-            expect(inbox.claim).toHaveBeenCalledWith("order", "o-1")
+            expect(inbox.claims).toEqual([{ source: "order", eventId: "o-1" }])
             expect(tx.em.save).toHaveBeenCalledWith(InvoiceEntity, {
                 orderId: "o-1",
                 personId: "p-1",
@@ -123,7 +129,7 @@ describe("InvoiceService", () => {
             const { service, inbox, bus } = await build(tx.em)
 
             await expect(service.issue(request)).rejects.toBe(failure)
-            expect(inbox.release).toHaveBeenCalledWith("order", "o-1")
+            expect(inbox.released).toEqual([{ source: "order", eventId: "o-1" }])
             expect(bus.writes).toEqual([])
             expect(tx.rollbacks).toBe(1)
         })

@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import type { EntityManager } from "typeorm"
-import { InjectInboxManagers } from "./inbox.decorators"
+import { InjectClaimManagers } from "./inbox.decorators"
 import type { Inbox } from "./inbox.port"
 import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 
@@ -10,7 +10,7 @@ import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 /** The Inbox adapter over the claims table: the unique (source, event id) pair decides who claims first. */
 export class PostgresInbox implements Inbox {
     constructor(
-        @InjectInboxManagers() private readonly managers: readonly [EntityManager],
+        @InjectClaimManagers() private readonly managers: readonly [EntityManager],
         @InjectClock() private readonly clock: Clock,
     ) {}
 
