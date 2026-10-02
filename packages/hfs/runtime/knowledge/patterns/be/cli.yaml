@@ -4,8 +4,10 @@ title: Backend cli
 purpose: |-
   Given a one-off action (migrate, seed, sync, backup, an operator command), where does it live and how is it written? Every
   one-off action is a nest-commander command of the cli feature root `be/src/features/cli/`, compiled into the one cli app
-  `be/apps/cli` and shipped as one image run as `cli <group> <command>`. A command is an action runner, not a thin
-  transport: it is unit-tested and counted in coverage like a service.
+  `be/apps/cli` and shipped as one image run as `cli <group> <command>`. A command is an action runner: thin (R203
+  `BE_FEATURE_THIN`) like every other feature file — it maps the command line and makes one delegating call into the
+  modules — and it still owes its unit spec beside it (the `cli` role of `ruleParams.be.unitRoles`). Its slot is
+  `coverage: none`, so a command is never a coverage target.
 appliesTo:
   - backend
 family: be
@@ -101,21 +103,22 @@ rules:
   - id: BE-CLI-3
     title: A command is an action runner with its own unit spec
     kind: mandatory
-    hfsRules: [R149, R47, R102]
+    hfsRules: [R149, R47, R102, R203]
     requirement: |-
-      A cli command is not a thin transport, so the thin-door rule (R88) does not apply to it: its `run` carries the action
-      (it may branch, loop and call the domain or platform services the action needs). Every `.cli.ts` therefore has its unit
-      spec `<name>.cli.spec.ts` beside it, built like a service spec (test.yaml BE-TEST-2), and the unit run measures
-      `src/features/cli/**/*.cli.ts` at per-file 100 (the `cli` entry of `ruleParams.be.unitRoles` of the slot manifest). A
-      command never imports an api feature: what it shares with a request lives in a domain capability (folder.yaml
-      BE-FOLDER-2).
+      A cli command is thin (R203 `BE_FEATURE_THIN`) like every other file of a feature-tier slot: `run` maps the command
+      line and makes one delegating call into the modules (a service, a platform capability or a modules function), with no
+      branch, loop, `try`, `throw` or computation. As an action runner it is exempt from the transport-shape law R88 (the
+      `exempt` of the `cli` entry of `ruleParams.be.unitRoles`), and it still owes its unit spec `<name>.cli.spec.ts` beside
+      it, built like a service spec (test.yaml BE-TEST-2), which asserts the delegation. The slot `be.cli` is
+      `coverage: none`, so a command is never a coverage target. A command never imports an api feature: what it shares
+      with a request lives in a domain capability (folder.yaml BE-FOLDER-2).
     rationale: |-
-      An operator action runs against production data, often once; its branches have no request path that an e2e run
-      exercises, so the unit spec is the only automatic proof.
+      An operator action runs against production data, often once; its delegation has no request path that an e2e run
+      exercises, so the unit spec is the only automatic proof that the command hands its inputs to the right module.
     cases:
       - id: case-1
         when: A seed command
-        write: 'features/cli/seed/subs/demo.cli.ts (`@SubCommand({ name: "demo" })`, `DemoSeedCli extends CommandRunner`) opens one transaction and calls CatalogService.createProduct for each demo product, skipping one that exists; demo.cli.spec.ts beside it asserts both paths.'
+        write: 'features/cli/seed/subs/demo.cli.ts (`@SubCommand({ name: "demo" })`, `DemoSeedCli extends CommandRunner`) reads its options and calls the seed runner of a platform or domain capability; demo.cli.spec.ts beside it asserts the delegation.'
       - id: case-2
         when: A command with no spec
         write: 'Refused (BE_CLI_COMMAND_SHAPE, unit-test-colocated): features/cli/db/subs/backup.cli.ts without backup.cli.spec.ts beside it.'
@@ -125,6 +128,7 @@ rules:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_PLACEMENT
+        - BE_FEATURE_THIN
       manual:
         - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
     relatedExamples: []

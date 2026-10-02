@@ -96,11 +96,13 @@ rules:
   - id: BE-JOBS-4
     title: A job is a processor plus steps, started by a producer and run by a worker or api app
     kind: mandatory
-    hfsRules: [R160, R156, R46]
+    hfsRules: [R160, R156, R46, R203]
     requirement: |-
       `features/jobs/<job>/transport/queue/<job>.processor.ts` declares a class extending `FencedProcessor` (it claims, calls `process(job)` and
       settles through the guarded writes); `steps/<step>.step.ts` declares a class implementing `JobStep`; `application/` holds
-      plain CQRS. A domain service starts the job with a typed queue producer `enqueueX(payload, tx)` inside its transaction
+      plain CQRS. The processor and every step are thin feature files (R203 `BE_FEATURE_THIN`): they map the claimed job and
+      delegate into `modules/`; the claim, the fence, the settle and the retry live in `platform/jobs`. A domain service starts
+      the job with a typed queue producer `enqueueX(payload, tx)` inside its transaction
       (queues.yaml). The jobs kind imports only `modules/*`: it never imports an api, saga or reactor feature, and it talks to
       them through events. An app of kind `worker` or `api` composes the job queue module.
     rationale: |-
@@ -115,6 +117,7 @@ rules:
         - BE_JOB_SHAPE
         - BE_KIND_ISOLATION
         - BE_BACKGROUND_UNOWNED
+        - BE_FEATURE_THIN
       manual:
         - Confirm each step is one external effect that is safe to repeat under the same run key.
     relatedExamples: [fenced-job]
@@ -228,12 +231,12 @@ files:
   - path: src/features/jobs/<job>/transport/queue/<job>.processor.ts
     slot: be.feature.jobs.queue
     template: jobs/job.processor.ts.tpl
-    role: The processor of one job; extends FencedProcessor.
+    role: 'The processor of one job; extends FencedProcessor — thin (R203 `BE_FEATURE_THIN`): `process` maps the claimed job and delegates into modules/.'
     rules: [BE_JOB_SHAPE]
   - path: src/features/jobs/<job>/steps/<step>.step.ts
     slot: be.jobs.steps
     template: jobs/job.step.ts.tpl
-    role: One external effect; implements JobStep and passes the run key.
+    role: 'One external effect; implements JobStep and passes the run key — thin (R203 `BE_FEATURE_THIN`): it maps the job and delegates into modules/.'
     rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
   - path: src/features/jobs/<job>/application/<action>.command.ts
     slot: be.feature.application

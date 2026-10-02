@@ -48,7 +48,7 @@ versioning:
 #   coverage    required | none, on every tracked slot of profile be. A required slot's subtree is measured at 100 per file on every
 #               ruleParams.be.logicRoles file (lines, branches, functions, statements); a none slot's subtree is never measured and
 #               is excluded from Sonar's coverage. scripts/hfs/coverage-scope.mjs derives the jest per-file thresholds, Sonar's
-#               sonar.coverage.exclusions and the Codecov paths and components from this field and nowhere else (R204, R205).
+#               sonar.coverage.exclusions and the Codecov paths and components from this field and nowhere else (R204).
 #               Orthogonal to the lite `editions`: an edition never changes what a slot measures.
 #   composedBy the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules); on an
 #               owner slot (be.cli) the app kinds that list its root module, every folder of the root holding one static module.
@@ -205,7 +205,7 @@ ruleParams:
     unitRoles:
       - {role: service, spec: service.spec}
       - {role: cli, spec: cli.spec, slot: be.cli, exempt: [BE_TRANSPORT_SHAPE]}
-    # R205 HFS_COVERAGE_SCOPE_DRIFT, R204 HFS_COVERAGE_UNDECLARED. THE roles that carry logic: a file `<name>.<role>.ts` of one of these roles
+    # R204 HFS_COVERAGE_SCOPE_DRIFT. THE roles that carry logic: a file `<name>.<role>.ts` of one of these roles
     # inside a slot whose `coverage` is required is measured at 100 per file on lines, branches, functions and statements (the three
     # generated consumers: jest thresholds, sonar.coverage.exclusions, codecov.yml). A role that is not listed here (module, module-definition,
     # options, config, command, query, contracts, port, event, queue, entity, sql, rows, messages, log-events, error, decorators, cache-keys,

@@ -35,9 +35,9 @@ files:
   - path: src/features/saga/<saga>/<saga>.saga.service.ts
     slot: be.feature.saga
     template: saga/saga.service.ts.tpl
-    role: "The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it. It lists the steps and compensations, imports them all and moves the run through `platform/saga` (a transition names the version it read)."
+    role: "The orchestrator. A `*.service.ts` because a handler injects only services; thin (R203 `BE_FEATURE_THIN`) like every feature file — it maps and delegates, and the run's orchestration lives in `platform/saga` — and it owes its `<saga>.saga.service.spec.ts` beside it (a `service` of `ruleParams.be.unitRoles`), which asserts the delegation. It lists the steps and compensations, imports them all and moves the run through `platform/saga` (a transition names the version it read); its slot is `coverage: none`, so it is never a coverage target."
     suffix: saga.service
-    rules: [R169, R170]
+    rules: [R169, R170, R203]
   - path: src/features/saga/<saga>/<saga>.saga.service.spec.ts
     slot: be.feature.saga
     template: saga/saga.service.spec.ts.tpl
@@ -132,7 +132,7 @@ files:
     optional: true
   - path: src/modules/platform/saga/
     slot: be.platform
-    role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` (unit-tested to 100%).'
+    role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` — a measured file of a `coverage: required` slot, held at 100 per file with its spec beside it.'
     rules: [R170, R80]
     optional: true
   - path: src/tests/e2e/<area>/<name>.e2e-spec.ts
@@ -179,10 +179,11 @@ rules:
   - id: BE-SAGA-2
     title: The state of a run is typed, versioned and moved only through the fenced store
     kind: mandatory
-    hfsRules: [R170, R80, R172]
+    hfsRules: [R170, R80, R172, R203]
     requirement: |-
-      `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator moves a run only
-      through `platform/saga`: a transition names the version it read and moves it by one, and takes its event through the
+      `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator is a thin feature
+      file (R203 `BE_FEATURE_THIN`) and the run's orchestration lives in `platform/saga`: the orchestrator moves a run only
+      through it, a transition names the version it read and moves it by one, and takes its event through the
       inbox first. A consumer of a saga passes the id of the delivery (`message.eventId`) to its command.
     rationale: |-
       Deliveries repeat and arrive late. The version fence stops a zombie delivery from moving a run twice, and the inbox makes
@@ -196,6 +197,7 @@ rules:
         - BE_SAGA_STATE_VERSIONED
         - BE_INBOX_DEDUPE_MISSING
         - BE_SAGA_CONSUMER_DEDUPE
+        - BE_FEATURE_THIN
       manual:
         - Check a failing compensation gives the event back so the redelivery resumes the run.
     relatedExamples: [saga]

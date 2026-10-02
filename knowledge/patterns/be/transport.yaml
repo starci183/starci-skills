@@ -57,7 +57,7 @@ rules:
   - id: BE-TRANSPORT-2
     title: A transport injects only the bus and dispatches one message
     kind: mandatory
-    hfsRules: [R88, R87]
+    hfsRules: [R88, R87, R203]
     requirement: |-
       A transport file may import its feature's `application/` messages and contracts, `platform/*`, the public decorators of
       `domain/identity` and its own `dto/`. It injects only `InjectCommandBus` / `InjectQueryBus` (and `InjectRequestLocale`
@@ -76,6 +76,7 @@ rules:
         - BE_TRANSPORT_SHAPE
         - BE_CQRS_SHAPE
         - BE_READONLY_BOUNDARY
+        - BE_FEATURE_THIN
       manual: []
     relatedExamples: []
   - id: BE-TRANSPORT-3

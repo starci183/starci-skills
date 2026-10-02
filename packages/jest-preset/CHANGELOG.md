@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Breaking (contract change `coverage-modules-logic`): `starciJestConfig({ coverage: { roots, roles, excludes } })` takes the coverage scope the managed `be/jest.config.js` renders (`hfs sync`, from the `coverage` field of the slot manifest and `ruleParams.be.logicRoles`, through `scripts/hfs/coverage-scope.mjs`), and refuses to run without it. `COVERAGE_SOURCES` is deleted: per-file 100 now holds on every logic role (service, policy, projection, guard, mapper, client, filter, interceptor, processor, step, saga, saga-step, compensation, consumer, webhook) inside the measured roots (the logic of `be/src/modules`), never on `be/src/features` (thin by R203). New exports `rootGlob` and `StarciCoverageScope`; `collectCoverageFrom(coverage)` and `hasCoverageSubjects(root, glob)` take a scope and a glob with `**` and `{a,b}`.
 - New: `fakeInbox()` (also `@starci/jest-preset/inbox`), the twin of `recordingOutbox()` for the delivery side: `claim` answers true for the first call of a (source, eventId) pair and false afterwards, `release` gives the claim back, `seen` marks a redelivery, and `claims`, `claimed`, `released`, `failNext` and `clear` let a spec assert what a consumer or a signed webhook did. A spec no longer stubs `mock<Inbox>()` by hand.
 
 ## 2.2.4 - 2026-10-02
