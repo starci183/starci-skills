@@ -1,4 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
+// Imports the host resolves (a comment, because this folder is a shape and not a compiled app):
+//   import { BaseEvent } from "@modules/platform/event-bus"
 
 /** The payload of `order.placed`: ids and amounts, never an entity. */
 export interface OrderPlacedPayload {

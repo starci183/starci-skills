@@ -42,6 +42,7 @@ $defs:
         properties:
           be: {$ref: '#/$defs/side'}
           fe: {$ref: '#/$defs/side'}
+      triggerKinds: {$ref: '#/$defs/nameList'}
       appKinds:
         type: object
         additionalProperties: false
@@ -378,6 +379,7 @@ $defs:
       tier: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'a tier of the matrix, none, or inherit (the tier of the enclosing owner)'}
       tests: {enum: [unit-beside, e2e, none]}
       owner: {type: boolean}
+      trigger: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'the trigger kind of a feature-tier slot (one of the manifest triggerKinds); a feature of one kind never imports a feature of another'}
       pattern: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'the design pattern a product declares in hfs.json sides.<side>.patterns to enable this opt-in slot (event-bus, queue, fenced-job, projection, saga); a path in the slot of an undeclared pattern is HFS_SLOT_NOT_ENABLED'}
       appKind: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       minInstances: {type: integer, minimum: 1}

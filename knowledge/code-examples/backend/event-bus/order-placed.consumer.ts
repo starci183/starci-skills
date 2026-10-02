@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common"
-import type { CommandBus } from "@nestjs/cqrs"
-import { OrderPlacedEvent } from "@modules/events/order"
-import { InjectCommandBus } from "@modules/platform/cqrs"
-import type { EventConsumer, EventDelivery } from "@modules/platform/event-bus"
-import { IssueInvoiceCommand } from "../../application/issue-invoice.command"
+// Imports the host resolves (a comment, because this folder is a shape and not a compiled app):
+//   import { Injectable } from "@nestjs/common"
+//   import type { CommandBus } from "@nestjs/cqrs"
+//   import { OrderPlacedEvent } from "@modules/events/order"
+//   import { InjectCommandBus } from "@modules/platform/cqrs"
+//   import type { EventConsumer, EventDelivery } from "@modules/platform/event-bus"
+//   import { IssueInvoiceCommand } from "../../application/issue-invoice.command"
 
 @Injectable()
 /** The consumer door of `order.placed`, in billing: it dispatches one command and forwards the event id. */

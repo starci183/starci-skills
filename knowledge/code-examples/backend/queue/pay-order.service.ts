@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { ReceiptQueue } from "@modules/queues/receipt"
-import { InjectOrderEntityManager } from "@modules/platform/database"
-import { PaymentEntity } from "./persistence/entities/payment.entity"
+// Imports the host resolves (a comment, because this folder is a shape and not a compiled app):
+//   import { Injectable } from "@nestjs/common"
+//   import type { EntityManager } from "typeorm"
+//   import { ReceiptQueue } from "@modules/queues/receipt"
+//   import { InjectOrderEntityManager } from "@modules/platform/database"
+//   import { PaymentEntity } from "./persistence/entities/payment.entity"
 
 @Injectable()
 /** A domain service that starts background work as part of its own change. */

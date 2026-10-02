@@ -28,7 +28,7 @@ topics:
     title: Architecture check
     path: architecture-check.yaml
     decides: Tier direction matrix, acyclic owners, thin application composition roots, the one module shape (one representative module per capability, registered once per app), public owner surface, composed features
-    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-5
+    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-6
   - id: be.cqrs
     title: CQRS application layer
     path: cqrs.yaml

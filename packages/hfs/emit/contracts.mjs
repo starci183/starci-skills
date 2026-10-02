@@ -1,6 +1,6 @@
 /**
  * `hfs emit-contracts`: writes `contracts/<service>/events.json` for every service that declares typed event classes under
- * `src/modules/events/<service>/` (events.mjs: the async contract, R139), `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
+ * `src/modules/events/<service>/` (events.mjs: the async contract, R140), `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
  * `contracts/<app>/openapi.json` for every api app whose `apps/<app>/src/operations.ts` exports the typed operation table
  * `OPERATIONS` (operations.mjs: OpenAPI 3.1 read from the TypeScript checker; nothing is executed).
  *

@@ -1,10 +1,11 @@
-import { Injectable } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { OrderPlacedEvent } from "@modules/events/order"
-import { InjectOrderEntityManager } from "@modules/platform/database"
-import { InjectEventBus } from "@modules/platform/event-bus"
-import type { EventBus } from "@modules/platform/event-bus"
-import { OrderEntity } from "./persistence/entities/order.entity"
+// Imports the host resolves (a comment, because this folder is a shape and not a compiled app):
+//   import { Injectable } from "@nestjs/common"
+//   import type { EntityManager } from "typeorm"
+//   import { OrderPlacedEvent } from "@modules/events/order"
+//   import { InjectOrderEntityManager } from "@modules/platform/database"
+//   import { InjectEventBus } from "@modules/platform/event-bus"
+//   import type { EventBus } from "@modules/platform/event-bus"
+//   import { OrderEntity } from "./persistence/entities/order.entity"
 
 @Injectable()
 /** A domain service: the order and its event commit together or not at all. */

@@ -10,7 +10,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 26de893148e783e7b0d364b8328c8f6dfbde5fe462f6324c3bceae42ffb44ed9
+        value: 8b142ce72e3e99b2808a86b5b8870f55d2ee1f4f17b5decd1eb1dca31bfffc77
         files: 139
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -607,6 +607,25 @@ profiles:
         rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
         guidance: knowledge/patterns/be/event-bus.yaml
 
+      - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
+        sourceRuleIds: [BE-EVENT-BUS-3, BE-EVENT-BUS-4, BE-QUEUES-1]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: The outbox is written only by a domain service with the manager of its own transaction, a message consumer is a transport door named after its event that forwards the event id, and a queue producer passes its own tx.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/outbox-write-tx, starci-be/event-consumer-shape, starci-be/queue-producer-shape]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/event-bus.yaml
+          review: Confirm each published event crosses a context or starts asynchronous work, and that each consumer's retry budget fits its side effects.
+        status: implemented
+      - id: NEST-EVENT-BUS-OBSERVATION
+        sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
+        rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
+        guidance: knowledge/patterns/be/event-bus.yaml
+
   next:
     title: StarCi Next.js code pattern
     canon:
@@ -617,7 +636,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 59b10cada651d6c33a9c4ba8d8741809b2fe4982c06a88de10bc5f400abc8c02
+        value: 25c491765ee2c6618490c8226978593512fe438dc2e8d7529147bbbd827acc2b
         files: 149
     sourceRuleRoots:
       - knowledge/patterns/fe

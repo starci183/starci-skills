@@ -47,6 +47,8 @@ versioning:
 #   tests       unit-beside | e2e | none.
 #   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
 #   budget      size budgets (lines per file, files per slot, exports).
+#   trigger     the trigger kind (triggerKinds) of a feature-tier slot: api, webhooks, realtime, saga, reactors, jobs or cli. A feature of one kind
+#               never imports a feature of another (BE_KIND_ISOLATION); the two meet only through the event bus.
 #   pattern     the design pattern whose declaration (hfs.json sides.<side>.patterns) enables this opt-in slot; a path in the slot of an
 #               undeclared pattern is HFS_SLOT_NOT_ENABLED, and a declared pattern's proof scenarios are ruleParams.be.patternScenarios.
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
@@ -65,6 +67,10 @@ testValues: [unit-beside, e2e, none]
 sides:
   be: {reads: []}
   fe: {reads: [be/contracts/]}     # the back end's committed contract snapshots, the input of the front end's codegen
+
+# The trigger kinds of the back end's features: what starts the work of a feature. A feature slot names its kind in `trigger`; no kind imports another
+# (BE_KIND_ISOLATION), every cross-kind call is an event on the bus, and only be/apps/* compose features.
+triggerKinds: [api, webhooks, realtime, saga, reactors, jobs, cli]
 
 appKinds:
   be: [api, worker, migrate, cli]
@@ -605,7 +611,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R139 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R140 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -665,6 +671,7 @@ slots:
     profiles: [be]
     path: "src/features/<feature>/"
     presence: required
+    trigger: api                  # a request-driven feature (graphql, http); the other trigger kinds have their own roots below
     tracked: tracked
     tier: feature
     owner: true
@@ -687,7 +694,7 @@ slots:
   - id: be.feature.saga
     profiles: [be]
     path: "src/features/<feature>/saga/"
-    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R142 to R146); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R143 to R147); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
     presence: opt-in
     tracked: tracked
     tier: feature
@@ -918,6 +925,32 @@ slots:
     allows: ["<queue>.queue.ts", "<queue>.contracts.ts", index.ts]
     tests: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
+  - id: be.feature.reactors
+    profiles: [be]
+    path: "src/features/reactors/<reactor>/"
+    presence: opt-in
+    pattern: event-bus            # a reactor consumes events of another context and keeps a local copy or triggers a projection
+    trigger: reactors
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<reactor>.module.ts", transport/]
+    allows: [index.ts, "<reactor>.module.ts", application/, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.feature.jobs
+    profiles: [be]
+    path: "src/features/jobs/<job>/"
+    presence: opt-in
+    pattern: fenced-job           # a background job: a processor with a fenced claim, steps and the application it dispatches to
+    trigger: jobs
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<job>.module.ts"]
+    allows: [index.ts, "<job>.module.ts", "<job>.processor.ts", application/, steps/, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"

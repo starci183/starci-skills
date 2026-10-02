@@ -24,6 +24,7 @@ export const LINT_ENFORCERS = Object.freeze([
   enforcer('tier-direction', BOTH, ['BE_TIER_DIRECTION', 'FE_TIER_DIRECTION'], 'An import goes only to a tier the slot matrix allows.'),
   enforcer('owner-cycle', BOTH, ['ARCH_OWNER_CYCLE'], 'Owners never import each other in a cycle.'),
   enforcer('feature-imports-feature', BE, ['BE_FEATURE_IMPORTS_FEATURE'], 'A feature never imports another feature.'),
+  enforcer('kind-isolation', BE, ['BE_KIND_ISOLATION'], 'A feature of one trigger kind never imports a feature of another kind; the kinds meet through the event bus.'),
   enforcer('app-isolation', FE, ['FE_APP_ISOLATION'], 'An app never imports another app.'),
   enforcer('feature-layout', BE, ['BE_FEATURE_LAYOUT_INVALID'], 'A feature file sits in the folder its role names.'),
   enforcer('application-never-imports-transport', BE, ['BE_APPLICATION_IMPORTS_TRANSPORT', 'BE_APPLICATION_TRANSPORT_FRAMEWORK'], 'Application code never imports transport code, directly or through a chain.'),

@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { InjectQueueOutbox } from "@modules/platform/queue"
-import type { QueueOutbox } from "@modules/platform/queue"
+// Imports the host resolves (a comment, because this folder is a shape and not a compiled app):
+//   import { Injectable } from "@nestjs/common"
+//   import type { EntityManager } from "typeorm"
+//   import { InjectQueueOutbox } from "@modules/platform/queue"
+//   import type { QueueOutbox } from "@modules/platform/queue"
 
 /** The queue name: the contract between this producer and the processor of the job. */
 export const RECEIPT_QUEUE = "receipt"
