@@ -6,7 +6,7 @@
 // restates it. The runtime owns three ports today:
 //   - the harness UI ports: modules/models/runtimes.yaml `statusApp.port` / `statusApp.devPort`, read only by
 //     ui/ports.mjs (its exports are the names everything else imports);
-//   - the local SonarQube host: scripts/gates/sonar-local.mjs `DEFAULT_HOST`.
+//   - the local SonarQube host: the DEFAULT_HOST constant of scripts/gates/sonar-local.mjs.
 // This check refuses:
 //   - an OWNED port literal in a port position of any in-scope file that is not the port's owner;
 //   - any OTHER 4-5 digit port literal in a port position of two or more source files: a port spelled twice has

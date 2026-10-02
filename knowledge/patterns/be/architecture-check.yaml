@@ -8,6 +8,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.app, be.app.worker, be.app.cli, be.feature]
 provenance:
   reviewedAt: 2026-09-30
   sources:

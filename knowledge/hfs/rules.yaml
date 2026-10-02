@@ -1760,6 +1760,42 @@ rules:
     failureCodes: ["RT_RETIRED_NAME_LIVE"]
     enforcers:
       - {kind: runtime, id: retired-names, at: scripts/checks/check-retired-names.mjs}
+  - id: R208
+    code: "RT_PORT_RESTATED"
+    law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, contract-change history, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PORT_RESTATED"]
+    enforcers:
+      - {kind: runtime, id: port-once, at: scripts/checks/check-port-once.mjs}
+  - id: R209
+    code: "RT_CONFIG_DEFAULT_TWICE"
+    law: "Every documented configuration default is stated once, by its owner, and read through it: a camelCase leaf or lowercase key of config.example.yaml, or a value an owner declares - scripts/machine/home.mjs DEFAULTS (supervisor workers, the land gate, frozenMinutes, pollIntervalMs), engine/config.mjs (connector, ask, UAT, spec and allocation defaults, and DEFAULT_OWNER_LANGUAGE which scripts/machine/home.mjs re-exports), engine/orca-config.mjs (worker depth), scripts/reconciler/state.mjs (the controller mode) - is never restated as a literal fallback (?? or ||, a parameter default, or a language ternary) in any other runtime source file; the reader calls the owner accessor (supervisorSettings(), configuredMode(), ownerLanguage(), ...). Specs, tests, the generated runtime copies, stories and the HFS templates are out of scope, and a bare identifier or a computed value is a read, not a restatement."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CONFIG_DEFAULT_TWICE"]
+    enforcers:
+      - {kind: runtime, id: default-once, at: scripts/checks/check-default-once.mjs}
+  - id: R210
+    code: "RT_VERSION_RESTATED"
+    law: "knowledge/hfs/canon-pins.yaml spells the version of every @starci package and every canon-pinned dependency once; a package.json is the declared install site and a lockfile its resolution. Anywhere else a semver literal equal to a pin - or a name@x.y.z specifier naming one - restates it, except on the declared binding keys a refresher owns and rewrites in place (canon.version of the code-pattern bindings held by check-canon-pins.mjs, provenance.version and identity.version of the grammar snapshots rewritten by scripts/work/ui/grammar-knowledge.mjs). Package manifests, lockfiles, changelogs, contract-change history, specs, tests, the generated runtime copies and .starciwork are out of scope; a restatement is fixed by naming the pin, never the literal."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_VERSION_RESTATED"]
+    enforcers:
+      - {kind: runtime, id: version-pin-once, at: scripts/checks/check-version-pin-once.mjs}
+  - id: R211
+    code: "RT_SLOT_ID_SHAPE"
+    law: "A slot id follows the grammar its manifest declares, read from the manifest not from a list: dot-separated lowercase kebab segments, a first segment of naming.prefixes in knowledge/hfs/slots.yaml (profiles in knowledge/hfs/runtime-slots.yaml), <side>.app.<kind> naming a kind of appKinds.<side>, and every deeper id extending a declared id - an explicit parent field, or a family at least two slots share; a lone deep orphan invents a family. The role-suffix vocabulary holds no synonym pairs: a profile's suffixes never share a word with bannedSuffixes, no naming.refusedPairs pair is live in suffixes on both sides, and naming.sameConceptPairs is the one declared exception (step + saga-step), live on both sides or dropped; naming.glossary binds the five incoming-thing names (consumer, subscription, webhook, processor, handler) to their distinct kinds."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SLOT_ID_SHAPE"]
+    enforcers:
+      - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
   - id: R212
     code: "RT_DOC_NO_OWNER"
     law: "Every tracked docs/*.md declares exactly one ownership header on its first line — \"Owner: <knowledge/ or modules/ path that exists>\" when the document explains a machine-owned source, \"Task: <one task>\" for a how-to — no two documents carry the same task, and two documents whose titles share two or more topic words while at least 30% of the shorter one's sentences appear in the other are one document merged, not two."
@@ -1796,7 +1832,3 @@ retired:
   - {id: R204, reason: "skipped when this lane's rule reserved R207; never the id of a landed rule"}
   - {id: R205, reason: "skipped when this lane's rule reserved R207; never the id of a landed rule"}
 
-  - {id: R208, reason: "skipped when this lane's rule reserved R212; never the id of a landed rule"}
-  - {id: R209, reason: "skipped when this lane's rule reserved R212; never the id of a landed rule"}
-  - {id: R210, reason: "skipped when this lane's rule reserved R212; never the id of a landed rule"}
-  - {id: R211, reason: "skipped when this lane's rule reserved R212; never the id of a landed rule"}

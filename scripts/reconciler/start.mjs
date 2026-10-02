@@ -35,8 +35,7 @@ import { CONNECTOR_DEFAULTS, loadConfig } from '../../engine/config.mjs';
 import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
-import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
-import { DEFAULT_SUPERVISOR_MODE, supervisorMode } from '../machine/home.mjs';
+import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs'; import { DEFAULT_SUPERVISOR_MODE, supervisorMode } from '../machine/home.mjs';
 import { probeOrcaAsync, serviceRegistry, servicePorts, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 

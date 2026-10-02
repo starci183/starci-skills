@@ -4,15 +4,15 @@
 //
 // A default for a key that config.example.yaml documents is stated once, by its owner, and every other reader
 // asks the owner. The owners today:
-//   - scripts/machine/home.mjs — DEFAULTS (workers base/max, landGate.mode, frozenMinutes, pollIntervalMs) and
-//     DEFAULT_OWNER_LANGUAGE; supervisorSettings() is the derived reader for all of them, and
-//     scripts/lib/i18n.mjs ownerLanguage() is the language accessor over it;
+//   - scripts/machine/home.mjs — DEFAULTS (workers base/max, landGate.mode, frozenMinutes, pollIntervalMs);
+//     supervisorSettings() is the derived reader for all of them;
 //   - engine/config.mjs — CONNECTOR_DEFAULTS, ASKS_DEFAULTS, UAT_DEFAULTS, SPEC_DEFAULTS,
-//     DEFAULT_ALLOCATION_WINDOW_HOURS, the kernel/model pin validation;
+//     DEFAULT_ALLOCATION_WINDOW_HOURS, the kernel/model pin validation, and DEFAULT_OWNER_LANGUAGE (base tier:
+//     scripts/lib/i18n.mjs ownerLanguage() reads it there; scripts/machine/home.mjs re-exports it);
 //   - engine/orca-config.mjs — ORCA_DEFAULTS (maxWorkerDepth);
 //   - scripts/reconciler/state.mjs — configuredMode() owns the controller-mode 'off' default.
 // The keys are derived by parsing config.example.yaml (documented leaf names and their documented scalar
-// values) and the owner files (the values DEFAULTS/DEFAULT_OWNER_LANGUAGE declare — never restated here).
+// values) and the owner files (the values DEFAULTS and DEFAULT_OWNER_LANGUAGE declare — never restated here).
 // This check refuses, in a second file than the owner:
 //   - `<key> ??|(|||=) <literal>` where key is a camelCase leaf the example documents (any literal restates the
 //     absent-or-default meaning: pollIntervalMs, frozenMinutes, windowHours, maxConcurrent, maxWorkerDepth,
@@ -88,13 +88,13 @@ export function commentedLeaves(exampleText) {
   return leaves;
 }
 
-/** The literal values scripts/machine/home.mjs declares (DEFAULTS block + DEFAULT_OWNER_LANGUAGE). */
-export function ownerDefaults(homeText) {
+/** The literal values the owner files declare: the home.mjs DEFAULTS block and engine/config.mjs's DEFAULT_OWNER_LANGUAGE. */
+export function ownerDefaults(homeText, configText = '') {
   const defaults = /DEFAULTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\)\)/.exec(homeText)?.[1] ?? '';
   const values = new Map();
   for (const m of defaults.matchAll(/\b([a-zA-Z][\w]*)\s*:\s*([\d_]+|'[^']*')/g))
     (values.get(m[1]) ?? values.set(m[1], new Set()).get(m[1])).add(m[2].replace(/'/g, '').replace(/_/g, ''));
-  const lang = /DEFAULT_OWNER_LANGUAGE\s*=\s*'([^']+)'/.exec(homeText)?.[1];
+  const lang = /DEFAULT_OWNER_LANGUAGE\s*=\s*'([^']+)'/.exec(configText)?.[1];
   return { values, language: lang ?? null };
 }
 
@@ -151,7 +151,8 @@ export function checkDefaultOnce(root = skillRoot) {
     for (const v of vals) set.add(v);
   }
   const home = fs.readFileSync(path.join(root, 'scripts/machine/home.mjs'), 'utf8');
-  const { values, language } = ownerDefaults(home);
+  const config = fs.readFileSync(path.join(root, 'engine/config.mjs'), 'utf8');
+  const { values, language } = ownerDefaults(home, config);
   return defaultOnceFindings(files, { leaves, ownerValues: values, ownerLanguage: language });
 }
 

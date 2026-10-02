@@ -10,6 +10,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.feature.jobs, be.queues, be.platform.queue]
 pattern: queue
 provenance:
   reviewedAt: 2026-10-02

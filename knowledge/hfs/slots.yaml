@@ -77,6 +77,21 @@ appKinds:
   be: [api, worker, cli]
   fe: [next]
 
+# RT_SLOT_ID_SHAPE — the slot-id grammar and the suffix vocabulary law, stated once (scripts/checks/check-slot-id-shape.mjs
+# reads this block): an id is dot-separated lowercase kebab segments whose first segment is one of `prefixes`;
+# `<side>.app.<kind>` names a kind of appKinds.<side>; any other deeper id extends a declared slot id (its `parent`)
+# or names `parent` explicitly. The role-suffix vocabulary never shares a word with bannedSuffixes and holds no
+# synonym pair beyond `sameConceptPairs` — the one owner-approved pair (step + saga-step: `.saga-step.ts` stays).
+# Every pair in `refusedPairs` may never both be live suffixes.
+# `glossary` (S9-02): the five names for "handles an incoming thing" are five distinct kinds, not synonyms —
+# consumer answers an event, subscription serves realtime, webhook is its own kind, processor runs a job, handler
+# is CQRS. That is why appKinds may say worker while bannedSuffixes refuses the worker/job file suffixes.
+naming:
+  prefixes: [app, be, fe, repo]
+  sameConceptPairs: [[step, saga-step]]
+  refusedPairs: [[use-case, handler], [listener, subscription], [job, processor], [worker, processor], [dto, input], [repository, mapper]]
+  glossary: {consumer: event, subscription: realtime, webhook: webhook, processor: job, handler: cqrs}
+
 # ---------------------------------------------------------------------------------------------------------
 # Tiers and the dependency direction matrix (owner granularity; type-only imports count; no cycles anywhere)
 # mayImport lists the tiers a file of that tier may import. Importing inside the same owner is always allowed.

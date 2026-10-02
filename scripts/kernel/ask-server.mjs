@@ -67,8 +67,7 @@ import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKind
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { ownerLanguage, translator } from '../lib/i18n.mjs';
-import { altOf, phrasesOf } from '../lib/source-phrases.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { altOf, phrasesOf } from '../lib/source-phrases.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
 // The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question

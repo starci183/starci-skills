@@ -15,8 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadConfig } from '../../engine/config.mjs';
-import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
+import { DEFAULT_OWNER_LANGUAGE, loadConfig } from '../../engine/config.mjs';
 
 export const CATALOG_DIR = 'modules/i18n/messages';
 export const PLACEHOLDER = /\{([A-Za-z_][\w]*)\}/g;
@@ -63,7 +62,7 @@ export function translate(en, vars = {}, { language = DEFAULT_OWNER_LANGUAGE, ro
   return fill(vi ?? en, vars);
 }
 
-/** The owner's language (config.yaml `language`); `fallback` when there is no readable config (DEFAULT_OWNER_LANGUAGE of scripts/machine/home.mjs). */
+/** The owner's language (config.yaml `language`); `fallback` when there is no readable config (DEFAULT_OWNER_LANGUAGE of engine/config.mjs). */
 export function ownerLanguage(fallback = DEFAULT_OWNER_LANGUAGE) {
   try { return loadConfig()?.language ?? fallback; } catch { return fallback; }
 }

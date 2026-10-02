@@ -45,7 +45,7 @@ const NODE_COMMAND = /(^|[\s`'"(])node\s+[\w./-]+\.mjs/;
 
 /** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
 function executableText(rel, text) {
-  if (CODE.test(rel) || rel === 'package.json' || rel === '.claude/settings.json') {
+  if (CODE.test(rel) || path.posix.basename(rel) === 'package.json' || rel === '.claude/settings.json') {
     return CODE.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
   }
   if (/\.ya?ml$/.test(rel) || /^skills\/.*SKILL\.md$/.test(rel)) {

@@ -13,7 +13,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../../engine/config.mjs';
+import { DEFAULT_OWNER_LANGUAGE, loadConfig } from '../../engine/config.mjs';
 import { machineLog, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { headTime } from '../api/git/head-time.mjs';
 
@@ -137,8 +137,8 @@ export function newestEvent(m, kind) {
  */
 export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
 export const DEFAULT_SUPERVISOR_MODE = 'chat';
-/** The owner-facing language when config.yaml `language` is absent — the one default every reader shares (scripts/lib/i18n.mjs ownerLanguage). */
-export const DEFAULT_OWNER_LANGUAGE = 'en';
+/** engine/config.mjs owns the owner-language default; home re-exports it so base (scripts/lib/i18n.mjs) never imports machine. */
+export { DEFAULT_OWNER_LANGUAGE };
 export const DEFAULT_AGENT = 'claude';
 export function supervisorMode({ env = process.env, config = undefined } = {}) {
   const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();

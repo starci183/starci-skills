@@ -50,6 +50,16 @@ $defs:
         properties:
           be: {$ref: '#/$defs/nameList'}
           fe: {$ref: '#/$defs/nameList'}
+      naming:
+        type: object
+        additionalProperties: false
+        required: [prefixes]
+        description: RT_SLOT_ID_SHAPE vocabulary — id prefixes, the declared same-concept/refused suffix pairs, and the S9-02 incoming-thing glossary. Optional so a manifest pinned to an older minor still validates.
+        properties:
+          prefixes: {$ref: '#/$defs/nameList'}
+          sameConceptPairs: {$ref: '#/$defs/stringPairs'}
+          refusedPairs: {$ref: '#/$defs/stringPairs'}
+          glossary: {type: object, additionalProperties: {type: string, minLength: 1}}
       tiers:
         type: object
         additionalProperties: false
@@ -370,6 +380,7 @@ $defs:
       retiredIn: {$ref: '#/$defs/major'}
       successor: {type: string}
       generatedBy: {type: string, minLength: 1, description: 'the one writer of a generated slot (tracked: generated)'}
+      parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
       - if: {properties: {tracked: {const: external}}, required: [tracked]}
         then: {required: [goesTo], properties: {presence: {const: forbidden}}}
@@ -422,6 +433,14 @@ $defs:
     minItems: 1
     uniqueItems: true
     items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+  stringPairs:
+    type: array
+    uniqueItems: true
+    items:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
   tierMap:
     type: object
     minProperties: 1
@@ -507,6 +526,7 @@ $defs:
       since: {$ref: '#/$defs/semver'}
       retiredIn: {$ref: '#/$defs/major'}
       successor: {type: string}
+      parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
       - if: {properties: {tracked: {const: external}}, required: [tracked]}
         then: {required: [goesTo], properties: {presence: {const: forbidden}}}

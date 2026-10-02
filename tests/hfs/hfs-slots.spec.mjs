@@ -60,7 +60,7 @@ test('schema and loader agree on a broken manifest', () => {
   }
 });
 
-test('the loader also refuses what only semantics can see', () => {
+test('the slot-manifest loader also refuses what only semantics can see', () => {
   const load = (mutate) => { const doc = parseYaml(manifestText); mutate(doc); return () => loadSlotManifest({ text: JSON.stringify(doc) }); };
   refusal(load((d) => { d.slots[1].id = d.slots[0].id; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots[0].tier = 'nowhere'; }), 'HFS_MANIFEST_INVALID');

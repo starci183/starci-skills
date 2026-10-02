@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
+import { controllerContract, fakeCtx } from '../../scripts/reconciler/testing.mjs';
 import workers, { KEYS, reconcileWorkers, waitCycles, planDeps, planOwed, planLand, planPush, overdueUrgent, DEFAULTS } from '../../scripts/reconciler/controllers/workers.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { digest, urgent, planUrgent, digestDue, composeDigest, URGENT_KEY_MS } from '../../scripts/reconciler/notifier.mjs';
@@ -24,11 +24,8 @@ const MIN = 60_000;
 const ledgers = [{ ledgerId: 'shop-be', repo: 'shop-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
 const ctxOf = (over = {}) => fakeCtx({ controller: 'workers', now: () => NOW, ledgers, openReader: () => ({ close() {} }), ...over });
 
-test('the controller module follows the shared contract', () => {
-  assert.equal(workers.name, 'workers');
-  assert.deepEqual(workers.concerns, ['workers.owed', 'workers.push', 'workers.deps', 'notify.owner']);
-  assert.equal(typeof workers.reconcile, 'function');
-  assert.equal(workers.routes['land-*']({ kind: 'land-passed' }), KEYS.land);
+test('the workers controller module follows the shared contract', () => {
+  controllerContract(workers, { name: 'workers', concerns: ['workers.owed', 'workers.push', 'workers.deps', 'notify.owner'], routeKey: 'land-*', routeEvent: { kind: 'land-passed' }, duty: KEYS.land });
 });
 
 test('waitCycles: a 2-workflow cycle is one cycle with a canonical order; a chain is none', () => {

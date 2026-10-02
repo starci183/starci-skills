@@ -95,8 +95,9 @@ test('commentedLeaves reads keys the example only comments about', () => {
 });
 
 test('ownerDefaults reads DEFAULTS scalars and DEFAULT_OWNER_LANGUAGE', () => {
-  const home = `export const DEFAULTS = Object.freeze({ workers: { base: 2, max: 6 }, landGate: { mode: 'shared' }, frozenMinutes: 45, pollIntervalMs: 600_000 }));\nexport const DEFAULT_OWNER_LANGUAGE = 'en';`;
-  const { values, language } = ownerDefaults(home);
+  const home = `export const DEFAULTS = Object.freeze({ workers: { base: 2, max: 6 }, landGate: { mode: 'shared' }, frozenMinutes: 45, pollIntervalMs: 600_000 }));`;
+  const config = `export const DEFAULT_OWNER_LANGUAGE='en';`;
+  const { values, language } = ownerDefaults(home, config);
   assert.equal(language, 'en');
   assert.deepEqual([...values.get('base')], ['2']);
   assert.deepEqual([...values.get('mode')], ['shared']);

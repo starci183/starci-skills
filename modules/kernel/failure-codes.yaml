@@ -14049,6 +14049,51 @@ RT_PROSE_RESTATES_SLOTS:
   owner: supervisor
   kind: check-finding
 
+RT_PORT_RESTATED:
+  title: "A port literal is spelled outside its owner"
+  title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"
+  meaning_vi: "Một cổng của runtime chỉ được viết literal một lần, trong tệp chủ của nó: port và devPort của UI nằm trong modules/models/runtimes.yaml (statusApp) và đọc qua ui/ports.mjs, host SonarQube nội bộ trong DEFAULT_HOST của scripts/gates/sonar-local.mjs. Một literal cổng ở vị trí cổng (authority scheme://host:NNNN, host:NNNN, gán *port*/PORT, lời gọi listen(NNNN)) trong một tệp không phải chủ sở hữu — hoặc cùng một literal không chủ trong từ hai tệp nguồn runtime — là một bản chép lại. Spec, test, bản runtime sinh ra, lịch sử hợp đồng, CHANGELOG, .starciwork và khai báo stack của sản phẩm nằm ngoài luật."
+  causes_vi:
+    - "Hard-code một port của runtime trong script hay tài liệu thay vì import từ tệp chủ"
+    - "Hai tệp nguồn cùng viết literal một port không chủ mà không khai báo hằng số chủ sở hữu"
+  nextStep_vi: "Người giám sát thay literal bằng import từ tệp chủ (ui/ports.mjs, sonar-local DEFAULT_HOST) hoặc khai báo một hằng số chủ duy nhất rồi cho mọi nơi khác tham chiếu."
+  owner: supervisor
+  kind: check-finding
+
+RT_CONFIG_DEFAULT_TWICE:
+  title: "A documented default is restated outside its owner"
+  title_vi: "Một giá trị mặc định được khai báo lại ngoài tệp chủ"
+  meaning_vi: "Mỗi mặc định của cấu hình được viết một lần trong tệp chủ của nó: các leaf camelCase hay khóa lowercase của config.example.yaml, và các mặc định mà chủ sở hữu khai báo (DEFAULTS của scripts/machine/home.mjs cho supervisor và ngôn ngữ owner, engine/config.mjs cho connector/ask/UAT/spec/allocation, engine/orca-config.mjs cho độ sâu worker, scripts/reconciler/state.mjs cho mode của controller). Một literal fallback (??, ||, mặc định tham số, hay ternary kiểu language === 'en' ? 'en' : 'vi') ở tệp khác là bản chép lại; phía đọc gọi accessor của chủ (supervisorSettings(), configuredMode(), ownerLanguage()). Spec, test, runtime sinh ra, story và template HFS nằm ngoài luật."
+  causes_vi:
+    - "Viết ?? <literal> hay || <literal> cho một khóa đã có trong config.example.yaml thay vì gọi accessor"
+    - "Khai báo tham số mặc định bằng literal giá trị mà chủ sở hữu đã định"
+  nextStep_vi: "Người giám sát thay literal bằng accessor của chủ sở hữu (import DEFAULTS/supervisorSettings/ownerLanguage...) hoặc chuyển mặc định về tệp chủ rồi đọc qua nó."
+  owner: supervisor
+  kind: check-finding
+
+RT_VERSION_RESTATED:
+  title: "A pinned version is spelled outside canon-pins.yaml"
+  title_vi: "Một phiên bản ghim được viết ngoài canon-pins.yaml"
+  meaning_vi: "knowledge/hfs/canon-pins.yaml viết phiên bản của mọi gói @starci và mọi phụ thuộc được ghim đúng một lần; package.json là nơi cài đặt khai báo và lockfile là kết quả resolve. Một literal semver bằng pin — hay specifier name@x.y.z nhắc tới nó — ở bất cứ đâu khác là bản chép lại, trừ các khóa binding mà refresher sở hữu và ghi đè tại chỗ (canon.version của code-pattern bindings do check-canon-pins giữ; provenance.version và identity.version của grammar snapshot do grammar-knowledge.mjs ghi lại). Manifest, lockfile, changelog, lịch sử hợp đồng, spec, test, runtime sinh ra và .starciwork nằm ngoài luật."
+  causes_vi:
+    - "Viết số phiên bản của một pin trong prose hay YAML thay vì nhắc tới tên pin"
+    - "Chép specifier name@x.y.z vào tài liệu hay mẫu scaffold"
+  nextStep_vi: "Người giám sát viết lại theo tên pin (\"the pinned @starci/grammar\", \"knowledge/hfs/canon-pins.yaml\") hoặc để refresher ghi qua khóa binding đã khai báo — không bao giờ viết literal."
+  owner: supervisor
+  kind: check-finding
+
+RT_SLOT_ID_SHAPE:
+  title: "A slot id breaks the manifest's declared grammar"
+  title_vi: "Một slot id vi phạm ngữ pháp mà manifest khai báo"
+  meaning_vi: "Một slot id đi theo ngữ pháp mà chính manifest khai báo: các đoạn lowercase kebab ngăn bằng dấu chấm, đoạn đầu thuộc naming.prefixes của knowledge/hfs/slots.yaml (profiles của runtime-slots.yaml), <side>.app.<kind> chỉ một kind trong appKinds.<side>, và mọi id sâu hơn mở rộng một id đã khai báo — qua trường parent tường minh, hoặc một family mà ít nhất hai slot cùng dùng; một id sâu lẻ loi tự bịa ra family. Từ vựng suffix không chứa cặp đồng nghĩa: suffixes của một profile không trùng bannedSuffixes, không cặp nào trong naming.refusedPairs sống ở cả hai vế, và naming.sameConceptPairs (step + saga-step) là ngoại lệ duy nhất — sống ở cả hai vế hoặc bị bỏ."
+  causes_vi:
+    - "Đặt một slot id mới không bắt đầu bằng prefix khai báo hay không kebab-case"
+    - "Tạo một id sâu không mở rộng slot nào đã khai báo và family chỉ có một thành viên"
+    - "Thêm một suffix đồng nghĩa với một suffix đã có mà không khai báo cặp đó trong naming"
+  nextStep_vi: "Người giám sát sửa id theo ngữ pháp (đổi tên, đặt parent, hay khai báo prefix/family trong naming của manifest) hoặc đưa từ trùng nghĩa về bannedSuffixes / khai báo cặp trong naming.sameConceptPairs/refusedPairs."
+  owner: supervisor
+  kind: check-finding
+
 EXAMPLES_CI_IMAGES_NOT_DERIVED:
   title: "The examples workflow does not build every image from a derived matrix"
   title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
@@ -14069,4 +14114,48 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
     - "Sửa tay tệp sinh ra"
   nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
   owner: runtime-core
+  kind: check-finding
+
+RT_EXAMPLE_COUPLING:
+  title: "Runtime source names a concrete example tree"
+  title_vi: "Mã nguồn runtime gọi tên một cây examples/ cụ thể"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử contract-change, CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
+  causes_vi:
+    - "Một script hay gate đọc ví dụ của riêng một sản phẩm (ví dụ một tệp declaration đặt theo tên repo) lúc chạy, thay vì một mẫu chung hay tệp của repo đang được kiểm"
+    - "Comment, tài liệu hay chuỗi trong nguồn trích dẫn đường dẫn examples/<name> cụ thể thay vì nói examples/<app>"
+  nextStep_vi: "Người giám sát khái quát hóa chỗ đó (ví dụ examples/<app>, một mẫu template.*, hay một hằng trong scripts/lib/example-refs.mjs khi runtime thật sự đọc cây đó) hoặc trỏ tới repo đang được kiểm tra, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PRODUCT_NAME_IN_SOURCE:
+  title: "A product name is written in runtime source"
+  title_vi: "Tên một sản phẩm xuất hiện trong mã nguồn runtime"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi viết tên của một sản phẩm mà runtime từng ship kèm (danh sách đóng PRODUCT_NAMES trong scripts/lib/example-refs.mjs) hoặc một mã inc-<hash> có tiền tố là tên sản phẩm. Canon chạy trong mọi repo sản phẩm, nên một tên cứng trong source rò rỉ phán đoán của một sản phẩm sang mọi sản phẩm khác. Spec, test và lịch sử được giữ tên đó; mọi nơi khác phải nói chung chung hoặc qua hằng khai báo trong scripts/lib/example-refs.mjs."
+  causes_vi:
+    - "Một câu chuyện sự cố trong comment hay log viết thẳng tên sản phẩm (ví dụ workflow wf-<product>-… hay một ledger cụ thể) thay vì 'a product's …' hay <product>"
+    - "Một ánh xạ, alias hay fixture đặt theo tên sản phẩm được để trong source thay vì trong tệp khai báo chung"
+  nextStep_vi: "Người giám sát viết lại chỗ đó theo dạng chung (<product>, a product's …, acme cho một ví dụ) hoặc chuyển giá trị thật sự cần vào một hằng trong scripts/lib/example-refs.mjs, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_HOST_PATH_IN_TEMPLATE:
+  title: "A host drive path is hard-coded in source"
+  title_vi: "Một đường dẫn trên host bị viết cứng trong mã nguồn"
+  meaning_vi: "Một tệp nguồn runtime hay một template quản lý viết cứng một đường dẫn của máy host — một ổ đĩa Windows kiểu chữ cái kèm dấu hai chấm, một thư mục người dùng kiểu Users hay home, hay một đường AppData đã bung. Source và template ship sang mọi máy và mọi sản phẩm, nên đường dẫn phải tương đối, đi qua runtime root, os.tmpdir() hay một giá trị cấu hình."
+  causes_vi:
+    - "Sao chép một đường dẫn tuyệt đối từ máy phát triển vào một script, template hay fixture"
+    - "Một chuỗi gỡ lỗi hay ví dụ viết thẳng đường dẫn host thay vì biến môi trường hay đường tương đối"
+  nextStep_vi: "Người giám sát thay đường đó bằng đường tương đối, runtime root, os.tmpdir() hay một cấu hình đã khai báo, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_DOC_NO_OWNER:
+  title: "A document has no single ownership header"
+  title_vi: "Một tài liệu không có đúng một dòng sở hữu"
+  meaning_vi: "Một tệp docs/*.md không mở đầu bằng đúng một dòng sở hữu — \"Owner: <đường dẫn knowledge/ hoặc modules/ tồn tại>\" khi tài liệu giải thích một nguồn do máy sở hữu, hoặc \"Task: <một việc>\" với một tài liệu hướng dẫn — hoặc nó trùng một tài liệu khác: cùng một dòng Task, hoặc hai tiêu đề chung từ hai từ chủ đề trở lên trong khi ít nhất 30% câu của tài liệu ngắn hơn xuất hiện trong tài liệu kia. Một câu chuyện chỉ có một tài liệu; nguồn máy là luật và tài liệu chỉ đọc nó."
+  causes_vi:
+    - "Thêm một tài liệu mà quên dòng Owner:/Task: đầu tiên, hoặc Owner trỏ tới một đường dẫn không tồn tại hay ngoài knowledge/ và modules/"
+    - "Tách một tài liệu thành hai mà không gộp nội dung trùng hoặc không đổi dòng Task của một trong hai"
+  nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
+  owner: supervisor
   kind: check-finding

@@ -38,8 +38,7 @@ import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf
 import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
-import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { altOf } from '../lib/source-phrases.mjs';
+import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs'; import { altOf } from '../lib/source-phrases.mjs';
 
 export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 /** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes/). */
@@ -57,8 +56,7 @@ export const LEARNED_KINDS = Object.freeze(['antiPattern', 'vocabulary', 'rubric
 /** Rubric check groups the critic gets from the owner. */
 export const OWNER_NOTE_GROUP = 'owner-note';
 export const OWNER_LEARNED_GROUP = 'owner-learned';
-/** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). The Vietnamese
- * alternatives of every word class below are lexicon data (modules/goal/source-phrases.yaml drawNote). */
+/** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). The Vietnamese alternatives of every word class below are lexicon data (modules/goal/source-phrases.yaml drawNote). */
 export const GOLDEN_WORDS = new RegExp(`\\bgolden\\b|${altOf('drawNote.golden')}`, 'i');
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
 const PRODUCT_WORDS = new RegExp(`\\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\\b|${altOf('drawNote.product')}`, 'i');

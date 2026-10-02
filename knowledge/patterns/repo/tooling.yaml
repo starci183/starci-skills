@@ -9,6 +9,9 @@ appliesTo:
   - backend
   - frontend
 family: repo
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.tool-config, be.tool-config-local, be.nest-cli, fe.tool-config, fe.tool-config-local, repo.side-root-forbidden, app.declaration, app.package-manifest, app.tool-config, app.format-config, app.tool-config-local, app.quality-config, app.hooks, app.ci, app.scripts]
 provenance:
   reviewedAt: 2026-10-01
   sources:

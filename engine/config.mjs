@@ -10,6 +10,8 @@ import {validateOrca} from './orca-config.mjs';
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
 export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
+/** The owner-facing language when config.yaml `language` is absent — the one default every reader shares (scripts/lib/i18n.mjs ownerLanguage). A base-tier value: machine (home.mjs) re-exports it, not the reverse. */
+export const DEFAULT_OWNER_LANGUAGE='en';
 const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];

@@ -44,85 +44,19 @@ examples:
   be: examples/ecommerce-app/be
   fe: examples/ecommerce-app/fe
 # File kind -> pattern files. A touched file's kind is the slot `hfs explain` names; its family is the slot id's first
-# segment. It owes the family's `always` files plus those of the longest dotted slot prefix listed under `slots`.
-# Paths are relative to knowledge/patterns/.
+# segment. It owes the family's `always` files plus the topics of the longest dotted slot prefix the derived map knows:
+# each pattern topic declares the slots it teaches in its own `slots` field (knowledge/patterns/<family>/<topic>.yaml),
+# and scripts/gates/read-digest.mjs inverts them (slotTopicMap), a slot's topics in index.yaml reading order. A slot no
+# topic names owes the `always` files alone. Paths are relative to knowledge/patterns/.
 kinds:
   be:
     always: [be/index.yaml, be/folder.yaml, be/naming.yaml, be/imports.yaml, be/typing.yaml, be/function.yaml, be/comment.yaml]
-    slots:
-      be.app: [be/architecture-check.yaml, be/config.yaml, be/injection.yaml, be/services.yaml]
-      be.app.worker: [be/architecture-check.yaml, be/config.yaml, be/background.yaml, be/services.yaml]
-      be.app.cli: [be/cli.yaml, be/architecture-check.yaml, be/config.yaml]
-      be.feature: [be/api.yaml, be/architecture-check.yaml, be/injection.yaml]
-      be.feature.application: [be/api.yaml, be/error.yaml, be/injection.yaml]
-      be.cli: [be/cli.yaml, be/test.yaml]
-      be.transport: [be/transport.yaml, be/api-auth.yaml]
-      be.transport.message: [be/transport.yaml, be/event-bus.yaml, be/background.yaml, be/idempotency.yaml, be/services.yaml]
-      be.feature.jobs: [be/jobs.yaml, be/queues.yaml, be/background.yaml]
-      be.feature.reactors: [be/reactors.yaml, be/event-bus.yaml, be/idempotency.yaml]
-      be.feature.jobs.steps: [be/jobs.yaml]
-      be.events: [be/event-bus.yaml]
-      be.queues: [be/queues.yaml]
-      be.projections: [be/projections.yaml]
-      be.platform.event-bus: [be/event-bus.yaml, be/infra.yaml]
-      be.platform.queue: [be/queues.yaml, be/infra.yaml]
-      be.platform.jobs: [be/jobs.yaml, be/infra.yaml]
-      be.feature.saga: [be/saga.yaml, be/cqrs.yaml, be/services.yaml]
-      be.contract: [be/transport.yaml, be/services.yaml]
-      be.domain: [be/error.yaml, be/messages.yaml]
-      be.errors: [be/error.yaml, be/messages.yaml]
-      be.feature.messages: [be/messages.yaml]
-      be.persistence: [be/persistence.yaml]
-      be.platform: [be/infra.yaml, be/config.yaml, be/logging.yaml, be/temporal.yaml, be/resilience.yaml]
-      be.integrations: [be/infra.yaml, be/resilience.yaml, be/idempotency.yaml]
-      be.tests: [be/test.yaml]
-      be.root-e2e: [be/test.yaml]
-      be.tool-config: [repo/tooling.yaml]
-      be.tool-config-local: [repo/tooling.yaml]
-      be.nest-cli: [repo/tooling.yaml]
   fe:
     always: [fe/index.yaml, fe/folder.yaml, fe/naming.yaml, fe/imports.yaml, fe/typing.yaml, fe/function.yaml, fe/comment.yaml]
-    slots:
-      fe.app: [fe/multi-app.yaml, fe/boundaries.yaml, fe/architecture-check.yaml]
-      fe.route: [fe/boundaries.yaml, fe/architecture-check.yaml, fe/error.yaml]
-      fe.feature: [fe/boundaries.yaml, fe/css.yaml, fe/error.yaml]
-      fe.components: [fe/boundaries.yaml, fe/css.yaml]
-      fe.hooks: [fe/boundaries.yaml, fe/transport.yaml]
-      fe.modules: [fe/boundaries.yaml]
-      fe.modules.api: [fe/transport.yaml, fe/error.yaml]
-      fe.transport: [fe/transport.yaml, fe/error.yaml]
-      fe.modules.i18n: [fe/i18n.yaml]
-      fe.modules.brand: [fe/css.yaml]
-      fe.package: [fe/packages.yaml]
-      fe.package.api: [fe/packages.yaml, fe/transport.yaml, fe/error.yaml]
-      fe.package.i18n: [fe/packages.yaml, fe/i18n.yaml]
-      fe.package.ui: [fe/packages.yaml, fe/css.yaml]
-      fe.tool-config: [repo/tooling.yaml]
-      fe.tool-config-local: [repo/tooling.yaml]
   repo:
     always: [repo/index.yaml, repo/folder.yaml]
-    slots:
-      repo.packages: [repo/pins.yaml]
-      repo.docs: [repo/folder.yaml]
-      repo.plaintext-env: [repo/secrets.yaml]
-      repo.side-root-forbidden: [repo/folder.yaml, repo/tooling.yaml]
   app:
     always: [repo/index.yaml, repo/folder.yaml]
-    slots:
-      app.declaration: [repo/tooling.yaml]
-      app.package-manifest: [repo/pins.yaml, repo/tooling.yaml]
-      app.lockfile: [repo/pins.yaml]
-      app.tool-config: [repo/tooling.yaml]
-      app.format-config: [repo/formatter.yaml, repo/tooling.yaml]
-      app.tool-config-local: [repo/tooling.yaml]
-      app.quality-config: [repo/tooling.yaml, repo/formatter.yaml]
-      app.hooks: [repo/tooling.yaml]
-      app.ci: [repo/tooling.yaml]
-      app.scripts: [repo/tooling.yaml]
-      app.starciwork: [repo/starciwork.yaml]
-      app.starcistacks: [repo/starcistacks.yaml]
-      app.sops: [repo/secrets.yaml]
-      app.plaintext-env: [repo/secrets.yaml]
 # The mechanism proofs of the ops beyond the code loop (contract change op-mechanism-proofs, owner 2026-10-01). Every op named
 # under opProofs runs the mechanism its job touches and attaches the document it prints; `api settle` re-reads each document
 # itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and

@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileReport, inspectLedger, ledgerFileFor, openLedger, writeContract, recordCheckRun } from '../../engine/db/ledger.mjs';
 import { GATE_EXIT, GATE_SCHEMA, appRootOf, droppedMainChanges, mergeGuard, newLintFindings, newTscFindings, parseGateArgs, runGate } from '../../scripts/gates/gate.mjs';
-import { DIGEST_SCHEMA } from '../../scripts/gates/read-digest.mjs';
+import { DIGEST_SCHEMA, patternsForSlot, slotTopicMap } from '../../scripts/gates/read-digest.mjs';
 import { OP_GATE_CHANGE, judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
 import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -246,6 +246,17 @@ test('judgeLoop: new lint or tsc findings, a tool failure, a missing gate or REA
   assert.equal(judgeLoop({ gate: gateDoc(), digest: null, kinds }).code, 'op-read-digest-missing');
   assert.equal(judgeLoop({ gate: gateDoc(), digest: digestDoc([{ path: 'examples/x/be/a.ts', role: 'example', sha256: SHA }]), kinds }).code, 'op-read-digest-no-pattern');
   assert.equal(judgeLoop({ gate: gateDoc(PREEXISTING_ONLY), digest: digestDoc(), kinds }).status, 'pass');
+});
+
+test('the READ topic map derives from the topics\' own slots fields, in index.yaml order, with longest-prefix lookup', () => {
+  const always = ['knowledge/patterns/be/index.yaml', 'knowledge/patterns/be/folder.yaml', 'knowledge/patterns/be/naming.yaml', 'knowledge/patterns/be/imports.yaml', 'knowledge/patterns/be/typing.yaml', 'knowledge/patterns/be/function.yaml', 'knowledge/patterns/be/comment.yaml'];
+  assert.deepEqual(patternsForSlot('be.app'), [...always, 'knowledge/patterns/be/architecture-check.yaml', 'knowledge/patterns/be/injection.yaml', 'knowledge/patterns/be/config.yaml', 'knowledge/patterns/be/services.yaml']);
+  assert.deepEqual(patternsForSlot('be.app.api'), patternsForSlot('be.app'), 'an unlisted sub-slot reads the longest covered prefix');
+  assert.deepEqual(patternsForSlot('app.format-config'), ['knowledge/patterns/repo/index.yaml', 'knowledge/patterns/repo/folder.yaml', 'knowledge/patterns/repo/tooling.yaml', 'knowledge/patterns/repo/formatter.yaml']);
+  assert.deepEqual(patternsForSlot('be.app.cli'), [...always, 'knowledge/patterns/be/architecture-check.yaml', 'knowledge/patterns/be/cli.yaml', 'knowledge/patterns/be/config.yaml']);
+  assert.deepEqual(patternsForSlot(null), []);
+  assert.deepEqual(patternsForSlot('app.tool-cache'), ['knowledge/patterns/repo/index.yaml', 'knowledge/patterns/repo/folder.yaml'], 'a slot no topic names owes the family always files alone');
+  assert.ok(slotTopicMap().get('be.feature').includes('be/api.yaml'));
 });
 
 const effectiveOf = (id) => loadContractChanges(ROOT).changes.find((c) => c.id === id).effectiveAt;

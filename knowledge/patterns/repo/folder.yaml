@@ -11,6 +11,9 @@ appliesTo:
   - backend
   - frontend
 family: repo
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [repo.docs, repo.side-root-forbidden]
 provenance:
   reviewedAt: 2026-10-01
   sources:
