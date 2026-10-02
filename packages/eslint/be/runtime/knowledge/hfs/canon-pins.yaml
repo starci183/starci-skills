@@ -94,7 +94,7 @@ pins:
     version: 2.11.6
     group: tooling
     side: fe
-    why: 'every app is a monorepo (R127): turbo runs build, dev, lint and typecheck over the fe workspaces fe/apps/* and fe/packages/* from the app root turbo.json, as nivo-fe does; 2.11.6 is the newest 2.x on 2026-10-02.'
+    why: 'every app is a monorepo (R128): turbo runs build, dev, lint and typecheck over the fe workspaces fe/apps/* and fe/packages/* from the app root turbo.json, as nivo-fe does; 2.11.6 is the newest 2.x on 2026-10-02.'
   prettier:
     version: 3.9.6
     group: tooling

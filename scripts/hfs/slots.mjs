@@ -315,7 +315,7 @@ function declarationShapeProblems(d) {
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      // One bounded context = one entry (R84, R131): {name, envPrefix, owner, isolation}; names and env prefixes unique, no prefix inside another's keys.
+      // One bounded context = one entry (R84, R159): {name, envPrefix, owner, isolation}; names and env prefixes unique, no prefix inside another's keys.
       const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
       if (shape.length) bad.push(...shape);
       else {

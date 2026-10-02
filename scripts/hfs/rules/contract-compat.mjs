@@ -1,4 +1,4 @@
-// contract-compat.mjs - event contracts evolve only additively (BE_CONTRACT_BREAKING, R134).
+// contract-compat.mjs - event contracts evolve only additively (BE_CONTRACT_BREAKING, R162).
 //
 // A service publishes its events in `be/contracts/<service>/events.json` (the vendored snapshot hfs emits from the service's event table).
 // The previous published contract is pinned beside it as `be/contracts/<service>/events.pin.json` (the same format, copied when a contract is
@@ -54,7 +54,7 @@ export function breakingChanges(pinned, current) {
   return problems;
 }
 
-/** R134: the findings of every service whose contract is pinned. `files` are the repository-relative tracked paths. */
+/** R162: the findings of every service whose contract is pinned. `files` are the repository-relative tracked paths. */
 export function contractCompatFindings({ repoRoot, files }) {
   const findings = [];
   for (const rel of [...files].sort()) {

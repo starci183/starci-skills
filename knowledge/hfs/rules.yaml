@@ -1272,7 +1272,7 @@ rules:
     failureCodes: ["RT_CONTROL_CHARACTER"]
     enforcers:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
-  - id: R127
+  - id: R128
     code: "HFS_MONO_WORKSPACES"
     law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
     kinds: [check]
@@ -1280,7 +1280,7 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACES"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R128
+  - id: R129
     code: "HFS_MONO_FE_WORKSPACE"
     law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
     kinds: [check]
@@ -1288,7 +1288,7 @@ rules:
     failureCodes: ["HFS_MONO_FE_WORKSPACE"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R129
+  - id: R130
     code: "HFS_MONO_NEST_PROJECTS"
     law: "The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `\"monorepo\": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{\"type\": \"application\", \"root\": \"apps/<app>\", \"sourceRoot\": \"apps/<app>/src\"}`."
     kinds: [check]
@@ -1296,7 +1296,7 @@ rules:
     failureCodes: ["HFS_MONO_NEST_PROJECTS"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R130
+  - id: R131
     code: "HFS_MONO_WORKSPACE_DEP"
     law: "An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `\"*\"`; the app root `package.json` never declares a workspace package."
     kinds: [check]
@@ -1304,7 +1304,7 @@ rules:
     failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
     enforcers:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
-  - id: R131
+  - id: R159
     code: "BE_CONTEXT_OWNER"
     law: "A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection)."
     kinds: [lint, design]
@@ -1312,7 +1312,7 @@ rules:
     failureCodes: ["BE_CONTEXT_OWNER"]
     enforcers:
       - {kind: eslint-be, id: context-owner}
-  - id: R132
+  - id: R160
     code: "BE_CONTEXT_COUPLING"
     law: "Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context."
     kinds: [lint, design]
@@ -1320,7 +1320,7 @@ rules:
     failureCodes: ["BE_CONTEXT_COUPLING"]
     enforcers:
       - {kind: eslint-be, id: context-coupling}
-  - id: R133
+  - id: R161
     code: "BE_CONTEXT_TRANSACTION"
     law: "One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga."
     kinds: [lint, design]
@@ -1328,7 +1328,7 @@ rules:
     failureCodes: ["BE_CONTEXT_TRANSACTION"]
     enforcers:
       - {kind: eslint-be, id: context-transaction}
-  - id: R134
+  - id: R162
     code: "BE_CONTRACT_BREAKING"
     law: "An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key."
     kinds: [check]
@@ -1336,7 +1336,7 @@ rules:
     failureCodes: ["BE_CONTRACT_BREAKING"]
     enforcers:
       - {kind: hfs, id: contract-compat, at: scripts/hfs/rules/contract-compat.mjs}
-  - id: R135
+  - id: R163
     code: "BE_CONTEXT_PLATFORM_TABLES"
     law: "A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it."
     kinds: [lint, design]
@@ -1344,7 +1344,7 @@ rules:
     failureCodes: ["BE_CONTEXT_PLATFORM_TABLES"]
     enforcers:
       - {kind: eslint-be, id: context-platform-tables}
-  - id: R136
+  - id: R166
     code: "BE_SQL_RETURNING_SHAPE"
     law: "A `sql` constant that UPDATEs or DELETEs with RETURNING is wrapped as `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed`, because EntityManager.query returns a bare UPDATE or DELETE with RETURNING as `[rows, affectedCount]`, not as rows."
     kinds: [lint, design]

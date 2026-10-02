@@ -55,7 +55,7 @@ rules:
   - id: BE-PERSISTENCE-2
     title: cli migrate is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34, R131]
+    hfsRules: [R33, R34, R159]
     requirement: |-
       Migrations run only through the `migrate` command of `be/apps/cli` (`cli migrate`), once per connection, before any api
       or worker process starts (a deploy runs it as an init job). `apps/cli` is required as soon as `hfs.json`
@@ -325,7 +325,7 @@ rules:
   - id: BE-PERSISTENCE-16
     title: UPDATE or DELETE with RETURNING is wrapped in a SELECT
     kind: mandatory
-    hfsRules: [R136]
+    hfsRules: [R166]
     requirement: |-
       EntityManager.query returns a bare `UPDATE ... RETURNING` or `DELETE ... RETURNING` as `[rows, affectedCount]`, not as rows (an
       `INSERT ... RETURNING` returns rows). A `SqlText` constant that updates or deletes and returns columns is written as
@@ -345,7 +345,7 @@ rules:
   - id: BE-PERSISTENCE-11
     title: A connection is a bounded context with one owning service
     kind: mandatory
-    hfsRules: [R131]
+    hfsRules: [R159]
     requirement: |-
       Every `hfs.json` `sides.be.connections` entry has an `owner` (an api or worker app declared in the same file) and an
       `isolation` (`database` or `schema`). An app passes to `DatabaseModule.register` only the connections it owns and imports
@@ -369,7 +369,7 @@ rules:
   - id: BE-PERSISTENCE-12
     title: Contexts are coupled only by events
     kind: mandatory
-    hfsRules: [R132, R86]
+    hfsRules: [R160, R86]
     requirement: |-
       No cross-context entity relation (`OneToOne`, `OneToMany`, `ManyToOne`, `ManyToMany` to another context's entity), no
       cross-context foreign key (`REFERENCES` another context's table in a migration), no cross-context SQL (BE-PERSISTENCE-9) and
@@ -397,7 +397,7 @@ rules:
   - id: BE-PERSISTENCE-13
     title: One transaction touches one context's connection
     kind: mandatory
-    hfsRules: [R133]
+    hfsRules: [R161]
     requirement: |-
       Inside `entityManager.transaction(async (manager) => ...)` of the manager of connection C, no entity manager of another
       connection is used and no capability of another context is called. Work that spans contexts is a saga: one transaction per
@@ -418,7 +418,7 @@ rules:
   - id: BE-PERSISTENCE-14
     title: Per-connection platform tables and projection placement
     kind: mandatory
-    hfsRules: [R135]
+    hfsRules: [R163]
     requirement: |-
       Projections keep their tables under their owning context's connection, in `modules/projections/<name>/persistence/{entities,migrations}`.
       The outbox and inbox tables exist per connection that publishes or consumes (`platform/event-bus/persistence`,
@@ -442,7 +442,7 @@ rules:
   - id: BE-PERSISTENCE-15
     title: Event contracts evolve only additively
     kind: mandatory
-    hfsRules: [R134]
+    hfsRules: [R162]
     requirement: |-
       `be/contracts/<service>/events.json` is compared with its pinned previous contract `events.pin.json` (copied over when the
       contract is published). Every pinned event keeps its stream, version, payload fields, types and optionality; a new field is

@@ -3,7 +3,7 @@ import { HOLE, tokenizeSql } from './sql-tokens.mjs';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R136 `sql-returning` (BE_SQL_RETURNING_SHAPE). TypeORM's `EntityManager.query` returns an UPDATE or DELETE with RETURNING as
+ * R166 `sql-returning` (BE_SQL_RETURNING_SHAPE). TypeORM's `EntityManager.query` returns an UPDATE or DELETE with RETURNING as
  * `[rows, affectedCount]`, not as rows (an INSERT ... RETURNING returns rows), so a caller that reads the result as rows silently reads
  * the wrong thing and no unit spec that stubs the SQL can see it. Every `sql` tagged template (the tag declared in platform/database) of a
  * `<name>.sql.ts` file in a capability's `persistence/` is read with the tokenizer of sql-tokens.mjs, split into statements at top-level

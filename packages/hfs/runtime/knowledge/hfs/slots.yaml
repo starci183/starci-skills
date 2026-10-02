@@ -594,7 +594,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R134 BE_CONTRACT_BREAKING)
+    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R162 BE_CONTRACT_BREAKING)
     rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -798,7 +798,7 @@ slots:
   - id: be.persistence
     profiles: [be]
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
-    # R135: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # R163: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
     perConnection: [event-bus, jobs]
     presence: optional

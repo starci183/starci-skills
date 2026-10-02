@@ -2,7 +2,7 @@ import { contextModelOf } from './context-map.mjs';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R135 `context-platform-tables` (BE_CONTEXT_PLATFORM_TABLES). A platform capability the manifest lists as `perConnection` (the event-bus outbox,
+ * R163 `context-platform-tables` (BE_CONTEXT_PLATFORM_TABLES). A platform capability the manifest lists as `perConnection` (the event-bus outbox,
  * the job table) keeps its tables on EVERY connection that uses it: when a call into the capability passes the entity manager of connection C
  * (an `Inject<C>EntityManager` property, or the manager of a transaction on one), the capability's `<c>Entities` and `<c>Migrations` must be
  * registered on C, or the row the call writes has no table in C's database. The caller's connection is proven by the manager's origin; a call
