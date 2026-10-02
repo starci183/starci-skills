@@ -42,7 +42,7 @@ function fixture(t, { changelog = CHANGELOG } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { suite: green, scan: scanOk } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { suite: green, scan: scanOk, lock: (work) => work() } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -57,9 +57,9 @@ test('pushRefusal: main plus exactly one release tag is the only push; any other
   assert.match(pushRefusal({ refs: ['refs/tags/v1.0.0'] }), /with its tag/);
 });
 
-test('a green release creates the annotated tag with the CHANGELOG section as its message and pushes main and the tag in one atomic push', (t) => {
+test('a green release creates the annotated tag with the CHANGELOG section as its message and pushes main and the tag in one atomic push', async (t) => {
   const fx = fixture(t);
-  const out = cut(fx);
+  const out = (await cut(fx));
   assert.deepEqual([out.ok, out.verdict, out.tag, out.tagCreated], [true, 'pushed', TAG, true], JSON.stringify(out));
   assert.deepEqual(out.suite.map((s) => [s.name, s.log]), [['npm test', 'npm test.log'], ['npm run check', 'npm run check.log']]);
   assert.equal(fx.remoteMain(), git(fx.repo, 'rev-parse', 'HEAD'), 'main moved to the release commit');
@@ -71,55 +71,55 @@ test('a green release creates the annotated tag with the CHANGELOG section as it
   assert.doesNotMatch(message, /older/, 'and only that section');
 });
 
-test('an annotated tag already on HEAD is reused; a lightweight one, one on another commit, a missing or non-release tag name are refused', (t) => {
+test('an annotated tag already on HEAD is reused; a lightweight one, one on another commit, a missing or non-release tag name are refused', async (t) => {
   const reuse = fixture(t);
   git(reuse.repo, 'tag', '-a', TAG, '-m', 'earlier notes');
-  const ok = cut(reuse);
+  const ok = (await cut(reuse));
   assert.deepEqual([ok.ok, ok.tagCreated], [true, false], JSON.stringify(ok));
   const light = fixture(t);
   git(light.repo, 'tag', TAG);
-  assert.equal(cut(light).verdict, 'tag-not-annotated');
+  assert.equal((await cut(light)).verdict, 'tag-not-annotated');
   const elsewhere = fixture(t);
   git(elsewhere.repo, 'tag', '-a', TAG, '-m', 'old', 'HEAD~1');
-  assert.equal(cut(elsewhere).verdict, 'tag-elsewhere');
+  assert.equal((await cut(elsewhere)).verdict, 'tag-elsewhere');
   const none = fixture(t);
-  assert.equal(cut(none, { tag: null }).verdict, 'no-release-tag');
-  assert.equal(cut(none, { tag: 'preserve/old' }).verdict, 'bad-tag');
-  assert.equal(cut(none, { tag: 'pre-1.0.4-merge' }).verdict, 'bad-tag');
+  assert.equal((await cut(none, { tag: null })).verdict, 'no-release-tag');
+  assert.equal((await cut(none, { tag: 'preserve/old' })).verdict, 'bad-tag');
+  assert.equal((await cut(none, { tag: 'pre-1.0.4-merge' })).verdict, 'bad-tag');
   for (const fx of [light, elsewhere, none]) untouched(fx);
 });
 
-test('a dirty tree, a branch other than main and a tag that already exists on the remote are refused', (t) => {
+test('a dirty tree, a branch other than main and a tag that already exists on the remote are refused', async (t) => {
   const dirty = fixture(t);
   fs.writeFileSync(path.join(dirty.repo, 'a.txt'), 'changed\n');
-  assert.equal(cut(dirty).verdict, 'dirty');
+  assert.equal((await cut(dirty)).verdict, 'dirty');
   assert.equal(fs.readFileSync(path.join(dirty.repo, 'a.txt'), 'utf8'), 'changed\n', 'nothing was stashed or reset');
   const off = fixture(t);
   git(off.repo, 'checkout', '-q', '-b', 'lane/x');
-  assert.equal(cut(off).verdict, 'not-on-main');
+  assert.equal((await cut(off)).verdict, 'not-on-main');
   const dup = fixture(t);
   git(dup.repo, 'tag', '-a', TAG, '-m', 'x');
   git(dup.repo, 'push', '-q', 'origin', `refs/tags/${TAG}`);
-  assert.equal(cut(dup).verdict, 'tag-exists-on-remote');
+  assert.equal((await cut(dup)).verdict, 'tag-exists-on-remote');
   assert.equal(dup.remoteMain(), dup.before, 'only the tag was already there; main is untouched');
   untouched(dirty); untouched(off);
 });
 
-test('unfinished release notes (a missing section, TBD, in preparation) stop the release before L4 runs', (t) => {
+test('unfinished release notes (a missing section, TBD, in preparation) stop the release before L4 runs', async (t) => {
   let suites = 0;
   for (const changelog of ['# Changelog\n\n## [1.0.0-alpha.3] — 2026-09-30\n\n- older\n', '# Changelog\n\n## [1.0.0-alpha.4] — 2026-10-04\n\n- TBD(sha)\n', '# Changelog\n\n## [1.0.0-alpha.4] — in preparation\n\n- x\n']) {
     const fx = fixture(t, { changelog });
-    const out = cut(fx, {}, { suite: () => { suites += 1; return green(); } });
+    const out = (await cut(fx, {}, { suite: () => { suites += 1; return green(); } }));
     assert.equal(out.verdict, 'release-notes', JSON.stringify(out));
     untouched(fx);
   }
   assert.equal(suites, 0, 'L4 never runs over unfinished notes');
 });
 
-test('a red or absent L4 step pushes nothing, names the step and its log; L4 runs exactly once and no tag is created', (t) => {
+test('a red or absent L4 step pushes nothing, names the step and its log; L4 runs exactly once and no tag is created', async (t) => {
   const fx = fixture(t);
   let runs = 0;
-  const out = cut(fx, {}, { suite: () => { runs += 1; return [step('npm test', { ok: false, log: 'red.log' }), step('ecommerce-app: npm run test:e2e', { ok: false, absent: true, log: null }), step('npm run check')]; } });
+  const out = (await cut(fx, {}, { suite: () => { runs += 1; return [step('npm test', { ok: false, log: 'red.log' }), step('ecommerce-app: npm run test:e2e', { ok: false, absent: true, log: null }), step('npm run check')]; } }));
   assert.equal(out.verdict, 'suite-red');
   assert.match(out.why, /npm test/);
   assert.match(out.why, /test:e2e \(absent\)/);
@@ -142,23 +142,23 @@ test('skips: the log parsers read the spec and TAP reporters; a skip from missin
   assert.deepEqual(report.failures.map((k) => k.class), ['infrastructure']);
 });
 
-test('a skip from missing infrastructure on the release host, or any undeclared skip, stops the release; declared browser skips pass and are recorded by name', (t) => {
+test('a skip from missing infrastructure on the release host, or any undeclared skip, stops the release; declared browser skips pass and are recorded by name', async (t) => {
   const infra = fixture(t);
-  const refused = cut(infra, {}, { suite: () => [step('npm test', { skips: [{ name: 'integration against Postgres', reason: 'docker daemon is not running' }] }), step('npm run check')] });
+  const refused = (await cut(infra, {}, { suite: () => [step('npm test', { skips: [{ name: 'integration against Postgres', reason: 'docker daemon is not running' }] }), step('npm run check')] }));
   assert.equal(refused.verdict, 'suite-skips');
   assert.match(refused.why, /integration against Postgres \[infrastructure: docker daemon is not running\]/);
   const odd = fixture(t);
-  assert.equal(cut(odd, {}, { suite: () => [step('npm test', { skips: [{ name: 'only on linux', reason: 'platform' }] })] }).verdict, 'suite-skips');
+  assert.equal((await cut(odd, {}, { suite: () => [step('npm test', { skips: [{ name: 'only on linux', reason: 'platform' }] })] })).verdict, 'suite-skips');
   untouched(infra); untouched(odd);
   const browser = fixture(t);
-  const out = cut(browser, {}, { suite: () => [step('npm test', { skips: [{ name: 'draw-render needs a browser', reason: 'no browser installed' }, { name: 'draw-layer needs a browser', reason: 'no browser installed' }] }), step('npm run check')] });
+  const out = (await cut(browser, {}, { suite: () => [step('npm test', { skips: [{ name: 'draw-render needs a browser', reason: 'no browser installed' }, { name: 'draw-layer needs a browser', reason: 'no browser installed' }] }), step('npm run check')] }));
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.deepEqual(out.declaredSkips, ['draw-layer needs a browser', 'draw-render needs a browser'], 'the kept skips are listed by name');
   assert.equal(out.skips.length, 2);
   assert.ok(out.skips.every((k) => k.reason && k.step === 'npm test'), 'every skip carries its reason and its step');
 });
 
-test('the L4 row: the runtime suite and check, every example script (lint, tsc, tests, builds, images) and the Sonar proof; a missing script or proof is absent and fails', (t) => {
+test('the L4 row: the runtime suite and check, every example script (lint, tsc, tests, builds, images) and the Sonar proof; a missing script or proof is absent and fails', async (t) => {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-l4-plan-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
@@ -169,51 +169,51 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   const plan = planL4(base, { runtimeRoot: base });
   const names = plan.steps.map((s) => s.name);
   for (const expected of ['shop: npm run lint', 'shop: npm run typecheck', 'shop: npm run test', 'shop: npm run test:e2e', 'shop: npm run docker:build', 'shop: npm run build:be']) assert.ok(names.includes(expected), expected);
-  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
+  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
   assert.deepEqual(plan.proofs, ['shop: sonar']);
   const ran = [];
-  const out = runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {} });
+  const out = (await runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {}, parity: null }));
   assert.ok(ran.some(([n, cwd]) => n === 'shop: npm run lint' && cwd === app), 'an example step runs in its own folder');
   const sonar = out.find((s) => s.name === 'shop: sonar');
   assert.deepEqual([sonar.ok, sonar.absent], [false, true], 'a proof nothing supplies is absent and fails');
-  assert.equal(runL4(base, { plan, step: () => ({ ok: true, log: 'x', ms: 1, text: '' }), proofs: { 'shop: sonar': () => ({ ok: true, log: 'sonar.json' }) } }).find((s) => s.name === 'shop: sonar').ok, true);
+  assert.equal((await runL4(base, { plan, step: () => ({ ok: true, log: 'x', ms: 1, text: '' }), proofs: { 'shop: sonar': () => ({ ok: true, log: 'sonar.json' }) }, parity: null })).find((s) => s.name === 'shop: sonar').ok, true);
   assert.deepEqual(out.find((s) => s.name === 'shop: npm run lint').skips, [{ name: 'draw-layer', reason: 'no browser' }], 'the skips of every step are read from its log');
 });
 
-test('main moving while L4 runs, and a secret in the pushed range, stop the push and create no tag', (t) => {
+test('main moving while L4 runs, and a secret in the pushed range, stop the push and create no tag', async (t) => {
   const moved = fixture(t);
-  const out = cut(moved, {}, { suite: () => { fs.writeFileSync(path.join(moved.repo, 'b.txt'), 'x\n'); git(moved.repo, 'add', '-A'); git(moved.repo, 'commit', '-q', '-m', 'late commit'); return green(); } });
+  const out = (await cut(moved, {}, { suite: () => { fs.writeFileSync(path.join(moved.repo, 'b.txt'), 'x\n'); git(moved.repo, 'add', '-A'); git(moved.repo, 'commit', '-q', '-m', 'late commit'); return green(); } }));
   assert.equal(out.verdict, 'main-moved');
   const secret = fixture(t);
-  const refused = cut(secret, {}, { scan: () => ({ ok: false, findings: [{ pattern: 'assigned-secret' }] }) });
+  const refused = (await cut(secret, {}, { scan: () => ({ ok: false, findings: [{ pattern: 'assigned-secret' }] }) }));
   assert.equal(refused.verdict, 'secret-scan');
   assert.equal(git(secret.repo, 'tag', '-l'), '');
   untouched(moved); untouched(secret);
 });
 
-test('the push is atomic: a remote that refuses the tag leaves main where it was', (t) => {
+test('the push is atomic: a remote that refuses the tag leaves main where it was', async (t) => {
   const fx = fixture(t);
   // An `update` hook judges ONE ref: it refuses the tag alone, so only --atomic keeps main from moving without it.
   const hook = path.join(fx.origin, 'hooks', 'update');
   fs.writeFileSync(hook, ['#!/bin/sh', 'case "$1" in refs/tags/*) echo "tags refused" >&2; exit 1;; esac', 'exit 0', ''].join('\n'), { mode: 0o755 });
-  const out = cut(fx);
+  const out = (await cut(fx));
   assert.equal(out.verdict, 'push-refused', JSON.stringify(out));
   assert.equal(fx.remoteMain(), fx.before, 'main did not move without its tag');
   assert.deepEqual(fx.remoteTags(), []);
 });
 
-test('L4 and the push each run inside the one host-lock function', (t) => {
+test('L4 and the push each run inside the one host-lock function', async (t) => {
   const fx = fixture(t);
   const events = [];
-  const out = cut(fx, {}, { suite: () => { events.push('suite'); return green(); }, lock: (work) => { events.push('lock-in'); const r = work(); events.push('lock-out'); return r; } });
+  const out = (await cut(fx, {}, { suite: () => { events.push('suite'); return green(); }, lock: (work) => { events.push('lock-in'); const r = work(); events.push('lock-out'); return r; } }));
   assert.equal(out.ok, true);
   assert.deepEqual(events, ['lock-in', 'suite', 'lock-out', 'lock-in', 'lock-out'], 'L4 and the push each hold the lock');
 });
 
-test('the L4 record of HEAD is written after the tag and before the push, naming the tag; a record that cannot be written stops the push', (t) => {
+test('the L4 record of HEAD is written after the tag and before the push, naming the tag; a record that cannot be written stops the push', async (t) => {
   const fx = fixture(t);
   const events = [];
-  const out = cut(fx, {}, { recordL4: (input) => { events.push(`record ${input.tag}`); return writeL4Record({ ...input, repo: fx.repo }); }, push: (args, o) => { events.push('push'); return push(args, o); } });
+  const out = (await cut(fx, {}, { recordL4: (input) => { events.push(`record ${input.tag}`); return writeL4Record({ ...input, repo: fx.repo }); }, push: (args, o) => { events.push('push'); return push(args, o); } }));
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.deepEqual(events, [`record ${TAG}`, 'push']);
   const head = git(fx.repo, 'rev-parse', 'HEAD');
@@ -223,16 +223,16 @@ test('the L4 record of HEAD is written after the tag and before the push, naming
   assert.equal(out.l4Record, l4RecordPath({ commonDir: gitCommonDir(fx.repo), head }));
 
   const blocked = fixture(t);
-  const refused = cut(blocked, {}, { recordL4: () => ({ ok: false, reason: 'the repository has no git common dir' }) });
+  const refused = (await cut(blocked, {}, { recordL4: () => ({ ok: false, reason: 'the repository has no git common dir' }) }));
   assert.equal(refused.verdict, 'l4-record');
   assert.match(refused.why, /pre-push gate would refuse/);
   assert.equal(blocked.remoteMain(), blocked.before, 'nothing was pushed');
 });
 
-test('a held host lock refuses the cut naming its owner: the suite never runs and no tag is created', (t) => {
+test('a held host lock refuses the cut naming its owner: the suite never runs and no tag is created', async (t) => {
   const fx = fixture(t);
   let suites = 0;
-  const out = cut(fx, {}, { suite: () => { suites += 1; return green(); }, lock: () => ({ ok: false, reason: 'held', owner: { role: 'coordinator', purpose: 'land', pid: 4242 } }) });
+  const out = (await cut(fx, {}, { suite: () => { suites += 1; return green(); }, lock: () => ({ ok: false, reason: 'held', owner: { role: 'coordinator', purpose: 'land', pid: 4242 } }) }));
   assert.equal(out.verdict, 'host-lock-held');
   assert.match(out.why, /held by coordinator \(land\) pid 4242/);
   assert.equal(suites, 0);
@@ -240,16 +240,16 @@ test('a held host lock refuses the cut naming its owner: the suite never runs an
   untouched(fx);
 });
 
-test('the pre-push hook lets exactly the release the cut made through: a push of main without the L4 record is refused, with it the atomic push passes', (t) => {
+test('the pre-push hook lets exactly the release the cut made through: a push of main without the L4 record is refused, with it the atomic push passes', async (t) => {
   const fx = fixture(t);
   const hooks = path.join(fx.repo, '.git', 'hooks');
   const rendered = renderRuntimeHooks({ root: path.resolve(import.meta.dirname, '..', '..') });
   fs.writeFileSync(path.join(hooks, 'pre-push'), rendered['pre-push'], { mode: 0o755 });
-  const blocked = cut(fx, {}, { recordL4: () => ({ ok: true, file: null }), push: (args, o) => push(args, o) });
+  const blocked = (await cut(fx, {}, { recordL4: () => ({ ok: true, file: null }), push: (args, o) => push(args, o) }));
   assert.equal(blocked.verdict, 'push-refused', JSON.stringify(blocked));
   assert.match(blocked.why, /RIGHTS_PUSH_NOT_RELEASE/);
   untouched(fx);
-  const ok = cut(fx, {}, { push: (args, o) => push(args, o) });
+  const ok = (await cut(fx, {}, { push: (args, o) => push(args, o) }));
   assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.deepEqual(fx.remoteTags(), [TAG]);
 });

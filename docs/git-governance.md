@@ -23,7 +23,7 @@ it uses the same git call files as the CLI's git verbs, never a git process of i
    2. One release commit: the version bump and the CHANGELOG section (generated from the land merge commits, finished by a person).
    3. Publish the packages from that commit, re-pin the examples, commit.
    4. `starci release cut --tag v<version>`: it checks the notes (R222), runs L4 once (the full row of the [test ladder](source-process.md): every spec, lint, checks, tsc, the
-      example proofs and images, each step to a recorded log; a skip caused by missing infrastructure fails it), makes sure main did not move, scans the pushed range, creates the
+      example installs, proofs and images, and the Linux-parity step: the light CI jobs run once in a Linux container on this host before the push, so the first GitHub run is not the first Linux run; each step to a recorded log; a skip caused by missing infrastructure fails it), makes sure main did not move, scans the pushed range, creates the
       ANNOTATED tag on the release commit with the CHANGELOG section as its message, and pushes main and the tag atomically.
    5. Linux parity before the push: the CI jobs run locally on Linux, because every local gate runs on the author's machine and CI does not.
    6. CI runs once, on that tag; the GitHub Release is made from the CHANGELOG section.
