@@ -144,7 +144,7 @@ rules:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
-    law: "CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
+    law: "CI runs the pinned `hfs lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
@@ -1950,6 +1950,33 @@ rules:
     failureCodes: ["RELEASE_NOTES"]
     enforcers:
       - {kind: runtime, id: release-notes, at: scripts/hfs/runtime-rules/release-notes.mjs}
+  - id: R223
+    code: "RIGHTS_ROLE_DENIED"
+    law: "By the caller's role, the command guard refuses git push, git tag, raw git commit/add/rm/mv, raw git synchronization writes, npm publish, a whole-suite run outside the release cut and unit.verify/e2e.verify, npm ci without the host lock, a release cut, and raw side-effecting tools; modules/kernel/command-policy.yaml is the one rule table read by both the PreToolUse guard and the PATH shim."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RIGHTS_ROLE_DENIED", "RIGHTS_GIT_PUSH", "RIGHTS_GIT_TAG", "RIGHTS_GIT_COMMIT", "RIGHTS_GIT_SYNC", "RIGHTS_NPM_PUBLISH", "RIGHTS_NPM_CI_UNLOCKED", "RIGHTS_SUITE_RUN", "RIGHTS_RELEASE_CUT", "RIGHTS_RAW_TOOL"]
+    enforcers:
+      - {kind: runtime, id: role-rights, at: scripts/hfs/runtime-rules/rights-policy.mjs}
+  - id: R224
+    code: "RIGHTS_PROTECTED_ZONE"
+    law: "The protected zone declared once in modules/kernel/protected-zone.yaml is edited only by the owner path; a supervisor self-upgrade files an owner proposal, and an op never writes the .claude runtime checkout."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RIGHTS_PROTECTED_ZONE", "RIGHTS_OP_RUNTIME_WRITE"]
+    enforcers:
+      - {kind: runtime, id: protected-zone, at: scripts/hfs/runtime-rules/rights-policy.mjs}
+  - id: R225
+    code: "RT_HOOK_SHAPE"
+    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags) and runs no npm test, jest, typecheck or lint."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_HOOK_SHAPE", "RIGHTS_PUSH_NOT_RELEASE"]
+    enforcers:
+      - {kind: runtime, id: hook-shape, at: scripts/hfs/runtime-rules/hook-shape.mjs}
 retired:
   - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}

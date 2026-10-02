@@ -1,3 +1,0 @@
-{{header}}
-# Commit gate: secrets/work hygiene, types, and lint/format of staged files. Lite has no spec step.
-{{> app/hooks/pre-commit-core}}

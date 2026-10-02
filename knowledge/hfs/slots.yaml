@@ -422,7 +422,6 @@ slots:
     tier: none
     tests: none
     managedBy: hooks
-    liteManagedBy: hooks-lite
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci
     profiles: [app]

@@ -1,0 +1,54 @@
+id: rights-role-rights
+effectiveAt: '2026-10-03T04:20:00+07:00'
+summary: >-
+  ROLE RIGHTS, THE PROTECTED ZONE, THE HOST LOCK AND GIT HOOKS ARE ENFORCED (rules R223-R225). The command guard and its
+  PATH shim read one policy, modules/kernel/command-policy.yaml: a bound agent uses the owned starci verb instead of raw
+  git writes, package publication, a whole-suite run, an unlocked clean install, a release cut or another side-effecting
+  tool; the release role is live only while it owns the release host lock. The protected zone is declared once in
+  modules/kernel/protected-zone.yaml: a Supervisor self-upgrade files an owner proposal instead of editing it, and an op
+  records a lesson or upgrade request instead of writing the .claude runtime checkout. The PreToolUse matcher covers
+  Bash, PowerShell, Edit, Write, MultiEdit and NotebookEdit, so shell redirects and every file-write tool reach the same
+  file-rights verdict. scripts/machine/host-lock.mjs supplies the synchronous role-bound lock API used by land and release
+  work, including stale-owner takeover and token-owned release. Generated runtime and app git hooks keep commits at L0
+  and make pre-push a release-record gate: backups go only to refs/backup/*, while main and annotated v* tags require the
+  matching L4 record of HEAD; the hook-shape runtime check prevents either hook from regaining tests, typecheck or lint.
+adds:
+  codes:
+    - RIGHTS_ROLE_DENIED
+    - RIGHTS_GIT_PUSH
+    - RIGHTS_GIT_TAG
+    - RIGHTS_GIT_COMMIT
+    - RIGHTS_GIT_SYNC
+    - RIGHTS_NPM_PUBLISH
+    - RIGHTS_NPM_CI_UNLOCKED
+    - RIGHTS_SUITE_RUN
+    - RIGHTS_RELEASE_CUT
+    - RIGHTS_RAW_TOOL
+    - RIGHTS_PROTECTED_ZONE
+    - RIGHTS_OP_RUNTIME_WRITE
+    - RIGHTS_PUSH_NOT_RELEASE
+    - RT_HOOK_SHAPE
+    - host-lock-held
+    - not-owner
+    - bad-role
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rights-role-rights.yaml
+  - modules/kernel/command-policy.yaml
+  - modules/kernel/protected-zone.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/repo/tooling.yaml
+  - scripts/guards/rights.mjs
+  - scripts/guards/command-policy.mjs
+  - scripts/guards/protected-zone.mjs
+  - scripts/guards/command-guard.mjs
+  - .claude/settings.json
+  - scripts/machine/host-lock.mjs
+  - scripts/supervisor/land.mjs
+  - packages/hfs/templates/app/hooks/husky/pre-commit
+  - packages/hfs/templates/app/hooks/husky/pre-push
+  - scripts/guards/git-hooks.mjs
+  - scripts/hfs/runtime-rules/hook-shape.mjs
+  - scripts/hfs/runtime-check.mjs

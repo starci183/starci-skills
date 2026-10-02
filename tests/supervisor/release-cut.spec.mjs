@@ -7,6 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { cutRelease, pushRefusal } from '../../scripts/supervisor/release-cut.mjs';
+import { push } from '../../scripts/api/git/push.mjs';
+import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
+import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
@@ -205,4 +208,48 @@ test('L4 and the push each run inside the one host-lock function', (t) => {
   const out = cut(fx, {}, { suite: () => { events.push('suite'); return green(); }, lock: (work) => { events.push('lock-in'); const r = work(); events.push('lock-out'); return r; } });
   assert.equal(out.ok, true);
   assert.deepEqual(events, ['lock-in', 'suite', 'lock-out', 'lock-in', 'lock-out'], 'L4 and the push each hold the lock');
+});
+
+test('the L4 record of HEAD is written after the tag and before the push, naming the tag; a record that cannot be written stops the push', (t) => {
+  const fx = fixture(t);
+  const events = [];
+  const out = cut(fx, {}, { recordL4: (input) => { events.push(`record ${input.tag}`); return writeL4Record({ ...input, repo: fx.repo }); }, push: (args, o) => { events.push('push'); return push(args, o); } });
+  assert.equal(out.ok, true, JSON.stringify(out));
+  assert.deepEqual(events, [`record ${TAG}`, 'push']);
+  const head = git(fx.repo, 'rev-parse', 'HEAD');
+  const record = readL4Record({ repo: fx.repo, head, tag: TAG });
+  assert.equal(record.tag, TAG);
+  assert.deepEqual(record.logs.map((s) => s.name), ['npm test', 'npm run check']);
+  assert.equal(out.l4Record, l4RecordPath({ commonDir: gitCommonDir(fx.repo), head }));
+
+  const blocked = fixture(t);
+  const refused = cut(blocked, {}, { recordL4: () => ({ ok: false, reason: 'the repository has no git common dir' }) });
+  assert.equal(refused.verdict, 'l4-record');
+  assert.match(refused.why, /pre-push gate would refuse/);
+  assert.equal(blocked.remoteMain(), blocked.before, 'nothing was pushed');
+});
+
+test('a held host lock refuses the cut naming its owner: the suite never runs and no tag is created', (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const out = cut(fx, {}, { suite: () => { suites += 1; return green(); }, lock: () => ({ ok: false, reason: 'held', owner: { role: 'coordinator', purpose: 'land', pid: 4242 } }) });
+  assert.equal(out.verdict, 'host-lock-held');
+  assert.match(out.why, /held by coordinator \(land\) pid 4242/);
+  assert.equal(suites, 0);
+  assert.equal(git(fx.repo, 'tag', '-l'), '', 'no tag was created');
+  untouched(fx);
+});
+
+test('the pre-push hook lets exactly the release the cut made through: a push of main without the L4 record is refused, with it the atomic push passes', (t) => {
+  const fx = fixture(t);
+  const hooks = path.join(fx.repo, '.git', 'hooks');
+  const rendered = renderRuntimeHooks({ root: path.resolve(import.meta.dirname, '..', '..') });
+  fs.writeFileSync(path.join(hooks, 'pre-push'), rendered['pre-push'], { mode: 0o755 });
+  const blocked = cut(fx, {}, { recordL4: () => ({ ok: true, file: null }), push: (args, o) => push(args, o) });
+  assert.equal(blocked.verdict, 'push-refused', JSON.stringify(blocked));
+  assert.match(blocked.why, /RIGHTS_PUSH_NOT_RELEASE/);
+  untouched(fx);
+  const ok = cut(fx, {}, { push: (args, o) => push(args, o) });
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  assert.deepEqual(fx.remoteTags(), [TAG]);
 });

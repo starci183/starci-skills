@@ -373,7 +373,7 @@ function mergeBaseOf(repoRoot, base) {
 }
 
 /** Tracked paths that differ from the merge-base (commits, staged and unstaged edits; deletions are not paths to judge). */
-export function changedSince(repoRoot, base) {
+function changedSince(repoRoot, base) {
   const sha = mergeBaseOf(repoRoot, base);
   if (!sha) {
     throw new Error(base

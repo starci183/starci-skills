@@ -108,7 +108,8 @@ test('through the command guard, real git stages and commits App Router owned pa
   const quote = (a) => `'${a.replace(/'/g, `'\\''`)}'`;
   // What an agent's shell call does: the hook decides first, and only an allowed command reaches git.
   const run = async (args, input) => {
-    const refused = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard, env });
+    // The role rights (R223: an op never runs a raw git add/commit, it uses `starci git commit`) are a later layer; this spec judges the git policy, so no role is resolved here.
+    const refused = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard, env, rights: { role: null, handle: null, lockOwner: () => null, policy: null } });
     if (refused) return { status: 2, stderr: `${refused.code}: ${refused.reason}`, refused };
     return spawnSync('git', args, { cwd: repo, encoding: 'utf8', env, ...(input == null ? {} : { input }) });
   };

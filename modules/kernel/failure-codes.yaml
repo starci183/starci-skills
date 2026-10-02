@@ -4371,6 +4371,149 @@ REV_NOT_MONOTONIC:
   owner: other-op:work.author
   kind: check-finding
 
+RIGHTS_GIT_COMMIT:
+  title: "Raw git commit write refused"
+  title_vi: "Từ chối ghi commit git trực tiếp"
+  meaning_vi: "Agent đã gọi trực tiếp git commit, add, rm hoặc mv, nhưng mọi thay đổi lịch sử và vùng staged phải đi qua động từ runtime để quyền, bằng chứng và bước settle được giữ nhất quán."
+  causes_vi:
+    - "Agent tự stage hoặc commit thay vì để runtime tạo commit của phần việc đã qua cổng"
+    - "Agent dùng git rm hoặc git mv trực tiếp cho một thay đổi trong cây làm việc"
+  nextStep_vi: "Lệnh bị từ chối; dùng starci git commit, hoặc để nguyên thay đổi và báo cáo để runtime commit phần việc đã qua cổng khi settle."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_GIT_PUSH:
+  title: "Git push refused by role rights"
+  title_vi: "Quyền theo vai trò từ chối git push"
+  meaning_vi: "Worker, lead, Supervisor hoặc coordinator không được đẩy remote theo ý mình: remote chỉ di chuyển một lần trong mỗi bản phát hành, khi main và thẻ phát hành được đẩy cùng nhau; coordinator hoặc Supervisor chỉ được đẩy bản sao lưu bằng refspec tường minh vào refs/backup/*."
+  causes_vi:
+    - "Agent định đẩy main, một nhánh thường, mọi thẻ hoặc một refspec quá rộng"
+    - "Coordinator hoặc Supervisor đẩy bản sao lưu nhưng đích không nằm trong refs/backup/* hoặc không có refspec tường minh"
+  nextStep_vi: "Lệnh bị từ chối; để thay đổi đi qua starci release cut, hoặc nếu là coordinator hay Supervisor thì dùng starci git backup với đích refs/backup/* tường minh."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_GIT_SYNC:
+  title: "Raw git synchronization write refused"
+  title_vi: "Từ chối lệnh git đồng bộ trực tiếp"
+  meaning_vi: "Agent đã gọi một lệnh git ghi lịch sử, ref, cấu hình hoặc cây làm việc ngoài commit, push và tag; các thao tác merge, rebase, pull, fetch, checkout, switch, reset, restore, clean, stash, worktree, branch và tương tự chỉ do runtime điều phối."
+  causes_vi:
+    - "Agent tự merge hoặc rebase main vào lane"
+    - "Agent tự đổi nhánh, reset, restore, clean, stash, sửa ref, cấu hình hoặc worktree"
+  nextStep_vi: "Lệnh bị từ chối; dùng starci git sync để cập nhật lane hoặc starci git land khi coordinator đưa thay đổi vào main."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_GIT_TAG:
+  title: "Git tag write refused"
+  title_vi: "Từ chối ghi thẻ git"
+  meaning_vi: "Thẻ là dấu của một bản phát hành nên chỉ release cut được tạo thẻ; agent không được tạo, di chuyển hoặc xóa thẻ, và dấu giữ chỗ không phải thẻ."
+  causes_vi:
+    - "Agent định tạo hoặc ký một thẻ phát hành"
+    - "Agent định di chuyển, ép ghi hoặc xóa thẻ, hoặc dùng thẻ làm dấu giữ chỗ"
+  nextStep_vi: "Lệnh bị từ chối; dùng starci release cut cho thẻ phát hành, còn dấu giữ chỗ dùng refs/backup/* hoặc refs/salvage/*."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_NPM_CI_UNLOCKED:
+  title: "Unlocked clean install refused"
+  title_vi: "Từ chối cài sạch khi chưa giữ khóa máy"
+  meaning_vi: "npm ci xóa và dựng lại node_modules nên là một lần chạy nặng; lệnh chỉ được chạy sau khi runtime đã lấy host lock cho đúng tác vụ."
+  causes_vi:
+    - "Agent gọi npm ci hoặc một biến thể clean install mà không có host lock"
+    - "Host lock đang do terminal khác giữ hoặc chủ khóa đã stale"
+  nextStep_vi: "Lệnh bị từ chối; dùng động từ starci của cổng hoặc đồng bộ ứng dụng để runtime lấy host lock rồi cài phụ thuộc, không chạy npm ci bằng tay."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_NPM_PUBLISH:
+  title: "Package publish refused"
+  title_vi: "Từ chối phát hành package"
+  meaning_vi: "Package chỉ được publish một lần trong mỗi bản phát hành và từ release commit, nên agent ở lane không được publish, unpublish, deprecate hoặc đổi dist-tag."
+  causes_vi:
+    - "Agent gọi npm, pnpm hoặc yarn publish"
+    - "Agent định unpublish, deprecate hoặc sửa dist-tag ngoài release cut"
+  nextStep_vi: "Lệnh bị từ chối; hoàn tất lane và để chủ chạy starci release cut từ release commit."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_OP_RUNTIME_WRITE:
+  title: "Op runtime write refused"
+  title_vi: "Từ chối op ghi vào runtime"
+  meaning_vi: "Op chỉ sửa ứng dụng trong worktree của workflow và không được ghi vào checkout .claude của runtime; lỗi của harness phải đi qua đường nâng cấp runtime."
+  causes_vi:
+    - "Op định sửa mã, cấu hình hoặc tri thức bên trong checkout .claude"
+    - "Op phát hiện lỗi harness rồi cố sửa ngay trong phần việc của ứng dụng"
+  nextStep_vi: "Lệnh bị từ chối; ghi lesson hoặc upgrade request trong báo cáo để đường owner hoặc supervisor self-upgrade xử lý."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_PROTECTED_ZONE:
+  title: "Protected-zone write refused"
+  title_vi: "Từ chối ghi vào vùng được bảo vệ"
+  meaning_vi: "Supervisor self-upgrade đã định sửa vùng được bảo vệ của runtime, nơi chỉ đường owner được thay đổi guard và quyền vai trò, release cut và git hook, trigger CI, chính sách test, host lock, rule catalog liên quan hoặc cài đặt quyền và model."
+  causes_vi:
+    - "Một self-upgrade sửa trực tiếp tệp nằm trong vùng được khai báo ở modules/kernel/protected-zone.yaml"
+    - "Một self-upgrade sửa mục rule hoặc failure code bảo vệ vùng đó"
+  nextStep_vi: "Lệnh bị từ chối; Supervisor nộp đề xuất cho owner, nêu thay đổi cần làm và lý do, để đường owner thực hiện."
+  owner: supervisor
+  kind: verb-refusal
+
+RIGHTS_PUSH_NOT_RELEASE:
+  title: "Pre-push release gate refused the push"
+  title_vi: "Cổng phát hành pre-push từ chối lần đẩy"
+  meaning_vi: "Hook pre-push đã chặn một đích không phải refs/backup/* hoặc một lần đẩy main và thẻ v* do release cut tạo, vì HEAD thiếu thẻ annotated hợp lệ hoặc thiếu bản ghi L4 khớp HEAD và thẻ."
+  causes_vi:
+    - "Đích là một nhánh khác, một thẻ không bắt đầu bằng v, hoặc thao tác xóa ref"
+    - "HEAD không mang thẻ annotated v[0-9]* hoặc bản ghi starci-release của HEAD thiếu hay không khớp"
+  nextStep_vi: "Không đẩy trực tiếp; dùng refs/backup/* cho bản sao lưu, hoặc chạy release cut đã được owner duyệt để ghi L4 rồi đẩy main và thẻ v* cùng nhau."
+  owner: supervisor
+  kind: verb-refusal
+
+RIGHTS_RAW_TOOL:
+  title: "Raw side-effecting tool refused"
+  title_vi: "Từ chối công cụ thô có tác động phụ"
+  meaning_vi: "Agent đã gọi trực tiếp một công cụ có tác động phụ trong khi runtime có động từ starci sở hữu thao tác đó; chính sách chỉ cho phép các lệnh chỉ đọc được khai báo một lần trong modules/kernel/command-policy.yaml."
+  causes_vi:
+    - "Agent gọi npm run, npm test, npm install, node scripts, docker, supabase, gh, schtasks, shutdown, một test runner hoặc Orca mutation trực tiếp"
+    - "Agent gọi một chương trình chưa được khai báo trong bảng chính sách lệnh"
+  nextStep_vi: "Lệnh bị từ chối; dùng đúng starci <nhóm> <động từ> mà lời từ chối nêu, hoặc nhờ owner khi không có động từ được phép."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_RELEASE_CUT:
+  title: "Release cut refused"
+  title_vi: "Từ chối cắt bản phát hành"
+  meaning_vi: "Release cut là quyết định phát hành của owner và chạy toàn bộ cổng L4 một lần; worker, lead, Supervisor và coordinator không được tự khởi động nó."
+  causes_vi:
+    - "Agent gọi starci release cut hoặc đường script tương đương"
+    - "Agent định publish bản phát hành mà chưa có phê duyệt của owner"
+  nextStep_vi: "Lệnh bị từ chối; báo lane đã sẵn sàng để owner phê duyệt và khởi động starci release cut."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_ROLE_DENIED:
+  title: "Action denied by role rights"
+  title_vi: "Quyền theo vai trò từ chối thao tác"
+  meaning_vi: "Command guard đã từ chối một thao tác vì vai trò của caller không sở hữu tác động đó; modules/kernel/command-policy.yaml là bảng chính sách duy nhất mà PreToolUse guard và PATH shim cùng đọc."
+  causes_vi:
+    - "Agent gọi một lệnh ghi hoặc công cụ có tác động phụ ngoài quyền của vai trò"
+    - "Agent bỏ qua động từ starci sở hữu thao tác"
+  nextStep_vi: "Không chạy đường thô; dùng động từ starci được lời từ chối nêu hoặc báo lại cho vai trò sở hữu thao tác."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_SUITE_RUN:
+  title: "Whole-suite run refused"
+  title_vi: "Từ chối chạy toàn bộ bộ kiểm thử"
+  meaning_vi: "Toàn bộ suite chỉ chạy một lần trong mỗi release hoặc theo yêu cầu trong unit.verify hay e2e.verify; một worker chỉ chạy tệp spec vừa thay đổi hoặc để op gate chọn phạm vi."
+  causes_vi:
+    - "Agent gọi npm test, một script test toàn bộ hoặc node --test trên cả cây tests"
+    - "Agent chạy suite ngoài release cut và ngoài op verify được yêu cầu"
+  nextStep_vi: "Lệnh bị từ chối; chạy riêng tệp spec đã thay đổi, để op gate chọn spec liên quan, hoặc dùng unit.verify/e2e.verify khi owner hay mục tiêu yêu cầu."
+  owner: op-retry
+  kind: verb-refusal
+
 ROUTED_FORBIDDEN:
   title: "routed on non-overlay"
   title_vi: "routed trên bản ghi không phải lớp phủ"
@@ -4547,6 +4690,17 @@ RT_GUIDANCE_REFUSED_COMMAND:
     - "Một bước hướng dẫn dọn dẹp bằng rm -rf hoặc Remove-Item -Recurse thay vì safeRemove"
     - "Một bước giao việc cho agent khác bằng codex exec, claude -p hoặc orca terminal create thay vì worker-start"
   nextStep_vi: "Người giám sát sửa câu hướng dẫn sang đường được phép (API worktree của runtime, workers.mjs stage --self, safeRemove hoặc safeRemoveWorktree, worker-start và worker-release) qua một lane đã land; nếu câu chỉ mô tả việc runtime tự làm thì viết lại để chủ ngữ là runtime."
+  owner: supervisor
+  kind: check-finding
+
+RT_HOOK_SHAPE:
+  title: "App hook template breaks the gate model"
+  title_vi: "Template hook của app phá vỡ mô hình cổng"
+  meaning_vi: "Template hook husky của app (packages/hfs/templates/app/hooks/husky) không đúng mô hình: pre-commit chỉ được chạy mức L0 (work-hygiene, eslint, stylelint, prettier trên tệp staged), không typecheck và không chạy test; pre-push chỉ kiểm cổng phát hành (bản ghi L4 trong starci-release, không gian refs/backup/, mẫu thẻ v[0-9]*), không chạy npm test, jest, typecheck hay lint."
+  causes_vi:
+    - "Thêm lại npm run typecheck hoặc test:affected vào pre-commit"
+    - "Đưa typecheck, lint hay test vào pre-push, hoặc xóa các dấu mốc cổng phát hành khỏi pre-push"
+  nextStep_vi: "Người giám sát trả template về đúng mô hình (pre-commit L0, pre-push chỉ kiểm cổng phát hành) rồi render lại hook các ví dụ bằng hfs sync --write, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -6846,6 +7000,16 @@ bad-attempt:
   nextStep_vi: "Lệnh bị từ chối; truyền lại số lần thử là số nguyên từ 1 trở lên."
   owner: op-retry
   kind: input-invalid
+bad-role:
+  title: "Host-lock role is invalid"
+  title_vi: "Vai trò giữ khóa máy không hợp lệ"
+  meaning_vi: "Runtime từ chối lấy host lock vì caller nêu một vai trò không thuộc tập release, coordinator, lead hoặc worker."
+  causes_vi:
+    - "Caller truyền sai tên vai trò khi lấy host lock"
+    - "Một đường gọi mới chưa ánh xạ vai trò của nó vào mô hình host lock"
+  nextStep_vi: "Lõi runtime sửa caller để dùng đúng vai trò release, coordinator, lead hoặc worker rồi lấy khóa lại."
+  owner: runtime-core
+  kind: blocker
 bare-shell:
   title: "Terminal shows only a shell"
   title_vi: "Terminal chỉ còn dấu nhắc shell"
@@ -8890,6 +9054,16 @@ not-an-op-job:
   nextStep_vi: "Không giải phóng phiên nào; bỏ qua."
   owner: runtime-core
   kind: settle-reason
+not-owner:
+  title: "Host-lock release refused for a non-owner"
+  title_vi: "Từ chối nhả khóa máy bởi caller không sở hữu"
+  meaning_vi: "Runtime từ chối nhả host lock vì token không khớp chủ hiện tại hoặc caller không đưa token; một caller lạ không bao giờ được xóa khóa."
+  causes_vi:
+    - "Caller dùng token cũ sau khi khóa đã được lấy lại"
+    - "Caller thiếu token hoặc cố nhả khóa do tác vụ khác giữ"
+  nextStep_vi: "Lõi runtime chỉ nhả khóa bằng token mà lần acquire thành công đã trả về; caller không sở hữu khóa phải để chủ hiện tại nhả nó."
+  owner: runtime-core
+  kind: blocker
 not-windows:
   title: "Not running on Windows"
   title_vi: "Không chạy trên Windows"
@@ -8991,6 +9165,16 @@ host-contract-drift:
   nextStep_vi: "Lệnh gọi Orca thất bại, không có tác động; cần sửa lớp nối Orca của runtime."
   owner: runtime-core
   kind: runtime-fault
+host-lock-held:
+  title: "Host lock is held"
+  title_vi: "Khóa máy đang được lần chạy khác giữ"
+  meaning_vi: "Một lần chạy nặng khác đang giữ host lock nên tác vụ mới bị từ chối; kết quả nêu rõ chủ khóa để không có hai lần chạy nặng chồng nhau."
+  causes_vi:
+    - "Một lần land, release, cài phụ thuộc hoặc tác vụ nặng khác chưa kết thúc"
+    - "Caller thử bắt đầu tác vụ mới trước khi chủ hiện tại nhả khóa"
+  nextStep_vi: "Supervisor xem chủ khóa được nêu, chờ lần chạy đó kết thúc và nhả khóa rồi chạy lại; không khởi động một lần chạy nặng song song."
+  owner: supervisor
+  kind: blocker
 host-unavailable:
   title: "Orca host did not answer"
   title_vi: "Orca không trả lời"
