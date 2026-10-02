@@ -13,8 +13,8 @@ summary: >-
   own context (a cross-context JOIN is refused), R84 BE_CONNECTION_DUPLICATE allows two schema contexts in one
   database with different schemas, and R35 BE_SCHEMA_OWNER lets a perConnection platform capability register on several
   connections. The be.persistence slot covers `src/modules/projections/<capability>/persistence/`, the manifest slot field
-  `perConnection` lists the platform capabilities that exist per connection, slot be.projection and the opt-in slot
-  be.contract.events.pin are new. BE-PERSISTENCE-2, -3, -5, -8 and -9 change and BE-PERSISTENCE-11 to -15 are new;
+  `perConnection` lists the platform capabilities that exist per connection, the context tiers are domain and projections,
+  and the opt-in slot be.contract.events.pin is new. BE-PERSISTENCE-2, -3, -5, -8 and -9 change and BE-PERSISTENCE-11 to -15 are new;
   BE-CONVENTION 1.4.1, 1.4.3, 1.4.6 change and 1.4.7 is new. Rule ids are provisional and renumber at rebase.
 reach: new-legs
 paths:

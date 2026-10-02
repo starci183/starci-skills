@@ -120,6 +120,8 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
 }
 
 const PERSISTENCE_SLOT = 'be.persistence';
+/** The slot tiers whose capabilities belong to a bounded context: the domain and the projections (a projection is owned by the context whose connection holds its tables). */
+const CONTEXT_TIERS = new Set(['domain', 'projections']);
 
 /** True for a platform capability the manifest lists as `perConnection` (its tables exist on every connection that uses it); `root` is the capability root. */
 export const isPerConnection = (resolver, root, name) => root.split('/').includes('platform') && (resolver.slot(PERSISTENCE_SLOT)?.perConnection ?? []).includes(name);
@@ -159,10 +161,10 @@ export function contextModelOf(kit, graph) {
   }
   /** The declared connection a capability root belongs to, or null (no registration, several, or a per-connection platform capability). */
   const contextOfCapability = root => contextOfRoot.get(root) ?? null;
-  /** The context of the capability owning `rel` when that capability is a domain-tier one (domain or projection), else null: only these are bounded contexts. */
+  /** The context of the capability owning `rel` when that capability is of a context tier (domain, projections), else null: only these are bounded contexts. */
   const contextOfFile = rel => {
     const file = graph.files.get(rel);
-    if (!file?.owner || file.tier !== 'domain') return null;
+    if (!file?.owner || !CONTEXT_TIERS.has(file.tier)) return null;
     return contextOfCapability(file.owner.root);
   };
   const unparen = node => { let current = node; while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current))) current = current.expression; return current; };

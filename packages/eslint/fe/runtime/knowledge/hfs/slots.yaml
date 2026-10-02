@@ -809,21 +809,6 @@ slots:
     forbids: [index.ts, "<name>.repository.ts"]
     tests: none
     rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
-  # A projection (R132 BE_CONTEXT_COUPLING): a read model kept up to date from events, owned by the context whose connection holds its
-  # tables. Its persistence is registered on that context's connection like a domain capability's.
-  - id: be.projection
-    profiles: [be]
-    path: "src/modules/projections/<capability>/"
-    presence: optional
-    tracked: tracked
-    tier: domain
-    owner: true
-    requires: [index.ts]
-    allows: ["<capability>.module.ts", "<capability>.options.ts", errors/, persistence/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts"]
-    forbids: [testing/, exceptions/, utils/, helpers/, shared/]
-    tests: unit-beside
-    budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_CONTEXT_COUPLING]
   - id: be.platform
     profiles: [be]
     path: "src/modules/platform/<capability>/"
