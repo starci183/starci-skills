@@ -16,10 +16,11 @@
 // `@@vCamel@@` its camelCase, `@@vUpper@@` its UPPER_SNAKE and `@@vSnake@@` its snake_case; the option `--service Class=module` gives `@@service@@` (the class) and `@@serviceModule@@`.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadSlotManifest, readRepoDeclaration, ruleParams } from '../runtime/scripts/hfs/slots.mjs';
+import { createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
+import { refuseInEdition } from './edition-gate.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const VARIABLE = /<([A-Za-z][A-Za-z0-9]*)>/g;
@@ -104,6 +105,15 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   if (!repo.sides?.be) throw new ScaffoldError('HFS_ADD_NO_BACK_END', 'this app has no back-end side');
   const nouns = [noun, ...(spec.also ?? [])];
   const specs = nouns.map((each) => [each, params.addKinds[each]]);
+  const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
+  const topics = new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)]);
+  const trees = new Map([...topics].map((topic) => [topic, readTree(topic)]));
+  // The slots the noun's trees name decide whether the edition has the noun (a slot lite does not carry or forbids
+  // makes it a full-edition capability); never the noun's name. Optional entries are never generated, so they gate nothing.
+  const writtenSlots = new Set();
+  for (const [each, eachSpec] of specs) for (const entry of trees.get(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX) && entry.optional !== true && entry.slot) writtenSlots.add(entry.slot);
+  for (const topic of topics) for (const entry of trees.get(topic)) if (entry.path.startsWith(PLATFORM_PREFIX) && entry.optional !== true && entry.slot) writtenSlots.add(entry.slot);
+  refuseInEdition({ resolver: createSlotResolver(manifest, repo), slotIds: [...writtenSlots], command: `add ${noun}` });
   const values = Object.assign({}, ...specs.map(([each, eachSpec]) => variablesOf({ spec: eachSpec, noun: each, name, options })), variablesOf({ spec, noun, name, options }));
   const stamp = String(now()).padStart(13, '0').slice(0, 13);
   const withStamp = { ...values, epochMs13: stamp };
@@ -125,9 +135,8 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
     planned.push({ target, absolute, body: renderBody(fs.readFileSync(templateFile, 'utf8'), withStamp, forms, entry.template), instance });
   };
 
-  for (const [each, eachSpec] of specs) for (const entry of readTree(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, eachSpec.topic, true, each !== noun);
-  const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
-  for (const topic of new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)])) for (const entry of readTree(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
+  for (const [each, eachSpec] of specs) for (const entry of trees.get(eachSpec.topic)) if (!entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, eachSpec.topic, true, each !== noun);
+  for (const topic of topics) for (const entry of trees.get(topic)) if (entry.path.startsWith(PLATFORM_PREFIX)) consider(entry, topic, false);
 
   const clash = planned.filter((file) => file.instance && fs.existsSync(file.absolute)).map((file) => file.target);
   if (clash.length) throw new ScaffoldError('HFS_ADD_EXISTS', `${noun} ${name} already exists: ${clash.join(', ')}`);
