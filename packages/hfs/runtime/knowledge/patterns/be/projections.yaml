@@ -105,6 +105,26 @@ rules:
         - BE_PATTERN_SPEC_MISSING
       manual: []
     relatedExamples: [projection]
+  - id: BE-PROJECTIONS-5
+    title: A projection stays inside the context that serves the read
+    kind: mandatory
+    hfsRules: [R160]
+    requirement: |-
+      A projection sits on the connection of one context. Its entity declares no relation and its migration no foreign key onto a table
+      of another context, and no file of the projection imports a file of a capability of another context (its entities, services or SQL).
+      The facts it summarises from another context arrive as events through a reactor, never through a join or an import.
+    rationale: |-
+      A read model that reaches into another context's schema rebuilds the coupling the contexts were split to avoid.
+    cases:
+      - id: case-1
+        when: An order summary that shows the payment status
+        write: 'The payment event reaches an order reactor, which dispatches a command that stores the status locally and calls recomputeOrderSummary; the projection never joins the payment tables.'
+    verification:
+      automated:
+        - BE_CONTEXT_COUPLING
+      manual:
+        - Confirm the projection sits on the connection of the context that serves the read.
+    relatedExamples: [projection]
 files:
   - path: src/modules/projections/<name>/index.ts
     slot: be.projections

@@ -126,10 +126,10 @@ rules:
     hfsRules: [R87, R88]
     requirement: |-
       A handler is reached only through `commandBus.execute` or `queryBus.execute` from a transport (the transport side is
-      transport.yaml BE-TRANSPORT-2). No `<op>.service.ts` sits between a transport and a handler. No in-process event
-      exists: `EventBus`, `@EventsHandler`, `EventEmitter2`, `@OnEvent` and NATS bridges are not used. A side effect that must
-      happen anyway, in another context or later, is an outbox message written in the handler's transaction and consumed in
-      `transport/message/` (background.yaml, BE-API-2).
+      transport.yaml BE-TRANSPORT-2). No `<op>.service.ts` sits between a transport and a handler. Work that stays
+      inside one context is synchronous: the handler calls the domain service in one transaction. A follow-up that must happen
+      anyway or that crosses a context is an event published inside that transaction (event-bus.yaml, BE-API-2), never an
+      in-process event: `EventBus`, `@EventsHandler`, `EventEmitter2`, `@OnEvent` and NATS bridges are not used.
     rationale: |-
       A forwarder is pure indirection where logic creeps in, and an in-process event does not survive a crash between the
       commit and the delivery.
@@ -139,7 +139,7 @@ rules:
         write: '`constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}` then `this.commandBus.execute(new StartCheckoutCommand({ request, principal }))`.'
       - id: case-2
         when: A follow-up effect in another context after a write
-        write: 'the handler calls `this.outbox.enqueue(manager, message)` inside its transaction; a consumer in transport/message runs the follow-up.'
+        write: 'the domain service the handler calls publishes the event with eventBus.publish(event, tx) in its own transaction; a reactor or job consumes it (event-bus.yaml).'
     verification:
       automated:
         - BE_CQRS_SHAPE
@@ -220,6 +220,64 @@ rules:
       manual:
         - Confirm each event crosses a context boundary or carries deferred work, and that no handler waits on an event of its own context.
     relatedExamples: []
+  - id: BE-API-3
+    title: Every operation has an e2e flow on the real app
+    kind: mandatory
+    hfsRules: [R46]
+    requirement: |-
+      Each resolver method and controller action of an api feature is driven by an e2e spec (`src/tests/e2e/<area>/*.e2e-spec.ts`) that boots the
+      app's real AppModule and calls it as a client does: the happy path, the refusal the command declares and the denial of an unauthenticated caller.
+    rationale: |-
+      A transport has no logic to unit-test; what can break is the wiring, the guards and the mapping, which only the booted app exercises.
+    cases:
+      - id: case-1
+        when: A new mutation
+        write: 'checkout.e2e-spec.ts signs a shopper in, runs startCheckout, asserts the typed payload, then asserts the same call without a token is refused.'
+    verification:
+      automated:
+        - BE_DEFAULT_DENY
+      manual:
+        - Confirm the spec asserts the error code of each refusal, not only a status.
+    relatedExamples: [api]
+  - id: BE-OPERATIONS-1
+    title: A versioned operation is declared once in the app's typed operation table
+    kind: mandatory
+    hfsRules: [R95, R88]
+    requirement: |-
+      A versioned operation `<name>@<version>` (for example `sales.policy@1`) that an app serves over one operation route is
+      declared once, in the app's operation table `be/apps/<app>/src/operations.ts`, which exports `OPERATIONS`. The table is made by
+      `defineOperations` of the platform capability `operations` (`be/src/modules/platform/operations/`, which declares
+      `OperationContract<Input, Output, RefusalCode>`, `query`, `mutation`, `defineOperations`, `OperationRequest<Table>` and
+      `OperationReply<Table>`). `Input` and `Output` are named, closed types: never `any`, `unknown`, `Record<string, unknown>`,
+      `object`, an unbound generic, a function or `Date`. `RefusalCode` is a closed union of string literals, or omitted for an
+      operation that never refuses. The one route of the app takes `@Body() request: OperationRequest<Table>` and answers
+      `Promise<OperationReply<Table>>` of the same table; the wire is `{ operation, requestId, input }` in and `{ operation, requestId,
+      outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `hfs emit-contracts`
+      derives `be/contracts/<app>/openapi.json` (OpenAPI 3.1, `x-operation: "<name>@<version>"`, a oneOf over the operations) from the
+      table with the type checker, and the full `hfs check` fails when the committed file is stale.
+    rationale: |-
+      The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
+      bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the
+      handlers the same types.
+    cases:
+      - id: case-1
+        when: A query with two refusals and a mutation with none
+        write: |-
+          // be/apps/core/src/operations.ts
+          export const OPERATIONS = defineOperations({
+              "sales.policy@1": query<SalesPolicyAsk, SalesPolicyView, "DENIED" | "INVALID">(),
+              "sales.close@1": mutation<SalesCloseAsk, SalesOpportunityView>(),
+          })
+          // features/api/sales/transport/http/operations.controller.ts
+          @Post("operations")
+          async invoke(@Body() request: OperationRequest<typeof OPERATIONS>): Promise<OperationReply<typeof OPERATIONS>> { ... }
+    verification:
+      automated:
+        - BE_OPERATION_CONTRACT
+        - HFS_CONTRACT_SNAPSHOT_DRIFT
+      manual:
+        - Confirm each refusal code is one the operation's owner can actually answer.
+    relatedExamples: [api]
 files:
   - path: src/features/api/checkout/index.ts
     slot: be.feature

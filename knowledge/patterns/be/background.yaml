@@ -23,32 +23,6 @@ provenance:
     authority.
 rules:
   - id: BE-BACKGROUND-1
-    title: Background work is a transport
-    kind: mandatory
-    hfsRules: [R46, R88, R90]
-    requirement: |-
-      Work that runs without a request is a transport that dispatches one command exactly as a resolver does and holds no
-      business decision. An event is consumed by `transport/message/<event>.consumer.ts` (knowledge/patterns/be/event-bus.yaml). A
-      job that was enqueued or scheduled is processed by a processor (knowledge/patterns/be/queues.yaml for the producer and the
-      BullMQ job schedulers). `@Cron`, `@Interval`, `@Timeout`, `setInterval` for work, `new Worker(`, `@Processor`, `WorkerHost`, `kafkajs`
-      and Nest's in-process event bus appear nowhere outside `platform/{event-bus,queue}`.
-    rationale: |-
-      One shape for every entry protocol keeps handlers reusable and lets the app choose which protocols it serves.
-    cases:
-      - id: case-1
-        when: A recurring task
-        write: 'a BullMQ job scheduler declared in modules/queues/<queue>/<queue>.queue.ts; its processor dispatches the command (queues.yaml).'
-      - id: case-2
-        when: A queue consumer
-        write: 'transport/message/payment-settled.consumer.ts maps the payload to SettlePaymentRequest and dispatches SettlePaymentCommand after claiming the event in the inbox.'
-    verification:
-      automated:
-        - BE_BACKGROUND_UNOWNED
-        - BE_INFRA_OWNER
-        - BE_TRANSPORT_SHAPE
-      manual: []
-    relatedExamples: []
-  - id: BE-BACKGROUND-2
     title: The owning api app runs it; a worker app only scales it apart
     kind: mandatory
     hfsRules: [R46, R31]
@@ -70,7 +44,7 @@ rules:
         - BE_APP_COMPOSITION_ONLY
       manual: []
     relatedExamples: []
-  - id: BE-BACKGROUND-3
+  - id: BE-BACKGROUND-2
     title: Every sweep has a runner
     kind: mandatory
     hfsRules: [R46]
@@ -89,26 +63,4 @@ rules:
         - BE_BACKGROUND_UNOWNED
       manual:
         - Confirm the schedule and the overlap policy fit the recovery contract.
-    relatedExamples: []
-  - id: BE-BACKGROUND-4
-    title: Producers publish through the event bus or a typed queue producer
-    kind: mandatory
-    hfsRules: [R82, R90, R137]
-    requirement: |-
-      A producer publishes an event with `eventBus.publish(event, tx)` or enqueues a job with a typed queue producer
-      (`enqueueX(payload, tx)`), only from a domain service and only inside its transaction. See event-bus.yaml and queues.yaml.
-      `Queue`, `Worker`, `kafkajs` and `KafkaClientService` are used only inside `platform/queue` and `platform/event-bus`.
-    rationale: |-
-      The outbox row commits with the write, so the publish is atomic with it.
-    cases:
-      - id: case-1
-        when: A publish atomic with a write
-        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, order); await this.eventBus.publish(OrderPlacedEvent.create({ orderId: order.id }), manager) })'
-    verification:
-      automated:
-        - BE_INFRA_OWNER
-        - BE_OUTBOX_WRITE_TX
-        - BE_TRANSACTION_EXTERNAL_CALL
-        - BE_RAW_INJECT
-      manual: []
     relatedExamples: []

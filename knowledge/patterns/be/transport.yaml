@@ -2,10 +2,9 @@ schema: starci/knowledge-source@1
 id: be.transport
 title: Backend transport
 purpose: |-
-  Given a door into an api feature (GraphQL, HTTP, WebSocket, schedule, message), how is it written? A transport maps its
-  input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else, returns no
-  envelope and takes no `GraphQLJSON`. The transport folders live under `src/features/api/<feature>/transport/<protocol>/`
-  (api.yaml). A cli command is not a transport: it is an action runner (cli.yaml).
+  Given a door into the application, how is it written? Every kind of door (api, webhooks, realtime, reactors, jobs) follows these rules and has its own topic; a cli command is not a transport, it is an action runner (cli.yaml). A transport
+  maps its input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else,
+  returns no envelope and takes no `GraphQLJSON`.
 appliesTo:
   - backend
 family: be
@@ -97,69 +96,4 @@ rules:
         - BE_TRANSPORT_SHAPE
         - BE_USER_COPY_LITERAL
       manual: []
-    relatedExamples: []
-  - id: BE-TRANSPORT-4
-    title: REST, WebSocket, schedule and message have one shape each
-    kind: mandatory
-    hfsRules: [R88, R89, R46, R90]
-    requirement: |-
-      REST is only for signed webhooks, OAuth redirects and callbacks, health and readiness, and byte streams:
-      `transport/http/<action>.controller.ts`, DTOs `dto/<action>.{request,response}.ts`, versioned routes, no `@Res()`
-      passthrough except a byte stream. WebSocket: `transport/websocket/<channel>.gateway.ts`, the handshake authenticated by
-      `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Jobs:
-      `features/jobs/<job>/<job>.processor.ts` (jobs.yaml). Message: `transport/message/<event>.consumer.ts`
-      (event-bus.yaml). An http, graphql or websocket module is composed only by an api app; a message module or a job processor by
-      the api app that owns it or by a worker app (R46).
-    rationale: |-
-      Each protocol has one place and one shape, so an app composes exactly the transports it serves.
-    cases:
-      - id: case-1
-        when: A health probe
-        write: 'features/api/health/transport/http/health.controller.ts is `@Public({ reason: PublicReason.Health })` and dispatches CheckHealthQuery.'
-    verification:
-      automated:
-        - BE_TRANSPORT_SHAPE
-        - BE_SOURCE_FORM
-        - BE_BACKGROUND_UNOWNED
-      manual:
-        - Confirm REST is used only where GraphQL cannot serve.
-    relatedExamples: []
-  - id: BE-OPERATIONS-1
-    title: A versioned operation is declared once in the app's typed operation table
-    kind: mandatory
-    hfsRules: [R95, R88]
-    requirement: |-
-      A versioned operation `<name>@<version>` (for example `sales.policy@1`) that an app serves over one operation route is
-      declared once, in the app's operation table `be/apps/<app>/src/operations.ts`, which exports `OPERATIONS`. The table is made by
-      `defineOperations` of the platform capability `operations` (`be/src/modules/platform/operations/`, which declares
-      `OperationContract<Input, Output, RefusalCode>`, `query`, `mutation`, `defineOperations`, `OperationRequest<Table>` and
-      `OperationReply<Table>`). `Input` and `Output` are named, closed types: never `any`, `unknown`, `Record<string, unknown>`,
-      `object`, an unbound generic, a function or `Date`. `RefusalCode` is a closed union of string literals, or omitted for an
-      operation that never refuses. The one route of the app takes `@Body() request: OperationRequest<Table>` and answers
-      `Promise<OperationReply<Table>>` of the same table; the wire is `{ operation, requestId, input }` in and `{ operation, requestId,
-      outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `hfs emit-contracts`
-      derives `be/contracts/<app>/openapi.json` (OpenAPI 3.1, `x-operation: "<name>@<version>"`, a oneOf over the operations) from the
-      table with the type checker, and the full `hfs check` fails when the committed file is stale.
-    rationale: |-
-      The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
-      bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the
-      handlers the same types.
-    cases:
-      - id: case-1
-        when: A query with two refusals and a mutation with none
-        write: |-
-          // be/apps/core/src/operations.ts
-          export const OPERATIONS = defineOperations({
-              "sales.policy@1": query<SalesPolicyAsk, SalesPolicyView, "DENIED" | "INVALID">(),
-              "sales.close@1": mutation<SalesCloseAsk, SalesOpportunityView>(),
-          })
-          // features/api/sales/transport/http/operations.controller.ts
-          @Post("operations")
-          async invoke(@Body() request: OperationRequest<typeof OPERATIONS>): Promise<OperationReply<typeof OPERATIONS>> { ... }
-    verification:
-      automated:
-        - BE_OPERATION_CONTRACT
-        - HFS_CONTRACT_SNAPSHOT_DRIFT
-      manual:
-        - Confirm each refusal code is one the operation's owner can actually answer.
     relatedExamples: []

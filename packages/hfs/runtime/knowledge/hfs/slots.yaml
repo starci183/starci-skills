@@ -821,6 +821,7 @@ slots:
     # module (cli.module.ts, module-definition pattern) imports each group module.
     path: "src/features/cli/"
     presence: optional
+    trigger: cli                  # the one cli feature root: a one-off action never imports a feature of another kind (BE_KIND_ISOLATION)
     tracked: tracked
     tier: feature
     owner: true
@@ -1014,7 +1015,7 @@ slots:
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
     allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
     tests: none
-    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION]
+    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"

@@ -1,0 +1,25 @@
+id: patterns-kind-topics
+effectiveAt: '2026-10-02T21:00:00+07:00'
+summary: >-
+  Lane PATTERNS (lead C2): every trigger kind and module family has a knowledge topic with a `files:` tree. New topics api.yaml (BE-API-1, BE-API-2, and the typed
+  operation table BE-OPERATIONS-1 moved from transport.yaml), cli.yaml (BE-CLI-1, BE-CLI-2) and domain.yaml (BE-DOMAIN-1, BE-DOMAIN-2), with code examples api, cli and
+  domain. The slot `be.feature.cli` (`src/features/cli/<command>/`, trigger cli) is the root of the cli kind, and the application, application support and cli
+  transport slots accept the `cli/` kind prefix. Duplicates are removed: BE-TRANSPORT-4 (replaced by the per-kind topics), BE-BACKGROUND-1 and -4 (the event-bus, queues
+  and jobs topics own them; the two that stay are renumbered BE-BACKGROUND-1 and -2), the in-process event wording of BE-CQRS-4 (event-bus.yaml owns it) and the error text
+  sentence of BE-MESSAGES-1 (error.yaml owns it). event-bus.yaml lists `contracts/<service>/events.json` again (slot be.contract.events). BE-PROJECTIONS-5 holds a projection
+  to its own context (R160 BE_CONTEXT_COUPLING), and the slot be.projections lists the rule. The files-tree spec accepts a rule id or a failure code in `rules:`.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/patterns-kind-topics.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/patterns/be/api.yaml
+  - knowledge/patterns/be/cli.yaml
+  - knowledge/patterns/be/domain.yaml
+  - knowledge/patterns/be/transport.yaml
+  - knowledge/patterns/be/background.yaml
+  - knowledge/patterns/be/cqrs.yaml
+  - knowledge/patterns/be/messages.yaml
+  - knowledge/patterns/be/projections.yaml
+  - knowledge/patterns/be/event-bus.yaml
+  - knowledge/patterns/be/index.yaml
+  - knowledge/code-examples/backend/index.yaml
