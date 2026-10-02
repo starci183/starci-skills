@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
-import { INBOX, INBOX_MANAGERS } from "./inbox.decorators"
+import { INBOX, CLAIM_MANAGERS } from "./inbox.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./inbox.module-definition"
 import { PostgresInbox } from "./inbox.service"
 
@@ -16,7 +16,7 @@ export class InboxModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 {
-                    provide: INBOX_MANAGERS,
+                    provide: CLAIM_MANAGERS,
                     useFactory: (manager: EntityManager) => [manager],
                     inject: [options.connection],
                 },

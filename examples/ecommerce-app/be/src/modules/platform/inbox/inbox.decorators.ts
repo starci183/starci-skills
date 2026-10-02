@@ -7,11 +7,11 @@ import type { Inbox } from "./inbox.port"
 export const INBOX: unique symbol = Symbol("platform.inbox")
 
 /** Token of the entity managers of the connections that hold the claims table, in the order the options name them. */
-export const INBOX_MANAGERS: unique symbol = Symbol("platform.inbox.managers")
+export const CLAIM_MANAGERS: unique symbol = Symbol("platform.inbox.claim-managers")
 
 /** Injects the Inbox port. Parameter type: Inbox. */
 export const InjectInbox = (): TypedParameterDecorator<Inbox> => injector<Inbox>(INBOX)
 
-/** Injects the entity managers of the connections that hold the claims table. Parameter type: a one-manager tuple. */
-export const InjectInboxManagers = (): TypedParameterDecorator<readonly [EntityManager]> =>
-    injector<readonly [EntityManager]>(INBOX_MANAGERS)
+/** Injects the entity managers of the connections that hold the claims table. Parameter type: a one-manager tuple (`readonly [EntityManager]`). */
+export const InjectClaimManagers = (): TypedParameterDecorator<readonly [EntityManager]> =>
+    injector<readonly [EntityManager]>(CLAIM_MANAGERS)

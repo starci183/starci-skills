@@ -1,5 +1,7 @@
 import { mock } from "@starci/jest-preset"
+import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
+import type { Request } from "express"
 import { PaymentService } from "@modules/domain/payment"
 import { HttpSecurityError, HttpSecurityErrorCode, WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
 import type { WebhookSignatureService } from "@modules/platform/http-security"
@@ -26,7 +28,7 @@ const noticeOf = (): SepayTransferRequest => {
 
 const NOTICE = noticeOf()
 const RAW_BODY = Buffer.from(JSON.stringify(NOTICE))
-const REQUEST = { rawBody: RAW_BODY } as never
+const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
 
 const build = async (signature: WebhookSignatureService, payments: PaymentService) => {
     const moduleRef = await Test.createTestingModule({
