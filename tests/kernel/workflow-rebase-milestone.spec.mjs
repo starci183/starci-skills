@@ -171,7 +171,7 @@ test('starci kernel settle records a workflow checkpoint only for a green op', (
   const runApi = (args, extraEnv = {}) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'kernel', 'cli.mjs'), ...args, '--repo', repo, '--json'],
     { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...env, ...extraEnv } });
   const seed = (job) => {
-    const ledger = openLedger({ file: ledgerFileFor(repo) });
+    const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
     try {
       const exists = ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId) != null;
       seedWorkflow(ledger, { id: workflowId, ...(exists ? {} : { goal: { revision: 1, markdown: '# Settle caller' } }), jobs: [job] });
@@ -180,7 +180,7 @@ test('starci kernel settle records a workflow checkpoint only for a green op', (
       return { ledger, attemptId };
     } catch (error) { ledger.close(); throw error; }
   };
-  const read = (fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger.db); } finally { ledger.close(); } };
+  const read = (fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return fn(ledger.db); } finally { ledger.close(); } };
 
   const passJob = 'op-docs.author-checkpoint';
   const pass = seed({ jobId: passJob, opId: 'docs.author', status: 'running', dispatchId: 'ctx-pass', payload: { opId: 'docs.author', owned_paths: ['docs/'] } });
@@ -189,7 +189,7 @@ test('starci kernel settle records a workflow checkpoint only for a green op', (
     const proofFiles = writeGreenProofs(path.join(tree, 'docs', 'proofs')).map((file) => path.relative(tree, file).replace(/\\/g, '/'));
     pass.ledger.write.fileReport({ attemptId: pass.attemptId, outcome: 'done', report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'green', files: ['docs/pass.md', ...proofFiles], checks: [{ name: 'unit', command: 'true', exitCode: 0 }] } });
   } finally { pass.ledger.close(); }
-  const checked = runApi(['check', '--job', passJob, '--checks', JSON.stringify({ checks: [{ name: 'unit', command: 'true', exitCode: 0, evidence: 'green' }] })], { STARCI_CALLER: 'runtime-settler' });
+  const checked = runApi(['record-checks', '--job', passJob, '--checks', JSON.stringify({ checks: [{ name: 'unit', command: 'true', exitCode: 0, evidence: 'green' }] })], { STARCI_CALLER: 'runtime-settler' });
   assert.equal(checked.status, 0, checked.stderr || checked.stdout);
   const settled = runApi(['settle', '--job', passJob, '--verdict', 'pass']);
   assert.equal(settled.status, 0, settled.stderr || settled.stdout);

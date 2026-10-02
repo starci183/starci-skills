@@ -246,7 +246,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
     const refusals = new Set(codes.refusals ?? []);
     const reported = new Set();
-    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], hfs: codes.hfs ?? [] })) {
+    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], 'starci app': codes.hfs ?? [] })) {
       for (const code of [...new Set(list)].sort()) {
         if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
         reported.add(code);

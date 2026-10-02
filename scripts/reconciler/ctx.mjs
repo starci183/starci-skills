@@ -260,8 +260,8 @@ export function createCtx({
       if (!l) return { ok: false, error: `unknown ledger ${ledgerId}` };
       const list = [...argv.map(String)];
       if (!list.includes('--json')) list.push('--json');
-      if (mode !== 'active') return would(`api ${verb}`, list, { ledgerId });
-      return act(`api ${verb}`, list, () => spawnChild(process.execPath, [API_FILE, verb, '--repo', l.repo, ...list], { env: childEnv(), timeoutMs }), { ledgerId });
+      if (mode !== 'active') return would(`starci kernel ${verb}`, list, { ledgerId });
+      return act(`starci kernel ${verb}`, list, () => spawnChild(process.execPath, [API_FILE, verb, '--repo', l.repo, ...list], { env: childEnv(), timeoutMs }), { ledgerId });
     },
     /** In active: {ok, code, value (last JSON line), stdout, stderr, actionId}; in shadow {ok: true, shadow: true}. */
     async run(cmd, args = [], { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {

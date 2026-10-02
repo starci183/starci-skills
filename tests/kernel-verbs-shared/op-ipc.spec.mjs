@@ -278,7 +278,7 @@ test('starci kernel consume-report marks the dispatch report consumed; starci ke
 test('starci kernel record-checks rejects scalar and double-encoded payloads before recording evidence',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-check-shape');
-  const valid=checkEnvelope({name:'validator',command:'starci runtime validate',exitCode:0,evidence:'green'});
+  const valid=checkEnvelope({name:'validator',command:'validator --check',exitCode:0,evidence:'green'});
 
   for(const malformed of [JSON.stringify('pass'),JSON.stringify(JSON.stringify(valid))]){
     const refused=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');

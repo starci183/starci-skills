@@ -95,10 +95,10 @@ test('the contract version digests the brief, the shared documents and what the 
   const sha='0123456789abcdef0123456789abcdef01234567';
   put('.git/HEAD','ref: refs/heads/main\n');put('.git/packed-refs',`# pack-refs\n${sha} refs/heads/main\n`);
   assert.equal(runtimeShaOf(root),sha,'a packed ref resolves');
-  assert.deepEqual(contractFilesOf(root,'interface.draw'),['modules/ops/ops/interface.draw.yaml','modules/ops/_common.yaml','modules/kernel/verdict-contract.yaml','modules/schemas/work-layout-tree.schema.yaml','scripts/work/ui/shell-conformance.mjs']);
+  assert.deepEqual(contractFilesOf(root,'interface.draw'),['modules/ops/ops/interface.draw.yaml','modules/ops/_common.yaml','modules/kernel/verdict-contract.yaml','modules/schemas/work-layout-tree.schema.yaml']);
   const v1=contractVersionOf(root,'interface.draw',{now:5});
   assert.deepEqual([v1.schema,v1.runtimeSha,v1.admittedAt],[CONTRACT_VERSION_SCHEMA,sha,5]);
-  assert.equal(v1.files.find(f=>f.path==='scripts/work/ui/shell-conformance.mjs').digest,'absent');
+  assert.equal(v1.files.some(f=>f.path==='scripts/work/ui/shell-conformance.mjs'),false,'the catalog command does not expose its internal script path');
   put('modules/schemas/work-layout-tree.schema.yaml','schema v2\n');
   assert.notEqual(contractVersionOf(root,'interface.draw').digest,v1.digest,'a change to a cited schema is a new contract version');
   assert.equal(runtimeShaOf(ROOT)?.length,40,'the runtime root itself reads its HEAD');

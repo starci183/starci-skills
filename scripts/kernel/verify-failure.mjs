@@ -35,8 +35,8 @@ const ENV_HEALTH_CHECK = 'env-health';
 // measurement leg is findings too unless its evidence says it could not run.
 const MEASURING_TOOLS = [
   { id: 'canon-scan', match: /canon-scan(\.mjs)?\b/i, error: [2, 3] },
-  // gate.mjs: 1 new findings, 2 a tool could not run (never a pass).
-  { id: 'gate', match: /\bgate\.mjs\b/i, error: [2] },
+  // starci gate run: 1 new findings, 2 a tool could not run (never a pass).
+  { id: 'gate', match: /\bstarci\s+gate\s+run\b/i, error: [2] },
   { id: 'starci-validate', match: /starci(\.mjs)?\s+validate\b|\bvalidate\b.*\.starciwork/i, error: [2] },
   { id: 'eslint', match: /\beslint\b|\blint(:check)?\b/i, error: [2] },
   { id: 'tsc', match: /\btsc\b|typecheck/i, error: [] },

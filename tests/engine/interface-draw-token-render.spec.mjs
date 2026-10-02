@@ -19,11 +19,11 @@ test('interface.draw draws only shapes, never a data status', () => {
 });
 
 test('interface.draw renders parts with draw-render and keeps ImageGen for raster regions', () => {
-  assert.match(steps, /node scripts\/work\/draw-render\.mjs/);
+  assert.match(steps, /starci work draw-render/);
   // Owner ruling 2026-09-27: the drawing is the real XBase (<XBase>.draw.tsx) rendered in the product's CSS; an older
   // hand-written html part is only re-measured.
   assert.match(steps, /--component <XBase>\.draw\.tsx --export <XBase> --props\s+<fixture\.json> --css <product global css> --product <app dir>/);
-  assert.match(steps, /node scripts\/work\/draw\/draw-source\.mjs <XBase>\.draw\.tsx/);
+  assert.match(steps, /starci work draw-source <XBase>\.draw\.tsx/);
   assert.match(steps, /--html <file> --out <dir>\s+--viewports <w>x<h>\) is re-measured, never drawn anew/);
   assert.match(steps, /@2x/);
   assert.match(steps, /--tool draw-render/);
@@ -38,9 +38,9 @@ test('interface.draw renders parts with draw-render and keeps ImageGen for raste
 });
 
 test('the brief carries the geometry, proof and grammar inputs verbatim', () => {
-  assert.match(steps, /node scripts\/work\/ui\/grammar-geometry\.mjs --prompt --repo\s+<repo>/);
-  assert.match(steps, /node scripts\/work\/ui\/ui-proof-brief\.mjs --surface <ui-record-dir> --repo <repo>/);
-  assert.match(steps, /brand-palette\.mjs --prompt/);
+  assert.match(steps, /starci work grammar-geometry --prompt --repo\s+<repo>/);
+  assert.match(steps, /starci work ui-proof-brief --surface <ui-record-dir> --repo <repo>/);
+  assert.match(steps, /starci work brand-palette --prompt/);
   assert.match(steps, /no number it does not\s+carry is invented/);
   assert.equal(draw.grammarContext, 'required');
   statesOnce(assert, draw, ['status line', 'grey band', 'field label'], { section: '$.steps', label: 'status-line placement' });
@@ -71,7 +71,7 @@ test('the render source is a declared .html asset and full-width controls take t
 
 test('the owner reviews shapes only; an owner request comes from ledger lineage', () => {
   const prose = JSON.stringify(draw);
-  assert.match(prose, /draw-review\.mjs question --ui <ui-record-dir> --job\s+<id>/);
+  assert.match(prose, /starci work draw-review question --ui <ui-record-dir> --job\s+<id>/);
   assert.match(prose, /drawOwnerRulingOf/);
   assert.doesNotMatch(prose, /--owner-requested|a prior owner redraw or feedback/);
   assert.match(proof(draw, 'owner-sees-parts').requirement.en, /retired data-status image is never shown/);

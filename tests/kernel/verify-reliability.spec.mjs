@@ -289,7 +289,7 @@ test('env-health: ready, probe-drift with a discovered health endpoint, down, hu
   assert.equal(by.api.ready,true);
   assert.equal(by.api.discovered.url,`http://127.0.0.1:${apiPort}/graphql`);
   assert.equal(by.worker.state,'down');
-  assert.match(by.worker.remedy,/env-health\.mjs serve --env environment\.t\.login-local --service worker/);
+  assert.match(by.worker.remedy,/starci gate env-health serve --env environment\.t\.login-local --service worker/);
   assert.equal(by.socket.state,'port-conflict','a hung listener that is not a server of this workspace is never killed');
   assert.equal(by.socket.listener.pid,process.pid);
   assert.deepEqual([result.ready,result.class,result.hardBlock],[false,'environment',true]);

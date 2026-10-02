@@ -46,7 +46,7 @@ export const KERNEL_REV_STALE = 'kernel-rev-stale';
 export const KERNEL_REV_UNKNOWN = 'kernel-rev-unknown';
 export const OP_REV_DRIFT = 'op-rev-drift';
 /** The runtime paths a Kernel's contract is read from (a directory covers what is inside it). */
-const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
+const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/cli/commands/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 /** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
 const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);

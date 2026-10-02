@@ -37,6 +37,7 @@ const specs = {
   'env-health': { script: 'scripts/uat/env-health.mjs', usage: (s) => between(s, '//   starci gate env-health check', '//\n// The JSON'), flags: ['env', 'paths', 'probe-timeout-ms', 'ready-timeout-ms', 'repo', 'restart', 'service', 'url'] },
   'hfs-sync': { script: 'scripts/gates/hfs-sync.mjs', usage: (s) => matching(s, '//   starci gate hfs-sync'), flags: ['repo'] },
   read: { script: 'scripts/gates/read-digest.mjs', usage: (s) => declaration(s), flags: ['knowledge', 'out', 'read', 'root', 'touch'] },
+  'reference-conventions': { script: 'scripts/gates/probe-reference-conventions.mjs', usage: () => [], flags: [] },
   'repo-presentation': { script: 'scripts/gates/repo-presentation.mjs', usage: (s) => matching(s, '//   starci gate repo-presentation'), flags: ['root', 'runtime'] },
   run: { script: 'scripts/gates/gate.mjs', usage: (s) => declaration(s), flags: ['base', 'changed', 'main', 'out', 'root', 'scope', 'tests', 'tree'] },
   sonar: { script: 'scripts/gates/sonar-local.mjs', usage: (s) => declaration(s, 'HELP'), flags: ['base', 'blob', 'declaration', 'host', 'isolate', 'keep-slice-project', 'key', 'log', 'name', 'no-ensure', 'out', 'paths', 'project-gate', 'stack', 'timeout', 'token-ref', 'wait', 'wait-timeout', 'with-token'] },

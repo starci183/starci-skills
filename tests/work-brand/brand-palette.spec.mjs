@@ -155,7 +155,7 @@ test('the contracts wire it: registered for new legs, the draw prompt carries th
     assert.ok(advisory.includes('PALETTE_OFF_BRAND') && advisory.includes('PRIMARY_ABSENT'), `${op}: an older leg meets the codes as advisory`);
   }
   const draw = fs.readFileSync(path.join(ROOT, 'modules/ops/ops/interface.draw.yaml'), 'utf8');
-  assert.match(draw, /brand-palette\.mjs --prompt/);
+  assert.match(draw, /starci work brand-palette --prompt/);
   assert.match(draw, /PALETTE_OFF_BRAND/);
   const drawOp = parseYaml(draw);
   assert.ok(drawOp.proofs.some((proof) => proof.id === 'brand-palette' && proof.check === 'scripts/work/ui/shell-conformance.mjs'));

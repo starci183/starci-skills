@@ -234,7 +234,7 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   const home=tmp(t,'starci-trust-guard-home-');const cwd=tmp(t,'starci-trust-guard-cwd-');
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
   const command=toolGuardCommand();
-  assert.match(command,/^node ".*\/scripts\/guards\/command-guard\.mjs"$/);
+  assert.equal(command,'starci guard command');
   assert.doesNotMatch(command,/\\/,'forward slashes: Claude and Devin run hooks through Git Bash on Windows');
   const {claudeSettings:settings,devinConfig:devinFile}=projectTargets(cwd);
   assert.equal(settings,path.join(cwd,'.claude','settings.local.json'));

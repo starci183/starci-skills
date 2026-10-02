@@ -241,7 +241,7 @@ test('starci kernel status lists assetSlotsOwed and proposes an interface.asset 
   assert.ok(action, JSON.stringify(body.nextActions));
   assert.equal(action.kind, 'dispatch');
   assert.deepEqual(action.slots, ['.starciwork/features/modules/ui/dashboard#overview-mascot']);
-  assert.match(action.reason, /api enqueue --op interface\.asset --paths \.starciwork\/features\/modules\/ui\/dashboard/);
+  assert.match(action.reason, /starci kernel enqueue --op interface\.asset --paths \.starciwork\/features\/modules\/ui\/dashboard/);
 });
 
 test('the runtime text says the real HeroUI Alert everywhere: no "tone fill", secondary Button, full-width h-2 Meter, asset slots', () => {

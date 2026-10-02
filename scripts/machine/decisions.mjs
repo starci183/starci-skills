@@ -258,10 +258,14 @@ export function claimDecision(ledger, id, { by, now = Date.now(), prefix = 'deci
   return out;
 }
 
-/** The verb's first word must be one of the DI's allowedVerbs (their first words) when it lists any. */
+/** The catalog verb must be one of the DI's allowedVerbs (their first words) when it lists any. */
+const catalogVerbOf = (value) => {
+  const words = String(value ?? '').trim().split(/\s+/).filter(Boolean);
+  return words[0] === 'starci' && words.length >= 3 ? words[2] : words[0] ?? '';
+};
 const verbAllowed = (di, verb) => {
-  const allowed = (di.allowedVerbs ?? []).map((v) => String(v).trim().replace(/^api\s+/, '').split(/\s+/)[0]).filter(Boolean);
-  const head = String(verb ?? '').trim().replace(/^api\s+/, '').split(/\s+/)[0];
+  const allowed = (di.allowedVerbs ?? []).map(catalogVerbOf).filter(Boolean);
+  const head = catalogVerbOf(verb);
   return !allowed.length || allowed.includes(head);
 };
 

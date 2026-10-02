@@ -44,7 +44,7 @@ test('starci app check inside a git worktree with a junctioned node_modules is n
   fs.mkdirSync(path.join(shared, '@starci'), { recursive: true });
   fs.symlinkSync(HFS_PACKAGE, path.join(shared, '@starci', 'hfs'), 'junction');
   fs.symlinkSync(shared, path.join(worktree, 'node_modules'), 'junction');
-  const bin = path.join(worktree, 'node_modules', '@starci', 'hfs', 'bin', 'hfs.mjs');
+  const bin = path.join(worktree, 'node_modules', '@starci', 'hfs', 'src', 'main.mjs');
   let run;
   try {
     run = spawnSync(process.execPath, [bin, 'check'], { cwd: worktree, encoding: 'utf8', timeout: 600_000 });

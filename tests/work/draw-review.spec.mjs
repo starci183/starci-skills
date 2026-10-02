@@ -314,7 +314,7 @@ test('starci kernel report refuses draw-review-unjudged when the guard cannot re
   seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') });
   const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
   assert.equal(warned.status, 0, warned.stderr);
-  assert.match(warned.stderr, /api report WARNING: the draw review guard could not judge/);
+  assert.match(warned.stderr, /starci kernel report WARNING: the draw review guard could not judge/);
   // An unparseable layout tree, and a report's ui record that does not parse, are unjudged too.
   fs.rmSync(broken);
   const shellFile = path.join(p.work, 'shell', 'index.yaml');

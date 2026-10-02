@@ -72,7 +72,8 @@ test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app li
   }
   assert.equal(ci.status, 0, `npm ci failed (${ci.status ?? ci.error?.message}): ${tail(ci)}`);
   assert.ok(fs.existsSync(path.join(app, 'node_modules', '.bin', 'turbo')), 'the install linked the workspace tools');
-  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'hfs', 'bin', 'hfs.mjs')), 'the install holds @starci/hfs from the canon registry');
+  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'cli', 'bin', 'starci.mjs')), 'the install holds @starci/cli from the canon registry');
+  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'hfs', 'src', 'main.mjs')), 'the install holds @starci/hfs, the transitive implementation @starci/cli runs');
 
   // starci app lint (and the starci app check it carries) read the app's tracked files: git ls-files of the index.
   execFileSync('git', ['init', '-q'], { cwd: app });

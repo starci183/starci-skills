@@ -69,7 +69,7 @@ test('no open operation and an open peer-wait: the frontier reads peer-wait, not
   const fx=fixture(t);
   const before=fx.frontier(WORK);
   assert.deepEqual([before.state,before.actionable],['orphaned-frontier',true],'the defect: an orphaned frontier re-wakes the Kernel');
-  assert.match(before.reason,/api incident --kind peer-wait --peer <workflowId>/);
+  assert.match(before.reason,/starci kernel incident --kind peer-wait --peer <workflowId>/);
   const {incidentId}=fx.wait();
   const after=fx.frontier(WORK);
   assert.deepEqual([after.state,after.actionable],['peer-wait',false]);

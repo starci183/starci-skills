@@ -81,7 +81,7 @@ test('3 failed status spawns: the finding and the ONE status-unreadable DI name 
   for (let i = 0; i < 3; i += 1) { last = await reconcileWorkflow(key, ctx, { settings: settings() }); rec.tick(); }
   assert.equal(rec.spawns.length, 3);
   assert.equal(last.statusUnreadable.misses, 3);
-  assert.match(last.statusUnreadable.error, /api status refused \(exit 1\): plan-edges-missing/, 'not "no value"');
+  assert.match(last.statusUnreadable.error, /starci kernel status refused \(exit 1\): plan-edges-missing/, 'not "no value"');
   assert.equal(last.statusUnreadable.failure.cause, 'refused');
   assert.ok(last.lines.some((l) => /^STATUS-UNREADABLE .*plan-edges-missing/.test(l)), last.lines.join('\n'));
 

@@ -187,7 +187,7 @@ const deliveredPrompt = (state) => {
 
 test('starci kernel dispatch delivers the typed-log block to the operation worker', (t) => {
   const w = promptWorld(t), workflowId = 'wf-typed-prompt', jobId = 'op-code.refactor-typed-prompt';
-  const ledger = openLedger({ file: ledgerFileFor(w.repo) });
+  const ledger = openLedger({ file: ledgerFileFor(w.repo, { env: w.env }) });
   try {
     seedWorkflow(ledger, { id: workflowId, goal: { revision: 1, markdown: '# Typed prompt' }, jobs: [
       { jobId: `kernel-${workflowId}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: 'term-kernel', payload: {} },
@@ -199,7 +199,7 @@ test('starci kernel dispatch delivers the typed-log block to the operation worke
   const prompt = deliveredPrompt(w.state());
   assert.equal(typeof prompt, 'string', 'worker-start stores the operation prompt it delivered');
   assert.ok(prompt.includes(LOG_TYPED_MISSING), 'the delivered prompt includes the missing typed-log warning');
-  assert.match(prompt, new RegExp(`cli\\.mjs log --repo \\S+ --workflow ${workflowId} --job ${jobId} --kind`),
+  assert.match(prompt, new RegExp(`starci kernel log --repo \\S+ --workflow ${workflowId} --job ${jobId} --kind`),
     'the delivered prompt includes this worker\'s typed-log command');
 });
 
@@ -225,7 +225,7 @@ test('the operation and kernel prompt contracts both require typed logs', async 
   assert.match(prompt, /^logging: the owner reads your work as TYPED LOG ROWS/m);
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);
-  assert.match(prompt, /cli\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
+  assert.match(prompt, /starci kernel log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);
   assert.match(kernelPrompt, /\[boundary\.typedLogs\]/);

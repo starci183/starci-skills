@@ -174,7 +174,7 @@ test('the Kernel releases a stuck cut; a sibling dispatched on a stub is told st
   assert.match(lines,/seamAssumptions/);
   const seamLines=seamPromptLines({cut:{id:'chat-impl',ordinal:1,total:3},jobLabel:seam,api:'cli.mjs',repoLabel:'R'}).join('\n');
   assert.match(seamLines,/CONTRACT FIRST/);
-  assert.match(seamLines,new RegExp(`node cli.mjs cut-seam --repo R --publish-interface --job ${seam}`));
+  assert.match(seamLines,new RegExp(`starci kernel cut-seam --repo R --publish-interface --job ${seam}`));
   settleJob(repo,seam,'succeeded');
   assert.equal(api('cut-seam','--release','--workflow','wf-seam-release','--op','docs.author','--cut-id','chat-impl','--reason','x').stderr.includes('cut-seam-passed'),true);
 });
@@ -200,7 +200,7 @@ test('a stub sibling that passed before its seam landed owes one light reconcile
   const owed=s.nextActions.find(x=>x.seamDuty==='reconcile');
   assert.equal(owed.kind,'impact-check');
   assert.equal(owed.jobId,a);
-  assert.match(owed.reason,/api cut-seam --reconcile --job/);
+  assert.match(owed.reason,/starci kernel cut-seam --reconcile --job/);
   assert.equal(s.frontier.actionable,true);
   assert.match(api('cut-seam','--reconcile','--job',b,'--exit-code','0').stderr,/cut-seam-no-stub/);
   assert.match(api('cut-seam','--reconcile','--job',a).stderr,/cut-seam-exit-code/);

@@ -197,7 +197,7 @@ test('a worker escalation is surfaced and answered through starci kernel reply',
   assert.equal(status.frontier.state,'worker-question');
   assert.deepEqual(status.workerQuestions.map(q=>[q.messageId,q.type,q.jobId,q.question]),[['msg_esc1','escalation',fx.jobId,text]]);
   const messages=json(fx.api(['messages','--workflow',fx.workflowId]).stdout);
-  assert.match(messages.messages.find(m=>m.id==='msg_esc1').handle,/api reply/);
+  assert.match(messages.messages.find(m=>m.id==='msg_esc1').handle,/starci kernel reply --message <id>/);
   const answer='Do not stop it; build with a separate Next distDir or report partial with the EBUSY evidence.';
   const replied=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_esc1','--body',answer]);
   assert.equal(replied.status,0,replied.stderr);

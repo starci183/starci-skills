@@ -126,7 +126,7 @@ test("orca orchestration check is refused from the Kernel's terminal; ops keep i
   for (const command of ['orca orchestration check --ack', 'orca orchestration check --json', 'orca orchestration check --wait --timeout-ms 600000']) {
     const d = await decide(command, 'term_kernel');
     assert.equal(d?.verdict.code, 'KERNEL_ORCA_CHECK', command);
-    assert.match(d.verdict.remedy, /api> messages/);
+    assert.match(d.verdict.remedy, /starci kernel messages --repo <repo> --workflow <id>/);
   }
   for (const command of ['orca orchestration check --ack', 'orca orchestration check --json']) assert.equal(await decide(command, 'term_op'), null, `an op keeps ${command}`);
   for (const command of ['orca orchestration inbox --json', 'orca orchestration worker-show --dispatch d-1', `starci kernel messages --repo ${root.replace(/\\/g, '/')} --workflow wf`])

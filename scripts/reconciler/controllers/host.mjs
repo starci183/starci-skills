@@ -136,11 +136,12 @@ const argOf = (cmd, name) => {
   const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
 };
-const RUNTIME_LOOP = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i;
+const RUNTIME_LOOP = /(?:[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)|(?:^|\s)starci\s+workflow\s+(start)(?=\s|$))/i;
 
 /**
- * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs whose --repo no managed
- * ledger owns, whose workflow no managed ledger runs, older than minAgeMs. A process with no --repo (the
+ * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs process or its public
+ * `starci workflow start` entry whose --repo no managed ledger owns, whose workflow no managed ledger runs, older than
+ * minAgeMs. A process with no --repo (the
  * Supervisor's watchdog) and a listed repo are never orphans. Pure.
  */
 export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs, exclude = [] }) {
@@ -156,7 +157,7 @@ export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs
     if (workflowId && runningWorkflows.has(workflowId)) continue;
     const ageMs = p.created ? now - p.created : 0;
     if (!p.created || ageMs < minAgeMs) continue;
-    out.push({ pid: p.pid, script: `${m[1]}.mjs`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
+    out.push({ pid: p.pid, script: m[1] ? `${m[1]}.mjs` : `starci workflow ${m[2]}`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
   }
   return out;
 }

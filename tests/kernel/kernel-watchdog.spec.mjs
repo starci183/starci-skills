@@ -180,7 +180,7 @@ test('watchdog wake names the Kernel seat it is for, checkable with starci kerne
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{
   const supervise=fs.readFileSync(new URL('../../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
-  assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
+  assert.match(supervise,/starci machine kernel-watchdog --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
 });
 
 // Every watchdog imported the liveness classifier once, hours before the

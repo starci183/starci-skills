@@ -28,6 +28,12 @@ const launchRefusal = (program, args, how) => ({ command: [program, ...args].joi
 const ORCA_WORKTREE_WRITES = new Set(['create', 'add', 'rm', 'remove', 'delete', 'prune', 'move']);
 // The uat rule (uat.verify, uat.assisted.*; OPS2 3.1): a walk runs on the app's real dev stack, never a test world.
 const TEST_WORLD_RUNNER = /(?:^|[\\/])test-world-run\.mjs$/;
+const testWorldOf = (program, args) => {
+  if (program === 'node' && args.some((a) => TEST_WORLD_RUNNER.test(a))) return 'test-world-run.mjs';
+  if (program !== 'starci') return null;
+  const words = args.filter((a) => !/^-/.test(a));
+  return words[0] === 'gate' && words[1] === 'test-world' ? 'starci gate test-world' : null;
+};
 export const launchVerdict = (program, args, guard = null) => {
   if (program === 'orca') {
     const words = args.filter((a) => !/^-/.test(a));
@@ -37,8 +43,9 @@ export const launchVerdict = (program, args, guard = null) => {
       remedy: 'inspect with `starci machine worktrees counts`; worktrees are created and removed only by the runtime worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree, scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree); report a need you cannot meet as blocked environment' };
     return null;
   }
-  if (program === 'node' && /^uat\./.test(String(guard?.op ?? '')) && args.some((a) => TEST_WORLD_RUNNER.test(a))) return { code: 'UAT_TEST_WORLD', command: [program, ...args].join(' ').slice(0, 200),
-    reason: `${guard.op} walks the app's real dev stack: a test world (test-world-run.mjs) fakes what the walk must prove`,
+  const testWorld = /^uat\./.test(String(guard?.op ?? '')) ? testWorldOf(program, args) : null;
+  if (testWorld) return { code: 'UAT_TEST_WORLD', command: [program, ...args].join(' ').slice(0, 200),
+    reason: `${guard.op} walks the app's real dev stack: a test world (${testWorld}) fakes what the walk must prove`,
     remedy: 'bring up the dev stack the app-root .starcistacks/<env> declares with its own start commands, check it with env-health, and walk it; a stack that will not come up is reported blocked environment' };
   let how = null;
   if (program === 'codex') {
